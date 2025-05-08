@@ -110,7 +110,6 @@ app.*.symbols
 *.env
 
 # Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-android/app/.cxx
+**/android/app/debug
+**/android/app/profile
+**/android/app/release
