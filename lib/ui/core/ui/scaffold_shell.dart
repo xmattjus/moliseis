@@ -1,0 +1,80 @@
+// Stateful nested navigation based on:
+// https://github.com/flutter/packages/blob/main/packages/go_router/example/lib/stateful_shell_route.dart
+
+import 'package:flutter/material.dart' hide kBottomNavigationBarHeight;
+import 'package:go_router/go_router.dart';
+import 'package:moliseis/utils/constants.dart';
+
+class ScaffoldShell extends StatelessWidget {
+  final StatefulNavigationShell _navigationShell;
+
+  const ScaffoldShell({
+    Key? key,
+    required StatefulNavigationShell navigationShell,
+  }) : _navigationShell = navigationShell,
+       super(key: key ?? const ValueKey('ScaffoldShell'));
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _navigationShell,
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _navigationShell.currentIndex,
+        destinations: _buildDestinations(),
+        onDestinationSelected: (index) => _onDestinationSelected(index),
+        height: kNavigationBarHeight,
+      ),
+      resizeToAvoidBottomInset: false,
+      extendBody: true,
+    );
+  }
+
+  List<NavigationDestination> _buildDestinations() {
+    return List.generate(4, (index) {
+      final icon = switch (index) {
+        0 => Icon(
+          _navigationShell.currentIndex == index
+              ? Icons.home
+              : Icons.home_outlined,
+        ),
+        1 => Icon(
+          _navigationShell.currentIndex == index
+              ? Icons.favorite
+              : Icons.favorite_outline,
+        ),
+        2 => Icon(
+          _navigationShell.currentIndex == index
+              ? Icons.photo
+              : Icons.photo_outlined,
+        ),
+        3 => Icon(
+          _navigationShell.currentIndex == index
+              ? Icons.explore
+              : Icons.explore_outlined,
+        ),
+        int() =>
+          throw RangeError('$index out of range, expected range >= 0 && <= 3'),
+      };
+      final label = switch (index) {
+        0 => 'Esplora',
+        1 => 'Preferiti',
+        2 => 'Galleria',
+        3 => 'Mappa',
+        int() =>
+          throw RangeError('$index out of range, expected range >= 0 && <= 3'),
+      };
+      return NavigationDestination(icon: icon, label: label);
+    }, growable: false);
+  }
+
+  void _onDestinationSelected(int index) {
+    _navigationShell.goBranch(
+      index,
+      // A common pattern when using bottom navigation bars is to support
+      // navigating to the initial location when tapping the item that is
+      // already active. This example demonstrates how to support this behavior,
+      // using the initialLocation parameter of goBranch.
+      initialLocation: index == _navigationShell.currentIndex,
+    );
+  }
+}

@@ -1,0 +1,150 @@
+name: moliseis
+description: "A new Flutter project."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.3.0+4
+
+environment:
+  sdk: ^3.7.0
+
+dependencies:
+  # A
+  #animations: ^2.0.11
+  # B
+  # C
+  cached_network_image: ^3.4.1
+  cupertino_icons: ^1.0.8
+  # D
+  device_info_plus: ^11.3.3
+  #dynamic_color: ^1.7.0
+  # E
+  envied: ^1.1.1
+  # F
+  flutter:
+    sdk: flutter
+  flutter_cache_manager: ^3.4.1
+  flutter_launcher_icons: ^0.14.3
+  flutter_map: ^8.1.1 # ^7.0.2
+  # G
+  # get_it: ^8.0.3
+  go_router: '>=12.1.3 <13.0.0' # ^14.8.1
+  # H
+  # I
+  # J
+  json_annotation: ^4.9.0
+  # K
+  # L
+  latlong2: ^0.9.1
+  logging: ^1.3.0
+  # M
+  meta: ^1.16.0
+  # N
+  # O
+  objectbox: ^4.1.0
+  objectbox_flutter_libs: ^4.1.0
+  # P
+  path: ^1.9.0
+  path_provider: ^2.1.5
+  provider: ^6.1.3
+  # Q
+  # R
+  responsive_framework: ^1.5.1
+  # result_dart: ^2.0.0
+  # S
+  sentry: ^8.14.1
+  sentry_flutter: ^8.14.1
+  sentry_logging: ^8.14.1
+  share_plus: ^10.1.4
+  skeletonizer: ^1.4.3
+  supabase: ^2.6.3
+  supabase_flutter: ^2.8.4
+  swipe_image_gallery: ^0.10.1
+  # T
+  # U
+  url_launcher: ^6.3.1
+  # V
+  # W
+  # X
+  # Y
+  # Z
+
+dev_dependencies:
+  # A
+  # B
+  build_runner: ^2.4.14
+  # C
+  # D
+  # E
+  envied_generator: ^1.1.1
+  # F
+  #flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+  # G
+  # H
+  # I
+  # J
+  json_serializable: ^6.9.0
+  # K
+  # L
+  lint: ^2.8.0
+  # M
+  # N
+  # O
+  objectbox_generator: ^4.1.0
+  # P
+  # Q
+  # R
+  # S
+  # T
+  # U
+  # V
+  # W
+  # X
+  # Y
+  # Z
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+
+  assets:
+    - assets/icon/
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/to/resolution-aware-images
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/to/asset-from-package
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces-VariableFont.ttf
+        #- asset: assets/fonts/Fraunces-Italic-VariableFont.ttf
+        #  style: italic
+    - family: Lexend
+      fonts:
+        - asset: assets/fonts/Lexend-VariableFont.ttf
+
+objectbox:
+  # Writes objectbox-model.json and objectbox.g.dart to lib/generated (and test/generated).
+  output_dir: generated
+  # Or optionally specify the lib and test output folder separately.
+  # output_dir:
+  #   lib: custom
+  #   test: other

@@ -1,0 +1,10 @@
+include: package:lint/strict.yaml
+
+analyzer:
+  exclude:
+    - '**.g.dart'
+
+linter:
+  rules:
+    - discarded_futures: false
+    - unawaited_futures: false

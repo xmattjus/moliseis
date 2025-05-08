@@ -1,0 +1,1 @@
+enum CustomAppBarType { standard, hidden }
