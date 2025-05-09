@@ -6,12 +6,13 @@ import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/cards/attraction_card_title_subtitle.dart';
 import 'package:moliseis/ui/core/ui/cards/base_attraction_card.dart';
-import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
+import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/future_built.dart';
 import 'package:moliseis/ui/core/ui/skeletons/card_skeleton_carousel_item.dart';
+import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 
 class ExploreScreenCarouselView extends StatelessWidget {
   const ExploreScreenCarouselView({
@@ -23,22 +24,19 @@ class ExploreScreenCarouselView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const sectionTextTopPadding = 0.0; // 16.0;
     const sectionTextBottomPadding = 8.0;
 
     final sectionTextStyle = CustomTextStyles.section(context);
 
-    /// The height the widget will have.
     final height =
-        MediaQuery.sizeOf(context).height * 0.45 -
-        (sectionTextTopPadding +
-            sectionTextBottomPadding +
-            (sectionTextStyle?.height ?? 16.0));
+        (MediaQuery.sizeOf(context).height * 0.45) -
+        sectionTextBottomPadding +
+        (sectionTextStyle?.height ?? 16.0);
 
-    /// The maximum extent a CarouselView child will have in the main axis.
-    /// This is necessary to correctly size the image of each child.
-    ///
-    /// See the CarouselView's 'flexWeights' property for more info.
+    // The maximum extent a CarouselView child will have in the main axis.
+    // Necessary to correctly size the image of each child and prevent rebuilds.
+    //
+    // See the CarouselView's 'flexWeights' property for more info.
     final maxWidthExtent = (6 / (1 + 6 + 1)) * MediaQuery.sizeOf(context).width;
 
     return SliverList.list(
@@ -46,7 +44,7 @@ class ExploreScreenCarouselView extends StatelessWidget {
         Padding(
           padding: const EdgeInsetsDirectional.fromSTEB(
             16.0,
-            sectionTextTopPadding,
+            0,
             16.0,
             sectionTextBottomPadding,
           ),
@@ -55,20 +53,17 @@ class ExploreScreenCarouselView extends StatelessWidget {
             labelTextStyle: CustomTextStyles.section(context),
           ),
         ),
-        FutureBuilt<List<int>>(
-          attractionsIdsFuture,
-          onLoading: () {
-            return SizedBox(
-              height: height,
-              child: const Center(
-                child: CustomCircularProgressIndicator.withDelay(),
-              ),
-            );
-          },
-          onSuccess: (data) {
-            return SizedBox(
-              height: height,
-              child: Padding(
+        SizedBox(
+          height: height,
+          child: FutureBuilt<List<int>>(
+            attractionsIdsFuture,
+            onLoading: () {
+              return const EmptyView.loading(
+                text: Text('Caricamento in corso...'),
+              );
+            },
+            onSuccess: (data) {
+              return Padding(
                 padding: const EdgeInsetsDirectional.only(
                   start: 8.0,
                   end: 16.0,
@@ -77,12 +72,7 @@ class ExploreScreenCarouselView extends StatelessWidget {
                   padding: const EdgeInsets.only(left: 8.0),
                   elevation: 0,
                   itemSnapping: true,
-                  onTap: (value) {
-                    GoRouter.of(context).goNamed(
-                      RouteNames.exploreStory,
-                      pathParameters: {'id': data[value].toString()},
-                    );
-                  },
+                  enableSplash: false,
                   flexWeights: const [6, 3, 2],
                   children: UnmodifiableListView<_CarouselViewItem>(
                     data.map<_CarouselViewItem>(
@@ -94,17 +84,14 @@ class ExploreScreenCarouselView extends StatelessWidget {
                     ),
                   ),
                 ),
-              ),
-            );
-          },
-          onError: (error) {
-            return SizedBox(
-              height: height,
-              child: const EmptyView.error(
+              );
+            },
+            onError: (error) {
+              return const EmptyView.error(
                 text: Text('Si è verificato un errore durante il caricamento.'),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ],
     );
@@ -133,32 +120,51 @@ class _CarouselViewItem extends StatelessWidget {
             DecoratedBox(
               decoration: BoxDecoration(color: Colors.black.withAlpha(40)),
               position: DecorationPosition.foreground,
-              child: CustomImage(
-                image,
-                width: width,
-                height: height,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Positioned(
-              left: 16.0,
-              bottom: 16.0,
-              right: 16.0,
-              child: LayoutBuilder(
-                builder: (_, constraints) {
-                  final show = constraints.maxWidth > 90;
-                  return AnimatedOpacity(
-                    opacity: show ? 1 : 0,
-                    duration: show ? Durations.medium4 : Duration.zero,
-                    curve: Easing.standardDecelerate,
-                    child: AttractionCardTitleSubtitle(
-                      attraction.name,
-                      place.name,
-                      color: Colors.white,
-                    ),
+              child: CardBase(
+                child: CustomImage(
+                  image,
+                  width: width,
+                  height: height,
+                  fit: BoxFit.cover,
+                ),
+                onPressed: () {
+                  GoRouter.of(context).goNamed(
+                    RouteNames.exploreStory,
+                    pathParameters: {'id': attraction.id.toString()},
                   );
                 },
               ),
+            ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final show = constraints.maxWidth > 90;
+                return AnimatedOpacity(
+                  opacity: show ? 1 : 0,
+                  duration: show ? Durations.medium4 : Duration.zero,
+                  curve: Easing.standardDecelerate,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: FavouriteButton(
+                          color: Colors.white70,
+                          id: attraction.id,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: AttractionCardTitleSubtitle(
+                          attraction.name,
+                          place.name,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         );
