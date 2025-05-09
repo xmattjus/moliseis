@@ -29,71 +29,20 @@ class StoryRepositoryLocal implements StoryRepository {
   final _logger = Logger('StoryRepositoryLocal');
 
   @override
-  Future<Result<void>> synchronize() async {
-    _logger.info(LogEvents.repositoryUpdate);
-
-    try {
-      final client = _supabase.client;
-
-      final stories = await client.from(_supabaseTable.tableName).select();
-
-      final remote = Set<Story>.unmodifiable(
-        stories.map((element) => Story.fromJson(element)),
-      );
-
-      var local = Set<Story>.unmodifiable(_storyBox.getAll());
-
-      final storiesToPut = remote.difference(local);
-
-      if (storiesToPut.isNotEmpty) {
-        for (final story in storiesToPut) {
-          if (_attractionBox.contains(story.backlinkId)) {
-            if (!_storyBox.contains(story.id)) {
-              story.attraction.targetId = story.backlinkId;
-
-              _storyBox.put(story);
-            } else {
-              final old = _storyBox.get(story.id);
-
-              if (old!.modifiedAt.toUtc() != story.modifiedAt) {
-                // TODO: implement Story.copyWith().
-                final copy = story;
-
-                _storyBox.put(copy);
-              }
-            }
-          } else {
-            _storyBox.remove(story.id);
-          }
-        }
-      }
-
-      local = Set<Story>.unmodifiable(await _storyBox.getAllAsync());
-
-      final danglingStories = local.difference(remote);
-
-      final danglingIds = danglingStories.map((e) => e.id).toList();
-
-      _storyBox.removeMany(danglingIds);
-
-      return const Result.success(null);
-    } on Exception catch (error) {
-      _logger.severe(LogEvents.repositoryUpdateError(error));
-      return Result.error(error);
-    }
-  }
-
-  @override
   Future<Result<List<Story>>> get allStories => throw UnimplementedError();
 
   @override
   Future<Result<List<Story>>> getStoriesFromAttractionId(int id) async {
     if (!_isInitialized) {
       try {
+        _logger.info(LogEvents.repositoryUpdate);
+
         await _initialize();
         _isInitialized = true;
-      } on Exception catch (e) {
-        return Result.error(e);
+      } on Exception catch (error) {
+        _logger.severe(LogEvents.repositoryUpdateError(error));
+
+        return Result.error(error);
       }
     }
 
@@ -133,8 +82,16 @@ class StoryRepositoryLocal implements StoryRepository {
             final old = await _storyBox.getAsync(story.id);
 
             if (old!.modifiedAt.toUtc() != story.modifiedAt) {
-              // TODO: implement Story.copyWith().
-              final copy = story;
+              final copy = old.copyWith(
+                title: story.title,
+                author: story.author,
+                shortDescription: story.shortDescription,
+                sources: story.sources,
+                backlinkId: story.backlinkId,
+                createdAt: story.createdAt,
+                modifiedAt: story.modifiedAt,
+                attraction: story.attraction,
+              );
 
               _storyBox.putAsync(copy);
             }
