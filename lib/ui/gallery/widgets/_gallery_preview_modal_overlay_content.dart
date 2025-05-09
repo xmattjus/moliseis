@@ -37,14 +37,13 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
           ),
         ),
         right: LinkTextButton(
-          attractionId,
           onPressed: () {
             GoRouter.of(context).pop();
             GoRouter.of(context).goNamed(
               RouteNames.exploreStory,
               pathParameters: {'id': attractionId.toString()},
             );
-          },
+          }, label: const Text('Apri dettagli'),
         ),
       );
     }

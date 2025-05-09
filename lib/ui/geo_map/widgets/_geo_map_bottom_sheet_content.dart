@@ -193,13 +193,12 @@ class _GoeMapBottomSheetContent extends StatelessWidget {
             Align(
               alignment: Alignment.centerRight,
               child: LinkTextButton(
-                attraction.id,
                 onPressed: () {
                   GoRouter.of(context).goNamed(
                     RouteNames.exploreStory,
                     pathParameters: {'id': attraction.id.toString()},
                   );
-                },
+                }, label: const Text('Apri dettagli'),
               ),
             ),
             Pad(
