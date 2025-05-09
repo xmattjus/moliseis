@@ -23,7 +23,6 @@ Marker generateMapMarker(Attraction attraction, {void Function()? onPressed}) {
 class _GeoMapMarkerIcon extends StatelessWidget {
   const _GeoMapMarkerIcon(
     this.icon, {
-    // super.key,
     required this.size,
     this.onPressed,
     this.tooltip,

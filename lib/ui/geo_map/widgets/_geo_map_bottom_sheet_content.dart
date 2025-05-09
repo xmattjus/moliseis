@@ -2,7 +2,6 @@ part of 'geo_map_bottom_sheet.dart';
 
 class _GoeMapBottomSheetContent extends StatelessWidget {
   const _GoeMapBottomSheetContent({
-    // super.key,
     required this.attractionId,
     required this.currentMapCenter,
     required this.onNearAttractionTap,

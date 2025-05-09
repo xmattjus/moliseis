@@ -15,7 +15,7 @@ class CategoryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
-      onPressed: () => onPressed.call(),
+      onPressed: onPressed,
       style: const ButtonStyle().byAttractionType(
         type,
         primary: Theme.of(context).colorScheme.primary,
