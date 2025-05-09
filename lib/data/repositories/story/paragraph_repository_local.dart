@@ -32,10 +32,14 @@ class ParagraphRepositoryLocal implements ParagraphRepository {
   Future<Result<List<Paragraph>>> getParagraphsFromStoryId(int id) async {
     if (!_isInitialized) {
       try {
-        await _synchronize();
+        _logger.info(LogEvents.repositoryUpdate);
+
+        await _initialize();
         _isInitialized = true;
-      } on Exception catch (e) {
-        return Result.error(e);
+      } on Exception catch (error) {
+        _logger.severe(LogEvents.repositoryUpdateError(error));
+
+        return Result.error(error);
       }
     }
 
@@ -47,7 +51,7 @@ class ParagraphRepositoryLocal implements ParagraphRepository {
     return Result.success(filter);
   }
 
-  Future<void> _synchronize() async {
+  Future<void> _initialize() async {
     final client = _supabase.client;
 
     final paragraphs = await client.from(_supabaseTable.tableName).select();
@@ -71,8 +75,15 @@ class ParagraphRepositoryLocal implements ParagraphRepository {
             final old = _paragraphBox.get(paragraph.id);
 
             if (old!.modifiedAt.toUtc() != paragraph.modifiedAt) {
-              // TODO: implement Paragraph.copyWith().
-              final copy = paragraph;
+              final copy = old.copyWith(
+                heading: paragraph.heading,
+                subheading: paragraph.subheading,
+                body: paragraph.body,
+                backlinkId: paragraph.backlinkId,
+                createdAt: paragraph.createdAt,
+                modifiedAt: paragraph.modifiedAt,
+                story: paragraph.story,
+              );
 
               _paragraphBox.put(copy);
             }
@@ -90,62 +101,5 @@ class ParagraphRepositoryLocal implements ParagraphRepository {
     final danglingIds = danglingParagraphs.map((e) => e.id).toList();
 
     _paragraphBox.removeMany(danglingIds);
-  }
-
-  @override
-  Future<Result<void>> synchronize() async {
-    _logger.info(LogEvents.repositoryUpdate);
-
-    try {
-      final client = _supabase.client;
-
-      final paragraphs = await client.from(_supabaseTable.tableName).select();
-
-      final remote = Set<Paragraph>.unmodifiable(
-        paragraphs.map((e) => Paragraph.fromJson(e)),
-      );
-
-      var local = Set<Paragraph>.unmodifiable(
-        await _paragraphBox.getAllAsync(),
-      );
-
-      final paragraphsToPut = remote.difference(local);
-
-      if (paragraphsToPut.isNotEmpty) {
-        for (final Paragraph paragraph in paragraphsToPut) {
-          if (_storyBox.contains(paragraph.backlinkId)) {
-            if (!_paragraphBox.contains(paragraph.id)) {
-              paragraph.story.targetId = paragraph.backlinkId;
-
-              _paragraphBox.putAsync(paragraph);
-            } else {
-              final old = await _paragraphBox.getAsync(paragraph.id);
-
-              if (old!.modifiedAt.toUtc() != paragraph.modifiedAt) {
-                // TODO: implement Paragraph.copyWith().
-                final copy = paragraph;
-
-                _paragraphBox.putAsync(copy);
-              }
-            }
-          } else {
-            _paragraphBox.removeAsync(paragraph.id);
-          }
-        }
-      }
-
-      local = Set<Paragraph>.unmodifiable(await _paragraphBox.getAllAsync());
-
-      final danglingParagraphs = local.difference(remote);
-
-      final danglingIds = danglingParagraphs.map((e) => e.id).toList();
-
-      _paragraphBox.removeManyAsync(danglingIds);
-
-      return const Result.success(null);
-    } on Exception catch (error) {
-      _logger.severe(LogEvents.repositoryUpdateError(error));
-      return Result.error(error);
-    }
   }
 }
