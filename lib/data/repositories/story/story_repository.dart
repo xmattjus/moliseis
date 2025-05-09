@@ -7,6 +7,4 @@ abstract class StoryRepository {
   /// Returns a future containing the list of all [Story]s from a given
   /// [Attraction] id.
   Future<Result<List<Story>>> getStoriesFromAttractionId(int id);
-
-  Future<Result<void>> synchronize();
 }
