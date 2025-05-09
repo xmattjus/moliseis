@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
-import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 
@@ -29,13 +28,25 @@ class FavouriteScreen extends StatelessWidget {
                 if (viewModel.load.running) {
                   return const SliverFillRemaining(
                     hasScrollBody: false,
-                    child: Center(child: CustomCircularProgressIndicator()),
+                    child: EmptyView.loading(
+                      text: Text('Caricamento in corso...'),
+                    ),
                   );
                 }
 
                 if (viewModel.load.error) {
-                  // TODO(xmattjus): manage error.
-                  return SizedBox();
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: EmptyView(
+                      text: const Text(
+                        'Si è verificato un errore durante il caricamento.',
+                      ),
+                      action: TextButton(
+                        onPressed: () => viewModel.load.execute(),
+                        child: const Text('Riprova'),
+                      ),
+                    ),
+                  );
                 }
 
                 if (viewModel.favourites.isEmpty) {
