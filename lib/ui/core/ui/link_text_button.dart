@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 // TODO: Add Widget 'child' (to be used as label.).
 class LinkTextButton extends StatelessWidget {
-  final int? id;
-  final void Function()? onPressed;
-
   /// Creates a [TextButton.icon] with the appropriate styling to be used as a
   /// link to an Attraction Post screen.
   const LinkTextButton(this.id, {super.key, this.onPressed});
+
+  final int? id;
+  final void Function()? onPressed;
 
   @override
   Widget build(BuildContext context) {

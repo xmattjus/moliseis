@@ -28,6 +28,16 @@ import 'package:provider/provider.dart';
 part '_geo_map_bottom_sheet_content.dart';
 
 class GeoMapBottomSheet extends StatefulWidget {
+  const GeoMapBottomSheet({
+    super.key,
+    required this.attractionId,
+    required this.controller,
+    required this.currentCenter,
+    required this.onNearAttractionTap,
+    required this.onCloseButtonTap,
+    required this.onVerticalDragUpdate,
+  });
+
   /// The [Attraction] Id.
   final int attractionId;
 
@@ -48,16 +58,6 @@ class GeoMapBottomSheet extends StatefulWidget {
   final void Function(int attractiondId) onNearAttractionTap;
 
   final void Function(double size) onVerticalDragUpdate;
-
-  const GeoMapBottomSheet({
-    super.key,
-    required this.attractionId,
-    required this.controller,
-    required this.currentCenter,
-    required this.onNearAttractionTap,
-    required this.onCloseButtonTap,
-    required this.onVerticalDragUpdate,
-  });
 
   @override
   State<GeoMapBottomSheet> createState() => _GeoMapBottomSheetState();

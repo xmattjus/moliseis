@@ -2,16 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/themes/button_style.dart';
 
 class UrlTextButton extends StatelessWidget {
-  final void Function()? onPressed;
-
-  final Widget? icon;
-
-  final double? iconSize;
-
-  final Widget label;
-
-  final Color? color;
-
   /// Creates a Material [TextButton] with a fixed style appropriate for
   /// launching URLs external to the app.
   const UrlTextButton({
@@ -32,6 +22,12 @@ class UrlTextButton extends StatelessWidget {
     required this.label,
     this.color,
   });
+
+  final void Function()? onPressed;
+  final Widget? icon;
+  final double? iconSize;
+  final Widget label;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {

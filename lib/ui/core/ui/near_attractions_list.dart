@@ -11,21 +11,20 @@ import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
 
 class NearAttractionsList extends StatefulWidget {
-  /// The list of coordinates to search near [Attraction]s from.
-  final List<double> coordinates;
-
-  /// Whether to show the first [Attraction] of the list or not.
-  final bool hideFirstItem;
-
-  ///
-  final void Function(int id) onPressed;
-
   const NearAttractionsList({
     super.key,
     required this.coordinates,
     this.hideFirstItem = false,
     required this.onPressed,
   });
+
+  /// The list of coordinates to search near [Attraction]s from.
+  final List<double> coordinates;
+
+  /// Whether to show the first [Attraction] of the list or not.
+  final bool hideFirstItem;
+
+  final void Function(int id) onPressed;
 
   @override
   State<NearAttractionsList> createState() => _NearAttractionsListState();

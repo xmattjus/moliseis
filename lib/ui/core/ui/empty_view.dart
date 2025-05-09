@@ -2,26 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 
 class EmptyView extends StatelessWidget {
-  final Widget? action;
-  final Widget? icon;
-  final Widget? text;
-
-  const EmptyView({super.key, this.action, this.icon, required this.text});
+  const EmptyView({super.key, this.icon, required this.text, this.action});
 
   const EmptyView.error({super.key, required this.text})
-    : action = null,
-      icon = const Icon(Icons.cancel_outlined, color: Colors.redAccent);
+    : icon = const Icon(Icons.cancel_outlined, color: Colors.redAccent),
+      action = null;
 
   const EmptyView.loading({super.key, required this.text})
-    : action = null,
-      icon = const CustomCircularProgressIndicator();
+    : icon = const CustomCircularProgressIndicator(),
+      action = null;
+
+  final Widget? icon;
+  final Widget? text;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+        children: <Widget>[
           if (icon != null)
             Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(

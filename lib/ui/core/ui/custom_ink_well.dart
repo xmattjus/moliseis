@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
 class CustomInkWell extends StatelessWidget {
+  /// Creates an ink well respecting the Material3 design guidelines.
+  ///
+  /// Must have an ancestor Material widget in which to cause ink reactions.
+  const CustomInkWell({super.key, required this.onPressed, this.shape});
+
   final void Function() onPressed;
 
   /// The shape of the [InkWell].
@@ -10,11 +15,6 @@ class CustomInkWell extends StatelessWidget {
   /// If this property is null then the shape will be a [RoundedRectangleBorder]
   /// with a circular corner radius of 12.0.
   final ShapeBorder? shape;
-
-  /// Creates an ink well respecting the Material3 design guidelines.
-  ///
-  /// Must have an ancestor Material widget in which to cause ink reactions.
-  const CustomInkWell({super.key, required this.onPressed, this.shape});
 
   @override
   Widget build(BuildContext context) {

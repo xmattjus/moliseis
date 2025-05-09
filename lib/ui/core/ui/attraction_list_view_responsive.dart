@@ -9,16 +9,16 @@ import 'package:moliseis/utils/constants.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
 class AttractionListViewResponsive extends StatelessWidget {
+  /// Creates a list/grid view of attractions based on the device form factor.
+  const AttractionListViewResponsive(
+      this.future, {
+        super.key,
+        required this.onPressed,
+      });
+
   final Future<List<int>> future;
 
   final void Function(int id) onPressed;
-
-  /// Creates a list/grid view of attractions based on the device form factor.
-  const AttractionListViewResponsive(
-    this.future, {
-    super.key,
-    required this.onPressed,
-  });
 
   @override
   Widget build(BuildContext context) {

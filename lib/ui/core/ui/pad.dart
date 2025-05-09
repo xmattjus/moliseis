@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 
 // TODO(xmattjus): phase out Pad, use Padding.
 class Pad extends StatelessWidget {
+  /// Creates a widget that insets its child.
+  const Pad({
+    super.key,
+    this.s,
+    this.t,
+    this.e,
+    this.b,
+    this.h,
+    this.v,
+    required this.child,
+  });
+
   /// Start.
   final double? s;
 
@@ -21,18 +33,6 @@ class Pad extends StatelessWidget {
   final double? v;
 
   final Widget child;
-
-  /// Creates a widget that insets its child.
-  const Pad({
-    super.key,
-    this.s,
-    this.t,
-    this.e,
-    this.b,
-    this.h,
-    this.v,
-    required this.child,
-  });
 
   @override
   Widget build(BuildContext context) {

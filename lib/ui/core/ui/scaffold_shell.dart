@@ -6,13 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'package:moliseis/utils/constants.dart';
 
 class ScaffoldShell extends StatelessWidget {
-  final StatefulNavigationShell _navigationShell;
-
   const ScaffoldShell({
     Key? key,
     required StatefulNavigationShell navigationShell,
   }) : _navigationShell = navigationShell,
        super(key: key ?? const ValueKey('ScaffoldShell'));
+
+  final StatefulNavigationShell _navigationShell;
 
   @override
   Widget build(BuildContext context) {

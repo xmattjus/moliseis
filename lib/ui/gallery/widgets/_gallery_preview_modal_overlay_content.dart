@@ -1,17 +1,7 @@
 part of 'gallery_preview_modal_overlay.dart';
 
 class _GalleryPreviewModalOverlayContent extends StatelessWidget {
-  final String? attractionName;
-  final String? title;
-  final String author;
-  final String license;
-  final String licenseUrl;
-  final String? placeName;
-  final int? attractionId;
-  final void Function()? onSharePressed;
-
   const _GalleryPreviewModalOverlayContent({
-    // super.key,
     this.attractionName = '',
     this.title = '',
     this.author = '',
@@ -21,6 +11,15 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
     this.attractionId,
     this.onSharePressed,
   });
+
+  final String? attractionName;
+  final String? title;
+  final String author;
+  final String license;
+  final String licenseUrl;
+  final String? placeName;
+  final int? attractionId;
+  final void Function()? onSharePressed;
 
   @override
   Widget build(BuildContext context) {

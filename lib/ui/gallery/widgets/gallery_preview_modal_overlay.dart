@@ -21,9 +21,9 @@ import 'package:share_plus/share_plus.dart';
 part '_gallery_preview_modal_overlay_content.dart';
 
 class GalleryPreviewModalOverlay extends StatelessWidget {
-  final MolisImage image;
-
   const GalleryPreviewModalOverlay({super.key, required this.image});
+
+  final MolisImage image;
 
   @override
   Widget build(BuildContext context) {
