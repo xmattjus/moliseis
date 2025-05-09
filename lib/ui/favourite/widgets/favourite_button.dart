@@ -11,6 +11,7 @@ class FavouriteButton extends StatelessWidget {
   /// Defaults to [IconButton].
   const FavouriteButton({
     super.key,
+    this.color,
     required this.id,
     this.type = FavouriteButtonType.small,
   });
@@ -18,8 +19,10 @@ class FavouriteButton extends StatelessWidget {
   /// Creates an actionable [OutlinedButton.icon] to set the saved state of an
   /// attraction.
   const FavouriteButton.wide({super.key, required this.id})
-    : type = FavouriteButtonType.wide;
+    : color = null,
+      type = FavouriteButtonType.wide;
 
+  final Color? color;
   final int id;
   final FavouriteButtonType type;
 
@@ -39,7 +42,7 @@ class FavouriteButton extends StatelessWidget {
             tooltip: 'Salva nei preferiti',
             isSelected: isSaved,
             selectedIcon: const Icon(Icons.favorite, color: Colors.redAccent),
-            icon: const Icon(Icons.favorite_outline_outlined),
+            icon: Icon(Icons.favorite_outline_outlined, color: color),
           );
         } else {
           return OutlinedButton.icon(
