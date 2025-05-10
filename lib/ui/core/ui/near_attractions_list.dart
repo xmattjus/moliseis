@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/attraction/attraction.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/cards/card_attraction_grid_item.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
-import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/future_built.dart';
+import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/explore/view_models/attraction_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
@@ -92,14 +91,11 @@ class _NearAttractionsListState extends State<NearAttractionsList> {
       return const SizedBox();
     }
 
-    final Widget row = Wrap(
+    const Widget row = Wrap(
       alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        CustomRichText(
-          const Text('Nelle vicinanze'),
-          labelTextStyle: CustomTextStyles.section(context),
-        ),
+        TextSectionDivider('Nelle vicinanze'),
         /*
         TextButton.icon(
           onPressed: () async {
@@ -143,8 +139,8 @@ class _NearAttractionsListState extends State<NearAttractionsList> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 8.0),
+        const Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 8.0),
           child: row,
         ),
         SizedBox(

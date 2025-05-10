@@ -7,6 +7,7 @@ import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/future_built.dart';
+import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/gallery/view_models/gallery_view_model.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_screen_image_sliver_grid.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
@@ -56,10 +57,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                         sliver: SliverList.list(
                           children: <Widget>[
                             SizedBox(height: i > 0 ? 16.0 : 0.0),
-                            Text(
-                              attractions[i].name,
-                              style: CustomTextStyles.section(context),
-                            ),
+                            TextSectionDivider(attractions[i].name),
                             if (placeName != null)
                               Padding(
                                 padding: const EdgeInsetsDirectional.only(

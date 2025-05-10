@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/categories/widgets/category_button.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
-import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
+import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/explore/view_models/attraction_view_model.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen_carousel_view.dart';
 import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
@@ -105,18 +104,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ExploreScreenCarouselView(
                 attractionsIdsFuture: _viewModel.suggestedAttractionIds,
               ),
-              SliverPadding(
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                  16.0,
-                  16.0,
-                  16.0,
-                  8.0,
-                ),
+              const SliverPadding(
+                padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 8.0),
                 sliver: SliverToBoxAdapter(
-                  child: CustomRichText(
-                    const Text('Categorie'),
-                    labelTextStyle: CustomTextStyles.section(context),
-                  ),
+                  child: TextSectionDivider('Categorie'),
                 ),
               ),
               SliverPadding(
@@ -158,12 +149,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Text(
-                          'Ultimi aggiunti',
-                          style: CustomTextStyles.section(context),
-                          overflow: TextOverflow.visible,
-                        ),
+                      const Expanded(
+                        child: TextSectionDivider('Ultimi aggiunti'),
                       ),
                       OutlinedButton.icon(
                         onPressed:

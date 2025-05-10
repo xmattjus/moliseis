@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/future_built.dart';
 import 'package:moliseis/ui/core/ui/pad.dart';
+import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
 
@@ -51,15 +51,12 @@ class _SearchResultState extends State<SearchResult> {
           children: [
             CustomScrollView(
               slivers: [
-                SliverToBoxAdapter(
+                const SliverToBoxAdapter(
                   child: Pad(
                     t: kToolbarHeight + 16.0,
                     b: 8.0,
                     h: 16.0,
-                    child: Text(
-                      'Risultati',
-                      style: CustomTextStyles.section(context),
-                    ),
+                    child: TextSectionDivider('Risultati'),
                   ),
                 ),
                 FutureBuilt<List<int>>(

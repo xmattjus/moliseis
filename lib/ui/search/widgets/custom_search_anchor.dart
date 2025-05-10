@@ -1,9 +1,8 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/cards/card_attraction_list_item.dart';
-import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
+import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/utils/debounceable.dart';
 import 'package:provider/provider.dart';
@@ -173,17 +172,14 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (index == 0)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.fromSTEB(
+                      const Padding(
+                        padding: EdgeInsetsDirectional.fromSTEB(
                           16.0,
                           16.0,
                           16.0,
                           8.0,
                         ),
-                        child: CustomRichText(
-                          const Text('Risultati rapidi'),
-                          labelTextStyle: CustomTextStyles.section(context),
-                        ),
+                        child: TextSectionDivider('Risultati rapidi'),
                       ),
                     Padding(
                       padding: EdgeInsetsDirectional.only(
@@ -267,16 +263,14 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
         padding: const EdgeInsetsDirectional.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          // mainAxisSize: MainAxisSize.min,
           spacing: 8.0,
           children: <Widget>[
-            Text('Categorie', style: CustomTextStyles.section(context)),
+            const TextSectionDivider('Categorie'),
             Wrap(
               spacing: 8.0,
               children: _buildChips(texts: _viewModel.typeSuggestions),
             ),
-            if (_lastHistory.isNotEmpty)
-              Text('Recenti', style: CustomTextStyles.section(context)),
+            if (_lastHistory.isNotEmpty) const TextSectionDivider('Recenti'),
             if (_lastHistory.isNotEmpty)
               Expanded(child: Wrap(spacing: 8.0, children: _lastHistory)),
           ],

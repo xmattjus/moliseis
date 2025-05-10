@@ -8,10 +8,10 @@ import 'package:moliseis/ui/core/ui/cards/attraction_card_title_subtitle.dart';
 import 'package:moliseis/ui/core/ui/cards/base_attraction_card.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
-import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/future_built.dart';
 import 'package:moliseis/ui/core/ui/skeletons/card_skeleton_carousel_item.dart';
+import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 
 class ExploreScreenCarouselView extends StatelessWidget {
@@ -40,18 +40,15 @@ class ExploreScreenCarouselView extends StatelessWidget {
     final maxWidthExtent = (6 / (1 + 6 + 1)) * MediaQuery.sizeOf(context).width;
 
     return SliverList.list(
-      children: <Widget>[
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(
+      children: [
+        const Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(
             16.0,
             0,
             16.0,
             sectionTextBottomPadding,
           ),
-          child: CustomRichText(
-            const Text('Suggeriti'),
-            labelTextStyle: CustomTextStyles.section(context),
-          ),
+          child: TextSectionDivider('Suggeriti'),
         ),
         SizedBox(
           height: height,
@@ -137,7 +134,7 @@ class _CarouselViewItem extends StatelessWidget {
             ),
             LayoutBuilder(
               builder: (context, constraints) {
-                final show = constraints.maxWidth > 90;
+                final show = constraints.maxWidth > 100.0;
                 return AnimatedOpacity(
                   opacity: show ? 1 : 0,
                   duration: show ? Durations.medium4 : Duration.zero,
