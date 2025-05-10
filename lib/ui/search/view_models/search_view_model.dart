@@ -1,58 +1,116 @@
 import 'dart:collection' show UnmodifiableListView;
 
+import 'package:flutter/material.dart';
 import 'package:moliseis/data/repositories/attraction/attraction_repository.dart';
 import 'package:moliseis/data/repositories/search/search_repository.dart';
 import 'package:moliseis/domain/models/attraction/attraction.dart';
 import 'package:moliseis/domain/models/attraction/attraction_type.dart';
+import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
-class SearchViewModel {
-  final SearchRepository _searchRepository;
-  final AttractionRepository _attractionRepository;
-
+class SearchViewModel extends ChangeNotifier {
   SearchViewModel({
+    required AttractionRepository attractionRepository,
     required SearchRepository searchRepository,
-    required AttractionRepository attractionService,
   }) : _searchRepository = searchRepository,
-       _attractionRepository = attractionService {
-    _typeSuggestions =
-        AttractionType.values.sublist(1).map((e) {
-          return e.readableName;
-        }).toList();
+       _attractionRepository = attractionRepository {
+    addToHistory = Command1(_addToHistory);
+    addToHistoryByAttractionId = Command1(_addToHistoryByAttractionId);
+    loadHistory = Command0(_loadHistory)..execute();
+    loadResults = Command1(_loadResults);
+    removeFromHistory = Command1(_removeFromHistory);
   }
 
-  List<String> _typeSuggestions = [];
+  final AttractionRepository _attractionRepository;
+  final SearchRepository _searchRepository;
 
+  List<String> _history = [];
+  List<int> _resultIds = [];
+  final List<String> _typeSuggestions =
+      AttractionType.values.sublist(1).map((e) {
+        return e.readableName;
+      }).toList();
+  UnmodifiableListView<String> get history => UnmodifiableListView(_history);
+  UnmodifiableListView<int> get resultIds => UnmodifiableListView(_resultIds);
   UnmodifiableListView<String> get typeSuggestions =>
       UnmodifiableListView(_typeSuggestions);
 
-  void addToHistory(String text) {
-    final lowerCaseTypeSuggest = _typeSuggestions.map((e) => e.toLowerCase());
-    if (!lowerCaseTypeSuggest.contains(text.toLowerCase())) {
-      _searchRepository.addToHistory(text);
+  late Command1<void, String> addToHistory;
+  late Command1<void, int> addToHistoryByAttractionId;
+  late Command0 loadHistory;
+  late Command1<void, String> loadResults;
+  late Command1<void, String> removeFromHistory;
+
+  Future<Result> _addToHistory(String text) async {
+    final historyToLowerCase = _history.map((e) => e.toLowerCase());
+    final lowerCaseText = text.toLowerCase();
+    final typeSuggestions = _typeSuggestions.map((e) => e.toLowerCase());
+
+    // Does not add the text to history since it's equal to one of the type
+    // suggestions or is already present in history.
+    if (typeSuggestions.contains(lowerCaseText) ||
+        historyToLowerCase.contains(lowerCaseText)) {
+      return const Result.success(null);
     }
-  }
 
-  Future<Result<void>> addToHistoryByAttractionId(int id) async {
-    final result = await _attractionRepository.getById(id);
+    _history.add(text);
 
-    switch (result) {
-      case Success<Attraction>():
-        await _searchRepository.addToHistory(result.value.name);
-      case Error<Attraction>():
-        // TODO: Handle this case.
-        throw UnimplementedError();
+    final result = await _searchRepository.addToHistory(text);
+
+    if (result is Error) {
+      _history.remove(text);
     }
 
     return result;
   }
 
-  Future<List<int>> getAttractionIdsByQuery(String query) =>
-      _searchRepository.getAttractionIdsByQuery(query);
+  Future<Result> _addToHistoryByAttractionId(int id) async {
+    final result = await _attractionRepository.getById(id);
 
-  void removeFromHistory(String query) =>
-      _searchRepository.removeFromHistory(query);
+    if (result is Success<Attraction>) {
+      if (!_history.contains(result.value.name)) {
+        _history.add(result.value.name);
 
-  Future<List<String>> get searchHistory => _searchRepository.searchHistory;
+        // Does not wait for any result.
+        _searchRepository.addToHistory(result.value.name);
+      }
+    }
+
+    return result;
+  }
+
+  Future<Result> _loadHistory() async {
+    final result = await _searchRepository.pastSearches;
+
+    switch (result) {
+      case Success<List<String>>():
+        _history = result.value;
+      case Error<List<String>>():
+    }
+
+    return result;
+  }
+
+  Future<Result> _loadResults(String query) async {
+    final result = await _searchRepository.getAttractionIdsByQuery(query);
+
+    if (result is Success<List<int>>) {
+      _resultIds = result.value;
+    }
+
+    return result;
+  }
+
+  Future<Result> _removeFromHistory(String query) async {
+    _history.remove(query);
+
+    final result = await _searchRepository.removeFromHistory(query);
+
+    if (result is Error) {
+      _history.add(query);
+    }
+
+    return const Result.success(null);
+  }
 }

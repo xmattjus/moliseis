@@ -1,9 +1,11 @@
+import 'package:moliseis/utils/result.dart';
+
 abstract class SearchRepository {
-  Future<void> addToHistory(String text);
+  Future<Result> addToHistory(String text);
 
-  Future<List<int>> getAttractionIdsByQuery(String text);
+  Future<Result<List<int>>> getAttractionIdsByQuery(String text);
 
-  Future<void> removeFromHistory(String text);
+  Future<Result<List<String>>> get pastSearches;
 
-  Future<List<String>> get searchHistory;
+  Future<Result> removeFromHistory(String text);
 }

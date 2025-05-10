@@ -72,14 +72,13 @@ final appRouter = GoRouter(
                   name: RouteNames.searchResult,
                   builder: (context, state) {
                     final viewModel = SearchViewModel(
+                      attractionRepository: context.read(),
                       searchRepository: context.read(),
-                      attractionService: context.read(),
                     );
 
                     return SearchResult(
                       viewModel: viewModel,
                       query: state.pathParameters['query'],
-                      refresh: state.uri.queryParameters['refresh'],
                     );
                   },
                 ),

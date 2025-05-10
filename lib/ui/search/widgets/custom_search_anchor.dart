@@ -141,7 +141,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
             viewLeading: BackButton(onPressed: _handleOnBackPressed),
             viewHintText: widget.hintText,
             viewOnSubmitted: (query) {
-              _viewModel.addToHistory(query);
+              _viewModel.addToHistory.execute(query);
 
               _searchController.closeView(query);
 
@@ -149,7 +149,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
             },
             suggestionsBuilder: (context, controller) async {
               if (controller.text.isEmpty) {
-                final history = await _viewModel.searchHistory;
+                final history = _viewModel.history;
 
                 return _lastHistory = _buildChips(
                   texts: history,
@@ -191,7 +191,9 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                             Theme.of(context).colorScheme.surfaceContainerHigh,
                         elevation: 0,
                         onPressed: () {
-                          _viewModel.addToHistoryByAttractionId(options[index]);
+                          _viewModel.addToHistoryByAttractionId.execute(
+                            options[index],
+                          );
 
                           widget.onSuggestionPressed(options[index]);
                         },
@@ -238,13 +240,13 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
           onPressed: () {
             _searchController.text = e;
 
-            _viewModel.addToHistory(e);
+            _viewModel.addToHistory.execute(e);
           },
           deleteIcon: const Icon(Icons.close),
           onDeleted:
               showDeleteIcon
                   ? () async {
-                    _viewModel.removeFromHistory(e);
+                    _viewModel.removeFromHistory.execute(e);
                     _searchController.text = '\u200B';
                     await Future.delayed(Durations.medium1, () {
                       _searchController.text = '';
@@ -295,10 +297,9 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
   Future<Iterable<int>?> _search(String query) async {
     _currentQuery = query;
 
-    // In a real application, there should be some error handling here.
-    final Iterable<int> options = await _viewModel.getAttractionIdsByQuery(
-      _currentQuery!,
-    );
+    await _viewModel.loadResults.execute(query);
+
+    final Iterable<int> options = _viewModel.resultIds;
 
     // If another search happened after this one, throw away these options.
     if (_currentQuery != query) {

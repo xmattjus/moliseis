@@ -3,9 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
-import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/future_built.dart';
 import 'package:moliseis/ui/core/ui/pad.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
@@ -16,12 +14,10 @@ class SearchResult extends StatefulWidget {
     super.key,
     required this.viewModel,
     this.query,
-    this.refresh,
   });
 
   final SearchViewModel viewModel;
   final String? query;
-  final String? refresh;
 
   @override
   State<SearchResult> createState() => _SearchResultState();
@@ -29,6 +25,15 @@ class SearchResult extends StatefulWidget {
 
 class _SearchResultState extends State<SearchResult> {
   final SearchController _controller = SearchController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.query != null) {
+      widget.viewModel.loadResults.execute(widget.query!);
+    }
+  }
 
   @override
   void dispose() {
@@ -40,7 +45,7 @@ class _SearchResultState extends State<SearchResult> {
   Widget build(BuildContext context) {
     final query = widget.query ?? '';
 
-    if (query.isNotEmpty && widget.refresh == null) {
+    if (query.isNotEmpty) {
       _controller.text = query;
     }
 
@@ -59,17 +64,40 @@ class _SearchResultState extends State<SearchResult> {
                     child: TextSectionDivider('Risultati'),
                   ),
                 ),
-                FutureBuilt<List<int>>(
-                  widget.viewModel.getAttractionIdsByQuery(query),
-                  onLoading: () {
-                    return const SliverFillRemaining(
-                      child: Center(
-                        child: CustomCircularProgressIndicator.withDelay(),
-                      ),
-                    );
-                  },
-                  onSuccess: (data) {
-                    if (data.isEmpty || query.isEmpty) {
+                ListenableBuilder(
+                  listenable: widget.viewModel.loadResults,
+                  builder: (context, child) {
+                    if (widget.viewModel.loadResults.running) {
+                      return const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: EmptyView.loading(
+                          text: Text('Caricamento in corso...'),
+                        ),
+                      );
+                    }
+
+                    if (widget.viewModel.loadResults.error) {
+                      return SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: EmptyView(
+                          text: const Text(
+                            'Si è verificato un errore durante il caricamento.',
+                          ),
+                          action: TextButton(
+                            onPressed: () {
+                              if (widget.query != null) {
+                                widget.viewModel.loadResults.execute(
+                                  widget.query!,
+                                );
+                              }
+                            },
+                            child: const Text('Riprova'),
+                          ),
+                        ),
+                      );
+                    }
+
+                    if (widget.viewModel.resultIds.isEmpty || query.isEmpty) {
                       return const SliverFillRemaining(
                         hasScrollBody: false,
                         child: EmptyView(
@@ -80,7 +108,7 @@ class _SearchResultState extends State<SearchResult> {
                     return SliverPadding(
                       padding: const EdgeInsetsDirectional.only(bottom: 16.0),
                       sliver: AttractionListViewResponsive(
-                        Future.sync(() => data),
+                        Future.sync(() => widget.viewModel.resultIds),
                         onPressed: (attractionId) {
                           _controller.closeView(_controller.text);
                           GoRouter.of(context).goNamed(
@@ -90,9 +118,6 @@ class _SearchResultState extends State<SearchResult> {
                         },
                       ),
                     );
-                  },
-                  onError: (error) {
-                    return SliverToBoxAdapter(child: Text('$error'));
                   },
                 ),
               ],
@@ -108,19 +133,11 @@ class _SearchResultState extends State<SearchResult> {
                     icon: const Icon(Icons.arrow_back),
                   ),
                   onSubmitted: (text) {
-                    context.replaceNamed(
-                      RouteNames.searchResult,
-                      pathParameters: {'query': text},
-                      queryParameters: {'refresh': 'true'},
-                    );
+                    widget.viewModel.loadResults.execute(text);
                   },
                   onSuggestionPressed: (attractionId) {
                     _controller.closeView(_controller.text);
-                    context.replaceNamed(
-                      RouteNames.searchResult,
-                      pathParameters: {'query': _controller.text},
-                      queryParameters: {'refresh': 'true'},
-                    );
+                    widget.viewModel.loadResults.execute(_controller.text);
                   },
                 ),
               ),

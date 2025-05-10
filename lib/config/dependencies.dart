@@ -166,11 +166,11 @@ List<SingleChildWidget> get providers {
       },
       lazy: true,
     ),
-    Provider<SearchViewModel>(
+    ChangeNotifierProvider<SearchViewModel>(
       create: (context) {
         return SearchViewModel(
+          attractionRepository: context.read(),
           searchRepository: context.read(),
-          attractionService: context.read(),
         );
       },
       lazy: true,
