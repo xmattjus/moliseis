@@ -10,7 +10,6 @@ import 'package:moliseis/ui/core/ui/button_list.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
-import 'package:moliseis/ui/core/ui/flex_test.dart';
 import 'package:moliseis/ui/core/ui/link_text_button.dart';
 import 'package:moliseis/ui/core/ui/url_text_button.dart';
 import 'package:moliseis/utils/app_url_launcher.dart';

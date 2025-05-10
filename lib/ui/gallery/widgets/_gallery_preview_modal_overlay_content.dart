@@ -26,25 +26,32 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
     Widget? attractionTitleText;
 
     if (attractionName != null && attractionName!.isNotEmpty) {
-      attractionTitleText = FlexTest(
-        left: Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Text(
-            attractionName!,
-            style: Theme.of(context).textTheme.titleMedium,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+      attractionTitleText = Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 3.0),
+              child: Text(
+                attractionName!,
+                style: Theme.of(context).textTheme.titleMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ),
-        ),
-        right: LinkTextButton(
-          onPressed: () {
-            GoRouter.of(context).pop();
-            GoRouter.of(context).goNamed(
-              RouteNames.exploreStory,
-              pathParameters: {'id': attractionId.toString()},
-            );
-          }, label: const Text('Apri dettagli'),
-        ),
+          LinkTextButton(
+            onPressed: () {
+              GoRouter.of(context).pop();
+              GoRouter.of(context).goNamed(
+                RouteNames.exploreStory,
+                pathParameters: {'id': attractionId.toString()},
+              );
+            },
+            label: const Text('Apri dettagli'),
+          ),
+        ],
       );
     }
 

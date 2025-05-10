@@ -5,7 +5,6 @@ import 'package:moliseis/ui/categories/widgets/category_button.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
-import 'package:moliseis/ui/core/ui/flex_test.dart';
 import 'package:moliseis/ui/explore/view_models/attraction_view_model.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen_carousel_view.dart';
 import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
@@ -156,23 +155,29 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   vertical: 8.0,
                 ),
                 sliver: SliverToBoxAdapter(
-                  child: FlexTest(
-                    left: Text(
-                      'Ultimi aggiunti',
-                      style: CustomTextStyles.section(context),
-                    ),
-                    right: OutlinedButton.icon(
-                      onPressed:
-                          () => GoRouter.of(context).goNamed(
-                            RouteNames.exploreCategories,
-                            pathParameters: {'index': '0'},
-                          ),
-                      style: const ButtonStyle(
-                        visualDensity: VisualDensity.compact,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Ultimi aggiunti',
+                          style: CustomTextStyles.section(context),
+                          overflow: TextOverflow.visible,
+                        ),
                       ),
-                      icon: const Icon(Icons.apps),
-                      label: const Text('Mostra tutti'),
-                    ),
+                      OutlinedButton.icon(
+                        onPressed:
+                            () => GoRouter.of(context).goNamed(
+                              RouteNames.exploreCategories,
+                              pathParameters: {'index': '0'},
+                            ),
+                        style: const ButtonStyle(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.apps),
+                        label: const Text('Mostra tutti'),
+                      ),
+                    ],
                   ),
                 ),
               ),

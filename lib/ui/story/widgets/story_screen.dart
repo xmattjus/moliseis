@@ -8,7 +8,6 @@ import 'package:moliseis/ui/core/ui/button_list.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/flex_test.dart';
 import 'package:moliseis/ui/core/ui/near_attractions_list.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/ui/story/view_models/paragraph_view_model.dart';
@@ -129,16 +128,31 @@ class _StoryScreenState extends State<StoryScreen> {
                     padding: const EdgeInsetsDirectional.only(start: 16.0),
                     sliver: SliverList.list(
                       children: <Widget>[
-                        FlexTest(
-                          left: Text(
-                            story.title,
-                            maxLines: 4,
-                            overflow: TextOverflow.ellipsis,
-                            style: CustomTextStyles.title(context),
-                          ),
-                          right: FavouriteButton(
-                            id: int.parse(widget.attractionId!),
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  top: 8.0,
+                                ),
+                                child: Text(
+                                  story.title,
+                                  style: CustomTextStyles.title(context),
+                                  overflow: TextOverflow.visible,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsetsDirectional.only(
+                                start: 8.0,
+                              ),
+                              child: FavouriteButton(
+                                id: int.parse(widget.attractionId!),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4.0),
                         CustomRichText(

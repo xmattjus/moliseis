@@ -87,31 +87,40 @@ class _GoeMapBottomSheetContent extends StatelessWidget {
 
         return SliverList.list(
           children: [
-            FlexTest(
-              left: Pad(
-                h: 16.0,
-                v: 8.0,
-                child: Text(
-                  'Esplora ${attraction.name}',
-                  style: CustomTextStyles.title(context),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 4,
-                ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                16.0,
+                8.0,
+                8.0,
+                8.0,
               ),
-              right: Pad(
-                e: 8.0,
-                child: IconButton.filledTonal(
-                  iconSize: 16.0,
-                  visualDensity: VisualDensity.compact,
-                  style: ButtonStyle(
-                    backgroundColor: WidgetStatePropertyAll(
-                      Theme.of(context).colorScheme.surfaceContainerHigh,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Esplora ${attraction.name}',
+                      style: CustomTextStyles.title(context),
+                      overflow: TextOverflow.visible,
                     ),
                   ),
-                  onPressed: () => onCloseButtonTap(),
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Chiudi',
-                ),
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 8.0),
+                    child: IconButton.filledTonal(
+                      iconSize: 16.0,
+                      visualDensity: VisualDensity.compact,
+                      style: ButtonStyle(
+                        backgroundColor: WidgetStatePropertyAll(
+                          Theme.of(context).colorScheme.surfaceContainerHigh,
+                        ),
+                      ),
+                      onPressed: () => onCloseButtonTap(),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Chiudi',
+                    ),
+                  ),
+                ],
               ),
             ),
             Pad(
@@ -198,7 +207,8 @@ class _GoeMapBottomSheetContent extends StatelessWidget {
                     RouteNames.exploreStory,
                     pathParameters: {'id': attraction.id.toString()},
                   );
-                }, label: const Text('Apri dettagli'),
+                },
+                label: const Text('Apri dettagli'),
               ),
             ),
             Pad(
