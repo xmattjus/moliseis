@@ -68,8 +68,8 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
     );
 
     _circularProgColorAnimation = ColorTween(
-      begin: Colors.deepPurpleAccent,
-      end: Colors.deepOrangeAccent,
+      begin: const Color.fromARGB(255, 239, 64, 64),
+      end: const Color.fromARGB(255, 194, 18, 146),
     ).animate(_animationController);
   }
 
