@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/attraction/attraction.dart';
 import 'package:moliseis/domain/models/attraction/attraction_sort.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
+import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
@@ -33,6 +34,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     return Selector<SettingsViewModel, AttractionSort>(
       builder: (_, sortBy, _) {
         return Scaffold(
+          appBar: const CustomAppBar.hidden(),
           body: SafeArea(
             child: NestedScrollView(
               body: FutureBuilt(
