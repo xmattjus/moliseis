@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
+import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/pad.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
@@ -124,9 +125,9 @@ class _SearchResultState extends State<SearchResult> {
                 color: Theme.of(context).colorScheme.surface,
                 child: CustomSearchAnchor(
                   controller: _controller,
-                  leading: IconButton(
-                    onPressed: () => GoRouter.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back),
+                  leading: const CustomBackButton(
+                    padding: EdgeInsetsDirectional.zero,
+                    backgroundColor: Colors.transparent,
                   ),
                   onSubmitted: (text) {
                     widget.viewModel.loadResults.execute(text);
