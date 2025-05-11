@@ -143,11 +143,14 @@ class _CarouselViewItem extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: FavouriteButton(
-                          color: Colors.white70,
-                          id: attraction.id,
+                      Padding(
+                        padding: const EdgeInsetsDirectional.all(8.0),
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: FavouriteButton(
+                            color: Colors.white70,
+                            id: attraction.id,
+                          ),
                         ),
                       ),
                       Padding(

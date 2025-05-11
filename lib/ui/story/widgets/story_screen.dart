@@ -133,20 +133,15 @@ class _StoryScreenState extends State<StoryScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: Padding(
-                                padding: const EdgeInsetsDirectional.only(
-                                  top: 8.0,
-                                ),
-                                child: Text(
-                                  story.title,
-                                  style: CustomTextStyles.title(context),
-                                  overflow: TextOverflow.visible,
-                                ),
+                              child: Text(
+                                story.title,
+                                style: CustomTextStyles.title(context),
+                                overflow: TextOverflow.visible,
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsetsDirectional.only(
-                                start: 8.0,
+                              padding: const EdgeInsetsDirectional.symmetric(
+                                horizontal: 8.0,
                               ),
                               child: FavouriteButton(
                                 id: int.parse(widget.attractionId!),

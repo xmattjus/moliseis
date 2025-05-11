@@ -33,16 +33,35 @@ class FavouriteButton extends StatelessWidget {
         final isSaved = viewModel.favourites.contains(id);
 
         if (type == FavouriteButtonType.small) {
-          return IconButton(
-            onPressed: () {
-              isSaved
-                  ? viewModel.deleteFavourite.execute(id)
-                  : viewModel.addFavourite.execute(id);
-            },
-            tooltip: 'Salva nei preferiti',
-            isSelected: isSaved,
-            selectedIcon: const Icon(Icons.favorite, color: Colors.redAccent),
-            icon: Icon(Icons.favorite_outline_outlined, color: color),
+          final feedbackColor = Theme.of(context).colorScheme.onSurfaceVariant;
+          final splashColor = Theme.of(context).colorScheme.onSurface;
+
+          return Tooltip(
+            message: 'Salva nei preferiti',
+            child: RawMaterialButton(
+              onPressed: () {
+                isSaved
+                    ? viewModel.deleteFavourite.execute(id)
+                    : viewModel.addFavourite.execute(id);
+              },
+              elevation: 0.0,
+              focusElevation: 0.0,
+              hoverElevation: 0.0,
+              highlightElevation: 0.0,
+              focusColor: feedbackColor.withValues(alpha: 0.08),
+              hoverColor: feedbackColor.withValues(alpha: 0.08),
+              splashColor: splashColor.withValues(alpha: 0.1),
+              constraints: const BoxConstraints.expand(width: 40, height: 40),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(40),
+              ),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              child: Icon(
+                isSaved ? Icons.favorite : Icons.favorite_border,
+                color: isSaved ? Colors.redAccent : color,
+                size: 24,
+              ),
+            ),
           );
         } else {
           return OutlinedButton.icon(
