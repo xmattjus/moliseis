@@ -7,6 +7,7 @@ import 'package:moliseis/domain/models/attraction/attraction_type.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/categories/view_models/categories_view_model.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
+import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
@@ -71,15 +72,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                       context,
                     ),
                     sliver: SliverAppBar(
-                      leading: IconButton(
-                        onPressed: () {
-                          GoRouter.of(context).pop();
-                        },
-                        style: IconButton.styleFrom(
-                          backgroundColor: Theme.of(context).canvasColor,
-                        ),
-                        icon: ButtonTheme(child: const Icon(Icons.arrow_back)),
-                      ),
+                      leading: const CustomBackButton(),
                       title: const Text('Categorie'),
                       actions: [
                         MenuAnchor(
@@ -156,7 +149,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                 controller: _tabController,
                 children:
                     _viewModel.attractionTypes.map((type) {
-                      return _AttractionCategoriesScreenContent(
+                      return _CategoriesScreenContent(
                         // key: ValueKey(type.name),
                         type: type,
                         orderBy: value.attractionSortBy,
@@ -172,8 +165,8 @@ class _CategoriesScreenState extends State<CategoriesScreen>
   }
 }
 
-class _AttractionCategoriesScreenContent extends StatefulWidget {
-  const _AttractionCategoriesScreenContent({
+class _CategoriesScreenContent extends StatefulWidget {
+  const _CategoriesScreenContent({
     required this.type,
     required this.orderBy,
     required this.viewModel,
@@ -184,12 +177,11 @@ class _AttractionCategoriesScreenContent extends StatefulWidget {
   final CategoriesViewModel viewModel;
 
   @override
-  State<_AttractionCategoriesScreenContent> createState() =>
-      _AttractionCategoriesScreenContentState();
+  State<_CategoriesScreenContent> createState() =>
+      _CategoriesScreenContentState();
 }
 
-class _AttractionCategoriesScreenContentState
-    extends State<_AttractionCategoriesScreenContent> {
+class _CategoriesScreenContentState extends State<_CategoriesScreenContent> {
   late Future<List<int>> _future;
 
   AttractionType get _type => widget.type;
@@ -198,20 +190,22 @@ class _AttractionCategoriesScreenContentState
   void initState() {
     super.initState();
 
-    updateFuture(_type, widget.orderBy);
+    _updateFuture(_type, widget.orderBy);
   }
 
   @override
-  void didUpdateWidget(covariant _AttractionCategoriesScreenContent oldWidget) {
+  void didUpdateWidget(covariant _CategoriesScreenContent oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (widget.orderBy != oldWidget.orderBy || widget.type != oldWidget.type) {
-      updateFuture(_type, widget.orderBy);
+      _updateFuture(_type, widget.orderBy);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final routerState = GoRouterState.of(context).uri;
+
     return Builder(
       builder: (context) {
         return CustomScrollView(
@@ -225,7 +219,6 @@ class _AttractionCategoriesScreenContentState
               sliver: AttractionListViewResponsive(
                 _future,
                 onPressed: (id) {
-                  final routerState = GoRouterState.of(context).uri;
                   final typeIndex =
                       widget.viewModel.getTypeIndexFromAttractionId(id) - 1;
 
@@ -252,7 +245,10 @@ class _AttractionCategoriesScreenContentState
     );
   }
 
-  Future<void> updateFuture(AttractionType type, AttractionSort orderBy) async {
+  Future<void> _updateFuture(
+    AttractionType type,
+    AttractionSort orderBy,
+  ) async {
     _future = widget.viewModel.getAttractionIdsByType(type, orderBy);
   }
 }

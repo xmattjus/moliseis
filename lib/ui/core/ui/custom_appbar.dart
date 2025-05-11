@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar_type.dart';
+import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({
@@ -11,7 +11,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.systemOverlayStyle,
     this.showBackButton = false,
-    this.backButtonBackground,
+    this.backButtonBgColor,
   }) : _type = CustomAppBarType.standard,
        assert(
          showBackButton == true && leading == null ||
@@ -29,7 +29,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       leading = null,
       actions = null,
       showBackButton = false,
-      backButtonBackground = Colors.transparent;
+      backButtonBgColor = Colors.transparent;
 
   final CustomAppBarType _type;
   final Widget? title;
@@ -37,7 +37,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final List<Widget>? actions;
   final SystemUiOverlayStyle? systemOverlayStyle;
   final bool showBackButton;
-  final Color? backButtonBackground;
+  final Color? backButtonBgColor;
 
   @override
   Size get preferredSize {
@@ -49,25 +49,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final leadingWidget =
         showBackButton
-            ? IconButton(
-              onPressed: () {
-                GoRouter.of(context).pop();
-              },
-              style: IconButton.styleFrom(
-                backgroundColor:
-                    backButtonBackground ?? Theme.of(context).canvasColor,
-              ),
-              icon: ButtonTheme(child: const Icon(Icons.arrow_back)),
-            )
+            ? CustomBackButton(backgroundColor: backButtonBgColor)
             : leading;
-    // final isStandardSize = _type == _AppToolbarType.standard;
+
     return AppBar(
       title: title,
       leading: leadingWidget,
       actions: actions,
       toolbarHeight: preferredSize.height,
       systemOverlayStyle: systemOverlayStyle,
-      forceMaterialTransparency: true, // isStandardSize ? true : true,
+      forceMaterialTransparency: true,
     );
   }
 }
