@@ -11,10 +11,10 @@ import 'package:responsive_framework/responsive_framework.dart';
 class AttractionListViewResponsive extends StatelessWidget {
   /// Creates a list/grid view of attractions based on the device form factor.
   const AttractionListViewResponsive(
-      this.future, {
-        super.key,
-        required this.onPressed,
-      });
+    this.future, {
+    super.key,
+    required this.onPressed,
+  });
 
   final Future<List<int>> future;
 
