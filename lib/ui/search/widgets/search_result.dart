@@ -10,11 +10,7 @@ import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
 
 class SearchResult extends StatefulWidget {
-  const SearchResult({
-    super.key,
-    required this.viewModel,
-    this.query,
-  });
+  const SearchResult({super.key, required this.viewModel, this.query});
 
   final SearchViewModel viewModel;
   final String? query;
