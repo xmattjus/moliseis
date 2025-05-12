@@ -1,31 +1,32 @@
+import 'package:logging/logging.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AppUrlLauncher {
-  final String _mapTilerUrl = 'https://www.maptiler.com/copyright/';
-
-  final String _openStreetMapUrl = 'https://www.openstreetmap.org/copyright';
-
-  final String _googleMapsUrl = 'https://www.google.com/maps/search/?api=1';
+  final _mapTilerUrl = 'https://www.maptiler.com/copyright/';
+  final _openStreetMapUrl = 'https://www.openstreetmap.org/copyright';
+  final _googleMapsUrl = 'https://www.google.com/maps/search/?api=1';
+  final _logger = Logger('AppUrlLauncher');
 
   Future<bool> _launch(String url) async {
-    Uri? uri;
+    // Whether [url] could be handled or not.
     var result = false;
 
     try {
-      uri = Uri.parse(url);
-    } catch (err) {
-      throw 'Could not parse a valid URI, $err';
-    }
+      final uri = Uri.parse(url);
 
-    try {
-      if (await canLaunchUrl(uri)) {
-        result = true;
-        await launchUrl(uri);
-      } else {
-        throw 'Could not launch $uri';
+      try {
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+          result = true;
+        } else {
+          _logger.severe('Could not handle $uri');
+        }
+      } on Exception catch (error) {
+        _logger.severe(error);
       }
-    } catch (err) {
-      throw '$err';
+    } on Exception catch (error) {
+      // Logs any parsing error.
+      _logger.severe(error);
     }
 
     return result;
