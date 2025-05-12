@@ -29,8 +29,6 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final urlLauncher = AppUrlLauncher();
-
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -177,10 +175,18 @@ class SettingsScreen extends StatelessWidget {
           ),
           ListTile(
             title: const Text('Informativa sulla privacy'),
-            onTap: () {
-              urlLauncher.generic(
-                'https://sites.google.com/view/molise-is-privacy-policy/home-page',
-              );
+            onTap: () async {
+              const url =
+                  'https://sites.google.com/view/molise-is-privacy-policy/home-page';
+              if (!await context.read<AppUrlLauncher>().generic(url)) {
+                if (context.mounted) {
+                  showSnackBar(
+                    context: context,
+                    textContent:
+                        'Si è verificato un errore, riprova più tardi.',
+                  );
+                }
+              }
             },
           ),
         ],

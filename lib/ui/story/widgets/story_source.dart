@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/url_text_button.dart';
 import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/extensions.dart';
@@ -26,7 +27,15 @@ class StorySource extends StatelessWidget {
                 icon: const Icon(Icons.link),
                 iconSize: 18.0,
                 onPressed: () async {
-                  await context.read<AppUrlLauncher>().generic(e);
+                  if (!await context.read<AppUrlLauncher>().generic(e)) {
+                    if (context.mounted) {
+                      showSnackBar(
+                        context: context,
+                        textContent:
+                            'Si è verificato un errore, riprova più tardi.',
+                      );
+                    }
+                  }
                 },
                 color: Theme.of(context).colorScheme.secondary,
               )
