@@ -100,7 +100,19 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
         iconSize: 18.0,
         onPressed:
             licenseUrl.isNotEmpty
-                ? () => context.read<AppUrlLauncher>().generic(licenseUrl)
+                ? () async {
+                  if (!await context.read<AppUrlLauncher>().generic(
+                    licenseUrl,
+                  )) {
+                    if (context.mounted) {
+                      showSnackBar(
+                        context: context,
+                        textContent:
+                            'Si è verificato un errore, riprova più tardi.',
+                      );
+                    }
+                  }
+                }
                 : null,
         label: Text.rich(
           maxLines: 1,
@@ -122,7 +134,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
             statusBarBrightness: Brightness.dark,
           ),
           showBackButton: true,
-          backButtonBackground: Colors.transparent,
+          backButtonBgColor: Colors.transparent,
         ),
         DecoratedBox(
           decoration: const BoxDecoration(
