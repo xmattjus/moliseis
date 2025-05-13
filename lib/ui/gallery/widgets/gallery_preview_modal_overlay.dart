@@ -41,13 +41,14 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
             final cache = DefaultCacheManager();
             final file = await cache.getSingleFile(image.url);
             final sharedImage = XFile(file.path, mimeType: 'image/*');
-            await Share.shareXFiles(<XFile>[sharedImage]);
+            await SharePlus.instance.share(ShareParams(files: [sharedImage]));
           } on Exception catch (error) {
             logger.severe(LogEvents.imageSharingError, error);
             if (context.mounted) {
               showSnackBar(
                 context: context,
-                textContent: 'Si è verificato un problema, riprova.',
+                textContent:
+                    'Si è verificato un errore durante la condivisione, riprova.',
               );
             }
           }
