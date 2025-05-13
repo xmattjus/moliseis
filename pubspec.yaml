@@ -17,7 +17,7 @@ dependencies:
   cached_network_image: ^3.4.1
   cupertino_icons: ^1.0.8
   # D
-  device_info_plus: ^11.3.3
+  device_info_plus: ^11.4.0
   #dynamic_color: ^1.7.0
   # E
   envied: ^1.1.1
@@ -26,9 +26,8 @@ dependencies:
     sdk: flutter
   flutter_cache_manager: ^3.4.1
   flutter_launcher_icons: ^0.14.3
-  flutter_map: ^8.1.1 # ^7.0.2
+  flutter_map: ^8.1.1
   # G
-  # get_it: ^8.0.3
   go_router: '>=12.1.3 <13.0.0' # ^14.8.1
   # H
   # I
@@ -42,25 +41,25 @@ dependencies:
   meta: ^1.16.0
   # N
   # O
-  objectbox: ^4.1.0
-  objectbox_flutter_libs: ^4.1.0
+  objectbox: ^4.2.0
+  objectbox_flutter_libs: ^4.2.0
   # P
-  path: ^1.9.0
+  path: ^1.9.1
   path_provider: ^2.1.5
-  provider: ^6.1.3
+  provider: ^6.1.5
   # Q
   # R
   responsive_framework: ^1.5.1
   # result_dart: ^2.0.0
   # S
-  sentry: ^8.14.1
-  sentry_flutter: ^8.14.1
-  sentry_logging: ^8.14.1
-  share_plus: ^10.1.4
+  sentry: ^8.14.2
+  sentry_flutter: ^8.14.2
+  sentry_logging: ^8.14.2
+  share_plus: ^11.0.0
   skeletonizer: ^1.4.3
-  supabase: ^2.6.3
-  supabase_flutter: ^2.8.4
-  swipe_image_gallery: ^0.10.1
+  supabase: ^2.7.0
+  supabase_flutter: ^2.9.0
+  swipe_image_gallery: ^0.10.2
   # T
   # U
   url_launcher: ^6.3.1
@@ -73,7 +72,7 @@ dependencies:
 dev_dependencies:
   # A
   # B
-  build_runner: ^2.4.14
+  build_runner: ^2.4.15
   # C
   # D
   # E
@@ -86,14 +85,14 @@ dev_dependencies:
   # H
   # I
   # J
-  json_serializable: ^6.9.0
+  json_serializable: ^6.9.5
   # K
   # L
   lint: ^2.8.0
   # M
   # N
   # O
-  objectbox_generator: ^4.1.0
+  objectbox_generator: ^4.2.0
   # P
   # Q
   # R
