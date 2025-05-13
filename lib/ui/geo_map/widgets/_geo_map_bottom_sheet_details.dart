@@ -1,68 +1,25 @@
 part of 'geo_map_bottom_sheet.dart';
 
-class _GoeMapBottomSheetContent extends StatelessWidget {
-  const _GoeMapBottomSheetContent({
+class _GoeMapBottomSheetDetails extends StatelessWidget {
+  const _GoeMapBottomSheetDetails({
     required this.attractionId,
-    required this.currentMapCenter,
-    required this.onNearAttractionTap,
     required this.onCloseButtonTap,
+    required this.onNearAttractionTap,
     required this.future,
   });
 
-  /// The [Attraction] Id.
-  ///
-  /// When both [attractionId] and [currentMapCenter] are defined,
-  /// [attractionId] will take priority, e.g. the details of that [Attraction]
-  /// will be shown in the bottom sheet.
+  /// The user selected attraction's local database id.
   final int attractionId;
 
-  /// The current map center.
-  ///
-  /// When both [attractionId] and [currentMapCenter] are defined,
-  /// [attractionId] will take priority, e.g. the details of that [Attraction]
-  /// will be shown in the bottom sheet.
-  final LatLng currentMapCenter;
-
-  /// Returns the [Attraction] Id that has been tapped on.
-  final void Function(int attractiondId) onNearAttractionTap;
-
-  /// Called when the close button has been tapped on.
+  /// Called when the close button has been pressed or otherwise activated.
   final VoidCallback onCloseButtonTap;
+
+  final void Function(int attractiondId) onNearAttractionTap;
 
   final Future<Attraction>? future;
 
   @override
   Widget build(BuildContext context) {
-    final urlLauncher = AppUrlLauncher();
-
-    if (attractionId == 0) {
-      return SliverList.list(
-        children: <Widget>[
-          Pad(
-            t: 8.0,
-            b: 16.0,
-            h: 16.0,
-            child: Text(
-              'Esplora i dintorni',
-              style: CustomTextStyles.title(context),
-              textAlign: Platform.isIOS ? TextAlign.center : TextAlign.start,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-          ),
-          NearAttractionsList(
-            coordinates: <double>[
-              currentMapCenter.latitude,
-              currentMapCenter.longitude,
-            ],
-            onPressed: (id) {
-              return onNearAttractionTap(id);
-            },
-          ),
-        ],
-      );
-    }
-
     return FutureBuilt<Attraction>(
       future,
       onLoading: () {
@@ -90,13 +47,14 @@ class _GoeMapBottomSheetContent extends StatelessWidget {
             Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(
                 16.0,
-                8.0,
-                8.0,
-                8.0,
+                18.0,
+                16.0,
+                4.0,
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 16.0,
                 children: [
                   Expanded(
                     child: Text(
@@ -105,19 +63,25 @@ class _GoeMapBottomSheetContent extends StatelessWidget {
                       overflow: TextOverflow.visible,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(start: 8.0),
-                    child: IconButton.filledTonal(
-                      iconSize: 16.0,
-                      visualDensity: VisualDensity.compact,
-                      style: ButtonStyle(
-                        backgroundColor: WidgetStatePropertyAll(
-                          Theme.of(context).colorScheme.surfaceContainerHigh,
-                        ),
+                  Tooltip(
+                    message: 'Chiudi',
+                    child: RawMaterialButton(
+                      onPressed: onCloseButtonTap,
+                      elevation: 0.0,
+                      focusElevation: 0.0,
+                      hoverElevation: 0.0,
+                      highlightElevation: 0.0,
+                      constraints: const BoxConstraints.expand(
+                        width: 32,
+                        height: 32,
                       ),
-                      onPressed: () => onCloseButtonTap(),
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Chiudi',
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(32),
+                      ),
+                      fillColor:
+                          Theme.of(context).colorScheme.surfaceContainerHigh,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      child: const Icon(Icons.close, size: 16),
                     ),
                   ),
                 ],
@@ -136,10 +100,18 @@ class _GoeMapBottomSheetContent extends StatelessWidget {
               items: <Widget>[
                 ElevatedButton.icon(
                   onPressed: () async {
-                    await urlLauncher.googleMaps(
+                    if (!await context.read<AppUrlLauncher>().googleMaps(
                       attraction.name,
                       attraction.place.target?.name,
-                    );
+                    )) {
+                      if (context.mounted) {
+                        showSnackBar(
+                          context: context,
+                          textContent:
+                              'Si è verificato un errore, riprova più tardi.',
+                        );
+                      }
+                    }
                   },
                   icon: const Icon(Icons.directions),
                   label: const Text('Indicazioni'),
@@ -156,14 +128,7 @@ class _GoeMapBottomSheetContent extends StatelessWidget {
                 FavouriteButton.wide(id: attraction.id),
               ],
             ),
-            Pad(
-              t: 16.0,
-              h: 16.0,
-              child: CustomRichText(
-                const Text('Immagini'),
-                labelTextStyle: CustomTextStyles.section(context),
-              ),
-            ),
+            const Pad(t: 16.0, h: 16.0, child: TextSectionDivider('Immagini')),
             SizedBox(
               height: 200.0,
               child: ListView.separated(
@@ -219,7 +184,7 @@ class _GoeMapBottomSheetContent extends StatelessWidget {
                   attraction.coordinates[1],
                 ],
                 hideFirstItem: true,
-                onPressed: (id) => onNearAttractionTap(id),
+                onPressed: onNearAttractionTap,
               ),
             ),
           ],
