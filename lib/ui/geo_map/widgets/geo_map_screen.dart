@@ -340,7 +340,10 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
               child: child,
             );
           },
-          child: appSearchBar,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: appSearchBar,
+          ),
         ),
       ),
     );
