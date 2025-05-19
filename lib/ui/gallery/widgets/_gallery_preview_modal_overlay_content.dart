@@ -45,7 +45,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
             onPressed: () {
               GoRouter.of(context).pop();
               GoRouter.of(context).goNamed(
-                RouteNames.exploreStory,
+                RouteNames.homeStory,
                 pathParameters: {'id': attractionId.toString()},
               );
             },

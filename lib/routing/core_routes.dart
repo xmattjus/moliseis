@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/categories/widgets/categories_screen.dart';
 import 'package:moliseis/ui/story/view_models/paragraph_view_model.dart';
 import 'package:moliseis/ui/story/view_models/story_view_model.dart';
@@ -9,7 +10,7 @@ GoRoute categoriesRoute({
   required String routeName,
   required String childRouteName,
 }) => GoRoute(
-  path: 'category/:index',
+  path: RoutePaths.category,
   name: routeName,
   builder: (context, state) {
     return CategoriesScreen(tabIndex: state.pathParameters['index']);
@@ -18,7 +19,7 @@ GoRoute categoriesRoute({
 );
 
 GoRoute storyRoute({required String routeName}) => GoRoute(
-  path: 'story/:id',
+  path: RoutePaths.story,
   name: routeName,
   builder: (context, state) {
     final id = int.parse(state.pathParameters['id']!);

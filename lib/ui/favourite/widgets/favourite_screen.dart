@@ -68,7 +68,7 @@ class FavouriteScreen extends StatelessWidget {
                     Future.sync(() => viewModel.favourites),
                     onPressed: (attractionId) {
                       GoRouter.of(context).goNamed(
-                        RouteNames.searchStory,
+                        RouteNames.favouritesStory,
                         pathParameters: {'id': attractionId.toString()},
                       );
                     },

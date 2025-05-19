@@ -109,7 +109,7 @@ class _SearchResultState extends State<SearchResult> {
                         onPressed: (attractionId) {
                           _controller.closeView(_controller.text);
                           GoRouter.of(context).goNamed(
-                            RouteNames.exploreStory,
+                            RouteNames.homeStory,
                             pathParameters: {'id': attractionId.toString()},
                           );
                         },

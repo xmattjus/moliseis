@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/attraction/attraction_sort.dart';
 import 'package:moliseis/domain/models/attraction/attraction_type.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/categories/view_models/categories_view_model.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
@@ -222,11 +223,12 @@ class _CategoriesScreenContentState extends State<_CategoriesScreenContent> {
                   final typeIndex =
                       widget.viewModel.getTypeIndexFromAttractionId(id) - 1;
 
-                  var nextPath = RouteNames.exploreCategoriesStory;
-                  if (routerState.toString().contains(
-                    RouteNames.searchCategories,
+                  var nextPath = RouteNames.homeCategoryStory;
+
+                  if (routerState.toString().startsWith(
+                    RoutePaths.favourites,
                   )) {
-                    nextPath = RouteNames.searchCategoriesStory;
+                    nextPath = RouteNames.favouritesCategoryStory;
                   }
 
                   GoRouter.of(context).goNamed(
