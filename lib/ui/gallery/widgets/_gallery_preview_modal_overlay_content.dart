@@ -2,90 +2,82 @@ part of 'gallery_preview_modal_overlay.dart';
 
 class _GalleryPreviewModalOverlayContent extends StatelessWidget {
   const _GalleryPreviewModalOverlayContent({
-    this.attractionName = '',
+    required this.attractionName,
     this.title = '',
     this.author = '',
     this.license = '',
     this.licenseUrl = '',
-    this.placeName,
-    this.attractionId,
+    required this.placeName,
+    this.attractionId = 0,
     this.onSharePressed,
   });
 
-  final String? attractionName;
-  final String? title;
+  final String attractionName;
+  final String title;
   final String author;
   final String license;
   final String licenseUrl;
-  final String? placeName;
-  final int? attractionId;
+  final String placeName;
+  final int attractionId;
   final void Function()? onSharePressed;
 
   @override
   Widget build(BuildContext context) {
-    Widget? attractionTitleText;
-
-    if (attractionName != null && attractionName!.isNotEmpty) {
-      attractionTitleText = Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 3.0),
-              child: Text(
-                attractionName!,
+    final attractionAndPlaceTitles = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 4.0,
+            children: [
+              Text(
+                attractionName,
                 style: Theme.of(context).textTheme.titleMedium,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-            ),
+              CustomRichText(
+                Text(placeName),
+                icon: const Icon(Icons.place_outlined),
+                labelTextStyle: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
           ),
-          LinkTextButton(
-            onPressed: () {
-              GoRouter.of(context).pop();
-              GoRouter.of(context).goNamed(
-                RouteNames.homeStory,
-                pathParameters: {'id': attractionId.toString()},
-              );
-            },
-            label: const Text('Apri dettagli'),
-          ),
-        ],
-      );
-    }
-
-    Widget? imageTitleText;
-
-    if (title != null && title!.isNotEmpty) {
-      imageTitleText = Padding(
-        padding: const EdgeInsets.only(bottom: 8.0),
-        child: Text(
-          title!,
-          style: Theme.of(context).textTheme.bodySmall,
-          maxLines: 2,
         ),
-      );
-    }
-
-    // TODO(xmattjus): find a nicer way to show the title of the image.
-    imageTitleText = null;
-
-    Widget? placeNameText;
-
-    if (placeName != null && placeName!.isNotEmpty) {
-      placeNameText = Padding(
-        padding: EdgeInsetsDirectional.only(
-          top: 4.0,
-          bottom: imageTitleText != null ? 4.0 : 8.0,
+        // TODO(xmattjus): open a bottom sheet instead of changing screen.
+        /*
+        LinkTextButton(
+          onPressed: () {
+            GoRouter.of(context).pop();
+            GoRouter.of(context).goNamed(
+              RouteNames.homeStory,
+              pathParameters: {'id': attractionId.toString()},
+            );
+          },
+          label: const Text('Apri dettagli'),
         ),
-        child: CustomRichText(
-          Text(placeName!),
-          icon: const Icon(Icons.place_outlined),
-          labelTextStyle: Theme.of(context).textTheme.bodyMedium,
-        ),
-      );
-    }
+         */
+      ],
+    );
+
+    final imageTitleText =
+        title.isNotEmpty
+            ? Padding(
+              padding: const EdgeInsetsDirectional.only(top: 8.0),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.9),
+                ),
+                overflow: TextOverflow.visible,
+              ),
+            )
+            : const SizedBox();
 
     final copyrightOwnerText = TextSpan(
       text: 'Copyright © ${author.isNotEmpty ? author : 'Sconosciuto'}',
@@ -94,7 +86,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
     final licenseText = TextSpan(text: ' $license');
 
     final licenseButton = Padding(
-      padding: const EdgeInsets.only(top: 4.0),
+      padding: const EdgeInsetsDirectional.only(top: 8.0),
       child: UrlTextButton.icon(
         icon: const Icon(Icons.attribution),
         iconSize: 18.0,
@@ -115,9 +107,8 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
                 }
                 : null,
         label: Text.rich(
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
           TextSpan(children: <InlineSpan>[copyrightOwnerText, licenseText]),
+          overflow: TextOverflow.ellipsis,
         ),
         color: Theme.of(context).colorScheme.tertiaryFixedDim,
       ),
@@ -150,7 +141,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
               padding: const EdgeInsetsDirectional.fromSTEB(
                 16.0,
                 16.0,
-                0,
+                0.0,
                 16.0,
               ),
               child: Column(
@@ -158,9 +149,8 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (attractionTitleText != null) attractionTitleText,
-                  if (placeNameText != null) placeNameText,
-                  if (imageTitleText != null) imageTitleText,
+                  attractionAndPlaceTitles,
+                  imageTitleText,
                   licenseButton,
                   const SizedBox(height: 16.0),
                   ButtonList(
