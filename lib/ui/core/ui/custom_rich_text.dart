@@ -9,7 +9,8 @@ class CustomRichText extends StatelessWidget {
     this.iconColor,
     this.content,
     this.contentTextStyle,
-    this.maxLines = 1,
+    this.overflow,
+    this.maxLines,
   });
 
   ///
@@ -46,20 +47,29 @@ class CustomRichText extends StatelessWidget {
   /// If null, defaults to [TextTheme.bodyMedium] of [ThemeData.textTheme].
   final TextStyle? contentTextStyle;
 
+  /// How visual overflow should be handled.
+  final TextOverflow? overflow;
+
   ///
   ///
   /// If null, defaults to 1.
-  final int maxLines;
+  final int? maxLines;
 
   @override
   Widget build(BuildContext context) {
     final defaults = Theme.of(context).textTheme.bodyMedium!;
 
+    // Whether to wrap the text to new lines or not.
+    final softWrap =
+        maxLines != null && maxLines! > 1 ||
+        content != null ||
+        overflow == TextOverflow.visible;
+
     if (icon == null && content == null) {
       return DefaultTextStyle(
         style: labelTextStyle ?? defaults,
-        softWrap: maxLines != 1,
-        overflow: TextOverflow.fade,
+        softWrap: softWrap,
+        overflow: overflow ?? TextOverflow.fade,
         maxLines: maxLines,
         child: label,
       );
@@ -67,11 +77,9 @@ class CustomRichText extends StatelessWidget {
 
     final fontSize = labelTextStyle?.fontSize ?? defaults.fontSize ?? 24.0;
 
-    final softWrap = maxLines != 1 || content != null;
-
     final spans = <InlineSpan>[];
 
-    /// Creates a widget span for the input icon, if defined.
+    // Creates a widget span for the input icon, if defined.
     if (icon != null) {
       spans.add(
         TextSpan(
@@ -106,7 +114,7 @@ class CustomRichText extends StatelessWidget {
       ),
     );
 
-    /// Creates a text span specifically for the content, if defined.
+    // Creates a text span specifically for the content, if defined.
     if (content != null) {
       spans.add(
         TextSpan(
