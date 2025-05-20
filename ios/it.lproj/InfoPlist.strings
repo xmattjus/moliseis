@@ -1,0 +1,8 @@
+/* 
+  InfoPlist.strings
+  Runner
+
+  Created by Benito Matteo Bercini on 20/05/25.
+  
+*/
+NSPhotoLibraryUsageDescription = "Questa app richiede l'accesso alla libreria delle foto.";
