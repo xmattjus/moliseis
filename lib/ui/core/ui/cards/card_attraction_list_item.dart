@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/ui/cards/attraction_card_title_subtitle.dart';
+import 'package:moliseis/ui/core/ui/attraction_and_place_names.dart';
 import 'package:moliseis/ui/core/ui/cards/base_attraction_card.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/skeletons/card_skeleton_list_item.dart';
@@ -85,9 +85,9 @@ class CardAttractionListItem extends StatelessWidget {
                     16.0 + additionalEndInset,
                     8.0,
                   ),
-                  child: AttractionCardTitleSubtitle(
-                    attraction.name,
-                    place.name,
+                  child: AttractionAndPlaceNames(
+                    name: attraction.name,
+                    placeName: place.name,
                   ),
                 ),
               ),

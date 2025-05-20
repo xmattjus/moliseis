@@ -28,22 +28,10 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 4.0,
-            children: [
-              Text(
-                attractionName,
-                style: Theme.of(context).textTheme.titleMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              CustomRichText(
-                Text(placeName),
-                icon: const Icon(Icons.place_outlined),
-                labelTextStyle: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
+          child: AttractionAndPlaceNames(
+            name: attractionName,
+            placeName: placeName,
+            overflow: TextOverflow.visible,
           ),
         ),
         // TODO(xmattjus): open a bottom sheet instead of changing screen.
