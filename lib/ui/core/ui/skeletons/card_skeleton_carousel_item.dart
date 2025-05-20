@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 class CardSkeletonCarouselItem extends StatelessWidget {
@@ -7,7 +8,7 @@ class CardSkeletonCarouselItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Skeletonizer.zone(
-      effect: const PulseEffect(),
+      effect: customPulseEffect(context: context),
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(
