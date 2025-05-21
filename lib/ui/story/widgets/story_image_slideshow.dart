@@ -178,8 +178,9 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
             size: Size(screenWidth, customPainterHeight),
             painter: MountainsPathPainter(
               gradientBottomColor: Theme.of(context).colorScheme.surface,
-              gradientTopColor:
-                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              gradientTopColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
             ),
           ),
         ),

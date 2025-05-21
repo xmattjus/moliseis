@@ -32,10 +32,9 @@ class AppSettings {
     if (value == null) {
       type = ThemeType.system;
     } else {
-      type =
-          value >= 0 && value < ThemeType.values.length
-              ? ThemeType.values[value]
-              : ThemeType.system;
+      type = value >= 0 && value < ThemeType.values.length
+          ? ThemeType.values[value]
+          : ThemeType.system;
     }
   }
 
@@ -51,10 +50,9 @@ class AppSettings {
     if (value == null) {
       brightness = ThemeBrightness.system;
     } else {
-      brightness =
-          value >= 0 && value < ThemeBrightness.values.length
-              ? ThemeBrightness.values[value]
-              : ThemeBrightness.system;
+      brightness = value >= 0 && value < ThemeBrightness.values.length
+          ? ThemeBrightness.values[value]
+          : ThemeBrightness.system;
     }
   }
 
@@ -70,10 +68,9 @@ class AppSettings {
     if (value == null) {
       attractionSort = AttractionSort.byName;
     } else {
-      attractionSort =
-          value >= 0 && value < AttractionSort.values.length
-              ? AttractionSort.values[value]
-              : AttractionSort.byName;
+      attractionSort = value >= 0 && value < AttractionSort.values.length
+          ? AttractionSort.values[value]
+          : AttractionSort.byName;
     }
   }
 

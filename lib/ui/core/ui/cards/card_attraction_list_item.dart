@@ -46,8 +46,9 @@ class CardAttractionListItem extends StatelessWidget {
     /// Calculates the amount of space to pad the attraction and place names
     /// with.
     var additionalEndInset = (actions?.length ?? 0) * 16.0;
-    additionalEndInset =
-        additionalEndInset == 0.0 ? 0.0 : additionalEndInset + 16.0;
+    additionalEndInset = additionalEndInset == 0.0
+        ? 0.0
+        : additionalEndInset + 16.0;
 
     return BaseAttractionCard(
       attractionId,

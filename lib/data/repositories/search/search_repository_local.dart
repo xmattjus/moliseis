@@ -13,21 +13,18 @@ class SearchRepositoryLocal implements SearchRepository {
   SearchRepositoryLocal({required ObjectBox objectBoxI})
     : _searchHistoryBox = objectBoxI.store.box<SearchQuery>(),
       _placeBox = objectBoxI.store.box<Place>(),
-      _placeQuery =
-          objectBoxI.store
-              .box<Place>()
-              .query(Place_.name.contains('', caseSensitive: false))
-              .build(),
-      _attractionQuery =
-          objectBoxI.store
-              .box<Attraction>()
-              .query(Attraction_.name.contains('', caseSensitive: false))
-              .build(),
-      _typeQuery =
-          objectBoxI.store
-              .box<Attraction>()
-              .query(Attraction_.dbType.oneOf(<int>[]))
-              .build();
+      _placeQuery = objectBoxI.store
+          .box<Place>()
+          .query(Place_.name.contains('', caseSensitive: false))
+          .build(),
+      _attractionQuery = objectBoxI.store
+          .box<Attraction>()
+          .query(Attraction_.name.contains('', caseSensitive: false))
+          .build(),
+      _typeQuery = objectBoxI.store
+          .box<Attraction>()
+          .query(Attraction_.dbType.oneOf(<int>[]))
+          .build();
 
   final Box<SearchQuery> _searchHistoryBox;
   final Box<Place> _placeBox;

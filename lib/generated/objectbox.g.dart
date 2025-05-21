@@ -538,15 +538,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
     Attraction: obx_int.EntityDefinition<Attraction>(
       model: _entities[0],
       toOneRelations: (Attraction object) => [object.place],
-      toManyRelations:
-          (Attraction object) => {
-            obx_int.RelInfo<MolisImage>.toOneBacklink(
-                  8,
-                  object.id,
-                  (MolisImage srcObject) => srcObject.attraction,
-                ):
-                object.images,
-          },
+      toManyRelations: (Attraction object) => {
+        obx_int.RelInfo<MolisImage>.toOneBacklink(
+          8,
+          object.id,
+          (MolisImage srcObject) => srcObject.attraction,
+        ): object.images,
+      },
       getId: (Attraction object) => object.id,
       setId: (Attraction object, int id) {
         if (object.id != id) {
@@ -638,26 +636,27 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final placeParam = obx.ToOne<Place>(
           targetId: const fb.Int64Reader().vTableGet(buffer, rootOffset, 24, 0),
         );
-        final object = Attraction(
-            id: idParam,
-            name: nameParam,
-            summary: summaryParam,
-            description: descriptionParam,
-            history: historyParam,
-            images: imagesParam,
-            coordinates: coordinatesParam,
-            sources: sourcesParam,
-            backlinkId: backlinkIdParam,
-            createdAt: createdAtParam,
-            modifiedAt: modifiedAtParam,
-            isSaved: isSavedParam,
-            place: placeParam,
-          )
-          ..dbType = const fb.Int64Reader().vTableGetNullable(
-            buffer,
-            rootOffset,
-            26,
-          );
+        final object =
+            Attraction(
+                id: idParam,
+                name: nameParam,
+                summary: summaryParam,
+                description: descriptionParam,
+                history: historyParam,
+                images: imagesParam,
+                coordinates: coordinatesParam,
+                sources: sourcesParam,
+                backlinkId: backlinkIdParam,
+                createdAt: createdAtParam,
+                modifiedAt: modifiedAtParam,
+                isSaved: isSavedParam,
+                place: placeParam,
+              )
+              ..dbType = const fb.Int64Reader().vTableGetNullable(
+                buffer,
+                rootOffset,
+                26,
+              );
         object.place.attach(store);
         obx_int.InternalToManyAccess.setRelInfo<Attraction>(
           object.images,
@@ -783,15 +782,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
     Place: obx_int.EntityDefinition<Place>(
       model: _entities[2],
       toOneRelations: (Place object) => [],
-      toManyRelations:
-          (Place object) => {
-            obx_int.RelInfo<Attraction>.toOneBacklink(
-                  11,
-                  object.id,
-                  (Attraction srcObject) => srcObject.place,
-                ):
-                object.attractions,
-          },
+      toManyRelations: (Place object) => {
+        obx_int.RelInfo<Attraction>.toOneBacklink(
+          11,
+          object.id,
+          (Attraction srcObject) => srcObject.place,
+        ): object.attractions,
+      },
       getId: (Place object) => object.id,
       setId: (Place object, int id) {
         if (object.id != id) {

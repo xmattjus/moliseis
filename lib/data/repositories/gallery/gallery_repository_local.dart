@@ -76,8 +76,9 @@ class GalleryRepositoryLocal implements GalleryRepository {
   }
 
   Future<void> _synchronize() async {
-    final images =
-        await _supabase.client.from(_supabaseTable.tableName).select();
+    final images = await _supabase.client
+        .from(_supabaseTable.tableName)
+        .select();
 
     /// The set of [MolisImage]s in the remote repository.
     final remote = Set<MolisImage>.unmodifiable(

@@ -63,100 +63,98 @@ class _CategoriesScreenState extends State<CategoriesScreen>
         child: Consumer<SettingsViewModel>(
           builder: (context, value, child) {
             return NestedScrollView(
-              headerSliverBuilder: (
-                BuildContext context,
-                bool innerBoxIsScrolled,
-              ) {
-                return <Widget>[
-                  SliverOverlapAbsorber(
-                    handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                      context,
-                    ),
-                    sliver: SliverAppBar(
-                      leading: const CustomBackButton(),
-                      title: const Text('Categorie'),
-                      actions: [
-                        MenuAnchor(
-                          menuChildren: [
-                            MenuItemButton(
-                              onPressed: () {
-                                value.saveAttractionSortBy(
-                                  AttractionSort.byName,
-                                );
-                              },
-                              leadingIcon: const Icon(Icons.text_fields),
-                              trailingIcon:
-                                  value.attractionSortBy ==
+              headerSliverBuilder:
+                  (BuildContext context, bool innerBoxIsScrolled) {
+                    return <Widget>[
+                      SliverOverlapAbsorber(
+                        handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                          context,
+                        ),
+                        sliver: SliverAppBar(
+                          leading: const CustomBackButton(),
+                          title: const Text('Categorie'),
+                          actions: [
+                            MenuAnchor(
+                              menuChildren: [
+                                MenuItemButton(
+                                  onPressed: () {
+                                    value.saveAttractionSortBy(
+                                      AttractionSort.byName,
+                                    );
+                                  },
+                                  leadingIcon: const Icon(Icons.text_fields),
+                                  trailingIcon:
+                                      value.attractionSortBy ==
                                           AttractionSort.byName
                                       ? const Icon(Icons.check)
                                       : null,
-                              child: const Text('Per nome'),
-                            ),
-                            MenuItemButton(
-                              onPressed: () {
-                                value.saveAttractionSortBy(
-                                  AttractionSort.byDate,
-                                );
-                              },
-                              leadingIcon: const Icon(Icons.access_time),
-                              trailingIcon:
-                                  value.attractionSortBy ==
+                                  child: const Text('Per nome'),
+                                ),
+                                MenuItemButton(
+                                  onPressed: () {
+                                    value.saveAttractionSortBy(
+                                      AttractionSort.byDate,
+                                    );
+                                  },
+                                  leadingIcon: const Icon(Icons.access_time),
+                                  trailingIcon:
+                                      value.attractionSortBy ==
                                           AttractionSort.byDate
                                       ? const Icon(Icons.check)
                                       : null,
-                              child: const Text('Per data'),
+                                  child: const Text('Per data'),
+                                ),
+                              ],
+                              builder: (_, controller, _) {
+                                return IconButton(
+                                  onPressed: () {
+                                    controller.isOpen
+                                        ? controller.close()
+                                        : controller.open();
+                                  },
+                                  tooltip: 'Ordina',
+                                  icon: const Icon(Icons.sort),
+                                );
+                              },
                             ),
                           ],
-                          builder: (_, controller, _) {
-                            return IconButton(
-                              onPressed: () {
-                                controller.isOpen
-                                    ? controller.close()
-                                    : controller.open();
-                              },
-                              tooltip: 'Ordina',
-                              icon: const Icon(Icons.sort),
-                            );
-                          },
-                        ),
-                      ],
-                      primary: false,
-                      floating: true,
-                      snap: true,
-                      forceMaterialTransparency: true,
-                    ),
-                  ),
-                  SliverAppBar(
-                    title: TabBar(
-                      tabs: UnmodifiableListView<Tab>(
-                        _viewModel.attractionTypes.map<Tab>(
-                          (AttractionType type) => Tab(text: type.readableName),
+                          primary: false,
+                          floating: true,
+                          snap: true,
+                          forceMaterialTransparency: true,
                         ),
                       ),
-                      controller: _tabController,
-                      automaticIndicatorColorAdjustment: false,
-                      isScrollable: true,
-                    ),
-                    automaticallyImplyLeading: false,
-                    elevation: 0,
-                    scrolledUnderElevation: 0,
-                    backgroundColor: Theme.of(context).canvasColor,
-                    // primary: false,
-                    pinned: true,
-                  ),
-                ];
-              },
+                      SliverAppBar(
+                        title: TabBar(
+                          tabs: UnmodifiableListView<Tab>(
+                            _viewModel.attractionTypes.map<Tab>(
+                              (AttractionType type) =>
+                                  Tab(text: type.readableName),
+                            ),
+                          ),
+                          controller: _tabController,
+                          automaticIndicatorColorAdjustment: false,
+                          isScrollable: true,
+                        ),
+                        automaticallyImplyLeading: false,
+                        elevation: 0,
+                        scrolledUnderElevation: 0,
+                        backgroundColor: Theme.of(context).canvasColor,
+                        // primary: false,
+                        pinned: true,
+                      ),
+                    ];
+                  },
               body: TabBarView(
                 controller: _tabController,
-                children:
-                    _viewModel.attractionTypes.map((type) {
-                      return _CategoriesScreenContent(
-                        // key: ValueKey(type.name),
-                        type: type,
-                        orderBy: value.attractionSortBy,
-                        viewModel: _viewModel,
-                      );
-                    }).toList(),
+                children: _viewModel.attractionTypes.map((type) {
+                  return _CategoriesScreenContent(
+                    // key: ValueKey(type.name),
+                    type: type,
+                    orderBy: value.attractionSortBy,
+                    viewModel: _viewModel,
+                  );
+                }).toList(),
               ),
             );
           },

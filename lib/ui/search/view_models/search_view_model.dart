@@ -27,10 +27,11 @@ class SearchViewModel extends ChangeNotifier {
 
   List<String> _history = [];
   List<int> _resultIds = [];
-  final List<String> _typeSuggestions =
-      AttractionType.values.sublist(1).map((e) {
-        return e.readableName;
-      }).toList();
+  final List<String> _typeSuggestions = AttractionType.values.sublist(1).map((
+    e,
+  ) {
+    return e.readableName;
+  }).toList();
   UnmodifiableListView<String> get history => UnmodifiableListView(_history);
   UnmodifiableListView<int> get resultIds => UnmodifiableListView(_resultIds);
   UnmodifiableListView<String> get typeSuggestions =>

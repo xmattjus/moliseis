@@ -43,8 +43,9 @@ class _GeoMapBottomSheetSearchState extends State<_GeoMapBottomSheetSearch> {
                 backgroundColor: Colors.transparent,
               ),
               Align(
-                alignment:
-                    Platform.isIOS ? Alignment.center : Alignment.topLeft,
+                alignment: Platform.isIOS
+                    ? Alignment.center
+                    : Alignment.topLeft,
                 child: Padding(
                   padding: const EdgeInsetsDirectional.fromSTEB(
                     72.0,

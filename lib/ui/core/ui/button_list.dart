@@ -11,8 +11,9 @@ class ButtonList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     /// Calculates the total widget height.
-    final height =
-        padding != null ? padding!.vertical + kButtonHeight : kButtonHeight;
+    final height = padding != null
+        ? padding!.vertical + kButtonHeight
+        : kButtonHeight;
 
     return SizedBox(
       height: height,

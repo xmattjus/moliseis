@@ -15,10 +15,9 @@ Attraction _$AttractionFromJson(Map<String, dynamic> json) => Attraction(
   images: const _MolisImageRelToManyConverter().fromJson(
     json['images'] as List<Map<String, dynamic>>?,
   ),
-  coordinates:
-      (json['coordinates'] as List<dynamic>)
-          .map((e) => (e as num).toDouble())
-          .toList(),
+  coordinates: (json['coordinates'] as List<dynamic>)
+      .map((e) => (e as num).toDouble())
+      .toList(),
   type:
       $enumDecodeNullable(_$AttractionTypeEnumMap, json['type']) ??
       AttractionType.unknown,

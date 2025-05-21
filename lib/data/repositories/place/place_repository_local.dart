@@ -31,8 +31,9 @@ class PlaceRepositoryLocal implements PlaceRepository {
     _logger.info(LogEvents.repositoryUpdate);
 
     try {
-      final places =
-          await _supabase.client.from(_supabaseTable.tableName).select();
+      final places = await _supabase.client
+          .from(_supabaseTable.tableName)
+          .select();
 
       /// The set of [Place]s in the remote repository.
       final remote = Set<Place>.unmodifiable(
@@ -50,11 +51,10 @@ class PlaceRepositoryLocal implements PlaceRepository {
         for (final place in remote) {
           final old = _placeBox.get(place.id);
 
-          final attractions =
-              _attractionBox
-                  .getAll()
-                  .where((e) => e.backlinkId == place.id)
-                  .toList();
+          final attractions = _attractionBox
+              .getAll()
+              .where((e) => e.backlinkId == place.id)
+              .toList();
 
           if (attractions.isNotEmpty) {
             /// Prepares the other Box this object relates to, to be updated
@@ -107,11 +107,10 @@ class PlaceRepositoryLocal implements PlaceRepository {
       /// might have been lost during synchronization.
       for (final place in local) {
         if (place.attractions.isEmpty) {
-          final attractions =
-              _attractionBox
-                  .getAll()
-                  .where((e) => e.backlinkId == place.id)
-                  .toList();
+          final attractions = _attractionBox
+              .getAll()
+              .where((e) => e.backlinkId == place.id)
+              .toList();
           place.attractions.addAll(attractions);
           _placeBox.put(place);
         }

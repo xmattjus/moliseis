@@ -105,62 +105,62 @@ class _GalleryScreenState extends State<GalleryScreen> {
                   );
                 },
               ),
-              headerSliverBuilder: (
-                BuildContext context,
-                bool innerBoxIsScrolled,
-              ) {
-                return <Widget>[
-                  SliverAppBar(
-                    title: const Text('Galleria'),
-                    elevation: 0,
-                    scrolledUnderElevation: 0,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    actions: <Widget>[
-                      MenuAnchor(
-                        menuChildren: <Widget>[
-                          MenuItemButton(
-                            onPressed: () {
-                              context
-                                  .read<SettingsViewModel>()
-                                  .saveAttractionSortBy(AttractionSort.byName);
-                            },
-                            leadingIcon: const Icon(Icons.text_fields),
-                            trailingIcon:
-                                sortBy == AttractionSort.byName
+              headerSliverBuilder:
+                  (BuildContext context, bool innerBoxIsScrolled) {
+                    return <Widget>[
+                      SliverAppBar(
+                        title: const Text('Galleria'),
+                        elevation: 0,
+                        scrolledUnderElevation: 0,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                        actions: <Widget>[
+                          MenuAnchor(
+                            menuChildren: <Widget>[
+                              MenuItemButton(
+                                onPressed: () {
+                                  context
+                                      .read<SettingsViewModel>()
+                                      .saveAttractionSortBy(
+                                        AttractionSort.byName,
+                                      );
+                                },
+                                leadingIcon: const Icon(Icons.text_fields),
+                                trailingIcon: sortBy == AttractionSort.byName
                                     ? const Icon(Icons.check)
                                     : null,
-                            child: const Text('Per nome'),
-                          ),
-                          MenuItemButton(
-                            onPressed: () {
-                              context
-                                  .read<SettingsViewModel>()
-                                  .saveAttractionSortBy(AttractionSort.byDate);
-                            },
-                            leadingIcon: const Icon(Icons.access_time),
-                            trailingIcon:
-                                sortBy == AttractionSort.byDate
+                                child: const Text('Per nome'),
+                              ),
+                              MenuItemButton(
+                                onPressed: () {
+                                  context
+                                      .read<SettingsViewModel>()
+                                      .saveAttractionSortBy(
+                                        AttractionSort.byDate,
+                                      );
+                                },
+                                leadingIcon: const Icon(Icons.access_time),
+                                trailingIcon: sortBy == AttractionSort.byDate
                                     ? const Icon(Icons.check)
                                     : null,
-                            child: const Text('Per data'),
+                                child: const Text('Per data'),
+                              ),
+                            ],
+                            builder: (_, controller, _) {
+                              return IconButton(
+                                onPressed: () {
+                                  controller.isOpen
+                                      ? controller.close()
+                                      : controller.open();
+                                },
+                                tooltip: 'Ordina',
+                                icon: const Icon(Icons.sort),
+                              );
+                            },
                           ),
                         ],
-                        builder: (_, controller, _) {
-                          return IconButton(
-                            onPressed: () {
-                              controller.isOpen
-                                  ? controller.close()
-                                  : controller.open();
-                            },
-                            tooltip: 'Ordina',
-                            icon: const Icon(Icons.sort),
-                          );
-                        },
                       ),
-                    ],
-                  ),
-                ];
-              },
+                    ];
+                  },
             ),
           ),
         );

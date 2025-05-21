@@ -100,10 +100,9 @@ class _GeoMapState extends State<GeoMap> {
         initialZoom: widget.initialZoom ?? 13.0,
         minZoom: 9.0,
         maxZoom: 18.0,
-        backgroundColor:
-            brightness == Brightness.dark
-                ? const Color(0xFF2E2E2E)
-                : const Color(0xFFEAEADD),
+        backgroundColor: brightness == Brightness.dark
+            ? const Color(0xFF2E2E2E)
+            : const Color(0xFFEAEADD),
         onMapEvent: (event) {
           if (event is MapEventMoveStart) {
             widget.onPositionChangeStart?.call(_mapController.camera.center);

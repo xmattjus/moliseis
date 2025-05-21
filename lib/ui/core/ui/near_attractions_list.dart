@@ -174,10 +174,9 @@ class _NearAttractionsListState extends State<NearAttractionsList> {
                     ),
                   );
                 },
-                separatorBuilder:
-                    (context, index) => SizedBox(
-                      width: widget.hideFirstItem && index == 0 ? 0 : 8.0,
-                    ),
+                separatorBuilder: (context, index) => SizedBox(
+                  width: widget.hideFirstItem && index == 0 ? 0 : 8.0,
+                ),
                 itemCount: data.length,
               );
             },

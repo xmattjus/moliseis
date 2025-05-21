@@ -157,8 +157,9 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                 );
               }
 
-              final List<int>? options =
-                  (await _debouncedSearch(controller.text))?.toList();
+              final List<int>? options = (await _debouncedSearch(
+                controller.text,
+              ))?.toList();
 
               if (options == null) {
                 return _lastOptions;
@@ -187,8 +188,9 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                       ),
                       child: CardAttractionListItem(
                         options[index],
-                        color:
-                            Theme.of(context).colorScheme.surfaceContainerHigh,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHigh,
                         elevation: 0,
                         onPressed: () {
                           _viewModel.addToHistoryByAttractionId.execute(
@@ -208,7 +210,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                         height:
                             (isFullScreen
                                 ? MediaQuery.maybePaddingOf(context)?.bottom ??
-                                    0
+                                      0
                                 : 0) +
                             16.0,
                       ),
@@ -243,16 +245,15 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
             _viewModel.addToHistory.execute(e);
           },
           deleteIcon: const Icon(Icons.close),
-          onDeleted:
-              showDeleteIcon
-                  ? () async {
-                    _viewModel.removeFromHistory.execute(e);
-                    _searchController.text = '\u200B';
-                    await Future.delayed(Durations.medium1, () {
-                      _searchController.text = '';
-                    });
-                  }
-                  : null,
+          onDeleted: showDeleteIcon
+              ? () async {
+                  _viewModel.removeFromHistory.execute(e);
+                  _searchController.text = '\u200B';
+                  await Future.delayed(Durations.medium1, () {
+                    _searchController.text = '';
+                  });
+                }
+              : null,
         );
       }),
     );
@@ -287,10 +288,9 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
     );
   }
 
-  void _handleOnBackPressed() =>
-      widget.onBackPressed != null
-          ? widget.onBackPressed!()
-          : _searchController.closeView(null);
+  void _handleOnBackPressed() => widget.onBackPressed != null
+      ? widget.onBackPressed!()
+      : _searchController.closeView(null);
 
   // Calls the "remote" API to search with the given query. Returns null when
   // the call has been made obsolete.

@@ -52,16 +52,18 @@ class ScaffoldShell extends StatelessWidget {
               ? Icons.explore
               : Icons.explore_outlined,
         ),
-        int() =>
-          throw RangeError('$index out of range, expected range >= 0 && <= 3'),
+        int() => throw RangeError(
+          '$index out of range, expected range >= 0 && <= 3',
+        ),
       };
       final label = switch (index) {
         0 => 'Esplora',
         1 => 'Preferiti',
         2 => 'Galleria',
         3 => 'Mappa',
-        int() =>
-          throw RangeError('$index out of range, expected range >= 0 && <= 3'),
+        int() => throw RangeError(
+          '$index out of range, expected range >= 0 && <= 3',
+        ),
       };
       return NavigationDestination(icon: icon, label: label);
     }, growable: false);

@@ -131,9 +131,9 @@ class SettingsScreen extends StatelessWidget {
                 subtitle: Text(
                   reportCrashes == true
                       ? "Gli errori dell'app verranno inviati "
-                          'automaticamente agli sviluppatori'
+                            'automaticamente agli sviluppatori'
                       : "Gli errori dell'app non verranno inviati agli "
-                          'sviluppatori',
+                            'sviluppatori',
                 ),
               );
             },

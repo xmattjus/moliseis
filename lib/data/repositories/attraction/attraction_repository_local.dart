@@ -57,10 +57,9 @@ class AttractionRepositoryLocal implements AttractionRepository {
           orderBy == AttractionSort.byName
               ? Attraction_.name
               : Attraction_.modifiedAt,
-          flags:
-              orderBy == AttractionSort.byDate
-                  ? Order.descending
-                  : Order.unsigned,
+          flags: orderBy == AttractionSort.byDate
+              ? Order.descending
+              : Order.unsigned,
         );
     final query = queryBuilder.build();
 
@@ -84,10 +83,9 @@ class AttractionRepositoryLocal implements AttractionRepository {
 
   @override
   Future<List<int>> getNearAttractionIds(List<double> coordinates) async {
-    final query =
-        _attractionBox
-            .query(Attraction_.coordinates.nearestNeighborsF32(coordinates, 3))
-            .build();
+    final query = _attractionBox
+        .query(Attraction_.coordinates.nearestNeighborsF32(coordinates, 3))
+        .build();
     final results = await query.findIdsWithScoresAsync();
     query.close();
 
@@ -99,8 +97,9 @@ class AttractionRepositoryLocal implements AttractionRepository {
     _logger.info(LogEvents.repositoryUpdate);
 
     try {
-      final attractions =
-          await _supabase.client.from(_supabaseTable.tableName).select();
+      final attractions = await _supabase.client
+          .from(_supabaseTable.tableName)
+          .select();
 
       /// The set of [Attraction]s in the remote repository.
       final remote = Set<Attraction>.unmodifiable(
@@ -183,8 +182,9 @@ class AttractionRepositoryLocal implements AttractionRepository {
 
   @override
   List<int> get savedAttractionIds {
-    final query =
-        _attractionBox.query(Attraction_.isSaved.equals(true)).build();
+    final query = _attractionBox
+        .query(Attraction_.isSaved.equals(true))
+        .build();
     // Casts the query results to a growable list with toList().
     final attractions = query.findIds().toList();
     query.close();

@@ -94,12 +94,11 @@ class _BaseAttractionCardState extends State<BaseAttractionCard>
       child: FutureBuilt<List>(
         _futures,
         onLoading: widget.onLoading,
-        onSuccess:
-            (data) => _buildSuccess(
-              attraction: data[0] as Attraction,
-              image: data[1] as MolisImage,
-              place: data[2] as Place,
-            ),
+        onSuccess: (data) => _buildSuccess(
+          attraction: data[0] as Attraction,
+          image: data[1] as MolisImage,
+          place: data[2] as Place,
+        ),
         onError: (error) {
           logger.severe('', error);
           return const EmptyView.error(text: SizedBox());

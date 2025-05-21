@@ -331,12 +331,12 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
           builder: (context, child) {
             return AnimatedSlide(
               offset: Offset(0, _showSearchBar.value ? 0 : -2.0),
-              curve:
-                  _showSearchBar.value
-                      ? Curves.easeInOutCubicEmphasized
-                      : Easing.emphasizedDecelerate,
-              duration:
-                  _showSearchBar.value ? Durations.medium2 : Durations.short3,
+              curve: _showSearchBar.value
+                  ? Curves.easeInOutCubicEmphasized
+                  : Easing.emphasizedDecelerate,
+              duration: _showSearchBar.value
+                  ? Durations.medium2
+                  : Durations.short3,
               child: child,
             );
           },

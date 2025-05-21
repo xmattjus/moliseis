@@ -45,8 +45,9 @@ class ParagraphRepositoryLocal implements ParagraphRepository {
 
     final paragraphs = await _paragraphBox.getAllAsync();
 
-    final filter =
-        paragraphs.where((element) => element.backlinkId == id).toList();
+    final filter = paragraphs
+        .where((element) => element.backlinkId == id)
+        .toList();
 
     return Result.success(filter);
   }

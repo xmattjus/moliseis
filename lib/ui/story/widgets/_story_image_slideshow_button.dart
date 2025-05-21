@@ -66,12 +66,13 @@ class _StoryImageSlideshowButtonState
       CurvedAnimation(parent: _animationController, curve: defaultCurve),
     );
 
-    alignmentAnimation = Tween<Alignment>(
-      begin: Alignment.center,
-      end: Alignment.centerLeft,
-    ).animate(
-      CurvedAnimation(parent: _animationController, curve: defaultCurve),
-    );
+    alignmentAnimation =
+        Tween<Alignment>(
+          begin: Alignment.center,
+          end: Alignment.centerLeft,
+        ).animate(
+          CurvedAnimation(parent: _animationController, curve: defaultCurve),
+        );
   }
 
   @override
@@ -97,12 +98,13 @@ class _StoryImageSlideshowButtonState
     ///
     /// The constants being added at the end are the default outlined button
     /// padding values per Material3 guidelines.
-    widthAnimation = Tween<double>(
-      begin: 40,
-      end: textPainter.width + (iconTheme.size ?? 18.0) + 16.0 + 8.0 + 24.0,
-    ).animate(
-      CurvedAnimation(parent: _animationController, curve: defaultCurve),
-    );
+    widthAnimation =
+        Tween<double>(
+          begin: 40,
+          end: textPainter.width + (iconTheme.size ?? 18.0) + 16.0 + 8.0 + 24.0,
+        ).animate(
+          CurvedAnimation(parent: _animationController, curve: defaultCurve),
+        );
   }
 
   @override
@@ -122,10 +124,9 @@ class _StoryImageSlideshowButtonState
   }
 
   /// Animates the button to its expanded or retracted state.
-  void _handleAnimation() =>
-      widget.expand
-          ? _animationController.forward()
-          : _animationController.reverse();
+  void _handleAnimation() => widget.expand
+      ? _animationController.forward()
+      : _animationController.reverse();
 
   @override
   Widget build(BuildContext context) {
@@ -159,17 +160,16 @@ class _StoryImageSlideshowButtonState
               icon: AnimatedIcons.pause_play,
               progress: _animationController,
             ),
-            label:
-                _animationController.isDismissed
-                    ? const SizedBox()
-                    : Opacity(
-                      opacity: opacityAnimation.value,
-                      child: const Text(
-                        'Attiva scorrimento automatico',
-                        softWrap: false,
-                        overflow: TextOverflow.fade,
-                      ),
+            label: _animationController.isDismissed
+                ? const SizedBox()
+                : Opacity(
+                    opacity: opacityAnimation.value,
+                    child: const Text(
+                      'Attiva scorrimento automatico',
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
                     ),
+                  ),
           ),
         );
       },

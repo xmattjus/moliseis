@@ -48,8 +48,9 @@ class StoryRepositoryLocal implements StoryRepository {
 
     final stories = await _storyBox.getAllAsync();
 
-    final filter =
-        stories.where((element) => element.backlinkId == id).toList();
+    final filter = stories
+        .where((element) => element.backlinkId == id)
+        .toList();
 
     if (filter.isEmpty) {
       return Result.error(Exception(ArgumentError()));

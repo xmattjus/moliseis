@@ -57,10 +57,9 @@ class AttractionListViewResponsive extends StatelessWidget {
                 ],
               );
             },
-            separatorBuilder:
-                (context, index) => Divider(
-                  color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                ),
+            separatorBuilder: (context, index) => Divider(
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            ),
             itemCount: data.length,
           );
         } else {
@@ -83,12 +82,11 @@ class AttractionListViewResponsive extends StatelessWidget {
           );
         }
       },
-      onError:
-          (error) => const SliverToBoxAdapter(
-            child: EmptyView.error(
-              text: Text('Si è verificato un errore durante il caricamento.'),
-            ),
-          ),
+      onError: (error) => const SliverToBoxAdapter(
+        child: EmptyView.error(
+          text: Text('Si è verificato un errore durante il caricamento.'),
+        ),
+      ),
     );
   }
 }

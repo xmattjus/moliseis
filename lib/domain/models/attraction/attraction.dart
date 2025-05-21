@@ -62,10 +62,9 @@ class Attraction {
     if (value == null) {
       type = AttractionType.unknown;
     } else {
-      type =
-          value >= 0 && value < AttractionType.values.length
-              ? AttractionType.values[value]
-              : AttractionType.unknown;
+      type = value >= 0 && value < AttractionType.values.length
+          ? AttractionType.values[value]
+          : AttractionType.unknown;
     }
   }
 

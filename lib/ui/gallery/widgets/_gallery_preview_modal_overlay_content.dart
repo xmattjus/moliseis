@@ -50,22 +50,21 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
       ],
     );
 
-    final imageTitleText =
-        title.isNotEmpty
-            ? Padding(
-              padding: const EdgeInsetsDirectional.only(top: 8.0),
-              child: Text(
-                title,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.9),
-                ),
-                overflow: TextOverflow.visible,
+    final imageTitleText = title.isNotEmpty
+        ? Padding(
+            padding: const EdgeInsetsDirectional.only(top: 8.0),
+            child: Text(
+              title,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontStyle: FontStyle.italic,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.9),
               ),
-            )
-            : const SizedBox();
+              overflow: TextOverflow.visible,
+            ),
+          )
+        : const SizedBox();
 
     final copyrightOwnerText = TextSpan(
       text: 'Copyright © ${author.isNotEmpty ? author : 'Sconosciuto'}',
@@ -78,22 +77,19 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
       child: UrlTextButton.icon(
         icon: const Icon(Icons.attribution),
         iconSize: 18.0,
-        onPressed:
-            licenseUrl.isNotEmpty
-                ? () async {
-                  if (!await context.read<AppUrlLauncher>().generic(
-                    licenseUrl,
-                  )) {
-                    if (context.mounted) {
-                      showSnackBar(
-                        context: context,
-                        textContent:
-                            'Si è verificato un errore, riprova più tardi.',
-                      );
-                    }
+        onPressed: licenseUrl.isNotEmpty
+            ? () async {
+                if (!await context.read<AppUrlLauncher>().generic(licenseUrl)) {
+                  if (context.mounted) {
+                    showSnackBar(
+                      context: context,
+                      textContent:
+                          'Si è verificato un errore, riprova più tardi.',
+                    );
                   }
                 }
-                : null,
+              }
+            : null,
         label: Text.rich(
           TextSpan(children: <InlineSpan>[copyrightOwnerText, licenseText]),
           overflow: TextOverflow.ellipsis,
