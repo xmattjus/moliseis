@@ -23,28 +23,28 @@ class StorySource extends StatelessWidget {
         ...texts.map((e) {
           return e.isValidUrl
               ? UrlTextButton.icon(
-                label: Text(e, maxLines: 1, overflow: TextOverflow.ellipsis),
-                icon: const Icon(Icons.link),
-                iconSize: 18.0,
-                onPressed: () async {
-                  if (!await context.read<AppUrlLauncher>().generic(e)) {
-                    if (context.mounted) {
-                      showSnackBar(
-                        context: context,
-                        textContent:
-                            'Si è verificato un errore, riprova più tardi.',
-                      );
+                  label: Text(e, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  icon: const Icon(Icons.link),
+                  iconSize: 18.0,
+                  onPressed: () async {
+                    if (!await context.read<AppUrlLauncher>().generic(e)) {
+                      if (context.mounted) {
+                        showSnackBar(
+                          context: context,
+                          textContent:
+                              'Si è verificato un errore, riprova più tardi.',
+                        );
+                      }
                     }
-                  }
-                },
-                color: Theme.of(context).colorScheme.secondary,
-              )
-              : Text(
-                e,
-                style: TextStyle(
+                  },
                   color: Theme.of(context).colorScheme.secondary,
-                ),
-              );
+                )
+              : Text(
+                  e,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                );
         }),
       ],
     );
