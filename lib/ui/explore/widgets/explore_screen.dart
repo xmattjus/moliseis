@@ -188,7 +188,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _showSearchResults(String text) {
     if (text.isNotEmpty) {
-      context.goNamed(RouteNames.searchResult, pathParameters: {'query': text});
+      context.goNamed(
+        RouteNames.homeSearchResults,
+        pathParameters: {'query': text},
+      );
     }
 
     _searchController.clear();
