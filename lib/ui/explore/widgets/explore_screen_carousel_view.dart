@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
-import 'package:moliseis/ui/core/ui/cards/attraction_card_title_subtitle.dart';
+import 'package:moliseis/ui/core/ui/attraction_and_place_names.dart';
 import 'package:moliseis/ui/core/ui/cards/base_attraction_card.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
@@ -157,9 +157,9 @@ class _CarouselViewItem extends StatelessWidget {
                       ),
                       Padding(
                         padding: const EdgeInsets.all(16.0),
-                        child: AttractionCardTitleSubtitle(
-                          attraction.name,
-                          place.name,
+                        child: AttractionAndPlaceNames(
+                          name: attraction.name,
+                          placeName: place.name,
                           color: Colors.white,
                         ),
                       ),

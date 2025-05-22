@@ -57,9 +57,11 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
                 spacing: 16.0,
                 children: [
                   Expanded(
-                    child: Text(
-                      'Esplora ${attraction.name}',
-                      style: CustomTextStyles.title(context),
+                    child: AttractionAndPlaceNames(
+                      name: 'Esplora ${attraction.name}',
+                      placeName: attraction.place.target!.name,
+                      nameStyle: CustomTextStyles.title(context),
+                      placeNameStyle: CustomTextStyles.subtitle(context),
                       overflow: TextOverflow.visible,
                     ),
                   ),
@@ -78,21 +80,14 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(32),
                       ),
-                      fillColor:
-                          Theme.of(context).colorScheme.surfaceContainerHigh,
+                      fillColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHigh,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       child: const Icon(Icons.close, size: 16),
                     ),
                   ),
                 ],
-              ),
-            ),
-            Pad(
-              h: 16.0,
-              child: CustomRichText(
-                Text(attraction.place.target!.name),
-                labelTextStyle: CustomTextStyles.subtitle(context),
-                icon: const Icon(Icons.place_outlined),
               ),
             ),
             ButtonList(

@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/attraction/attraction.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
+import 'package:moliseis/ui/core/ui/attraction_and_place_names.dart';
 import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
 import 'package:moliseis/ui/core/ui/button_list.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
