@@ -20,10 +20,12 @@ class GalleryPreviewModal {
       await SwipeImageGallery(
         context: context,
         itemBuilder: (context, index) {
-          return CustomImage(
-            images[index],
+          return CustomImage.network(
             width: MediaQuery.sizeOf(context).width,
             height: MediaQuery.sizeOf(context).height,
+            imageWidth: images[index].width.toDouble(),
+            imageHeight: images[index].height.toDouble(),
+            url: images[index].url,
           );
         },
         itemCount: images.length,

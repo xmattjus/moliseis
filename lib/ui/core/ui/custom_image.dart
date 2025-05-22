@@ -1,37 +1,59 @@
+import 'dart:io' show File;
 import 'dart:math' show sqrt;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/molis_image/molis_image.dart';
 import 'package:moliseis/main.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/utils/log_events.dart';
 
 class CustomImage extends StatelessWidget {
   const CustomImage(
-    this.imageData, {
+    this.provider, {
     super.key,
     required this.width,
     required this.height,
+    required this.imageWidth,
+    required this.imageHeight,
     this.fit,
     this.onImageLoading,
   });
 
-  final MolisImage imageData;
+  CustomImage.network({
+    required this.width,
+    required this.height,
+    required this.imageWidth,
+    required this.imageHeight,
+    this.fit,
+    this.onImageLoading,
+    required String url,
+  }) : provider = CachedNetworkImageProvider(url);
 
-  /// If non-null, require the image to have this width (in logical pixels,
-  /// a.k.a screen independent pixels).
-  ///
-  /// If null, the image will pick a size that best preserves its intrinsic
-  /// aspect ratio.
+  CustomImage.file({
+    required this.width,
+    required this.height,
+    required this.imageWidth,
+    required this.imageHeight,
+    this.fit,
+    this.onImageLoading,
+    required File file,
+  }) : provider = FileImage(file);
+
+  final ImageProvider provider;
+
+  /// Require the image to have this width (in logical pixels, a.k.a screen
+  /// independent pixels).
   final double width;
 
-  /// If non-null, require the image to have this height (in logical pixels,
-  /// a.k.a screen independent pixels).
-  ///
-  /// If null, the image will pick a size that best preserves its intrinsic
-  /// aspect ratio.
+  /// Require the image to have this height (in logical pixels, a.k.a screen
+  /// independent pixels).
   final double height;
+
+  /// The image width.
+  final double imageWidth;
+
+  /// The image height.
+  final double imageHeight;
 
   /// How to inscribe the image into the space allocated during layout.
   final BoxFit? fit;
@@ -46,43 +68,43 @@ class CustomImage extends StatelessWidget {
     final widgetWidthPx = width * devicePixelRatio;
     final widgetHeightPx = height * devicePixelRatio;
     final widgetAspectRatio = widgetWidthPx / widgetHeightPx;
-    final srcAspectRatio = imageData.width / imageData.height;
+    final srcAspectRatio = imageWidth / imageHeight;
 
     double targetWidthPx;
     double targetHeightPx;
 
-    /// Calculates the width and the height the image must be decoded to.
-    ///
-    /// Source: https://medium.com/make-android/save-your-memory-usage-by-optimizing-network-image-in-flutter-cbc9f8af47cd
-    /// Source: https://github.com/BigTimo/auto_resize_image/blob/master/lib/src/auto_resize_image.dart
-    if (imageData.width * imageData.height <= widgetWidthPx * widgetHeightPx) {
-      targetWidthPx = imageData.width.toDouble();
-      targetHeightPx = imageData.height.toDouble();
+    // Calculates the width and the height the image must be decoded to.
+    //
+    // Sources:
+    // https://medium.com/make-android/save-your-memory-usage-by-optimizing-network-image-in-flutter-cbc9f8af47cd
+    // https://github.com/BigTimo/auto_resize_image/blob/master/lib/src/auto_resize_image.dart
+    if (imageWidth * imageHeight <= widgetWidthPx * widgetHeightPx) {
+      targetWidthPx = imageWidth;
+      targetHeightPx = imageHeight;
     } else {
       if (srcAspectRatio / widgetAspectRatio > 2 ||
           (1 / srcAspectRatio) / (1 / widgetAspectRatio) > 2) {
         if (srcAspectRatio > 1) {
-          //wide
+          // Landscape
           targetWidthPx = widgetHeightPx * srcAspectRatio;
           targetHeightPx = widgetHeightPx;
         } else {
-          //long
+          // Portrait
           targetWidthPx = widgetWidthPx;
           targetHeightPx = widgetWidthPx / srcAspectRatio;
         }
       } else {
         final scale = sqrt(
-          (widgetWidthPx * widgetHeightPx) /
-              (imageData.width * imageData.height),
+          (widgetWidthPx * widgetHeightPx) / (imageWidth * imageHeight),
         );
-        targetWidthPx = imageData.width * scale;
-        targetHeightPx = imageData.height * scale;
+        targetWidthPx = imageWidth * scale;
+        targetHeightPx = imageHeight * scale;
       }
     }
 
     return Image(
       image: ResizeImage(
-        CachedNetworkImageProvider(imageData.url),
+        provider,
         width: targetWidthPx.toInt(),
         height: targetHeightPx.toInt(),
       ),

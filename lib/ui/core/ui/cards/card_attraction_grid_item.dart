@@ -52,11 +52,13 @@ class CardAttractionGridItem extends StatelessWidget {
                         borderRadius: BorderRadius.circular(kCardCornerRadius),
                       ),
                     ),
-                    child: CustomImage(
-                      image,
+                    child: CustomImage.network(
                       width: constraints.biggest.width,
                       height: constraints.biggest.height,
+                      imageWidth: image.width.toDouble(),
+                      imageHeight: image.height.toDouble(),
                       fit: BoxFit.cover,
+                      url: image.url,
                     ),
                   );
                 },

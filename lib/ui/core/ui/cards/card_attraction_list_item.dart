@@ -71,11 +71,13 @@ class CardAttractionListItem extends StatelessWidget {
                     borderRadius: BorderRadius.circular(kCardCornerRadius),
                   ),
                 ),
-                child: CustomImage(
-                  image,
+                child: CustomImage.network(
                   width: 72.0,
                   height: 72.0,
+                  imageWidth: image.width.toDouble(),
+                  imageHeight: image.height.toDouble(),
                   fit: BoxFit.cover,
+                  url: image.url,
                 ),
               ),
               Expanded(
