@@ -67,7 +67,10 @@ class ExploreScreenCarouselView extends StatelessWidget {
                 ),
                 child: CarouselView.weighted(
                   padding: const EdgeInsets.only(left: 8.0),
-                  elevation: 0,
+                  elevation: 0.0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(Shapes.extraLarge),
+                  ),
                   itemSnapping: true,
                   enableSplash: false,
                   flexWeights: const [6, 3, 2],

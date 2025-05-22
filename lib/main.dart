@@ -20,13 +20,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 part '_main.dart';
 
-/// The app ObjectBox instance, initialized during app start-up.
+/// The ObjectBox instance.
 late final ObjectBox objectBox;
 
 late final Logger logger;
 
 void main() async {
-  /// Ensures the disk can be accessed before continuing app start-up.
+  // Ensures the disk can be accessed before continuing app start-up.
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
@@ -38,8 +38,7 @@ void main() async {
 
   logger = Logger('Molise Is');
 
-  /// Whether the user has given his consent to log app Exceptions to the
-  /// Sentry service or not.
+  // Whether the user has given his consent to log app exceptions to Sentry or not.
   var enableCrashReporting = false;
 
   final settings = objectBox.store.box<AppSettings>().get(settingsId);

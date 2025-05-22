@@ -40,7 +40,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          edgeOffset: kToolbarHeight * 2.0 + 16.0,
+          edgeOffset: kToolbarHeight * 2.0 + 8.0,
           onRefresh: () async {
             context.read<SyncViewModel>().synchronize(force: true);
 
@@ -80,8 +80,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ],
               ),
               SliverAppBar(
-                elevation: 0,
-                scrolledUnderElevation: 0,
+                elevation: 0.0,
+                scrolledUnderElevation: 0.0,
                 backgroundColor: Theme.of(context).colorScheme.surface,
                 flexibleSpace: Align(
                   child: CustomSearchAnchor(
@@ -97,10 +97,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
                 primary: false,
                 centerTitle: false,
-                collapsedHeight: kToolbarHeight + 16.0,
+                collapsedHeight: kToolbarHeight + 8.0,
                 expandedHeight: kToolbarHeight,
                 pinned: true,
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: 8.0)),
               ExploreScreenCarouselView(
                 attractionsIdsFuture: _viewModel.suggestedAttractionIds,
               ),
@@ -111,17 +112,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                  16.0,
-                  0.0,
-                  16.0,
-                  16.0,
+                padding: const EdgeInsetsDirectional.symmetric(
+                  horizontal: 16.0,
                 ),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final attractionType = _viewModel.attractionTypes[index];
                     return CategoryButton(
-                      type: attractionType,
                       onPressed: () {
                         return GoRouter.of(context).goNamed(
                           RouteNames.homeCategory,
@@ -130,6 +127,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           },
                         );
                       },
+                      attractionType: attractionType,
                     );
                   }, childCount: _viewModel.attractionTypes.length),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -145,6 +143,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   horizontal: 16.0,
                   vertical: 8.0,
                 ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 sliver: SliverToBoxAdapter(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -167,6 +168,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 ),
               ),
+              const SliverToBoxAdapter(child: SizedBox(height: 8.0)),
               AttractionListViewResponsive(
                 _viewModel.latestAttractionIds,
                 onPressed: (attractionId) {
@@ -176,9 +178,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   );
                 },
               ),
-              const SliverPadding(
-                padding: EdgeInsetsDirectional.only(bottom: 16.0),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
             ],
           ),
         ),
