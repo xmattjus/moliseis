@@ -3,6 +3,7 @@ import 'dart:collection' show UnmodifiableListView;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/attraction_and_place_names.dart';
 import 'package:moliseis/ui/core/ui/cards/base_attraction_card.dart';
@@ -155,6 +156,7 @@ class _CarouselViewItem extends StatelessWidget {
                           child: FavouriteButton(
                             color: Colors.white70,
                             id: attraction.id,
+                            radius: Shapes.full,
                           ),
                         ),
                       ),
