@@ -70,7 +70,7 @@ class SearchRepositoryLocal implements SearchRepository {
       /// Searches for any [AttractionType]'s name matching the search query,
       /// then creates a [List] of indexes to pass to the [ObjectBox] query.
       final matchingTypes = AttractionType.values.where(
-        (type) => type.readableName.toLowerCase().contains(query.toLowerCase()),
+        (type) => type.label.toLowerCase().contains(query.toLowerCase()),
       );
 
       final typeIndexes = matchingTypes.map((type) => type.index).toList();

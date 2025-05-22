@@ -12,7 +12,7 @@ Marker generateMapMarker(Attraction attraction, {void Function()? onPressed}) {
     width: 60.0,
     height: 60.0,
     child: _GeoMapMarkerIcon(
-      attraction.type.getIcon(outlined: false),
+      attraction.type.icon,
       size: 60.0,
       onPressed: onPressed,
       tooltip: attraction.name,

@@ -129,7 +129,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                           tabs: UnmodifiableListView<Tab>(
                             _viewModel.attractionTypes.map<Tab>(
                               (AttractionType type) =>
-                                  Tab(text: type.readableName),
+                                  Tab(text: type.label),
                             ),
                           ),
                           controller: _tabController,

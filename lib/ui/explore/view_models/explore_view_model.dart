@@ -24,7 +24,7 @@ class ExploreViewModel extends ChangeNotifier {
 
   /// Returns a list of [AttractionType]s containing all but
   /// [AttractionType.unknown].
-  final _attractionTypes = AttractionType.values.sublist(1);
+  final _attractionTypes = AttractionType.values.minusUnknown;
 
   final List<AttractionUiState> _latestAttractions = [];
   List<int> _latestAttractionIds = [];

@@ -55,8 +55,8 @@ class CategoryButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(Shapes.medium),
         ),
       ),
-      icon: Icon(attractionType.getIcon()),
-      label: Text(attractionType.readableName),
+      icon: Icon(attractionType.iconAlt),
+      label: Text(attractionType.label),
     );
   }
 }

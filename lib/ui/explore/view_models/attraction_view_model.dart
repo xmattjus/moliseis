@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/data/repositories/attraction/attraction_repository.dart';
 import 'package:moliseis/domain/models/attraction/attraction.dart';
 import 'package:moliseis/domain/models/attraction/attraction_type.dart';
+import 'package:moliseis/utils/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class AttractionViewModel extends ChangeNotifier {
@@ -17,9 +18,7 @@ class AttractionViewModel extends ChangeNotifier {
   Future<List<int>>? _latestAttractionIds;
   final List<int> _savedAttractionIds;
 
-  /// Returns a list of [AttractionType]s containing all but
-  /// [AttractionType.unknown].
-  final List<AttractionType> _types = AttractionType.values.sublist(1);
+  final List<AttractionType> _types = AttractionType.values.minusUnknown;
 
   UnmodifiableListView<AttractionType> get attractionTypes =>
       UnmodifiableListView(_types);
