@@ -36,7 +36,7 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
             child: CustomRichText(
               const Text('In breve'),
               labelTextStyle: CustomTextStyles.section(context),
-              content: Text(attraction.summary).justify,
+              content: Text(attraction.summary),
               maxLines: 2,
             ),
           );

@@ -70,28 +70,3 @@ extension StringExtensions on String {
     return false;
   }
 }
-
-extension TextExtensions on Text {
-  /// Changes the Text textAlign property to [TextAlign.justify].
-  Text get justify {
-    return Text(
-      data!,
-      key: key,
-      style: style,
-      strutStyle: strutStyle,
-      textAlign: TextAlign.justify,
-      textDirection: textDirection,
-      locale: locale,
-      softWrap: softWrap,
-      overflow: overflow,
-      // ignore: deprecated_member_use
-      textScaleFactor: textScaleFactor,
-      textScaler: textScaler,
-      maxLines: maxLines,
-      semanticsLabel: semanticsLabel,
-      textWidthBasis: textWidthBasis,
-      textHeightBehavior: textHeightBehavior,
-      selectionColor: selectionColor,
-    );
-  }
-}
