@@ -155,10 +155,12 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
                       }
                     }
                   },
-                  child: CustomImage(
-                    widget.images[index],
+                  child: CustomImage.network(
+                    widget.images[index].url,
                     width: screenWidth,
                     height: widgetHeight,
+                    imageWidth: widget.images[index].width.toDouble(),
+                    imageHeight: widget.images[index].height.toDouble(),
                     fit: BoxFit.cover,
                     onImageLoading: (isLoading) {
                       if (_enableAutoScroll) {

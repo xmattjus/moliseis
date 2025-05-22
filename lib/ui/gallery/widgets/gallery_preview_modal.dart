@@ -21,11 +21,11 @@ class GalleryPreviewModal {
         context: context,
         itemBuilder: (context, index) {
           return CustomImage.network(
+            images[index].url,
             width: MediaQuery.sizeOf(context).width,
             height: MediaQuery.sizeOf(context).height,
             imageWidth: images[index].width.toDouble(),
             imageHeight: images[index].height.toDouble(),
-            url: images[index].url,
           );
         },
         itemCount: images.length,

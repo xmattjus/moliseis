@@ -118,10 +118,12 @@ class _CarouselViewItem extends StatelessWidget {
               decoration: BoxDecoration(color: Colors.black.withAlpha(40)),
               position: DecorationPosition.foreground,
               child: CardBase(
-                child: CustomImage(
-                  image,
+                child: CustomImage.network(
+                  image.url,
                   width: width,
                   height: height,
+                  imageWidth: image.width.toDouble(),
+                  imageHeight: image.height.toDouble(),
                   fit: BoxFit.cover,
                 ),
                 onPressed: () {

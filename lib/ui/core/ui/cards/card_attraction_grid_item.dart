@@ -53,12 +53,12 @@ class CardAttractionGridItem extends StatelessWidget {
                       ),
                     ),
                     child: CustomImage.network(
+                      image.url,
                       width: constraints.biggest.width,
                       height: constraints.biggest.height,
                       imageWidth: image.width.toDouble(),
                       imageHeight: image.height.toDouble(),
                       fit: BoxFit.cover,
-                      url: image.url,
                     ),
                   );
                 },

@@ -19,24 +19,24 @@ class CustomImage extends StatelessWidget {
     this.onImageLoading,
   });
 
-  CustomImage.network({
+  CustomImage.network(
+    String url, {
     required this.width,
     required this.height,
     required this.imageWidth,
     required this.imageHeight,
     this.fit,
     this.onImageLoading,
-    required String url,
   }) : provider = CachedNetworkImageProvider(url);
 
-  CustomImage.file({
+  CustomImage.file(
+    File file, {
     required this.width,
     required this.height,
     required this.imageWidth,
     required this.imageHeight,
     this.fit,
     this.onImageLoading,
-    required File file,
   }) : provider = FileImage(file);
 
   final ImageProvider provider;

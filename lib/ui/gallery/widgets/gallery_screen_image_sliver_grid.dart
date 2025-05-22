@@ -35,12 +35,12 @@ class GalleryScreenImageSliverGrid extends StatelessWidget {
                 LayoutBuilder(
                   builder: (_, constraints) {
                     return CustomImage.network(
+                      attraction.images[index].url,
                       width: constraints.biggest.width,
                       height: constraints.biggest.height,
                       imageWidth: attraction.images[index].width.toDouble(),
                       imageHeight: attraction.images[index].height.toDouble(),
                       fit: BoxFit.cover,
-                      url: attraction.images[index].url,
                     );
                   },
                 ),

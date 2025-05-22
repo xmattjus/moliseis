@@ -151,10 +151,12 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
                         initialIndex: index,
                       );
                     },
-                    child: CustomImage(
-                      attraction.images[index],
+                    child: CustomImage.network(
+                      attraction.images[index].url,
                       width: width,
                       height: 200.0,
+                      imageWidth: attraction.images[index].width.toDouble(),
+                      imageHeight: attraction.images[index].height.toDouble(),
                       fit: BoxFit.cover,
                     ),
                   );
