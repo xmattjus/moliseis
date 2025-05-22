@@ -5,6 +5,7 @@ import 'package:moliseis/data/repositories/core/repository_sync_state.dart';
 import 'package:moliseis/domain/models/geo_map/geo_map_state.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
@@ -27,31 +28,31 @@ final _mapShellNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
-  initialLocation: '/${RouteNames.explore}',
   redirect: (context, state) {
     final repositoryViewModel = context.read<SyncViewModel>();
 
     if (repositoryViewModel.state == RepositorySyncState.loading) {
-      return '/${RouteNames.sync}';
+      return RoutePaths.sync;
     }
 
     if (repositoryViewModel.state == RepositorySyncState.done &&
         repositoryViewModel.result != RepositorySyncResult.majorError &&
-        state.uri.toString().contains('/${RouteNames.sync}')) {
-      return '/${RouteNames.explore}';
+        state.uri.toString().contains(RoutePaths.sync)) {
+      return RoutePaths.home;
     }
+
+    // https://stackoverflow.com/a/78203240
+    if (state.fullPath?.isEmpty ?? true) return RoutePaths.home;
 
     return null;
   },
   routes: <RouteBase>[
     GoRoute(
-      path: '/${RouteNames.sync}',
-      pageBuilder: (BuildContext context, GoRouterState state) {
-        return const NoTransitionPage(child: SyncScreen());
-      },
+      path: RoutePaths.sync,
+      pageBuilder: (_, _) => const NoTransitionPage(child: SyncScreen()),
     ),
     GoRoute(
-      path: '/${RouteNames.settings}',
+      path: RoutePaths.settings,
       name: RouteNames.settings,
       builder: (_, _) => const SettingsScreen(),
     ),
@@ -61,15 +62,13 @@ final appRouter = GoRouter(
           navigatorKey: _exploreShellNavigatorKey,
           routes: <RouteBase>[
             GoRoute(
-              path: '/${RouteNames.explore}',
-              name: RouteNames.explore,
-              builder: (_, _) {
-                return const ExploreScreen();
-              },
+              path: RoutePaths.home,
+              name: RouteNames.home,
+              builder: (_, _) => const ExploreScreen(),
               routes: <RouteBase>[
                 GoRoute(
-                  path: RouteNames.searchResult,
-                  name: RouteNames.searchResult,
+                  path: RoutePaths.homeSearchResults,
+                  name: RouteNames.homeSearchResults,
                   builder: (context, state) {
                     final viewModel = SearchViewModel(
                       attractionRepository: context.read(),
@@ -82,7 +81,7 @@ final appRouter = GoRouter(
                     );
                   },
                 ),
-                storyRoute(routeName: RouteNames.exploreStory),
+                storyRoute(routeName: RouteNames.homeStory),
                 categoriesRoute(
                   routeName: RouteNames.exploreCategories,
                   childRouteName: RouteNames.exploreCategoriesStory,
@@ -95,18 +94,18 @@ final appRouter = GoRouter(
           navigatorKey: _searchShellNavigatorKey,
           routes: [
             GoRoute(
-              path: '/${RouteNames.search}',
-              name: RouteNames.search,
+              path: RoutePaths.favourites,
+              name: RouteNames.favourites,
               builder: (context, _) {
                 return FavouriteScreen(
                   viewModel: context.read<FavouriteViewModel>(),
                 );
               },
               routes: <RouteBase>[
-                storyRoute(routeName: RouteNames.searchStory),
+                storyRoute(routeName: RouteNames.favouritesStory),
                 categoriesRoute(
-                  routeName: RouteNames.searchCategories,
-                  childRouteName: RouteNames.searchCategoriesStory,
+                  routeName: RouteNames.favouritesCategory,
+                  childRouteName: RouteNames.favouritesCategoryStory,
                 ),
               ],
             ),
@@ -116,7 +115,7 @@ final appRouter = GoRouter(
           navigatorKey: _galleryShellNavigatorKey,
           routes: <RouteBase>[
             GoRoute(
-              path: '/${RouteNames.gallery}',
+              path: RoutePaths.gallery,
               name: RouteNames.gallery,
               builder: (_, _) {
                 return const GalleryScreen();
@@ -128,8 +127,8 @@ final appRouter = GoRouter(
           navigatorKey: _mapShellNavigatorKey,
           routes: <RouteBase>[
             GoRoute(
-              path: '/${RouteNames.map}',
-              name: RouteNames.map,
+              path: RoutePaths.geoMap,
+              name: RouteNames.geoMap,
               builder: (context, state) {
                 final mapState =
                     state.extra as GeoMapState? ?? const GeoMapState();

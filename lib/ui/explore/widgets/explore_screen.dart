@@ -124,7 +124,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       type: attractionType,
                       onPressed: () {
                         return GoRouter.of(context).goNamed(
-                          RouteNames.exploreCategories,
+                          RouteNames.homeCategory,
                           pathParameters: {
                             'index': (attractionType.index - 1).toString(),
                           },
@@ -153,11 +153,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         child: TextSectionDivider('Ultimi aggiunti'),
                       ),
                       OutlinedButton.icon(
-                        onPressed:
-                            () => GoRouter.of(context).goNamed(
-                              RouteNames.exploreCategories,
-                              pathParameters: {'index': '0'},
-                            ),
+                        onPressed: () => GoRouter.of(context).goNamed(
+                          RouteNames.homeCategory,
+                          pathParameters: {'index': '0'},
+                        ),
                         style: const ButtonStyle(
                           visualDensity: VisualDensity.compact,
                         ),
@@ -172,7 +171,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 _viewModel.latestAttractionIds,
                 onPressed: (attractionId) {
                   GoRouter.of(context).goNamed(
-                    RouteNames.exploreStory,
+                    RouteNames.homeStory,
                     pathParameters: {'id': attractionId.toString()},
                   );
                 },

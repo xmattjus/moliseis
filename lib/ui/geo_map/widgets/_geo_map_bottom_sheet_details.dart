@@ -166,7 +166,7 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
               child: LinkTextButton(
                 onPressed: () {
                   GoRouter.of(context).goNamed(
-                    RouteNames.exploreStory,
+                    RouteNames.homeStory,
                     pathParameters: {'id': attraction.id.toString()},
                   );
                 },

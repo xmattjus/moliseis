@@ -128,7 +128,7 @@ class _CarouselViewItem extends StatelessWidget {
                 ),
                 onPressed: () {
                   GoRouter.of(context).goNamed(
-                    RouteNames.exploreStory,
+                    RouteNames.homeStory,
                     pathParameters: {'id': attraction.id.toString()},
                   );
                 },
