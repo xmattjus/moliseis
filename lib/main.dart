@@ -38,16 +38,13 @@ void main() async {
 
   logger = Logger('Molise Is');
 
-  // Whether the user has given his consent to log app exceptions to Sentry or not.
-  var enableCrashReporting = false;
-
+  // Retrieves the app settings to check whether the user has given his consent
+  // to report exceptions or not.
   final settings = objectBox.store.box<AppSettings>().get(settingsId);
 
-  if (settings != null) {
-    enableCrashReporting = settings.crashReporting && !kDebugMode;
-  }
+  final reportExceptions = (settings?.crashReporting ?? false) && !kDebugMode;
 
-  await _initializeSentry(enableCrashReporting, const MoliseIsApp());
+  await _initializeSentry(reportExceptions, const MoliseIsApp());
 }
 
 class MoliseIsApp extends StatelessWidget {
