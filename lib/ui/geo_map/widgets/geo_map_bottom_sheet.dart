@@ -19,7 +19,6 @@ import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/future_built.dart';
 import 'package:moliseis/ui/core/ui/link_text_button.dart';
 import 'package:moliseis/ui/core/ui/near_attractions_list.dart';
-import 'package:moliseis/ui/core/ui/pad.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/explore/view_models/attraction_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';

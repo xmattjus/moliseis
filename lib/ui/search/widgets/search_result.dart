@@ -5,7 +5,6 @@ import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/pad.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
@@ -53,11 +52,14 @@ class _SearchResultState extends State<SearchResult> {
           children: [
             CustomScrollView(
               slivers: [
-                const SliverToBoxAdapter(
-                  child: Pad(
-                    t: kToolbarHeight + 16.0,
-                    b: 8.0,
-                    h: 16.0,
+                const SliverPadding(
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    16.0,
+                    kToolbarHeight + 16.0,
+                    16.0,
+                    8.0,
+                  ),
+                  sliver: SliverToBoxAdapter(
                     child: TextSectionDivider('Risultati'),
                   ),
                 ),

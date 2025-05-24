@@ -123,7 +123,10 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
                 FavouriteButton.wide(id: attraction.id),
               ],
             ),
-            const Pad(t: 16.0, h: 16.0, child: TextSectionDivider('Immagini')),
+            const Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 0.0),
+              child: TextSectionDivider('Immagini'),
+            ),
             SizedBox(
               height: 200.0,
               child: ListView.separated(
@@ -173,8 +176,10 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
                 label: const Text('Apri dettagli'),
               ),
             ),
-            Pad(
-              t: attraction.summary.isNotEmpty ? 16.0 : 0,
+            Padding(
+              padding: EdgeInsetsDirectional.only(
+                top: attraction.summary.isNotEmpty ? 16.0 : 0.0,
+              ),
               child: NearAttractionsList(
                 coordinates: <double>[
                   attraction.coordinates[0],

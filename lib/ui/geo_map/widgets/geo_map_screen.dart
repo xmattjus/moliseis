@@ -8,7 +8,6 @@ import 'package:moliseis/domain/models/attraction/attraction.dart';
 import 'package:moliseis/domain/models/geo_map/geo_map_state.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/future_built.dart';
-import 'package:moliseis/ui/core/ui/pad.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_attribution.dart';
@@ -267,7 +266,10 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
             child: child,
           );
         },
-        child: const Pad(v: 8.0, child: GeoMapAttribution()),
+        child: const Padding(
+          padding: EdgeInsetsDirectional.symmetric(vertical: 8.0),
+          child: GeoMapAttribution(),
+        ),
       ),
     );
 
