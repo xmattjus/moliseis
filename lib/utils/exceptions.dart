@@ -1,7 +1,7 @@
 class AttractionNullException implements Exception {
-  final int id;
+  const AttractionNullException(this.id);
 
-  AttractionNullException(this.id);
+  final int id;
 
   @override
   String toString() {
@@ -10,9 +10,9 @@ class AttractionNullException implements Exception {
 }
 
 class MolisImageNullException implements Exception {
-  final int id;
+  const MolisImageNullException(this.id);
 
-  MolisImageNullException(this.id);
+  final int id;
 
   @override
   String toString() {
@@ -22,9 +22,9 @@ class MolisImageNullException implements Exception {
 }
 
 class PlaceNullException implements Exception {
-  final int id;
+  const PlaceNullException(this.id);
 
-  PlaceNullException(this.id);
+  final int id;
 
   @override
   String toString() {
