@@ -20,10 +20,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 part '_main.dart';
 
+late final Logger log;
+
 /// The ObjectBox instance.
 late final ObjectBox objectBox;
-
-late final Logger logger;
 
 void main() async {
   // Ensures the disk can be accessed before continuing app start-up.
@@ -36,7 +36,7 @@ void main() async {
 
   objectBox = await ObjectBox.create();
 
-  logger = Logger('Molise Is');
+  log = Logger('Molise Is');
 
   // Retrieves the app settings to check whether the user has given his consent
   // to report exceptions or not.

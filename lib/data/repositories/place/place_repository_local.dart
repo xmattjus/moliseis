@@ -20,15 +20,16 @@ class PlaceRepositoryLocal implements PlaceRepository {
        _placeBox = objectBoxI.store.box<Place>(),
        _attractionBox = objectBoxI.store.box<Attraction>();
 
+  final _log = Logger('PlaceRepositoryLocal');
+
   final Supabase _supabase;
   final PlaceSupabaseTable _supabaseTable;
   final Box<Place> _placeBox;
   final Box<Attraction> _attractionBox;
-  final _logger = Logger('PlaceRepositoryLocal');
 
   @override
   Future<Result<void>> synchronize() async {
-    _logger.info(LogEvents.repositoryUpdate);
+    _log.info(LogEvents.repositoryUpdate);
 
     try {
       final places = await _supabase.client
@@ -62,26 +63,26 @@ class PlaceRepositoryLocal implements PlaceRepository {
             place.attractions.addAll(attractions);
 
             if (old == null) {
-              _logger.info('Inserting new place with id: ${place.id}');
+              _log.info('Inserting new place with id: ${place.id}');
 
               _placeBox.put(place);
             } else {
               if (old != place) {
-                _logger.info('Updating place with id: ${place.id}');
+                _log.info('Updating place with id: ${place.id}');
 
                 _placeBox.put(place);
               }
             }
           } else {
             if (_placeBox.contains(place.id)) {
-              _logger.warning(
+              _log.warning(
                 'Place with id: ${place.id} does not have a valid backlink and '
                 'will be removed',
               );
 
               _placeBox.remove(place.id);
             } else {
-              _logger.warning(
+              _log.warning(
                 'Place with id: ${place.id} does not have a valid backlink and '
                 'will not be put',
               );
@@ -118,7 +119,7 @@ class PlaceRepositoryLocal implements PlaceRepository {
 
       return const Result.success(null);
     } on Exception catch (error) {
-      _logger.severe(LogEvents.repositoryUpdateError(error));
+      _log.severe(LogEvents.repositoryUpdateError(error));
 
       return Result.error(error);
     }

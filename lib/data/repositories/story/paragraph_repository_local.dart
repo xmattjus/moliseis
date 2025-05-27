@@ -19,6 +19,8 @@ class ParagraphRepositoryLocal implements ParagraphRepository {
        _storyBox = objectBoxI.store.box<Story>(),
        _paragraphBox = objectBoxI.store.box<Paragraph>();
 
+  final _log = Logger('ParagraphRepositoryLocal');
+
   final Supabase _supabase;
   final ParagraphSupabaseTable _supabaseTable;
   // The box to which the [Story] box depends upon.
@@ -26,18 +28,17 @@ class ParagraphRepositoryLocal implements ParagraphRepository {
   final Box<Paragraph> _paragraphBox;
 
   bool _isInitialized = false;
-  final _logger = Logger('ParagraphRepositoryLocal');
 
   @override
   Future<Result<List<Paragraph>>> getParagraphsFromStoryId(int id) async {
     if (!_isInitialized) {
       try {
-        _logger.info(LogEvents.repositoryUpdate);
+        _log.info(LogEvents.repositoryUpdate);
 
         await _initialize();
         _isInitialized = true;
       } on Exception catch (error) {
-        _logger.severe(LogEvents.repositoryUpdateError(error));
+        _log.severe(LogEvents.repositoryUpdateError(error));
 
         return Result.error(error);
       }

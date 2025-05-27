@@ -19,6 +19,8 @@ class StoryRepositoryLocal implements StoryRepository {
        _attractionBox = objectBoxI.store.box<Attraction>(),
        _storyBox = objectBoxI.store.box<Story>();
 
+  final _log = Logger('StoryRepositoryLocal');
+
   final Supabase _supabase;
   final StorySupabaseTable _supabaseTable;
   // The box to which the [Story] box depends upon.
@@ -26,7 +28,6 @@ class StoryRepositoryLocal implements StoryRepository {
   final Box<Story> _storyBox;
 
   bool _isInitialized = false;
-  final _logger = Logger('StoryRepositoryLocal');
 
   @override
   Future<Result<List<Story>>> get allStories => throw UnimplementedError();
@@ -35,12 +36,12 @@ class StoryRepositoryLocal implements StoryRepository {
   Future<Result<List<Story>>> getStoriesFromAttractionId(int id) async {
     if (!_isInitialized) {
       try {
-        _logger.info(LogEvents.repositoryUpdate);
+        _log.info(LogEvents.repositoryUpdate);
 
         await _initialize();
         _isInitialized = true;
       } on Exception catch (error) {
-        _logger.severe(LogEvents.repositoryUpdateError(error));
+        _log.severe(LogEvents.repositoryUpdateError(error));
 
         return Result.error(error);
       }

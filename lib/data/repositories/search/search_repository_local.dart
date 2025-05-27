@@ -26,12 +26,13 @@ class SearchRepositoryLocal implements SearchRepository {
           .query(Attraction_.dbType.oneOf(<int>[]))
           .build();
 
+  final _log = Logger('SearchRepositoryLocal');
+
   final Box<SearchQuery> _searchHistoryBox;
   final Box<Place> _placeBox;
   final Query<Place> _placeQuery;
   final Query<Attraction> _attractionQuery;
   final Query<Attraction> _typeQuery;
-  final _logger = Logger('SearchRepositoryLocal');
 
   @override
   Future<Result> addToHistory(String query) async {
@@ -50,7 +51,7 @@ class SearchRepositoryLocal implements SearchRepository {
 
       _searchHistoryBox.putAsync(SearchQuery(query));
     } on Exception catch (error) {
-      _logger.severe(error);
+      _log.severe(error);
       return Result.error(error);
     }
 
@@ -109,7 +110,7 @@ class SearchRepositoryLocal implements SearchRepository {
 
       return Result.success(results);
     } on Exception catch (error) {
-      _logger.severe(error);
+      _log.severe(error);
       return Result.error(error);
     }
   }
@@ -123,7 +124,7 @@ class SearchRepositoryLocal implements SearchRepository {
         history.map<String>((element) => element.name).toList(),
       );
     } on Exception catch (error) {
-      _logger.severe(error);
+      _log.severe(error);
       return Result.error(error);
     }
   }
@@ -141,7 +142,7 @@ class SearchRepositoryLocal implements SearchRepository {
       }
       return const Result.success(null);
     } on Exception catch (error) {
-      _logger.severe(error);
+      _log.severe(error);
       return Result.error(error);
     }
   }

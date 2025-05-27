@@ -2,10 +2,11 @@ import 'package:logging/logging.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AppUrlLauncher {
+  final _log = Logger('AppUrlLauncher');
+
   final _mapTilerUrl = 'https://www.maptiler.com/copyright/';
   final _openStreetMapUrl = 'https://www.openstreetmap.org/copyright';
   final _googleMapsUrl = 'https://www.google.com/maps/search/?api=1';
-  final _logger = Logger('AppUrlLauncher');
 
   Future<bool> _launch(String url) async {
     // Whether [url] could be handled or not.
@@ -19,14 +20,14 @@ class AppUrlLauncher {
           await launchUrl(uri);
           result = true;
         } else {
-          _logger.severe('Could not handle $uri');
+          _log.severe('Could not handle $uri');
         }
       } on Exception catch (error) {
-        _logger.severe(error);
+        _log.severe(error);
       }
     } on Exception catch (error) {
       // Logs any parsing error.
-      _logger.severe(error);
+      _log.severe(error);
     }
 
     return result;

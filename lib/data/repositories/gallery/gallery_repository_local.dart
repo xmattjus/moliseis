@@ -20,11 +20,12 @@ class GalleryRepositoryLocal implements GalleryRepository {
        _attractionBox = objectBoxI.store.box<Attraction>(),
        _imageBox = objectBoxI.store.box<MolisImage>();
 
+  final _log = Logger('GalleryRepositoryLocal');
+
   final Supabase _supabase;
   final ImageSupabaseTable _supabaseTable;
   final Box<Attraction> _attractionBox;
   final Box<MolisImage> _imageBox;
-  final _logger = Logger('GalleryRepositoryLocal');
 
   @override
   List<MolisImage> getAllImages(AttractionSort sortBy) {
@@ -48,13 +49,13 @@ class GalleryRepositoryLocal implements GalleryRepository {
   @override
   Future<Result<void>> synchronize() async {
     try {
-      _logger.info(LogEvents.repositoryUpdate);
+      _log.info(LogEvents.repositoryUpdate);
 
       await _synchronize();
 
       return const Result.success(null);
     } on Exception catch (error) {
-      _logger.severe(LogEvents.repositoryUpdateError(error));
+      _log.severe(LogEvents.repositoryUpdateError(error));
 
       return Result.error(error);
     }
@@ -99,7 +100,7 @@ class GalleryRepositoryLocal implements GalleryRepository {
         /// related does exist.
         if (_attractionBox.contains(image.backlinkId)) {
           if (!_imageBox.contains(image.id)) {
-            _logger.info(
+            _log.info(
               'Inserting new image with id: ${image.id} and '
               'backlink id: ${image.backlinkId}',
             );
@@ -114,7 +115,7 @@ class GalleryRepositoryLocal implements GalleryRepository {
             final old = _imageBox.get(image.id)!;
 
             if (old.modifiedAt.toUtc() != image.modifiedAt) {
-              _logger.info(
+              _log.info(
                 'Updating image with id: ${image.id} and '
                 'backlink id: ${image.backlinkId}',
               );
@@ -137,14 +138,14 @@ class GalleryRepositoryLocal implements GalleryRepository {
           }
         } else {
           if (_imageBox.contains(image.id)) {
-            _logger.warning(
+            _log.warning(
               'Image with id: ${image.id} does not have a valid backlink and '
               'will be removed from the local copy',
             );
 
             _imageBox.remove(image.id);
           } else {
-            _logger.warning(
+            _log.warning(
               'Image with id: ${image.id} does not have a valid backlink and '
               'will not be put',
             );

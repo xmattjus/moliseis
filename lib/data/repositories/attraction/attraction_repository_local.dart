@@ -20,10 +20,11 @@ class AttractionRepositoryLocal implements AttractionRepository {
        _supabaseTable = attractionSupabaseTable,
        _attractionBox = objectBoxI.store.box<Attraction>();
 
+  final _log = Logger('AttractionRepositoryLocal');
+
   final Supabase _supabase;
   final AttractionSupabaseTable _supabaseTable;
   final Box<Attraction> _attractionBox;
-  final _logger = Logger('AttractionRepositoryLocal');
 
   @override
   Future<List<Attraction>> getAll(AttractionSort sortBy) async {
@@ -94,7 +95,7 @@ class AttractionRepositoryLocal implements AttractionRepository {
 
   @override
   Future<Result<void>> synchronize() async {
-    _logger.info(LogEvents.repositoryUpdate);
+    _log.info(LogEvents.repositoryUpdate);
 
     try {
       final attractions = await _supabase.client
@@ -120,12 +121,12 @@ class AttractionRepositoryLocal implements AttractionRepository {
           final old = _attractionBox.get(attraction.id);
 
           if (old == null) {
-            _logger.info('Inserting new attraction with id: ${attraction.id}');
+            _log.info('Inserting new attraction with id: ${attraction.id}');
 
             _attractionBox.put(attraction);
           } else {
             if (old != attraction) {
-              _logger.info('updating attraction with id: ${attraction.id}');
+              _log.info('updating attraction with id: ${attraction.id}');
 
               final updated = old.copyWith(
                 name: attraction.name,
@@ -162,7 +163,7 @@ class AttractionRepositoryLocal implements AttractionRepository {
 
       return const Result.success(null);
     } on Exception catch (error) {
-      _logger.severe(LogEvents.repositoryUpdateError(error));
+      _log.severe(LogEvents.repositoryUpdateError(error));
 
       return Result.error(error);
     }
