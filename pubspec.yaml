@@ -21,6 +21,7 @@ dependencies:
   device_info_plus: ^11.4.0
   #dynamic_color: ^1.7.0
   # E
+  email_validator: ^3.0.0
   envied: ^1.1.1
   # F
   flutter:
@@ -59,6 +60,7 @@ dependencies:
   sentry_logging: ^8.14.2
   share_plus: ^11.0.0
   skeletonizer: ^2.0.1
+  string_validator: ^1.1.0
   supabase: ^2.7.0
   supabase_flutter: ^2.9.0
   swipe_image_gallery: ^0.10.2

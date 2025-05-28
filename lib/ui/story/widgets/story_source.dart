@@ -3,7 +3,7 @@ import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/url_text_button.dart';
 import 'package:moliseis/utils/app_url_launcher.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/string_validator.dart';
 import 'package:provider/provider.dart';
 
 class StorySource extends StatelessWidget {
@@ -21,7 +21,7 @@ class StorySource extends StatelessWidget {
           child: Text('Fonti', style: CustomTextStyles.section(context)),
         ),
         ...texts.map((e) {
-          return e.isValidUrl
+          return StringValidator.isValidUrl(e)
               ? UrlTextButton.icon(
                   label: Text(e, maxLines: 1, overflow: TextOverflow.ellipsis),
                   icon: const Icon(Icons.link),

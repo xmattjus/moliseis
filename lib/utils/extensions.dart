@@ -52,18 +52,3 @@ extension BuildContextExtensions on BuildContext {
     return Theme.of(this).brightness == Brightness.dark;
   }
 }
-
-extension StringExtensions on String {
-  bool get isValidUrl {
-    final regExp = RegExp(
-      r'(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])',
-      caseSensitive: false,
-    );
-
-    if (regExp.hasMatch(this)) {
-      return true;
-    }
-
-    return false;
-  }
-}
