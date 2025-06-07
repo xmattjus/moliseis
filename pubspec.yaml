@@ -44,8 +44,8 @@ dependencies:
   meta: ^1.16.0
   # N
   # O
-  objectbox: ^4.2.0
-  objectbox_flutter_libs: ^4.2.0
+  objectbox: ^4.3.0
+  objectbox_flutter_libs: ^4.3.0
   # P
   path: ^1.9.1
   path_provider: ^2.1.5
@@ -96,7 +96,7 @@ dev_dependencies:
   # M
   # N
   # O
-  objectbox_generator: ^4.2.0
+  objectbox_generator: ^4.3.0
   # P
   # Q
   # R
