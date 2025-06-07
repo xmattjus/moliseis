@@ -4,6 +4,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:logging/logging.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/config/env/env.dart';
@@ -76,6 +77,15 @@ class MoliseIsApp extends StatelessWidget {
               );
             },
             title: 'Molise Is',
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale.fromSubtags(languageCode: 'en'),
+              Locale.fromSubtags(languageCode: 'it'), // Spanish
+            ],
             theme: AppThemeData.light(),
             darkTheme: AppThemeData.dark(),
             themeMode: controller.themeMode,
