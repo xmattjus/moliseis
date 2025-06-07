@@ -84,7 +84,7 @@ class MoliseIsApp extends StatelessWidget {
             ],
             supportedLocales: const [
               Locale.fromSubtags(languageCode: 'en'),
-              Locale.fromSubtags(languageCode: 'it'), // Spanish
+              Locale.fromSubtags(languageCode: 'it'),
             ],
             theme: AppThemeData.light(),
             darkTheme: AppThemeData.dark(),
