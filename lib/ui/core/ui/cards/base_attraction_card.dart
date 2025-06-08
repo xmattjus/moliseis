@@ -100,7 +100,7 @@ class _BaseAttractionCardState extends State<BaseAttractionCard>
           place: data[2] as Place,
         ),
         onError: (error) {
-          logger.severe('', error);
+          log.severe('', error);
           return const EmptyView.error(text: SizedBox());
         },
       ),
