@@ -24,7 +24,7 @@ void showSnackBar({
   final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
 
   if (scaffoldMessenger == null) {
-    logger.warning('ScaffoldMessenger.maybeOf(context) is null.');
+    log.warning('ScaffoldMessenger.maybeOf(context) is null.');
     return;
   }
 

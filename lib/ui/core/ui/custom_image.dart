@@ -125,7 +125,7 @@ class CustomImage extends StatelessWidget {
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        logger.severe(LogEvents.imageLoadingError, error, stackTrace);
+        log.severe(LogEvents.imageLoadingError, error, stackTrace);
 
         const color = Colors.grey;
 
