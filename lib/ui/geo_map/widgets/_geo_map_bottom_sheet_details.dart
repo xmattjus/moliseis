@@ -141,6 +141,7 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
                   final mediaQuery = MediaQuery.maybeSizeOf(context);
                   final width = (mediaQuery?.width ?? 400.0) * 0.66;
                   return CardBase(
+                    elevation: 0.0,
                     onPressed: () async {
                       const modal = GalleryPreviewModal();
                       await modal(
