@@ -17,7 +17,7 @@ final class StringValidator {
   ///
   /// Setting [allowSecureTransportOnly] to false optionally allows an http url
   /// to be considered valid.
-  static bool isValidUrl(String? s, [bool allowSecureTransportOnly = true]) {
+  static bool isValidUrl(String? s, {bool allowSecureTransportOnly = true}) {
     final supportedProtocols = allowSecureTransportOnly
         ? ['https']
         : ['http', 'https'];
