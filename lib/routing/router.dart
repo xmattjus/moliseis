@@ -16,6 +16,8 @@ import 'package:moliseis/ui/geo_map/widgets/geo_map_screen.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/search_result.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
+import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
+import 'package:moliseis/ui/suggestion/widgets/suggestion_screen.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
 import 'package:provider/provider.dart';
@@ -85,6 +87,17 @@ final appRouter = GoRouter(
                 categoriesRoute(
                   routeName: RouteNames.exploreCategories,
                   childRouteName: RouteNames.exploreCategoriesStory,
+                ),
+                GoRoute(
+                  path: RoutePaths.suggestion,
+                  name: RouteNames.suggestion,
+                  builder: (context, _) {
+                    final viewModel = SuggestionViewModel(
+                      suggestionRepository: context.read(),
+                    );
+                    return SuggestionScreen(viewModel: viewModel);
+                  },
+                  parentNavigatorKey: _rootNavigatorKey,
                 ),
               ],
             ),

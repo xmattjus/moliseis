@@ -31,3 +31,39 @@ class PlaceNullException implements Exception {
     return 'No Place from attraction id: $id has been found in the Places box.';
   }
 }
+
+class SupabaseResponseException implements Exception {
+  const SupabaseResponseException();
+
+  @override
+  String toString() {
+    return 'Supabase exception.';
+  }
+}
+
+class CloudinaryEmptyResponseException implements Exception {
+  const CloudinaryEmptyResponseException();
+
+  @override
+  String toString() {
+    return 'Cloudinary returned an empty response.';
+  }
+}
+
+class CloudinaryEmptyUrlException implements Exception {
+  const CloudinaryEmptyUrlException();
+
+  @override
+  String toString() {
+    return 'Cloudinary returned an empty url.';
+  }
+}
+
+class CloudinaryNullResponseException implements Exception {
+  const CloudinaryNullResponseException();
+
+  @override
+  String toString() {
+    return 'Cloudinary returned no response (null).';
+  }
+}

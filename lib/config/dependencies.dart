@@ -1,6 +1,7 @@
 import 'dart:async' show StreamController;
 
 import 'package:flutter/material.dart' show Widget;
+import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/repositories/attraction/attraction_repository.dart';
 import 'package:moliseis/data/repositories/attraction/attraction_repository_local.dart';
 import 'package:moliseis/data/repositories/gallery/gallery_repository.dart';
@@ -15,11 +16,15 @@ import 'package:moliseis/data/repositories/story/paragraph_repository.dart';
 import 'package:moliseis/data/repositories/story/paragraph_repository_local.dart';
 import 'package:moliseis/data/repositories/story/story_repository.dart';
 import 'package:moliseis/data/repositories/story/story_repository_local.dart';
+import 'package:moliseis/data/repositories/suggestion/suggestion_repository.dart';
+import 'package:moliseis/data/repositories/suggestion/suggestion_repository_remote.dart';
+import 'package:moliseis/data/services/remote/cloudinary.dart';
 import 'package:moliseis/domain/models/attraction/attraction_supabase_table.dart';
 import 'package:moliseis/domain/models/molis_image/image_supabase_table.dart';
 import 'package:moliseis/domain/models/paragraph/paragraph_supabase_table.dart';
 import 'package:moliseis/domain/models/place/place_supabase_table.dart';
 import 'package:moliseis/domain/models/story/story_supabase_table.dart';
+import 'package:moliseis/domain/models/suggestion/suggestion_supabase_table.dart';
 import 'package:moliseis/domain/use-cases/sync/sync_start_use_case.dart';
 import 'package:moliseis/main.dart';
 import 'package:moliseis/ui/categories/view_models/categories_view_model.dart';
@@ -107,6 +112,22 @@ List<SingleChildWidget> get providers {
             as StoryRepository;
       },
       lazy: true,
+    ),
+    Provider<SuggestionRepository>(
+      create: (_) {
+        final cloudinaryClient = CloudinaryClient(
+          cloudName: Env.cloudinaryProdCloudName,
+          apiKey: Env.cloudinaryProdApiKey,
+          apiSecret: Env.cloudinaryProdApiSecret,
+        );
+
+        return SuggestionRepositoryRemote(
+              supabase: Supabase.instance,
+              supabaseTable: SuggestionSupabaseTable(),
+              cloudinaryClient: cloudinaryClient,
+            )
+            as SuggestionRepository;
+      },
     ),
     //#endregion
 

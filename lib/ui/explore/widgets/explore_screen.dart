@@ -7,6 +7,7 @@ import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/explore/view_models/attraction_view_model.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen_carousel_view.dart';
 import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
+import 'package:moliseis/ui/suggestion/widgets/suggestion_cta_button.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
@@ -139,9 +140,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
+                padding: const EdgeInsets.all(16.0),
+                sliver: SliverToBoxAdapter(
+                  child: SuggestionCTAButton(
+                    onPressed: () => context.goNamed(RouteNames.suggestion),
+                  ),
                 ),
               ),
               SliverPadding(
