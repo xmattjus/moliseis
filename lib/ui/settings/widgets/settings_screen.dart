@@ -1,9 +1,9 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/settings/theme_brightness.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
+import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
@@ -31,13 +31,7 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => GoRouter.of(context).pop(),
-          style: IconButton.styleFrom(
-            backgroundColor: Theme.of(context).canvasColor,
-          ),
-          icon: ButtonTheme(child: const Icon(Icons.arrow_back)),
-        ),
+        leading: const CustomBackButton(),
         title: const Text('Impostazioni'),
         forceMaterialTransparency: true,
       ),
@@ -174,19 +168,17 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
           ListTile(
+            title: const Text('Termini di Servizio'),
+            onTap: () async {
+              final urlLauncher = context.read<AppUrlLauncher>();
+              await urlLauncher.termsOfService();
+            },
+          ),
+          ListTile(
             title: const Text('Informativa sulla privacy'),
             onTap: () async {
-              const url =
-                  'https://sites.google.com/view/molise-is-privacy-policy/home-page';
-              if (!await context.read<AppUrlLauncher>().generic(url)) {
-                if (context.mounted) {
-                  showSnackBar(
-                    context: context,
-                    textContent:
-                        'Si è verificato un errore, riprova più tardi.',
-                  );
-                }
-              }
+              final urlLauncher = context.read<AppUrlLauncher>();
+              await urlLauncher.privacyPolicy();
             },
           ),
         ],
