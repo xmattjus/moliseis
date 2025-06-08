@@ -85,8 +85,8 @@ final appRouter = GoRouter(
                 ),
                 storyRoute(routeName: RouteNames.homeStory),
                 categoriesRoute(
-                  routeName: RouteNames.exploreCategories,
-                  childRouteName: RouteNames.exploreCategoriesStory,
+                  routeName: RouteNames.homeCategory,
+                  childRouteName: RouteNames.homeCategoryStory,
                 ),
                 GoRoute(
                   path: RoutePaths.suggestion,
