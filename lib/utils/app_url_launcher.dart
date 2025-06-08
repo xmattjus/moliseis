@@ -7,6 +7,10 @@ class AppUrlLauncher {
   final _mapTilerUrl = 'https://www.maptiler.com/copyright/';
   final _openStreetMapUrl = 'https://www.openstreetmap.org/copyright';
   final _googleMapsUrl = 'https://www.google.com/maps/search/?api=1';
+  final _privacyPolicy =
+      'https://sites.google.com/view/molise-is-privacy-policy/';
+  final _termsOfService =
+      'https://sites.google.com/view/molise-is-terms-of-service/';
 
   Future<bool> _launch(String url) async {
     // Whether [url] could be handled or not.
@@ -48,4 +52,10 @@ class AppUrlLauncher {
       '$_googleMapsUrl&query=$attractionName, $placeName, Molise, Italia',
     );
   }
+
+  /// Opens the app Privacy Policy web page.
+  Future<bool> privacyPolicy() => _launch(_privacyPolicy);
+
+  /// Opens the app Terms of Service web page.
+  Future<bool> termsOfService() => _launch(_termsOfService);
 }
