@@ -21,16 +21,19 @@ class CustomBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: padding ?? const EdgeInsets.all(8.0),
-      child: IconButton(
-        onPressed: onPressed ?? () => Navigator.pop(context),
-        style: IconButton.styleFrom(
-          padding: EdgeInsets.only(left: Platform.isIOS ? 10.0 : 0),
-          backgroundColor:
-              backgroundColor ?? Theme.of(context).colorScheme.surface,
+    return Tooltip(
+      message: 'Indietro',
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(8.0),
+        child: IconButton(
+          onPressed: onPressed ?? () => Navigator.pop(context),
+          style: IconButton.styleFrom(
+            padding: EdgeInsets.only(left: Platform.isIOS ? 10.0 : 0),
+            backgroundColor:
+                backgroundColor ?? Theme.of(context).colorScheme.surface,
+          ),
+          icon: Icon(Platform.isIOS ? Icons.arrow_back_ios : Icons.arrow_back),
         ),
-        icon: Icon(Platform.isIOS ? Icons.arrow_back_ios : Icons.arrow_back),
       ),
     );
   }
