@@ -10,7 +10,7 @@ class CustomCircularProgressIndicator extends StatelessWidget {
   /// Defaults to 330 ms of delay.
   const CustomCircularProgressIndicator.withDelay({
     super.key,
-    Duration delay = const Duration(milliseconds: 330),
+    Duration delay = Durations.medium2,
   }) : _delay = delay;
 
   /// The delay after which the [CircularProgressIndicator] will be shown.

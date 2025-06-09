@@ -11,7 +11,6 @@ import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
 import 'package:moliseis/ui/core/ui/button_list.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
-import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';

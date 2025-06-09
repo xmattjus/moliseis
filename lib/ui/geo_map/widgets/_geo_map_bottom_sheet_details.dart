@@ -24,7 +24,7 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
       future,
       onLoading: () {
         return const SliverToBoxAdapter(
-          child: Center(child: CustomCircularProgressIndicator.withDelay()),
+          child: EmptyView.loading(text: Text('Caricamento in corso...'),),
         );
       },
       onSuccess: (attraction) {

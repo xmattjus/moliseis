@@ -8,8 +8,8 @@ class EmptyView extends StatelessWidget {
     : icon = const Icon(Icons.cancel_outlined, color: Colors.redAccent),
       action = null;
 
-  const EmptyView.loading({super.key, required this.text})
-    : icon = const CustomCircularProgressIndicator(),
+  const EmptyView.loading({super.key, this.text})
+    : icon = const CustomCircularProgressIndicator.withDelay(),
       action = null;
 
   final Widget? icon;

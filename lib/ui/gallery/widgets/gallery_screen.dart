@@ -3,7 +3,6 @@ import 'package:moliseis/domain/models/attraction/attraction.dart';
 import 'package:moliseis/domain/models/attraction/attraction_sort.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
-import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/future_built.dart';
@@ -41,8 +40,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
               body: FutureBuilt(
                 _viewModel.getAllAttractions(sortBy),
                 onLoading: () {
-                  return const Center(
-                    child: CustomCircularProgressIndicator.withDelay(),
+                  return const EmptyView.loading(
+                    text: Text('Caricamento in corso...'),
                   );
                 },
                 onSuccess: (List<Attraction> attractions) {
