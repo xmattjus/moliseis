@@ -9,6 +9,7 @@ import 'package:cloudinary_url_gen/transformation/delivery/delivery_actions.dart
 import 'package:cloudinary_url_gen/transformation/transformation.dart';
 import 'package:logging/logging.dart';
 import 'package:moliseis/utils/exceptions.dart';
+import 'package:moliseis/utils/log_events.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
 
@@ -53,7 +54,8 @@ class CloudinaryClient {
         return const Result.error(CloudinaryNullResponseException());
       }
     } on Exception catch (error, stackTrace) {
-      _log.severe('Pippo', error, stackTrace);
+      _log.severe(LogEvents.imageUploadError, error, stackTrace);
+
       return Result.error(error);
     }
   }

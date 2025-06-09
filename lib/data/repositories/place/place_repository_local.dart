@@ -118,8 +118,8 @@ class PlaceRepositoryLocal implements PlaceRepository {
       }
 
       return const Result.success(null);
-    } on Exception catch (error) {
-      _log.severe(LogEvents.repositoryUpdateError(error));
+    } on Exception catch (error, stackTrace) {
+      _log.severe(LogEvents.repositoryUpdateError, error, stackTrace);
 
       return Result.error(error);
     }

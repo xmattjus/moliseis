@@ -40,8 +40,8 @@ class StoryRepositoryLocal implements StoryRepository {
 
         await _initialize();
         _isInitialized = true;
-      } on Exception catch (error) {
-        _log.severe(LogEvents.repositoryUpdateError(error));
+      } on Exception catch (error, stackTrace) {
+        _log.severe(LogEvents.repositoryUpdateError, error, stackTrace);
 
         return Result.error(error);
       }
