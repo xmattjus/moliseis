@@ -1,6 +1,5 @@
 import 'dart:collection' show UnmodifiableListView;
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/attraction/attraction_type.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
@@ -237,39 +236,47 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                             text: TextSpan(
                               style: textStyle,
                               children: [
-                                const TextSpan(
-                                  text: 'Inviando il suggerimento, accetti i ',
-                                ),
-                                TextSpan(
-                                  text: 'Termini di Servizio',
-                                  style: textStyle?.copyWith(
-                                    color: Colors.blue,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: Colors.blue,
+                                const WidgetSpan(
+                                  child: Text(
+                                    'Inviando il suggerimento, accetti i ',
                                   ),
-                                  recognizer: TapGestureRecognizer()
-                                    ..onTap = () async {
+                                ),
+                                WidgetSpan(
+                                  child: InkWell(
+                                    onTap: () async {
                                       final urlLauncher = context
                                           .read<AppUrlLauncher>();
                                       await urlLauncher.termsOfService();
                                     },
-                                ),
-                                const TextSpan(text: " e l'"),
-                                TextSpan(
-                                  text: 'Informativa sulla privacy',
-                                  style: textStyle?.copyWith(
-                                    color: Colors.blue,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: Colors.blue,
+                                    child: const Text(
+                                      'Termini di Servizio',
+                                      style: TextStyle(
+                                        color: Colors.blue,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: Colors.blue,
+                                      ),
+                                    ),
                                   ),
-                                  recognizer: TapGestureRecognizer()
-                                    ..onTap = () async {
+                                ),
+                                const WidgetSpan(child: Text(" e l'")),
+                                WidgetSpan(
+                                  child: InkWell(
+                                    onTap: () async {
                                       final urlLauncher = context
                                           .read<AppUrlLauncher>();
                                       await urlLauncher.privacyPolicy();
                                     },
+                                    child: const Text(
+                                      'Informativa sulla privacy',
+                                      style: TextStyle(
+                                        color: Colors.blue,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                                const TextSpan(text: " di Molise Is"),
+                                const WidgetSpan(child: Text(' di Molise Is')),
                               ],
                             ),
                           ),
