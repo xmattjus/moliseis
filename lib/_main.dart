@@ -35,18 +35,17 @@ Future<void> _initializeSystemChrome(Brightness brightness) async {
     // Android 8 does not support a transparent navigation bar.
     final info = await DeviceInfoPlugin().androidInfo;
     if (info.version.sdkInt <= 26) {
-      overlayStyle =
-          brightness == Brightness.light
-              ? const SystemUiOverlayStyle(
-                systemNavigationBarColor: Colors.white,
-                systemNavigationBarDividerColor: Colors.white,
-                systemNavigationBarIconBrightness: Brightness.dark,
-              )
-              : const SystemUiOverlayStyle(
-                systemNavigationBarColor: Colors.black,
-                systemNavigationBarDividerColor: Colors.black,
-                systemNavigationBarIconBrightness: Brightness.light,
-              );
+      overlayStyle = brightness == Brightness.light
+          ? const SystemUiOverlayStyle(
+              systemNavigationBarColor: Colors.white,
+              systemNavigationBarDividerColor: Colors.white,
+              systemNavigationBarIconBrightness: Brightness.dark,
+            )
+          : const SystemUiOverlayStyle(
+              systemNavigationBarColor: Colors.black,
+              systemNavigationBarDividerColor: Colors.black,
+              systemNavigationBarIconBrightness: Brightness.light,
+            );
     }
   }
   SystemChrome.setSystemUIOverlayStyle(overlayStyle);

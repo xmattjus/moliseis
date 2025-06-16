@@ -31,7 +31,10 @@ class CheckboxFormField extends FormField<bool> {
                if (state.hasError)
                  Padding(
                    padding: const EdgeInsetsDirectional.fromSTEB(
-                       12.0, 2.0, 12.0, 0.0,
+                     12.0,
+                     2.0,
+                     12.0,
+                     0.0,
                    ),
                    child: Builder(
                      builder: (context) {

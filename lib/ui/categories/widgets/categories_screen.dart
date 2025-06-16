@@ -128,8 +128,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
                         title: TabBar(
                           tabs: UnmodifiableListView<Tab>(
                             _viewModel.attractionTypes.map<Tab>(
-                              (AttractionType type) =>
-                                  Tab(text: type.label),
+                              (AttractionType type) => Tab(text: type.label),
                             ),
                           ),
                           controller: _tabController,
