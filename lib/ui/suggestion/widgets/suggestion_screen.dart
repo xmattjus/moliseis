@@ -1,8 +1,5 @@
-import 'dart:collection' show UnmodifiableListView;
-
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/attraction/attraction_type.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
+import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
 import 'package:moliseis/ui/suggestion/widgets/checkbox_form_field.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_date_chip.dart';
@@ -11,8 +8,6 @@ import 'package:moliseis/ui/suggestion/widgets/suggestion_send_button.dart';
 import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
-
-typedef _TypeMenuEntry = DropdownMenuEntry<AttractionType>;
 
 class SuggestionScreen extends StatefulWidget {
   const SuggestionScreen({super.key, required this.viewModel});
@@ -46,25 +41,40 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               sliver: SliverList.list(
                 children: [
-                  const SizedBox(height: 8.0),
-                  Text('Categoria', style: CustomTextStyles.section(context)),
-                  const SizedBox(height: 8.0),
-                  DropdownMenu<AttractionType>(
-                    initialSelection: attractionTypes.first,
-                    dropdownMenuEntries: UnmodifiableListView<_TypeMenuEntry>(
-                      attractionTypes.map<_TypeMenuEntry>(
-                        (AttractionType type) => DropdownMenuEntry(
-                          value: type,
-                          label: type == AttractionType.unknown
-                              ? '-'
-                              : type.label,
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: TextSectionDivider('Categoria'),
+                  ),
+                  Wrap(
+                    spacing: 8.0,
+                    children: attractionTypes.map<InputChip>((element) {
+                      final isSelected = widget.viewModel.type == element;
+
+                      return InputChip(
+                        avatar: Icon(
+                          isSelected ? element.iconAlt : element.icon,
                         ),
-                      ),
-                    ),
-                    onSelected: (value) => widget.viewModel.type = value,
+                        label: Text(element.label),
+                        selected: isSelected,
+                        deleteIcon: isSelected ? const Icon(Icons.close) : null,
+                        onDeleted: isSelected
+                            ? () {
+                                setState(() {
+                                  widget.viewModel.type = null;
+                                });
+                              }
+                            : null,
+                        onPressed: () {
+                          setState(() {
+                            widget.viewModel.type = element;
+                          });
+                        },
+                        showCheckmark: false,
+                      );
+                    }).toList(),
                   ),
                   const SizedBox(height: 16.0),
-                  Text('Dettagli', style: CustomTextStyles.section(context)),
+                  const TextSectionDivider('Dettagli'),
                   const SizedBox(height: 8.0),
                   Form(
                     key: _form1Key,
@@ -135,6 +145,8 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
 
                         final endDate = widget.viewModel.endDate;
 
+                        final locale = Localizations.localeOf(context);
+
                         return Wrap(
                           crossAxisAlignment: WrapCrossAlignment.center,
                           spacing: 8.0,
@@ -143,7 +155,7 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                               initialDate: startDate,
                               label: Text(
                                 startDate != null
-                                    ? 'Inizia il ${widget.viewModel.formatDate(startDate)}'
+                                    ? 'Inizia il ${widget.viewModel.formatDate(locale, startDate)}'
                                     : 'Seleziona data di inizio',
                               ),
                               onDatePicked: (date) {
@@ -155,13 +167,24 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                               initialDate: endDate ?? startDate,
                               label: Text(
                                 endDate != null
-                                    ? 'Finisce il ${widget.viewModel.formatDate(endDate)}'
+                                    ? 'Finisce il ${widget.viewModel.formatDate(locale, endDate)}'
                                     : 'Seleziona data di fine',
                               ),
                               onDatePicked: (date) {
                                 widget.viewModel.setEndDate(date);
                               },
                             ),
+                            if (startDate != null)
+                              SuggestionDateChip(
+                                initialDate: startDate,
+                                label: Text(
+                                  'Inizia alle ${widget.viewModel.formatTime(locale, startDate)}',
+                                ),
+                                mode: SuggestionDateChipMode.time,
+                                onDatePicked: (date) {
+                                  widget.viewModel.setStartTime(date);
+                                },
+                              ),
                           ],
                         );
                       },
@@ -232,52 +255,66 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                         ),
                         const SizedBox(height: 16.0),
                         CheckboxFormField(
-                          title: RichText(
-                            text: TextSpan(
-                              style: textStyle,
-                              children: [
-                                const WidgetSpan(
-                                  child: Text(
-                                    'Inviando il suggerimento, accetti i ',
+                          title: MergeSemantics(
+                            child: RichText(
+                              text: TextSpan(
+                                style: textStyle,
+                                children: [
+                                  const WidgetSpan(
+                                    child: Text(
+                                      'Inviando il suggerimento, accetti i ',
+                                    ),
                                   ),
-                                ),
-                                WidgetSpan(
-                                  child: InkWell(
-                                    onTap: () async {
-                                      final urlLauncher = context
-                                          .read<AppUrlLauncher>();
-                                      await urlLauncher.termsOfService();
-                                    },
-                                    child: const Text(
-                                      'Termini di Servizio',
-                                      style: TextStyle(
-                                        color: Colors.blue,
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: Colors.blue,
+                                  WidgetSpan(
+                                    child: Semantics(
+                                      label: 'Termini di Servizio',
+                                      excludeSemantics: true,
+                                      child: InkWell(
+                                        onTap: () async {
+                                          final urlLauncher = context
+                                              .read<AppUrlLauncher>();
+                                          await urlLauncher.termsOfService();
+                                        },
+                                        child: const Text(
+                                          'Termini di Servizio',
+                                          style: TextStyle(
+                                            color: Colors.blue,
+                                            decoration:
+                                                TextDecoration.underline,
+                                            decorationColor: Colors.blue,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const WidgetSpan(child: Text(" e l'")),
-                                WidgetSpan(
-                                  child: InkWell(
-                                    onTap: () async {
-                                      final urlLauncher = context
-                                          .read<AppUrlLauncher>();
-                                      await urlLauncher.privacyPolicy();
-                                    },
-                                    child: const Text(
-                                      'Informativa sulla privacy',
-                                      style: TextStyle(
-                                        color: Colors.blue,
-                                        decoration: TextDecoration.underline,
-                                        decorationColor: Colors.blue,
+                                  const WidgetSpan(child: Text(" e l'")),
+                                  WidgetSpan(
+                                    child: Semantics(
+                                      label: 'Informativa sulla privacy',
+                                      excludeSemantics: true,
+                                      child: InkWell(
+                                        onTap: () async {
+                                          final urlLauncher = context
+                                              .read<AppUrlLauncher>();
+                                          await urlLauncher.privacyPolicy();
+                                        },
+                                        child: const Text(
+                                          'Informativa sulla privacy',
+                                          style: TextStyle(
+                                            color: Colors.blue,
+                                            decoration:
+                                                TextDecoration.underline,
+                                            decorationColor: Colors.blue,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const WidgetSpan(child: Text(' di Molise Is')),
-                              ],
+                                  const WidgetSpan(
+                                    child: Text(' di Molise Is'),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           validator: (value) {

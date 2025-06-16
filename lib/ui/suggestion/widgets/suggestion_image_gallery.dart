@@ -2,10 +2,10 @@ import 'dart:io' show File;
 
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
+import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
 
 class SuggestionImageGallery extends StatelessWidget {
@@ -19,9 +19,9 @@ class SuggestionImageGallery extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: 8.0,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text('Foto', style: CustomTextStyles.section(context)),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.0),
+          child: TextSectionDivider('Foto'),
         ),
         SizedBox(
           height: 72.0,

@@ -10,6 +10,7 @@ import 'package:moliseis/data/repositories/suggestion/suggestion_repository.dart
 import 'package:moliseis/domain/models/attraction/attraction_type.dart';
 import 'package:moliseis/domain/models/suggestion/suggestion.dart';
 import 'package:moliseis/utils/command.dart';
+import 'package:moliseis/utils/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
 
@@ -37,7 +38,7 @@ class SuggestionViewModel extends ChangeNotifier {
   String? place;
   DateTime? _startDate;
   AttractionType? type;
-  final _types = AttractionType.values;
+  final _types = AttractionType.values.minusUnknown;
 
   DateTime? get endDate => _endDate;
   UnmodifiableListView<XFile> get mediaFileList =>
@@ -101,13 +102,22 @@ class SuggestionViewModel extends ChangeNotifier {
   }
 
   void setStartDate(DateTime? date) {
-    _startDate = date;
+    _startDate = date?.copyWith(
+      hour: _startDate?.hour,
+      minute: _startDate?.minute,
+    );
 
     if (_startDate != null &&
         _endDate != null &&
         _endDate!.isBefore(_startDate!)) {
-      _endDate = date;
+      _endDate = date?.copyWith(hour: 23, minute: 55, second: 55);
     }
+
+    notifyListeners();
+  }
+
+  void setStartTime(DateTime? date) {
+    _startDate = _startDate?.copyWith(hour: date?.hour, minute: date?.minute);
 
     notifyListeners();
   }
@@ -159,7 +169,11 @@ class SuggestionViewModel extends ChangeNotifier {
     }
   }
 
-  String formatDate(DateTime date) => DateFormat('dd/MM/y').format(date);
+  String formatDate(Locale locale, DateTime date) =>
+      DateFormat.yMd(locale.languageCode).format(date);
+
+  String formatTime(Locale locale, DateTime date) =>
+      DateFormat.Hm(locale.languageCode).format(date);
 
   bool validateEmail(String? text) => StringValidator.isValidEmail(text);
 }
