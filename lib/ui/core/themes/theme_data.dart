@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/themes/color.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_theme.dart';
 import 'package:moliseis/utils/constants.dart';
 
@@ -11,7 +12,6 @@ class _BaseThemeData {
     Iterable<ThemeExtension<dynamic>>? extensions,
   }) {
     return ThemeData(
-      // useMaterial3: true,
       extensions: extensions,
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
@@ -30,13 +30,43 @@ class _BaseThemeData {
         constraints: BoxConstraints(minHeight: 56.0),
         elevation: WidgetStatePropertyAll<double>(0),
       ),
-      tabBarTheme: const TabBarTheme(
+      tabBarTheme: const TabBarThemeData(
         indicatorSize: TabBarIndicatorSize.tab,
         dividerHeight: 0,
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         strokeWidth: 3.0,
+        // ignore: deprecated_member_use
         year2023: false,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Shapes.medium),
+        ),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(Shapes.medium),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: ButtonStyle(
+          shape: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.pressed)) {
+              return RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(Shapes.medium),
+              );
+            }
+
+            return RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(Shapes.full),
+            );
+          }),
+        ),
       ),
     );
   }
