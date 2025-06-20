@@ -1,10 +1,13 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
+import 'package:moliseis/domain/models/attraction/attraction_type.dart';
+import 'package:moliseis/ui/categories/widgets/category_chip.dart';
 import 'package:moliseis/ui/core/ui/cards/card_attraction_list_item.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/utils/debounceable.dart';
+import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
@@ -271,7 +274,19 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
             const TextSectionDivider('Categorie'),
             Wrap(
               spacing: 8.0,
-              children: _buildChips(texts: _viewModel.typeSuggestions),
+              children: UnmodifiableListView(
+                _viewModel.types.map((AttractionType e) {
+                  return CategoryChip(
+                    element: e,
+                    isSelected: false,
+                    onPressed: () {
+                      _searchController.text = e.label;
+
+                      _viewModel.addToHistory.execute(e.label);
+                    },
+                  );
+                }),
+              ),
             ),
             if (_lastHistory.isNotEmpty) const TextSectionDivider('Recenti'),
             if (_lastHistory.isNotEmpty)

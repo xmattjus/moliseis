@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/categories/widgets/category_chip.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
 import 'package:moliseis/ui/suggestion/widgets/checkbox_form_field.dart';
@@ -6,7 +7,6 @@ import 'package:moliseis/ui/suggestion/widgets/suggestion_date_chip.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_image_gallery.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_send_button.dart';
 import 'package:moliseis/utils/app_url_launcher.dart';
-import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
 
 class SuggestionScreen extends StatefulWidget {
@@ -47,29 +47,22 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                   ),
                   Wrap(
                     spacing: 8.0,
-                    children: attractionTypes.map<InputChip>((element) {
+                    children: attractionTypes.map<CategoryChip>((element) {
                       final isSelected = widget.viewModel.type == element;
 
-                      return InputChip(
-                        avatar: Icon(
-                          isSelected ? element.iconAlt : element.icon,
-                        ),
-                        label: Text(element.label),
-                        selected: isSelected,
-                        deleteIcon: isSelected ? const Icon(Icons.close) : null,
+                      return CategoryChip(
+                        element: element,
+                        isSelected: isSelected,
                         onDeleted: isSelected
-                            ? () {
-                                setState(() {
-                                  widget.viewModel.type = null;
-                                });
-                              }
+                            ? () => setState(() {
+                                widget.viewModel.type = null;
+                              })
                             : null,
                         onPressed: () {
                           setState(() {
                             widget.viewModel.type = element;
                           });
                         },
-                        showCheckmark: false,
                       );
                     }).toList(),
                   ),
