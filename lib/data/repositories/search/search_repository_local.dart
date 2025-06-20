@@ -6,39 +6,46 @@ import 'package:moliseis/domain/models/attraction/attraction_type.dart';
 import 'package:moliseis/domain/models/place/place.dart';
 import 'package:moliseis/domain/models/search/search_query.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
-import 'package:moliseis/main.dart';
 import 'package:moliseis/utils/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SearchRepositoryLocal implements SearchRepository {
   SearchRepositoryLocal({required ObjectBox objectBoxI})
-    : _searchHistoryBox = objectBoxI.store.box<SearchQuery>(),
-      _placeBox = objectBoxI.store.box<Place>(),
-      _placeQuery = objectBoxI.store
-          .box<Place>()
-          .query(Place_.name.contains('', caseSensitive: false))
-          .build(),
-      _attractionQuery = objectBoxI.store
-          .box<Attraction>()
-          .query(Attraction_.name.contains('', caseSensitive: false))
-          .build(),
-      _typeQuery = objectBoxI.store
-          .box<Attraction>()
-          .query(Attraction_.dbType.oneOf(<int>[]))
-          .build();
+    : _objectBox = objectBoxI,
+      _searchHistoryBox = objectBoxI.store.box<SearchQuery>() {
+    _init();
+  }
 
   final _log = Logger('SearchRepositoryLocal');
 
+  late final Query<Attraction> _attractionQuery;
+  final ObjectBox _objectBox;
+  late final Query<Place> _placeQuery;
   final Box<SearchQuery> _searchHistoryBox;
-  final Box<Place> _placeBox;
-  final Query<Place> _placeQuery;
-  final Query<Attraction> _attractionQuery;
-  final Query<Attraction> _typeQuery;
+  late final Query<Attraction> _typeQuery;
 
   /// The list of the last search results.
   var _lastResults = <int>[];
 
   var _typeSearched = false;
+
+  /// Caches the ObjectBox queries.
+  void _init() {
+    _attractionQuery = _objectBox.store
+        .box<Attraction>()
+        .query(Attraction_.name.contains('', caseSensitive: false))
+        .build();
+
+    _placeQuery = _objectBox.store
+        .box<Place>()
+        .query(Place_.name.contains('', caseSensitive: false))
+        .build();
+
+    _typeQuery = _objectBox.store
+        .box<Attraction>()
+        .query(Attraction_.dbType.oneOf(<int>[]))
+        .build();
+  }
 
   @override
   Future<Result> addToHistory(String query) async {
@@ -96,7 +103,7 @@ class SearchRepositoryLocal implements SearchRepository {
 
       results.addAll(attractionQuery);
 
-      final test = _placeBox.getMany(placeQuery);
+      final test = _objectBox.store.box<Place>().getMany(placeQuery);
 
       for (var i = 0; i < test.length; i++) {
         final place = test[i];
@@ -132,7 +139,7 @@ class SearchRepositoryLocal implements SearchRepository {
     }
 
     try {
-      final attractionBox = objectBox.store.box<Attraction>();
+      final attractionBox = _objectBox.store.box<Attraction>();
 
       final attractions = attractionBox.getMany(_lastResults);
 
