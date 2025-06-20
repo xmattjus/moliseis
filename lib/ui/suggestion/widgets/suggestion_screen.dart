@@ -155,6 +155,17 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                                 widget.viewModel.setStartDate(date);
                               },
                             ),
+                            if (startDate != null)
+                              SuggestionDateChip(
+                                initialDate: startDate,
+                                label: Text(
+                                  'Inizia alle ${widget.viewModel.formatTime(locale, startDate)}',
+                                ),
+                                mode: SuggestionDateChipMode.time,
+                                onDatePicked: (date) {
+                                  widget.viewModel.setStartTime(date);
+                                },
+                              ),
                             SuggestionDateChip(
                               firstDate: startDate,
                               initialDate: endDate ?? startDate,
@@ -167,17 +178,6 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                                 widget.viewModel.setEndDate(date);
                               },
                             ),
-                            if (startDate != null)
-                              SuggestionDateChip(
-                                initialDate: startDate,
-                                label: Text(
-                                  'Inizia alle ${widget.viewModel.formatTime(locale, startDate)}',
-                                ),
-                                mode: SuggestionDateChipMode.time,
-                                onDatePicked: (date) {
-                                  widget.viewModel.setStartTime(date);
-                                },
-                              ),
                           ],
                         );
                       },

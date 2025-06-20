@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 /// Different display modes of [SuggestionDateChip].
 enum SuggestionDateChipMode { date, time }
@@ -43,96 +44,75 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
       label: widget.label,
       onPressed: () async {
         if (Platform.isIOS) {
-          _showDialog(
-            context,
-            Column(
-              children: [
-                CupertinoTheme(
-                  data: const CupertinoThemeData(
-                    primaryColor: CupertinoColors.activeBlue,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      CupertinoButton(
-                        sizeStyle: CupertinoButtonSize.medium,
-                        child: const Text('Annulla'),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                      Expanded(
-                        child: Text(
-                          widget.mode == SuggestionDateChipMode.date
-                              ? 'Seleziona una data'
-                              : "Seleziona un'ora",
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'system',
-                              ),
-                          textAlign: TextAlign.center,
+          if (ResponsiveBreakpoints.of(context).isMobile) {
+            return _showDialog(
+              context,
+              Column(
+                children: [
+                  CupertinoTheme(
+                    data: const CupertinoThemeData(
+                      primaryColor: CupertinoColors.activeBlue,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        CupertinoButton(
+                          sizeStyle: CupertinoButtonSize.medium,
+                          child: const Text('Annulla'),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
                         ),
-                      ),
-                      CupertinoButton(
-                        sizeStyle: CupertinoButtonSize.medium,
-                        child: const Text('Conferma'),
-                        onPressed: () {
-                          if (_selectedDateTime != null) {
-                            widget.onDatePicked(_selectedDateTime);
-                          }
-                          Navigator.of(context).pop();
-                        },
-                      ),
-                    ],
+                        Expanded(
+                          child: Text(
+                            widget.mode == SuggestionDateChipMode.date
+                                ? 'Seleziona una data'
+                                : "Seleziona un'ora",
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'system',
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        CupertinoButton(
+                          sizeStyle: CupertinoButtonSize.medium,
+                          child: const Text('Conferma'),
+                          onPressed: () {
+                            if (_selectedDateTime != null) {
+                              widget.onDatePicked(_selectedDateTime);
+                            }
+                            Navigator.of(context).pop();
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                Expanded(
-                  child: CupertinoDatePicker(
-                    mode: widget.mode == SuggestionDateChipMode.date
-                        ? CupertinoDatePickerMode.date
-                        : CupertinoDatePickerMode.time,
-                    onDateTimeChanged: (value) => _selectedDateTime = value,
-                    initialDateTime:
-                        widget.initialDate ??
-                        now.copyWith(minute: now.minute % 5 * 5),
-                    minimumDate:
-                        widget.firstDate ?? now.subtract(durationLimit),
-                    maximumDate: now.add(durationLimit),
-                    minuteInterval: 5,
-                    use24hFormat: true,
-                    dateOrder: DatePickerDateOrder.dmy,
+                  Expanded(
+                    child: CupertinoDatePicker(
+                      mode: widget.mode == SuggestionDateChipMode.date
+                          ? CupertinoDatePickerMode.date
+                          : CupertinoDatePickerMode.time,
+                      onDateTimeChanged: (value) => _selectedDateTime = value,
+                      initialDateTime:
+                          widget.initialDate ??
+                          now.copyWith(minute: now.minute % 5 * 5),
+                      minimumDate:
+                          widget.firstDate ?? now.subtract(durationLimit),
+                      maximumDate: now.add(durationLimit),
+                      minuteInterval: 5,
+                      use24hFormat: true,
+                      dateOrder: DatePickerDateOrder.dmy,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        } else {
-          switch (widget.mode) {
-            case SuggestionDateChipMode.date:
-              final selectedDate = await showDatePicker(
-                context: context,
-                initialDate: widget.initialDate ?? now,
-                firstDate: widget.firstDate ?? now.subtract(durationLimit),
-                lastDate: now.add(durationLimit),
-              );
-
-              if (selectedDate != null) {
-                widget.onDatePicked.call(selectedDate);
-              }
-            case SuggestionDateChipMode.time:
-              final selectedTime = await showTimePicker(
-                context: context,
-                initialTime: TimeOfDay(hour: now.hour, minute: now.minute),
-              );
-
-              if (selectedTime != null) {
-                widget.onDatePicked.call(
-                  DateTime(1977, selectedTime.hour, selectedTime.minute),
-                );
-              }
+                ],
+              ),
+            );
           }
+
+          return await _showMaterialDatePicker(now, durationLimit);
         }
       },
     );
@@ -156,5 +136,35 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
         child: SafeArea(top: false, child: child),
       ),
     );
+  }
+
+  Future<void> _showMaterialDatePicker(
+    DateTime now,
+    Duration durationLimit,
+  ) async {
+    switch (widget.mode) {
+      case SuggestionDateChipMode.date:
+        final selectedDate = await showDatePicker(
+          context: context,
+          initialDate: widget.initialDate ?? now,
+          firstDate: widget.firstDate ?? now.subtract(durationLimit),
+          lastDate: now.add(durationLimit),
+        );
+
+        if (selectedDate != null) {
+          widget.onDatePicked.call(selectedDate);
+        }
+      case SuggestionDateChipMode.time:
+        final selectedTime = await showTimePicker(
+          context: context,
+          initialTime: TimeOfDay(hour: now.hour, minute: now.minute),
+        );
+
+        if (selectedTime != null) {
+          widget.onDatePicked.call(
+            now.copyWith(hour: selectedTime.hour, minute: selectedTime.minute),
+          );
+        }
+    }
   }
 }
