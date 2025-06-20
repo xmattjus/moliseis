@@ -82,11 +82,12 @@ class AppThemeData {
   /// See:
   /// https://github.com/material-foundation/flutter-packages/issues/574
   /// https://github.com/material-foundation/flutter-packages/issues/582
-  static ColorScheme _colorScheme(Color? primary, Brightness brightness) =>
-      CustomColorSchemes.main(
-        primary ?? CustomColorSchemes.appSeed,
-        brightness,
-      );
+  static ColorScheme _colorScheme(Color? primary, Brightness brightness) {
+    return ColorScheme.fromSeed(
+      seedColor: primary ?? CustomColorSchemes.primary,
+      brightness: brightness,
+    );
+  }
 
   static ThemeData light({ColorScheme? dynamicColorScheme}) {
     final colorScheme = _colorScheme(

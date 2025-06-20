@@ -1,96 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:material_color_utilities/blend/blend.dart';
+import 'package:moliseis/domain/models/attraction/attraction_type.dart';
 
 class CustomColorSchemes {
   const CustomColorSchemes._();
 
-  /// The color seed used to generate the app color scheme.
-  static const Color appSeed = Color(0xFF10A549);
+  /// The baseline primary color.
+  static const Color primary = Color(0xFF10A549);
 
-  // TODO(xmattjus): add user customizable colors.
+  /// The content categories primary colors.
+  static const Color _primaryNature = Color(0xFF52EA3E);
+  static const Color _primaryHistory = Color(0XFFe83c70);
+  static const Color _primaryFolklore = Color(0XFFe8ea3f);
+  static const Color _primaryFood = Color(0XFF3fa1ec);
+  static const Color _primaryAllure = Color(0XFFe9863a);
+  static const Color _primaryExperience = Color(0XFF3ce9e6);
 
-  static const Color _natureSeed = Color(0xFF52EA3E);
-  static const Color _historySeed = Color(0XFFe83c70);
-  static const Color _folkloreSeed = Color(0XFFe8ea3f);
-  static const Color _foodSeed = Color(0XFF3fa1ec);
-  static const Color _allureSeed = Color(0XFFe9863a);
-  static const Color _experienceSeed = Color(0XFF3ce9e6);
+  static Color harmonize(Color from, Color to) {
+    if (from == to) return from;
 
-  static Brightness? _brightness;
-
-  static ColorScheme? _main;
-  static ColorScheme? _nature;
-  static ColorScheme? _history;
-  static ColorScheme? _folklore;
-  static ColorScheme? _food;
-  static ColorScheme? _allure;
-  static ColorScheme? _experience;
-
-  static void _resetBrightness(Brightness newBrightness) {
-    if (newBrightness != _brightness) {
-      _brightness = newBrightness;
-      _main = ColorScheme.fromSeed(
-        seedColor: appSeed,
-        brightness: _brightness!,
-      );
-      _nature = ColorScheme.fromSeed(
-        seedColor: _natureSeed,
-        brightness: _brightness!,
-      );
-      _history = ColorScheme.fromSeed(
-        seedColor: _historySeed,
-        brightness: _brightness!,
-      );
-      _folklore = ColorScheme.fromSeed(
-        seedColor: _folkloreSeed,
-        brightness: _brightness!,
-      );
-      _food = ColorScheme.fromSeed(
-        seedColor: _foodSeed,
-        brightness: _brightness!,
-      );
-      _allure = ColorScheme.fromSeed(
-        seedColor: _allureSeed,
-        brightness: _brightness!,
-      );
-      _experience = ColorScheme.fromSeed(
-        seedColor: _experienceSeed,
-        brightness: _brightness!,
-      );
-    }
+    return Color(Blend.harmonize(from.toARGB32(), to.toARGB32()));
   }
 
-  static ColorScheme main(Color primary, Brightness brightness) {
-    _resetBrightness(brightness);
-    return _main!;
-  }
+  /// Generates a color scheme using the appropriate primary color based on
+  /// [type].
+  static ColorScheme fromAttractionType(
+    AttractionType type,
+    Brightness brightness,
+  ) {
+    final color = switch (type) {
+      AttractionType.unknown => primary,
+      AttractionType.nature => harmonize(_primaryNature, primary),
+      AttractionType.history => harmonize(_primaryHistory, primary),
+      AttractionType.folklore => harmonize(_primaryFolklore, primary),
+      AttractionType.food => harmonize(_primaryFood, primary),
+      AttractionType.allure => harmonize(_primaryAllure, primary),
+      AttractionType.experience => harmonize(_primaryExperience, primary),
+    };
 
-  static ColorScheme nature(Color primary, Brightness brightness) {
-    _resetBrightness(brightness);
-    return _nature!;
-  }
-
-  static ColorScheme history(Color primary, Brightness brightness) {
-    _resetBrightness(brightness);
-    return _history!;
-  }
-
-  static ColorScheme folklore(Color primary, Brightness brightness) {
-    _resetBrightness(brightness);
-    return _folklore!;
-  }
-
-  static ColorScheme food(Color primary, Brightness brightness) {
-    _resetBrightness(brightness);
-    return _food!;
-  }
-
-  static ColorScheme allure(Color primary, Brightness brightness) {
-    _resetBrightness(brightness);
-    return _allure!;
-  }
-
-  static ColorScheme experience(Color primary, Brightness brightness) {
-    _resetBrightness(brightness);
-    return _experience!;
+    return ColorScheme.fromSeed(seedColor: color, brightness: brightness);
   }
 }
