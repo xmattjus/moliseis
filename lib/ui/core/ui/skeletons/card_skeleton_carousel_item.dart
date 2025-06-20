@@ -15,16 +15,13 @@ class CardSkeletonCarouselItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(Shape.extraLarge),
         ),
         margin: EdgeInsets.zero,
-        child: const Align(
-          alignment: Alignment.bottomLeft,
-          child: Padding(
-            padding: EdgeInsetsDirectional.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 8.0,
-              children: [Bone.text(words: 3), Bone.text(words: 2)],
-            ),
+        child: const Padding(
+          padding: EdgeInsetsDirectional.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 8.0,
+            children: [Bone.text(words: 3), Bone.text(words: 2)],
           ),
         ),
       ),

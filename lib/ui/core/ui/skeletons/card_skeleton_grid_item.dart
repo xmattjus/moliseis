@@ -9,23 +9,17 @@ class CardSkeletonGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Skeletonizer.zone(
       effect: CustomPulseEffect(context: context),
-      child: Card(
+      child: const Card(
         elevation: 0,
         margin: EdgeInsets.zero,
-        child: const Column(
-          spacing: 8.0,
-          children: [
-            Expanded(child: Bone.square(uniRadius: kCardCornerRadius)),
-            Padding(padding: EdgeInsets.all(8.0), child: Bone.text(words: 3)),
-            Padding(
-              padding: EdgeInsetsDirectional.only(
-                start: 8.0,
-                end: 8.0,
-                bottom: 8.0,
-              ),
-              child: Bone.text(words: 2),
-            ),
-          ],
+        child: Padding(
+          padding: EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 8.0,
+            children: [Bone.text(words: 3), Bone.text(words: 2)],
+          ),
         ),
       ),
     );
