@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/ui/core/themes/shape.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:provider/provider.dart';
 
@@ -40,7 +40,7 @@ class FavouriteButton extends StatelessWidget {
 
         final shape = RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(
-            radius ?? (isSaved ? Shapes.medium : Shapes.full),
+            radius ?? (isSaved ? Shape.medium : Shape.full),
           ),
         );
 
@@ -98,7 +98,7 @@ class FavouriteButton extends StatelessWidget {
                 shape: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.pressed)) {
                     return RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Shapes.medium),
+                      borderRadius: BorderRadius.circular(Shape.medium),
                     );
                   }
 
