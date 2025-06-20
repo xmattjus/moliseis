@@ -84,6 +84,19 @@ local.properties
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
 
+**/ios/*.perspectivev3
+**/ios/Pods/
+
+Pods/
+Podfile.lock
+Pods.xcodeproj/
+*.xcuserdatad/
+*.xcworkspace/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework/
+**/ios/Flutter/App.framework/
+**/ios/Flutter/Flutter-Structs.h
+
 # macOS
 **/Flutter/ephemeral/
 **/Pods/
