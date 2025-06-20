@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
+import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
 import 'package:moliseis/ui/story/view_models/paragraph_view_model.dart';
 import 'package:moliseis/ui/story/widgets/paragraph_content.dart';
 import 'package:skeletonizer/skeletonizer.dart';

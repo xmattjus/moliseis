@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/core/themes/shape.dart';
 import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
