@@ -19,32 +19,40 @@ class SearchViewModel extends ChangeNotifier {
     addToHistoryByAttractionId = Command1(_addToHistoryByAttractionId);
     loadHistory = Command0(_loadHistory)..execute();
     loadResults = Command1(_loadResults);
+    loadRelatedResults = Command1(_loadMoreResults);
     removeFromHistory = Command1(_removeFromHistory);
   }
 
   final AttractionRepository _attractionRepository;
   final SearchRepository _searchRepository;
 
-  List<String> _history = [];
-  List<int> _resultIds = [];
-  final List<String> _typeSuggestions = AttractionType.values.minusUnknown
-      .map((AttractionType type) => type.label)
-      .toList();
+  var _history = <String>[];
+  var _resultIds = <int>[];
+  var _relatedResultsIds = <int>[];
+  final _types = AttractionType.values.minusUnknown;
+
   UnmodifiableListView<String> get history => UnmodifiableListView(_history);
   UnmodifiableListView<int> get resultIds => UnmodifiableListView(_resultIds);
-  UnmodifiableListView<String> get typeSuggestions =>
-      UnmodifiableListView(_typeSuggestions);
+  UnmodifiableListView<int> get relatedResultIds =>
+      UnmodifiableListView(_relatedResultsIds);
+  UnmodifiableListView<AttractionType> get types =>
+      UnmodifiableListView(_types);
 
   late Command1<void, String> addToHistory;
   late Command1<void, int> addToHistoryByAttractionId;
   late Command0 loadHistory;
   late Command1<void, String> loadResults;
+  late Command1<void, String> loadRelatedResults;
   late Command1<void, String> removeFromHistory;
 
   Future<Result> _addToHistory(String text) async {
+    if (text.isEmpty) {
+      return const Result.success(null);
+    }
+
     final historyToLowerCase = _history.map((e) => e.toLowerCase());
     final lowerCaseText = text.toLowerCase();
-    final typeSuggestions = _typeSuggestions.map((e) => e.toLowerCase());
+    final typeSuggestions = _types.map((e) => e.label.toLowerCase());
 
     // Does not add the text to history since it's equal to one of the type
     // suggestions or is already present in history.
@@ -82,20 +90,36 @@ class SearchViewModel extends ChangeNotifier {
   Future<Result> _loadHistory() async {
     final result = await _searchRepository.pastSearches;
 
-    switch (result) {
-      case Success<List<String>>():
-        _history = result.value;
-      case Error<List<String>>():
+    if (result is Success<List<String>>) {
+      _history = result.value;
     }
 
     return result;
   }
 
   Future<Result> _loadResults(String query) async {
+    if (query.isEmpty) {
+      return const Result.success(<int>[]);
+    }
+
     final result = await _searchRepository.getAttractionIdsByQuery(query);
 
     if (result is Success<List<int>>) {
       _resultIds = result.value;
+    }
+
+    return result;
+  }
+
+  Future<Result> _loadMoreResults(String query) async {
+    if (query.isEmpty) {
+      return const Result.success(<int>[]);
+    }
+
+    final result = await _searchRepository.getRelatedResults(query);
+
+    if (result is Success<List<int>>) {
+      _relatedResultsIds = result.value;
     }
 
     return result;

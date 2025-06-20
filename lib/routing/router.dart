@@ -77,10 +77,12 @@ final appRouter = GoRouter(
                       searchRepository: context.read(),
                     );
 
-                    return SearchResult(
-                      viewModel: viewModel,
-                      query: state.pathParameters['query'],
-                    );
+                    final query = state.pathParameters['query'] ?? '';
+
+                    viewModel.loadResults.execute(query);
+                    viewModel.loadRelatedResults.execute(query);
+
+                    return SearchResult(viewModel: viewModel, query: query);
                   },
                 ),
                 storyRoute(routeName: RouteNames.homeStory),
