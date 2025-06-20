@@ -127,4 +127,4 @@ app.*.symbols
 **/android/app/profile
 **/android/app/release
 
-*_old.dart
+lib/ui/story/widgets/story_screen_old.dart
