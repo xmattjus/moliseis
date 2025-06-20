@@ -124,7 +124,8 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
 
   @override
   void dispose() {
-    _sheetController.dispose();
+    // TODO(xmattjus): Understand why disposing the sheet controller causes crash on go_router ver. > 12.1.3
+    // _sheetController.dispose();
     _mapController.dispose();
     _searchController.dispose();
     super.dispose();
