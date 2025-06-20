@@ -6,8 +6,6 @@ const double kButtonHeight = 40.0;
 
 const double kNavigationBarHeight = 80.0;
 
-const double kCardCornerRadius = 12.0;
-
 const double kStorySlideshowPortraitHeightPerc = 0.45;
 
 const double kStorySlideshowLandscapeHeightPerc = 0.65;

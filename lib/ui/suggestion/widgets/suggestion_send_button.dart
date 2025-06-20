@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/ui/core/themes/shape.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
 
 class SuggestionSendButton extends StatelessWidget {
@@ -130,7 +130,7 @@ class _OutlinedCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: foregroundColor),
-        borderRadius: BorderRadius.circular(Shapes.medium),
+        borderRadius: BorderRadius.circular(Shape.medium),
       ),
       color: backgroundColor,
       child: Padding(

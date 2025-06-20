@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/core/themes/shape.dart';
 import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -14,7 +15,10 @@ class CardSkeletonListItem extends StatelessWidget {
         child: Row(
           spacing: 16.0,
           children: [
-            Bone.square(size: 72.0, borderRadius: BorderRadius.circular(12.0)),
+            Bone.square(
+              size: 72.0,
+              borderRadius: BorderRadius.circular(Shape.medium),
+            ),
             const Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,

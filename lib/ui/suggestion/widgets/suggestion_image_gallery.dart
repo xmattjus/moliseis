@@ -1,7 +1,7 @@
 import 'dart:io' show File;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/ui/core/themes/shape.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
@@ -63,7 +63,7 @@ class SuggestionImageGallery extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(Shapes.medium),
+                        borderRadius: BorderRadius.circular(Shape.medium),
                         child: CustomImage.file(
                           File(viewModel.mediaFileList[index].path),
                           width: 72.0,
@@ -83,7 +83,7 @@ class SuggestionImageGallery extends StatelessWidget {
                         ),
                         padding: const EdgeInsets.all(4.0),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(Shapes.medium),
+                          borderRadius: BorderRadius.circular(Shape.medium),
                         ),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         child: const Icon(Icons.remove, size: 20.0),

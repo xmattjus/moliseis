@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/core/themes/shape.dart';
 import 'package:moliseis/ui/core/ui/attraction_and_place_names.dart';
 import 'package:moliseis/ui/core/ui/cards/base_attraction_card.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/skeletons/card_skeleton_list_item.dart';
-import 'package:moliseis/utils/constants.dart';
 
 class CardAttractionListItem extends StatelessWidget {
   const CardAttractionListItem(
@@ -68,7 +68,7 @@ class CardAttractionListItem extends StatelessWidget {
               ClipPath(
                 clipper: ShapeBorderClipper(
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(kCardCornerRadius),
+                    borderRadius: BorderRadius.circular(Shape.medium),
                   ),
                 ),
                 child: CustomImage.network(

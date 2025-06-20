@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/themes/color.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/ui/core/themes/shape.dart';
 import 'package:moliseis/ui/core/themes/text_theme.dart';
-import 'package:moliseis/utils/constants.dart';
 
 class _BaseThemeData {
   const _BaseThemeData._();
@@ -23,7 +22,7 @@ class _BaseThemeData {
       textTheme: appTextTheme,
       cardTheme: CardThemeData(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(kCardCornerRadius),
+          borderRadius: BorderRadius.circular(Shape.medium),
         ),
       ),
       searchBarTheme: const SearchBarThemeData(
@@ -42,14 +41,14 @@ class _BaseThemeData {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Shapes.medium),
+          borderRadius: BorderRadius.circular(Shape.medium),
         ),
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(Shapes.medium),
+            borderRadius: BorderRadius.circular(Shape.medium),
           ),
         ),
       ),
@@ -58,12 +57,12 @@ class _BaseThemeData {
           shape: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.pressed)) {
               return RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Shapes.medium),
+                borderRadius: BorderRadius.circular(Shape.medium),
               );
             }
 
             return RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(Shapes.full),
+              borderRadius: BorderRadius.circular(Shape.full),
             );
           }),
         ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
-import 'package:moliseis/utils/constants.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 class CardSkeletonGridItem extends StatelessWidget {
@@ -12,9 +11,6 @@ class CardSkeletonGridItem extends StatelessWidget {
       effect: CustomPulseEffect(context: context),
       child: Card(
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(kCardCornerRadius),
-        ),
         margin: EdgeInsets.zero,
         child: const Column(
           spacing: 8.0,

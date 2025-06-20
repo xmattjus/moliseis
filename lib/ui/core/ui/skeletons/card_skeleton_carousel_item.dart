@@ -12,7 +12,7 @@ class CardSkeletonCarouselItem extends StatelessWidget {
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(26.0),
+          borderRadius: BorderRadius.circular(Shape.extraLarge),
         ),
         margin: EdgeInsets.zero,
         child: const Align(
