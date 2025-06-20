@@ -85,6 +85,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 scrolledUnderElevation: 0.0,
                 backgroundColor: Theme.of(context).colorScheme.surface,
                 flexibleSpace: Align(
+                  alignment: Alignment.centerLeft,
                   child: CustomSearchAnchor(
                     controller: _searchController,
                     onSubmitted: (text) {
