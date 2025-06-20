@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/attraction/attraction_type.dart';
 import 'package:moliseis/domain/models/geo_map/geo_map_state.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/ui/categories/widgets/category_button.dart';
 import 'package:moliseis/ui/core/themes/text_style.dart';
+import 'package:moliseis/ui/core/ui/attraction_and_place_names.dart';
 import 'package:moliseis/ui/core/ui/button_list.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
-import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/near_attractions_list.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
@@ -129,19 +131,23 @@ class _StoryScreenState extends State<StoryScreen> {
                     sliver: SliverList.list(
                       children: <Widget>[
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          spacing: 16.0,
                           children: [
                             Expanded(
-                              child: Text(
-                                story.title,
-                                style: CustomTextStyles.title(context),
+                              child: AttractionAndPlaceNames(
+                                name: story.title,
+                                placeName: attraction.place.target!.name,
+                                nameStyle: CustomTextStyles.title(context),
+                                placeNameStyle: CustomTextStyles.subtitle(
+                                  context,
+                                ),
                                 overflow: TextOverflow.visible,
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsetsDirectional.symmetric(
-                                horizontal: 8.0,
+                              padding: const EdgeInsetsDirectional.only(
+                                end: 8.0,
                               ),
                               child: FavouriteButton(
                                 id: int.parse(widget.attractionId!),
@@ -149,15 +155,16 @@ class _StoryScreenState extends State<StoryScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4.0),
-                        CustomRichText(
-                          Text(attraction.place.target!.name),
-                          labelTextStyle: CustomTextStyles.subtitle(context),
-                          icon: const Icon(Icons.place_outlined),
-                        ),
                         const SizedBox(height: 16.0),
                         ButtonList(
-                          items: <ButtonStyleButton>[
+                          items: [
+                            CategoryButton(
+                              onPressed: () {
+                                _buildCategoriesRoute(attraction.type);
+                              },
+                              attractionType: attraction.type,
+                            ),
+                            /*
                             ElevatedButton.icon(
                               onPressed: () {
                                 _buildCategoriesRoute(attraction.type);
@@ -177,6 +184,7 @@ class _StoryScreenState extends State<StoryScreen> {
                               icon: const Icon(Icons.share_outlined),
                               label: const Text('Condividi'),
                             ),
+                             */
                           ],
                         ),
                         const SizedBox(height: 16.0),
@@ -241,7 +249,7 @@ class _StoryScreenState extends State<StoryScreen> {
                                 /// prevent state changes for the next route if
                                 /// it is already present in the navigation stack.
                                 context.goNamed(
-                                  RouteNames.map,
+                                  RouteNames.geoMap,
                                   queryParameters: {
                                     "key": UniqueKey().toString(),
                                   },
@@ -291,48 +299,50 @@ class _StoryScreenState extends State<StoryScreen> {
   void _buildCategoriesRoute(AttractionType type) {
     String? nextRouteName;
 
-    if (_currentUri.contains(RouteNames.explore)) {
-      nextRouteName = RouteNames.exploreCategories;
-    } else if (_currentUri.contains(RouteNames.search)) {
-      nextRouteName = RouteNames.searchCategories;
+    if (_currentUri.startsWith(RoutePaths.favourites)) {
+      nextRouteName = RouteNames.favouritesCategory;
+    } else {
+      nextRouteName = RouteNames.homeCategory;
     }
 
-    if (nextRouteName != null) {
-      GoRouter.of(context).goNamed(
-        nextRouteName,
-        pathParameters: {'index': (type.index - 1).toString()},
-      );
-    }
+    GoRouter.of(context).goNamed(
+      nextRouteName,
+      pathParameters: {'index': (type.index - 1).toString()},
+    );
   }
 
   void _buildStoryRoute(int id, int typeIndex) {
     String? nextRouteName;
     var indexNecessary = false;
 
-    if (_currentUri.contains(RouteNames.exploreCategories)) {
-      nextRouteName = RouteNames.exploreCategoriesStory;
+    if (_currentUri.startsWith('${RoutePaths.home}/${RoutePaths.category}')) {
+      nextRouteName = RouteNames.homeCategoryStory;
       indexNecessary = true;
-    } else if (_currentUri.contains(RouteNames.explore)) {
-      nextRouteName = RouteNames.exploreStory;
+    } else if (_currentUri.startsWith(RoutePaths.home)) {
+      nextRouteName = RouteNames.homeStory;
     }
 
-    if (_currentUri.contains(RouteNames.searchCategories)) {
-      nextRouteName = RouteNames.searchCategoriesStory;
+    if (_currentUri.startsWith(
+      '${RoutePaths.favourites}/${RoutePaths.category}',
+    )) {
+      nextRouteName = RouteNames.favouritesCategoryStory;
       indexNecessary = true;
-    } else if (_currentUri.contains(RouteNames.search)) {
-      nextRouteName = RouteNames.searchStory;
+    } else if (_currentUri.startsWith(RoutePaths.favourites)) {
+      nextRouteName = RouteNames.favouritesStory;
     }
 
     if (nextRouteName != null) {
-      final map = <String, String>{'id': id.toString()};
+      final map = {'id': id.toString()};
 
       if (indexNecessary) {
         map['index'] = (typeIndex - 1).toString();
       }
 
-      GoRouter.of(context).pop();
+      GoRouter.of(context)
+        ..pop()
+        ..goNamed(nextRouteName, pathParameters: map);
 
-      GoRouter.of(context).goNamed(nextRouteName, pathParameters: map);
+      // GoRouter.of(context).goNamed(nextRouteName, pathParameters: map);
     }
   }
 }

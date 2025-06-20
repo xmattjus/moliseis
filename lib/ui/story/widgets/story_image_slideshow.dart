@@ -25,8 +25,7 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
 
   late final Animation<Color?> _circularProgColorAnimation;
 
-  final _circularProgNotifier = ValueNotifier<double>(0);
-  double get _circularProgressValue => _circularProgNotifier.value;
+  final _circularProgNotifier = ValueNotifier<double>(0.0);
 
   Duration _delta = Duration.zero;
 
@@ -37,29 +36,25 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
   static const _durationToNextSlide = Duration(seconds: 5);
 
   Duration _elapsedTime = Duration.zero;
+  Duration _lastElapsed = Duration.zero;
 
   /// Creates a page controller showing the [Attraction]'s images.
   final PageController _pageController = PageController();
 
-  Ticker? _ticker;
+  late Ticker _ticker;
+
+  /// Whether [_ticker] must be initialized or not.
+  bool get _initTicker => widget.images.length > 1;
+
+  int _lastPage = 0;
 
   @override
   void initState() {
     super.initState();
 
-    if (widget.images.length > 1) {
-      _ticker = createTicker((elapsed) {
-        _elapsedTime = elapsed - _delta;
-
-        if (_elapsedTime.inMilliseconds > _durationToNextSlide.inMilliseconds) {
-          _animateToNextSlide();
-
-          _delta = elapsed;
-        }
-
-        _circularProgNotifier.value =
-            _elapsedTime.inMilliseconds / _durationToNextSlide.inMilliseconds;
-      });
+    if (_initTicker) {
+      // The ticker will be started when the first image has been loaded.
+      _ticker = createTicker(_onTick);
     }
 
     _animationController = AnimationController(
@@ -68,31 +63,55 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
     );
 
     _circularProgColorAnimation = ColorTween(
-      begin: const Color.fromARGB(255, 239, 64, 64),
-      end: const Color.fromARGB(255, 194, 18, 146),
+      begin: Colors.white54,
+      end: Colors.white,
     ).animate(_animationController);
+  }
+
+  void _onTick(Duration elapsed) {
+    if (elapsed - _lastElapsed > const Duration(milliseconds: 500)) {
+      _delta = Duration.zero;
+    }
+
+    _elapsedTime = elapsed - _delta;
+
+    if (_elapsedTime > _durationToNextSlide) {
+      _animateToNextOrInitialPage();
+
+      _delta = elapsed;
+    }
+
+    _circularProgNotifier.value =
+        _elapsedTime.inMilliseconds / _durationToNextSlide.inMilliseconds;
+
+    _lastElapsed = elapsed;
   }
 
   @override
   void dispose() {
     _animationController.dispose();
-    _ticker?.dispose();
+    if (_initTicker) _ticker.dispose();
     _pageController.dispose();
     _circularProgNotifier.dispose();
     _autoScrollNotifier.dispose();
     super.dispose();
   }
 
-  void _animateToNextSlide() {
-    if (_elapsedTime.inMilliseconds > _durationToNextSlide.inMilliseconds) {
-      final currentPage = _pageController.page?.toInt();
-      if (currentPage != null && _pageController.hasClients) {
-        _pageController.animateToPage(
-          currentPage < widget.images.length - 1 ? currentPage + 1 : 0,
-          duration: Durations.extralong4,
-          curve: Curves.easeInOutCubicEmphasized,
-        );
-      }
+  void _animateToNextOrInitialPage() {
+    if (_pageController.hasClients) {
+      final currentPage = _pageController.page?.toInt() ?? _lastPage;
+
+      final nextPage = currentPage < widget.images.length - 1
+          ? currentPage + 1
+          : 0;
+
+      _pageController.animateToPage(
+        nextPage,
+        duration: Durations.extralong4,
+        curve: Curves.easeInOutCubicEmphasized,
+      );
+
+      _lastPage = nextPage;
     }
   }
 
@@ -186,7 +205,7 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
             ),
           ),
         ),
-        if (widget.images.length > 1)
+        if (_initTicker)
           Positioned(
             bottom: customPainterHeight + 4.0,
             right: 8.0,
@@ -217,7 +236,7 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
                         child: Visibility(
                           visible: _enableAutoScroll,
                           child: CircularProgressIndicator(
-                            value: _circularProgressValue,
+                            value: _circularProgNotifier.value,
                             backgroundColor: Colors.white38,
                             valueColor: _circularProgColorAnimation,
                             trackGap: 0,
@@ -235,16 +254,16 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
   }
 
   void _startAutoPlay() {
-    if (_ticker != null && _ticker!.isActive == false) {
+    if (_initTicker && !_ticker.isActive) {
       _delta = Duration.zero;
-      _ticker!.start();
+      _ticker.start();
       _animationController.forward();
     }
   }
 
   void _stopAutoPlay() {
-    if (_ticker != null && _ticker!.isActive) {
-      _ticker!.stop();
+    if (_initTicker && _ticker.isActive) {
+      _ticker.stop();
       _animationController.reset();
     }
   }
