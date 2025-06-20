@@ -22,7 +22,7 @@ class ParagraphSliverList extends StatelessWidget {
       builder: (context, child) {
         if (viewModel.loadParagraphs.running) {
           return Skeletonizer.sliver(
-            effect: const PulseEffect(),
+            effect: CustomPulseEffect(context: context),
             ignoreContainers: false,
             child: SliverList.list(
               children: const <Widget>[

@@ -8,7 +8,7 @@ class CardSkeletonListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Skeletonizer.zone(
-      effect: customPulseEffect(context: context),
+      effect: CustomPulseEffect(context: context),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(

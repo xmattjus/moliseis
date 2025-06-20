@@ -9,7 +9,7 @@ class CardSkeletonGridItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Skeletonizer.zone(
-      effect: customPulseEffect(context: context),
+      effect: CustomPulseEffect(context: context),
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(
