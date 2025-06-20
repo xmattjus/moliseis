@@ -9,7 +9,7 @@ class EmptyView extends StatelessWidget {
       action = null;
 
   const EmptyView.loading({super.key, this.text})
-    : icon = const CustomCircularProgressIndicator.withDelay(),
+    : icon = const CustomCircularProgressIndicator(),
       action = null;
 
   final Widget? icon;
