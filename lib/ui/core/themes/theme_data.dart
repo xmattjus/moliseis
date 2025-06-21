@@ -41,7 +41,8 @@ class _BaseThemeData {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Shape.medium),
+          borderRadius: BorderRadius.circular(Shape.none),
+          gapPadding: Shape.extraSmall + 2.0,
         ),
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
@@ -52,21 +53,36 @@ class _BaseThemeData {
           ),
         ),
       ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
+      elevatedButtonTheme: ElevatedButtonThemeData(
         style: ButtonStyle(
-          shape: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.pressed)) {
-              return RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(Shape.medium),
-              );
-            }
-
-            return RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(Shape.full),
-            );
-          }),
+          shape: WidgetStateProperty.resolveWith(_expressiveButtonShape),
         ),
       ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: ButtonStyle(
+          shape: WidgetStateProperty.resolveWith(_expressiveButtonShape),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: ButtonStyle(
+          shape: WidgetStateProperty.resolveWith(_expressiveButtonShape),
+        ),
+      ),
+    );
+  }
+
+  /// Returns a border shape based on the current widget state following the
+  /// M3 Expressive design.
+  // TODO(xmattjus): remove when M3 Expressive lands to Material widgets. See: https://github.com/flutter/flutter/issues/168813.
+  static OutlinedBorder? _expressiveButtonShape(Set<WidgetState> states) {
+    if (states.contains(WidgetState.pressed)) {
+      return RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Shape.medium),
+      );
+    }
+
+    return RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(Shape.full),
     );
   }
 }

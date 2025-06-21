@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/attraction/attraction_type.dart';
 import 'package:moliseis/ui/core/themes/color.dart';
-import 'package:moliseis/ui/core/themes/shape.dart';
 import 'package:moliseis/utils/extensions.dart';
 
 class CategoryButton extends StatelessWidget {
@@ -23,13 +22,8 @@ class CategoryButton extends StatelessWidget {
           Theme.of(context).brightness,
         ),
       ),
-      child: ElevatedButton.icon(
+      child: FilledButton.tonalIcon(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(Shape.medium),
-          ),
-        ),
         icon: Icon(attractionType.iconAlt),
         label: Text(attractionType.label),
       ),
