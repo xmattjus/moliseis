@@ -111,9 +111,9 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
               ),
             );
           }
-
-          return await _showMaterialDatePicker(now, durationLimit);
         }
+
+        return await _showMaterialDatePicker(now, durationLimit);
       },
     );
   }
