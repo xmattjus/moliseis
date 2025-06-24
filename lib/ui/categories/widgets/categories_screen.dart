@@ -14,9 +14,9 @@ import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
 
 class CategoriesScreen extends StatefulWidget {
-  const CategoriesScreen({super.key, this.tabIndex});
+  const CategoriesScreen({super.key, required this.tabIndex});
 
-  final String? tabIndex;
+  final int tabIndex;
 
   @override
   State<CategoriesScreen> createState() => _CategoriesScreenState();
@@ -31,12 +31,10 @@ class _CategoriesScreenState extends State<CategoriesScreen>
   void initState() {
     super.initState();
 
-    final initialIndex = int.parse(widget.tabIndex ?? '0');
-
     _viewModel = context.read();
 
     _tabController = TabController(
-      initialIndex: initialIndex,
+      initialIndex: widget.tabIndex,
       length: _viewModel.attractionTypes.length,
       vsync: this,
     );
@@ -51,8 +49,8 @@ class _CategoriesScreenState extends State<CategoriesScreen>
   @override
   void didUpdateWidget(covariant CategoriesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.tabIndex != oldWidget.tabIndex && widget.tabIndex != null) {
-      _tabController.index = int.parse(widget.tabIndex!);
+    if (widget.tabIndex != oldWidget.tabIndex) {
+      _tabController.index = widget.tabIndex;
     }
   }
 

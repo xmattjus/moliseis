@@ -30,7 +30,7 @@ class StoryScreen extends StatefulWidget {
     required this.storyViewModel,
   });
 
-  final String? attractionId;
+  final int attractionId;
   final ParagraphViewModel paragraphViewModel;
   final StoryViewModel storyViewModel;
 
@@ -83,9 +83,7 @@ class _StoryScreenState extends State<StoryScreen> {
                 ),
                 action: TextButton(
                   onPressed: () {
-                    widget.storyViewModel.load.execute(
-                      int.parse(widget.attractionId!),
-                    );
+                    widget.storyViewModel.load.execute(widget.attractionId);
                   },
                   child: const Text('Riprova'),
                 ),
@@ -149,9 +147,7 @@ class _StoryScreenState extends State<StoryScreen> {
                               padding: const EdgeInsetsDirectional.only(
                                 end: 8.0,
                               ),
-                              child: FavouriteButton(
-                                id: int.parse(widget.attractionId!),
-                              ),
+                              child: FavouriteButton(id: widget.attractionId),
                             ),
                           ],
                         ),

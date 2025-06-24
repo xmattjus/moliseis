@@ -85,10 +85,10 @@ final appRouter = GoRouter(
                     return SearchResult(viewModel: viewModel, query: query);
                   },
                 ),
-                storyRoute(routeName: RouteNames.homeStory),
+                storyRoute(name: RouteNames.homeStory),
                 categoriesRoute(
-                  routeName: RouteNames.homeCategory,
-                  childRouteName: RouteNames.homeCategoryStory,
+                  name: RouteNames.homeCategory,
+                  childName: RouteNames.homeCategoryStory,
                 ),
                 GoRoute(
                   path: RoutePaths.suggestion,
@@ -117,10 +117,10 @@ final appRouter = GoRouter(
                 );
               },
               routes: <RouteBase>[
-                storyRoute(routeName: RouteNames.favouritesStory),
+                storyRoute(name: RouteNames.favouritesStory),
                 categoriesRoute(
-                  routeName: RouteNames.favouritesCategory,
-                  childRouteName: RouteNames.favouritesCategoryStory,
+                  name: RouteNames.favouritesCategory,
+                  childName: RouteNames.favouritesCategoryStory,
                 ),
               ],
             ),
