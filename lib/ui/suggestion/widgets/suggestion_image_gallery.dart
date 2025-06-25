@@ -40,8 +40,8 @@ class SuggestionImageGallery extends StatelessWidget {
                   if (viewModel.mediaFileList.length == index) {
                     if (viewModel.addImages.running) {
                       return const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: Center(child: CustomCircularProgressIndicator()),
+                        padding: EdgeInsets.all(18.0),
+                        child: CustomCircularProgressIndicator(size: 36.0),
                       );
                     }
 
@@ -50,7 +50,7 @@ class SuggestionImageGallery extends StatelessWidget {
                       height: 72.0,
                       elevation: 0.0,
                       child: const Center(
-                        child: Icon(Icons.add_a_photo_outlined, size: 20.0),
+                        child: Icon(Icons.add_a_photo_outlined, size: 24.0),
                       ),
                       onPressed: () async =>
                           await viewModel.addImages.execute(),
@@ -75,7 +75,9 @@ class SuggestionImageGallery extends StatelessWidget {
                       RawMaterialButton(
                         onPressed: () =>
                             viewModel.removeImageAtIndex.execute(index),
-                        fillColor: Colors.white,
+                        fillColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainer,
                         elevation: 0.0,
                         constraints: const BoxConstraints(
                           maxWidth: 56.0,
