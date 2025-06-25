@@ -161,18 +161,6 @@ class _StoryScreenState extends State<StoryScreen> {
                               attractionType: attraction.type,
                             ),
                             /*
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                _buildCategoriesRoute(attraction.type);
-                              },
-                              style: const ButtonStyle().byAttractionType(
-                                attraction.type,
-                                primary: Theme.of(context).colorScheme.primary,
-                                brightness: Theme.of(context).brightness,
-                              ),
-                              icon: Icon(attraction.type.getIcon()),
-                              label: Text(attraction.type.readableName),
-                            ),
                             OutlinedButton.icon(
                               onPressed: () {
                                 // TODO(xmattjus): share deep link to this screen.
@@ -189,7 +177,7 @@ class _StoryScreenState extends State<StoryScreen> {
                   ),
                   if (story.shortDescription.isNotEmpty)
                     SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      padding: _insets,
                       sliver: SliverToBoxAdapter(
                         child: Text(story.shortDescription),
                       ),
@@ -203,20 +191,14 @@ class _StoryScreenState extends State<StoryScreen> {
                   ),
                   if (story.sources.isNotEmpty)
                     SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16.0,
-                        horizontal: 16.0,
-                      ),
+                      padding: _insets,
                       sliver: SliverToBoxAdapter(
                         child: StorySource(texts: story.sources),
                       ),
                     ),
                   if (story.author.isNotEmpty)
                     SliverPadding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16.0,
-                        horizontal: 16.0,
-                      ),
+                      padding: _insets,
                       sliver: StoryAuthor(s: story.author),
                     ),
                   SliverPadding(
@@ -317,8 +299,6 @@ class _StoryScreenState extends State<StoryScreen> {
     } else if (_currentUri.startsWith('/category/')) {
       nextRoute = RouteNames.homeCategoryStory;
       indexNecessary = true;
-    } else if (_currentUri.startsWith(RoutePaths.favourites)) {
-      nextRouteName = RouteNames.favouritesStory;
     } else if (_currentUri.startsWith('favourites/')) {
       nextRoute = RouteNames.favouritesStory;
     } else if (_currentUri.startsWith('/')) {
@@ -335,4 +315,7 @@ class _StoryScreenState extends State<StoryScreen> {
       GoRouter.of(context).pushReplacementNamed(nextRoute, pathParameters: map);
     }
   }
+
+  EdgeInsetsGeometry get _insets =>
+      const EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 16.0);
 }
