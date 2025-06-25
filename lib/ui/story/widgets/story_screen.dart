@@ -55,7 +55,7 @@ class _StoryScreenState extends State<StoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _currentUri = GoRouterState.of(context).uri.toString();
+    _currentUri = GoRouterState.of(context).fullPath.toString();
 
     final screenHeight = MediaQuery.sizeOf(context).height;
 
@@ -308,37 +308,31 @@ class _StoryScreenState extends State<StoryScreen> {
   }
 
   void _buildStoryRoute(int id, int typeIndex) {
-    String? nextRouteName;
+    String? nextRoute;
     var indexNecessary = false;
 
-    if (_currentUri.startsWith('${RoutePaths.home}/${RoutePaths.category}')) {
-      nextRouteName = RouteNames.homeCategoryStory;
+    if (_currentUri.startsWith('/favourites/category/')) {
+      nextRoute = RouteNames.favouritesCategoryStory;
       indexNecessary = true;
-    } else if (_currentUri.startsWith(RoutePaths.home)) {
-      nextRouteName = RouteNames.homeStory;
-    }
-
-    if (_currentUri.startsWith(
-      '${RoutePaths.favourites}/${RoutePaths.category}',
-    )) {
-      nextRouteName = RouteNames.favouritesCategoryStory;
+    } else if (_currentUri.startsWith('/category/')) {
+      nextRoute = RouteNames.homeCategoryStory;
       indexNecessary = true;
     } else if (_currentUri.startsWith(RoutePaths.favourites)) {
       nextRouteName = RouteNames.favouritesStory;
+    } else if (_currentUri.startsWith('favourites/')) {
+      nextRoute = RouteNames.favouritesStory;
+    } else if (_currentUri.startsWith('/')) {
+      nextRoute = RouteNames.homeStory;
     }
 
-    if (nextRouteName != null) {
+    if (nextRoute != null) {
       final map = {'id': id.toString()};
 
       if (indexNecessary) {
         map['index'] = (typeIndex - 1).toString();
       }
 
-      GoRouter.of(context)
-        ..pop()
-        ..goNamed(nextRouteName, pathParameters: map);
-
-      // GoRouter.of(context).goNamed(nextRouteName, pathParameters: map);
+      GoRouter.of(context).pushReplacementNamed(nextRoute, pathParameters: map);
     }
   }
 }
