@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class CustomCircularProgressIndicator extends StatelessWidget {
   /// Creates a [CircularProgressIndicator] immediately.
-  const CustomCircularProgressIndicator({super.key}) : _delay = null;
+  const CustomCircularProgressIndicator({super.key, this.size}) : _delay = null;
 
   /// Creates a [CircularProgressIndicator] after the requested [delay] has
   /// passed.
@@ -11,10 +11,13 @@ class CustomCircularProgressIndicator extends StatelessWidget {
   const CustomCircularProgressIndicator.withDelay({
     super.key,
     Duration delay = Durations.medium2,
+    this.size,
   }) : _delay = delay;
 
   /// The delay after which the [CircularProgressIndicator] will be shown.
   final Duration? _delay;
+
+  final double? size;
 
   @override
   Widget build(BuildContext context) {
@@ -37,10 +40,10 @@ class CustomCircularProgressIndicator extends StatelessWidget {
   }
 
   Widget _buildSpinner() {
-    return const SizedBox(
-      width: 40.0,
-      height: 40.0,
-      child: CircularProgressIndicator(),
+    return SizedBox(
+      width: size,
+      height: size,
+      child: const CircularProgressIndicator(),
     );
   }
 }

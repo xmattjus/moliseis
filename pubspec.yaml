@@ -34,7 +34,7 @@ dependencies:
     sdk: flutter
   flutter_map: ^8.1.1
   # G
-  go_router: ^15.2.3 # '>=12.1.3 <13.0.0'
+  go_router: ^15.2.4 # '>=12.1.3 <13.0.0'
   # H
   # I
   image_picker: ^1.1.2
@@ -83,7 +83,7 @@ dependencies:
 dev_dependencies:
   # A
   # B
-  build_runner: ^2.5.3
+  build_runner: ^2.5.4
   # C
   # D
   # E
