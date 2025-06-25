@@ -14,7 +14,7 @@ class ParagraphContent extends StatelessWidget {
       children: <Widget>[
         if (paragraph.heading.isNotEmpty)
           Padding(
-            padding: const EdgeInsetsDirectional.only(top: 16.0),
+            padding: const EdgeInsets.only(bottom: 8.0),
             child: Text(
               paragraph.heading,
               style: CustomTextStyles.paragraphHeading(context),
@@ -22,18 +22,13 @@ class ParagraphContent extends StatelessWidget {
           ),
         if (paragraph.subheading.isNotEmpty)
           Padding(
-            padding: const EdgeInsetsDirectional.only(top: 8.0),
+            padding: const EdgeInsets.only(bottom: 4.0),
             child: Text(
               paragraph.subheading,
               style: CustomTextStyles.paragraphSubheading(context),
             ),
           ),
-        if (paragraph.body.isNotEmpty)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(top: 4.0),
-            child: Text(paragraph.body),
-          ),
-        // const SizedBox(height: 8.0),
+        if (paragraph.body.isNotEmpty) Text(paragraph.body),
       ],
     );
   }

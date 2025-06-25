@@ -19,28 +19,26 @@ class ParagraphSliverList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: viewModel.loadParagraphs..execute(id),
+      listenable: viewModel.load..execute(id),
       builder: (context, child) {
-        if (viewModel.loadParagraphs.running) {
+        if (viewModel.load.running) {
           return Skeletonizer.sliver(
             effect: CustomPulseEffect(context: context),
             ignoreContainers: false,
             child: SliverList.list(
               children: const <Widget>[
-                SizedBox(height: 16.0),
+                // SizedBox(height: 16.0),
                 _ParagraphSkeleton(),
                 SizedBox(height: 16.0),
                 _ParagraphSkeleton(),
               ],
             ),
           );
-        } else if (viewModel.loadParagraphs.error) {
+        } else if (viewModel.load.error) {
           return SliverToBoxAdapter(
             child: EmptyView(
               action: TextButton(
-                onPressed: () {
-                  viewModel.loadParagraphs.execute(id);
-                },
+                onPressed: () => viewModel.load.execute(id),
                 child: const Text('Riprova'),
               ),
               text: const Text(
@@ -51,8 +49,11 @@ class ParagraphSliverList extends StatelessWidget {
         }
 
         return SliverList.builder(
-          itemBuilder: (context, index) {
-            return ParagraphContent(paragraph: viewModel.paragraphs[index]);
+          itemBuilder: (_, index) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: ParagraphContent(paragraph: viewModel.paragraphs[index]),
+            );
           },
           itemCount: viewModel.paragraphs.length,
         );
