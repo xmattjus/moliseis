@@ -24,8 +24,8 @@ class GalleryPreviewModal {
             images[index].url,
             width: MediaQuery.sizeOf(context).width,
             height: MediaQuery.sizeOf(context).height,
-            imageWidth: images[index].width.toDouble(),
-            imageHeight: images[index].height.toDouble(),
+            imageWidth: images[index].width,
+            imageHeight: images[index].height,
           );
         },
         itemCount: images.length,

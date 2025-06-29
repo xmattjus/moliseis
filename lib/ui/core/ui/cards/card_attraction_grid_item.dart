@@ -56,8 +56,8 @@ class CardAttractionGridItem extends StatelessWidget {
                       image.url,
                       width: constraints.biggest.width,
                       height: constraints.biggest.height,
-                      imageWidth: image.width.toDouble(),
-                      imageHeight: image.height.toDouble(),
+                      imageWidth: image.width,
+                      imageHeight: image.height,
                       fit: BoxFit.cover,
                     ),
                   );

@@ -178,8 +178,8 @@ class _StoryImageSlideshowState extends State<StoryImageSlideshow>
                     widget.images[index].url,
                     width: screenWidth,
                     height: widgetHeight,
-                    imageWidth: widget.images[index].width.toDouble(),
-                    imageHeight: widget.images[index].height.toDouble(),
+                    imageWidth: widget.images[index].width,
+                    imageHeight: widget.images[index].height,
                     fit: BoxFit.cover,
                     onImageLoading: (isLoading) {
                       if (_enableAutoScroll) {

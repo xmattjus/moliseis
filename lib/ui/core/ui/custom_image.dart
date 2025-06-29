@@ -50,10 +50,10 @@ class CustomImage extends StatelessWidget {
   final double height;
 
   /// The image width.
-  final double imageWidth;
+  final int imageWidth;
 
   /// The image height.
-  final double imageHeight;
+  final int imageHeight;
 
   /// How to inscribe the image into the space allocated during layout.
   final BoxFit? fit;
@@ -79,8 +79,8 @@ class CustomImage extends StatelessWidget {
     // https://medium.com/make-android/save-your-memory-usage-by-optimizing-network-image-in-flutter-cbc9f8af47cd
     // https://github.com/BigTimo/auto_resize_image/blob/master/lib/src/auto_resize_image.dart
     if (imageWidth * imageHeight <= widgetWidthPx * widgetHeightPx) {
-      targetWidthPx = imageWidth;
-      targetHeightPx = imageHeight;
+      targetWidthPx = imageWidth.toDouble();
+      targetHeightPx = imageHeight.toDouble();
     } else {
       if (srcAspectRatio / widgetAspectRatio > 2 ||
           (1 / srcAspectRatio) / (1 / widgetAspectRatio) > 2) {

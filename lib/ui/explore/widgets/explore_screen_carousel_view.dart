@@ -126,8 +126,8 @@ class _CarouselViewItem extends StatelessWidget {
                   image.url,
                   width: width,
                   height: height,
-                  imageWidth: image.width.toDouble(),
-                  imageHeight: image.height.toDouble(),
+                  imageWidth: image.width,
+                  imageHeight: image.height,
                   fit: BoxFit.cover,
                 ),
                 onPressed: () {

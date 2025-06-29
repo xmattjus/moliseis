@@ -38,8 +38,8 @@ class GalleryScreenImageSliverGrid extends StatelessWidget {
                       attraction.images[index].url,
                       width: constraints.biggest.width,
                       height: constraints.biggest.height,
-                      imageWidth: attraction.images[index].width.toDouble(),
-                      imageHeight: attraction.images[index].height.toDouble(),
+                      imageWidth: attraction.images[index].width,
+                      imageHeight: attraction.images[index].height,
                       fit: BoxFit.cover,
                     );
                   },

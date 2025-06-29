@@ -154,8 +154,8 @@ class _GoeMapBottomSheetDetails extends StatelessWidget {
                       attraction.images[index].url,
                       width: width,
                       height: 200.0,
-                      imageWidth: attraction.images[index].width.toDouble(),
-                      imageHeight: attraction.images[index].height.toDouble(),
+                      imageWidth: attraction.images[index].width,
+                      imageHeight: attraction.images[index].height,
                       fit: BoxFit.cover,
                     ),
                   );
