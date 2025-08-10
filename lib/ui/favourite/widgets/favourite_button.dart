@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:moliseis/ui/core/themes/shape.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:provider/provider.dart';
 
@@ -8,43 +10,42 @@ enum FavouriteButtonType { small, wide }
 
 class FavouriteButton extends StatelessWidget {
   /// Creates an actionable [IconButton] or [OutlinedButton.icon] to set the
-  /// saved state of an attraction.
+  /// saved state of the content.
   ///
   /// Defaults to [IconButton].
   const FavouriteButton({
     super.key,
     this.color,
-    required this.id,
+    required this.content,
     this.radius,
-    this.type = FavouriteButtonType.small,
-  });
+  }) : _type = FavouriteButtonType.small;
 
-  /// Creates an actionable [OutlinedButton.icon] to set the saved state of an
-  /// attraction.
-  const FavouriteButton.wide({super.key, required this.id, this.radius})
+  /// Creates an actionable [OutlinedButton.icon] to set the saved state of the
+  /// content.
+  const FavouriteButton.wide({super.key, required this.content, this.radius})
     : color = null,
-      type = FavouriteButtonType.wide;
+      _type = FavouriteButtonType.wide;
 
   final Color? color;
-  final int id;
+  final ContentBase content;
   final double? radius;
-  final FavouriteButtonType type;
+  final FavouriteButtonType _type;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Consumer<FavouriteViewModel>(
       builder: (_, viewModel, _) {
-        final colorScheme = Theme.of(context).colorScheme;
-
-        final isSaved = viewModel.favourites.contains(id);
+        final isSaved = viewModel.isFavourite(content);
 
         final shape = RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(
-            radius ?? (isSaved ? Shape.medium : Shape.full),
+            radius ?? (isSaved ? Shapes.medium : Shapes.full),
           ),
         );
 
-        switch (type) {
+        switch (_type) {
           case FavouriteButtonType.small:
             final feedbackColor = colorScheme.onSurfaceVariant;
             final splashColor = colorScheme.onSurface;
@@ -58,18 +59,12 @@ class FavouriteButton extends StatelessWidget {
                 },
                 child: RawMaterialButton(
                   key: ValueKey<bool>(isSaved),
-                  onPressed: () {
-                    HapticFeedback.lightImpact();
-
-                    isSaved
-                        ? viewModel.deleteFavourite.execute(id)
-                        : viewModel.addFavourite.execute(id);
-                  },
+                  onPressed: onPressed(content, isSaved, viewModel),
                   fillColor: isSaved ? colorScheme.errorContainer : null,
-                  elevation: 0.0,
-                  focusElevation: 0.0,
-                  hoverElevation: 0.0,
-                  highlightElevation: 0.0,
+                  elevation: 0,
+                  focusElevation: 0,
+                  hoverElevation: 0,
+                  highlightElevation: 0,
                   focusColor: feedbackColor.withValues(alpha: 0.08),
                   hoverColor: feedbackColor.withValues(alpha: 0.08),
                   splashColor: splashColor.withValues(alpha: 0.1),
@@ -89,16 +84,12 @@ class FavouriteButton extends StatelessWidget {
             );
           case FavouriteButtonType.wide:
             return OutlinedButton.icon(
-              onPressed: () {
-                isSaved
-                    ? viewModel.deleteFavourite.execute(id)
-                    : viewModel.addFavourite.execute(id);
-              },
+              onPressed: onPressed(content, isSaved, viewModel),
               style: ButtonStyle(
                 shape: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.pressed)) {
                     return RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Shape.medium),
+                      borderRadius: BorderRadius.circular(Shapes.medium),
                     );
                   }
 
@@ -111,5 +102,29 @@ class FavouriteButton extends StatelessWidget {
         }
       },
     );
+  }
+
+  void Function() onPressed(
+    ContentBase content,
+    bool isSaved,
+    FavouriteViewModel viewModel,
+  ) {
+    return () {
+      HapticFeedback.lightImpact();
+
+      if (content is EventContent) {
+        if (isSaved) {
+          viewModel.removeEvent.execute(content.remoteId);
+        } else {
+          viewModel.addEvent.execute(content.remoteId);
+        }
+      } else {
+        if (isSaved) {
+          viewModel.removePlace.execute(content.remoteId);
+        } else {
+          viewModel.addPlace.execute(content.remoteId);
+        }
+      }
+    };
   }
 }

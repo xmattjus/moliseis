@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/repositories/suggestion/suggestion_repository.dart';
-import 'package:moliseis/domain/models/attraction/attraction_type.dart';
+import 'package:moliseis/domain/models/core/content_category.dart';
 import 'package:moliseis/domain/models/suggestion/suggestion.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions.dart';
@@ -37,14 +37,14 @@ class SuggestionViewModel extends ChangeNotifier {
   final _mediaFileHashes = <int>[];
   String? place;
   DateTime? _startDate;
-  AttractionType? type;
-  final _types = AttractionType.values.minusUnknown;
+  ContentCategory? type;
+  final _categories = ContentCategory.values.minusUnknown;
 
   DateTime? get endDate => _endDate;
   UnmodifiableListView<XFile> get mediaFileList =>
       UnmodifiableListView<XFile>(_mediaFileList);
-  UnmodifiableListView<AttractionType> get types =>
-      UnmodifiableListView<AttractionType>(_types);
+  UnmodifiableListView<ContentCategory> get categories =>
+      UnmodifiableListView<ContentCategory>(_categories);
   DateTime? get startDate => _startDate;
 
   late Command0<void> addImages;
@@ -75,7 +75,11 @@ class SuggestionViewModel extends ChangeNotifier {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(null, error, stackTrace);
+      _log.severe(
+        'An exception occurred while adding images to the upload list.',
+        error,
+        stackTrace,
+      );
 
       return Result.error(error);
     }
@@ -90,7 +94,11 @@ class SuggestionViewModel extends ChangeNotifier {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(null, error, stackTrace);
+      _log.severe(
+        'An exception occurred while removing image at index $index from the upload list.',
+        error,
+        stackTrace,
+      );
 
       return Result.error(error);
     }

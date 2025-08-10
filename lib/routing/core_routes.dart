@@ -1,56 +1,92 @@
 import 'package:go_router/go_router.dart';
-import 'package:moliseis/main.dart' show log;
+import 'package:logging/logging.dart';
+import 'package:moliseis/domain/models/core/content_category.dart';
+import 'package:moliseis/domain/use-cases/category/category_use_case.dart';
+import 'package:moliseis/domain/use-cases/detail/detail_use_case.dart';
+import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/routing/route_paths.dart';
-import 'package:moliseis/ui/categories/widgets/categories_screen.dart';
+import 'package:moliseis/ui/category/view_models/category_view_model.dart';
+import 'package:moliseis/ui/category/widgets/category_screen.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
-import 'package:moliseis/ui/story/view_models/paragraph_view_model.dart';
-import 'package:moliseis/ui/story/view_models/story_view_model.dart';
-import 'package:moliseis/ui/story/widgets/story_screen.dart';
+import 'package:moliseis/ui/detail/view_models/detail_view_model.dart';
+import 'package:moliseis/ui/detail/widgets/detail_screen.dart';
+import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
 
-GoRoute categoriesRoute({required String name, required String childName}) {
+GoRoute categoryRoute({required String name, required String childName}) {
   return GoRoute(
     path: RoutePaths.category,
     name: name,
     builder: (_, state) {
-      final tabIndex = int.parse(state.pathParameters['index'] ?? '0');
-      return CategoriesScreen(tabIndex: tabIndex);
+      final tabIndex = int.parse(
+        state.pathParameters['index'] ?? kcategoryScreenNoIndex.toString(),
+      );
+
+      return ChangeNotifierProvider<CategoryViewModel>(
+        create: (context) {
+          final viewModel = CategoryViewModel(
+            categoryUseCase: CategoryUseCase(
+              eventRepository: context.read(),
+              placeRepository: context.read(),
+            ),
+            exploreGetByIdUseCase: ExploreUseCase(
+              eventRepository: context.read(),
+              placeRepository: context.read(),
+            ),
+            settingsRepository: context.read(),
+          );
+
+          final allCategories = ContentCategory.values.minusUnknown;
+
+          viewModel.setSelectedCategories.execute(
+            tabIndex != kcategoryScreenNoIndex
+                ? {allCategories.elementAt(tabIndex)}
+                : {...allCategories},
+          );
+
+          return viewModel;
+        },
+        builder: (context, _) => CategoryScreen(viewModel: context.read()),
+      );
     },
-    routes: <RouteBase>[storyRoute(name: childName)],
+    routes: <RouteBase>[detailRoute(name: childName)],
   );
 }
 
-GoRoute storyRoute({required String name}) {
+GoRoute detailRoute({required String name}) {
   return GoRoute(
-    path: RoutePaths.story,
+    path: RoutePaths.details,
     name: name,
     builder: (context, state) {
       final id = int.parse(state.pathParameters['id']!);
-
-      final viewModel = StoryViewModel(
-        attractionRepository: context.read(),
-        galleryRepository: context.read(),
-        storyRepository: context.read(),
+      final isEvent = bool.parse(
+        state.uri.queryParameters['isEvent'] ?? 'false',
       );
 
-      final paragraphViewModel = ParagraphViewModel(
-        paragraphRepository: context.read(),
+      final viewModel = DetailViewModel(
+        detailUseCase: DetailUseCase(
+          eventRepository: context.read(),
+          geoMapRepository: context.read(),
+          placeRepository: context.read(),
+        ),
       );
 
-      // Loads the story from the backend.
-      viewModel.load.execute(id);
+      if (isEvent) {
+        viewModel.loadEvent.execute(id);
+      } else {
+        viewModel.loadPlace.execute(id);
+      }
 
-      return StoryScreen(
-        attractionId: id,
-        paragraphViewModel: paragraphViewModel,
-        storyViewModel: viewModel,
-      );
+      return DetailScreen(isEvent: isEvent, viewModel: viewModel);
     },
     redirect: (context, state) {
-      final attractionId = state.pathParameters['id'];
+      final contentId = state.pathParameters['id'];
 
-      if (attractionId == null || int.tryParse(attractionId) == null) {
-        log.severe('Attraction id $attractionId is not a parsable integer.');
+      if (contentId == null || int.tryParse(contentId) == null) {
+        final log = Logger('CoreRoutes');
+
+        log.severe('Content Id $contentId is not a parsable integer.');
         showSnackBar(
           context: context,
           textContent:

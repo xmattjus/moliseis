@@ -1,69 +1,66 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/attraction/attraction.dart';
-import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
-import 'package:moliseis/ui/core/ui/attraction_and_place_names.dart';
-import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
-import 'package:moliseis/ui/core/ui/button_list.dart';
-import 'package:moliseis/ui/core/ui/cards/card_base.dart';
-import 'package:moliseis/ui/core/ui/custom_back_button.dart';
-import 'package:moliseis/ui/core/ui/custom_image.dart';
-import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
-import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/place/place.dart';
+import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/ui/core/themes/text_styles.dart';
+import 'package:moliseis/ui/core/ui/bottom_sheet_adaptive_title.dart';
+import 'package:moliseis/ui/core/ui/bottom_sheet_drag_handle.dart';
+import 'package:moliseis/ui/core/ui/content/event_content_card_grid_item.dart';
+import 'package:moliseis/ui/core/ui/content/place_content_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/future_built.dart';
-import 'package:moliseis/ui/core/ui/link_text_button.dart';
-import 'package:moliseis/ui/core/ui/near_attractions_list.dart';
+import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid_item.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
-import 'package:moliseis/ui/explore/view_models/attraction_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
-import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal.dart';
+import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_details.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_search.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions.dart';
-import 'package:provider/provider.dart';
-
-part '_geo_map_bottom_sheet_default.dart';
-part '_geo_map_bottom_sheet_details.dart';
-part '_geo_map_bottom_sheet_search.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class GeoMapBottomSheet extends StatefulWidget {
   const GeoMapBottomSheet({
     super.key,
-    required this.attractionId,
-    this.searchQuery = '',
+    // required this.contentId,
+    required this.content,
     required this.controller,
     required this.currentCenter,
-    required this.onAttractionPressed,
     required this.onCloseButtonPressed,
+    required this.onContentPressed,
     required this.onVerticalDragUpdate,
+    this.searchQuery = '',
+    required this.viewModel,
+    required this.searchViewModel,
   });
 
-  /// The user selected attraction's local database id.
-  final int attractionId;
+  // final int contentId;
+  final ContentBase? content;
 
-  final String searchQuery;
-
-  /// The controller for the bottom sheet.
   final DraggableScrollableController controller;
 
   /// The current map center.
   ///
-  /// When both the [_attractionId] and [currentCenter] are defined, the first
-  /// will take priority, e.g. the details of that [Attraction] will be shown in
+  /// When both the [contentId] and [currentCenter] are defined, the first
+  /// will take priority, e.g. the details of that [Place] will be shown in
   /// the bottom sheet.
   final LatLng currentCenter;
 
   final VoidCallback onCloseButtonPressed;
 
-  final void Function(int id) onAttractionPressed;
+  final void Function(ContentBase content) onContentPressed;
 
   final void Function(double size) onVerticalDragUpdate;
+
+  final String searchQuery;
+
+  final GeoMapViewModel viewModel;
+
+  final SearchViewModel searchViewModel;
 
   @override
   State<GeoMapBottomSheet> createState() => _GeoMapBottomSheetState();
@@ -72,10 +69,6 @@ class GeoMapBottomSheet extends StatefulWidget {
 class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
     with TickerProviderStateMixin {
   DraggableScrollableController get _controller => widget.controller;
-
-  late final AttractionViewModel _uiAttractionController;
-
-  Future<Attraction>? _future;
 
   double _minSize = 0;
 
@@ -86,10 +79,8 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
     super.initState();
     _controller.addListener(_onVerticalDragUpdate);
 
-    _uiAttractionController = context.read();
-
-    if (widget.attractionId > 0) {
-      _updateFuture('${widget.attractionId}');
+    if (widget.content != null) {
+      _showContent();
     }
   }
 
@@ -100,8 +91,9 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
     if (context.isLandscape) {
       _updateMinSize(0.35);
 
-      /// Removes the snap sizes that would make dragging the bottom sheet
-      /// behind the navigation bar without closing it possible in landscape.
+      /// Removes the snap sizes that would make possible to drag the bottom
+      /// sheet behind the navigation bar without completely closing it in
+      /// landscape.
       _snapSizes.remove(0.2);
     } else {
       _updateMinSize(0.2);
@@ -111,12 +103,17 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
       }
     }
 
-    if (widget.attractionId != oldWidget.attractionId) {
-      if (widget.attractionId > 0) {
-        _updateFuture('${widget.attractionId}');
-      } else {
-        _future = null;
-      }
+    if (widget.content != null &&
+        widget.content!.remoteId != oldWidget.content?.remoteId) {
+      _showContent();
+    }
+  }
+
+  void _showContent() {
+    if (widget.content! is EventContent) {
+      widget.viewModel.showEvent.execute(widget.content!.remoteId);
+    } else if (widget.content! is PlaceContent) {
+      widget.viewModel.showPlace.execute(widget.content!.remoteId);
     }
   }
 
@@ -139,43 +136,84 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
       builder: (context, scrollController) {
         Widget? child;
 
-        if (widget.searchQuery.isNotEmpty) {
-          child = _GeoMapBottomSheetSearch(
-            widget.searchQuery,
-            onResultPressed: widget.onAttractionPressed,
-            onBackPressed: widget.onCloseButtonPressed,
+        final id = widget.content?.remoteId ?? 0;
+
+        if (id > 0) {
+          child = ListenableBuilder(
+            listenable: Listenable.merge([
+              widget.viewModel.showEvent,
+              widget.viewModel.showPlace,
+            ]),
+            builder: (_, _) {
+              if (widget.content! is EventContent &&
+                      widget.viewModel.showEvent.completed ||
+                  widget.content! is PlaceContent &&
+                      widget.viewModel.showPlace.completed) {
+                return GeoMapBottomSheetDetails(
+                  widget.viewModel.selectedContent!,
+                  onNearContentPressed: widget.onContentPressed,
+                  onCloseButtonPressed: widget.onCloseButtonPressed,
+                  viewModel: widget.viewModel,
+                );
+              }
+
+              return SliverSkeletonizer(
+                effect: CustomPulseEffect(context: context),
+                child: SliverPadding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 18.0,
+                    horizontal: 16.0,
+                  ),
+                  sliver: SliverList.list(
+                    children: <Widget>[
+                      Text(
+                        'Esplora Placeholder: nome di un luogo',
+                        style: CustomTextStyles.title(context),
+                      ),
+                      const SizedBox(height: 4.0),
+                      Text(
+                        'Placeholder: nome di un paese',
+                        style: CustomTextStyles.subtitle(context),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           );
-        } else if (widget.attractionId > 0) {
-          child = _GoeMapBottomSheetDetails(
-            attractionId: widget.attractionId,
-            onNearAttractionTap: widget.onAttractionPressed,
-            onCloseButtonTap: widget.onCloseButtonPressed,
-            future: _future,
+        } else if (widget.searchQuery.isNotEmpty) {
+          child = GeoMapBottomSheetSearch(
+            widget.searchQuery,
+            onResultPressed: widget.onContentPressed,
+            onBackPressed: widget.onCloseButtonPressed,
+            viewModel: widget.searchViewModel,
           );
         } else {
-          child = _GeoMapBottomSheetDefault(
+          child = GeoMapBottomSheetDefault(
             currentMapCenter: widget.currentCenter,
-            onNearAttractionTap: widget.onAttractionPressed,
+            onNearContentPressed: widget.onContentPressed,
+            viewModel: widget.viewModel,
           );
         }
 
         return Material(
           elevation: 1.0,
           color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28.0)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(Shapes.extraLarge),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: CustomScrollView(
             controller: scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: <Widget>[
-              const SliverToBoxAdapter(child: _Draggable()),
+              const SliverToBoxAdapter(child: BottomSheetDragHandle()),
               child,
 
               // Adds some padding to prevent the bottom navigation bar
               // from overlapping the bottom sheet content.
               const SliverPadding(
-                padding: EdgeInsetsDirectional.only(
-                  bottom: kNavigationBarHeight + 32.0,
-                ),
+                padding: EdgeInsets.only(bottom: kNavigationBarHeight + 32.0),
               ),
             ],
           ),
@@ -187,13 +225,10 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
   /// Notifies its listeners on [_controller] size changes.
   void _onVerticalDragUpdate() => widget.onVerticalDragUpdate(_controller.size);
 
-  Future<void> _updateFuture(String id) =>
-      _future = _uiAttractionController.getAttractionById(id);
-
   /// Changes the bottom sheet minimum size to disallow closing it completely
-  /// when an attraction is open.
+  /// when content is visible.
   void _updateMinSize(double newSize) {
-    if (widget.attractionId != 0) {
+    if (widget.content != null) {
       _minSize = newSize;
     } else {
       _minSize = 0;
@@ -201,22 +236,171 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
   }
 }
 
-class _Draggable extends StatelessWidget {
-  const _Draggable();
+class GeoMapBottomSheetDefault extends StatelessWidget {
+  const GeoMapBottomSheetDefault({
+    required this.currentMapCenter,
+    required this.onNearContentPressed,
+    required this.viewModel,
+  });
+
+  /// The current map center.
+  final LatLng currentMapCenter;
+
+  /// Returns the [Place] Id that has been tapped on.
+  final void Function(ContentBase content) onNearContentPressed;
+
+  final GeoMapViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.topCenter,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 9.0),
-        width: 32.0,
-        height: 4.0,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          borderRadius: BorderRadius.circular(8.0),
+    return SliverList.list(
+      children: <Widget>[
+        const BottomSheetAdaptiveTitle('Esplora i dintorni'),
+        NearbyContentHorizontalList(
+          coordinates: [currentMapCenter.latitude, currentMapCenter.longitude],
+          onPressed: onNearContentPressed,
+          viewModel: viewModel,
         ),
-      ),
+      ],
+    );
+  }
+}
+
+class NearbyContentHorizontalList extends StatefulWidget {
+  const NearbyContentHorizontalList({
+    // super.key,
+    required this.coordinates,
+    required this.onPressed,
+    required this.viewModel,
+  });
+
+  final List<double> coordinates;
+  final void Function(ContentBase content) onPressed;
+  final GeoMapViewModel viewModel;
+
+  @override
+  State<NearbyContentHorizontalList> createState() =>
+      _NearbyContentHorizontalListState();
+}
+
+class _NearbyContentHorizontalListState
+    extends State<NearbyContentHorizontalList> {
+  @override
+  void initState() {
+    super.initState();
+
+    widget.viewModel.loadNearContent.execute(widget.coordinates);
+  }
+
+  @override
+  void didUpdateWidget(covariant NearbyContentHorizontalList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.coordinates.first != widget.coordinates.first ||
+        oldWidget.coordinates.last != widget.coordinates.last) {
+      widget.viewModel.loadNearContent.execute(widget.coordinates);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const padding = EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 4.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 8.0),
+          child: TextSectionDivider('Nelle vicinanze'),
+        ),
+        SizedBox(
+          height: kGridViewCardHeight,
+          child: ListenableBuilder(
+            listenable: widget.viewModel.loadNearContent,
+            builder: (context, child) {
+              if (widget.viewModel.loadNearContent.completed) {
+                if (widget.viewModel.nearContent.isEmpty) {
+                  return const EmptyView(
+                    text: Text('Nessun luogo trovato nelle vicinanze.'),
+                  );
+                }
+
+                return ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: padding,
+                  itemBuilder: (_, index) {
+                    final content = widget.viewModel.nearContent[index];
+
+                    if (content is EventContent) {
+                      return EventContentCardGridItem(
+                        content,
+                        width: kGridViewCardWidth,
+                        onPressed: () => widget.onPressed(content),
+                        actions: <Widget>[
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(
+                              top: 8.0,
+                              end: 8.0,
+                            ),
+                            child: FavouriteButton(
+                              color: Colors.white70,
+                              content: content,
+                              radius: Shapes.small,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return PlaceContentCardGridItem(
+                      content,
+                      width: kGridViewCardWidth,
+                      onPressed: () => widget.onPressed(content),
+                      actions: <Widget>[
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(
+                            top: 8.0,
+                            end: 8.0,
+                          ),
+                          child: FavouriteButton(
+                            color: Colors.white70,
+                            content: content,
+                            radius: Shapes.small,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  separatorBuilder: (_, _) => const SizedBox(width: 8.0),
+                  itemCount: widget.viewModel.nearContent.length,
+                );
+              }
+
+              if (widget.viewModel.loadNearContent.error) {
+                return const EmptyView.error(
+                  text: Text(
+                    'Si è verificato un errore durante il caricamento.',
+                  ),
+                );
+              }
+
+              return Skeletonizer(
+                effect: CustomPulseEffect(context: context),
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: padding,
+                  itemBuilder: (_, _) => const SkeletonContentGridItem(
+                    width: kGridViewCardWidth,
+                    height: kGridViewCardHeight,
+                  ),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8.0),
+                  itemCount: 5,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

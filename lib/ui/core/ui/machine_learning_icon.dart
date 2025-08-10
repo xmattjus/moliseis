@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
 
 class MachineLearningIcon extends StatelessWidget {
   const MachineLearningIcon({super.key});
@@ -13,7 +12,7 @@ class MachineLearningIcon extends StatelessWidget {
         end: Alignment.bottomRight,
         colors: [Colors.deepPurpleAccent.shade100, Colors.deepPurple],
       ).createShader(bounds),
-      child: const Icon(Symbols.magic_button_rounded),
+      child: const Icon(Icons.auto_awesome_outlined),
     );
   }
 }

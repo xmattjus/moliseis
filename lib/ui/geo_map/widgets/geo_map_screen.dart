@@ -4,39 +4,37 @@ import 'dart:ui' show clampDouble;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/attraction/attraction.dart';
-import 'package:moliseis/domain/models/geo_map/geo_map_state.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/ui/category/widgets/category_selection_list.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
-import 'package:moliseis/ui/core/ui/future_built.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_attribution.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
+import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
 import 'package:moliseis/utils/debounceable.dart';
 
 class GeoMapScreen extends StatefulWidget {
   const GeoMapScreen({
     super.key,
-    required this.mapState,
+    required this.contentExtra,
     required this.viewModel,
+    required this.searchViewModel,
   });
 
-  final GeoMapState mapState;
+  final ContentBase? contentExtra;
   final GeoMapViewModel viewModel;
+  final SearchViewModel searchViewModel;
 
   @override
   State<GeoMapScreen> createState() => _GeoMapScreenState();
 }
 
 class _GeoMapScreenState extends State<GeoMapScreen> {
-  /// The user selected attraction's local database id.
-  ///
-  /// When [_attractionId] is equal to 0, [GeoMapBottomSheet] will show a list
-  /// of the nearest attractions to [_currentCenter], otherwise the details of
-  /// the selected attraction will be shown instead.
-  int _attractionId = 0;
+  ContentBase? _selectedContent;
 
   /// The current map center.
   ///
@@ -46,9 +44,6 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   late final Debounceable1<bool> _debouncedUpdate;
 
   final _mapController = MapController();
-
-  /// Caches this [Future].
-  late final Future<List<Attraction>> _mapMarkersFuture;
 
   /// The opacity of the layer shown on top of the map when the bottom sheet
   /// is vertically dragged above a certain threshold.
@@ -64,7 +59,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   /// See also:
   ///
   ///  * [didUpdateWidget]
-  bool _scheduleCallbackOnNextFrame = true;
+  bool _scheduleCallbackOnNextFrame = false;
 
   final _searchController = SearchController();
   final _sheetController = DraggableScrollableController();
@@ -78,79 +73,67 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   void initState() {
     super.initState();
 
-    if (widget.mapState.hasValidCoords && widget.mapState.hasValidId) {
-      _attractionId = widget.mapState.attractionId;
+    _sheetController.addListener(_bottomSheetListener);
+
+    if (widget.contentExtra != null) {
+      _selectedContent = widget.contentExtra;
       _currentCenter = LatLng(
-        widget.mapState.latitude,
-        widget.mapState.longitude,
+        widget.contentExtra!.coordinates[0],
+        widget.contentExtra!.coordinates[1],
       );
     }
 
     _debouncedUpdate = debounce1<bool>(
       duration: const Duration(milliseconds: 1500),
-      function: _update,
+      function: () => Future.value(true),
     );
-
-    _mapMarkersFuture = widget.viewModel.getAllAttractions();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    if (_sheetController.isAttached) {
-      _clampMapAttributionPosition();
-    }
   }
 
   @override
   void didUpdateWidget(covariant GeoMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (widget.mapState.hasValidCoords && widget.mapState.hasValidId) {
+    if (widget.contentExtra != null) {
+      _selectedContent = widget.contentExtra;
+      _currentCenter = LatLng(
+        widget.contentExtra!.coordinates[0],
+        widget.contentExtra!.coordinates[1],
+      );
+
       _searchQuery = '';
       _searchController.text = '';
 
-      _attractionId = widget.mapState.attractionId;
-      _currentCenter = LatLng(
-        widget.mapState.latitude,
-        widget.mapState.longitude,
-      );
-
-      /// Schedules a callback on next frame build.
+      // Schedules a callback on next frame build to animate the bottom sheet.
       _scheduleCallbackOnNextFrame = true;
     }
   }
 
   @override
   void dispose() {
-    // TODO(xmattjus): Understand why disposing the sheet controller causes crash on go_router ver. > 12.1.3
-    // _sheetController.dispose();
+    _sheetController.removeListener(_bottomSheetListener);
+    _sheetController.dispose();
     _mapController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<bool> _update() async => true;
-
   @override
   Widget build(BuildContext context) {
-    /// Guards the addPostFrameCallback() from running multiple times
-    /// when it is not needed, e.g. when the app Brightness changes and
-    /// widgets are rebuilt.
+    // Guards the addPostFrameCallback() from running multiple times
+    // when it is not needed, e.g. when the app Brightness changes and
+    // widgets are rebuilt.
     if (_scheduleCallbackOnNextFrame) {
-      /// Schedules a callback to be fired once when the build phase of this
-      /// widget has ended.
+      // Schedules a callback to be fired once when the build phase of this
+      // widget has ended.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        /// Animates the bottom sheet up to show an attraction's details if
-        /// the user has requested to view in this screen or somewhere else.
-        if (_attractionId != 0) {
-          _animateStateChange(
-            _currentCenter.latitude,
-            _currentCenter.longitude,
-            _attractionId,
-          );
-        }
+        // Animates the bottom sheet up to show the content's details.
+        _animateStateChange(
+          latitude: _currentCenter.latitude,
+          longitude: _currentCenter.longitude,
+        );
+
+        // Prevents the scheduling of this callback on next frame builds.
+        _scheduleCallbackOnNextFrame = false;
       });
     }
 
@@ -158,32 +141,53 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       mapController: _mapController,
       initialCenter: _currentCenter,
       children: <Widget>[
-        FutureBuilt<List<Attraction>>(
-          _mapMarkersFuture,
-          onSuccess: (data) {
-            return MarkerLayer(
-              markers: UnmodifiableListView<Marker>(
-                data.map<Marker>((Attraction attraction) {
-                  return generateMapMarker(
-                    attraction,
-                    onPressed: () {
-                      _animateStateChange(
-                        attraction.coordinates[0],
-                        attraction.coordinates[1],
-                        attraction.id,
-                      );
-                    },
-                  );
-                }),
-              ),
-            );
-          },
-          onError: (error) {
-            return const SizedBox();
+        ListenableBuilder(
+          listenable: Listenable.merge(<Listenable>[
+            widget.viewModel.loadEvents,
+            widget.viewModel.loadPlaces,
+          ]),
+          builder: (_, _) {
+            if (widget.viewModel.loadEvents.completed &&
+                widget.viewModel.loadPlaces.completed) {
+              return MarkerLayer(
+                markers: <Marker>[
+                  ...UnmodifiableListView<Marker>(
+                    widget.viewModel.allEvents.map<Marker>(
+                      (content) => generateMapMarker(
+                        content,
+                        onPressed: () {
+                          _animateStateChange(
+                            latitude: content.coordinates[0],
+                            longitude: content.coordinates[1],
+                            content: content,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  ...UnmodifiableListView<Marker>(
+                    widget.viewModel.allPlaces.map<Marker>(
+                      (content) => generateMapMarker(
+                        content,
+                        onPressed: () {
+                          _animateStateChange(
+                            latitude: content.coordinates[0],
+                            longitude: content.coordinates[1],
+                            content: content,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return const EmptyBox();
           },
         ),
       ],
-      onPressed: (tapPosition, point) {
+      onPressed: (_, _) {
         /// Shows the bottom sheet if it's currently not visible.
         if (_sheetController.size <= 0.01) {
           _animateBottomSheetTo(0.5);
@@ -191,7 +195,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
           _animateBottomSheetTo(0.3);
         }
       },
-      onPositionChangeStart: (center) => _animateBottomSheetTo(0.3),
+      onPositionChangeStart: (_) => _animateBottomSheetTo(0.3),
       onPositionChangeEnd: (center) async {
         final update = await _debouncedUpdate();
 
@@ -205,31 +209,28 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
 
     final bottomSheet = SafeArea(
       child: GeoMapBottomSheet(
+        content: _selectedContent,
         controller: _sheetController,
-        attractionId: _attractionId,
-        searchQuery: _searchQuery,
         currentCenter: _currentCenter,
-        onAttractionPressed: (id) async {
-          final attraction = await widget.viewModel.getAttractionById(id);
-
-          _searchQuery = '';
-          _searchController.text = '';
-
-          _animateStateChange(
-            attraction.coordinates[0],
-            attraction.coordinates[1],
-            attraction.id,
-          );
-        },
         onCloseButtonPressed: () {
           setState(() {
-            _attractionId = 0;
+            _selectedContent = null;
             _currentCenter = _mapController.camera.center;
             _searchQuery = '';
             _searchController.text = '';
           });
 
           _animateBottomSheetTo(0.3);
+        },
+        onContentPressed: (content) {
+          _searchQuery = '';
+          _searchController.text = '';
+
+          _animateStateChange(
+            latitude: content.coordinates[0],
+            longitude: content.coordinates[1],
+            content: content,
+          );
         },
         onVerticalDragUpdate: (size) {
           /// The maximum bottom sheet size above which the search bar will
@@ -251,9 +252,10 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
           } else if (size > maxBottomSheetSize && _scrimOpacity.value != 0.32) {
             _scrimOpacity.value = 0.32;
           }
-
-          _clampMapAttributionPosition();
         },
+        searchQuery: _searchQuery,
+        viewModel: widget.viewModel,
+        searchViewModel: widget.searchViewModel,
       ),
     );
 
@@ -280,7 +282,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       child: AnimatedBuilder(
         animation: _scrimOpacity,
         builder: (_, child) {
-          return _scrimOpacity.value > 0 ? child! : const SizedBox();
+          return _scrimOpacity.value > 0 ? child! : const EmptyBox();
         },
         child: ColoredBox(color: scrimColor, child: const SizedBox.expand()),
       ),
@@ -311,19 +313,16 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         );
       },
       elevation: 1.0,
-      onSuggestionPressed: (attractionId) async {
-        final attraction = await widget.viewModel.getAttractionById(
-          attractionId,
-        );
-
-        _searchController.closeView(attraction.name);
+      onSuggestionPressed: (ContentBase content) {
+        _searchController.closeView(content.name);
 
         setState(() {
-          _searchQuery = attraction.name;
+          _searchQuery = content.name;
         });
 
         _animateBottomSheetTo(1.0);
       },
+      viewModel: widget.searchViewModel,
     );
 
     final searchBar = SafeArea(
@@ -331,7 +330,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         alignment: Alignment.topLeft,
         child: AnimatedBuilder(
           animation: _showSearchBar,
-          builder: (context, child) {
+          builder: (_, child) {
             return AnimatedSlide(
               offset: Offset(0, _showSearchBar.value ? 0 : -2.0),
               curve: _showSearchBar.value
@@ -343,19 +342,37 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
               child: child,
             );
           },
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4.0),
-            child: appSearchBar,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              appSearchBar,
+              CategorySelectionList(
+                /*
+                  chipBackgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHigh,
+                  */
+                onCategoriesSelectionChanged: (selectedCategories) {
+                  widget.viewModel.setSelectedCategories.execute(
+                    selectedCategories,
+                  );
+                },
+                onTypesSelectionChanged: (selectedTypes) {
+                  widget.viewModel.setSelectedTypes.execute(selectedTypes);
+                },
+              ),
+            ],
           ),
         ),
       ),
     );
 
     return PopScope(
-      canPop: _attractionId == 0 && _searchQuery.isEmpty,
+      canPop: _selectedContent == null && _searchQuery.isEmpty,
       onPopInvokedWithResult: (didPop, result) {
         setState(() {
-          _attractionId = 0;
+          _selectedContent = null;
           _searchController.text = '';
           _searchQuery = '';
         });
@@ -381,39 +398,49 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   }
 
   /// Animates various UI elements on requested widget rebuilds.
-  void _animateStateChange(
-    double latitude,
-    double longitude,
-    int attractionId,
-  ) {
+  void _animateStateChange({
+    required double latitude,
+    required double longitude,
+    ContentBase? content,
+  }) {
     setState(() {
-      _attractionId = attractionId;
-      _currentCenter = LatLng(latitude, longitude);
+      if (content != null) {
+        _selectedContent = content;
+      }
 
-      /// Prevents the scheduling of this callback on next frame builds.
-      ///
-      /// [didUpdateWidget] will resets this value to false.
-      _scheduleCallbackOnNextFrame = false;
+      _currentCenter = LatLng(latitude, longitude);
     });
 
-    final newCenter = LatLng(latitude, longitude);
+    final screenHeight = MediaQuery.maybeSizeOf(context)?.height ?? 0;
 
-    /// Centers the pressed map marker to the first half of the screen since the
-    /// second half will be covered by the bottom sheet.
-    final x = MediaQuery.sizeOf(context).height * 16 / 75;
+    // Calculates the offset the new center will have. The map marker should be
+    // positioned at an equal distance between the system status bar, if any,
+    // and the "bottom window chrome" (e.g. the bottom sheet height).
+    final topViewPadding = MediaQuery.maybeViewPaddingOf(context)?.top ?? 0;
+
+    final bottomChromeHeight = screenHeight * 0.5;
+
+    // The offset is negative because the new center will be moved "up" on the
+    // screen.
+    final offset = (bottomChromeHeight - topViewPadding) / -2;
 
     // TODO(xmattjus): find out why the map does not load without a fake delay, https://github.com/fleaflet/flutter_map/issues/1813.
     Future.delayed(Duration.zero, () {
-      _mapController.move(newCenter, 16, offset: Offset(0, -x));
+      _mapController.move(_currentCenter, 16, offset: Offset(0, offset + 16.0));
     });
 
     _animateBottomSheetTo(0.5);
   }
 
-  /// Clamps the [GeoMapAttribution] movement on the X-axis to prevent its
-  /// disappearing when the bottom sheet is completely closed.
-  void _clampMapAttributionPosition() =>
+  /// Listens to the bottom sheet controller movement.
+  void _bottomSheetListener() {
+    /// Clamps the [GeoMapAttribution] movement on the X-axis to prevent its
+    /// disappearing when the bottom sheet is completely closed.
+    // FIXME: setState() or markNeedsBuild() called during build.
+    Future.delayed(Duration.zero, () {
       _moveMapAttribution.value = clampDouble(_sheetController.size, 0, 0.5);
+    });
+  }
 
   /// Animates the attached sheet from its current size to the given [size], a
   /// fractional value of the parent container's height.

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/color.dart';
-import 'package:moliseis/ui/core/themes/shape.dart';
+import 'package:moliseis/ui/core/themes/color_schemes.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_theme.dart';
 
 class _BaseThemeData {
@@ -20,36 +20,27 @@ class _BaseThemeData {
       ),
       colorScheme: colorScheme,
       textTheme: appTextTheme,
-      cardTheme: CardThemeData(
+      chipTheme: ChipThemeData(
+        padding: const EdgeInsets.only(
+          left: 12.0,
+          top: 8.0,
+          bottom: 8.0,
+          right: 8.0,
+        ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Shape.medium),
+          borderRadius: BorderRadiusGeometry.circular(Shapes.full),
         ),
       ),
-      searchBarTheme: const SearchBarThemeData(
-        constraints: BoxConstraints(minHeight: 56.0),
-        elevation: WidgetStatePropertyAll<double>(0),
-      ),
-      tabBarTheme: const TabBarThemeData(
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerHeight: 0,
-      ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        strokeWidth: 3.0,
-        // ignore: deprecated_member_use
-        year2023: false,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(Shape.none),
-          gapPadding: Shape.extraSmall + 2.0,
-        ),
+      dividerTheme: DividerThemeData(
+        color: colorScheme?.brightness == Brightness.light
+            ? colorScheme?.surfaceDim
+            : colorScheme?.surfaceBright,
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(Shape.medium),
+            borderRadius: BorderRadius.circular(Shapes.medium),
           ),
         ),
       ),
@@ -63,10 +54,30 @@ class _BaseThemeData {
           shape: WidgetStateProperty.resolveWith(_expressiveButtonShape),
         ),
       ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Shapes.none),
+          gapPadding: Shapes.extraSmall + 2.0,
+        ),
+      ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: ButtonStyle(
           shape: WidgetStateProperty.resolveWith(_expressiveButtonShape),
         ),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        strokeWidth: 3.0,
+        // ignore: deprecated_member_use
+        year2023: false,
+      ),
+      searchBarTheme: const SearchBarThemeData(
+        constraints: BoxConstraints(minHeight: 56.0),
+        elevation: WidgetStatePropertyAll<double>(0),
+      ),
+      tabBarTheme: const TabBarThemeData(
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerHeight: 0,
       ),
     );
   }
@@ -77,12 +88,12 @@ class _BaseThemeData {
   static OutlinedBorder? _expressiveButtonShape(Set<WidgetState> states) {
     if (states.contains(WidgetState.pressed)) {
       return RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Shape.medium),
+        borderRadius: BorderRadius.circular(Shapes.medium),
       );
     }
 
     return RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(Shape.full),
+      borderRadius: BorderRadius.circular(Shapes.full),
     );
   }
 }

@@ -128,3 +128,5 @@ app.*.symbols
 **/android/app/release
 
 lib/ui/story/widgets/story_screen_old.dart
+
+lib/ui/explore/view_models/explore_view_model.dart.old

@@ -1,49 +1,58 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/repositories/attraction/attraction_repository.dart';
+import 'package:moliseis/data/repositories/event/event_repository.dart';
 import 'package:moliseis/data/repositories/search/search_repository.dart';
-import 'package:moliseis/domain/models/attraction/attraction.dart';
-import 'package:moliseis/domain/models/attraction/attraction_type.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/core/content_category.dart';
+import 'package:moliseis/domain/models/event/event.dart';
+import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SearchViewModel extends ChangeNotifier {
+  final EventRepository _eventRepository;
+  final ExploreUseCase _exploreGetByIdUseCase;
+  final SearchRepository _searchRepository;
+
+  late Command1<void, String> addToHistory;
+  late Command0 loadHistory;
+  late Command1<void, String> loadResults;
+  late Command0 loadRelatedResults;
+  late Command1<void, String> loadRelatedResultsIds;
+  late Command1<void, String> removeFromHistory;
+
   SearchViewModel({
-    required AttractionRepository attractionRepository,
+    required EventRepository eventRepository,
+    required ExploreUseCase exploreGetByIdUseCase,
     required SearchRepository searchRepository,
-  }) : _searchRepository = searchRepository,
-       _attractionRepository = attractionRepository {
+  }) : _eventRepository = eventRepository,
+       _exploreGetByIdUseCase = exploreGetByIdUseCase,
+       _searchRepository = searchRepository {
     addToHistory = Command1(_addToHistory);
-    addToHistoryByAttractionId = Command1(_addToHistoryByAttractionId);
     loadHistory = Command0(_loadHistory)..execute();
     loadResults = Command1(_loadResults);
-    loadRelatedResults = Command1(_loadMoreResults);
+    loadRelatedResults = Command0(_loadRelatedResults);
+    loadRelatedResultsIds = Command1(_loadRelatedResultsIds);
     removeFromHistory = Command1(_removeFromHistory);
   }
 
-  final AttractionRepository _attractionRepository;
-  final SearchRepository _searchRepository;
-
   var _history = <String>[];
-  var _resultIds = <int>[];
+  final _results = <ContentBase>[];
+  var _relatedResults = <ContentBase>[];
   var _relatedResultsIds = <int>[];
-  final _types = AttractionType.values.minusUnknown;
+  final _types = ContentCategory.values.minusUnknown;
 
   UnmodifiableListView<String> get history => UnmodifiableListView(_history);
-  UnmodifiableListView<int> get resultIds => UnmodifiableListView(_resultIds);
+  UnmodifiableListView<ContentBase> get results =>
+      UnmodifiableListView(_results);
+  UnmodifiableListView<ContentBase> get relatedResults =>
+      UnmodifiableListView(_relatedResults);
   UnmodifiableListView<int> get relatedResultIds =>
       UnmodifiableListView(_relatedResultsIds);
-  UnmodifiableListView<AttractionType> get types =>
-      UnmodifiableListView(_types);
-
-  late Command1<void, String> addToHistory;
-  late Command1<void, int> addToHistoryByAttractionId;
-  late Command0 loadHistory;
-  late Command1<void, String> loadResults;
-  late Command1<void, String> loadRelatedResults;
-  late Command1<void, String> removeFromHistory;
 
   Future<Result> _addToHistory(String text) async {
     if (text.isEmpty) {
@@ -72,23 +81,8 @@ class SearchViewModel extends ChangeNotifier {
     return result;
   }
 
-  Future<Result> _addToHistoryByAttractionId(int id) async {
-    final result = await _attractionRepository.getById(id);
-
-    if (result is Success<Attraction>) {
-      if (!_history.contains(result.value.name)) {
-        _history.add(result.value.name);
-
-        // Does not wait for any result.
-        _searchRepository.addToHistory(result.value.name);
-      }
-    }
-
-    return result;
-  }
-
   Future<Result> _loadHistory() async {
-    final result = await _searchRepository.pastSearches;
+    final result = await _searchRepository.pastSearches();
 
     if (result is Success<List<String>>) {
       _history = result.value;
@@ -97,21 +91,58 @@ class SearchViewModel extends ChangeNotifier {
     return result;
   }
 
-  Future<Result> _loadResults(String query) async {
-    if (query.isEmpty) {
-      return const Result.success(<int>[]);
+  Future<Result<void>> _loadResults(String query) async {
+    if (query.length < 3) {
+      return const Result.success(null);
     }
 
-    final result = await _searchRepository.getAttractionIdsByQuery(query);
+    _results.clear();
 
-    if (result is Success<List<int>>) {
-      _resultIds = result.value;
+    final job1 = await _searchRepository.getPlaceIdsByQuery(query);
+
+    if (job1 is Success<List<int>>) {
+      for (final id in job1.value) {
+        final result = await _exploreGetByIdUseCase.getById(id);
+
+        if (result is Success<PlaceContent>) {
+          _results.add(result.value);
+        }
+      }
     }
 
-    return result;
+    final job2 = await _searchRepository.getEventIdsByQuery(query);
+
+    if (job2 is Success<List<int>>) {
+      for (final id in job2.value) {
+        final result = await _eventRepository.getById(id);
+
+        if (result is Success<Event>) {
+          _results.add(EventContent.fromEvent(result.value));
+        }
+      }
+    }
+
+    return const Result.success(null);
   }
 
-  Future<Result> _loadMoreResults(String query) async {
+  Future<Result> _loadRelatedResults() async {
+    final temp = <ContentBase>[];
+
+    for (final id in _relatedResultsIds) {
+      final result = await _exploreGetByIdUseCase.getById(id);
+
+      if (result is Success<PlaceContent>) {
+        temp.add(result.value);
+      }
+    }
+
+    _relatedResults = temp;
+    notifyListeners();
+
+    return const Result.success(null);
+  }
+
+  Future<Result> _loadRelatedResultsIds(String query) async {
     if (query.isEmpty) {
       return const Result.success(<int>[]);
     }
@@ -120,6 +151,8 @@ class SearchViewModel extends ChangeNotifier {
 
     if (result is Success<List<int>>) {
       _relatedResultsIds = result.value;
+
+      loadRelatedResults.execute();
     }
 
     return result;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 class CustomCircularProgressIndicator extends StatelessWidget {
   /// Creates a [CircularProgressIndicator] immediately.
@@ -31,7 +32,7 @@ class CustomCircularProgressIndicator extends StatelessWidget {
             return child;
           }
 
-          return const SizedBox();
+          return const EmptyBox();
         },
       );
     }

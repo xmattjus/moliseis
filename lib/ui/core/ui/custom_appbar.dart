@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:moliseis/ui/core/ui/custom_appbar_type.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
+
+enum CustomAppBarType { standard, hidden }
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({

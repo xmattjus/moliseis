@@ -1,8 +1,9 @@
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/repositories/search/search_repository.dart';
 import 'package:moliseis/data/services/objectbox.dart';
-import 'package:moliseis/domain/models/attraction/attraction.dart';
-import 'package:moliseis/domain/models/attraction/attraction_type.dart';
+import 'package:moliseis/domain/models/city/city.dart';
+import 'package:moliseis/domain/models/core/content_category.dart';
+import 'package:moliseis/domain/models/event/event.dart';
 import 'package:moliseis/domain/models/place/place.dart';
 import 'package:moliseis/domain/models/search/search_query.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
@@ -10,6 +11,14 @@ import 'package:moliseis/utils/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SearchRepositoryLocal implements SearchRepository {
+  late final Query<City> _cityQuery;
+  late final Query<Event> _eventCategoryQuery;
+  late final Query<Event> _eventQuery;
+  final ObjectBox _objectBox;
+  late final Query<Place> _placeCategoryQuery;
+  late final Query<Place> _placeQuery;
+  final Box<SearchQuery> _searchHistoryBox;
+
   SearchRepositoryLocal({required ObjectBox objectBoxI})
     : _objectBox = objectBoxI,
       _searchHistoryBox = objectBoxI.store.box<SearchQuery>() {
@@ -18,22 +27,30 @@ class SearchRepositoryLocal implements SearchRepository {
 
   final _log = Logger('SearchRepositoryLocal');
 
-  late final Query<Attraction> _attractionQuery;
-  final ObjectBox _objectBox;
-  late final Query<Place> _placeQuery;
-  final Box<SearchQuery> _searchHistoryBox;
-  late final Query<Attraction> _typeQuery;
+  /// The list of the Event IDs returned by the last search.
+  // var _lastEventResultIds = <int>[];
 
-  /// The list of the last search results.
-  var _lastResults = <int>[];
+  /// The list of the Place IDs returned by the last search.
+  var _lastPlaceResultIds = <int>[];
 
-  var _typeSearched = false;
+  /// Whether the last search was made by category.
+  var _categorySearched = false;
 
   /// Caches the ObjectBox queries.
   void _init() {
-    _attractionQuery = _objectBox.store
-        .box<Attraction>()
-        .query(Attraction_.name.contains('', caseSensitive: false))
+    _cityQuery = _objectBox.store
+        .box<City>()
+        .query(City_.name.contains('', caseSensitive: false))
+        .build();
+
+    _eventQuery = _objectBox.store
+        .box<Event>()
+        .query(Event_.name.contains('', caseSensitive: false))
+        .build();
+
+    _eventCategoryQuery = _objectBox.store
+        .box<Event>()
+        .query(Event_.dbType.oneOf(<int>[]))
         .build();
 
     _placeQuery = _objectBox.store
@@ -41,15 +58,15 @@ class SearchRepositoryLocal implements SearchRepository {
         .query(Place_.name.contains('', caseSensitive: false))
         .build();
 
-    _typeQuery = _objectBox.store
-        .box<Attraction>()
-        .query(Attraction_.dbType.oneOf(<int>[]))
+    _placeCategoryQuery = _objectBox.store
+        .box<Place>()
+        .query(Place_.dbType.oneOf(<int>[]))
         .build();
   }
 
   @override
-  Future<Result> addToHistory(String query) async {
-    if (query.isEmpty) {
+  Future<Result> addToHistory(String text) async {
+    if (text.isEmpty) {
       return const Result.success(null);
     }
 
@@ -57,14 +74,18 @@ class SearchRepositoryLocal implements SearchRepository {
       final history = _searchHistoryBox.getAll();
 
       for (final element in history) {
-        if (element.name.toLowerCase() == query.toLowerCase()) {
+        if (element.name.toLowerCase() == text.toLowerCase()) {
           return const Result.success(null);
         }
       }
 
-      _searchHistoryBox.putAsync(SearchQuery(query));
-    } on Exception catch (error) {
-      _log.severe(error);
+      _searchHistoryBox.putAsync(SearchQuery(text));
+    } on Exception catch (error, stackTrace) {
+      _log.severe(
+        'An exception occurred while adding $text to search history.',
+        error,
+        stackTrace,
+      );
       return Result.error(error);
     }
 
@@ -72,110 +93,163 @@ class SearchRepositoryLocal implements SearchRepository {
   }
 
   @override
-  Future<Result<List<int>>> getAttractionIdsByQuery(String query) async {
+  Future<Result<List<int>>> getEventIdsByQuery(String text) async {
     try {
-      /// Searches the [Place]'s box for any [Place]s' name matching the query.
-      _placeQuery.param(Place_.name).value = query;
+      _cityQuery.param(City_.name).value = text;
 
-      /// Searches the [Attraction]'s box for any [Attraction]s' name matching the
-      /// query.
-      _attractionQuery.param(Attraction_.name).value = query;
+      _eventQuery.param(Event_.name).value = text;
 
-      /// Searches for any [AttractionType]'s name matching the search query,
-      /// then creates a [List] of indexes to pass to the [ObjectBox] query.
-      final matchingTypes = AttractionType.values.where(
-        (type) => type.label.toLowerCase().contains(query.toLowerCase()),
+      _eventCategoryQuery.param(Event_.dbType).values = _getCategoryIndexes(
+        text,
       );
 
-      final typeIndexes = matchingTypes.map((type) => type.index).toList();
-
-      _typeQuery.param(Attraction_.dbType).values = typeIndexes;
-
-      /// Generates a [Record] of [List]s of [Attraction] and [Place] types.
-      /// Source: https://stackoverflow.com/a/77073846
-      final (attractionQuery, placeQuery, typeQuery) = (
-        _attractionQuery.findIds(),
-        _placeQuery.findIds(),
-        _typeQuery.findIds(),
+      final (categoryQuery, cityQuery, eventQuery) = (
+        _eventCategoryQuery.findIds(),
+        _cityQuery.findIds(),
+        _eventQuery.findIds(),
       );
 
       final results = <int>[];
 
-      results.addAll(attractionQuery);
+      results.addAll(eventQuery);
 
-      final test = _objectBox.store.box<Place>().getMany(placeQuery);
+      final test = _objectBox.store.box<City>().getMany(cityQuery);
 
       for (var i = 0; i < test.length; i++) {
-        final place = test[i];
-        if (place != null) {
-          for (final attraction in place.attractions) {
-            results.add(attraction.id);
+        final city = test[i];
+        if (city != null) {
+          for (final event in city.events) {
+            results.add(event.remoteId);
           }
         }
       }
 
-      _typeSearched = typeQuery.isNotEmpty;
+      results.addAll(categoryQuery);
 
-      results.addAll(typeQuery);
+      // _lastEventResultIds = results;
 
-      /// Purges the query results from any duplicate (generated by searching
-      /// both the [Place]s' and [Attraction]s' boxes).
+      // Purges the query results from any duplicate.
       final uniqueIds = <dynamic>{};
       results.retainWhere((id) => uniqueIds.add(id));
 
-      _lastResults = results;
+      return Result.success(results);
+    } on Exception catch (error, stackTrace) {
+      _log.warning(
+        'An exception occurred while getting event ids by query: $text.',
+        error,
+        stackTrace,
+      );
+      return Result.error(error);
+    }
+  }
+
+  @override
+  Future<Result<List<int>>> getPlaceIdsByQuery(String text) async {
+    try {
+      _cityQuery.param(City_.name).value = text;
+
+      _placeQuery.param(Place_.name).value = text;
+
+      _placeCategoryQuery.param(Place_.dbType).values = _getCategoryIndexes(
+        text,
+      );
+
+      // Generates a record.
+      // Source: https://stackoverflow.com/a/77073846
+      final (categoryQuery, cityQuery, placeQuery) = (
+        _placeCategoryQuery.findIds(),
+        _cityQuery.findIds(),
+        _placeQuery.findIds(),
+      );
+
+      final results = <int>[];
+
+      results.addAll(placeQuery);
+
+      final test = _objectBox.store.box<City>().getMany(cityQuery);
+
+      for (var i = 0; i < test.length; i++) {
+        final city = test[i];
+        if (city != null) {
+          for (final place in city.places) {
+            results.add(place.remoteId);
+          }
+        }
+      }
+
+      _categorySearched = categoryQuery.isNotEmpty;
+
+      results.addAll(categoryQuery);
+
+      // Purges the query results from any duplicate.
+      final uniqueIds = <dynamic>{};
+      results.retainWhere((id) => uniqueIds.add(id));
+
+      _lastPlaceResultIds = results;
 
       return Result.success(results);
-    } on Exception catch (error) {
-      _log.severe(error);
+    } on Exception catch (error, stackTrace) {
+      _log.warning(
+        'An exception occurred while getting place ids by query: $text.',
+        error,
+        stackTrace,
+      );
       return Result.error(error);
     }
   }
 
   @override
   Future<Result<List<int>>> getRelatedResults(String text) async {
-    if (_typeSearched) {
+    if (_categorySearched) {
       return const Result.success(<int>[]);
     }
 
     try {
-      final attractionBox = _objectBox.store.box<Attraction>();
+      final placeBox = _objectBox.store.box<Place>();
 
-      final attractions = attractionBox.getMany(_lastResults);
+      final places = placeBox.getMany(_lastPlaceResultIds);
 
-      final attractions1 = <Attraction>[];
+      final places1 = <Place>[];
 
-      for (final attraction in attractions) {
-        if (attraction != null) {
-          attractions1.add(attraction);
+      for (final place in places) {
+        if (place != null) {
+          places1.add(place);
         }
       }
 
-      final related = _getRelatedResults(attractions1);
+      final related = _getRelatedResults(places1);
 
-      final results = related.map<int>((Attraction e) => e.id).toList();
+      final results = related.map<int>((Place e) => e.remoteId).toList();
 
       final set1 = results.toSet();
-      final set2 = _lastResults.toSet();
+      final set2 = _lastPlaceResultIds.toSet();
       final diff = set1.difference(set2).toList();
 
       return Result.success(diff);
-    } on Exception catch (error) {
-      _log.severe(error);
+    } on Exception catch (error, stackTrace) {
+      _log.severe(
+        'An exception occurred while getting related results.',
+        error,
+        stackTrace,
+      );
       return Result.error(error);
     }
   }
 
   @override
-  Future<Result<List<String>>> get pastSearches async {
+  Future<Result<List<String>>> pastSearches() async {
     try {
       final history = await _searchHistoryBox.getAllAsync();
 
       return Result.success(
         history.map<String>((element) => element.name).toList(),
       );
-    } on Exception catch (error) {
-      _log.severe(error);
+    } on Exception catch (error, stackTrace) {
+      _log.severe(
+        'An exception occurred while getting past searches.',
+        error,
+        stackTrace,
+      );
       return Result.error(error);
     }
   }
@@ -192,22 +266,26 @@ class SearchRepositoryLocal implements SearchRepository {
         _searchHistoryBox.remove(result.id);
       }
       return const Result.success(null);
-    } on Exception catch (error) {
-      _log.severe(error);
+    } on Exception catch (error, stackTrace) {
+      _log.severe(
+        'An exception occurred while removing $text from search history.',
+        error,
+        stackTrace,
+      );
       return Result.error(error);
     }
   }
 
-  List<Attraction> _getRelatedResults(List<Attraction> searchResults) {
+  List<Place> _getRelatedResults(List<Place> searchResults) {
     try {
       // Creates a frequency map from direct search results where each key is
-      // an AttractionType and the corresponding value represents how many
+      // a ContentCategory and the corresponding value represents how many
       // times that type appears in the results.
-      final freqMap = searchResults.fold<Map<AttractionType, int>>({}, (
-        Map<AttractionType, int> map,
-        Attraction element,
+      final freqMap = searchResults.fold<Map<ContentCategory, int>>({}, (
+        Map<ContentCategory, int> map,
+        Place element,
       ) {
-        map[element.type] = (map[element.type] ?? 0) + 1;
+        map[element.category] = (map[element.category] ?? 0) + 1;
         return map;
       });
 
@@ -217,18 +295,28 @@ class SearchRepositoryLocal implements SearchRepository {
           (k1, k2) => (freqMap[k2]! as num).compareTo(freqMap[k1]! as num),
         );
 
-      // Finds all the attractions having the most appeared type.
-      _typeQuery.param(Attraction_.dbType).values = [sorted.first.index];
+      // Finds all places having the most appeared type.
+      _placeCategoryQuery.param(Place_.dbType).values = [sorted.first.index];
 
-      return _typeQuery.find();
+      return _placeCategoryQuery.find();
     } on Exception catch (error, stackTrace) {
       _log.severe(
-        'An error occurred while searching related results',
+        'An exception occurred while loading related results.',
         error,
         stackTrace,
       );
 
-      return <Attraction>[];
+      return <Place>[];
     }
+  }
+
+  List<int> _getCategoryIndexes(String query) {
+    final matchingTypes = ContentCategory.values.where(
+      (type) => type.label.toLowerCase().contains(query.toLowerCase()),
+    );
+
+    final typeIndexes = matchingTypes.map((type) => type.index).toList();
+
+    return typeIndexes;
   }
 }

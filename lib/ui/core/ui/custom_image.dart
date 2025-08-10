@@ -3,9 +3,8 @@ import 'dart:math' show sqrt;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:moliseis/main.dart';
+import 'package:logging/logging.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/utils/log_events.dart';
 
 class CustomImage extends StatelessWidget {
   const CustomImage(
@@ -125,7 +124,9 @@ class CustomImage extends StatelessWidget {
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        log.severe(LogEvents.imageLoadingError, error, stackTrace);
+        final log = Logger('CustomImage');
+
+        log.severe('An error during image loading.', error, stackTrace);
 
         const color = Colors.grey;
 

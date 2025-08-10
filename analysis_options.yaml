@@ -6,5 +6,5 @@ analyzer:
 
 linter:
   rules:
-    - discarded_futures: false
-    - unawaited_futures: false
+    - discarded_futures: true
+    - unawaited_futures: true

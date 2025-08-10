@@ -1,7 +1,7 @@
 import 'dart:io' show File;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/shape.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
@@ -48,7 +48,7 @@ class SuggestionImageGallery extends StatelessWidget {
                     return CardBase(
                       width: 72.0,
                       height: 72.0,
-                      elevation: 0.0,
+                      elevation: 0,
                       child: const Center(
                         child: Icon(Icons.add_a_photo_outlined, size: 24.0),
                       ),
@@ -63,7 +63,7 @@ class SuggestionImageGallery extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(Shape.medium),
+                        borderRadius: BorderRadius.circular(Shapes.medium),
                         child: CustomImage.file(
                           File(viewModel.mediaFileList[index].path),
                           width: 72.0,
@@ -78,14 +78,14 @@ class SuggestionImageGallery extends StatelessWidget {
                         fillColor: Theme.of(
                           context,
                         ).colorScheme.surfaceContainer,
-                        elevation: 0.0,
+                        elevation: 0,
                         constraints: const BoxConstraints(
                           maxWidth: 56.0,
                           maxHeight: 56.0,
                         ),
                         padding: const EdgeInsets.all(4.0),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(Shape.medium),
+                          borderRadius: BorderRadius.circular(Shapes.medium),
                         ),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         child: const Icon(Icons.remove, size: 20.0),

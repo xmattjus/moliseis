@@ -2,54 +2,25 @@ part of 'gallery_preview_modal_overlay.dart';
 
 class _GalleryPreviewModalOverlayContent extends StatelessWidget {
   const _GalleryPreviewModalOverlayContent({
-    required this.attractionName,
+    required this.eventOrPlaceName,
     this.title = '',
     this.author = '',
     this.license = '',
     this.licenseUrl = '',
-    required this.placeName,
-    this.attractionId = 0,
+    required this.cityName,
     this.onSharePressed,
   });
 
-  final String attractionName;
+  final String eventOrPlaceName;
   final String title;
   final String author;
   final String license;
   final String licenseUrl;
-  final String placeName;
-  final int attractionId;
+  final String cityName;
   final void Function()? onSharePressed;
 
   @override
   Widget build(BuildContext context) {
-    final attractionAndPlaceTitles = Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: AttractionAndPlaceNames(
-            name: attractionName,
-            placeName: placeName,
-            overflow: TextOverflow.visible,
-          ),
-        ),
-        // TODO(xmattjus): open a bottom sheet instead of changing screen.
-        /*
-        LinkTextButton(
-          onPressed: () {
-            GoRouter.of(context).pop();
-            GoRouter.of(context).goNamed(
-              RouteNames.homeStory,
-              pathParameters: {'id': attractionId.toString()},
-            );
-          },
-          label: const Text('Apri dettagli'),
-        ),
-         */
-      ],
-    );
-
     final imageTitleText = title.isNotEmpty
         ? Padding(
             padding: const EdgeInsetsDirectional.only(top: 8.0),
@@ -64,7 +35,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
               overflow: TextOverflow.visible,
             ),
           )
-        : const SizedBox();
+        : const EmptyBox();
 
     final copyrightOwnerText = TextSpan(
       text: 'Copyright © ${author.isNotEmpty ? author : 'Sconosciuto'}',
@@ -125,19 +96,23 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
               padding: const EdgeInsetsDirectional.fromSTEB(
                 16.0,
                 16.0,
-                0.0,
+                0,
                 16.0,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  attractionAndPlaceTitles,
+                children: <Widget>[
+                  ContentNameAndCity(
+                    name: eventOrPlaceName,
+                    cityName: cityName,
+                    overflow: TextOverflow.visible,
+                  ),
                   imageTitleText,
                   licenseButton,
                   const SizedBox(height: 16.0),
-                  ButtonList(
+                  HorizontalButtonList(
                     items: <Widget>[
                       ElevatedButton.icon(
                         onPressed: () => onSharePressed?.call(),

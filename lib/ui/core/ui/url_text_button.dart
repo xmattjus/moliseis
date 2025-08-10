@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/button_style.dart';
+import 'package:moliseis/ui/core/themes/button_styles.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 class UrlTextButton extends StatelessWidget {
   /// Creates a Material [TextButton] with a fixed style appropriate for
@@ -50,7 +51,7 @@ class UrlTextButton extends StatelessWidget {
           color: widgetColor,
           applyTextScaling: false,
         ),
-        child: icon ?? const SizedBox(),
+        child: icon ?? const EmptyBox(),
       ),
       label: label,
     );

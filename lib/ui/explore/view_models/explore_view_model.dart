@@ -1,113 +1,143 @@
-/*
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/repositories/attraction/attraction_repository.dart';
-import 'package:moliseis/domain/models/attraction/attraction_type.dart';
-import 'package:moliseis/domain/use-cases/explore/explore_get_use_case.dart';
+import 'package:moliseis/data/repositories/place/place_repository.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/core/content_category.dart';
+import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/utils/command.dart';
+import 'package:moliseis/utils/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class ExploreViewModel extends ChangeNotifier {
-  ExploreViewModel({
-    required AttractionRepository attractionRepository,
-    required ExploreGetUseCase exploreGetUseCase,
-  }) : _exploreGetUseCase = exploreGetUseCase,
-        _attractionRepository = attractionRepository {
-    getLatest = Command0(_getLatest);
-    getSuggested = Command0(_getSuggested);
-    load = Command0(_load)..execute();
-  }
-
-  final AttractionRepository _attractionRepository;
-  final ExploreGetUseCase _exploreGetUseCase;
-
-  /// Returns a list of [AttractionType]s containing all but
-  /// [AttractionType.unknown].
-  final _attractionTypes = AttractionType.values.minusUnknown;
-
-  final List<AttractionUiState> _latestAttractions = [];
-  List<int> _latestAttractionIds = [];
-  final List<AttractionUiState> _suggestedAttractions = [];
-  List<int> _suggestedAttractionIds = [];
+  final ExploreUseCase _byIdUseCase;
+  final PlaceRepository _placeRepository;
 
   late Command0<void> load;
-  late Command0<void> getSuggested;
-  late Command0<void> getLatest;
+  late Command0<void> loadLatest;
+  late Command1<void, List<double>> loadNear;
+  late Command0<void> loadSuggested;
 
-  UnmodifiableListView<AttractionType> get attractionTypes =>
-      UnmodifiableListView(_attractionTypes);
-  UnmodifiableListView<AttractionUiState> get latestAttractions =>
-      UnmodifiableListView(_latestAttractions);
-  UnmodifiableListView<int> get latestAttractionIds =>
-      UnmodifiableListView(_latestAttractionIds);
-  UnmodifiableListView<AttractionUiState> get suggestedAttractions =>
-      UnmodifiableListView(_suggestedAttractions);
-  UnmodifiableListView<int> get suggestedAttractionIds =>
-      UnmodifiableListView(_suggestedAttractionIds);
-
-  /// Retrieves the list of latest attractions from the backend.
-  Future<Result<void>> _getLatest() async {
-    for (final attractionId in _latestAttractionIds) {
-      final result = await _exploreGetUseCase.getById(attractionId);
-
-      switch (result) {
-        case Success<AttractionUiState>():
-          _latestAttractions.add(result.value);
-        case Error<AttractionUiState>():
-        // TODO: Handle this case.
-      }
-    }
-
-    notifyListeners();
-
-    return const Result.success(null);
+  ExploreViewModel({
+    required ExploreUseCase byIdUseCase,
+    required PlaceRepository placeRepository,
+  }) : _byIdUseCase = byIdUseCase,
+       _placeRepository = placeRepository {
+    load = Command0(_load)..execute();
+    loadLatest = Command0(_loadLatest);
+    loadNear = Command1(_loadNear);
+    loadSuggested = Command0(_loadSuggested);
   }
 
-  /// Retrieves the list of suggested attractions from the backend.
-  Future<Result<void>> _getSuggested() async {
-    for (final attractionId in _suggestedAttractionIds) {
-      final result = await _exploreGetUseCase.getById(attractionId);
+  var _latest = <PlaceContent>[];
+  final _near = <ContentBase>[];
+  var _suggested = <PlaceContent>[];
 
-      switch (result) {
-        case Success<AttractionUiState>():
-          _suggestedAttractions.add(result.value);
-        case Error<AttractionUiState>():
-        // TODO: Handle this case.
-      }
-    }
+  var _latestIds = <int>[];
+  var _nearIds = <int>[];
+  var _suggestedIds = <int>[];
 
-    notifyListeners();
+  UnmodifiableListView<PlaceContent> get latest =>
+      UnmodifiableListView(_latest);
+  UnmodifiableListView<ContentBase> get near => UnmodifiableListView(_near);
+  UnmodifiableListView<PlaceContent> get suggested =>
+      UnmodifiableListView(_suggested);
 
-    return const Result.success(null);
-  }
+  UnmodifiableListView<int> get latestIds => UnmodifiableListView(_latestIds);
+  UnmodifiableListView<int> get suggestedIds =>
+      UnmodifiableListView(_suggestedIds);
+
+  UnmodifiableListView<ContentCategory> get types =>
+      UnmodifiableListView(ContentCategory.values.minusUnknown);
 
   Future<Result<void>> _load() async {
-    final resultLatest = await _attractionRepository.latestAttractionsIds;
+    final result1 = await _placeRepository.getLatestPlaceIds();
 
-    switch (resultLatest) {
+    switch (result1) {
       case Success<List<int>>():
-        // _latestAttractionIds = resultLatest.value;
+        _latestIds = result1.value;
       case Error<List<int>>():
-      // TODO: Handle this case.
     }
 
-    final resultSuggested = await _attractionRepository.suggestedAttractionsIds;
+    final result2 = await _placeRepository.getSuggestedPlaceIds();
 
-    switch (resultSuggested) {
+    switch (result2) {
       case Success<List<int>>():
-        // _suggestedAttractionIds = resultSuggested.value;
+        _suggestedIds = result2.value;
       case Error<List<int>>():
-      // TODO: Handle this case.
     }
 
     notifyListeners();
 
-    getLatest.execute();
+    loadLatest.execute();
 
-    getSuggested.execute();
+    loadSuggested.execute();
+
+    return const Result.success(null);
+  }
+
+  Future<Result<void>> _loadLatest() async {
+    _latest = [];
+
+    for (final int id in _latestIds) {
+      final result = await _byIdUseCase.getById(id);
+
+      switch (result) {
+        case Success<PlaceContent>():
+          _latest.add(result.value);
+        case Error<PlaceContent>():
+      }
+    }
+
+    notifyListeners();
+
+    return const Result.success(null);
+  }
+
+  Future<Result<void>> _loadNear(List<double> coordinates) async {
+    final result = await _placeRepository.getIdsByCoordinates(coordinates);
+
+    switch (result) {
+      case Success<List<int>>():
+        _nearIds = result.value;
+        notifyListeners();
+      case Error<List<int>>():
+        return Result.error(result.error);
+    }
+
+    _near.clear();
+
+    for (final id in _nearIds) {
+      final result2 = await _byIdUseCase.getById(id);
+
+      switch (result2) {
+        case Success<PlaceContent>():
+          _near.add(result2.value);
+        case Error<PlaceContent>():
+      }
+    }
+
+    notifyListeners();
+
+    return const Result.success(null);
+  }
+
+  Future<Result<void>> _loadSuggested() async {
+    _suggested = [];
+
+    for (final int id in _suggestedIds) {
+      final result = await _byIdUseCase.getById(id);
+
+      switch (result) {
+        case Success<PlaceContent>():
+          _suggested.add(result.value);
+        case Error<PlaceContent>():
+      }
+    }
+
+    notifyListeners();
 
     return const Result.success(null);
   }
 }
- */

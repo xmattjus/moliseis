@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/domain/models/event/event_content.dart';
 import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
+import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class FavouriteScreen extends StatelessWidget {
   const FavouriteScreen({super.key, required this.viewModel});
@@ -25,13 +29,38 @@ class FavouriteScreen extends StatelessWidget {
             ListenableBuilder(
               listenable: viewModel,
               builder: (context, _) {
-                if (viewModel.load.running) {
-                  return const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyView.loading(
-                      text: Text('Caricamento in corso...'),
-                    ),
-                  );
+                if (viewModel.load.completed) {
+                  if (viewModel.favouriteEventIds.isEmpty &&
+                      viewModel.favouritePlaceIds.isEmpty) {
+                    return const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: EmptyView(
+                        icon: Icon(
+                          Icons.favorite_border_sharp,
+                          color: Colors.redAccent,
+                        ),
+                        text: Text(
+                          'Il contenuto salvato verrà mostrato qui, prova!',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  } else {
+                    return ContentAdaptiveListGridView(
+                      viewModel.favouriteEvents + viewModel.favouritePlaces,
+                      onPressed: (content) {
+                        GoRouter.of(context).goNamed(
+                          RouteNames.favouritesStory,
+                          pathParameters: {'id': content.remoteId.toString()},
+                          queryParameters: {
+                            'isEvent': (content is EventContent
+                                ? 'true'
+                                : 'false'),
+                          },
+                        );
+                      },
+                    );
+                  }
                 }
 
                 if (viewModel.load.error) {
@@ -49,33 +78,16 @@ class FavouriteScreen extends StatelessWidget {
                   );
                 }
 
-                if (viewModel.favourites.isEmpty) {
-                  return const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyView(
-                      icon: Icon(
-                        Icons.favorite_border_sharp,
-                        color: Colors.redAccent,
-                      ),
-                      text: Text(
-                        'Il contenuto salvato verrà mostrato qui, prova!',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  );
-                } else {
-                  return AttractionListViewResponsive(
-                    Future.sync(() => viewModel.favourites),
-                    onPressed: (attractionId) {
-                      GoRouter.of(context).goNamed(
-                        RouteNames.favouritesStory,
-                        pathParameters: {'id': attractionId.toString()},
-                      );
-                    },
-                  );
-                }
+                final length =
+                    viewModel.favouriteEventIds.length +
+                    viewModel.favouritePlaceIds.length;
+
+                return ResponsiveBreakpoints.of(context).isMobile
+                    ? SkeletonContentList.sliver(itemCount: length)
+                    : CardSkeletonGrid.sliver(itemCount: length);
               },
             ),
+            const SliverPadding(padding: EdgeInsets.only(bottom: 16.0)),
           ],
         ),
       ),

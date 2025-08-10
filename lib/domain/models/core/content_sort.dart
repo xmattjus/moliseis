@@ -1,0 +1,1 @@
+enum ContentSort { byName, byDate }

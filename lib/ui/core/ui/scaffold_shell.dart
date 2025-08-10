@@ -2,6 +2,7 @@
 // https://github.com/flutter/packages/blob/main/packages/go_router/example/lib/stateful_shell_route.dart
 
 import 'package:flutter/material.dart' hide kBottomNavigationBarHeight;
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/utils/constants.dart';
 
@@ -16,20 +17,36 @@ class ScaffoldShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _navigationShell.currentIndex,
-        destinations: _buildDestinations(),
-        onDestinationSelected: (index) => _onDestinationSelected(index),
-        height: kNavigationBarHeight,
+    return AnnotatedRegion(
+      value: SystemUiOverlayStyle(
+        systemNavigationBarColor: Theme.of(
+          context,
+        ).colorScheme.surfaceContainer,
+        systemNavigationBarDividerColor: Theme.of(
+          context,
+        ).colorScheme.surfaceContainer,
+        systemNavigationBarIconBrightness: switch (Theme.of(
+          context,
+        ).brightness) {
+          Brightness.dark => Brightness.light,
+          Brightness.light => Brightness.dark,
+        },
       ),
-      resizeToAvoidBottomInset: false,
-      extendBody: true,
+      child: Scaffold(
+        body: _navigationShell,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _navigationShell.currentIndex,
+          destinations: _buildDestinations,
+          onDestinationSelected: _onDestinationSelected,
+          height: kNavigationBarHeight,
+        ),
+        resizeToAvoidBottomInset: false,
+        extendBody: true,
+      ),
     );
   }
 
-  List<NavigationDestination> _buildDestinations() {
+  List<NavigationDestination> get _buildDestinations {
     return List.generate(4, (index) {
       final icon = switch (index) {
         0 => Icon(
@@ -44,8 +61,8 @@ class ScaffoldShell extends StatelessWidget {
         ),
         2 => Icon(
           _navigationShell.currentIndex == index
-              ? Icons.photo
-              : Icons.photo_outlined,
+              ? Icons.event
+              : Icons.event_outlined,
         ),
         3 => Icon(
           _navigationShell.currentIndex == index
@@ -59,7 +76,7 @@ class ScaffoldShell extends StatelessWidget {
       final label = switch (index) {
         0 => 'Esplora',
         1 => 'Preferiti',
-        2 => 'Galleria',
+        2 => 'Eventi',
         3 => 'Mappa',
         int() => throw RangeError(
           '$index out of range, expected range >= 0 && <= 3',

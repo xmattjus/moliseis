@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
-import 'package:moliseis/data/repositories/core/repository_sync_result.dart';
-import 'package:moliseis/data/repositories/core/repository_sync_state.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
@@ -33,51 +31,57 @@ class _SyncScreenState extends State<SyncScreen> {
       ),
       body: Consumer<SyncViewModel>(
         builder: (_, viewModel, _) {
-          if (viewModel.state == RepositorySyncState.done) {
-            if (viewModel.result == RepositorySyncResult.error) {
-              _scheduleCallback(() {
-                GoRouter.of(context).refresh();
+          return ListenableBuilder(
+            listenable: viewModel.sync,
+            builder: (context, child) {
+              if (viewModel.sync.completed) {
+                _scheduleCallback(() {
+                  GoRouter.of(context).refresh();
+                });
+              }
 
-                showSnackBar(
-                  context: context,
-                  textContent:
-                      "Si è verificato un errore durante l'aggiornamento dei "
-                      'contenuti.',
-                );
-              });
-            }
+              if (viewModel.sync.error) {
+                if (viewModel.fatalError) {
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    spacing: 8.0,
+                    children: <Widget>[
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Text(
+                          'Molise Is necessita di una connessione ad internet '
+                          "per l'aggiornamento dei contenuti. Controlla le "
+                          'impostazioni di rete.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          _scheduleCallbackOnNextFrame = true;
+                          viewModel.sync.execute(true);
+                        },
+                        child: const Text('Riprova'),
+                      ),
+                    ],
+                  );
+                } else {
+                  _scheduleCallback(() {
+                    GoRouter.of(context).refresh();
 
-            if (viewModel.result == RepositorySyncResult.majorError) {
-              return Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                spacing: 8.0,
-                children: [
-                  const Text(
-                    'Molise Is necessita di una connessione ad internet per '
-                    "l'aggiornamento dei contenuti. Controlla le impostazioni "
-                    'di rete.',
-                    textAlign: TextAlign.center,
-                  ),
-                  TextButton(
-                    onPressed: () async {
-                      _scheduleCallbackOnNextFrame = true;
-                      await viewModel.synchronize(force: true);
-                    },
-                    child: const Text('Riprova'),
-                  ),
-                ],
+                    showSnackBar(
+                      context: context,
+                      textContent:
+                          "Si è verificato un errore durante l'aggiornamento "
+                          'dei contenuti.',
+                    );
+                  });
+                }
+              }
+
+              return const EmptyView.loading(
+                text: Text('Aggiornamento dei contenuti in corso...'),
               );
-            }
-
-            if (viewModel.result == RepositorySyncResult.success) {
-              _scheduleCallback(() {
-                GoRouter.of(context).refresh();
-              });
-            }
-          }
-
-          return const EmptyView.loading(
-            text: Text('Aggiornamento dei contenuti in corso...'),
+            },
           );
         },
       ),

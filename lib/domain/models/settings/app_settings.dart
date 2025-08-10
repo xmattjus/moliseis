@@ -1,4 +1,4 @@
-import 'package:moliseis/domain/models/attraction/attraction_sort.dart';
+import 'package:moliseis/domain/models/core/content_sort.dart';
 import 'package:moliseis/domain/models/settings/theme_brightness.dart';
 import 'package:moliseis/domain/models/settings/theme_type.dart';
 import 'package:objectbox/objectbox.dart';
@@ -18,7 +18,7 @@ class AppSettings {
   ThemeBrightness brightness;
 
   @Transient()
-  AttractionSort attractionSort;
+  ContentSort contentSort;
 
   int? get dbMode {
     _assertThemeTypeEnumValues();
@@ -56,48 +56,48 @@ class AppSettings {
     }
   }
 
-  int? get dbAttractionSort {
-    _assertAttractionSortEnumValues();
+  int? get dbContentSort {
+    _assertContentSortEnumValues();
 
-    return attractionSort.index;
+    return contentSort.index;
   }
 
-  set dbAttractionSort(int? value) {
-    _assertAttractionSortEnumValues();
+  set dbContentSort(int? value) {
+    _assertContentSortEnumValues();
 
     if (value == null) {
-      attractionSort = AttractionSort.byName;
+      contentSort = ContentSort.byName;
     } else {
-      attractionSort = value >= 0 && value < AttractionSort.values.length
-          ? AttractionSort.values[value]
-          : AttractionSort.byName;
+      contentSort = value >= 0 && value < ContentSort.values.length
+          ? ContentSort.values[value]
+          : ContentSort.byName;
     }
   }
 
   @Property(type: PropertyType.dateNano)
-  final DateTime modifiedAt;
+  final DateTime? modifiedAt;
 
   final bool crashReporting;
 
   AppSettings({
     this.type = ThemeType.system,
     this.brightness = ThemeBrightness.system,
-    this.attractionSort = AttractionSort.byName,
-    required this.modifiedAt,
+    this.contentSort = ContentSort.byName,
+    this.modifiedAt,
     this.crashReporting = true,
   });
 
   AppSettings copyWith({
     ThemeType? type,
     ThemeBrightness? brightness,
-    AttractionSort? attractionSort,
+    ContentSort? contentSort,
     DateTime? modifiedAt,
     bool? crashReporting,
   }) {
     return AppSettings(
       type: type ?? this.type,
       brightness: brightness ?? this.brightness,
-      attractionSort: attractionSort ?? this.attractionSort,
+      contentSort: contentSort ?? this.contentSort,
       modifiedAt: modifiedAt ?? this.modifiedAt,
       crashReporting: crashReporting ?? this.crashReporting,
     );
@@ -114,8 +114,8 @@ class AppSettings {
     assert(ThemeBrightness.dark.index == 2);
   }
 
-  void _assertAttractionSortEnumValues() {
-    assert(AttractionSort.byName.index == 0);
-    assert(AttractionSort.byDate.index == 1);
+  void _assertContentSortEnumValues() {
+    assert(ContentSort.byName.index == 0);
+    assert(ContentSort.byDate.index == 1);
   }
 }

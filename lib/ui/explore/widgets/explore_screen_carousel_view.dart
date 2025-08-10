@@ -2,26 +2,25 @@ import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/place/place_content.dart';
 import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/ui/core/themes/shape.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
-import 'package:moliseis/ui/core/ui/attraction_and_place_names.dart';
-import 'package:moliseis/ui/core/ui/cards/base_attraction_card.dart';
-import 'package:moliseis/ui/core/ui/cards/card_base.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/ui/core/themes/text_styles.dart';
+import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
+import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/future_built.dart';
-import 'package:moliseis/ui/core/ui/skeletons/card_skeleton_carousel_item.dart';
+import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
+import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class ExploreScreenCarouselView extends StatelessWidget {
-  const ExploreScreenCarouselView({
-    super.key,
-    required this.attractionsIdsFuture,
-  });
+  const ExploreScreenCarouselView({super.key, required this.exploreViewModel});
 
-  final Future<List<int>> attractionsIdsFuture;
+  final ExploreViewModel exploreViewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -53,43 +52,63 @@ class ExploreScreenCarouselView extends StatelessWidget {
         ),
         SizedBox(
           height: height,
-          child: FutureBuilt<List<int>>(
-            attractionsIdsFuture,
-            onLoading: () {
-              return const EmptyView.loading(
-                text: Text('Caricamento in corso...'),
-              );
-            },
-            onSuccess: (data) {
+          child: ListenableBuilder(
+            listenable: exploreViewModel.loadSuggested,
+            builder: (context, child) {
+              final length = exploreViewModel.suggestedIds.length;
+
+              if (exploreViewModel.loadSuggested.error) {
+                return SizedBox(
+                  height: height,
+                  child: const EmptyView.error(
+                    text: Text(
+                      'Si è verificato un errore durante il caricamento.',
+                    ),
+                  ),
+                );
+              }
+
+              // Generates a list of placeholders while loading the suggested
+              // places from the repository.
+              final List<Widget> children =
+                  exploreViewModel.loadSuggested.running
+                  ? List.generate(length, (index) {
+                      return Container(
+                        color: Colors.black,
+                        width: double.maxFinite,
+                        height: height,
+                      );
+                    })
+                  : UnmodifiableListView<Widget>(
+                      exploreViewModel.suggested.map<Widget>(
+                        (PlaceContent content) => _CarouselViewItem(
+                          content: content,
+                          width: maxWidthExtent,
+                          height: height,
+                        ),
+                      ),
+                    );
+
               return Padding(
                 padding: const EdgeInsetsDirectional.only(
                   start: 8.0,
                   end: 16.0,
                 ),
-                child: CarouselView.weighted(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  elevation: 0.0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(Shape.extraLarge),
-                  ),
-                  itemSnapping: true,
-                  enableSplash: false,
-                  flexWeights: const [6, 3, 2],
-                  children: UnmodifiableListView<_CarouselViewItem>(
-                    data.map<_CarouselViewItem>(
-                      (int id) => _CarouselViewItem(
-                        attractionId: id,
-                        width: maxWidthExtent,
-                        height: height,
-                      ),
+                child: Skeletonizer(
+                  enabled: exploreViewModel.loadSuggested.running,
+                  effect: CustomPulseEffect(context: context),
+                  child: CarouselView.weighted(
+                    padding: const EdgeInsets.only(left: 8.0),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(Shapes.extraLarge),
                     ),
+                    itemSnapping: true,
+                    enableSplash: false,
+                    flexWeights: const [6, 3, 2],
+                    children: children,
                   ),
                 ),
-              );
-            },
-            onError: (error) {
-              return const EmptyView.error(
-                text: Text('Si è verificato un errore durante il caricamento.'),
               );
             },
           ),
@@ -101,81 +120,83 @@ class ExploreScreenCarouselView extends StatelessWidget {
 
 class _CarouselViewItem extends StatelessWidget {
   const _CarouselViewItem({
-    required this.attractionId,
+    required this.content,
     required this.width,
     required this.height,
   });
 
-  final int attractionId;
+  final PlaceContent content;
   final double width;
   final double height;
 
   @override
   Widget build(BuildContext context) {
-    return BaseAttractionCard(
-      attractionId,
-      onLoading: () => const CardSkeletonCarouselItem(),
-      builder: (attraction, image, place) {
-        return Stack(
-          children: <Widget>[
-            DecoratedBox(
-              decoration: BoxDecoration(color: Colors.black.withAlpha(40)),
-              position: DecorationPosition.foreground,
-              child: CardBase(
-                child: CustomImage.network(
-                  image.url,
-                  width: width,
-                  height: height,
-                  imageWidth: image.width,
-                  imageHeight: image.height,
-                  fit: BoxFit.cover,
-                ),
-                onPressed: () {
-                  GoRouter.of(context).goNamed(
-                    RouteNames.homeStory,
-                    pathParameters: {'id': attraction.id.toString()},
-                  );
+    return Stack(
+      children: <Widget>[
+        DecoratedBox(
+          decoration: BoxDecoration(color: Colors.black.withAlpha(40)),
+          position: DecorationPosition.foreground,
+          child: CustomImage.network(
+            content.media.first.url,
+            width: width,
+            height: height,
+            imageWidth: content.media.first.width,
+            imageHeight: content.media.first.height,
+            fit: BoxFit.cover,
+          ),
+        ),
+        Positioned.fill(
+          child: Material(
+            type: MaterialType.transparency,
+            child: CustomInkWell(
+              onPressed: () => GoRouter.of(context).goNamed(
+                RouteNames.homeStory,
+                pathParameters: {'id': content.remoteId.toString()},
+                queryParameters: {
+                  'isEvent': (content is EventContent ? 'true' : 'false'),
                 },
               ),
             ),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final show = constraints.maxWidth > 100.0;
-                return AnimatedOpacity(
-                  opacity: show ? 1 : 0,
-                  duration: show ? Durations.medium4 : Duration.zero,
-                  curve: Easing.standardDecelerate,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Padding(
-                        padding: const EdgeInsetsDirectional.all(8.0),
-                        child: Align(
-                          alignment: Alignment.topRight,
-                          child: FavouriteButton(
-                            color: Colors.white70,
-                            id: attraction.id,
-                            radius: Shape.full,
-                          ),
-                        ),
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final show = constraints.maxWidth > 100.0;
+            return AnimatedOpacity(
+              opacity: show ? 1 : 0,
+              duration: show ? Durations.medium4 : Duration.zero,
+              curve: Easing.standardDecelerate,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsetsDirectional.all(8.0),
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: FavouriteButton(
+                        color: Colors.white70,
+                        content: content,
+                        radius: Shapes.largeIncreased,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: AttractionAndPlaceNames(
-                          name: attraction.name,
-                          placeName: place.name,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                );
-              },
-            ),
-          ],
-        );
-      },
+                  IgnorePointer(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ContentNameAndCity(
+                        name: content.name,
+                        cityName: content.city.target?.name,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }

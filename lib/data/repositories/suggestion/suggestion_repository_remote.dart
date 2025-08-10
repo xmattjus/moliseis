@@ -2,10 +2,9 @@ import 'dart:io' show File;
 
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/repositories/suggestion/suggestion_repository.dart';
-import 'package:moliseis/data/services/remote/cloudinary.dart';
+import 'package:moliseis/data/services/remote/cloudinary_client.dart';
 import 'package:moliseis/domain/models/suggestion/suggestion.dart';
 import 'package:moliseis/domain/models/suggestion/suggestion_supabase_table.dart';
-import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -41,7 +40,11 @@ class SuggestionRepositoryRemote extends SuggestionRepository {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(const SupabaseResponseException(), error, stackTrace);
+      _log.severe(
+        'An exception occurred while uploading suggestion.',
+        error,
+        stackTrace,
+      );
       return Result.error(error);
     }
   }

@@ -19,21 +19,20 @@ class AppUrlLauncher {
     try {
       final uri = Uri.parse(url);
 
-      try {
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-          result = true;
-        } else {
-          _log.severe('Could not handle $uri');
-        }
-      } on Exception catch (error) {
-        _log.severe(error);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+        result = true;
+      } else {
+        _log.severe('Could not handle $uri');
       }
-    } on Exception catch (error) {
+    } on Exception catch (error, stackTrace) {
       // Logs any parsing error.
-      _log.severe(error);
+      _log.severe(
+        'An exception occurred while launching $url.',
+        error,
+        stackTrace,
+      );
     }
-
     return result;
   }
 
@@ -46,10 +45,10 @@ class AppUrlLauncher {
   /// app.
   Future<bool> openStreetMapWebsite() => _launch(_openStreetMapUrl);
 
-  /// Opens the requested attraction in a Google Maps window.
-  Future<bool> googleMaps(String attractionName, String? placeName) {
+  /// Opens the requested content in a Google Maps window.
+  Future<bool> googleMaps(String contentName, String? cityName) {
     return _launch(
-      '$_googleMapsUrl&query=$attractionName, $placeName, Molise, Italia',
+      '$_googleMapsUrl&query=$contentName, $cityName, Molise, Italia',
     );
   }
 

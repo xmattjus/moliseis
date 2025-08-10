@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/main.dart';
+import 'package:logging/logging.dart';
 
 SnackBar _buildSnackBar(BuildContext context, String textContent) {
   return SnackBar(
@@ -24,6 +24,8 @@ void showSnackBar({
   final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
 
   if (scaffoldMessenger == null) {
+    final log = Logger('CustomSnackBar');
+
     log.warning('ScaffoldMessenger.maybeOf(context) is null.');
     return;
   }

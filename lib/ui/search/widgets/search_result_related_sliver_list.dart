@@ -1,5 +1,9 @@
+// TODO(xmattjus): Implement related results in search.
+/*
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/machine_learning_icon.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
@@ -12,7 +16,7 @@ class SearchResultRelatedSliverList extends StatelessWidget {
     required this.viewModel,
   });
 
-  final void Function(int id) onResultPressed;
+  final void Function(ContentBase content) onResultPressed;
   final SearchViewModel viewModel;
 
   @override
@@ -20,37 +24,41 @@ class SearchResultRelatedSliverList extends StatelessWidget {
     return ListenableBuilder(
       listenable: viewModel.loadRelatedResults,
       builder: (context, child) {
-        if (viewModel.loadRelatedResults.running) {
-          return const SliverToBoxAdapter(
-            child: EmptyView(
-              icon: MachineLearningIcon(),
-              text: Text('Sto generando altri risultati...'),
-            ),
-          );
-        }
-
-        if (viewModel.loadRelatedResults.completed &&
-            viewModel.relatedResultIds.isNotEmpty) {
-          return SliverMainAxisGroup(
-            slivers: [
-              const SliverPadding(
-                padding: EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 8.0),
-                sliver: SliverToBoxAdapter(
-                  child: TextSectionDivider('Altri risultati'),
+        if (viewModel.loadRelatedResults.completed) {
+          if (viewModel.relatedResults.isNotEmpty) {
+            return SliverMainAxisGroup(
+              slivers: [
+                const SliverPadding(
+                  padding: EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 8.0),
+                  sliver: SliverToBoxAdapter(
+                    child: TextSectionDivider('Altri risultati'),
+                  ),
                 ),
-              ),
-              AttractionListViewResponsive(
-                Future.sync(() => viewModel.relatedResultIds),
-                onPressed: onResultPressed,
-              ),
-              const SliverPadding(padding: EdgeInsets.only(bottom: 16.0)),
-            ],
-          );
+                ContentAdaptiveListGridView(
+                  viewModel.relatedResults,
+                  onPressed: onResultPressed,
+                ),
+
+                const SliverPadding(padding: EdgeInsets.only(bottom: 16.0)),
+              ],
+            );
+          } else {
+            return const SliverToBoxAdapter(child: EmptyBox());
+          }
         }
 
-        // Returns an empty box in case of error or no results to show.
-        return const SliverToBoxAdapter(child: SizedBox());
+        if (viewModel.loadRelatedResults.error) {
+          return const SliverToBoxAdapter(child: EmptyBox());
+        }
+
+        return const SliverToBoxAdapter(
+          child: EmptyView(
+            icon: MachineLearningIcon(),
+            text: Text('Sto generando altri risultati...'),
+          ),
+        );
       },
     );
   }
 }
+*/

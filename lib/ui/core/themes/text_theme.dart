@@ -11,7 +11,7 @@ const TextTheme appTextTheme = TextTheme(
     ],
   ),
   titleMedium: TextStyle(
-    fontFamily: 'Fraunces',
+    fontFamily: 'Lexend',
     fontVariations: [FontVariation.weight(500)],
   ),
   titleSmall: TextStyle(

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/ui/attraction_list_view_responsive.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class SearchResultSliverList extends StatelessWidget {
   const SearchResultSliverList({
@@ -12,7 +16,7 @@ class SearchResultSliverList extends StatelessWidget {
   });
 
   final void Function()? onRetrySearchPressed;
-  final void Function(int id) onResultPressed;
+  final void Function(ContentBase content) onResultPressed;
   final SearchViewModel viewModel;
 
   @override
@@ -22,16 +26,26 @@ class SearchResultSliverList extends StatelessWidget {
         ListenableBuilder(
           listenable: viewModel.loadResults,
           builder: (context, child) {
-            if (viewModel.loadResults.running) {
-              return const SliverFillRemaining(
-                hasScrollBody: false,
-                child: EmptyView.loading(text: Text('Caricamento in corso...')),
-              );
+            if (viewModel.loadResults.completed) {
+              if (viewModel.results.isEmpty) {
+                return const SliverToBoxAdapter(
+                  child: EmptyView(
+                    text: Text('Non è stato trovato alcun risultato.'),
+                  ),
+                );
+              } else {
+                return SliverPadding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  sliver: ContentAdaptiveListGridView(
+                    viewModel.results,
+                    onPressed: onResultPressed,
+                  ),
+                );
+              }
             }
 
             if (viewModel.loadResults.error) {
-              return SliverFillRemaining(
-                hasScrollBody: false,
+              return SliverToBoxAdapter(
                 child: EmptyView(
                   text: const Text(
                     'Si è verificato un errore durante il caricamento.',
@@ -44,22 +58,9 @@ class SearchResultSliverList extends StatelessWidget {
               );
             }
 
-            if (viewModel.resultIds.isEmpty) {
-              return const SliverFillRemaining(
-                hasScrollBody: false,
-                child: EmptyView(
-                  text: Text('Non è stato trovato alcun risultato.'),
-                ),
-              );
-            }
-
-            return SliverPadding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              sliver: AttractionListViewResponsive(
-                Future.sync(() => viewModel.resultIds),
-                onPressed: onResultPressed,
-              ),
-            );
+            return ResponsiveBreakpoints.of(context).isMobile
+                ? const SkeletonContentList.sliver(itemCount: 10)
+                : const CardSkeletonGrid.sliver(itemCount: 10);
           },
         ),
       ],

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/text_style.dart';
+import 'package:moliseis/ui/core/themes/text_styles.dart';
 
 class TextSectionDivider extends StatelessWidget {
   /// Creates a text widget.

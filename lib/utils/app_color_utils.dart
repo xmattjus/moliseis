@@ -3,12 +3,14 @@ import 'dart:math' show pow;
 import 'package:flutter/material.dart';
 
 class AppColorUtils {
+  AppColorUtils._();
+
   /// Source: https://stackoverflow.com/a/21682946.
   static Color stringToColor(
-      String string, [
-        double saturation = 1.0,
-        double lightness = 0.0,
-      ]) {
+    String string, [
+    double saturation = 1.0,
+    double lightness = 0.0,
+  ]) {
     int hash = 0;
 
     for (int i = 0; i < string.length; i++) {

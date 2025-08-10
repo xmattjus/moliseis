@@ -1,7 +1,7 @@
 import 'dart:async' show StreamController;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/molis_image/molis_image.dart';
+import 'package:moliseis/domain/models/media/media.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal_overlay.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +12,7 @@ class GalleryPreviewModal {
 
   Future<bool?> call({
     required BuildContext context,
-    required List<MolisImage> images,
+    required List<Media> images,
     required int initialIndex,
   }) async {
     if (context.mounted) {

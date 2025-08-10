@@ -1,6 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:meta/meta.dart';
-import 'package:moliseis/domain/models/attraction/attraction_type.dart';
+import 'package:moliseis/domain/models/core/content_category.dart';
 
 @immutable
 class Suggestion {
@@ -21,7 +21,7 @@ class Suggestion {
 
   final int? id;
 
-  final AttractionType? type;
+  final ContentCategory? type;
 
   final String? city;
 
@@ -46,7 +46,7 @@ class Suggestion {
   final DateTime? modifiedAt;
 
   Suggestion copyWith({
-    AttractionType? type,
+    ContentCategory? type,
     String? city,
     String? place,
     String? description,

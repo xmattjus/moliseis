@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/attraction/attraction.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker_painter.dart';
 import 'package:moliseis/utils/extensions.dart';
 
-/// Generates a map marker with the given [Attraction].
-Marker generateMapMarker(Attraction attraction, {void Function()? onPressed}) {
+/// Generates a map marker with the given [ContentBase].
+Marker generateMapMarker(ContentBase content, {void Function()? onPressed}) {
   return Marker(
-    point: LatLng(attraction.coordinates[0], attraction.coordinates[1]),
+    point: LatLng(content.coordinates[0], content.coordinates[1]),
     width: 60.0,
     height: 60.0,
     child: _GeoMapMarkerIcon(
-      attraction.type.icon,
+      content.category.icon,
       size: 60.0,
       onPressed: onPressed,
-      tooltip: attraction.name,
+      tooltip: content.name,
     ),
   );
 }

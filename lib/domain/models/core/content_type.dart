@@ -1,0 +1,1 @@
+enum ContentType { event, place }

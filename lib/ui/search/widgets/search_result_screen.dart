@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/event/event_content.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
-import 'package:moliseis/ui/search/widgets/search_result_related_sliver_list.dart';
+// import 'package:moliseis/ui/search/widgets/search_result_related_sliver_list.dart';
 import 'package:moliseis/ui/search/widgets/search_result_sliver_list.dart';
 
 class SearchResultScreen extends StatefulWidget {
   const SearchResultScreen({
     super.key,
-    required this.viewModel,
     required this.query,
+    required this.viewModel,
   });
 
-  final SearchViewModel viewModel;
   final String query;
+  final SearchViewModel viewModel;
 
   @override
   State<SearchResultScreen> createState() => _SearchResultScreenState();
@@ -57,18 +59,20 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                   ),
                 ),
                 SearchResultSliverList(
-                  onResultPressed: (int id) =>
-                      _onSearchResultPressed(context, id),
+                  onResultPressed: (content) =>
+                      _onSearchResultPressed(context, content),
                   onRetrySearchPressed: () {
                     widget.viewModel.loadResults.execute(widget.query);
                   },
                   viewModel: widget.viewModel,
                 ),
+                /*
                 SearchResultRelatedSliverList(
-                  onResultPressed: (int id) =>
-                      _onSearchResultPressed(context, id),
+                  onResultPressed: (content) =>
+                      _onSearchResultPressed(context, content),
                   viewModel: widget.viewModel,
                 ),
+                */
               ],
             ),
             Align(
@@ -85,15 +89,14 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                     ),
                     onSubmitted: (text) {
                       widget.viewModel.loadResults.execute(text);
-                      widget.viewModel.loadRelatedResults.execute(text);
+                      // widget.viewModel.loadRelatedResultsIds.execute(text);
                     },
-                    onSuggestionPressed: (attractionId) {
+                    onSuggestionPressed: (_) {
                       _controller.closeView(_controller.text);
                       widget.viewModel.loadResults.execute(_controller.text);
-                      widget.viewModel.loadRelatedResults.execute(
-                        _controller.text,
-                      );
+                      // widget.viewModel.loadRelatedResultsIds.execute(_controller.text);
                     },
+                    viewModel: widget.viewModel,
                   ),
                 ),
               ),
@@ -104,14 +107,20 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     );
   }
 
-  void _onSearchResultPressed(BuildContext context, int id) {
+  void _onSearchResultPressed(BuildContext context, ContentBase content) {
     if (_controller.isOpen) {
       _controller.closeView(_controller.text);
     }
 
     GoRouter.of(context).goNamed(
-      RouteNames.homeSearchResultsStory,
-      pathParameters: {'query': widget.query, 'id': id.toString()},
+      RouteNames.homeSearchResultsDetail,
+      pathParameters: {
+        'query': widget.query,
+        'id': content.remoteId.toString(),
+      },
+      queryParameters: {
+        'isEvent': (content is EventContent ? 'true' : 'false'),
+      },
     );
   }
 }

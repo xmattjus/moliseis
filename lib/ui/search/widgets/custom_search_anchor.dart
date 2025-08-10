@@ -1,14 +1,19 @@
-import 'dart:collection' show UnmodifiableListView;
+import 'dart:math' as math show max;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/attraction/attraction_type.dart';
-import 'package:moliseis/ui/categories/widgets/category_chip.dart';
-import 'package:moliseis/ui/core/ui/cards/card_attraction_list_item.dart';
+import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/core/content_category.dart';
+import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/ui/category/widgets/category_chip.dart';
+import 'package:moliseis/ui/core/ui/content/event_content_card_list_item.dart';
+import 'package:moliseis/ui/core/ui/content/place_content_card_list_item.dart';
+import 'package:moliseis/ui/core/ui/empty_view.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
+import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/debounceable.dart';
 import 'package:moliseis/utils/extensions.dart';
-import 'package:provider/provider.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
 class CustomSearchAnchor extends StatefulWidget {
@@ -21,6 +26,7 @@ class CustomSearchAnchor extends StatefulWidget {
     this.onBackPressed,
     this.elevation,
     required this.onSuggestionPressed,
+    required this.viewModel,
   });
 
   /// An optional controller that allows to interact with the search bar from
@@ -51,23 +57,25 @@ class CustomSearchAnchor extends StatefulWidget {
 
   final double? elevation;
 
-  final void Function(int attractionId) onSuggestionPressed;
+  final void Function(ContentBase content) onSuggestionPressed;
+
+  final SearchViewModel viewModel;
 
   @override
   State<CustomSearchAnchor> createState() => _CustomSearchAnchorState();
 }
 
 class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
-  late final Debounceable<Iterable<int>?, String> _debouncedSearch;
+  late final Debounceable<Iterable<ContentBase>?, String> _debouncedSearch;
 
-  // The query currently being searched for. If null, there is no pending
-  // request.
+  /// The query currently being searched for. If null, there is no pending
+  /// request.
   String? _currentQuery;
 
-  // The list of past searches.
+  /// The list of past searches.
   late List<Widget> _lastHistory = <Widget>[];
 
-  // The most recent suggestions received from the API.
+  /// The most recent suggestions received from the API.
   late List<Widget> _lastOptions = <Widget>[];
 
   /// Creates an internal search controller if it has not been provided.
@@ -75,18 +83,23 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
   SearchController get _searchController =>
       widget.controller ?? (_internalSearchController ??= SearchController());
 
-  late final SearchViewModel _viewModel;
+  late bool _isFullScreen;
 
   @override
   void initState() {
     super.initState();
 
-    _debouncedSearch = debounce<Iterable<int>?, String>(
+    _debouncedSearch = debounce<Iterable<ContentBase>?, String>(
       duration: const Duration(milliseconds: 500),
       function: _search,
     );
+  }
 
-    _viewModel = context.read();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    _isFullScreen = ResponsiveBreakpoints.of(context).isMobile;
   }
 
   @override
@@ -97,12 +110,10 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
 
   @override
   Widget build(BuildContext context) {
-    final isFullScreen = ResponsiveBreakpoints.of(context).isMobile;
-
-    /// Imposes constraints to the search bar dimensions to respect Material3
-    /// guidelines.
-    ///
-    /// https://m3.material.io/components/search/specs#9df461f4-6c39-4f0a-8749-bdb63216d4af
+    // Imposes constraints to the search bar dimensions to respect Material3
+    // guidelines.
+    //
+    // https://m3.material.io/components/search/specs#9df461f4-6c39-4f0a-8749-bdb63216d4af
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 360.0, maxWidth: 720.0),
       child: FocusScope(
@@ -112,7 +123,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
         /// Handles the [SearchAnchor] back gesture/button.
         child: BackButtonListener(
           child: SearchAnchor(
-            isFullScreen: isFullScreen,
+            isFullScreen: _isFullScreen,
             searchController: _searchController,
             viewBuilder: _buildViewBuilder,
             builder: (context, controller) {
@@ -144,7 +155,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
             viewLeading: BackButton(onPressed: _handleOnBackPressed),
             viewHintText: widget.hintText,
             viewOnSubmitted: (query) {
-              _viewModel.addToHistory.execute(query);
+              widget.viewModel.addToHistory.execute(query);
 
               _searchController.closeView(query);
 
@@ -152,7 +163,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
             },
             suggestionsBuilder: (context, controller) async {
               if (controller.text.isEmpty) {
-                final history = _viewModel.history;
+                final history = widget.viewModel.history;
 
                 return _lastHistory = _buildChips(
                   texts: history,
@@ -160,7 +171,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                 );
               }
 
-              final List<int>? options = (await _debouncedSearch(
+              final List<ContentBase>? options = (await _debouncedSearch(
                 controller.text,
               ))?.toList();
 
@@ -168,58 +179,96 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                 return _lastOptions;
               }
 
-              return _lastOptions = List<Widget>.generate(options.length, (
-                index,
-              ) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (index == 0)
-                      const Padding(
-                        padding: EdgeInsetsDirectional.fromSTEB(
-                          16.0,
-                          16.0,
-                          16.0,
-                          8.0,
-                        ),
-                        child: TextSectionDivider('Risultati rapidi'),
-                      ),
-                    Padding(
-                      padding: EdgeInsetsDirectional.only(
-                        bottom: index == options.length ? 16.0 : 0,
-                      ),
-                      child: CardAttractionListItem(
-                        options[index],
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHigh,
-                        elevation: 0,
-                        onPressed: () {
-                          _viewModel.addToHistoryByAttractionId.execute(
-                            options[index],
-                          );
+              return _lastOptions = <Widget>[
+                ListenableBuilder(
+                  listenable: widget.viewModel.loadResults,
+                  builder: (context, _) {
+                    if (widget.viewModel.loadResults.completed) {
+                      if (widget.viewModel.results.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: EmptyView(
+                            text: Text('Non è stato trovato alcun risultato.'),
+                          ),
+                        );
+                      }
 
-                          widget.onSuggestionPressed(options[index]);
-                        },
-                      ),
-                    ),
-                    if (index < options.length - 1)
-                      Divider(color: Theme.of(context).colorScheme.surfaceDim),
-                    // Adds some space to the last item of the list to prevent
-                    // the bottom navigation bar from overlapping the results.
-                    if (index == options.length - 1)
-                      SizedBox(
-                        height:
-                            (isFullScreen
-                                ? MediaQuery.maybePaddingOf(context)?.bottom ??
-                                      0
-                                : 0) +
-                            16.0,
-                      ),
-                  ],
-                );
-              });
+                      final length = math.max(
+                        0,
+                        widget.viewModel.results.length * 2 - 1,
+                      );
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          const Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                              16.0,
+                              16.0,
+                              16.0,
+                              8.0,
+                            ),
+                            child: TextSectionDivider('Risultati rapidi'),
+                          ),
+                          ...List.generate(length, (index) {
+                            final int itemIndex = index ~/ 2;
+                            final content = widget.viewModel.results[itemIndex];
+                            if (index.isEven) {
+                              if (content is EventContent) {
+                                return EventContentCardListItem(
+                                  content,
+                                  key: ValueKey<String>(
+                                    'list-event:${content.remoteId}',
+                                  ),
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHigh,
+                                  elevation: 0,
+                                  onPressed: (ContentBase content) {
+                                    widget.viewModel.addToHistory.execute(
+                                      content.name,
+                                    );
+
+                                    widget.onSuggestionPressed(content);
+                                  },
+                                );
+                              }
+
+                              return PlaceContentCardListItem(
+                                content,
+                                key: ValueKey<String>(
+                                  'list-place:${content.remoteId}',
+                                ),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHigh,
+                                elevation: 0,
+                                onPressed: (ContentBase content) {
+                                  widget.viewModel.addToHistory.execute(
+                                    content.name,
+                                  );
+
+                                  widget.onSuggestionPressed(content);
+                                },
+                              );
+                            } else {
+                              return const Divider();
+                            }
+                          }),
+                        ],
+                      );
+                    }
+
+                    if (widget.viewModel.loadResults.error) {
+                      return const ListTile(
+                        title: Text('Si è verificato un problema, riprova.'),
+                      );
+                    }
+
+                    return const SkeletonContentList(itemCount: 10);
+                  },
+                ),
+              ];
             },
           ),
           onBackButtonPressed: () async {
@@ -234,72 +283,95 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
     );
   }
 
-  UnmodifiableListView<Widget> _buildChips({
+  List<Widget> _buildChips({
     List<String> texts = const [],
     bool showDeleteIcon = false,
   }) {
-    return UnmodifiableListView(
-      texts.map((e) {
-        return RawChip(
-          label: Text(e),
-          onPressed: () {
-            _searchController.text = e;
+    return texts
+        .map((e) {
+          return RawChip(
+            label: Text(e),
+            onPressed: () {
+              _searchController.text = e;
 
-            _viewModel.addToHistory.execute(e);
-          },
-          deleteIcon: const Icon(Icons.close),
-          onDeleted: showDeleteIcon
-              ? () async {
-                  _viewModel.removeFromHistory.execute(e);
-                  _searchController.text = '\u200B';
-                  await Future.delayed(Durations.medium1, () {
-                    _searchController.text = '';
-                  });
-                }
-              : null,
-        );
-      }),
-    );
+              widget.viewModel.addToHistory.execute(e);
+            },
+            deleteIcon: const Icon(Icons.close),
+            onDeleted: showDeleteIcon
+                ? () async {
+                    widget.viewModel.removeFromHistory.execute(e);
+                    _searchController.text = '\u200B';
+                    await Future.delayed(Durations.medium1, () {
+                      _searchController.text = '';
+                    });
+                  }
+                : null,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          );
+        })
+        .toList(growable: false);
   }
 
   /// Lays out the suggestion list of the search view.
   Widget _buildViewBuilder(Iterable<Widget> suggestions) {
+    final children = <Widget>[];
     if (_searchController.text.isEmpty) {
-      return Padding(
-        padding: const EdgeInsetsDirectional.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 8.0,
-          children: <Widget>[
-            const TextSectionDivider('Categorie'),
-            Wrap(
-              spacing: 8.0,
-              children: UnmodifiableListView(
-                _viewModel.types.map((AttractionType e) {
+      children.addAll([
+        const Padding(
+          padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 0),
+          child: TextSectionDivider('Categorie'),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Wrap(
+            spacing: 8.0,
+            children: ContentCategory.values.minusUnknown
+                .map((category) {
                   return CategoryChip(
-                    element: e,
+                    category,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerLow,
                     isSelected: false,
                     onPressed: () {
-                      _searchController.text = e.label;
+                      _searchController.text = category.label;
 
-                      _viewModel.addToHistory.execute(e.label);
+                      widget.viewModel.addToHistory.execute(category.label);
                     },
                   );
-                }),
-              ),
-            ),
-            if (_lastHistory.isNotEmpty) const TextSectionDivider('Recenti'),
-            if (_lastHistory.isNotEmpty)
-              Expanded(child: Wrap(spacing: 8.0, children: _lastHistory)),
-          ],
+                })
+                .toList(growable: false),
+          ),
         ),
-      );
+      ]);
+
+      if (_lastHistory.isNotEmpty) {
+        children.addAll([
+          const Padding(
+            padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 8.0),
+            child: TextSectionDivider('Recenti'),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Wrap(spacing: 8.0, children: _lastHistory),
+          ),
+        ]);
+      }
+    } else {
+      children.addAll(suggestions);
     }
+
+    children.add(
+      SizedBox(height: _isFullScreen ? kNavigationBarHeight + 32.0 : 16.0),
+    );
 
     return MediaQuery.removePadding(
       context: context,
       removeTop: true,
-      child: ListView(children: UnmodifiableListView<Widget>(suggestions)),
+      child: Material(
+        type: MaterialType.transparency,
+        child: ListView(children: children),
+      ),
     );
   }
 
@@ -309,12 +381,20 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
 
   // Calls the "remote" API to search with the given query. Returns null when
   // the call has been made obsolete.
-  Future<Iterable<int>?> _search(String query) async {
+  Future<Iterable<ContentBase>?> _search(String query) async {
+    // If the query is too short, do not search.
+    if (query.length < 3) {
+      // Resets the last shown options.
+      _lastOptions = <Widget>[];
+
+      return null;
+    }
+
     _currentQuery = query;
 
-    await _viewModel.loadResults.execute(query);
+    await widget.viewModel.loadResults.execute(query);
 
-    final Iterable<int> options = _viewModel.resultIds;
+    final Iterable<ContentBase> options = widget.viewModel.results;
 
     // If another search happened after this one, throw away these options.
     if (_currentQuery != query) {

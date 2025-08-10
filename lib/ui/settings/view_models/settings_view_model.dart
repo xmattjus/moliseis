@@ -1,32 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/data/repositories/settings/settings_repository.dart';
-import 'package:moliseis/domain/models/attraction/attraction_sort.dart';
+import 'package:moliseis/utils/command.dart';
+import 'package:moliseis/utils/result.dart';
 
 class SettingsViewModel extends ChangeNotifier {
   final SettingsRepository _settingsRepository;
-  AttractionSort? _sortBy;
-  bool? _crashReporting;
+
+  late Command1<void, bool> setCrashReporting;
 
   SettingsViewModel({required SettingsRepository settingsRepository})
-    : _settingsRepository = settingsRepository;
-
-  AttractionSort get attractionSortBy =>
-      _sortBy ??= _settingsRepository.attractionSort;
-
-  void saveAttractionSortBy(AttractionSort sortBy) {
-    _sortBy = sortBy;
-    notifyListeners();
-
-    _settingsRepository.setAttractionSort(sortBy);
+    : _settingsRepository = settingsRepository {
+    setCrashReporting = Command1(_setCrashReporting);
   }
+
+  bool? _crashReporting;
 
   bool get crashReporting =>
       _crashReporting ??= _settingsRepository.crashReporting;
 
-  void saveCrashReporting(bool enable) {
+  Future<Result<void>> _setCrashReporting(bool enable) async {
     _crashReporting = enable;
+
     notifyListeners();
 
-    _settingsRepository.setCrashReporting(enable);
+    final result = await _settingsRepository.setCrashReporting(enable);
+
+    if (result is Error) {
+      _crashReporting = !_crashReporting!; // Revert the change on error.
+
+      notifyListeners();
+    }
+
+    return result;
   }
 }

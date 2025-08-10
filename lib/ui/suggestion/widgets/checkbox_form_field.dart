@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 class CheckboxFormField extends FormField<bool> {
   CheckboxFormField({
@@ -25,7 +26,7 @@ class CheckboxFormField extends FormField<bool> {
                      ),
                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                    ),
-                   Expanded(child: title ?? const SizedBox()),
+                   Expanded(child: title ?? const EmptyBox()),
                  ],
                ),
                if (state.hasError)
@@ -34,7 +35,7 @@ class CheckboxFormField extends FormField<bool> {
                      12.0,
                      2.0,
                      12.0,
-                     0.0,
+                     0,
                    ),
                    child: Builder(
                      builder: (context) {

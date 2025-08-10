@@ -1,10 +1,9 @@
 name: moliseis
-description: "A new Flutter project."
-# The following line prevents the package from being accidentally published to
-# pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+description: "La prima app multipiattaforma per il turismo in Molise."
 
-version: 1.3.0+4
+publish_to: 'none'
+
+version: 2.0.0+7
 
 environment:
   sdk: ^3.8.1
@@ -15,7 +14,7 @@ dependencies:
   # B
   # C
   cached_network_image: ^3.4.1
-  cloudinary_api: ^1.1.0
+  cloudinary_api: ^1.1.1
   cloudinary_url_gen: ^1.8.0
   crypto: ^3.0.6
   cupertino_icons: ^1.0.8
@@ -24,7 +23,7 @@ dependencies:
   #dynamic_color: ^1.7.0
   # E
   email_validator: ^3.0.0
-  envied: ^1.1.1
+  envied: ^1.2.0
   # F
   flutter:
     sdk: flutter
@@ -32,10 +31,11 @@ dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_localizations:
     sdk: flutter
-  flutter_map: ^8.1.1
+  flutter_map: ^8.2.1
   # G
-  go_router: ^15.2.4 # '>=12.1.3 <13.0.0'
+  go_router: ^16.0.0 # '>=12.1.3 <13.0.0'
   # H
+  http: ^1.5.0-beta.2
   # I
   image_picker: ^1.1.2
   intl: any
@@ -46,8 +46,9 @@ dependencies:
   latlong2: ^0.9.1
   logging: ^1.3.0
   # M
+  markdown_widget: ^2.3.2+8
   material_color_utilities: ^0.11.1
-  material_symbols_icons: ^4.2815.1
+  # material_symbols_icons: ^4.2815.1
   meta: ^1.16.0
   # N
   # O
@@ -62,18 +63,18 @@ dependencies:
   responsive_framework: ^1.5.1
   # result_dart: ^2.0.0
   # S
-  sentry: ^8.14.2
-  sentry_flutter: ^8.14.2
-  sentry_logging: ^8.14.2
+  sentry: ^9.6.0
+  sentry_flutter: ^9.6.0
+  sentry_logging: ^9.6.0
   share_plus: ^11.0.0
-  skeletonizer: ^2.0.1
-  string_validator: ^1.1.0
+  skeletonizer: ^2.1.0+1
+  string_validator: ^1.2.0
   supabase: ^2.8.0
   supabase_flutter: ^2.9.1
   swipe_image_gallery: ^0.10.2
   # T
   # U
-  url_launcher: ^6.3.1
+  url_launcher: ^6.3.2
   # V
   # W
   # X
@@ -128,7 +129,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icon/
+    - assets/icons/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
