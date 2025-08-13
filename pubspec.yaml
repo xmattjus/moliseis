@@ -66,7 +66,7 @@ dependencies:
   sentry: ^9.6.0
   sentry_flutter: ^9.6.0
   sentry_logging: ^9.6.0
-  share_plus: ^11.0.0
+  share_plus: ^11.1.0
   skeletonizer: ^2.1.0+1
   string_validator: ^1.2.0
   supabase: ^2.8.0
