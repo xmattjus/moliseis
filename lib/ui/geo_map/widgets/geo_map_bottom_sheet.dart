@@ -8,8 +8,8 @@ import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_adaptive_title.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_drag_handle.dart';
-import 'package:moliseis/ui/core/ui/content/event_content_card_grid_item.dart';
-import 'package:moliseis/ui/core/ui/content/place_content_card_grid_item.dart';
+import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
+import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid_item.dart';
@@ -331,44 +331,19 @@ class _NearbyContentHorizontalListState
                   itemBuilder: (_, index) {
                     final content = widget.viewModel.nearContent[index];
 
-                    if (content is EventContent) {
-                      return EventContentCardGridItem(
-                        content,
-                        width: kGridViewCardWidth,
-                        onPressed: () => widget.onPressed(content),
-                        actions: <Widget>[
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                              top: 8.0,
-                              end: 8.0,
-                            ),
-                            child: FavouriteButton(
-                              color: Colors.white70,
-                              content: content,
-                              radius: Shapes.small,
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-
-                    return PlaceContentCardGridItem(
+                    return ContentBaseCardGridItem(
                       content,
                       width: kGridViewCardWidth,
-                      onPressed: () => widget.onPressed(content),
-                      actions: <Widget>[
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(
-                            top: 8.0,
-                            end: 8.0,
-                          ),
-                          child: FavouriteButton(
-                            color: Colors.white70,
-                            content: content,
-                            radius: Shapes.small,
-                          ),
-                        ),
-                      ],
+                      onPressed: (ContentBase content) =>
+                          widget.onPressed(content),
+                      verticalTrailing: content is EventContent
+                          ? EventContentStartDateTime(content)
+                          : null,
+                      horizontalTrailing: FavouriteButton(
+                        color: Colors.white,
+                        content: content,
+                        radius: Shapes.small,
+                      ),
                     );
                   },
                   separatorBuilder: (_, _) => const SizedBox(width: 8.0),

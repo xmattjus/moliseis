@@ -1,8 +1,6 @@
 const double kGridViewCardWidth = 252.0;
 
-const double kGridViewCardHeight = 168.0;
-
-const double kEventGridViewCardHeight = 200.0;
+const double kGridViewCardHeight = 196.0;
 
 const double kButtonHeight = 40.0;
 

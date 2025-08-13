@@ -3,15 +3,14 @@ import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/domain/models/core/content_category.dart';
 import 'package:moliseis/domain/models/event/event_content.dart';
-// import 'package:moliseis/domain/models/geo_map/geo_map_state.dart';
 import 'package:moliseis/domain/models/place/place_content.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/category/widgets/category_button.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
+import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
-import 'package:moliseis/ui/core/ui/content/event_content_card_grid_item.dart';
-import 'package:moliseis/ui/core/ui/content/place_content_card_grid_item.dart';
+import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
@@ -125,7 +124,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       ),
                     ),
                     SliverPadding(
-                      padding: const EdgeInsetsDirectional.only(start: 16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       sliver: SliverToBoxAdapter(
                         child: ContentNameAndCity(
                           name: content.name,
@@ -415,44 +414,19 @@ class __NearbyContentHorizontalListState
                   itemBuilder: (_, index) {
                     final content = widget.viewModel.nearContent[index];
 
-                    if (content is EventContent) {
-                      return EventContentCardGridItem(
-                        content,
-                        width: kGridViewCardWidth,
-                        onPressed: () => widget.onPressed(content),
-                        actions: <Widget>[
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(
-                              top: 8.0,
-                              end: 8.0,
-                            ),
-                            child: FavouriteButton(
-                              color: Colors.white70,
-                              content: content,
-                              radius: Shapes.small,
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-
-                    return PlaceContentCardGridItem(
+                    return ContentBaseCardGridItem(
                       content,
                       width: kGridViewCardWidth,
-                      onPressed: () => widget.onPressed(content),
-                      actions: <Widget>[
-                        Padding(
-                          padding: const EdgeInsetsDirectional.only(
-                            top: 8.0,
-                            end: 8.0,
-                          ),
-                          child: FavouriteButton(
-                            color: Colors.white70,
-                            content: content,
-                            radius: Shapes.small,
-                          ),
-                        ),
-                      ],
+                      onPressed: (ContentBase content) =>
+                          widget.onPressed(content),
+                      verticalTrailing: content is EventContent
+                          ? EventContentStartDateTime(content)
+                          : null,
+                      horizontalTrailing: FavouriteButton(
+                        color: Colors.white,
+                        content: content,
+                        radius: Shapes.small,
+                      ),
                     );
                   },
                   separatorBuilder: (_, _) => const SizedBox(width: 8.0),

@@ -5,8 +5,8 @@ import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/domain/models/core/content_category.dart';
 import 'package:moliseis/domain/models/event/event_content.dart';
 import 'package:moliseis/ui/category/widgets/category_chip.dart';
-import 'package:moliseis/ui/core/ui/content/event_content_card_list_item.dart';
-import 'package:moliseis/ui/core/ui/content/place_content_card_list_item.dart';
+import 'package:moliseis/ui/core/ui/content/content_base_list_item.dart';
+import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
@@ -133,7 +133,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                   controller: controller,
                   hintText: widget.hintText,
                   leading: widget.leading,
-                  trailing: [
+                  trailing: <Widget>[
                     Icon(
                       Icons.search_outlined,
                       size: 24.0,
@@ -214,35 +214,11 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
                             final int itemIndex = index ~/ 2;
                             final content = widget.viewModel.results[itemIndex];
                             if (index.isEven) {
-                              if (content is EventContent) {
-                                return EventContentCardListItem(
-                                  content,
-                                  key: ValueKey<String>(
-                                    'list-event:${content.remoteId}',
-                                  ),
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHigh,
-                                  elevation: 0,
-                                  onPressed: (ContentBase content) {
-                                    widget.viewModel.addToHistory.execute(
-                                      content.name,
-                                    );
-
-                                    widget.onSuggestionPressed(content);
-                                  },
-                                );
-                              }
-
-                              return PlaceContentCardListItem(
+                              return ContentBaseListItem(
                                 content,
-                                key: ValueKey<String>(
-                                  'list-place:${content.remoteId}',
+                                key: ValueKey(
+                                  'list-content:${content.remoteId}',
                                 ),
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHigh,
-                                elevation: 0,
                                 onPressed: (ContentBase content) {
                                   widget.viewModel.addToHistory.execute(
                                     content.name,
@@ -250,6 +226,9 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
 
                                   widget.onSuggestionPressed(content);
                                 },
+                                verticalTrailing: content is EventContent
+                                    ? EventContentStartDateTime(content)
+                                    : null,
                               );
                             } else {
                               return const Divider();

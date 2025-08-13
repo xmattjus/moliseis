@@ -175,7 +175,7 @@ class _CarouselViewItem extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.topRight,
                       child: FavouriteButton(
-                        color: Colors.white70,
+                        color: Colors.white,
                         content: content,
                         radius: Shapes.largeIncreased,
                       ),

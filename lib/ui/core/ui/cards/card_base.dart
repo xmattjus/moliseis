@@ -1,51 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
-import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 enum _CardBaseType { elevated, filled, outlined }
 
-enum CardBaseActionAlignment { start, center, end }
-
 class CardBase extends StatelessWidget {
-  const CardBase({
-    super.key,
-    this.width,
-    this.height,
-    this.color,
-    this.elevation,
-    this.shape,
-    this.onPressed,
-    this.actions = const <Widget>[],
-    this.actionAlignment = CardBaseActionAlignment.center,
-    required this.child,
-  }) : _variant = _CardBaseType.elevated;
-
-  const CardBase.filled({
-    super.key,
-    this.width,
-    this.height,
-    this.color,
-    this.elevation,
-    this.shape,
-    this.onPressed,
-    this.actions = const <Widget>[],
-    this.actionAlignment = CardBaseActionAlignment.center,
-    required this.child,
-  }) : _variant = _CardBaseType.filled;
-
-  const CardBase.outlined({
-    super.key,
-    this.width,
-    this.height,
-    this.color,
-    this.elevation,
-    this.shape,
-    this.onPressed,
-    this.actions = const <Widget>[],
-    this.actionAlignment = CardBaseActionAlignment.center,
-    required this.child,
-  }) : _variant = _CardBaseType.outlined;
-
   /// If non-null, requires the child to have exactly this width.
   final double? width;
 
@@ -77,16 +35,45 @@ class CardBase extends StatelessWidget {
   /// Called when the user presses this part of the material.
   final void Function()? onPressed;
 
-  final List<Widget> actions;
-
-  final CardBaseActionAlignment actionAlignment;
-
   /// The widget below this widget in the tree.
   ///
   /// {@macro flutter.widgets.ProxyWidget.child}
   final Widget child;
 
   final _CardBaseType _variant;
+
+  const CardBase({
+    super.key,
+    this.width,
+    this.height,
+    this.color,
+    this.elevation,
+    this.shape,
+    this.onPressed,
+    required this.child,
+  }) : _variant = _CardBaseType.elevated;
+
+  const CardBase.filled({
+    super.key,
+    this.width,
+    this.height,
+    this.color,
+    this.elevation,
+    this.shape,
+    this.onPressed,
+    required this.child,
+  }) : _variant = _CardBaseType.filled;
+
+  const CardBase.outlined({
+    super.key,
+    this.width,
+    this.height,
+    this.color,
+    this.elevation,
+    this.shape,
+    this.onPressed,
+    required this.child,
+  }) : _variant = _CardBaseType.outlined;
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +83,7 @@ class CardBase extends StatelessWidget {
         elevation: elevation,
         shape: shape,
         margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.hardEdge,
         child: ExcludeFocusTraversal(
           excluding: onPressed != null,
           child: child,
@@ -107,7 +94,7 @@ class CardBase extends StatelessWidget {
         elevation: elevation,
         shape: shape,
         margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.hardEdge,
         child: ExcludeFocusTraversal(
           excluding: onPressed != null,
           child: child,
@@ -118,7 +105,7 @@ class CardBase extends StatelessWidget {
         elevation: elevation,
         shape: shape,
         margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.hardEdge,
         child: ExcludeFocusTraversal(
           excluding: onPressed != null,
           child: child,
@@ -126,39 +113,20 @@ class CardBase extends StatelessWidget {
       ),
     };
 
-    Widget ink = const EmptyBox();
-    Widget act = const EmptyBox();
-
-    /// Creates a pressable ink layer on top of the card content if the onTap
-    /// callback has been defined.
-    if (onPressed != null) {
-      ink = Positioned.fill(
-        child: Material(
-          type: MaterialType.transparency,
-          child: CustomInkWell(onPressed: onPressed!, shape: shape),
-        ),
-      );
-    }
-
-    if (actions.isNotEmpty) {
-      act = Positioned.fill(
-        left: null,
-        top:
-            (actionAlignment == CardBaseActionAlignment.start ||
-                actionAlignment == CardBaseActionAlignment.center)
-            ? 0
-            : null,
-        bottom:
-            (actionAlignment == CardBaseActionAlignment.end ||
-                actionAlignment == CardBaseActionAlignment.center)
-            ? 0
-            : null,
-        child: Row(children: actions),
-      );
-    }
-
     final content = SizedBox(width: width, height: height, child: card);
 
-    return Stack(children: [content, ink, act]);
+    return onPressed != null
+        ? Stack(
+            children: <Widget>[
+              content,
+              Positioned.fill(
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: CustomInkWell(onPressed: onPressed!, shape: shape),
+                ),
+              ),
+            ],
+          )
+        : content;
   }
 }
