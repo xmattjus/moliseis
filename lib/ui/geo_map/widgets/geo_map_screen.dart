@@ -330,39 +330,35 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         alignment: Alignment.topLeft,
         child: AnimatedBuilder(
           animation: _showSearchBar,
-          builder: (_, child) {
-            return AnimatedSlide(
-              offset: Offset(0, _showSearchBar.value ? 0 : -2.0),
-              curve: _showSearchBar.value
-                  ? Curves.easeInOutCubicEmphasized
-                  : Easing.emphasizedDecelerate,
-              duration: _showSearchBar.value
-                  ? Durations.medium2
-                  : Durations.short3,
-              child: child,
-            );
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              appSearchBar,
-              CategorySelectionList(
-                /*
-                  chipBackgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHigh,
-                  */
-                onCategoriesSelectionChanged: (selectedCategories) {
-                  widget.viewModel.setSelectedCategories.execute(
-                    selectedCategories,
-                  );
-                },
-                onTypesSelectionChanged: (selectedTypes) {
-                  widget.viewModel.setSelectedTypes.execute(selectedTypes);
-                },
-              ),
-            ],
+          builder: (_, child) => AnimatedSlide(
+            offset: Offset(0, _showSearchBar.value ? 0 : -2.0),
+            curve: _showSearchBar.value
+                ? Curves.easeInOutCubicEmphasized
+                : Easing.emphasizedDecelerate,
+            duration: _showSearchBar.value
+                ? Durations.medium2
+                : Durations.short3,
+            child: child,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                appSearchBar,
+                CategorySelectionList(
+                  onCategoriesSelectionChanged: (selectedCategories) {
+                    widget.viewModel.setSelectedCategories.execute(
+                      selectedCategories,
+                    );
+                  },
+                  onTypesSelectionChanged: (selectedTypes) {
+                    widget.viewModel.setSelectedTypes.execute(selectedTypes);
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -6,18 +6,13 @@ import 'package:moliseis/domain/models/event/event_content.dart';
 import 'package:moliseis/domain/models/place/place_content.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/category/widgets/category_button.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
-import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
-import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
+import 'package:moliseis/ui/core/ui/content/nearby_content_horizontal_list.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
-import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid_item.dart';
-import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/detail/view_models/detail_view_model.dart';
 import 'package:moliseis/ui/detail/widgets/detail_geo_map_preview.dart';
 import 'package:moliseis/ui/detail/widgets/detail_image_slideshow.dart';
@@ -28,7 +23,6 @@ import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 
 class DetailScreen extends StatefulWidget {
   const DetailScreen({
@@ -277,10 +271,12 @@ class _DetailScreenState extends State<DetailScreen> {
                       ),
                     ),
                     SliverToBoxAdapter(
-                      child: _NearbyContentHorizontalList(
+                      child: NearbyContentHorizontalList(
                         coordinates: content.coordinates,
                         onPressed: (content) => _buildStoryRoute(content),
-                        viewModel: widget.viewModel,
+                        loadNearContentCommand:
+                            widget.viewModel.loadNearContent,
+                        nearContent: widget.viewModel.nearContent,
                       ),
                     ),
                     const SliverPadding(padding: EdgeInsets.only(bottom: 16.0)),
@@ -355,110 +351,5 @@ class _DetailScreenState extends State<DetailScreen> {
         },
       );
     }
-  }
-}
-
-class _NearbyContentHorizontalList extends StatefulWidget {
-  const _NearbyContentHorizontalList({
-    // super.key,
-    required this.coordinates,
-    required this.onPressed,
-    required this.viewModel,
-  });
-
-  final List<double> coordinates;
-  final void Function(ContentBase content) onPressed;
-  final DetailViewModel viewModel;
-
-  @override
-  State<_NearbyContentHorizontalList> createState() =>
-      __NearbyContentHorizontalListState();
-}
-
-class __NearbyContentHorizontalListState
-    extends State<_NearbyContentHorizontalList> {
-  @override
-  void initState() {
-    super.initState();
-
-    widget.viewModel.loadNearContent.execute(widget.coordinates);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const padding = EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 4.0);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        const Padding(
-          padding: EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 8.0),
-          child: TextSectionDivider('Nelle vicinanze'),
-        ),
-        SizedBox(
-          height: kGridViewCardHeight,
-          child: ListenableBuilder(
-            listenable: widget.viewModel.loadNearContent,
-            builder: (context, child) {
-              if (widget.viewModel.loadNearContent.completed) {
-                if (widget.viewModel.nearContent.isEmpty) {
-                  return const EmptyView(
-                    text: Text('Nessun luogo trovato nelle vicinanze.'),
-                  );
-                }
-
-                return ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: padding,
-                  itemBuilder: (_, index) {
-                    final content = widget.viewModel.nearContent[index];
-
-                    return ContentBaseCardGridItem(
-                      content,
-                      width: kGridViewCardWidth,
-                      onPressed: (ContentBase content) =>
-                          widget.onPressed(content),
-                      verticalTrailing: content is EventContent
-                          ? EventContentStartDateTime(content)
-                          : null,
-                      horizontalTrailing: FavouriteButton(
-                        color: Colors.white,
-                        content: content,
-                        radius: Shapes.small,
-                      ),
-                    );
-                  },
-                  separatorBuilder: (_, _) => const SizedBox(width: 8.0),
-                  itemCount: widget.viewModel.nearContent.length,
-                );
-              }
-
-              if (widget.viewModel.loadNearContent.error) {
-                return const EmptyView.error(
-                  text: Text(
-                    'Si è verificato un errore durante il caricamento.',
-                  ),
-                );
-              }
-
-              return Skeletonizer(
-                effect: CustomPulseEffect(context: context),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: padding,
-                  itemBuilder: (_, _) => const SkeletonContentGridItem(
-                    width: kGridViewCardWidth,
-                    height: kGridViewCardHeight,
-                  ),
-                  separatorBuilder: (_, _) => const SizedBox(width: 8.0),
-                  itemCount: 5,
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
   }
 }

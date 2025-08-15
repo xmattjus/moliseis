@@ -8,13 +8,8 @@ import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_adaptive_title.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_drag_handle.dart';
-import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
-import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
-import 'package:moliseis/ui/core/ui/empty_view.dart';
+import 'package:moliseis/ui/core/ui/content/nearby_content_horizontal_list.dart';
 import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid_item.dart';
-import 'package:moliseis/ui/core/ui/text_section_divider.dart';
-import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_details.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_search.dart';
@@ -259,121 +254,8 @@ class GeoMapBottomSheetDefault extends StatelessWidget {
         NearbyContentHorizontalList(
           coordinates: [currentMapCenter.latitude, currentMapCenter.longitude],
           onPressed: onNearContentPressed,
-          viewModel: viewModel,
-        ),
-      ],
-    );
-  }
-}
-
-class NearbyContentHorizontalList extends StatefulWidget {
-  const NearbyContentHorizontalList({
-    // super.key,
-    required this.coordinates,
-    required this.onPressed,
-    required this.viewModel,
-  });
-
-  final List<double> coordinates;
-  final void Function(ContentBase content) onPressed;
-  final GeoMapViewModel viewModel;
-
-  @override
-  State<NearbyContentHorizontalList> createState() =>
-      _NearbyContentHorizontalListState();
-}
-
-class _NearbyContentHorizontalListState
-    extends State<NearbyContentHorizontalList> {
-  @override
-  void initState() {
-    super.initState();
-
-    widget.viewModel.loadNearContent.execute(widget.coordinates);
-  }
-
-  @override
-  void didUpdateWidget(covariant NearbyContentHorizontalList oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.coordinates.first != widget.coordinates.first ||
-        oldWidget.coordinates.last != widget.coordinates.last) {
-      widget.viewModel.loadNearContent.execute(widget.coordinates);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const padding = EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 4.0);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        const Padding(
-          padding: EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 8.0),
-          child: TextSectionDivider('Nelle vicinanze'),
-        ),
-        SizedBox(
-          height: kGridViewCardHeight,
-          child: ListenableBuilder(
-            listenable: widget.viewModel.loadNearContent,
-            builder: (context, child) {
-              if (widget.viewModel.loadNearContent.completed) {
-                if (widget.viewModel.nearContent.isEmpty) {
-                  return const EmptyView(
-                    text: Text('Nessun luogo trovato nelle vicinanze.'),
-                  );
-                }
-
-                return ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: padding,
-                  itemBuilder: (_, index) {
-                    final content = widget.viewModel.nearContent[index];
-
-                    return ContentBaseCardGridItem(
-                      content,
-                      width: kGridViewCardWidth,
-                      onPressed: (ContentBase content) =>
-                          widget.onPressed(content),
-                      verticalTrailing: content is EventContent
-                          ? EventContentStartDateTime(content)
-                          : null,
-                      horizontalTrailing: FavouriteButton(
-                        color: Colors.white,
-                        content: content,
-                        radius: Shapes.small,
-                      ),
-                    );
-                  },
-                  separatorBuilder: (_, _) => const SizedBox(width: 8.0),
-                  itemCount: widget.viewModel.nearContent.length,
-                );
-              }
-
-              if (widget.viewModel.loadNearContent.error) {
-                return const EmptyView.error(
-                  text: Text(
-                    'Si è verificato un errore durante il caricamento.',
-                  ),
-                );
-              }
-
-              return Skeletonizer(
-                effect: CustomPulseEffect(context: context),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: padding,
-                  itemBuilder: (_, _) => const SkeletonContentGridItem(
-                    width: kGridViewCardWidth,
-                    height: kGridViewCardHeight,
-                  ),
-                  separatorBuilder: (_, _) => const SizedBox(width: 8.0),
-                  itemCount: 5,
-                ),
-              );
-            },
-          ),
+          loadNearContentCommand: viewModel.loadNearContent,
+          nearContent: viewModel.nearContent,
         ),
       ],
     );

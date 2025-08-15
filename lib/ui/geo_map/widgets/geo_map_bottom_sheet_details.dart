@@ -3,6 +3,7 @@ import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
+import 'package:moliseis/ui/core/ui/content/nearby_content_horizontal_list.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
@@ -11,7 +12,6 @@ import 'package:moliseis/ui/detail/widgets/details_content.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
-import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
@@ -159,7 +159,8 @@ class GeoMapBottomSheetDetails extends StatelessWidget {
           child: NearbyContentHorizontalList(
             coordinates: [content.coordinates.first, content.coordinates.last],
             onPressed: onNearContentPressed,
-            viewModel: viewModel,
+            loadNearContentCommand: viewModel.loadNearContent,
+            nearContent: viewModel.nearContent,
           ),
         ),
       ],
