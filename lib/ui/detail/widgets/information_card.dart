@@ -29,7 +29,10 @@ class InformationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = TextTheme.of(context);
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final backgroundColor = theme.colorScheme.secondaryContainer;
+    final foregroundColor = theme.colorScheme.onSecondaryContainer;
 
     final subtitle = useBoldSubtitle
         ? DefaultTextStyle.merge(
@@ -41,7 +44,10 @@ class InformationCard extends StatelessWidget {
     final rightPart = Expanded(
       child: enableSkeletonizer
           ? Skeletonizer(
-              effect: CustomPulseEffect(context: context),
+              effect: CustomPulseEffect(
+                context: context,
+                customColor: backgroundColor,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -58,7 +64,7 @@ class InformationCard extends StatelessWidget {
     );
 
     return CardBase.filled(
-      color: Theme.of(context).colorScheme.secondaryContainer,
+      color: backgroundColor,
       onPressed: onPressed,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -69,10 +75,7 @@ class InformationCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: IconTheme.merge(
-                data: IconThemeData(
-                  size: 24.0,
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
-                ),
+                data: IconThemeData(size: 24.0, color: foregroundColor),
                 child: leading,
               ),
             ),
