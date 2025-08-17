@@ -20,12 +20,15 @@ This project is a multi-platform application that allows users to explore the Mo
 
 ## Coding Guidelines
 
-- Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary) for commit messages.
+- Follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary) specification for commit messages.
 - Follow the MVVM (Model-View-ViewModel) architecture pattern.
 - Use the `Repository` pattern for data access.
 - Use the `Command` and `Result` pattern for actions that can be executed asynchronously, such actions must be placed in the appropriate ViewModel.
 # - Write unit tests for all new features and bug fixes.
-- Use descriptive names for variables, functions, and classes.
+- Use descriptive names and follow the naming conventions for variables, functions, and classes.
 - Keep the widget tree as flat as possible to improve performance.
-- Use `dart fix --apply` to automatically fix lint issues.
-- Use `dart format .` to format the code.
+- Use const constructors whenever possible.
+- Use `dart fix --apply` to fix lint issues.
+- Use `dart format` to format the code.
+- Comments should be clear and concise, explaining the why behind the code rather than the what.
+- Comments should be contained within the code blocks.
