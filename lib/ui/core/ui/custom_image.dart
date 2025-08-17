@@ -61,6 +61,10 @@ class CustomImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    assert(
+      width.isFinite && height.isFinite,
+      'Invalid image dimensions: $width x $height',
+    );
     // debugInvertOversizedImages = true;
 
     final devicePixelRatio = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
