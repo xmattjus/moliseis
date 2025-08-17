@@ -4,8 +4,9 @@ import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
+import 'package:moliseis/ui/core/ui/window_size_provider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-import 'package:responsive_framework/responsive_framework.dart';
+import 'package:moliseis/utils/extensions.dart';
 
 class SearchResultSliverList extends StatelessWidget {
   const SearchResultSliverList({
@@ -58,9 +59,11 @@ class SearchResultSliverList extends StatelessWidget {
               );
             }
 
-            return ResponsiveBreakpoints.of(context).isMobile
+            return WindowSizeProvider.of(context).isMobile
                 ? const SkeletonContentList.sliver(itemCount: 10)
-                : const CardSkeletonGrid.sliver(itemCount: 10);
+                : SkeletonContentGrid.sliver(
+                    itemCount: context.gridViewColumnCount,
+                  );
           },
         ),
       ],

@@ -60,7 +60,7 @@ dependencies:
   provider: ^6.1.5
   # Q
   # R
-  responsive_framework: ^1.5.1
+  # responsive_framework: ^1.5.1
   # result_dart: ^2.0.0
   # S
   sentry: ^9.6.0

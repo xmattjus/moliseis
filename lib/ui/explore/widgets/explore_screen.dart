@@ -9,6 +9,7 @@ import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
+import 'package:moliseis/ui/core/ui/window_size_provider.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen_carousel_view.dart';
@@ -18,7 +19,6 @@ import 'package:moliseis/ui/suggestion/widgets/suggestion_cta_button.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
-import 'package:responsive_framework/responsive_framework.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({
@@ -208,9 +208,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
                   final length = widget.eventViewModel.nextIds.length;
 
-                  return ResponsiveBreakpoints.of(context).isMobile
+                  return WindowSizeProvider.of(context).isMobile
                       ? SkeletonContentList.sliver(itemCount: length)
-                      : CardSkeletonGrid.sliver(itemCount: length);
+                      : SkeletonContentGrid.sliver(itemCount: length);
                 },
               ),
               SliverPadding(
@@ -282,9 +282,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
                   final length = widget.exploreViewModel.latestIds.length;
 
-                  return ResponsiveBreakpoints.of(context).isMobile
+                  return WindowSizeProvider.of(context).isMobile
                       ? SkeletonContentList.sliver(itemCount: length)
-                      : CardSkeletonGrid.sliver(itemCount: length);
+                      : SkeletonContentGrid.sliver(itemCount: length);
                 },
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
@@ -292,6 +292,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
         ),
       ),
+      resizeToAvoidBottomInset: false,
     );
   }
 

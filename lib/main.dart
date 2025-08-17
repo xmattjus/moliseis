@@ -7,9 +7,9 @@ import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/domain/models/settings/app_settings.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/core/themes/theme_data.dart';
+import 'package:moliseis/ui/core/ui/window_size_provider.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:provider/provider.dart';
-import 'package:responsive_framework/responsive_framework.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_logging/sentry_logging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -71,21 +71,7 @@ class MoliseIsApp extends StatelessWidget {
         builder: (_, viewModel, _) {
           return MaterialApp.router(
             routerConfig: appRouter,
-            builder: (context, child) {
-              return ResponsiveBreakpoints.builder(
-                breakpoints: <Breakpoint>[
-                  const Breakpoint(start: 0, end: 450, name: MOBILE),
-                  const Breakpoint(start: 451, end: 800, name: TABLET),
-                  const Breakpoint(
-                    start: 801,
-                    end: double.infinity,
-                    name: DESKTOP,
-                  ),
-                ],
-                useShortestSide: true,
-                child: child!,
-              );
-            },
+            builder: (_, child) => AutoWindowSizeProvider(child: child!),
             title: 'Molise Is',
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,

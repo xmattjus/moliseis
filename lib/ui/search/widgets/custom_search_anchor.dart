@@ -10,11 +10,11 @@ import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
+import 'package:moliseis/ui/core/ui/window_size_provider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/debounceable.dart';
 import 'package:moliseis/utils/extensions.dart';
-import 'package:responsive_framework/responsive_framework.dart';
 
 class CustomSearchAnchor extends StatefulWidget {
   const CustomSearchAnchor({
@@ -99,7 +99,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    _isFullScreen = ResponsiveBreakpoints.of(context).isMobile;
+    _isFullScreen = WindowSizeProvider.of(context).isMobile;
   }
 
   @override

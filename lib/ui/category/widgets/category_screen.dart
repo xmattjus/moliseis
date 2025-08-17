@@ -10,7 +10,10 @@ import 'package:moliseis/ui/category/view_models/category_view_model.dart';
 import 'package:moliseis/ui/category/widgets/category_selection_list.dart';
 import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
+import 'package:moliseis/ui/core/ui/window_size_provider.dart';
+import 'package:moliseis/utils/extensions.dart';
 
 class CategoryScreen extends StatefulWidget {
   const CategoryScreen({super.key, required this.viewModel});
@@ -128,7 +131,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
                     );
                   }
 
-                  return const SkeletonContentList.sliver(itemCount: 10);
+                  return WindowSizeProvider.of(context).isMobile
+                      ? const SkeletonContentList.sliver(itemCount: 10)
+                      : SkeletonContentGrid.sliver(
+                          itemCount: context.gridViewColumnCount,
+                        );
                 },
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 16.0)),

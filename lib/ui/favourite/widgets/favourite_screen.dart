@@ -6,8 +6,8 @@ import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
+import 'package:moliseis/ui/core/ui/window_size_provider.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
-import 'package:responsive_framework/responsive_framework.dart';
 
 class FavouriteScreen extends StatelessWidget {
   const FavouriteScreen({super.key, required this.viewModel});
@@ -82,9 +82,9 @@ class FavouriteScreen extends StatelessWidget {
                     viewModel.favouriteEventIds.length +
                     viewModel.favouritePlaceIds.length;
 
-                return ResponsiveBreakpoints.of(context).isMobile
+                return WindowSizeProvider.of(context).isMobile
                     ? SkeletonContentList.sliver(itemCount: length)
-                    : CardSkeletonGrid.sliver(itemCount: length);
+                    : SkeletonContentGrid.sliver(itemCount: length);
               },
             ),
             const SliverPadding(padding: EdgeInsets.only(bottom: 16.0)),
