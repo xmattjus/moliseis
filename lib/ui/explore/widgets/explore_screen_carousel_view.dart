@@ -133,18 +133,19 @@ class _CarouselViewItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: <Widget>[
-        DecoratedBox(
-          decoration: BoxDecoration(color: Colors.black.withAlpha(40)),
-          position: DecorationPosition.foreground,
-          child: CustomImage.network(
-            content.media.first.url,
-            width: width,
-            height: height,
-            imageWidth: content.media.first.width,
-            imageHeight: content.media.first.height,
-            fit: BoxFit.cover,
+        if (content.media.isNotEmpty)
+          DecoratedBox(
+            decoration: BoxDecoration(color: Colors.black.withAlpha(40)),
+            position: DecorationPosition.foreground,
+            child: CustomImage.network(
+              content.media.first.url,
+              width: width,
+              height: height,
+              imageWidth: content.media.first.width,
+              imageHeight: content.media.first.height,
+              fit: BoxFit.cover,
+            ),
           ),
-        ),
         Positioned.fill(
           child: Material(
             type: MaterialType.transparency,
