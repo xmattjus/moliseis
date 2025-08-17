@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid_item.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/extensions.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 /// A skeleton loading widget that displays a grid of placeholder items.
@@ -25,11 +26,11 @@ import 'package:skeletonizer/skeletonizer.dart';
 ///   ],
 /// )
 /// ```
-class CardSkeletonGrid extends StatelessWidget {
+class SkeletonContentGrid extends StatelessWidget {
   /// Creates a regular CardSkeletonGrid widget.
   ///
   /// The [itemCount] parameter specifies the number of skeleton items to display.
-  const CardSkeletonGrid({super.key, required this.itemCount})
+  const SkeletonContentGrid({super.key, required this.itemCount})
     : _isSliver = false;
 
   /// Creates a CardSkeletonGrid as a sliver widget.
@@ -38,7 +39,7 @@ class CardSkeletonGrid extends StatelessWidget {
   /// CustomScrollView or other sliver-based widgets.
   ///
   /// The [itemCount] parameter specifies the number of skeleton items to display.
-  const CardSkeletonGrid.sliver({super.key, required this.itemCount})
+  const SkeletonContentGrid.sliver({super.key, required this.itemCount})
     : _isSliver = true;
 
   /// Whether this widget should be rendered as a sliver.
@@ -56,14 +57,17 @@ class CardSkeletonGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final skeletonEffect = CustomPulseEffect(context: context);
-
+    const insets = EdgeInsets.symmetric(horizontal: 16.0);
     final childrenDelegate = SliverChildBuilderDelegate(
-      (_, _) => const SkeletonContentGridItem(),
+      (_, _) => const SkeletonContentGridItem(
+        width: double.maxFinite,
+        height: kGridViewCardHeight,
+        elevation: 0,
+      ),
       childCount: itemCount,
     );
-
-    const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
+    final gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: context.gridViewColumnCount,
       mainAxisSpacing: 8.0,
       crossAxisSpacing: 8.0,
       mainAxisExtent: kGridViewCardHeight,
@@ -73,7 +77,7 @@ class CardSkeletonGrid extends StatelessWidget {
         ? SliverSkeletonizer(
             effect: skeletonEffect,
             child: SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: insets,
               sliver: SliverGrid(
                 delegate: childrenDelegate,
                 gridDelegate: gridDelegate,
@@ -82,9 +86,12 @@ class CardSkeletonGrid extends StatelessWidget {
           )
         : Skeletonizer(
             effect: skeletonEffect,
-            child: GridView.custom(
-              childrenDelegate: childrenDelegate,
-              gridDelegate: gridDelegate,
+            child: Padding(
+              padding: insets,
+              child: GridView.custom(
+                childrenDelegate: childrenDelegate,
+                gridDelegate: gridDelegate,
+              ),
             ),
           );
   }

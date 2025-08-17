@@ -4,10 +4,12 @@ import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
+import 'package:moliseis/utils/constants.dart';
 
 class ContentBaseCardGridItem extends StatelessWidget {
   final ContentBase content;
   final double? width;
+  final Color? color;
   final void Function(ContentBase content)? onPressed;
   final Widget? verticalTrailing;
   final Widget? horizontalTrailing;
@@ -16,6 +18,7 @@ class ContentBaseCardGridItem extends StatelessWidget {
     this.content, {
     super.key,
     this.width,
+    this.color,
     this.onPressed,
     this.verticalTrailing,
     this.horizontalTrailing,
@@ -27,32 +30,31 @@ class ContentBaseCardGridItem extends StatelessWidget {
       children: <Widget>[
         CardBase.filled(
           width: width,
+          color: color,
           onPressed: onPressed != null ? () => onPressed!(content) : null,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             spacing: 4.0,
             children: <Widget>[
               if (content.media.isNotEmpty)
-                AspectRatio(
-                  aspectRatio: 3 / 1.2,
+                SizedBox(
+                  height: kGridViewCardHeight * 0.5,
                   child: LayoutBuilder(
-                    builder: (_, constraints) {
-                      return ClipPath(
-                        clipper: ShapeBorderClipper(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(Shapes.medium),
-                          ),
+                    builder: (_, constraints) => ClipPath(
+                      clipper: ShapeBorderClipper(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(Shapes.medium),
                         ),
-                        child: CustomImage.network(
-                          content.media.first.url,
-                          width: constraints.biggest.width,
-                          height: constraints.biggest.height,
-                          imageWidth: content.media.first.width,
-                          imageHeight: content.media.first.height,
-                          fit: BoxFit.cover,
-                        ),
-                      );
-                    },
+                      ),
+                      child: CustomImage.network(
+                        content.media.first.url,
+                        width: constraints.maxWidth,
+                        height: constraints.maxHeight,
+                        imageWidth: content.media.first.width,
+                        imageHeight: content.media.first.height,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   ),
                 ),
               Padding(
@@ -65,6 +67,7 @@ class ContentBaseCardGridItem extends StatelessWidget {
                     ContentNameAndCity(
                       name: content.name,
                       cityName: content.city.target?.name,
+                      // color: Theme.of(context).colorScheme.onSecondaryContainer,
                     ),
                     if (verticalTrailing != null) verticalTrailing!,
                   ],
