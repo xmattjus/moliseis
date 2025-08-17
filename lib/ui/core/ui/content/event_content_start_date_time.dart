@@ -3,15 +3,24 @@ import 'package:moliseis/domain/models/event/event_content.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 
 class EventContentStartDateTime extends StatelessWidget {
-  const EventContentStartDateTime(this.content, {super.key});
+  const EventContentStartDateTime(
+    this.content, {
+    super.key,
+    this.iconColor,
+    this.textColor,
+  });
 
   final EventContent content;
+  final Color? iconColor;
+  final Color? textColor;
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.primary;
+    final color = iconColor ?? Theme.of(context).colorScheme.primary;
 
-    final textStyle = CustomTextStyles.subtitle(context);
+    final textStyle = textColor != null
+        ? CustomTextStyles.subtitle(context)?.copyWith(color: textColor)
+        : CustomTextStyles.subtitle(context);
 
     final localizations = MaterialLocalizations.of(context);
 

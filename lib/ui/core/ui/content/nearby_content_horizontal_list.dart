@@ -19,14 +19,6 @@ import 'package:skeletonizer/skeletonizer.dart';
 /// - A [Command1] for loading nearby content by coordinates
 /// - A list of nearby content items
 class NearbyContentHorizontalList extends StatefulWidget {
-  const NearbyContentHorizontalList({
-    super.key,
-    required this.coordinates,
-    required this.onPressed,
-    required this.loadNearContentCommand,
-    required this.nearContent,
-  });
-
   /// The coordinates to search nearby content from.
   final List<double> coordinates;
 
@@ -38,6 +30,14 @@ class NearbyContentHorizontalList extends StatefulWidget {
 
   /// The list of nearby content items.
   final List<ContentBase> nearContent;
+
+  const NearbyContentHorizontalList({
+    super.key,
+    required this.coordinates,
+    required this.onPressed,
+    required this.loadNearContentCommand,
+    required this.nearContent,
+  });
 
   @override
   State<NearbyContentHorizontalList> createState() =>
@@ -69,6 +69,11 @@ class _NearbyContentHorizontalListState
   @override
   Widget build(BuildContext context) {
     const padding = EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 4.0);
+    const skeletonItems = 5;
+    // final theme = Theme.of(context);
+    // final colorScheme = theme.colorScheme;
+    // final backgroundColor = colorScheme.secondaryContainer;
+    // final foregroundColor = colorScheme.onSecondaryContainer;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,10 +106,15 @@ class _NearbyContentHorizontalListState
                     return ContentBaseCardGridItem(
                       content,
                       width: kGridViewCardWidth,
+                      // color: backgroundColor,
                       onPressed: (ContentBase content) =>
                           widget.onPressed(content),
                       verticalTrailing: content is EventContent
-                          ? EventContentStartDateTime(content)
+                          ? EventContentStartDateTime(
+                              content,
+                              // iconColor: colorScheme.tertiary,
+                              // textColor: foregroundColor,
+                            )
                           : null,
                       horizontalTrailing: FavouriteButton(
                         color: Colors.white,
@@ -127,16 +137,20 @@ class _NearbyContentHorizontalListState
               }
 
               return Skeletonizer(
-                effect: CustomPulseEffect(context: context),
+                effect: CustomPulseEffect(
+                  context: context,
+                  // customColor: backgroundColor,
+                ),
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: padding,
                   itemBuilder: (_, _) => const SkeletonContentGridItem(
                     width: kGridViewCardWidth,
                     height: kGridViewCardHeight,
+                    elevation: 0,
                   ),
                   separatorBuilder: (_, _) => const SizedBox(width: 8.0),
-                  itemCount: 5,
+                  itemCount: skeletonItems,
                 ),
               );
             },
