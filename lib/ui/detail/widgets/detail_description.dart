@@ -2,21 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:markdown_widget/config/markdown_generator.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 
-class DetailsContent extends StatefulWidget {
-  const DetailsContent({super.key, required this.content}) : isSliver = false;
+class DetailDescription extends StatefulWidget {
+  const DetailDescription({super.key, required this.content})
+    : isSliver = false;
 
-  const DetailsContent.sliver({super.key, required this.content})
+  const DetailDescription.sliver({super.key, required this.content})
     : isSliver = true;
 
   final ContentBase content;
   final bool isSliver;
 
   @override
-  State<DetailsContent> createState() => _DetailsContentState();
+  State<DetailDescription> createState() => _DetailDescriptionState();
 }
 
-class _DetailsContentState extends State<DetailsContent> {
+class _DetailDescriptionState extends State<DetailDescription> {
   final _markdownGenerator = MarkdownGenerator();
 
   List<Widget>? _markdownWidgets;
@@ -30,7 +32,7 @@ class _DetailsContentState extends State<DetailsContent> {
   }
 
   @override
-  void didUpdateWidget(covariant DetailsContent oldWidget) {
+  void didUpdateWidget(covariant DetailDescription oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (widget.content.description != oldWidget.content.description) {
@@ -42,6 +44,12 @@ class _DetailsContentState extends State<DetailsContent> {
 
   @override
   Widget build(BuildContext context) {
+    if (_markdownWidgets?.isEmpty ?? true) {
+      return widget.isSliver
+          ? const SliverToBoxAdapter(child: EmptyBox())
+          : const EmptyBox();
+    }
+
     final children = <Widget>[
       Text('Descrizione', style: CustomTextStyles.section(context)),
       ...?_markdownWidgets,

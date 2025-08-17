@@ -8,7 +8,7 @@ import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
-import 'package:moliseis/ui/detail/widgets/details_content.dart';
+import 'package:moliseis/ui/detail/widgets/detail_description.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
@@ -150,7 +150,7 @@ class GeoMapBottomSheetDetails extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: DetailsContent(content: content),
+          child: DetailDescription(content: content),
         ),
         Padding(
           padding: EdgeInsetsDirectional.only(

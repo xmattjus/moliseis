@@ -14,9 +14,9 @@ import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
 import 'package:moliseis/ui/detail/view_models/detail_view_model.dart';
+import 'package:moliseis/ui/detail/widgets/detail_description.dart';
 import 'package:moliseis/ui/detail/widgets/detail_geo_map_preview.dart';
 import 'package:moliseis/ui/detail/widgets/detail_image_slideshow.dart';
-import 'package:moliseis/ui/detail/widgets/details_content.dart';
 import 'package:moliseis/ui/detail/widgets/information_card.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/utils/app_url_launcher.dart';
@@ -218,7 +218,7 @@ class _DetailScreenState extends State<DetailScreen> {
                       ),
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      sliver: DetailsContent.sliver(content: content),
+                      sliver: DetailDescription.sliver(content: content),
                     ),
                     _pad(
                       SliverList.list(

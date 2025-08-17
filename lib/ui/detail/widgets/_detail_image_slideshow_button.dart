@@ -25,21 +25,19 @@ class _DetailImageSlideshowButtonState
     extends State<_DetailImageSlideshowButton> {
   late final AnimationController _animationController;
 
-  late final Animation<Alignment> alignmentAnimation;
+  late final Animation<Alignment> _alignmentAnimation;
 
   /// Animates the text opacity while the button is expanding/shrinking.
-  late final Animation<double> opacityAnimation;
+  late final Animation<double> _opacityAnimation;
 
-  /// Animates the button width (expand/shrink) to accommodate for the text
-  /// being shown or hidden.
-  late final Animation<double> widthAnimation;
+  /// Animates the button width (expand/shrink) to accommodate the text length.
+  late Animation<double> _widthAnimation;
 
-  late final Animation<double> paddingAnimation;
+  late final Animation<double> _paddingAnimation;
 
-  final Interval defaultCurve = const Interval(
-    0.000,
-    1.000,
-    curve: Curves.easeInOutCubicEmphasized,
+  CurvedAnimation get _defaultCurved => CurvedAnimation(
+    parent: _animationController,
+    curve: const Interval(0.000, 1.000, curve: Curves.easeInOutCubicEmphasized),
   );
 
   @override
@@ -51,7 +49,7 @@ class _DetailImageSlideshowButtonState
       vsync: widget.tickerProvider,
     );
 
-    opacityAnimation = Tween<double>(begin: 0, end: 1).animate(
+    _opacityAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: const Interval(
@@ -62,24 +60,22 @@ class _DetailImageSlideshowButtonState
       ),
     );
 
-    paddingAnimation = Tween<double>(begin: 7.95, end: 16.0).animate(
-      CurvedAnimation(parent: _animationController, curve: defaultCurve),
-    );
+    _paddingAnimation = Tween<double>(
+      begin: 7.95,
+      end: 16.0,
+    ).animate(_defaultCurved);
 
-    alignmentAnimation =
-        Tween<Alignment>(
-          begin: Alignment.center,
-          end: Alignment.centerLeft,
-        ).animate(
-          CurvedAnimation(parent: _animationController, curve: defaultCurve),
-        );
+    _alignmentAnimation = Tween<Alignment>(
+      begin: Alignment.center,
+      end: Alignment.centerLeft,
+    ).animate(_defaultCurved);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    /// Calculates the button's text total width before rendering it on screen.
+    // Calculates the button's text total width before rendering it on screen.
     final textSpan = TextSpan(
       text: 'Attiva scorrimento automatico',
       style: TextTheme.of(context).labelLarge,
@@ -94,17 +90,14 @@ class _DetailImageSlideshowButtonState
 
     final iconTheme = IconTheme.of(context);
 
-    /// The maximum button width depends on the global text and icon themes.
-    ///
-    /// The constants being added at the end are the default outlined button
-    /// padding values per Material3 guidelines.
-    widthAnimation =
-        Tween<double>(
-          begin: 40,
-          end: textPainter.width + (iconTheme.size ?? 18.0) + 16.0 + 8.0 + 24.0,
-        ).animate(
-          CurvedAnimation(parent: _animationController, curve: defaultCurve),
-        );
+    // The maximum button width depends on the global text and icon themes.
+    //
+    // The constants being added at the end are the default outlined button
+    // padding values per Material3 guidelines.
+    _widthAnimation = Tween<double>(
+      begin: 40.0,
+      end: textPainter.width + (iconTheme.size ?? 18.0) + 16.0 + 8.0 + 24.0,
+    ).animate(_defaultCurved);
   }
 
   @override
@@ -134,7 +127,7 @@ class _DetailImageSlideshowButtonState
       animation: _animationController.view,
       builder: (_, _) {
         return SizedBox(
-          width: widthAnimation.value,
+          width: _widthAnimation.value,
           child: OutlinedButton.icon(
             onPressed: widget.onPressed,
             style: ButtonStyle(
@@ -146,15 +139,15 @@ class _DetailImageSlideshowButtonState
               ),
               padding: WidgetStatePropertyAll<EdgeInsets>(
                 EdgeInsets.only(
-                  left: paddingAnimation.value,
-                  right: paddingAnimation.value - 8.0,
+                  left: _paddingAnimation.value,
+                  right: _paddingAnimation.value - 8.0,
                 ),
               ),
               iconColor: const WidgetStatePropertyAll<Color>(Colors.white),
               fixedSize: WidgetStatePropertyAll(
-                Size(widthAnimation.value, 40.0),
+                Size(_widthAnimation.value, 40.0),
               ),
-              alignment: alignmentAnimation.value,
+              alignment: _alignmentAnimation.value,
             ),
             icon: AnimatedIcon(
               icon: AnimatedIcons.pause_play,
@@ -163,7 +156,7 @@ class _DetailImageSlideshowButtonState
             label: _animationController.isDismissed
                 ? const EmptyBox()
                 : Opacity(
-                    opacity: opacityAnimation.value,
+                    opacity: _opacityAnimation.value,
                     child: const Text(
                       'Attiva scorrimento automatico',
                       softWrap: false,
