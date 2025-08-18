@@ -119,9 +119,13 @@ extension BuildContextExtensions on BuildContext {
   int get gridViewColumnCount {
     final windowSize = WindowSizeProvider.of(this);
 
-    if (windowSize.isDesktop) {
+    if (windowSize.isExtraLarge) {
+      return 6;
+    } else if (windowSize.isLarge) {
+      return 5;
+    } else if (windowSize.isExpanded) {
       return 4;
-    } else if (windowSize.isTabletLarge) {
+    } else if (windowSize.isMedium) {
       return 3;
     } else {
       return 2;

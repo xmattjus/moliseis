@@ -29,7 +29,7 @@ class ContentAdaptiveListGridView extends StatelessWidget {
       );
     }
 
-    if (WindowSizeProvider.of(context).isMobile) {
+    if (WindowSizeProvider.of(context).isCompact) {
       return SliverList.separated(
         itemBuilder: (context, index) {
           final content = items[index];

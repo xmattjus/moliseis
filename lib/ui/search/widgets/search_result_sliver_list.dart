@@ -59,7 +59,7 @@ class SearchResultSliverList extends StatelessWidget {
               );
             }
 
-            return WindowSizeProvider.of(context).isMobile
+            return WindowSizeProvider.of(context).isCompact
                 ? const SkeletonContentList.sliver(itemCount: 10)
                 : SkeletonContentGrid.sliver(
                     itemCount: context.gridViewColumnCount,

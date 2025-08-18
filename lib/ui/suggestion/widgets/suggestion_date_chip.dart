@@ -44,7 +44,7 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
       label: widget.label,
       onPressed: () async {
         if (Platform.isIOS) {
-          if (WindowSizeProvider.of(context).isMobile) {
+          if (WindowSizeProvider.of(context).isCompact) {
             return _showDialog(
               context,
               Column(

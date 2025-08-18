@@ -99,7 +99,7 @@ class _CustomSearchAnchorState extends State<CustomSearchAnchor> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    _isFullScreen = WindowSizeProvider.of(context).isMobile;
+    _isFullScreen = WindowSizeProvider.of(context).isCompact;
   }
 
   @override
