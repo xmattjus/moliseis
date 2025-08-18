@@ -3,6 +3,12 @@ import 'package:moliseis/ui/core/themes/button_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 class UrlTextButton extends StatelessWidget {
+  final void Function()? onPressed;
+  final Widget? icon;
+  final double? iconSize;
+  final Widget label;
+  final Color? color;
+
   /// Creates a Material [TextButton] with a fixed style appropriate for
   /// launching URLs external to the app.
   const UrlTextButton({
@@ -24,31 +30,23 @@ class UrlTextButton extends StatelessWidget {
     this.color,
   });
 
-  final void Function()? onPressed;
-  final Widget? icon;
-  final double? iconSize;
-  final Widget label;
-  final Color? color;
-
   @override
   Widget build(BuildContext context) {
-    /// The color the map attribution icons and texts will have.
-    final widgetColor =
-        color ??
-        Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7);
-
-    /// The style the map attribution texts will have.
-    final textStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: widgetColor);
+    final theme = Theme.of(context);
+    final textStyle = theme.textTheme.bodySmall;
+    // The color the map attribution icons and texts will have.
+    final foregroundColor = color ?? textStyle?.color?.withValues(alpha: 0.7);
 
     return TextButton.icon(
       onPressed: onPressed,
-      style: CustomButtonStyles.url(textStyle, widgetColor),
+      style: CustomButtonStyles.url(
+        textStyle?.copyWith(color: foregroundColor),
+        foregroundColor,
+      ),
       icon: IconTheme(
         data: IconThemeData(
           size: iconSize,
-          color: widgetColor,
+          color: foregroundColor,
           applyTextScaling: false,
         ),
         child: icon ?? const EmptyBox(),
