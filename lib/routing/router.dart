@@ -136,13 +136,13 @@ final appRouter = GoRouter(
                     );
                   },
                   routes: <RouteBase>[
-                    detailRoute(name: RouteNames.homeSearchResultsDetail),
+                    detailRoute(name: RouteNames.homeSearchResultsDetails),
                   ],
                 ),
-                detailRoute(name: RouteNames.homeStory),
+                detailRoute(name: RouteNames.homeDetails),
                 categoryRoute(
                   name: RouteNames.homeCategory,
-                  childName: RouteNames.homeCategoryDetail,
+                  childName: RouteNames.homeCategoryDetails,
                 ),
                 GoRoute(
                   path: RoutePaths.suggestion,
@@ -171,10 +171,10 @@ final appRouter = GoRouter(
                 );
               },
               routes: <RouteBase>[
-                detailRoute(name: RouteNames.favouritesStory),
+                detailRoute(name: RouteNames.favouritesDetails),
                 categoryRoute(
                   name: RouteNames.favouritesCategory,
-                  childName: RouteNames.favouritesCategoryDetail,
+                  childName: RouteNames.favouritesCategoryDetails,
                 ),
               ],
             ),
@@ -198,7 +198,13 @@ final appRouter = GoRouter(
                   ),
                 );
               },
-              routes: <RouteBase>[detailRoute(name: RouteNames.eventsDetails)],
+              routes: <RouteBase>[
+                detailRoute(name: RouteNames.eventsDetails),
+                categoryRoute(
+                  name: RouteNames.eventsCategory,
+                  childName: RouteNames.eventsCategoryDetails,
+                ),
+              ],
             ),
           ],
         ),

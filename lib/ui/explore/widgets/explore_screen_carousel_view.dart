@@ -151,7 +151,7 @@ class _CarouselViewItem extends StatelessWidget {
             type: MaterialType.transparency,
             child: CustomInkWell(
               onPressed: () => GoRouter.of(context).goNamed(
-                RouteNames.homeStory,
+                RouteNames.homeDetails,
                 pathParameters: {'id': content.remoteId.toString()},
                 queryParameters: {
                   'isEvent': (content is EventContent ? 'true' : 'false'),

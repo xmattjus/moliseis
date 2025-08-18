@@ -5,16 +5,16 @@ abstract class RouteNames {
   static const eventsDetails = 'eventsDetails';
   static const favourites = 'favourites';
   static const favouritesCategory = 'favouritesCategory';
-  static const favouritesCategoryDetail = 'favouritesCategoryStory';
-  static const favouritesStory = 'favouritesStory';
-  static const gallery = 'gallery';
-  static const geoMap = 'geoMap';
+  static const favouritesCategoryDetails = 'favouritesCategoryDetails';
+  static const favouritesDetails = 'favouritesDetails';
+  // static const gallery = 'gallery';
+  static const geoMap = 'map';
   static const home = 'home';
   static const homeCategory = 'homeCategory';
-  static const homeCategoryDetail = 'homeCategoryStory';
+  static const homeCategoryDetails = 'homeCategoryDetails';
+  static const homeDetails = 'homeDetails';
   static const homeSearchResults = 'homeSearchResults';
-  static const homeSearchResultsDetail = 'homeSearchResultsStory';
-  static const homeStory = 'homeStory';
+  static const homeSearchResultsDetails = 'homeSearchResultsDetails';
   static const settings = 'settings';
   static const suggestion = 'suggestion';
 }

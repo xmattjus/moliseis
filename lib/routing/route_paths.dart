@@ -4,7 +4,7 @@ abstract class RoutePaths {
   static const favourites = '/favourites';
   static const gallery = '/gallery';
   static const geoMap = '/map';
-  static const home = '/';
+  static const home = '/home';
   static const homeSearchResults = 'search_results/:query';
   static const settings = '/settings';
   static const sync = '/sync';

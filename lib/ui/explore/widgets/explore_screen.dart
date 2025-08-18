@@ -174,7 +174,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         widget.eventViewModel.next,
                         onPressed: (content) {
                           GoRouter.of(context).goNamed(
-                            RouteNames.homeStory,
+                            RouteNames.homeDetails,
                             pathParameters: {'id': content.remoteId.toString()},
                             queryParameters: {
                               'isEvent': (content is EventContent
@@ -208,7 +208,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
                   final length = widget.eventViewModel.nextIds.length;
 
-                  return WindowSizeProvider.of(context).isMobile
+                  return WindowSizeProvider.of(context).isCompact
                       ? SkeletonContentList.sliver(itemCount: length)
                       : SkeletonContentGrid.sliver(itemCount: length);
                 },
@@ -249,7 +249,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       widget.exploreViewModel.latest,
                       onPressed: (content) {
                         GoRouter.of(context).goNamed(
-                          RouteNames.homeStory,
+                          RouteNames.homeDetails,
                           pathParameters: {'id': content.remoteId.toString()},
                           queryParameters: {
                             'isEvent': (content is EventContent
@@ -282,7 +282,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
                   final length = widget.exploreViewModel.latestIds.length;
 
-                  return WindowSizeProvider.of(context).isMobile
+                  return WindowSizeProvider.of(context).isCompact
                       ? SkeletonContentList.sliver(itemCount: length)
                       : SkeletonContentGrid.sliver(itemCount: length);
                 },

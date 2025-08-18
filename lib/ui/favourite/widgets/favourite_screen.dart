@@ -50,7 +50,7 @@ class FavouriteScreen extends StatelessWidget {
                       viewModel.favouriteEvents + viewModel.favouritePlaces,
                       onPressed: (content) {
                         GoRouter.of(context).goNamed(
-                          RouteNames.favouritesStory,
+                          RouteNames.favouritesDetails,
                           pathParameters: {'id': content.remoteId.toString()},
                           queryParameters: {
                             'isEvent': (content is EventContent
@@ -82,7 +82,7 @@ class FavouriteScreen extends StatelessWidget {
                     viewModel.favouriteEventIds.length +
                     viewModel.favouritePlaceIds.length;
 
-                return WindowSizeProvider.of(context).isMobile
+                return WindowSizeProvider.of(context).isCompact
                     ? SkeletonContentList.sliver(itemCount: length)
                     : SkeletonContentGrid.sliver(itemCount: length);
               },

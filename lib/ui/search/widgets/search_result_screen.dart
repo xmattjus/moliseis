@@ -113,7 +113,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     }
 
     GoRouter.of(context).goNamed(
-      RouteNames.homeSearchResultsDetail,
+      RouteNames.homeSearchResultsDetails,
       pathParameters: {
         'query': widget.query,
         'id': content.remoteId.toString(),
