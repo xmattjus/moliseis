@@ -5,6 +5,7 @@ import 'package:moliseis/domain/models/core/content_category.dart';
 import 'package:moliseis/domain/models/event/event_content.dart';
 import 'package:moliseis/domain/models/place/place_content.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/category/widgets/category_button.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
@@ -13,11 +14,13 @@ import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
+import 'package:moliseis/ui/core/ui/url_text_button.dart';
 import 'package:moliseis/ui/detail/view_models/detail_view_model.dart';
 import 'package:moliseis/ui/detail/widgets/detail_description.dart';
 import 'package:moliseis/ui/detail/widgets/detail_geo_map_preview.dart';
 import 'package:moliseis/ui/detail/widgets/detail_image_slideshow.dart';
 import 'package:moliseis/ui/detail/widgets/information_card.dart';
+import 'package:moliseis/ui/detail/widgets/information_grid.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/constants.dart';
@@ -172,50 +175,55 @@ class _DetailScreenState extends State<DetailScreen> {
                         ],
                       ),
                     ),
-                    if (content is EventContent)
-                      _pad(
-                        SliverToBoxAdapter(
-                          child: InformationCard(
-                            leading: const Icon(Icons.calendar_month_outlined),
-                            title: Text(
-                              localizations.formatFullDate(content.startDate),
+                    _pad(
+                      InformationGrid.sliver(
+                        children: <Widget>[
+                          if (content.coordinates.length == 2 &&
+                              content.coordinates.first != 0 &&
+                              content.coordinates.last != 0)
+                            ListenableBuilder(
+                              listenable: widget.viewModel.loadStreetAddress,
+                              builder: (context, child) {
+                                return InformationCard(
+                                  top: const Text('Indirizzo'),
+                                  leading: const Icon(Icons.place_outlined),
+                                  title: Text(
+                                    widget.viewModel.streetAddress,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                  ),
+                                  subtitle: UrlTextButton(
+                                    onPressed: () {
+                                      context
+                                          .read<AppUrlLauncher>()
+                                          .openStreetMapWebsite();
+                                    },
+                                    label: const Text(
+                                      '© OpenStreetMap contributors',
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                            subtitle: Text(
-                              localizations.formatTimeOfDay(
-                                TimeOfDay.fromDateTime(content.startDate),
+                          if (content is EventContent)
+                            InformationCard(
+                              top: const Text('Data di inizio'),
+                              leading: const Icon(
+                                Icons.calendar_month_outlined,
+                              ),
+                              title: Text(
+                                localizations.formatFullDate(content.startDate),
+                              ),
+                              subtitle: Text(
+                                localizations.formatTimeOfDay(
+                                  TimeOfDay.fromDateTime(content.startDate),
+                                ),
                               ),
                             ),
-                            enableSkeletonizer: false,
-                          ),
-                        ),
+                        ],
                       ),
-                    if (content.coordinates.length == 2 &&
-                        content.coordinates.first != 0)
-                      _pad(
-                        SliverToBoxAdapter(
-                          child: ListenableBuilder(
-                            listenable: widget.viewModel.loadStreetAddress,
-                            builder: (context, child) {
-                              return InformationCard(
-                                leading: const Icon(Icons.place_outlined),
-                                title: Text(
-                                  widget.viewModel.loadStreetAddress.running
-                                      ? 'Pippo Baudo in concerto, Via Roma 1, Campobasso'
-                                      : widget.viewModel.streetAddress,
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                subtitle: Text(
-                                  'Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                useBoldSubtitle: false,
-                                enableSkeletonizer:
-                                    widget.viewModel.loadStreetAddress.running,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
+                    ),
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       sliver: DetailDescription.sliver(content: content),
@@ -298,8 +306,10 @@ class _DetailScreenState extends State<DetailScreen> {
   void _buildCategoriesRoute(ContentCategory category) {
     String? nextRouteName;
 
-    if (_currentUri.startsWith('/favourites/')) {
+    if (_currentUri.startsWith(RoutePaths.favourites)) {
       nextRouteName = RouteNames.favouritesCategory;
+    } else if (_currentUri.startsWith(RoutePaths.events)) {
+      nextRouteName = RouteNames.eventsCategory;
     } else {
       nextRouteName = RouteNames.homeCategory;
     }
@@ -324,16 +334,21 @@ class _DetailScreenState extends State<DetailScreen> {
     String? nextRoute;
     var indexNecessary = false;
 
-    if (_currentUri.startsWith('/favourites/category/')) {
-      nextRoute = RouteNames.favouritesCategoryDetail;
+    if (_currentUri.startsWith('${RoutePaths.events}/category')) {
+      nextRoute = RouteNames.eventsCategoryDetails;
       indexNecessary = true;
-    } else if (_currentUri.startsWith('/category/')) {
-      nextRoute = RouteNames.homeCategoryDetail;
+    } else if (_currentUri.startsWith('${RoutePaths.favourites}/category')) {
+      nextRoute = RouteNames.favouritesCategoryDetails;
       indexNecessary = true;
-    } else if (_currentUri.startsWith('/favourites/')) {
-      nextRoute = RouteNames.favouritesStory;
-    } else if (_currentUri.startsWith('/')) {
-      nextRoute = RouteNames.homeStory;
+    } else if (_currentUri.startsWith('${RoutePaths.home}/category')) {
+      nextRoute = RouteNames.homeCategoryDetails;
+      indexNecessary = true;
+    } else if (_currentUri.startsWith(RoutePaths.events)) {
+      nextRoute = RouteNames.eventsDetails;
+    } else if (_currentUri.startsWith(RoutePaths.favourites)) {
+      nextRoute = RouteNames.favouritesDetails;
+    } else if (_currentUri.startsWith(RoutePaths.home)) {
+      nextRoute = RouteNames.homeDetails;
     }
 
     if (nextRoute != null) {
