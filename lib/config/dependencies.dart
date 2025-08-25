@@ -19,7 +19,7 @@ import 'package:moliseis/data/repositories/settings/settings_repository_local.da
 import 'package:moliseis/data/repositories/suggestion/suggestion_repository.dart';
 import 'package:moliseis/data/repositories/suggestion/suggestion_repository_remote.dart';
 import 'package:moliseis/data/services/remote/cloudinary_client.dart';
-import 'package:moliseis/data/services/remote/openstreetmap_client.dart';
+import 'package:moliseis/data/services/remote/openstreetmap/openstreetmap_client.dart';
 import 'package:moliseis/domain/models/city/city_supabase_table.dart';
 import 'package:moliseis/domain/models/event/event_supabase_table.dart';
 import 'package:moliseis/domain/models/media/media_supabase_table.dart';
