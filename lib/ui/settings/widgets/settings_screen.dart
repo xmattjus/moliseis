@@ -1,8 +1,8 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:moliseis/domain/models/settings/theme_brightness.dart';
+import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
@@ -31,16 +31,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion(
-      value: SystemUiOverlayStyle(
-        systemNavigationBarColor: Theme.of(context).colorScheme.surface,
-        systemNavigationBarDividerColor: Theme.of(context).colorScheme.surface,
-        systemNavigationBarIconBrightness: switch (Theme.of(
-          context,
-        ).brightness) {
-          Brightness.dark => Brightness.light,
-          Brightness.light => Brightness.dark,
-        },
-      ),
+      value: SystemUiOverlayStyles(context).surface,
       child: Scaffold(
         appBar: AppBar(
           leading: const CustomBackButton(),

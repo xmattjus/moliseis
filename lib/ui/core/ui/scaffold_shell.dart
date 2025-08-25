@@ -2,8 +2,8 @@
 // https://github.com/flutter/packages/blob/main/packages/go_router/example/lib/stateful_shell_route.dart
 
 import 'package:flutter/material.dart' hide kBottomNavigationBarHeight;
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/utils/constants.dart';
 
 class ScaffoldShell extends StatelessWidget {
@@ -18,20 +18,7 @@ class ScaffoldShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion(
-      value: SystemUiOverlayStyle(
-        systemNavigationBarColor: Theme.of(
-          context,
-        ).colorScheme.surfaceContainer,
-        systemNavigationBarDividerColor: Theme.of(
-          context,
-        ).colorScheme.surfaceContainer,
-        systemNavigationBarIconBrightness: switch (Theme.of(
-          context,
-        ).brightness) {
-          Brightness.dark => Brightness.light,
-          Brightness.light => Brightness.dark,
-        },
-      ),
+      value: SystemUiOverlayStyles(context).surfaceWithNavigationBar,
       child: Scaffold(
         body: _navigationShell,
         bottomNavigationBar: NavigationBar(
