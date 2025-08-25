@@ -5,7 +5,9 @@ import 'package:moliseis/ui/core/ui/bottom_sheet_adaptive_title.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_drag_handle.dart';
 import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
+import 'package:moliseis/ui/core/ui/window_size_provider.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 
 class EventBottomSheetContent extends StatelessWidget {
@@ -22,52 +24,56 @@ class EventBottomSheetContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      expand: false,
-      builder: (context, scrollController) {
-        final command = viewModel.loadByDate;
+    return AutoWindowSizeProvider(
+      child: DraggableScrollableSheet(
+        expand: false,
+        builder: (context, scrollController) {
+          final command = viewModel.loadByDate;
 
-        return CustomScrollView(
-          controller: scrollController,
-          slivers: <Widget>[
-            SliverList.list(
-              children: <Widget>[
-                const BottomSheetDragHandle(),
-                BottomSheetAdaptiveTitle(
-                  'Eventi del ${selectedDate.day} ${localizedMonths[selectedDate.month - 1]}',
-                ),
-              ],
-            ),
-            ListenableBuilder(
-              listenable: command,
-              builder: (context, child) {
-                if (command.completed) {
-                  final events = viewModel.byMonth;
+          return CustomScrollView(
+            controller: scrollController,
+            slivers: <Widget>[
+              SliverList.list(
+                children: <Widget>[
+                  const BottomSheetDragHandle(),
+                  BottomSheetAdaptiveTitle(
+                    'Eventi del ${selectedDate.day} ${localizedMonths[selectedDate.month - 1]}',
+                  ),
+                ],
+              ),
+              ListenableBuilder(
+                listenable: command,
+                builder: (context, child) {
+                  if (command.completed) {
+                    final events = viewModel.byMonth;
 
-                  if (events.isEmpty) {
-                    return const EmptyView(
-                      text: Text('Nessun evento trovato per questa data.'),
+                    if (events.isEmpty) {
+                      return const EmptyView(
+                        text: Text('Nessun evento trovato per questa data.'),
+                      );
+                    }
+
+                    return ContentAdaptiveListGridView(
+                      events,
+                      onPressed: (content) {
+                        GoRouter.of(context).goNamed(
+                          RouteNames.eventsDetails,
+                          pathParameters: {'id': content.remoteId.toString()},
+                          queryParameters: {'isEvent': 'true'},
+                        );
+                      },
                     );
                   }
 
-                  return ContentAdaptiveListGridView(
-                    events,
-                    onPressed: (content) {
-                      GoRouter.of(context).goNamed(
-                        RouteNames.eventsDetails,
-                        pathParameters: {'id': content.remoteId.toString()},
-                        queryParameters: {'isEvent': 'true'},
-                      );
-                    },
-                  );
-                }
-
-                return const SkeletonContentList.sliver(itemCount: 3);
-              },
-            ),
-          ],
-        );
-      },
+                  return WindowSizeProvider.of(context).isCompact
+                      ? const SkeletonContentList.sliver(itemCount: 3)
+                      : const SkeletonContentGrid.sliver(itemCount: 3);
+                },
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
