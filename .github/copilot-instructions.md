@@ -32,3 +32,5 @@ This project is a multi-platform application that allows users to explore the Mo
 - Use `dart format` to format the code.
 - Comments should be clear and concise, explaining the why behind the code rather than the what.
 - Comments should be contained within the code blocks.
+- Constructor parameters must be placed above the constructor body.
+- Internal variables should be prefixed with an underscore and must be placed below the constructor body.
