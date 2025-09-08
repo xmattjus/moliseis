@@ -1,6 +1,7 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
+import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/settings/theme_brightness.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
@@ -8,7 +9,6 @@ import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
-import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/theme_extensions.dart';
 // import 'package:moliseis/features/settings/domain/theme_type.dart';
 import 'package:provider/provider.dart';
@@ -173,15 +173,15 @@ class SettingsScreen extends StatelessWidget {
             ListTile(
               title: const Text('Termini di Servizio'),
               onTap: () async {
-                final urlLauncher = context.read<AppUrlLauncher>();
-                await urlLauncher.termsOfService();
+                final urlLauncher = context.read<UrlLaunchService>();
+                await urlLauncher.openTermsOfService();
               },
             ),
             ListTile(
               title: const Text('Informativa sulla privacy'),
               onTap: () async {
-                final urlLauncher = context.read<AppUrlLauncher>();
-                await urlLauncher.privacyPolicy();
+                final urlLauncher = context.read<UrlLaunchService>();
+                await urlLauncher.openPrivacyPolicy();
               },
             ),
           ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/ui/category/widgets/category_chip.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
@@ -7,7 +8,6 @@ import 'package:moliseis/ui/suggestion/widgets/checkbox_form_field.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_date_chip.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_image_gallery.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_send_button.dart';
-import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:provider/provider.dart';
 
 class SuggestionScreen extends StatefulWidget {
@@ -278,8 +278,9 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                                         child: InkWell(
                                           onTap: () async {
                                             final urlLauncher = context
-                                                .read<AppUrlLauncher>();
-                                            await urlLauncher.termsOfService();
+                                                .read<UrlLaunchService>();
+                                            await urlLauncher
+                                                .openTermsOfService();
                                           },
                                           child: const Text(
                                             'Termini di Servizio',
@@ -301,8 +302,9 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                                         child: InkWell(
                                           onTap: () async {
                                             final urlLauncher = context
-                                                .read<AppUrlLauncher>();
-                                            await urlLauncher.privacyPolicy();
+                                                .read<UrlLaunchService>();
+                                            await urlLauncher
+                                                .openPrivacyPolicy();
                                           },
                                           child: const Text(
                                             'Informativa sulla privacy',

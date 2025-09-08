@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/url_text_button.dart';
-import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
 
@@ -22,7 +22,9 @@ class GeoMapAttribution extends StatelessWidget {
           children: <Widget>[
             UrlTextButton.icon(
               onPressed: () async {
-                if (!await context.read<AppUrlLauncher>().mapTilerWebsite()) {
+                if (!await context
+                    .read<UrlLaunchService>()
+                    .openMapTilerWebsite()) {
                   if (context.mounted) {
                     showSnackBar(
                       context: context,
@@ -39,8 +41,8 @@ class GeoMapAttribution extends StatelessWidget {
             UrlTextButton(
               onPressed: () async {
                 if (!await context
-                    .read<AppUrlLauncher>()
-                    .openStreetMapWebsite()) {
+                    .read<UrlLaunchService>()
+                    .openOpenStreetMapWebsite()) {
                   if (context.mounted) {
                     showSnackBar(
                       context: context,

@@ -50,7 +50,9 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
         iconSize: 18.0,
         onPressed: licenseUrl.isNotEmpty
             ? () async {
-                if (!await context.read<AppUrlLauncher>().generic(licenseUrl)) {
+                if (!await context.read<UrlLaunchService>().launchGenericUrl(
+                  licenseUrl,
+                )) {
                   if (context.mounted) {
                     showSnackBar(
                       context: context,

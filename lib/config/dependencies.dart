@@ -18,8 +18,12 @@ import 'package:moliseis/data/repositories/settings/settings_repository.dart';
 import 'package:moliseis/data/repositories/settings/settings_repository_local.dart';
 import 'package:moliseis/data/repositories/suggestion/suggestion_repository.dart';
 import 'package:moliseis/data/repositories/suggestion/suggestion_repository_remote.dart';
+import 'package:moliseis/data/services/app_info_service.dart';
+import 'package:moliseis/data/services/external_url_service.dart';
+import 'package:moliseis/data/services/map_url_service.dart';
 import 'package:moliseis/data/services/remote/cloudinary_client.dart';
 import 'package:moliseis/data/services/remote/openstreetmap/openstreetmap_client.dart';
+import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/city/city_supabase_table.dart';
 import 'package:moliseis/domain/models/event/event_supabase_table.dart';
 import 'package:moliseis/domain/models/media/media_supabase_table.dart';
@@ -32,7 +36,6 @@ import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
-import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -162,8 +165,33 @@ List<SingleChildWidget> get providers {
     ),
     //#endregion
 
+    //#region URL Services
+    Provider<ExternalUrlService>(
+      create: (_) => ExternalUrlService(),
+      lazy: true,
+    ),
+    Provider<AppInfoService>(
+      create: (context) => AppInfoService(
+        externalUrlService: context.read<ExternalUrlService>(),
+      ),
+      lazy: true,
+    ),
+    Provider<MapUrlService>(
+      create: (context) =>
+          MapUrlService(externalUrlService: context.read<ExternalUrlService>()),
+      lazy: true,
+    ),
+    Provider<UrlLaunchService>(
+      create: (context) => UrlLaunchService(
+        externalUrlService: context.read<ExternalUrlService>(),
+        appInfoService: context.read<AppInfoService>(),
+        mapUrlService: context.read<MapUrlService>(),
+      ),
+      lazy: true,
+    ),
+    //#endregion
+
     //#region Other
-    Provider<AppUrlLauncher>(create: (_) => AppUrlLauncher(), lazy: true),
     Provider<StreamController<Widget>>(
       create: (_) => StreamController<Widget>.broadcast(),
       lazy: true,

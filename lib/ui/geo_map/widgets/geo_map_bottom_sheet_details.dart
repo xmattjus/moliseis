@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
@@ -12,7 +13,6 @@ import 'package:moliseis/ui/detail/widgets/detail_description.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
-import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
 
@@ -82,7 +82,7 @@ class GeoMapBottomSheetDetails extends StatelessWidget {
             FavouriteButton.wide(content: content),
             OutlinedButton.icon(
               onPressed: () async {
-                if (!await context.read<AppUrlLauncher>().googleMaps(
+                if (!await context.read<UrlLaunchService>().openGoogleMaps(
                   content.name,
                   content.city.target?.name ?? 'Molise',
                 )) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:logging/logging.dart';
+import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/media/media.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/themes/theme_data.dart';
@@ -11,7 +12,6 @@ import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
 import 'package:moliseis/ui/core/ui/url_text_button.dart';
-import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 

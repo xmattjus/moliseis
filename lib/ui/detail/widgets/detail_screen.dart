@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/domain/models/core/content_category.dart';
 import 'package:moliseis/domain/models/event/event_content.dart';
@@ -146,8 +147,8 @@ class _DetailScreenState extends State<DetailScreen> {
                           OutlinedButton.icon(
                             onPressed: () async {
                               if (!await context
-                                  .read<AppUrlLauncher>()
-                                  .googleMaps(
+                                  .read<UrlLaunchService>()
+                                  .openGoogleMaps(
                                     content.name,
                                     content.city.target?.name ?? 'Molise',
                                   )) {
