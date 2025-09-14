@@ -5,7 +5,7 @@ import 'package:moliseis/domain/models/event/event.dart';
 import 'package:moliseis/utils/result.dart';
 
 abstract class EventRepository extends RepositoryBase {
-  Future<Result<List<Event>>> getAll({ContentSort sort = ContentSort.byName});
+  Future<Result<List<Event>>> getByCurrentYear();
 
   Future<Result<List<Event>>> getByDate(DateTime date);
 

@@ -17,12 +17,10 @@ class ExploreUseCase {
   }) : _eventRepository = eventRepository,
        _placeRepository = placeRepository;
 
-  Future<Result<List<EventContent>>> getAllEvents([
-    ContentSort sort = ContentSort.byName,
-  ]) async {
+  Future<Result<List<EventContent>>> getAllEvents() async {
     final list = <EventContent>[];
 
-    final result = await _eventRepository.getAll(sort: sort);
+    final result = await _eventRepository.getByCurrentYear();
 
     switch (result) {
       case Success<List<Event>>():

@@ -27,14 +27,49 @@ class EventRepositoryLocal implements EventRepository {
 
   List<Event>? _cache;
 
-  @override
-  Future<Result<List<Event>>> getAll({
-    ContentSort sort = ContentSort.byName,
-  }) async {
-    try {
-      final results = _cache ??= await _eventBox.getAllAsync();
+  Future<Result<List<Event>>> _getByCurrentYear() async {
+    Query<Event>? query;
 
+    try {
+      final today = DateTime.now();
+
+      final startDate = DateTime(today.year);
+      final endDate = DateTime(today.year, 12, 31, 23, 59, 59);
+
+      final builder = _eventBox
+          .query(
+            Event_.startDate
+                .greaterOrEqualDate(startDate)
+                .and(Event_.startDate.lessThanDate(endDate)),
+          )
+          .order(Event_.startDate, flags: Order.unsigned);
+      query = builder.build();
+      final results = await query.findAsync();
       return Result.success(results);
+    } on Exception catch (error) {
+      return Result.error(error);
+    } finally {
+      query?.close();
+    }
+  }
+
+  @override
+  Future<Result<List<Event>>> getByCurrentYear() async {
+    try {
+      // Do not query the database again if the events are already cached.
+      if (_cache != null) {
+        return Result.success(_cache!);
+      }
+
+      final result = await _getByCurrentYear();
+
+      switch (result) {
+        case Success<List<Event>>():
+          _cache = result.value;
+          return Result.success(_cache!);
+        case Error<List<Event>>():
+          return Result.error(result.error);
+      }
     } on Exception catch (error, stackTrace) {
       _log.severe(
         'An exception occurred while getting all events.',
