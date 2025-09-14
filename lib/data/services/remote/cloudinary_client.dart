@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:cloudinary_api/src/request/model/uploader_params.dart'
@@ -8,6 +9,7 @@ import 'package:cloudinary_url_gen/transformation/delivery/delivery.dart';
 import 'package:cloudinary_url_gen/transformation/delivery/delivery_actions.dart';
 import 'package:cloudinary_url_gen/transformation/transformation.dart';
 import 'package:logging/logging.dart';
+import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
@@ -28,14 +30,20 @@ class CloudinaryClient {
 
   Future<Result<String>> uploadImage(File image) async {
     try {
-      final result = await _cloudinary.uploader().upload(
-        image,
-        params: UploadParams(
-          transformation: Transformation().delivery(
-            Delivery.quality(Quality.autoEco()),
-          ),
-        ),
-      );
+      final result = await _cloudinary
+          .uploader()
+          .upload(
+            image,
+            params: UploadParams(
+              transformation: Transformation().delivery(
+                Delivery.quality(Quality.autoEco()),
+              ),
+              extraHeaders: {
+                'User-Agent': 'com.benitomatteobercini.moliseis/2.0',
+              },
+            ),
+          )
+          ?.timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 
       if (result != null) {
         if (result.data != null) {
@@ -52,6 +60,9 @@ class CloudinaryClient {
       } else {
         throw const CloudinaryNullResponseException();
       }
+    } on TimeoutException catch (error) {
+      _log.severe(const NetworkTimeoutException());
+      return Result.error(error);
     } on Exception catch (error, stackTrace) {
       _log.severe(
         'An exception occurred while uploading the image.',

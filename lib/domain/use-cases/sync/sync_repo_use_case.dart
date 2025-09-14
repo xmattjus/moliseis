@@ -3,6 +3,8 @@ import 'package:moliseis/data/repositories/event/event_repository.dart';
 import 'package:moliseis/data/repositories/media/media_repository.dart';
 import 'package:moliseis/data/repositories/place/place_repository.dart';
 import 'package:moliseis/data/repositories/settings/settings_repository.dart';
+import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SynchronizeRepositoriesUseCase {
@@ -25,22 +27,28 @@ class SynchronizeRepositoriesUseCase {
   final SettingsRepository _settingsRepository;
 
   Future<Result<void>> start() async {
-    // The number of synchronization tasks to execute.
-    const syncTasks = 4;
+    // A list of the repositories to synchronize with the backend.
+    final repositoriesToSynchronize = [
+      _cityRepository.synchronize(),
+      _placeRepository.synchronize(),
+      _eventRepository.synchronize(),
+      _mediaRepository.synchronize(),
+    ];
 
-    for (int i = 0; i < syncTasks; i++) {
-      final result = switch (i) {
-        0 => await _cityRepository.synchronize(),
-        1 => await _placeRepository.synchronize(),
-        2 => await _eventRepository.synchronize(),
-        3 => await _mediaRepository.synchronize(),
-        int() => UnimplementedError(),
-      };
+    for (int i = 0; i < repositoriesToSynchronize.length; i++) {
+      final result = await repositoriesToSynchronize[i].timeout(
+        const Duration(seconds: kDefaultNetworkTimeoutSeconds),
+        onTimeout: () {
+          return const Result.error(NetworkTimeoutException());
+        },
+      );
+
       if (result is Error) {
         return Result.error(result.error);
       }
     }
 
+    // If all repositories synchronized successfully, update the last sync time.
     _settingsRepository.setModifiedAt(DateTime.now());
 
     return const Result.success(null);

@@ -1,8 +1,11 @@
+import 'dart:async' show TimeoutException;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/remote/openstreetmap/geocoding_address.dart';
 import 'package:moliseis/data/services/remote/openstreetmap/reverse_geocoding_response.dart';
+import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Uses OpenStreetMap Nominatim service for reverse geocoding.
@@ -21,13 +24,15 @@ class OpenStreetMapClient {
         "lat=$latitude&lon=$longitude",
       );
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'com.benitomatteobercini.moliseis/2.0',
-        },
-      );
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'com.benitomatteobercini.moliseis/2.0',
+            },
+          )
+          .timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 
       if (response.statusCode == 200) {
         final jsonData = ReverseGeocodingResponse.fromJson(
@@ -44,6 +49,9 @@ class OpenStreetMapClient {
           'HTTP ${response.statusCode}: ${response.reasonPhrase}',
         );
       }
+    } on TimeoutException catch (error) {
+      _log.warning(const NetworkTimeoutException());
+      return Result.error(error);
     } on Exception catch (error, stackTrace) {
       _log.warning(
         'An exception occurred while getting address from coordinates.',

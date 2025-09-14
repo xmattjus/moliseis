@@ -57,3 +57,12 @@ class PlaceNullException implements Exception {
     return 'No Place with remote ID: $id has been found in the Places box.';
   }
 }
+
+class NetworkTimeoutException implements Exception {
+  const NetworkTimeoutException();
+
+  @override
+  String toString() {
+    return 'Network request timed out after 10 seconds.';
+  }
+}

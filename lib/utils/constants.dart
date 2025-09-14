@@ -2,6 +2,8 @@ const double kGridViewCardWidth = 252.0;
 
 const double kGridViewCardHeight = 196.0;
 
+const double kInformationCardHeight = kGridViewCardHeight * 0.7;
+
 const double kButtonHeight = 40.0;
 
 const double kNavigationBarHeight = 80.0;
@@ -18,3 +20,5 @@ const int kcategoryScreenNoIndex = -1;
 
 const String kAssetMapTilerIconPath =
     'assets/icons/maptiler-icon-dark_64x69_optimized.png';
+
+const int kDefaultNetworkTimeoutSeconds = 10;
