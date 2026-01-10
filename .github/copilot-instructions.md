@@ -1,8 +1,14 @@
-# Project Overview
+---
+applyTo: '**'
+---
+
+### Project Overview
 
 This project is a multi-platform application that allows users to explore the Molise region in Italy. It is built using Flutter, uses ObjectBox for local data storage, and integrates with the Supabase backend for remote data access.
 
-## Folder Structure
+---
+
+#### 1. Folder Structure
 
 - `/config`: Contains the source code for dependency injection.
 - `/data`: Contains the source code for the business logic.
@@ -11,26 +17,30 @@ This project is a multi-platform application that allows users to explore the Mo
 - `/routing`: Contains the source code for the UI routing logic.
 - `/ui`: Contains the source code for the UI.
 
-## Libraries and Frameworks
+#### 2. Libraries and Frameworks
 
 - Flutter and Dart for the frontend and business logic.
 - ObjectBox for local data storage.
 - Supabase for remote data access.
 - Sentry for error tracking and monitoring.
 
-## Coding Guidelines
+#### 3. Coding Patterns
 
-- Follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/#summary) specification for commit messages.
-- Follow the MVVM (Model-View-ViewModel) architecture pattern.
+- Use the `Provider` package for dependency injection and state management.
 - Use the `Repository` pattern for data access.
-- Use the `Command` and `Result` pattern for actions that can be executed asynchronously, such actions must be placed in the appropriate ViewModel.
-# - Write unit tests for all new features and bug fixes.
-- Use descriptive names and follow the naming conventions for variables, functions, and classes.
-- Keep the widget tree as flat as possible to improve performance.
+- Use the `Command` and `Result` pattern for actions that can be executed asynchronously.
+
+#### 4. Coding Standards
+
+- Follow the MVVM (Model-View-ViewModel) architecture pattern.
 - Use const constructors whenever possible.
-- Use `dart fix --apply` to fix lint issues.
-- Use `dart format` to format the code.
 - Comments should be clear and concise, explaining the why behind the code rather than the what.
 - Comments should be contained within the code blocks.
 - Constructor parameters must be placed above the constructor body.
 - Internal variables should be prefixed with an underscore and must be placed below the constructor body.
+
+#### 5. Commit Message Format
+*   When providing a commit message, use the [Conventional Commits](
+https://www.conventionalcommits.org
+) format: `type(scope): summary`.
+*   **Examples:** `feat(auth): add password reset endpoint`, `fix(api): correct error status code`.
