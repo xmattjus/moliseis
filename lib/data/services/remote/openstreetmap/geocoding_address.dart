@@ -20,7 +20,7 @@ class GeocodingAddress {
   final String state;
   @JsonKey(name: 'ISO3166-2-lvl4')
   final String iso3166_2_lvl4;
-  final String postcode;
+  final String? postcode;
   final String country;
   @JsonKey(name: 'country_code')
   final String countryCode;
@@ -36,7 +36,7 @@ class GeocodingAddress {
     required this.iso3166_2_lvl6,
     required this.state,
     required this.iso3166_2_lvl4,
-    required this.postcode,
+    this.postcode,
     required this.country,
     required this.countryCode,
   });

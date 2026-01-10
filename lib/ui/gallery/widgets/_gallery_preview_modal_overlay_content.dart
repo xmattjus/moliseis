@@ -74,24 +74,15 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+      children: <Widget>[
         const CustomAppBar(
           title: Text('Anteprima'),
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-          ),
           showBackButton: true,
           backButtonBgColor: Colors.transparent,
         ),
-        DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: <Color>[Colors.black54, Colors.transparent],
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-            ),
-          ),
+        LinearGradientBackground(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
           child: SafeArea(
             top: false,
             child: Padding(

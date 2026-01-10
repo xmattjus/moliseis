@@ -35,7 +35,7 @@ class EventViewModel extends ChangeNotifier {
   UnmodifiableListView<int> get nextIds => UnmodifiableListView(_nextIds);
 
   Future<Result<void>> _loadAll() async {
-    final result = await _eventRepository.getAll();
+    final result = await _eventRepository.getByCurrentYear();
 
     switch (result) {
       case Success<List<Event>>():

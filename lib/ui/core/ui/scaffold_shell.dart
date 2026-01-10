@@ -18,7 +18,7 @@ class ScaffoldShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion(
-      value: SystemUiOverlayStyles(context).surfaceWithNavigationBar,
+      value: SystemUiOverlayStyles(context).scaffoldShell,
       child: Scaffold(
         body: _navigationShell,
         bottomNavigationBar: NavigationBar(

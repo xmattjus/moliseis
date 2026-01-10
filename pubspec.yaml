@@ -3,7 +3,7 @@ description: "La prima app multipiattaforma per il turismo in Molise."
 
 publish_to: 'none'
 
-version: 2.0.0+7
+version: 2.1.0+8
 
 environment:
   sdk: ^3.10.7

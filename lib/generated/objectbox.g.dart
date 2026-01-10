@@ -140,6 +140,7 @@ final _entities = <obx_int.ModelEntity>[
         type: 11,
         flags: 520,
         indexId: const obx_int.IdUid(36, 9013254662882675406),
+        relationField: 'city',
         relationTarget: 'City',
       ),
       obx_int.ModelProperty(
@@ -296,6 +297,7 @@ final _entities = <obx_int.ModelEntity>[
         type: 11,
         flags: 520,
         indexId: const obx_int.IdUid(31, 5776771134122569850),
+        relationField: 'event',
         relationTarget: 'Event',
       ),
       obx_int.ModelProperty(
@@ -304,6 +306,7 @@ final _entities = <obx_int.ModelEntity>[
         type: 11,
         flags: 520,
         indexId: const obx_int.IdUid(32, 1172106281265160496),
+        relationField: 'place',
         relationTarget: 'Place',
       ),
       obx_int.ModelProperty(
@@ -379,6 +382,7 @@ final _entities = <obx_int.ModelEntity>[
         type: 11,
         flags: 520,
         indexId: const obx_int.IdUid(35, 8824042754856611254),
+        relationField: 'city',
         relationTarget: 'City',
       ),
       obx_int.ModelProperty(
@@ -448,6 +452,11 @@ Future<obx.Store> openStore({
 /// [obx.Store.new].
 obx_int.ModelDefinition getObjectBoxModel() {
   final model = obx_int.ModelInfo(
+    // If this version is not found, it means that this file was generated
+    // with an older version of the ObjectBox Dart generator.
+    // Please regenerate this file with the current generator version.
+    // Typically, this is done with `dart run build_runner build`.
+    generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
     lastEntityId: const obx_int.IdUid(14, 7448834948269191750),
     lastIndexId: const obx_int.IdUid(43, 5036267638047410142),

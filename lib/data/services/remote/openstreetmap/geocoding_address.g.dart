@@ -18,7 +18,7 @@ GeocodingAddress _$GeocodingAddressFromJson(Map<String, dynamic> json) =>
       iso3166_2_lvl6: json['ISO3166-2-lvl6'] as String,
       state: json['state'] as String,
       iso3166_2_lvl4: json['ISO3166-2-lvl4'] as String,
-      postcode: json['postcode'] as String,
+      postcode: json['postcode'] as String?,
       country: json['country'] as String,
       countryCode: json['country_code'] as String,
     );

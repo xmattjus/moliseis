@@ -16,9 +16,11 @@ class EventContent extends ContentBase {
     required super.remoteId,
     required super.isSaved,
     required this.startDate,
+    this.endDate,
   });
 
   final DateTime startDate;
+  final DateTime? endDate;
 
   factory EventContent.fromEvent(Event event) => EventContent(
     category: event.category,
@@ -31,6 +33,7 @@ class EventContent extends ContentBase {
     name: event.name!,
     remoteId: event.remoteId,
     startDate: event.startDate!,
+    endDate: event.endDate,
     isSaved: event.isSaved,
   );
 }

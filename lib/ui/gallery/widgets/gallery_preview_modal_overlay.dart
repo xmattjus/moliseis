@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
@@ -11,6 +10,7 @@ import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
+import 'package:moliseis/ui/core/ui/linear_gradient_background.dart';
 import 'package:moliseis/ui/core/ui/url_text_button.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -25,7 +25,7 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion(
-      value: SystemUiOverlayStyles(context).gallerySurface,
+      value: SystemUiOverlayStyles(context).gallery,
       child: Theme(
         data: AppThemeData.photoViewer,
         child: _GalleryPreviewModalOverlayContent(

@@ -1,6 +1,8 @@
 import 'package:moliseis/data/repositories/event/event_repository.dart';
 import 'package:moliseis/data/repositories/geo_map/geo_map_repository.dart';
 import 'package:moliseis/data/repositories/place/place_repository.dart';
+import 'package:moliseis/data/services/remote/open-meteo/hourly_weather_forecast_response.dart';
+import 'package:moliseis/data/services/remote/open-meteo/open_meteo_client.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/domain/models/event/event.dart';
 import 'package:moliseis/domain/models/event/event_content.dart';
@@ -12,13 +14,16 @@ class DetailUseCase {
   final EventRepository _eventRepository;
   final GeoMapRepository _geoMapRepository;
   final PlaceRepository _placeRepository;
+  final OpenMeteoClient _openMeteoClient;
 
   const DetailUseCase({
     required EventRepository eventRepository,
     required GeoMapRepository geoMapRepository,
+    required OpenMeteoClient openMeteoClient,
     required PlaceRepository placeRepository,
   }) : _eventRepository = eventRepository,
        _geoMapRepository = geoMapRepository,
+       _openMeteoClient = openMeteoClient,
        _placeRepository = placeRepository;
 
   Future<Result<ContentBase>> getEventById(int id) async {
@@ -96,5 +101,12 @@ class DetailUseCase {
       case Error<String?>():
         return Result.error(result.error);
     }
+  }
+
+  Future<Result<HourlyWeatherForecastResponse>> getHourlyWeatherForecast(
+    double latitude,
+    double longitude,
+  ) {
+    return _openMeteoClient.getHourlyWeatherForecast(latitude, longitude);
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';
@@ -15,15 +16,13 @@ import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
-import 'package:moliseis/ui/core/ui/url_text_button.dart';
+import 'package:moliseis/ui/core/ui/linear_gradient_background.dart';
 import 'package:moliseis/ui/detail/view_models/detail_view_model.dart';
+import 'package:moliseis/ui/detail/widgets/components/supplementary_information.dart';
 import 'package:moliseis/ui/detail/widgets/detail_description.dart';
 import 'package:moliseis/ui/detail/widgets/detail_geo_map_preview.dart';
 import 'package:moliseis/ui/detail/widgets/detail_image_slideshow.dart';
-import 'package:moliseis/ui/detail/widgets/information_card.dart';
-import 'package:moliseis/ui/detail/widgets/information_grid.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
-import 'package:moliseis/utils/app_url_launcher.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
@@ -59,8 +58,6 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = MaterialLocalizations.of(context);
-
     _currentUri = GoRouterState.of(context).fullPath.toString();
 
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -72,99 +69,101 @@ class _DetailScreenState extends State<DetailScreen> {
             : kStorySlideshowPortraitHeightPerc - 0.2);
 
     return Scaffold(
-      appBar: const CustomAppBar(showBackButton: true),
-      body: SafeArea(
-        top: false,
-        child: ListenableBuilder(
-          listenable: Listenable.merge([
-            widget.viewModel.loadEvent,
-            widget.viewModel.loadPlace,
-          ]),
-          builder: (context, child) {
-            if (widget.viewModel.loadEvent.completed ||
-                widget.viewModel.loadPlace.completed) {
-              final content = widget.viewModel.content is EventContent
-                  ? widget.viewModel.content as EventContent
-                  : widget.viewModel.content as PlaceContent;
+      appBar: const CustomAppBar(
+        showBackButton: true,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+      ),
+      body: Stack(
+        children: [
+          SafeArea(
+            top: false,
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                widget.viewModel.loadEvent,
+                widget.viewModel.loadPlace,
+              ]),
+              builder: (context, child) {
+                if (widget.viewModel.loadEvent.completed ||
+                    widget.viewModel.loadPlace.completed) {
+                  final content = widget.viewModel.content is EventContent
+                      ? widget.viewModel.content as EventContent
+                      : widget.viewModel.content as PlaceContent;
 
-              // Load the street address for the content.
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                widget.viewModel.loadStreetAddress.execute(content.coordinates);
-              });
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      // Make sure to update the ValueNotifier only when needed.
+                      if (_scrollController.position.pixels > trigger &&
+                          _slideshowEnabled) {
+                        _slideshowValueNotifier.value = false;
+                      } else if (_scrollController.position.pixels <= trigger &&
+                          !_slideshowEnabled) {
+                        _slideshowValueNotifier.value = true;
+                      }
 
-              return NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  // Make sure to update the ValueNotifier only when needed.
-                  if (_scrollController.position.pixels > trigger &&
-                      _slideshowEnabled) {
-                    _slideshowValueNotifier.value = false;
-                  } else if (_scrollController.position.pixels <= trigger &&
-                      !_slideshowEnabled) {
-                    _slideshowValueNotifier.value = true;
-                  }
-
-                  // Returning false allows the notification to continue
-                  // bubbling up to ancestor listeners.
-                  return false;
-                },
-                child: CustomScrollView(
-                  controller: _scrollController,
-                  slivers: <Widget>[
-                    SliverToBoxAdapter(
-                      child: AnimatedBuilder(
-                        animation: _slideshowValueNotifier,
-                        builder: (context, child) {
-                          return TickerMode(
-                            enabled: _slideshowEnabled,
-                            child: DetailImageSlideshow(images: content.media),
-                          );
-                        },
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      sliver: SliverToBoxAdapter(
-                        child: ContentNameAndCity(
-                          name: content.name,
-                          cityName: content.city.target?.name,
-                          nameStyle: CustomTextStyles.title(context),
-                          cityNameStyle: CustomTextStyles.subtitle(context),
-                          overflow: TextOverflow.visible,
+                      // Returning false allows the notification to continue
+                      // bubbling up to ancestor listeners.
+                      return false;
+                    },
+                    child: CustomScrollView(
+                      controller: _scrollController,
+                      slivers: <Widget>[
+                        SliverToBoxAdapter(
+                          child: AnimatedBuilder(
+                            animation: _slideshowValueNotifier,
+                            builder: (context, child) {
+                              return TickerMode(
+                                enabled: _slideshowEnabled,
+                                child: DetailImageSlideshow(
+                                  images: content.media,
+                                ),
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: HorizontalButtonList(
-                        padding: const EdgeInsets.all(16.0),
-                        items: <Widget>[
-                          CategoryButton(
-                            onPressed: () {
-                              _buildCategoriesRoute(content.category);
-                            },
-                            contentCategory: content.category,
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          sliver: SliverToBoxAdapter(
+                            child: ContentNameAndCity(
+                              name: content.name,
+                              cityName: content.city.target?.name,
+                              nameStyle: CustomTextStyles.title(context),
+                              cityNameStyle: CustomTextStyles.subtitle(context),
+                              overflow: TextOverflow.visible,
+                            ),
                           ),
-                          FavouriteButton.wide(content: content),
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              if (!await context
-                                  .read<UrlLaunchService>()
-                                  .openGoogleMaps(
-                                    content.name,
-                                    content.city.target?.name ?? 'Molise',
-                                  )) {
-                                if (context.mounted) {
-                                  showSnackBar(
-                                    context: context,
-                                    textContent:
-                                        'Si è verificato un errore, riprova più tardi.',
-                                  );
-                                }
-                              }
-                            },
-                            icon: const Icon(Icons.directions),
-                            label: const Text('Indicazioni'),
-                          ),
-                          /*
+                        ),
+                        SliverToBoxAdapter(
+                          child: HorizontalButtonList(
+                            padding: const EdgeInsets.all(16.0),
+                            items: <Widget>[
+                              CategoryButton(
+                                onPressed: () {
+                                  _buildCategoriesRoute(content.category);
+                                },
+                                contentCategory: content.category,
+                              ),
+                              FavouriteButton.wide(content: content),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  if (!await context
+                                      .read<UrlLaunchService>()
+                                      .openGoogleMaps(
+                                        content.name,
+                                        content.city.target?.name ?? 'Molise',
+                                      )) {
+                                    if (context.mounted) {
+                                      showSnackBar(
+                                        context: context,
+                                        textContent:
+                                            'Si è verificato un errore, riprova più tardi.',
+                                      );
+                                    }
+                                  }
+                                },
+                                icon: const Icon(Icons.directions),
+                                label: const Text('Indicazioni'),
+                              ),
+                              /*
                             OutlinedButton.icon(
                               onPressed: () {
                                 // TODO(xmattjus): share deep link to this screen.
@@ -173,76 +172,29 @@ class _DetailScreenState extends State<DetailScreen> {
                               label: const Text('Condividi'),
                             ),
                              */
-                        ],
-                      ),
-                    ),
-                    _pad(
-                      InformationGrid.sliver(
-                        children: <Widget>[
-                          if (content.coordinates.length == 2 &&
-                              content.coordinates.first != 0 &&
-                              content.coordinates.last != 0)
-                            ListenableBuilder(
-                              listenable: widget.viewModel.loadStreetAddress,
-                              builder: (context, child) {
-                                return InformationCard(
-                                  top: const Text('Indirizzo'),
-                                  leading: const Icon(Icons.place_outlined),
-                                  title: Text(
-                                    widget.viewModel.streetAddress,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodyMedium,
+                            ],
+                          ),
+                        ),
+                        SupplementaryInformation(viewModel: widget.viewModel),
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          sliver: DetailDescription.sliver(content: content),
+                        ),
+                        _pad(
+                          SliverList.list(
+                            children: <Widget>[
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                spacing: 16.0,
+                                children: [
+                                  Text(
+                                    'Mappa',
+                                    style: CustomTextStyles.section(context),
                                   ),
-                                  subtitle: UrlTextButton(
+                                  OutlinedButton.icon(
                                     onPressed: () {
-                                      context
-                                          .read<AppUrlLauncher>()
-                                          .openStreetMapWebsite();
-                                    },
-                                    label: const Text(
-                                      '© OpenStreetMap contributors',
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          if (content is EventContent)
-                            InformationCard(
-                              top: const Text('Data di inizio'),
-                              leading: const Icon(
-                                Icons.calendar_month_outlined,
-                              ),
-                              title: Text(
-                                localizations.formatFullDate(content.startDate),
-                              ),
-                              subtitle: Text(
-                                localizations.formatTimeOfDay(
-                                  TimeOfDay.fromDateTime(content.startDate),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      sliver: DetailDescription.sliver(content: content),
-                    ),
-                    _pad(
-                      SliverList.list(
-                        children: <Widget>[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            spacing: 16.0,
-                            children: [
-                              Text(
-                                'Mappa',
-                                style: CustomTextStyles.section(context),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  /*
+                                      /*
                                   final mapState = GeoMapState(
                                     latitude: content.coordinates[0],
                                     longitude: content.coordinates[1],
@@ -250,55 +202,67 @@ class _DetailScreenState extends State<DetailScreen> {
                                   );
                                   */
 
-                                  // Sets a [UniqueKey] so that go_router
-                                  // can notify [mapState] changes to the next
-                                  // route.
-                                  //
-                                  // Removing the [key] query parameter will
-                                  // prevent state changes for the next route
-                                  // if it is already present in the
-                                  // navigation stack.
-                                  context.goNamed(
-                                    RouteNames.geoMap,
-                                    queryParameters: {
-                                      "key": UniqueKey().toString(),
+                                      // Sets a [UniqueKey] so that go_router
+                                      // can notify [mapState] changes to the next
+                                      // route.
+                                      //
+                                      // Removing the [key] query parameter will
+                                      // prevent state changes for the next route
+                                      // if it is already present in the
+                                      // navigation stack.
+                                      context.goNamed(
+                                        RouteNames.geoMap,
+                                        queryParameters: {
+                                          "key": UniqueKey().toString(),
+                                        },
+                                        extra: content,
+                                      );
                                     },
-                                    extra: content,
-                                  );
-                                },
-                                style: const ButtonStyle(
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                                icon: const Icon(Icons.explore_outlined),
-                                label: const Text('Apri mappa'),
+                                    style: const ButtonStyle(
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    icon: const Icon(Icons.explore_outlined),
+                                    label: const Text('Apri mappa'),
+                                  ),
+                                ],
                               ),
+                              const SizedBox(height: 8.0),
+                              DetailGeoMapPreview(content: content),
                             ],
                           ),
-                          const SizedBox(height: 8.0),
-                          DetailGeoMapPreview(content: content),
-                        ],
-                      ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: NearbyContentHorizontalList(
+                            coordinates: content.coordinates,
+                            onPressed: (content) => _buildStoryRoute(content),
+                            loadNearContentCommand:
+                                widget.viewModel.loadNearContent,
+                            nearContent: widget.viewModel.nearContent,
+                          ),
+                        ),
+                        const SliverPadding(
+                          padding: EdgeInsets.only(bottom: 16.0),
+                        ),
+                      ],
                     ),
-                    SliverToBoxAdapter(
-                      child: NearbyContentHorizontalList(
-                        coordinates: content.coordinates,
-                        onPressed: (content) => _buildStoryRoute(content),
-                        loadNearContentCommand:
-                            widget.viewModel.loadNearContent,
-                        nearContent: widget.viewModel.nearContent,
-                      ),
-                    ),
-                    const SliverPadding(padding: EdgeInsets.only(bottom: 16.0)),
-                  ],
-                ),
-              );
-            }
+                  );
+                }
 
-            return const Center(
-              child: EmptyView.loading(text: Text('Caricamento in corso...')),
-            );
-          },
-        ),
+                return const Center(
+                  child: EmptyView.loading(
+                    text: Text('Caricamento in corso...'),
+                  ),
+                );
+              },
+            ),
+          ),
+          LinearGradientBackground(
+            child: SizedBox(
+              width: double.infinity,
+              height: MediaQuery.paddingOf(context).top,
+            ),
+          ),
+        ],
       ),
       extendBodyBehindAppBar: true,
     );

@@ -32,7 +32,6 @@ class SuggestionViewModel extends ChangeNotifier {
   String? description;
   DateTime? _endDate;
   final _imagePicker = ImagePicker();
-  final _images = <String>[];
   final _mediaFileList = <XFile>[];
   final _mediaFileHashes = <int>[];
   String? place;
@@ -130,28 +129,17 @@ class SuggestionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Result<String>> _uploadImage(XFile image) async {
-    final upload = await _suggestionRepository.uploadImage(File(image.path));
-
-    switch (upload) {
-      case Error<String>():
-        _log.severe(upload.error);
-
-        return Result.error(upload.error);
-      case Success<String>():
-        return Result.success(upload.value);
-    }
-  }
-
   Future<Result<void>> _uploadSuggestion() async {
+    final mediaUrls = <String>[];
+
     for (final file in _mediaFileList) {
-      final result = await _uploadImage(file);
+      final result = await _suggestionRepository.uploadImage(File(file.path));
 
       switch (result) {
         case Success<String>():
-          _images.add(result.value);
+          mediaUrls.add(result.value);
         case Error<String>():
-          _log.severe(result.error);
+          return Result.error(result.error);
       }
     }
 
@@ -164,7 +152,7 @@ class SuggestionViewModel extends ChangeNotifier {
       endDate: _endDate,
       authorEmail: authorEmail,
       authorName: authorName,
-      images: _images,
+      images: mediaUrls,
     );
 
     final result = await _suggestionRepository.upload(suggestion);

@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
+import 'package:moliseis/data/services/remote/open-meteo/open_meteo_client.dart';
 import 'package:moliseis/domain/models/core/content_category.dart';
 import 'package:moliseis/domain/use-cases/category/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/detail/detail_use_case.dart';
@@ -68,6 +69,7 @@ GoRoute detailRoute({required String name}) {
         detailUseCase: DetailUseCase(
           eventRepository: context.read(),
           geoMapRepository: context.read(),
+          openMeteoClient: OpenMeteoClient(),
           placeRepository: context.read(),
         ),
       );
