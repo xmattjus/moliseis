@@ -195,11 +195,16 @@ class EventRepositoryLocal implements EventRepository {
     Query<Event>? query;
 
     try {
-      final today = DateTime.now();
-      final startOfToday = DateTime(today.year, today.month, today.day);
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final nextMonth = DateTime(now.year, now.month, now.day + 30);
 
       final builder = _eventBox
-          .query(Event_.startDate.greaterOrEqualDate(startOfToday))
+          .query(
+            Event_.startDate
+                .greaterOrEqualDate(today)
+                .and(Event_.startDate.lessThanDate(nextMonth)),
+          )
           .order(Event_.startDate, flags: Order.unsigned);
       query = builder.build()..limit = 6;
       final results = query.findIds();
