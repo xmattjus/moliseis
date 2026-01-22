@@ -21,4 +21,5 @@ const int kcategoryScreenNoIndex = -1;
 const String kAssetMapTilerIconPath =
     'assets/icons/maptiler-icon-dark_64x69_optimized.png';
 
+/// The default network request timeout in seconds.
 const int kDefaultNetworkTimeoutSeconds = 10;
