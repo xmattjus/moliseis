@@ -63,9 +63,9 @@ dependencies:
   # responsive_framework: ^1.5.1
   # result_dart: ^2.0.0
   # S
-  sentry: ^9.9.2
-  sentry_flutter: ^9.9.2
-  sentry_logging: ^9.9.2
+  sentry: ^9.10.0
+  sentry_flutter: ^9.10.0
+  sentry_logging: ^9.10.0
   share_plus: ^12.0.1
   skeletonizer: ^2.1.2
   string_validator: ^1.2.0
