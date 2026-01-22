@@ -16,8 +16,10 @@ HourlyWeatherForecastResponse _$HourlyWeatherForecastResponseFromJson(
   timezone: json['timezone'] as String,
   timezoneAbbreviation: json['timezone_abbreviation'] as String,
   elevation: (json['elevation'] as num).toInt(),
-  hourlyUnits: HourlyUnits.fromJson(
+  units: HourlyWeatherForecastDataUnits.fromJson(
     json['hourly_units'] as Map<String, dynamic>,
   ),
-  hourly: Hourly.fromJson(json['hourly'] as Map<String, dynamic>),
+  data: HourlyWeatherForecastData.fromJson(
+    json['data'] as Map<String, dynamic>,
+  ),
 );

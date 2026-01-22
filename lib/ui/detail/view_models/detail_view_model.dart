@@ -1,7 +1,6 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/services/remote/open-meteo/hourly_weather_forecast_response.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/domain/use-cases/detail/detail_use_case.dart';
 import 'package:moliseis/utils/command.dart';
@@ -11,28 +10,22 @@ class DetailViewModel extends ChangeNotifier {
   final DetailUseCase _detailUseCase;
 
   late Command1<void, int> loadEvent;
-  late Command1<void, List<double>> loadHourlyWeatherForecast;
   late Command1<void, List<double>> loadNearContent;
   late Command1<void, int> loadPlace;
-  late Command1<void, List<double>> loadStreetAddress;
 
   DetailViewModel({required DetailUseCase detailUseCase})
     : _detailUseCase = detailUseCase {
     loadEvent = Command1(_loadEvent);
-    loadHourlyWeatherForecast = Command1(_loadHourlyWeatherForecast);
     loadNearContent = Command1(_loadNearContent);
     loadPlace = Command1(_loadPlace);
-    loadStreetAddress = Command1(_loadStreetAddress);
   }
 
   late ContentBase _content;
   final _nearContent = <ContentBase>[];
-  var _streetAddress = '';
 
   ContentBase get content => _content;
   UnmodifiableListView<ContentBase> get nearContent =>
       UnmodifiableListView(_nearContent);
-  String get streetAddress => _streetAddress;
 
   Future<Result<void>> _loadEvent(int id) async {
     final result = await _detailUseCase.getEventById(id);
@@ -88,36 +81,5 @@ class DetailViewModel extends ChangeNotifier {
     }
 
     return result;
-  }
-
-  Future<Result<void>> _loadStreetAddress(List<double> coordinates) async {
-    final result = await _detailUseCase.getStreetAddressByCoords(
-      coordinates[0],
-      coordinates[1],
-    );
-
-    switch (result) {
-      case Success<String?>():
-        _streetAddress = result.value ?? 'Indirizzo non trovato';
-      case Error<String?>():
-      // Does not do anything since an empty box will be shown on error.
-    }
-
-    return result;
-  }
-
-  Future<Result<void>> _loadHourlyWeatherForecast(
-    List<double> coordinates,
-  ) async {
-    final result = await _detailUseCase.getHourlyWeatherForecast(
-      coordinates[0],
-      coordinates[1],
-    );
-
-    if (result is Success<HourlyWeatherForecastResponse>) {
-      print(result.value.hourly.temperature2m[19]);
-    }
-
-    return const Result.success(null);
   }
 }

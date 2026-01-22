@@ -2,7 +2,7 @@ import 'dart:io' show File;
 
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/repositories/suggestion/suggestion_repository.dart';
-import 'package:moliseis/data/services/remote/cloudinary_client.dart';
+import 'package:moliseis/data/services/api/cloudinary_client.dart';
 import 'package:moliseis/domain/models/suggestion/suggestion.dart';
 import 'package:moliseis/domain/models/suggestion/suggestion_supabase_table.dart';
 import 'package:moliseis/utils/result.dart';

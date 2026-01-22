@@ -38,9 +38,35 @@ This project is a multi-platform application that allows users to explore the Mo
 - Comments should be contained within the code blocks.
 - Constructor parameters must be placed above the constructor body.
 - Internal variables should be prefixed with an underscore and must be placed below the constructor body.
+- Documentation comments should follow the Effective Dart guidelines and be used for all public classes and methods.
+- Documentation comments must use triple slashes (///) and each line should contain atmost 80 characters. Each phrase should end with a period.
+- Documentation comments for classes should include a brief description of the class's purpose and functionality. Focus on the "why" rather than the "what".
 
 #### 5. Commit Message Format
-*   When providing a commit message, use the [Conventional Commits](
-https://www.conventionalcommits.org
-) format: `type(scope): summary`.
-*   **Examples:** `feat(auth): add password reset endpoint`, `fix(api): correct error status code`.
+- Generated commit messages should follow the Conventional Commits specification:
+  - Each commit message must consist of a header, and optionally a body and footer:
+  ```
+  <header>
+  <BLANK LINE>
+  <body>
+  <BLANK LINE>
+  <footer>
+  ```
+  - The header is mandatory and must contain a type, an optional scope, and a subject: `<type>(<scope>): <subject>`
+    - `<type>`: A noun indicating the type of change. Common types include:
+      - `build`: Changes to the build process or auxiliary tools and libraries.
+      - `ci`: Changes to CI configuration files and scripts.
+      - `docs`: Changes to documentation.
+      - `feat`: A new feature.
+      - `fix`: A bug fix.
+      - `perf`: A code change that improves performance.
+      - `refactor`: Code changes that neither fix a bug nor add a feature.
+      - `test`: Adding or updating tests.
+    - `<scope>`: A noun indicating the section of the codebase affected (optional).
+    - `<subject>`: A short description of the change in imperative mood.
+  - The body is optional and should provide a more detailed explanation of the change, wrapped at 72 characters.
+  - The footer is optional and should include any relevant issue references or breaking changes.
+  - Examples:
+    - `feat(auth): add login functionality`
+    - `fix(ui): resolve button alignment issue`
+    - `docs(readme): update installation instructions`

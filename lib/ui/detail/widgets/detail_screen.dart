@@ -23,6 +23,8 @@ import 'package:moliseis/ui/detail/widgets/detail_description.dart';
 import 'package:moliseis/ui/detail/widgets/detail_geo_map_preview.dart';
 import 'package:moliseis/ui/detail/widgets/detail_image_slideshow.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
+import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
+import 'package:moliseis/ui/weather/widgets/weather_forecast_button.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions.dart';
 import 'package:provider/provider.dart';
@@ -32,10 +34,12 @@ class DetailScreen extends StatefulWidget {
     super.key,
     required this.isEvent,
     required this.viewModel,
+    required this.weatherViewModel,
   });
 
   final bool isEvent;
   final DetailViewModel viewModel;
+  final WeatherViewModel weatherViewModel;
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
@@ -74,9 +78,10 @@ class _DetailScreenState extends State<DetailScreen> {
         systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
       body: Stack(
-        children: [
+        children: <Widget>[
           SafeArea(
             top: false,
+
             child: ListenableBuilder(
               listenable: Listenable.merge([
                 widget.viewModel.loadEvent,
@@ -123,12 +128,27 @@ class _DetailScreenState extends State<DetailScreen> {
                         SliverPadding(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0),
                           sliver: SliverToBoxAdapter(
-                            child: ContentNameAndCity(
-                              name: content.name,
-                              cityName: content.city.target?.name,
-                              nameStyle: CustomTextStyles.title(context),
-                              cityNameStyle: CustomTextStyles.subtitle(context),
-                              overflow: TextOverflow.visible,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: ContentNameAndCity(
+                                    name: content.name,
+                                    cityName: content.city.target?.name,
+                                    nameStyle: CustomTextStyles.title(context),
+                                    cityNameStyle: CustomTextStyles.subtitle(
+                                      context,
+                                    ),
+                                    overflow: TextOverflow.visible,
+                                  ),
+                                ),
+                                WeatherForecastButton(
+                                  content: content,
+                                  coordinates: content.coordinates.toLatLng,
+                                  viewModel: widget.weatherViewModel,
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -194,14 +214,6 @@ class _DetailScreenState extends State<DetailScreen> {
                                   ),
                                   OutlinedButton.icon(
                                     onPressed: () {
-                                      /*
-                                  final mapState = GeoMapState(
-                                    latitude: content.coordinates[0],
-                                    longitude: content.coordinates[1],
-                                    contentId: content.remoteId,
-                                  );
-                                  */
-
                                       // Sets a [UniqueKey] so that go_router
                                       // can notify [mapState] changes to the next
                                       // route.

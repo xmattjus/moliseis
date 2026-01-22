@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/core/content_category.dart';
 import 'package:moliseis/domain/models/core/content_type.dart';
+import 'package:moliseis/ui/core/themes/app_colors_theme_extension.dart';
+import 'package:moliseis/ui/core/themes/app_effects_theme_extension.dart';
+import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
 import 'package:moliseis/ui/core/ui/window_size_provider.dart';
 
 extension ColorExtensions on Color? {
@@ -130,5 +134,35 @@ extension BuildContextExtensions on BuildContext {
     } else {
       return 2;
     }
+  }
+
+  ThemeData get theme => Theme.of(this);
+
+  TextTheme get textTheme => theme.textTheme;
+
+  ColorScheme get colorScheme => theme.colorScheme;
+
+  DefaultTextStyle get defaultTextStyle => DefaultTextStyle.of(this);
+
+  AppColorsThemeExtension get appColors =>
+      theme.extension<AppColorsThemeExtension>()!;
+
+  AppEffectsThemeExtension get appEffects =>
+      theme.extension<AppEffectsThemeExtension>()!;
+
+  AppSizesThemeExtension get appSizes =>
+      theme.extension<AppSizesThemeExtension>()!;
+}
+
+extension ListDoubleExtensions on List<double> {
+  /// Converts a list of double into a [LatLng] object.
+  /// The list must contain exactly two elements:
+  /// the first element is treated as latitude and the second as longitude.
+  LatLng get toLatLng {
+    assert(length == 2);
+    assert(this[0] >= -90 && this[0] <= 90);
+    assert(this[1] >= -180 && this[1] <= 180);
+
+    return LatLng(this[0], this[1]);
   }
 }

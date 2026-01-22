@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/core/themes/app_colors_theme_extension.dart';
+import 'package:moliseis/ui/core/themes/app_effects_theme_extension.dart';
+import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/color_schemes.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_theme.dart';
@@ -11,7 +14,10 @@ class _BaseThemeData {
     Iterable<ThemeExtension<dynamic>>? extensions,
   }) {
     return ThemeData(
-      extensions: extensions,
+      extensions: [
+        AppEffectsThemeExtension.defaultEffects(),
+        if (extensions != null) ...extensions,
+      ],
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
           TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
@@ -122,7 +128,13 @@ class AppThemeData {
       Brightness.light,
     );
 
-    return _BaseThemeData.get(colorScheme: colorScheme);
+    return _BaseThemeData.get(
+      colorScheme: colorScheme,
+      extensions: <ThemeExtension<dynamic>>[
+        AppColorsThemeExtension.light(),
+        AppSizesThemeExtension.defaultSizes(),
+      ],
+    );
   }
 
   static ThemeData dark({ColorScheme? dynamicColorScheme}) {
@@ -131,7 +143,13 @@ class AppThemeData {
       Brightness.dark,
     );
 
-    return _BaseThemeData.get(colorScheme: colorScheme);
+    return _BaseThemeData.get(
+      colorScheme: colorScheme,
+      extensions: <ThemeExtension<dynamic>>[
+        AppColorsThemeExtension.dark(),
+        AppSizesThemeExtension.defaultSizes(),
+      ],
+    );
   }
 
   static ThemeData get photoViewer {
@@ -142,6 +160,36 @@ class AppThemeData {
         surface: Colors.black,
       ),
       textTheme: appTextTheme,
+    );
+  }
+
+  static ThemeData modalScreen(BuildContext context) {
+    return Theme.of(context).copyWith(
+      textTheme: appTextTheme.copyWith(
+        displayLarge: appTextTheme.displayLarge?.copyWith(color: Colors.white),
+        displayMedium: appTextTheme.displayMedium?.copyWith(
+          color: Colors.white,
+        ),
+        displaySmall: appTextTheme.displaySmall?.copyWith(color: Colors.white),
+        headlineLarge: appTextTheme.headlineLarge?.copyWith(
+          color: Colors.white,
+        ),
+        headlineMedium: appTextTheme.headlineMedium?.copyWith(
+          color: Colors.white,
+        ),
+        headlineSmall: appTextTheme.headlineSmall?.copyWith(
+          color: Colors.white,
+        ),
+        titleLarge: appTextTheme.titleLarge?.copyWith(color: Colors.white),
+        titleMedium: appTextTheme.titleMedium?.copyWith(color: Colors.white),
+        titleSmall: appTextTheme.titleSmall?.copyWith(color: Colors.white),
+        bodyLarge: appTextTheme.bodyLarge?.copyWith(color: Colors.white),
+        bodyMedium: appTextTheme.bodyMedium?.copyWith(color: Colors.white),
+        bodySmall: appTextTheme.bodySmall?.copyWith(color: Colors.white),
+        labelLarge: appTextTheme.labelLarge?.copyWith(color: Colors.white),
+        labelMedium: appTextTheme.labelMedium?.copyWith(color: Colors.white),
+        labelSmall: appTextTheme.labelSmall?.copyWith(color: Colors.white),
+      ),
     );
   }
 }

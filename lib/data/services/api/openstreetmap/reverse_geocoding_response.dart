@@ -1,10 +1,10 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:meta/meta.dart';
-import 'package:moliseis/data/services/remote/openstreetmap/geocoding_address.dart';
+import 'package:moliseis/data/services/api/openstreetmap/geocoding_address.dart';
 
 part 'reverse_geocoding_response.g.dart';
 
-@Immutable()
+@immutable
 @JsonSerializable(createToJson: false, explicitToJson: true)
 class ReverseGeocodingResponse {
   @JsonKey(name: 'place_id')

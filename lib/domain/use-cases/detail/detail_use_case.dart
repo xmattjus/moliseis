@@ -1,8 +1,9 @@
 import 'package:moliseis/data/repositories/event/event_repository.dart';
-import 'package:moliseis/data/repositories/geo_map/geo_map_repository.dart';
 import 'package:moliseis/data/repositories/place/place_repository.dart';
-import 'package:moliseis/data/services/remote/open-meteo/hourly_weather_forecast_response.dart';
-import 'package:moliseis/data/services/remote/open-meteo/open_meteo_client.dart';
+import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
+import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
+import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
+import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';
 import 'package:moliseis/domain/models/event/event.dart';
 import 'package:moliseis/domain/models/event/event_content.dart';
@@ -11,19 +12,16 @@ import 'package:moliseis/domain/models/place/place_content.dart';
 import 'package:moliseis/utils/result.dart';
 
 class DetailUseCase {
+  final CachedWeatherApiClient _cachedWeatherApiClient;
   final EventRepository _eventRepository;
-  final GeoMapRepository _geoMapRepository;
   final PlaceRepository _placeRepository;
-  final OpenMeteoClient _openMeteoClient;
 
   const DetailUseCase({
+    required CachedWeatherApiClient cachedWeatherApiClient,
     required EventRepository eventRepository,
-    required GeoMapRepository geoMapRepository,
-    required OpenMeteoClient openMeteoClient,
     required PlaceRepository placeRepository,
-  }) : _eventRepository = eventRepository,
-       _geoMapRepository = geoMapRepository,
-       _openMeteoClient = openMeteoClient,
+  }) : _cachedWeatherApiClient = cachedWeatherApiClient,
+       _eventRepository = eventRepository,
        _placeRepository = placeRepository;
 
   Future<Result<ContentBase>> getEventById(int id) async {
@@ -86,27 +84,33 @@ class DetailUseCase {
     }
   }
 
-  Future<Result<String?>> getStreetAddressByCoords(
-    double latitude,
-    double longitude,
-  ) async {
-    final result = await _geoMapRepository.getStreetAddreFromCoords(
-      latitude,
-      longitude,
-    );
-
-    switch (result) {
-      case Success<String?>():
-        return Result.success(result.value);
-      case Error<String?>():
-        return Result.error(result.error);
-    }
-  }
-
-  Future<Result<HourlyWeatherForecastResponse>> getHourlyWeatherForecast(
+  Future<Result<CurrentWeatherForecastData>> getCurrentWeatherForecast(
     double latitude,
     double longitude,
   ) {
-    return _openMeteoClient.getHourlyWeatherForecast(latitude, longitude);
+    return _cachedWeatherApiClient.getCurrentWeatherByCoordinates(
+      latitude,
+      longitude,
+    );
+  }
+
+  Future<Result<HourlyWeatherForecastData>> getHourlyWeatherForecast(
+    double latitude,
+    double longitude,
+  ) {
+    return _cachedWeatherApiClient.getHourlyWeatherByCoordinates(
+      latitude,
+      longitude,
+    );
+  }
+
+  Future<Result<DailyWeatherForecastData>> getDailyWeatherForecast(
+    double latitude,
+    double longitude,
+  ) {
+    return _cachedWeatherApiClient.getDailyWeatherByCoordinates(
+      latitude,
+      longitude,
+    );
   }
 }

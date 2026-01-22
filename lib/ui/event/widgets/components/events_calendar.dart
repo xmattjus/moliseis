@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
-import 'package:moliseis/ui/core/ui/custom_modal_bottom_sheet.dart';
+import 'package:moliseis/ui/core/themes/theme_data.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
-import 'package:moliseis/ui/event/widgets/event_bottom_sheet_content.dart';
-import 'package:moliseis/ui/event/widgets/events_month.dart';
+import 'package:moliseis/ui/event/widgets/components/events_modal.dart';
+import 'package:moliseis/ui/event/widgets/components/events_month.dart';
 
 class EventsCalendar extends StatefulWidget {
   const EventsCalendar({super.key, required this.viewModel});
@@ -58,7 +59,7 @@ class _EventsCalendarState extends State<EventsCalendar> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Text(
-                    '${_dateSymbols.MONTHS[i - 1]} 2025',
+                    '${_dateSymbols.MONTHS[i - 1]} ${date.year}',
                     style: CustomTextStyles.section(context)?.copyWith(
                       color: Theme.of(context).brightness == Brightness.light
                           ? Colors.black87
@@ -77,16 +78,25 @@ class _EventsCalendarState extends State<EventsCalendar> {
                     if (event != null) {
                       widget.viewModel.loadByDate.execute(event.startDate);
 
-                      await showCustomModalBottomSheet(
+                      await showModalBottomSheet(
                         context: context,
-                        builder: (context) {
-                          return EventBottomSheetContent(
+                        builder: (context) => Theme(
+                          data: AppThemeData.modalScreen(context),
+                          child: EventsModal(
                             localizedMonths: _dateSymbols.MONTHS,
                             selectedDate: event.startDate,
                             viewModel: widget.viewModel,
-                          );
-                        },
+                          ),
+                        ),
+                        backgroundColor: Colors.transparent,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(Shapes.extraLarge),
+                          ),
+                        ),
+                        constraints: const BoxConstraints(maxWidth: 720.0),
                         isScrollControlled: true,
+                        useSafeArea: true,
                       );
                     }
                   },

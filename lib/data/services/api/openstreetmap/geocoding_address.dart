@@ -5,7 +5,7 @@ import 'package:meta/meta.dart';
 
 part 'geocoding_address.g.dart';
 
-@Immutable()
+@immutable
 @JsonSerializable(createToJson: false)
 class GeocodingAddress {
   final String? amenity;

@@ -1,5 +1,5 @@
 import 'package:moliseis/data/repositories/geo_map/geo_map_repository.dart';
-import 'package:moliseis/data/services/remote/openstreetmap/openstreetmap_client.dart';
+import 'package:moliseis/data/services/api/openstreetmap/openstreetmap_client.dart';
 import 'package:moliseis/utils/result.dart';
 
 class GeoMapRepositoryRemote implements GeoMapRepository {

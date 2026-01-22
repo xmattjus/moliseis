@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
-import 'package:moliseis/ui/event/widgets/events_calendar.dart';
+import 'package:moliseis/ui/event/widgets/components/events_calendar.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key, required this.viewModel});

@@ -1,12 +1,17 @@
-import 'dart:io' show Platform;
+import 'dart:collection';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/core/content_category.dart';
 import 'package:moliseis/domain/models/core/content_type.dart';
+import 'package:moliseis/ui/core/themes/app_colors_theme_extension.dart';
+import 'package:moliseis/ui/core/themes/app_effects_theme_extension.dart';
+import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
+import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/ui/core/themes/theme_data.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_drag_handle.dart';
-import 'package:moliseis/ui/core/ui/custom_modal_bottom_sheet.dart';
+import 'package:moliseis/ui/core/ui/bottom_sheet_title.dart';
 import 'package:moliseis/utils/extensions.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class CategorySelectionList extends StatefulWidget {
   final Color? chipBackgroundColor;
@@ -87,24 +92,36 @@ class _CategorySelectionListState extends State<CategorySelectionList> {
   Future<void> _onTypeChipPressed() async {
     await _showGenericSelectionBottomSheet(
       title: 'Seleziona per tipo',
-      children: ContentType.values
-          .map<Widget>(
-            (type) => ListTile(
-              title: Text(type.label),
-              trailing: StatefulBuilder(
-                builder: (_, setState) {
-                  return _SelectionWidget(
-                    key: ValueKey<ContentType>(type),
-                    isSelected: _selectedTypes.contains(type),
-                    onChanged: (value) {
-                      _changeSelectedTypes(value, type, setState);
-                    },
-                  );
-                },
-              ),
+      children: UnmodifiableListView(
+        ContentType.values.map<Widget>((type) {
+          return Padding(
+            padding: const EdgeInsetsDirectional.only(start: 16.0, end: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              spacing: 16.0,
+              children: <Widget>[
+                Text(
+                  type.label,
+                  style: context.defaultTextStyle.style.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+                StatefulBuilder(
+                  builder: (_, setState) {
+                    return _SelectionWidget(
+                      key: ValueKey<ContentType>(type),
+                      isSelected: _selectedTypes.contains(type),
+                      onChanged: (value) {
+                        _changeSelectedTypes(value, type, setState);
+                      },
+                    );
+                  },
+                ),
+              ],
             ),
-          )
-          .toList(growable: false),
+          );
+        }),
+      ),
     );
 
     if (mounted) {
@@ -123,24 +140,36 @@ class _CategorySelectionListState extends State<CategorySelectionList> {
   Future<void> _onCategoryChipPressed() async {
     await _showGenericSelectionBottomSheet(
       title: 'Seleziona per categoria',
-      children: ContentCategory.values.minusUnknown
-          .map<Widget>(
-            (category) => ListTile(
-              title: Text(category.label),
-              trailing: StatefulBuilder(
-                builder: (_, setState) {
-                  return _SelectionWidget(
-                    key: ValueKey<ContentCategory>(category),
-                    isSelected: _selectedCategories.contains(category),
-                    onChanged: (value) {
-                      _changeSelectedCategories(value, category, setState);
-                    },
-                  );
-                },
-              ),
+      children: UnmodifiableListView(
+        ContentCategory.values.minusUnknown.map<Widget>((category) {
+          return Padding(
+            padding: const EdgeInsetsDirectional.only(start: 16.0, end: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              spacing: 16.0,
+              children: <Widget>[
+                Text(
+                  category.label,
+                  style: context.defaultTextStyle.style.copyWith(
+                    color: Colors.white,
+                  ),
+                ),
+                StatefulBuilder(
+                  builder: (_, setState) {
+                    return _SelectionWidget(
+                      key: ValueKey<ContentCategory>(category),
+                      isSelected: _selectedCategories.contains(category),
+                      onChanged: (value) {
+                        _changeSelectedCategories(value, category, setState);
+                      },
+                    );
+                  },
+                ),
+              ],
             ),
-          )
-          .toList(growable: false),
+          );
+        }),
+      ),
     );
 
     if (mounted) {
@@ -160,36 +189,94 @@ class _CategorySelectionListState extends State<CategorySelectionList> {
     required String title,
     required List<Widget> children,
   }) {
-    return showCustomModalBottomSheet(
+    return showModalBottomSheet<T?>(
       context: context,
-      builder: (_) {
-        return DraggableScrollableSheet(
-          expand: false,
-          builder: (_, scrollController) {
-            return ListView(
-              controller: scrollController,
-              children: <Widget>[
-                const BottomSheetDragHandle(),
-                AppBar(
-                  leading: IconButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    tooltip: 'Chiudi',
-                    icon: const Icon(Icons.close),
-                  ),
-                  title: Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                  ),
-                  forceMaterialTransparency: true,
-                ),
-                ...children,
-                const SizedBox(height: 16.0),
-              ],
-            );
-          },
+      builder: (context) {
+        return Theme(
+          data: AppThemeData.modalScreen(context),
+          child: Builder(
+            builder: (context) {
+              final appSizes = Theme.of(
+                context,
+              ).extension<AppSizesThemeExtension>()!;
+              final appEffects = Theme.of(
+                context,
+              ).extension<AppEffectsThemeExtension>()!;
+
+              return DraggableScrollableSheet(
+                snap: true,
+                minChildSize: appSizes.modalMinSnapSize,
+                snapSizes: appSizes.modalSnapSizes,
+                builder: (_, scrollController) {
+                  final appColors = Theme.of(
+                    context,
+                  ).extension<AppColorsThemeExtension>()!;
+
+                  return ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(Shapes.extraLarge),
+                    ),
+                    child: Stack(
+                      children: <Widget>[
+                        Positioned.fill(
+                          child: ClipRRect(
+                            child: BackdropFilter(
+                              filter: appEffects.modalBlurEffect,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: appColors.modalBackgroundColor,
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(Shapes.extraLarge),
+                                  ),
+                                  border: Border.all(
+                                    color: appColors.modalBorderColor,
+                                    width: appSizes.borderSize,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SingleChildScrollView(
+                          controller: scrollController,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              const Align(child: BottomSheetDragHandle()),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 16.0,
+                                ),
+                                child: BottomSheetTitle(
+                                  title: title,
+                                  tooltipMessage: 'Salva e chiudi',
+                                  icon: PhosphorIconsBold.check,
+                                  onClose: () => Navigator.of(context).pop(),
+                                ),
+                              ),
+                              ...children,
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(Shapes.extraLarge),
+        ),
+      ),
+      constraints: const BoxConstraints(maxWidth: 720.0),
       isScrollControlled: true,
+      useSafeArea: true,
     );
   }
 
@@ -233,7 +320,17 @@ class _SelectionWidget extends StatelessWidget {
   final void Function(bool? value) onChanged;
 
   @override
-  Widget build(BuildContext context) => Platform.isIOS
-      ? CupertinoSwitch(value: isSelected, onChanged: onChanged)
-      : Checkbox(value: isSelected, onChanged: onChanged);
+  Widget build(BuildContext context) {
+    return Checkbox(
+      value: isSelected,
+      onChanged: onChanged,
+      activeColor: context.appColors.modalBackgroundColor,
+      checkColor: Colors.white,
+      shape: const RoundedRectangleBorder(),
+      side: BorderSide(
+        color: context.appColors.modalBorderColor,
+        width: context.appSizes.borderSize,
+      ),
+    );
+  }
 }

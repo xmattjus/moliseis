@@ -6,8 +6,8 @@ import 'package:moliseis/domain/models/place/place.dart';
 import 'package:moliseis/domain/models/place/place_content.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
-import 'package:moliseis/ui/core/ui/bottom_sheet_adaptive_title.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_drag_handle.dart';
+import 'package:moliseis/ui/core/ui/bottom_sheet_title.dart';
 import 'package:moliseis/ui/core/ui/content/nearby_content_horizontal_list.dart';
 import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
@@ -250,7 +250,11 @@ class GeoMapBottomSheetDefault extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverList.list(
       children: <Widget>[
-        const BottomSheetAdaptiveTitle('Esplora i dintorni'),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.0),
+          child: BottomSheetTitle(title: 'Esplora i dintorni', icon: null),
+        ),
+        const SizedBox(height: 16.0),
         NearbyContentHorizontalList(
           coordinates: [currentMapCenter.latitude, currentMapCenter.longitude],
           onPressed: onNearContentPressed,

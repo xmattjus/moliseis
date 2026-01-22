@@ -38,8 +38,7 @@ import 'package:objectbox/objectbox.dart';
 /// Used in the domain layer to represent content in a clean, abstract form,
 /// decoupled from data sources or UI-specific formatting.
 ///
-/// TODO (xmattjus): make [Place], [Event], etc. classes extends [ContentBase]
-/// when objectbox Entity inheritance lands.
+/// TODO (xmattjus): make [Place], [Event], etc. classes extends [ContentBase] when objectbox Entity inheritance lands.
 /// See: https://github.com/objectbox/objectbox-dart/issues/249
 abstract class ContentBase {
   final ContentCategory category;

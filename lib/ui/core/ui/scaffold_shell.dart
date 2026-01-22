@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' hide kBottomNavigationBarHeight;
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class ScaffoldShell extends StatelessWidget {
   const ScaffoldShell({
@@ -36,25 +37,29 @@ class ScaffoldShell extends StatelessWidget {
   List<NavigationDestination> get _buildDestinations {
     return List.generate(4, (index) {
       final icon = switch (index) {
-        0 => Icon(
+        0 => PhosphorIcon(
           _navigationShell.currentIndex == index
-              ? Icons.home
-              : Icons.home_outlined,
+              ? PhosphorIconsDuotone.house
+              : PhosphorIconsRegular.house,
+          duotoneSecondaryColor: Colors.green,
         ),
-        1 => Icon(
+        1 => PhosphorIcon(
           _navigationShell.currentIndex == index
-              ? Icons.favorite
-              : Icons.favorite_outline,
+              ? PhosphorIconsDuotone.heartStraight
+              : PhosphorIconsRegular.heartStraight,
+          duotoneSecondaryColor: Colors.green,
         ),
-        2 => Icon(
+        2 => PhosphorIcon(
           _navigationShell.currentIndex == index
-              ? Icons.event
-              : Icons.event_outlined,
+              ? PhosphorIconsDuotone.calendarStar
+              : PhosphorIconsRegular.calendarStar,
+          duotoneSecondaryColor: Colors.green,
         ),
-        3 => Icon(
+        3 => PhosphorIcon(
           _navigationShell.currentIndex == index
-              ? Icons.explore
-              : Icons.explore_outlined,
+              ? PhosphorIconsDuotone.globeStand
+              : PhosphorIconsRegular.globeStand,
+          duotoneSecondaryColor: Colors.green,
         ),
         int() => throw RangeError(
           '$index out of range, expected range >= 0 && <= 3',
