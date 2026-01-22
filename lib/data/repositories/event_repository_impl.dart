@@ -23,7 +23,7 @@ class EventRepositoryImpl implements EventRepository {
   final EventSupabaseTable _supabaseTable;
   final Box<Event> _eventBox;
 
-  final _log = Logger('EventRepositoryLocal');
+  final _log = Logger('EventRepositoryImpl');
 
   List<Event>? _cache;
 
@@ -31,10 +31,10 @@ class EventRepositoryImpl implements EventRepository {
     Query<Event>? query;
 
     try {
-      final today = DateTime.now();
+      final currentYear = DateTime.now().year;
 
-      final startDate = DateTime(today.year);
-      final endDate = DateTime(today.year, 12, 31, 23, 59, 59);
+      final startDate = DateTime(currentYear);
+      final endDate = DateTime(currentYear, 12, 31, 23, 59, 59);
 
       final builder = _eventBox
           .query(
@@ -87,12 +87,17 @@ class EventRepositoryImpl implements EventRepository {
   }) async {
     Query<Event>? query;
 
+    final now = DateTime.now();
+    final nextYear = DateTime(now.year + 1);
+
     try {
-      final condition = Event_.dbType.oneOf(
-        categories.map((e) => e.index).toList(),
-      );
-      final builder = _eventBox.query(condition);
-      query = builder.build();
+      final condition = Event_.dbType
+          .oneOf(categories.map((e) => e.index).toList())
+          .andAll([
+            Event_.startDate.greaterOrEqualDate(now),
+            Event_.startDate.lessThanDate(nextYear),
+          ]);
+      query = _eventBox.query(condition).build();
       final results = await query.findAsync();
 
       return Result.success(results);
@@ -112,10 +117,17 @@ class EventRepositoryImpl implements EventRepository {
   Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) async {
     Query<Event>? query;
 
+    final now = DateTime.now();
+    final nextYear = DateTime(now.year + 1);
+
     try {
-      query = _eventBox
-          .query(Event_.coordinates.nearestNeighborsF32(coordinates, 200))
-          .build();
+      final condition = Event_.coordinates
+          .nearestNeighborsF32(coordinates, 200)
+          .andAll([
+            Event_.startDate.greaterOrEqualDate(now),
+            Event_.startDate.lessThanDate(nextYear),
+          ]);
+      query = _eventBox.query(condition).build();
       query.limit = 2;
       final resultsWithScores = await query.findWithScoresAsync();
       query.close();
