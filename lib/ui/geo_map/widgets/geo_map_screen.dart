@@ -4,7 +4,7 @@ import 'dart:ui' show clampDouble;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/category/widgets/category_selection_list.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
@@ -77,10 +77,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
 
     if (widget.contentExtra != null) {
       _selectedContent = widget.contentExtra;
-      _currentCenter = LatLng(
-        widget.contentExtra!.coordinates[0],
-        widget.contentExtra!.coordinates[1],
-      );
+      _currentCenter = widget.contentExtra!.coordinates;
     }
 
     _debouncedUpdate = debounce1<bool>(
@@ -95,10 +92,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
 
     if (widget.contentExtra != null) {
       _selectedContent = widget.contentExtra;
-      _currentCenter = LatLng(
-        widget.contentExtra!.coordinates[0],
-        widget.contentExtra!.coordinates[1],
-      );
+      _currentCenter = widget.contentExtra!.coordinates;
 
       _searchQuery = '';
       _searchController.text = '';
@@ -127,10 +121,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       // widget has ended.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // Animates the bottom sheet up to show the content's details.
-        _animateStateChange(
-          latitude: _currentCenter.latitude,
-          longitude: _currentCenter.longitude,
-        );
+        _animateStateChange(coordinates: _currentCenter);
 
         // Prevents the scheduling of this callback on next frame builds.
         _scheduleCallbackOnNextFrame = false;
@@ -157,8 +148,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
                         content,
                         onPressed: () {
                           _animateStateChange(
-                            latitude: content.coordinates[0],
-                            longitude: content.coordinates[1],
+                            coordinates: content.coordinates,
                             content: content,
                           );
                         },
@@ -171,8 +161,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
                         content,
                         onPressed: () {
                           _animateStateChange(
-                            latitude: content.coordinates[0],
-                            longitude: content.coordinates[1],
+                            coordinates: content.coordinates,
                             content: content,
                           );
                         },
@@ -227,8 +216,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
           _searchController.text = '';
 
           _animateStateChange(
-            latitude: content.coordinates[0],
-            longitude: content.coordinates[1],
+            coordinates: content.coordinates,
             content: content,
           );
         },
@@ -395,8 +383,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
 
   /// Animates various UI elements on requested widget rebuilds.
   void _animateStateChange({
-    required double latitude,
-    required double longitude,
+    required LatLng coordinates,
     ContentBase? content,
   }) {
     setState(() {
@@ -404,7 +391,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         _selectedContent = content;
       }
 
-      _currentCenter = LatLng(latitude, longitude);
+      _currentCenter = coordinates;
     });
 
     final screenHeight = MediaQuery.maybeSizeOf(context)?.height ?? 0;

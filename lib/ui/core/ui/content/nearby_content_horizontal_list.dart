@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
@@ -11,6 +12,7 @@ import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/extensions.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 /// A reusable horizontal list widget that displays nearby content.
@@ -20,13 +22,13 @@ import 'package:skeletonizer/skeletonizer.dart';
 /// - A list of nearby content items
 class NearbyContentHorizontalList extends StatefulWidget {
   /// The coordinates to search nearby content from.
-  final List<double> coordinates;
+  final LatLng coordinates;
 
   /// Callback when a content item is pressed.
   final void Function(ContentBase content) onPressed;
 
   /// The command to execute for loading nearby content.
-  final Command1<void, List<double>> loadNearContentCommand;
+  final Command1<void, LatLng> loadNearContentCommand;
 
   /// The list of nearby content items.
   final List<ContentBase> nearContent;
@@ -57,11 +59,8 @@ class _NearbyContentHorizontalListState
     super.didUpdateWidget(oldWidget);
 
     // Reload data if coordinates changed
-    if (oldWidget.coordinates.length != widget.coordinates.length ||
-        (widget.coordinates.isNotEmpty &&
-            oldWidget.coordinates.isNotEmpty &&
-            (oldWidget.coordinates.first != widget.coordinates.first ||
-                oldWidget.coordinates.last != widget.coordinates.last))) {
+    if (oldWidget.coordinates != widget.coordinates ||
+        widget.coordinates.isValid) {
       widget.loadNearContentCommand.execute(widget.coordinates);
     }
   }

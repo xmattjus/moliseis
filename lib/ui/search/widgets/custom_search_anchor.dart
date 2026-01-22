@@ -1,9 +1,9 @@
 import 'dart:math' as math show max;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/core/content_category.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/category/widgets/category_chip.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_list_item.dart';
 import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';

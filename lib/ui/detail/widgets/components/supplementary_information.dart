@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
-import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/ui/detail/view_models/detail_view_model.dart';
 import 'package:moliseis/ui/detail/widgets/components/event_dates_information.dart';
 import 'package:moliseis/ui/detail/widgets/components/information_grid.dart';

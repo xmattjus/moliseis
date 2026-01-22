@@ -1,7 +1,7 @@
 import 'dart:async' show StreamController;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/media/media.dart';
+import 'package:moliseis/data/sources/media.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal_overlay.dart';
 import 'package:provider/provider.dart';

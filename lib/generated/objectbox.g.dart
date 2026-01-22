@@ -14,12 +14,12 @@ import 'package:objectbox/internal.dart'
 import 'package:objectbox/objectbox.dart' as obx;
 import 'package:objectbox_flutter_libs/objectbox_flutter_libs.dart';
 
-import '../domain/models/city/city.dart';
-import '../domain/models/event/event.dart';
-import '../domain/models/media/media.dart';
-import '../domain/models/place/place.dart';
-import '../domain/models/search/search_query.dart';
-import '../domain/models/settings/app_settings.dart';
+import '../data/sources/app_settings.dart';
+import '../data/sources/city.dart';
+import '../data/sources/event.dart';
+import '../data/sources/media.dart';
+import '../data/sources/place.dart';
+import '../data/sources/search_query.dart';
 
 export 'package:objectbox/objectbox.dart'; // so that callers only have to import this file
 

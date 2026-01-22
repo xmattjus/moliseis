@@ -4,7 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/services/objectbox.dart';
-import 'package:moliseis/domain/models/settings/app_settings.dart';
+import 'package:moliseis/data/sources/app_settings.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/core/themes/theme_data.dart';
 import 'package:moliseis/ui/core/ui/window_size_provider.dart';

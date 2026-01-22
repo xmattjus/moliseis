@@ -1,7 +1,8 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/use-cases/detail/detail_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
@@ -10,7 +11,7 @@ class DetailViewModel extends ChangeNotifier {
   final DetailUseCase _detailUseCase;
 
   late Command1<void, int> loadEvent;
-  late Command1<void, List<double>> loadNearContent;
+  late Command1<void, LatLng> loadNearContent;
   late Command1<void, int> loadPlace;
 
   DetailViewModel({required DetailUseCase detailUseCase})
@@ -40,12 +41,12 @@ class DetailViewModel extends ChangeNotifier {
     return result;
   }
 
-  Future<Result<void>> _loadNearContent(List<double> coordinates) async {
+  Future<Result<void>> _loadNearContent(LatLng coordinates) async {
     _nearContent.clear();
 
     var result = await _detailUseCase.getNearEventsByCoords(
-      coordinates[0],
-      coordinates[1],
+      coordinates.latitude,
+      coordinates.longitude,
     );
 
     switch (result) {
@@ -55,8 +56,8 @@ class DetailViewModel extends ChangeNotifier {
     }
 
     result = await _detailUseCase.getNearPlacesByCoords(
-      coordinates[0],
-      coordinates[1],
+      coordinates.latitude,
+      coordinates.longitude,
     );
 
     switch (result) {

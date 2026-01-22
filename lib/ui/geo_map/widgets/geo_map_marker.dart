@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker_painter.dart';
 import 'package:moliseis/utils/extensions.dart';
 
 /// Generates a map marker with the given [ContentBase].
 Marker generateMapMarker(ContentBase content, {void Function()? onPressed}) {
   return Marker(
-    point: LatLng(content.coordinates[0], content.coordinates[1]),
+    point: content.coordinates,
     width: 60.0,
     height: 60.0,
     child: _GeoMapMarkerIcon(

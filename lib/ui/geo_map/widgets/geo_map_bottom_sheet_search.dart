@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_adaptive_title.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';

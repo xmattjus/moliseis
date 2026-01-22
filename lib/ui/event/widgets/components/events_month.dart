@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
-import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 

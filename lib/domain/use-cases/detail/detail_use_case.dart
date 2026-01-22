@@ -1,14 +1,14 @@
-import 'package:moliseis/data/repositories/event/event_repository.dart';
-import 'package:moliseis/data/repositories/place/place_repository.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/event/event.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
-import 'package:moliseis/domain/models/place/place.dart';
-import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/data/sources/event.dart';
+import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/repositories/event_repository.dart';
+import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/utils/result.dart';
 
 class DetailUseCase {

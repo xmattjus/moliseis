@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/repositories/settings/settings_repository.dart';
-import 'package:moliseis/domain/models/settings/theme_brightness.dart';
-import 'package:moliseis/domain/models/settings/theme_type.dart';
+import 'package:moliseis/domain/models/theme_brightness.dart';
+import 'package:moliseis/domain/models/theme_type.dart';
+import 'package:moliseis/domain/repositories/settings_repository.dart';
 
 // TODO(xmattjus): Implement Command & Result patterns.
 class ThemeViewModel extends ChangeNotifier {

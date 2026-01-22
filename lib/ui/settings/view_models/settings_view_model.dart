@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/repositories/settings/settings_repository.dart';
+import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 

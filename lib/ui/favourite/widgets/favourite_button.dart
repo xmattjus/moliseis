@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:provider/provider.dart';

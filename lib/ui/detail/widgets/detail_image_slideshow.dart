@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:moliseis/domain/models/media/media.dart';
+import 'package:moliseis/data/sources/media.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';

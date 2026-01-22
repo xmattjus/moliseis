@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/core/content_category.dart';
-import 'package:moliseis/domain/models/core/content_type.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/ui/core/themes/app_colors_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_effects_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
@@ -164,5 +164,18 @@ extension ListDoubleExtensions on List<double> {
     assert(this[1] >= -180 && this[1] <= 180);
 
     return LatLng(this[0], this[1]);
+  }
+}
+
+extension LatLngExtensions on LatLng {
+  bool get isValid {
+    if (latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180) {
+      return true;
+    }
+
+    return false;
   }
 }

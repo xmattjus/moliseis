@@ -1,8 +1,8 @@
-import 'package:moliseis/data/repositories/city/city_repository.dart';
-import 'package:moliseis/data/repositories/event/event_repository.dart';
-import 'package:moliseis/data/repositories/media/media_repository.dart';
-import 'package:moliseis/data/repositories/place/place_repository.dart';
-import 'package:moliseis/data/repositories/settings/settings_repository.dart';
+import 'package:moliseis/domain/repositories/city_repository.dart';
+import 'package:moliseis/domain/repositories/event_repository.dart';
+import 'package:moliseis/domain/repositories/media_repository.dart';
+import 'package:moliseis/domain/repositories/place_repository.dart';
+import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/result.dart';

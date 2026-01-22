@@ -2,7 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
-import 'package:moliseis/domain/models/core/content_category.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/use-cases/category/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/detail/detail_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';

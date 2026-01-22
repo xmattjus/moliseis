@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_color_utilities/blend/blend.dart';
-import 'package:moliseis/domain/models/core/content_category.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 
 class CustomColorSchemes {
   const CustomColorSchemes._();

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';

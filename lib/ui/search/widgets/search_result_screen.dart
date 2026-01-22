@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';

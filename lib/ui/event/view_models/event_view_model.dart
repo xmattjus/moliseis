@@ -1,9 +1,9 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/repositories/event/event_repository.dart';
-import 'package:moliseis/domain/models/event/event.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/data/sources/event.dart';
+import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 

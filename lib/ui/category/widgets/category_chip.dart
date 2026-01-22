@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/core/content_category.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/ui/core/themes/color_schemes.dart';
 import 'package:moliseis/utils/extensions.dart';
 

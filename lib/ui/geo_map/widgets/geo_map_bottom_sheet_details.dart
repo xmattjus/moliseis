@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
@@ -157,7 +157,7 @@ class GeoMapBottomSheetDetails extends StatelessWidget {
             top: content.description.isNotEmpty ? 16.0 : 0,
           ),
           child: NearbyContentHorizontalList(
-            coordinates: [content.coordinates.first, content.coordinates.last],
+            coordinates: content.coordinates,
             onPressed: onNearContentPressed,
             loadNearContentCommand: viewModel.loadNearContent,
             nearContent: viewModel.nearContent,

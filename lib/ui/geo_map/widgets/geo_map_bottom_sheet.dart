@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
-import 'package:moliseis/domain/models/place/place.dart';
-import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/bottom_sheet_drag_handle.dart';
@@ -256,7 +256,7 @@ class GeoMapBottomSheetDefault extends StatelessWidget {
         ),
         const SizedBox(height: 16.0),
         NearbyContentHorizontalList(
-          coordinates: [currentMapCenter.latitude, currentMapCenter.longitude],
+          coordinates: currentMapCenter,
           onPressed: onNearContentPressed,
           loadNearContentCommand: viewModel.loadNearContent,
           nearContent: viewModel.nearContent,

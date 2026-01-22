@@ -2,7 +2,7 @@ import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
-import 'package:moliseis/domain/models/settings/theme_brightness.dart';
+import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';

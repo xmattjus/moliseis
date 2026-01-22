@@ -2,8 +2,8 @@ import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
-import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';

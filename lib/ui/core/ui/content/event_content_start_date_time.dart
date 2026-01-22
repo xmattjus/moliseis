@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 
 class EventContentStartDateTime extends StatelessWidget {

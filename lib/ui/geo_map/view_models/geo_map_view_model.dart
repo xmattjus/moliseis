@@ -1,11 +1,12 @@
 import 'dart:collection' show UnmodifiableListView, UnmodifiableSetView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/core/content_category.dart';
-import 'package:moliseis/domain/models/core/content_type.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
-import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/content_type.dart';
+import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/domain/use-cases/geo_map/geo_map_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions.dart';
@@ -15,7 +16,7 @@ class GeoMapViewModel extends ChangeNotifier {
   final GeoMapUseCase _geoMapUseCase;
 
   late Command0<void> loadEvents;
-  late Command1<void, List<double>> loadNearContent;
+  late Command1<void, LatLng> loadNearContent;
   late Command0<void> loadPlaces;
   late Command1<void, Set<ContentCategory>> setSelectedCategories;
   late Command1<void, Set<ContentType>> setSelectedTypes;
@@ -84,12 +85,12 @@ class GeoMapViewModel extends ChangeNotifier {
     return result;
   }
 
-  Future<Result<void>> _loadNearContent(List<double> coordinates) async {
+  Future<Result<void>> _loadNearContent(LatLng coordinates) async {
     _nearContent.clear();
 
     var result = await _geoMapUseCase.getNearPlacesByCoords(
-      coordinates[0],
-      coordinates[1],
+      coordinates.latitude,
+      coordinates.longitude,
     );
 
     switch (result) {
@@ -99,8 +100,8 @@ class GeoMapViewModel extends ChangeNotifier {
     }
 
     result = await _geoMapUseCase.getNearEventsByCoords(
-      coordinates[0],
-      coordinates[1],
+      coordinates.latitude,
+      coordinates.longitude,
     );
 
     switch (result) {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_list_item.dart';

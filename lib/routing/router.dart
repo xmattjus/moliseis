@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map/geo_map_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';

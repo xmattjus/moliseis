@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:markdown_widget/config/markdown_generator.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 

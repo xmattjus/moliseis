@@ -1,10 +1,10 @@
-import 'package:moliseis/data/repositories/event/event_repository.dart';
-import 'package:moliseis/data/repositories/place/place_repository.dart';
-import 'package:moliseis/domain/models/core/content_sort.dart';
-import 'package:moliseis/domain/models/event/event.dart';
-import 'package:moliseis/domain/models/event/event_content.dart';
-import 'package:moliseis/domain/models/place/place.dart';
-import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/data/sources/event.dart';
+import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/repositories/event_repository.dart';
+import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/utils/result.dart';
 
 class ExploreUseCase {

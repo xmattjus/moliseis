@@ -2,22 +2,14 @@ import 'dart:async' show StreamController;
 
 import 'package:flutter/material.dart';
 import 'package:moliseis/config/env/env.dart';
-import 'package:moliseis/data/repositories/city/city_repository.dart';
-import 'package:moliseis/data/repositories/city/city_repository_local.dart';
-import 'package:moliseis/data/repositories/event/event_repository.dart';
-import 'package:moliseis/data/repositories/event/event_repository_local.dart';
-import 'package:moliseis/data/repositories/geo_map/geo_map_repository.dart';
-import 'package:moliseis/data/repositories/geo_map/geo_map_repository_remote.dart';
-import 'package:moliseis/data/repositories/media/media_repository.dart';
-import 'package:moliseis/data/repositories/media/media_repository_local.dart';
-import 'package:moliseis/data/repositories/place/place_repository.dart';
-import 'package:moliseis/data/repositories/place/place_repository_local.dart';
-import 'package:moliseis/data/repositories/search/search_repository.dart';
-import 'package:moliseis/data/repositories/search/search_repository_local.dart';
-import 'package:moliseis/data/repositories/settings/settings_repository.dart';
-import 'package:moliseis/data/repositories/settings/settings_repository_local.dart';
-import 'package:moliseis/data/repositories/suggestion/suggestion_repository.dart';
-import 'package:moliseis/data/repositories/suggestion/suggestion_repository_remote.dart';
+import 'package:moliseis/data/repositories/city_repository_impl.dart';
+import 'package:moliseis/data/repositories/event_repository_impl.dart';
+import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
+import 'package:moliseis/data/repositories/media_repository_impl.dart';
+import 'package:moliseis/data/repositories/place_repository_impl.dart';
+import 'package:moliseis/data/repositories/search_repository_impl.dart';
+import 'package:moliseis/data/repositories/settings_repository_impl.dart';
+import 'package:moliseis/data/repositories/suggestion_repository_impl.dart';
 import 'package:moliseis/data/services/api/cloudinary_client.dart';
 import 'package:moliseis/data/services/api/openstreetmap/openstreetmap_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
@@ -28,11 +20,19 @@ import 'package:moliseis/data/services/app_info_service.dart';
 import 'package:moliseis/data/services/external_url_service.dart';
 import 'package:moliseis/data/services/map_url_service.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
-import 'package:moliseis/domain/models/city/city_supabase_table.dart';
-import 'package:moliseis/domain/models/event/event_supabase_table.dart';
-import 'package:moliseis/domain/models/media/media_supabase_table.dart';
-import 'package:moliseis/domain/models/place/place_supabase_table.dart';
-import 'package:moliseis/domain/models/suggestion/suggestion_supabase_table.dart';
+import 'package:moliseis/data/sources/city_supabase_table.dart';
+import 'package:moliseis/data/sources/event_supabase_table.dart';
+import 'package:moliseis/data/sources/media_supabase_table.dart';
+import 'package:moliseis/data/sources/place_supabase_table.dart';
+import 'package:moliseis/data/sources/suggestion_supabase_table.dart';
+import 'package:moliseis/domain/repositories/city_repository.dart';
+import 'package:moliseis/domain/repositories/event_repository.dart';
+import 'package:moliseis/domain/repositories/geo_map_repository.dart';
+import 'package:moliseis/domain/repositories/media_repository.dart';
+import 'package:moliseis/domain/repositories/place_repository.dart';
+import 'package:moliseis/domain/repositories/search_repository.dart';
+import 'package:moliseis/domain/repositories/settings_repository.dart';
+import 'package:moliseis/domain/repositories/suggestion_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/sync/sync_repo_use_case.dart';
 import 'package:moliseis/main.dart';
@@ -50,7 +50,7 @@ List<SingleChildWidget> get providers {
     //#region Repositories (sorted by name ascending)
     Provider(
       create: (_) {
-        return PlaceRepositoryLocal(
+        return PlaceRepositoryImpl(
               supabaseI: Supabase.instance,
               supabaseTable: PlaceSupabaseTable(),
               objectBoxI: objectBox,
@@ -61,7 +61,7 @@ List<SingleChildWidget> get providers {
     ),
     Provider(
       create: (_) {
-        return EventRepositoryLocal(
+        return EventRepositoryImpl(
               supabaseI: Supabase.instance,
               supabaseTable: EventSupabaseTable(),
               objectBoxI: objectBox,
@@ -71,7 +71,7 @@ List<SingleChildWidget> get providers {
     ),
     Provider(
       create: (_) {
-        return MediaRepositoryLocal(
+        return MediaRepositoryImpl(
               supabaseI: Supabase.instance,
               imageSupabaseTable: MediaSupabaseTable(),
               objectBoxI: objectBox,
@@ -82,7 +82,7 @@ List<SingleChildWidget> get providers {
     ),
     Provider(
       create: (_) {
-        return CityRepositoryLocal(
+        return CityRepositoryImpl(
               supabaseI: Supabase.instance,
               placeSupabaseTable: CitySupabaseTable(),
               objectBoxI: objectBox,
@@ -93,13 +93,13 @@ List<SingleChildWidget> get providers {
     ),
     Provider(
       create: (_) {
-        return SearchRepositoryLocal(objectBoxI: objectBox) as SearchRepository;
+        return SearchRepositoryImpl(objectBoxI: objectBox) as SearchRepository;
       },
       lazy: true,
     ),
     Provider(
       create: (context) {
-        return SettingsRepositoryLocal(objectBoxI: objectBox)
+        return SettingsRepositoryImpl(objectBoxI: objectBox)
             as SettingsRepository;
       },
       lazy: true,
@@ -112,7 +112,7 @@ List<SingleChildWidget> get providers {
           apiSecret: Env.cloudinaryProdApiSecret,
         );
 
-        return SuggestionRepositoryRemote(
+        return SuggestionRepositoryImpl(
               supabase: Supabase.instance,
               supabaseTable: SuggestionSupabaseTable(),
               cloudinaryClient: cloudinaryClient,
@@ -122,9 +122,7 @@ List<SingleChildWidget> get providers {
     ),
     Provider<GeoMapRepository>(
       create: (_) {
-        return GeoMapRepositoryRemote(
-              openStreetMapClient: OpenStreetMapClient(),
-            )
+        return GeoMapRepositoryImpl(openStreetMapClient: OpenStreetMapClient())
             as GeoMapRepository;
       },
       lazy: true,

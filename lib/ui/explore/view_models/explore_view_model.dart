@@ -1,10 +1,10 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/repositories/place/place_repository.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
-import 'package:moliseis/domain/models/core/content_category.dart';
-import 'package:moliseis/domain/models/place/place_content.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions.dart';

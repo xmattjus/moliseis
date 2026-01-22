@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/core/content_base.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_attribution.dart';
@@ -21,10 +20,7 @@ class DetailGeoMapPreview extends StatelessWidget {
           children: <Widget>[
             IgnorePointer(
               child: GeoMap(
-                initialCenter: LatLng(
-                  content.coordinates[0],
-                  content.coordinates[1],
-                ),
+                initialCenter: content.coordinates,
                 initialZoom: 16.0,
                 markers: <Marker>[generateMapMarker(content)],
               ),
