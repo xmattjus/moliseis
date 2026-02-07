@@ -8,7 +8,7 @@
 PRODUCT_NAME = moliseis
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = it.moliseis.moliseis
+PRODUCT_BUNDLE_IDENTIFIER = it.benitomatteobercini.moliseis
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2024 it.moliseis. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 it.benitomatteobercini. All rights reserved.
