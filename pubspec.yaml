@@ -6,11 +6,15 @@ publish_to: 'none'
 version: 2.1.0+8
 
 environment:
-  sdk: ^3.10.7
+  sdk: ^3.10.8
 
 dependencies:
   # A
   #animations: ^2.0.11
+  animated_stateful_shell_route:
+    git:
+      url: https://github.com/xmattjus/animated_stateful_shell_route.git
+      ref: main
   # B
   # C
   cached_network_image: ^3.4.1
@@ -33,14 +37,14 @@ dependencies:
     sdk: flutter
   flutter_map: ^8.2.2
   # G
-  go_router: ^17.0.1
+  go_router: ^17.1.0
   # H
   http: ^1.6.0
   # I
   image_picker: ^1.2.1
   intl: any
   # J
-  json_annotation: ^4.9.0
+  json_annotation: ^4.10.0
   # K
   # L
   latlong2: ^0.9.1
@@ -52,8 +56,8 @@ dependencies:
   meta: ^1.16.0
   # N
   # O
-  objectbox: ^5.1.0
-  objectbox_flutter_libs: ^5.1.0
+  objectbox: ^5.2.0
+  objectbox_flutter_libs: ^5.2.0
   # P
   path: ^1.9.1
   path_provider: ^2.1.5
@@ -64,9 +68,9 @@ dependencies:
   # responsive_framework: ^1.5.1
   # result_dart: ^2.0.0
   # S
-  sentry: ^9.10.0
-  sentry_flutter: ^9.10.0
-  sentry_logging: ^9.10.0
+  sentry: ^9.12.0
+  sentry_flutter: ^9.12.0
+  sentry_logging: ^9.12.0
   share_plus: ^12.0.1
   skeletonizer: ^2.1.2
   string_validator: ^1.2.0
@@ -98,14 +102,14 @@ dev_dependencies:
   # H
   # I
   # J
-  json_serializable: ^6.11.2
+  json_serializable: ^6.12.0
   # K
   # L
   lint: ^2.8.0
   # M
   # N
   # O
-  objectbox_generator: ^5.1.0
+  objectbox_generator: ^5.2.0
   # P
   # Q
   # R
