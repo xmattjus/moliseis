@@ -1,3 +1,4 @@
+import 'package:animated_stateful_shell_route/animated_stateful_shell_route.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_base.dart';
@@ -61,7 +62,8 @@ final appRouter = GoRouter(
       name: RouteNames.settings,
       builder: (_, _) => const SettingsScreen(),
     ),
-    StatefulShellRoute.indexedStack(
+    AnimatedStatefulShellRoute(
+      transitionBuilder: ShellRouteTransitions.fade,
       branches: <StatefulShellBranch>[
         StatefulShellBranch(
           navigatorKey: _exploreShellNavigatorKey,
