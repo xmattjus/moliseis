@@ -9,7 +9,7 @@ import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
-import 'package:moliseis/utils/theme_extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 // import 'package:moliseis/features/settings/domain/theme_type.dart';
 import 'package:provider/provider.dart';
 
@@ -24,7 +24,7 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildSectionText(BuildContext context, String s) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Text(s, style: CustomTextStyles.section(context)),
+      child: Text(s, style: AppTextStyles.section(context)),
     );
   }
 

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class WeatherForecastHourlyList extends StatefulWidget {
   final Color borderColor;
@@ -27,10 +26,11 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
 
   @override
   Widget build(BuildContext context) {
-    final vM = widget.viewModel;
-    final nowHour = DateTime.now().hour;
+    final appEffects = context.appEffects;
+    final appSizes = context.appSizes;
 
-    final appSizes = Theme.of(context).extension<AppSizesThemeExtension>()!;
+    final viewModel = widget.viewModel;
+    final nowHour = DateTime.now().hour;
 
     // Schedules the hourly forecast list scroll to the current hour after
     // the first frame is rendered.
@@ -45,7 +45,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
           color: widget.backgroundColor,
           border: Border.all(
             color: widget.borderColor,
-            width: appSizes.borderSize,
+            width: appSizes.borderSide.medium,
           ),
           borderRadius: BorderRadius.circular(25.0),
         ),
@@ -61,9 +61,9 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
               ),
             ),
             ListenableBuilder(
-              listenable: vM.loadHourlyForecast,
+              listenable: viewModel.loadHourlyForecast,
               builder: (_, _) {
-                if (vM.loadHourlyForecast.completed) {
+                if (viewModel.loadHourlyForecast.completed) {
                   return ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 140.0),
                     child: ListView.builder(
@@ -71,7 +71,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                       controller: _hourlyScrollController,
                       padding: const EdgeInsets.all(8.0),
                       itemBuilder: (context, index) {
-                        final hourlyData = vM.getHourlyForecastData!;
+                        final hourlyData = viewModel.getHourlyForecastData!;
                         final hour = () {
                           if (index == nowHour) {
                             return 'Adesso';
@@ -97,12 +97,11 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                                     ),
                                 softWrap: false,
                               ),
-                              icon: PhosphorIcon(
+                              icon: Icon(
                                 const WmoWeatherIconMapper().iconForCode(
                                   hourlyData.weatherCode[index],
                                   hourlyData.isDay?[index] == 1,
                                 ),
-                                color: Colors.white,
                               ),
                               label: Text(
                                 index == nowHour
@@ -116,10 +115,13 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                           if (index == nowHour) {
                             return DecoratedBox(
                               decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.2),
+                                color: appEffects.containerColor2(
+                                  context.colorScheme.primary,
+                                  context.colorScheme.surfaceContainer,
+                                ),
                                 border: Border.all(
-                                  color: Colors.green.withValues(alpha: 0.25),
-                                  width: appSizes.borderSize,
+                                  color: context.appColors.modalBorderColor,
+                                  width: appSizes.borderSide.medium,
                                 ),
                                 borderRadius: BorderRadius.circular(16.0),
                               ),

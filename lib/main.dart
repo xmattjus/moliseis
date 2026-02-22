@@ -6,8 +6,7 @@ import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/app_settings.dart';
 import 'package:moliseis/routing/router.dart';
-import 'package:moliseis/ui/core/themes/theme_data.dart';
-import 'package:moliseis/ui/core/ui/window_size_provider.dart';
+import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -71,7 +70,7 @@ class MoliseIsApp extends StatelessWidget {
         builder: (_, viewModel, _) {
           return MaterialApp.router(
             routerConfig: appRouter,
-            builder: (_, child) => AutoWindowSizeProvider(child: child!),
+            builder: (_, child) => child!,
             title: 'Molise Is',
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
@@ -82,8 +81,8 @@ class MoliseIsApp extends StatelessWidget {
               Locale.fromSubtags(languageCode: 'en'),
               Locale.fromSubtags(languageCode: 'it'),
             ],
-            theme: AppThemeData.light(),
-            darkTheme: AppThemeData.dark(),
+            theme: AppThemeData.light(context: context),
+            darkTheme: AppThemeData.dark(context: context),
             themeMode: viewModel.themeMode,
             debugShowCheckedModeBanner: false,
           );

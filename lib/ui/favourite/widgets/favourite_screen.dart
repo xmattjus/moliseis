@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
+import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
-import 'package:moliseis/ui/core/ui/window_size_provider.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 
 class FavouriteScreen extends StatelessWidget {
@@ -36,21 +35,21 @@ class FavouriteScreen extends StatelessWidget {
                       hasScrollBody: false,
                       child: EmptyView(
                         icon: Icon(
-                          Icons.favorite_border_sharp,
+                          Symbols.favorite_border,
                           color: Colors.redAccent,
                         ),
                         text: Text(
-                          'Il contenuto salvato verrà mostrato qui, prova!',
+                          'Non hai ancora aggiunto nulla ai preferiti.',
                           textAlign: TextAlign.center,
                         ),
                       ),
                     );
                   } else {
-                    return ContentAdaptiveListGridView(
+                    return ContentSliverGrid(
                       viewModel.favouriteEvents + viewModel.favouritePlaces,
                       onPressed: (content) {
                         GoRouter.of(context).goNamed(
-                          RouteNames.favouritesDetails,
+                          RouteNames.favouritesPost,
                           pathParameters: {'id': content.remoteId.toString()},
                           queryParameters: {
                             'isEvent': (content is EventContent
@@ -78,13 +77,7 @@ class FavouriteScreen extends StatelessWidget {
                   );
                 }
 
-                final length =
-                    viewModel.favouriteEventIds.length +
-                    viewModel.favouritePlaceIds.length;
-
-                return WindowSizeProvider.of(context).isCompact
-                    ? SkeletonContentList.sliver(itemCount: length)
-                    : SkeletonContentGrid.sliver(itemCount: length);
+                return const SkeletonContentSliverGrid();
               },
             ),
             const SliverPadding(padding: EdgeInsets.only(bottom: 16.0)),

@@ -77,7 +77,7 @@ class SystemUiOverlayStyles {
     );
   }
 
-  SystemUiOverlayStyle get detail {
+  SystemUiOverlayStyle get post {
     final theme = Theme.of(context);
     const iconBrightness = Brightness.dark;
     final navigationBarColor = theme.colorScheme.surfaceContainer;

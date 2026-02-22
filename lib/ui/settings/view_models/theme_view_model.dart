@@ -3,7 +3,7 @@ import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 
-// TODO(xmattjus): Implement Command & Result patterns.
+// TODO (xmattjus): Implement Command & Result patterns.
 class ThemeViewModel extends ChangeNotifier {
   final SettingsRepository _settingsRepository;
   ThemeType? _themeType;

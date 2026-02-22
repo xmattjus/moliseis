@@ -1,4 +1,5 @@
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:flutter/widgets.dart';
+import 'package:material_symbols_icons/material_symbols_icons.dart';
 
 /// Maps WMO weather codes to the proper weather icon with day/night variants.
 ///
@@ -8,53 +9,52 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 class WmoWeatherIconMapper {
   const WmoWeatherIconMapper();
 
-  static const Map<int, PhosphorIconData> _sharedWeatherCodeMap = {
-    45: PhosphorIconsBold.cloudFog,
-    48: PhosphorIconsBold.cloudFog,
-    51: PhosphorIconsBold.cloudRain,
-    53: PhosphorIconsBold.cloudRain,
-    55: PhosphorIconsBold.cloudRain,
-    56: PhosphorIconsBold.cloudSnow,
-    57: PhosphorIconsBold.cloudSnow,
-    61: PhosphorIconsBold.cloudRain,
-    63: PhosphorIconsBold.cloudRain,
-    65: PhosphorIconsBold.cloudRain,
-    66: PhosphorIconsBold.cloudSnow,
-    67: PhosphorIconsBold.cloudSnow,
-    71: PhosphorIconsBold.snowflake,
-    73: PhosphorIconsBold.snowflake,
-    75: PhosphorIconsBold.snowflake,
-    77: PhosphorIconsBold.cloudSnow,
-    80: PhosphorIconsBold.cloudRain,
-    81: PhosphorIconsBold.cloudRain,
-    82: PhosphorIconsBold.cloudRain,
-    85: PhosphorIconsBold.cloudSnow,
-    86: PhosphorIconsBold.cloudSnow,
-    95: PhosphorIconsBold.cloudLightning,
-    96: PhosphorIconsBold.cloudLightning,
-    99: PhosphorIconsBold.cloudLightning,
+  static const Map<int, IconData> _sharedWeatherCodeMap = {
+    3: Symbols.cloud,
+    45: Symbols.foggy,
+    48: Symbols.mist,
+    51: Symbols.rainy,
+    53: Symbols.rainy,
+    55: Symbols.rainy,
+    56: Symbols.weather_mix,
+    57: Symbols.weather_mix,
+    61: Symbols.rainy,
+    63: Symbols.rainy,
+    65: Symbols.rainy,
+    66: Symbols.weather_mix,
+    67: Symbols.weather_mix,
+    71: Symbols.weather_snowy,
+    73: Symbols.weather_snowy,
+    75: Symbols.weather_snowy,
+    77: Symbols.weather_hail,
+    80: Symbols.rainy,
+    81: Symbols.rainy,
+    82: Symbols.rainy,
+    85: Symbols.weather_snowy,
+    86: Symbols.weather_snowy,
+    95: Symbols.thunderstorm,
+    96: Symbols.weather_hail,
+    99: Symbols.weather_hail,
   };
 
-  static const Map<int, PhosphorIconData> _dayOverrides = {
-    0: PhosphorIconsBold.sun,
-    1: PhosphorIconsBold.sunDim,
-    2: PhosphorIconsBold.cloudSun,
-    3: PhosphorIconsBold.cloudSun,
+  static const Map<int, IconData> _dayOverrides = {
+    0: Symbols.sunny,
+    1: Symbols.wb_sunny,
+    2: Symbols.partly_cloudy_day,
   };
 
-  static const Map<int, PhosphorIconData> _nightOverrides = {
-    0: PhosphorIconsBold.moon,
-    1: PhosphorIconsBold.cloudMoon,
-    2: PhosphorIconsBold.cloudMoon,
-    3: PhosphorIconsBold.cloudMoon,
+  static const Map<int, IconData> _nightOverrides = {
+    0: Symbols.moon_stars,
+    1: Symbols.bedtime,
+    2: Symbols.partly_cloudy_night,
   };
 
-  static const Map<int, PhosphorIconData> _dayWeatherCodeMap = {
+  static const Map<int, IconData> _dayWeatherCodeMap = {
     ..._sharedWeatherCodeMap,
     ..._dayOverrides,
   };
 
-  static const Map<int, PhosphorIconData> _nightWeatherCodeMap = {
+  static const Map<int, IconData> _nightWeatherCodeMap = {
     ..._sharedWeatherCodeMap,
     ..._nightOverrides,
   };
@@ -62,8 +62,8 @@ class WmoWeatherIconMapper {
   /// Returns the appropriate icon for the given [weatherCode] and time of day.
   ///
   /// The [isDay] parameter determines whether to use day or night variants.
-  /// Returns [Icons.help_outline] if the code is not recognized.
-  PhosphorIconData iconForCode(int weatherCode, bool isDay) {
+  /// Returns [Symbols.help_outline] if the code is not recognized.
+  IconData iconForCode(int weatherCode, bool isDay) {
     return () {
           if (isDay) {
             return _dayWeatherCodeMap[weatherCode];
@@ -71,6 +71,6 @@ class WmoWeatherIconMapper {
             return _nightWeatherCodeMap[weatherCode];
           }
         }() ??
-        PhosphorIconsBold.questionMark;
+        Symbols.help_outline;
   }
 }

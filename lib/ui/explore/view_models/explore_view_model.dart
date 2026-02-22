@@ -7,7 +7,7 @@ import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/utils/command.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class ExploreViewModel extends ChangeNotifier {

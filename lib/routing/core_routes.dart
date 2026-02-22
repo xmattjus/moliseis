@@ -4,19 +4,19 @@ import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dar
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/use-cases/category/category_use_case.dart';
-import 'package:moliseis/domain/use-cases/detail/detail_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
+import 'package:moliseis/domain/use-cases/post/post_use_case.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/category/view_models/category_view_model.dart';
 import 'package:moliseis/ui/category/widgets/category_screen.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
-import 'package:moliseis/ui/detail/view_models/detail_view_model.dart';
-import 'package:moliseis/ui/detail/widgets/detail_screen.dart';
+import 'package:moliseis/ui/post/view_models/post_view_model.dart';
+import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/constants.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 GoRoute categoryRoute({required String name, required String childName}) {
@@ -55,13 +55,13 @@ GoRoute categoryRoute({required String name, required String childName}) {
         builder: (context, _) => CategoryScreen(viewModel: context.read()),
       );
     },
-    routes: <RouteBase>[detailRoute(name: childName)],
+    routes: <RouteBase>[postRoute(name: childName)],
   );
 }
 
-GoRoute detailRoute({required String name}) {
+GoRoute postRoute({required String name}) {
   return GoRoute(
-    path: RoutePaths.details,
+    path: RoutePaths.post,
     name: name,
     builder: (context, state) {
       final id = int.parse(state.pathParameters['id']!);
@@ -69,7 +69,7 @@ GoRoute detailRoute({required String name}) {
         state.uri.queryParameters['isEvent'] ?? 'false',
       );
 
-      final detailUseCase = DetailUseCase(
+      final postUseCase = PostUseCase(
         cachedWeatherApiClient: CachedWeatherApiClient(
           weatherApiClient: WeatherApiClient(),
           currentWeatherCache: context.read(),
@@ -80,10 +80,10 @@ GoRoute detailRoute({required String name}) {
         placeRepository: context.read(),
       );
 
-      final viewModel = DetailViewModel(detailUseCase: detailUseCase);
+      final viewModel = PostViewModel(postUseCase: postUseCase);
 
       final weatherViewModel = WeatherViewModel(
-        detailUseCase: detailUseCase,
+        postUseCase: postUseCase,
         weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
         weatherCodeIconMapper: const WmoWeatherIconMapper(),
       );
@@ -94,7 +94,7 @@ GoRoute detailRoute({required String name}) {
         viewModel.loadPlace.execute(id);
       }
 
-      return DetailScreen(
+      return PostScreen(
         isEvent: isEvent,
         viewModel: viewModel,
         weatherViewModel: weatherViewModel,

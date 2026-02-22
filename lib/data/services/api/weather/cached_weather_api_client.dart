@@ -108,7 +108,7 @@ class CachedWeatherApiClient {
         ),
       );
 
-      debugPrint('Cache added for key: $cacheKey (current, hourly, daily)');
+      debugPrint('Cache added for key: $cacheKey');
     }
 
     return result;

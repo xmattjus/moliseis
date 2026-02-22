@@ -27,12 +27,14 @@ class EventViewModel extends ChangeNotifier {
   var _byDate = <EventContent>[];
   final _next = <EventContent>[];
   var _nextIds = <int>[];
+  var _selectedDate = DateTime.now();
 
   UnmodifiableListView<EventContent> get all => UnmodifiableListView(_all);
   UnmodifiableListView<EventContent> get byMonth =>
       UnmodifiableListView(_byDate);
   UnmodifiableListView<EventContent> get next => UnmodifiableListView(_next);
   UnmodifiableListView<int> get nextIds => UnmodifiableListView(_nextIds);
+  DateTime get selectedDate => _selectedDate;
 
   Future<Result<void>> _loadAll() async {
     final result = await _eventRepository.getByCurrentYear();
@@ -51,6 +53,8 @@ class EventViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _loadByDate(DateTime date) async {
+    _selectedDate = date;
+
     final result = await _eventRepository.getByDate(date);
 
     switch (result) {

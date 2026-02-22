@@ -89,7 +89,7 @@ class FavouriteViewModel extends ChangeNotifier {
   }
 
   Future<void> _getEventFromRepository(int id) async {
-    // Fetches the event details and adds it to favourites.
+    // Fetches the event post and adds it to favourites.
     final result = await _favouriteGetIdsUseCase.getEventById(id);
 
     switch (result) {
@@ -100,7 +100,7 @@ class FavouriteViewModel extends ChangeNotifier {
   }
 
   Future<void> _getPlaceFromRepository(int id) async {
-    // Fetches the place details and adds it to favourites.
+    // Fetches the place post and adds it to favourites.
     final result = await _favouriteGetIdsUseCase.getPlaceById(id);
 
     switch (result) {

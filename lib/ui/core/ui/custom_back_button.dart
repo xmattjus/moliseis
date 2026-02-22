@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 class CustomBackButton extends StatelessWidget {
   const CustomBackButton({
@@ -32,7 +33,9 @@ class CustomBackButton extends StatelessWidget {
             backgroundColor:
                 backgroundColor ?? Theme.of(context).colorScheme.surface,
           ),
-          icon: Icon(Platform.isIOS ? Icons.arrow_back_ios : Icons.arrow_back),
+          icon: Icon(
+            Platform.isIOS ? Symbols.arrow_back_ios : Symbols.arrow_back,
+          ),
         ),
       ),
     );

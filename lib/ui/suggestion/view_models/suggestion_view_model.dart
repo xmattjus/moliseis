@@ -10,7 +10,6 @@ import 'package:moliseis/data/sources/suggestion.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/suggestion_repository.dart';
 import 'package:moliseis/utils/command.dart';
-import 'package:moliseis/utils/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
 
@@ -37,13 +36,10 @@ class SuggestionViewModel extends ChangeNotifier {
   String? place;
   DateTime? _startDate;
   ContentCategory? type;
-  final _categories = ContentCategory.values.minusUnknown;
 
   DateTime? get endDate => _endDate;
   UnmodifiableListView<XFile> get mediaFileList =>
       UnmodifiableListView<XFile>(_mediaFileList);
-  UnmodifiableListView<ContentCategory> get categories =>
-      UnmodifiableListView<ContentCategory>(_categories);
   DateTime? get startDate => _startDate;
 
   late Command0<void> addImages;

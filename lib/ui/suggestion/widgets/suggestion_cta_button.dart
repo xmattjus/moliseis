@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 
@@ -32,7 +33,7 @@ class SuggestionCTAButton extends StatelessWidget {
                       children: <Widget>[
                         Text(
                           'Suggerisci un luogo o un evento',
-                          style: CustomTextStyles.titleSmaller(
+                          style: AppTextStyles.titleSmaller(
                             context,
                           )?.copyWith(color: fgColor),
                         ),
@@ -45,7 +46,7 @@ class SuggestionCTAButton extends StatelessWidget {
                     ),
                   ),
                 ),
-                Icon(Icons.maps_ugc, color: fgColor),
+                Icon(Symbols.maps_ugc, color: fgColor),
               ],
             ),
           ),

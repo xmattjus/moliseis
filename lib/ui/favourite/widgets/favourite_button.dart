@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/ui/core/ui/blurred_box.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 enum FavouriteButtonType { small, wide }
@@ -17,32 +19,38 @@ class FavouriteButton extends StatelessWidget {
     super.key,
     this.color,
     required this.content,
-    this.radius,
+    this.borderRadius,
   }) : _type = FavouriteButtonType.small;
 
   /// Creates an actionable [OutlinedButton.icon] to set the saved state of the
   /// content.
-  const FavouriteButton.wide({super.key, required this.content, this.radius})
-    : color = null,
-      _type = FavouriteButtonType.wide;
+  const FavouriteButton.wide({
+    super.key,
+    required this.content,
+    this.borderRadius,
+  }) : color = null,
+       _type = FavouriteButtonType.wide;
 
   final Color? color;
   final ContentBase content;
-  final double? radius;
+  final BorderRadius? borderRadius;
   final FavouriteButtonType _type;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
+    final appShapes = context.appShapes;
 
     return Consumer<FavouriteViewModel>(
       builder: (_, viewModel, _) {
         final isSaved = viewModel.isFavourite(content);
 
         final shape = RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(
-            radius ?? (isSaved ? Shapes.medium : Shapes.full),
-          ),
+          borderRadius:
+              borderRadius ??
+              (isSaved
+                  ? appShapes.circular.cornerMedium
+                  : appShapes.circular.cornerFull),
         );
 
         switch (_type) {
@@ -57,27 +65,30 @@ class FavouriteButton extends StatelessWidget {
                 transitionBuilder: (child, animation) {
                   return FadeTransition(opacity: animation, child: child);
                 },
-                child: RawMaterialButton(
-                  key: ValueKey<bool>(isSaved),
-                  onPressed: onPressed(content, isSaved, viewModel),
-                  fillColor: isSaved ? colorScheme.errorContainer : null,
-                  elevation: 0,
-                  focusElevation: 0,
-                  hoverElevation: 0,
-                  highlightElevation: 0,
-                  focusColor: feedbackColor.withValues(alpha: 0.08),
-                  hoverColor: feedbackColor.withValues(alpha: 0.08),
-                  splashColor: splashColor.withValues(alpha: 0.1),
-                  constraints: const BoxConstraints.expand(
-                    width: 40.0,
-                    height: 40.0,
-                  ),
-                  shape: shape,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  child: Icon(
-                    isSaved ? Icons.favorite : Icons.favorite_border,
-                    color: isSaved ? colorScheme.error : color,
-                    size: 24.0,
+                child: BlurredBox(
+                  backgroundColor: isSaved
+                      ? Color.alphaBlend(
+                          Colors.red.withAlpha(36),
+                          colorScheme.surfaceContainer.withAlpha(64),
+                        )
+                      : null,
+                  borderRadius: shape.borderRadius as BorderRadius?,
+                  child: IconButton(
+                    key: ValueKey<bool>(isSaved),
+                    onPressed: onPressed(content, isSaved, viewModel),
+                    focusColor: feedbackColor.withValues(alpha: 0.08),
+                    hoverColor: feedbackColor.withValues(alpha: 0.08),
+                    splashColor: splashColor.withValues(alpha: 0.1),
+                    constraints: const BoxConstraints.expand(
+                      width: 40.0,
+                      height: 40.0,
+                    ),
+                    icon: Icon(
+                      isSaved ? Symbols.favorite : Symbols.favorite_border,
+                      fill: isSaved ? 1.0 : 0.0,
+                      color: isSaved ? Colors.redAccent : color,
+                      size: 24.0,
+                    ),
                   ),
                 ),
               ),
@@ -86,17 +97,37 @@ class FavouriteButton extends StatelessWidget {
             return OutlinedButton.icon(
               onPressed: onPressed(content, isSaved, viewModel),
               style: ButtonStyle(
+                side: WidgetStateProperty.resolveWith((states) {
+                  if (isSaved && !states.contains(WidgetState.pressed)) {
+                    return BorderSide(
+                      color: Colors.redAccent,
+                      width: context.appSizes.borderSide.large,
+                    );
+                  }
+
+                  return null;
+                }),
                 shape: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.pressed)) {
                     return RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(Shapes.medium),
+                      borderRadius: appShapes.circular.cornerMedium,
                     );
                   }
 
                   return shape;
                 }),
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.pressed)) {
+                    return colorScheme.onSurfaceVariant;
+                  }
+
+                  return isSaved ? Colors.redAccent : null;
+                }),
               ),
-              icon: Icon(isSaved ? Icons.favorite : Icons.favorite_outline),
+              icon: Icon(
+                isSaved ? Symbols.favorite : Symbols.favorite_border,
+                fill: isSaved ? 1.0 : 0.0,
+              ),
               label: Text(isSaved ? 'Rimuovi' : 'Salva'),
             );
         }

@@ -7,7 +7,7 @@ import 'package:moliseis/data/sources/search_query.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SearchRepositoryImpl implements SearchRepository {

@@ -1,12 +1,13 @@
 import 'dart:io' show File;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class SuggestionImageGallery extends StatelessWidget {
   const SuggestionImageGallery({super.key, required this.viewModel});
@@ -15,13 +16,15 @@ class SuggestionImageGallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appShapes = context.appShapes;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: 8.0,
       children: [
-        const Padding(
+        const TextSectionDivider(
+          'Foto',
           padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: TextSectionDivider('Foto'),
         ),
         SizedBox(
           height: 72.0,
@@ -50,7 +53,7 @@ class SuggestionImageGallery extends StatelessWidget {
                       height: 72.0,
                       elevation: 0,
                       child: const Center(
-                        child: Icon(Icons.add_a_photo_outlined, size: 24.0),
+                        child: Icon(Symbols.add_a_photo, size: 24.0),
                       ),
                       onPressed: () async =>
                           await viewModel.addImages.execute(),
@@ -63,7 +66,7 @@ class SuggestionImageGallery extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       ClipRRect(
-                        borderRadius: BorderRadius.circular(Shapes.medium),
+                        borderRadius: appShapes.circular.cornerMedium,
                         child: CustomImage.file(
                           File(viewModel.mediaFileList[index].path),
                           width: 72.0,
@@ -85,10 +88,10 @@ class SuggestionImageGallery extends StatelessWidget {
                         ),
                         padding: const EdgeInsets.all(4.0),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(Shapes.medium),
+                          borderRadius: appShapes.circular.cornerMedium,
                         ),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        child: const Icon(Icons.remove, size: 20.0),
+                        child: const Icon(Symbols.remove, size: 20.0),
                       ),
                     ],
                   );

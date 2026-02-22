@@ -10,7 +10,7 @@ import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/utils/command.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SearchViewModel extends ChangeNotifier {
@@ -24,6 +24,7 @@ class SearchViewModel extends ChangeNotifier {
   late Command0 loadRelatedResults;
   late Command1<void, String> loadRelatedResultsIds;
   late Command1<void, String> removeFromHistory;
+  late Command1<void, String> loadSuggestions;
 
   SearchViewModel({
     required EventRepository eventRepository,
@@ -38,6 +39,7 @@ class SearchViewModel extends ChangeNotifier {
     loadRelatedResults = Command0(_loadRelatedResults);
     loadRelatedResultsIds = Command1(_loadRelatedResultsIds);
     removeFromHistory = Command1(_removeFromHistory);
+    loadSuggestions = Command1(_loadSuggestions);
   }
 
   var _history = <String>[];
@@ -165,6 +167,40 @@ class SearchViewModel extends ChangeNotifier {
 
     if (result is Error) {
       _history.add(query);
+    }
+
+    return const Result.success(null);
+  }
+
+  Future<Result> _loadSuggestions(String query) async {
+    if (query.length < 3) {
+      return const Result.success(null);
+    }
+
+    _results.clear();
+
+    final job1 = await _searchRepository.getPlaceIdsByQuery(query);
+
+    if (job1 is Success<List<int>>) {
+      for (final id in job1.value) {
+        final result = await _exploreGetByIdUseCase.getById(id);
+
+        if (result is Success<PlaceContent>) {
+          _results.add(result.value);
+        }
+      }
+    }
+
+    final job2 = await _searchRepository.getEventIdsByQuery(query);
+
+    if (job2 is Success<List<int>>) {
+      for (final id in job2.value) {
+        final result = await _eventRepository.getById(id);
+
+        if (result is Success<Event>) {
+          _results.add(EventContent.fromEvent(result.value));
+        }
+      }
     }
 
     return const Result.success(null);

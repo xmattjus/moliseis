@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class EventContentStartDateTime extends StatelessWidget {
   const EventContentStartDateTime(
@@ -16,11 +18,11 @@ class EventContentStartDateTime extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = iconColor ?? Theme.of(context).colorScheme.primary;
+    final color = iconColor ?? context.colorScheme.primary;
 
-    final textStyle = textColor != null
-        ? CustomTextStyles.subtitle(context)?.copyWith(color: textColor)
-        : CustomTextStyles.subtitle(context);
+    final textStyle = AppTextStyles.subtitle(
+      context,
+    )?.copyWith(color: textColor);
 
     final localizations = MaterialLocalizations.of(context);
 
@@ -29,7 +31,7 @@ class EventContentStartDateTime extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       spacing: 4.0,
       children: <Widget>[
-        Icon(Icons.calendar_month_outlined, size: 18.0, color: color),
+        Icon(Symbols.calendar_month, size: 18.0, color: color),
         Flexible(
           flex: 2,
           child: Text(
@@ -40,7 +42,7 @@ class EventContentStartDateTime extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4.0),
-        Icon(Icons.schedule_outlined, size: 18.0, color: color),
+        Icon(Symbols.schedule, size: 18.0, color: color),
         Flexible(
           child: Text(
             localizations.formatTimeOfDay(

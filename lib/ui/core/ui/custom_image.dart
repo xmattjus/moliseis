@@ -4,6 +4,7 @@ import 'dart:math' show sqrt;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 
 class CustomImage extends StatelessWidget {
@@ -148,7 +149,7 @@ class CustomImage extends StatelessWidget {
           width: width,
           height: height,
           child: EmptyView(
-            icon: const Icon(Icons.image_not_supported_outlined, color: color),
+            icon: const Icon(Symbols.image_not_supported, color: color),
             text: height > 148 ? widget : null,
           ),
         );

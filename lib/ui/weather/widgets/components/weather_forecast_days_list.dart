@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
-import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
-import 'package:moliseis/utils/extensions.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class WeatherForecastDaysList extends StatefulWidget {
   final Color borderColor;
@@ -42,9 +41,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
 
   @override
   Widget build(BuildContext context) {
-    final vM = widget.viewModel;
-
-    final appSizes = Theme.of(context).extension<AppSizesThemeExtension>()!;
+    final viewModel = widget.viewModel;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(25.0),
@@ -53,7 +50,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
           color: widget.backgroundColor,
           border: Border.all(
             color: widget.borderColor,
-            width: appSizes.borderSize,
+            width: context.appSizes.borderSide.medium,
           ),
           borderRadius: BorderRadius.circular(25.0),
         ),
@@ -62,10 +59,10 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             ListenableBuilder(
-              listenable: vM.loadDailyForecast,
+              listenable: viewModel.loadDailyForecast,
               builder: (context, child) {
-                if (vM.loadDailyForecast.completed) {
-                  final dailyData = vM.getDailyForecastData!;
+                if (viewModel.loadDailyForecast.completed) {
+                  final dailyData = viewModel.getDailyForecastData!;
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -74,15 +71,10 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                     itemBuilder: (context, index) {
                       final date = DateTime.parse(dailyData.time[index]);
 
-                      final weekday = [
-                        _dateSymbols.STANDALONESHORTWEEKDAYS[1],
-                        _dateSymbols.STANDALONESHORTWEEKDAYS[2],
-                        _dateSymbols.STANDALONESHORTWEEKDAYS[3],
-                        _dateSymbols.STANDALONESHORTWEEKDAYS[4],
-                        _dateSymbols.STANDALONESHORTWEEKDAYS[5],
-                        _dateSymbols.STANDALONESHORTWEEKDAYS[6],
-                        _dateSymbols.STANDALONESHORTWEEKDAYS[0],
-                      ][date.weekday - 1];
+                      final weekDays = _dateSymbols.STANDALONESHORTWEEKDAYS
+                          .shift(1);
+
+                      final weekday = weekDays[date.weekday - 1];
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -103,18 +95,15 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                                 Text(
                                   _isToday(date) ? 'Oggi' : weekday,
                                   style: context.defaultTextStyle.style
-                                      .copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      .copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: <Widget>[
-                                    const PhosphorIcon(
-                                      PhosphorIconsFill.drop,
+                                    const Icon(
+                                      Symbols.water_drop,
                                       size: 16.0,
-                                      color: Colors.white,
+                                      fill: 1.0,
                                     ),
                                     Text(
                                       ' ${dailyData.precipitationProbabilityMax[index]}%',
@@ -124,23 +113,22 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                                     ),
                                   ],
                                 ),
-                                PhosphorIcon(
+                                Icon(
                                   const WmoWeatherIconMapper().iconForCode(
                                     dailyData.weatherCode[index],
                                     true,
                                   ),
                                   size: 24.0,
-                                  color: Colors.white,
                                 ),
                                 _temperatureForecast(
                                   temperature:
                                       dailyData.temperature2mMin[index],
-                                  iconData: PhosphorIconsFill.arrowDownLeft,
+                                  iconData: Symbols.south_west,
                                 ),
                                 _temperatureForecast(
                                   temperature:
                                       dailyData.temperature2mMax[index],
-                                  iconData: PhosphorIconsFill.arrowUpRight,
+                                  iconData: Symbols.north_east,
                                 ),
                                 const SizedBox(height: 40.0),
                               ],
@@ -163,14 +151,14 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
 
   Widget _temperatureForecast({
     required double temperature,
-    required PhosphorIconData iconData,
+    required IconData iconData,
   }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       mainAxisSize: MainAxisSize.min,
       spacing: 4.0,
       children: <Widget>[
-        PhosphorIcon(iconData, size: 16.0, color: Colors.white),
+        Icon(iconData, size: 16.0),
         Text(
           '${temperature.toStringAsFixed(0)}°',
           style: Theme.of(

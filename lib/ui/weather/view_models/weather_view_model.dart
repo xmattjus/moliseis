@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
-import 'package:moliseis/domain/use-cases/detail/detail_use_case.dart';
+import 'package:moliseis/domain/use-cases/post/post_use_case.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class WeatherViewModel extends ChangeNotifier {
-  final DetailUseCase _detailUseCase;
+  final PostUseCase _postUseCase;
   final WmoWeatherDescriptionMapper _weatherDescriptionMapper;
   final WmoWeatherIconMapper _weatherCodeIconMapper;
 
@@ -20,10 +20,10 @@ class WeatherViewModel extends ChangeNotifier {
   late Command1<void, LatLng> loadDailyForecast;
 
   WeatherViewModel({
-    required DetailUseCase detailUseCase,
+    required PostUseCase postUseCase,
     required WmoWeatherDescriptionMapper weatherDescriptionMapper,
     required WmoWeatherIconMapper weatherCodeIconMapper,
-  }) : _detailUseCase = detailUseCase,
+  }) : _postUseCase = postUseCase,
        _weatherDescriptionMapper = weatherDescriptionMapper,
        _weatherCodeIconMapper = weatherCodeIconMapper {
     loadCurrentForecast = Command1(_loadCurrentWeatherForecast);
@@ -32,7 +32,7 @@ class WeatherViewModel extends ChangeNotifier {
   }
 
   var _currentTemperatureCelsius = '--.-';
-  PhosphorIconData _currentWeatherCodeIcon = PhosphorIconsBold.question;
+  IconData _currentWeatherCodeIcon = Symbols.question_mark;
   var _currentWeatherDescription = 'Meteo sconosciuto';
   var _isDay = false;
 
@@ -49,7 +49,7 @@ class WeatherViewModel extends ChangeNotifier {
   DailyWeatherForecastData? get getDailyForecastData => _dailyForecastData;
 
   Future<Result<void>> _loadCurrentWeatherForecast(LatLng coordinates) async {
-    final result = await _detailUseCase.getCurrentWeatherForecast(
+    final result = await _postUseCase.getCurrentWeatherForecast(
       coordinates.latitude,
       coordinates.longitude,
     );
@@ -70,7 +70,7 @@ class WeatherViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _loadHourlyWeatherForecast(LatLng coordinates) async {
-    final result = await _detailUseCase.getHourlyWeatherForecast(
+    final result = await _postUseCase.getHourlyWeatherForecast(
       coordinates.latitude,
       coordinates.longitude,
     );
@@ -83,7 +83,7 @@ class WeatherViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _loadDailyWeatherForecast(LatLng coordinates) async {
-    final result = await _detailUseCase.getDailyWeatherForecast(
+    final result = await _postUseCase.getDailyWeatherForecast(
       coordinates.latitude,
       coordinates.longitude,
     );

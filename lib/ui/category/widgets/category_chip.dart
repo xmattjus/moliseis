@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/ui/core/themes/color_schemes.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class CategoryChip extends StatelessWidget {
   const CategoryChip(
@@ -20,25 +20,19 @@ class CategoryChip extends StatelessWidget {
   final void Function() onPressed;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Theme(
-      data: theme.copyWith(
-        colorScheme: CustomColorSchemes.fromContentCategory(
-          category,
-          theme.brightness,
-        ),
-      ),
-      child: InputChip(
-        avatar: Icon(isSelected ? Icons.check : category.icon),
-        label: Text(category.label),
-        selected: isSelected,
-        deleteIcon: isSelected ? const Icon(Icons.close) : null,
-        onDeleted: onDeleted,
-        backgroundColor: backgroundColor,
-        onPressed: onPressed,
-        showCheckmark: false,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Theme(
+    data: context.theme.copyWith(
+      colorScheme: context.appColorSchemes.byCategory(category),
+    ),
+    child: InputChip(
+      avatar: Icon(isSelected ? Symbols.check : category.icon),
+      label: Text(category.label),
+      selected: isSelected,
+      deleteIcon: isSelected ? const Icon(Symbols.close) : null,
+      onDeleted: onDeleted,
+      backgroundColor: backgroundColor,
+      onPressed: onPressed,
+      showCheckmark: false,
+    ),
+  );
 }

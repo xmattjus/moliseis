@@ -1,11 +1,14 @@
 // Stateful nested navigation based on:
 // https://github.com/flutter/packages/blob/main/packages/go_router/example/lib/stateful_shell_route.dart
 
-import 'package:flutter/material.dart' hide kBottomNavigationBarHeight;
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
-import 'package:moliseis/utils/constants.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:moliseis/ui/core/ui/adaptive_navigation_bar.dart';
+import 'package:moliseis/ui/core/ui/app_navigation_rail.dart';
+import 'package:moliseis/utils/enums.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ScaffoldShell extends StatelessWidget {
   const ScaffoldShell({
@@ -18,65 +21,56 @@ class ScaffoldShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final windowSizeClass = context.windowSizeClass;
     return AnnotatedRegion(
       value: SystemUiOverlayStyles(context).scaffoldShell,
       child: Scaffold(
-        body: _navigationShell,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _navigationShell.currentIndex,
-          destinations: _buildDestinations,
-          onDestinationSelected: _onDestinationSelected,
-          height: kNavigationBarHeight,
+        body: Row(
+          children: <Widget>[
+            if (windowSizeClass.isAtLeast(WindowSizeClass.expanded))
+              AppNavigationRail(
+                selectedIndex: _navigationShell.currentIndex,
+                onDestinationSelected: _onDestinationSelected,
+                destinations: _buildDestinations,
+              ),
+            Expanded(child: _navigationShell),
+          ],
         ),
+        bottomNavigationBar: windowSizeClass.isAtMost(WindowSizeClass.medium)
+            ? AdaptiveNavigationBar(
+                selectedIndex: _navigationShell.currentIndex,
+                onDestinationSelected: _onDestinationSelected,
+                destinations: _buildDestinations,
+              )
+            : null,
         resizeToAvoidBottomInset: false,
         extendBody: true,
       ),
     );
   }
 
-  List<NavigationDestination> get _buildDestinations {
-    return List.generate(4, (index) {
-      final icon = switch (index) {
-        0 => PhosphorIcon(
-          _navigationShell.currentIndex == index
-              ? PhosphorIconsDuotone.house
-              : PhosphorIconsRegular.house,
-          duotoneSecondaryColor: Colors.green,
-        ),
-        1 => PhosphorIcon(
-          _navigationShell.currentIndex == index
-              ? PhosphorIconsDuotone.heartStraight
-              : PhosphorIconsRegular.heartStraight,
-          duotoneSecondaryColor: Colors.green,
-        ),
-        2 => PhosphorIcon(
-          _navigationShell.currentIndex == index
-              ? PhosphorIconsDuotone.calendarStar
-              : PhosphorIconsRegular.calendarStar,
-          duotoneSecondaryColor: Colors.green,
-        ),
-        3 => PhosphorIcon(
-          _navigationShell.currentIndex == index
-              ? PhosphorIconsDuotone.globeStand
-              : PhosphorIconsRegular.globeStand,
-          duotoneSecondaryColor: Colors.green,
-        ),
-        int() => throw RangeError(
-          '$index out of range, expected range >= 0 && <= 3',
-        ),
-      };
-      final label = switch (index) {
-        0 => 'Esplora',
-        1 => 'Preferiti',
-        2 => 'Eventi',
-        3 => 'Mappa',
-        int() => throw RangeError(
-          '$index out of range, expected range >= 0 && <= 3',
-        ),
-      };
-      return NavigationDestination(icon: icon, label: label);
-    }, growable: false);
-  }
+  List<NavigationDestination> get _buildDestinations => const [
+    NavigationDestination(
+      icon: Icon(Symbols.home),
+      selectedIcon: Icon(Symbols.home, fill: 1.0),
+      label: 'Esplora',
+    ),
+    NavigationDestination(
+      icon: Icon(Symbols.favorite_rounded),
+      selectedIcon: Icon(Symbols.favorite_rounded, fill: 1.0),
+      label: 'Preferiti',
+    ),
+    NavigationDestination(
+      icon: Icon(Symbols.event),
+      selectedIcon: Icon(Symbols.event, fill: 1.0),
+      label: 'Eventi',
+    ),
+    NavigationDestination(
+      icon: Icon(Symbols.map),
+      selectedIcon: Icon(Symbols.map, fill: 1.0),
+      label: 'Mappa',
+    ),
+  ];
 
   void _onDestinationSelected(int index) {
     _navigationShell.goBranch(

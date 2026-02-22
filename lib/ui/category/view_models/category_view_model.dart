@@ -1,5 +1,4 @@
-import 'dart:collection' show UnmodifiableListView;
-
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -11,7 +10,7 @@ import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/category/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/utils/command.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class CategoryViewModel extends ChangeNotifier {
@@ -24,6 +23,8 @@ class CategoryViewModel extends ChangeNotifier {
   late Command1<void, ContentSort> setSort;
   late Command1<void, Set<ContentType>> setSelectedTypes;
 
+  late DeepCollectionEquality equality;
+
   CategoryViewModel({
     required CategoryUseCase categoryUseCase,
     required ExploreUseCase exploreGetByIdUseCase,
@@ -35,19 +36,23 @@ class CategoryViewModel extends ChangeNotifier {
     setSelectedCategories = Command1(_setSelectedCategories);
     setSort = Command1(_setSort);
     setSelectedTypes = Command1(_setSelectedTypes);
+
+    equality = const DeepCollectionEquality();
   }
 
   final _content = <ContentBase>[];
   var _selectedCategories = Set<ContentCategory>.from(
     ContentCategory.values.minusUnknown,
   );
-  var _selectedTypes = {ContentType.place, ContentType.event};
+  var _selectedTypes = Set<ContentType>.from(ContentType.values);
   ContentSort? _sort;
 
   UnmodifiableListView<ContentBase> get content =>
       UnmodifiableListView(_content);
-  Set<ContentCategory> get selectedCategories =>
-      Set<ContentCategory>.from(_selectedCategories);
+  UnmodifiableSetView<ContentCategory> get selectedCategories =>
+      UnmodifiableSetView(_selectedCategories);
+  UnmodifiableSetView<ContentType> get selectedTypes =>
+      UnmodifiableSetView(_selectedTypes);
   ContentSort get sort => _sort ??= _settingsRepository.contentSort;
 
   Future<Result<void>> _load() async {
@@ -77,10 +82,6 @@ class CategoryViewModel extends ChangeNotifier {
             return Result.error(job2.error);
         }
       }
-
-      notifyListeners();
-
-      return const Result.success(null);
     } else {
       if (_selectedTypes.contains(ContentType.place)) {
         final job1 = await _exploreGetByIdUseCase.getAllPlaces();
@@ -103,16 +104,22 @@ class CategoryViewModel extends ChangeNotifier {
             return Result.error(job2.error);
         }
       }
-
-      notifyListeners();
-
-      return const Result.success(null);
     }
+
+    await _sortContent(sort);
+
+    notifyListeners();
+
+    return const Result.success(null);
   }
 
   Future<Result<void>> _setSelectedCategories(
     Set<ContentCategory> categories,
   ) async {
+    if (equality.equals(categories, _selectedCategories)) {
+      return const Result.success(null);
+    }
+
     _selectedCategories = categories;
 
     _content.clear();
@@ -123,6 +130,10 @@ class CategoryViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _setSelectedTypes(Set<ContentType> types) async {
+    if (equality.equals(types, _selectedTypes)) {
+      return const Result.success(null);
+    }
+
     _selectedTypes = types;
 
     _content.clear();
@@ -133,18 +144,26 @@ class CategoryViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _setSort(ContentSort sort) async {
-    _sort = sort;
-
-    if (sort == ContentSort.byName) {
-      _content.sort((a, b) => a.name.compareTo(b.name));
-    } else if (sort == ContentSort.byDate) {
-      _content.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
+    if (sort == _sort) {
+      return const Result.success(null);
     }
+
+    await _sortContent(sort);
 
     notifyListeners();
 
     _settingsRepository.setContentSort(sort);
 
     return const Result.success(null);
+  }
+
+  Future<void> _sortContent(ContentSort sort) async {
+    _sort = sort;
+
+    if (_sort == ContentSort.byName) {
+      _content.sort((a, b) => a.name.compareTo(b.name));
+    } else if (_sort == ContentSort.byDate) {
+      _content.sort((a, b) => b.modifiedAt.compareTo(a.modifiedAt));
+    }
   }
 }

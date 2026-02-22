@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker_painter.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 /// Generates a map marker with the given [ContentBase].
 Marker generateMapMarker(ContentBase content, {void Function()? onPressed}) {
@@ -47,7 +47,13 @@ class _GeoMapMarkerIcon extends StatelessWidget {
           ),
           Positioned(
             top: 5.0,
-            child: Icon(icon, size: size * 0.30, color: Colors.white),
+            child: Icon(
+              icon,
+              size: size * 0.30,
+              fill: 1.0,
+              weight: 500,
+              color: Colors.white,
+            ),
           ),
         ],
       ),

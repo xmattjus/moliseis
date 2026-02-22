@@ -8,6 +8,6 @@ abstract class RoutePaths {
   static const homeSearchResults = 'search_results/:query';
   static const settings = '/settings';
   static const sync = '/sync';
-  static const details = 'details/:id';
+  static const post = 'posts/:id';
   static const suggestion = 'suggestion';
 }

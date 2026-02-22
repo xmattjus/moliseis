@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class SkeletonContentGridItem extends StatelessWidget {
   const SkeletonContentGridItem({
@@ -17,7 +17,7 @@ class SkeletonContentGridItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       elevation: elevation ?? 1.0,
-      borderRadius: BorderRadius.circular(Shapes.medium),
+      borderRadius: context.appShapes.circular.cornerMedium,
       clipBehavior: Clip.hardEdge,
       child: Container(color: Colors.black, width: width, height: height),
     );

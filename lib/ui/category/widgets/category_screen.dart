@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -8,13 +9,10 @@ import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/category/view_models/category_view_model.dart';
-import 'package:moliseis/ui/category/widgets/category_selection_list.dart';
-import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
+import 'package:moliseis/ui/category/widgets/category_content_and_type_selection.dart';
+import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
-import 'package:moliseis/ui/core/ui/window_size_provider.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 
 class CategoryScreen extends StatefulWidget {
   const CategoryScreen({super.key, required this.viewModel});
@@ -45,40 +43,45 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   leading: const CustomBackButton(),
                   title: const Text('Categorie'),
                   actions: <Widget>[
-                    MenuAnchor(
-                      menuChildren: <Widget>[
-                        MenuItemButton(
-                          onPressed: () => widget.viewModel.setSort.execute(
-                            ContentSort.byName,
-                          ),
-                          leadingIcon: const Icon(Icons.text_fields),
-                          trailingIcon:
-                              widget.viewModel.sort == ContentSort.byName
-                              ? const Icon(Icons.check)
-                              : null,
-                          child: const Text('Per nome'),
-                        ),
-                        MenuItemButton(
-                          onPressed: () => widget.viewModel.setSort.execute(
-                            ContentSort.byDate,
-                          ),
-                          leadingIcon: const Icon(Icons.access_time),
-                          trailingIcon:
-                              widget.viewModel.sort == ContentSort.byDate
-                              ? const Icon(Icons.check)
-                              : null,
-                          child: const Text('Per data'),
-                        ),
-                      ],
-                      builder: (_, controller, _) {
-                        return IconButton(
-                          onPressed: () {
-                            controller.isOpen
-                                ? controller.close()
-                                : controller.open();
+                    ListenableBuilder(
+                      listenable: widget.viewModel.setSort,
+                      builder: (context, child) {
+                        return MenuAnchor(
+                          menuChildren: <Widget>[
+                            MenuItemButton(
+                              onPressed: () => widget.viewModel.setSort.execute(
+                                ContentSort.byName,
+                              ),
+                              leadingIcon: const Icon(Symbols.text_fields),
+                              trailingIcon:
+                                  widget.viewModel.sort == ContentSort.byName
+                                  ? const Icon(Symbols.check)
+                                  : null,
+                              child: const Text('Per nome'),
+                            ),
+                            MenuItemButton(
+                              onPressed: () => widget.viewModel.setSort.execute(
+                                ContentSort.byDate,
+                              ),
+                              leadingIcon: const Icon(Symbols.access_time),
+                              trailingIcon:
+                                  widget.viewModel.sort == ContentSort.byDate
+                                  ? const Icon(Symbols.check)
+                                  : null,
+                              child: const Text('Per data'),
+                            ),
+                          ],
+                          builder: (_, controller, _) {
+                            return IconButton(
+                              onPressed: () {
+                                controller.isOpen
+                                    ? controller.close()
+                                    : controller.open();
+                              },
+                              tooltip: 'Ordina',
+                              icon: const Icon(Symbols.sort),
+                            );
                           },
-                          tooltip: 'Ordina',
-                          icon: const Icon(Icons.sort),
                         );
                       },
                     ),
@@ -91,15 +94,16 @@ class _CategoryScreenState extends State<CategoryScreen> {
               ),
               SliverAppBar(
                 flexibleSpace: FlexibleSpaceBar(
-                  background: CategorySelectionList(
-                    onCategoriesSelectionChanged:
+                  background: CategoryContentAndTypeSelection(
+                    selectedCategories: widget.viewModel.selectedCategories,
+                    selectedTypes: widget.viewModel.selectedTypes,
+                    onContentSelectionChanged:
                         (Set<ContentCategory> categories) => widget
                             .viewModel
                             .setSelectedCategories
                             .execute(categories),
-                    onTypesSelectionChanged: (Set<ContentType> types) =>
+                    onTypeSelectionChanged: (Set<ContentType> types) =>
                         widget.viewModel.setSelectedTypes.execute(types),
-                    selectedCategories: widget.viewModel.selectedCategories,
                   ),
                 ),
                 automaticallyImplyLeading: false,
@@ -117,18 +121,14 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 builder: (context, _) {
                   if (widget.viewModel.load.completed ||
                       widget.viewModel.setSort.completed) {
-                    return ContentAdaptiveListGridView(
+                    return ContentSliverGrid(
                       widget.viewModel.content,
                       onPressed: (ContentBase content) =>
                           _buildStoryRoute(content),
                     );
                   }
 
-                  return WindowSizeProvider.of(context).isCompact
-                      ? const SkeletonContentList.sliver(itemCount: 10)
-                      : SkeletonContentGrid.sliver(
-                          itemCount: context.gridViewColumnCount,
-                        );
+                  return const SkeletonContentSliverGrid();
                 },
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
@@ -143,11 +143,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
     String? nextRoute;
 
     if (_currentUri.startsWith('${RoutePaths.events}/category')) {
-      nextRoute = RouteNames.eventsCategoryDetails;
+      nextRoute = RouteNames.eventsCategoryPost;
     } else if (_currentUri.startsWith('${RoutePaths.favourites}/category')) {
-      nextRoute = RouteNames.favouritesCategoryDetails;
+      nextRoute = RouteNames.favouritesCategoryPost;
     } else if (_currentUri.startsWith('${RoutePaths.home}/category')) {
-      nextRoute = RouteNames.homeCategoryDetails;
+      nextRoute = RouteNames.homeCategoryPost;
     }
 
     if (nextRoute != null) {

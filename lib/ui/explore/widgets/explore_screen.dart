@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/category/widgets/category_button.dart';
-import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
+import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
-import 'package:moliseis/ui/core/ui/window_size_provider.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
-import 'package:moliseis/ui/explore/widgets/explore_screen_carousel_view.dart';
+import 'package:moliseis/ui/explore/widgets/components/suggested_carousel_view.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
+import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_cta_button.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/enums.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -66,12 +67,25 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
                 actions: <Widget>[
                   MenuAnchor(
-                    menuChildren: [
+                    menuChildren: <Widget>[
+                      if (context.windowSizeClass.isAtLeast(
+                        WindowSizeClass.expanded,
+                      ))
+                        MenuItemButton(
+                          onPressed: () {
+                            context.read<SyncViewModel>().sync.execute(true);
+
+                            // Redirects to the local app repositories synchronization screen.
+                            GoRouter.of(context).refresh();
+                          },
+                          leadingIcon: const Icon(Symbols.sync),
+                          child: const Text('Aggiorna'),
+                        ),
                       MenuItemButton(
                         onPressed: () {
                           context.pushNamed(RouteNames.settings);
                         },
-                        leadingIcon: const Icon(Icons.settings),
+                        leadingIcon: const Icon(Symbols.settings),
                         child: const Text('Impostazioni'),
                       ),
                     ],
@@ -83,7 +97,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               : controller.open();
                         },
                         tooltip: 'Altro',
-                        icon: const Icon(Icons.more_vert),
+                        icon: const Icon(Symbols.more_vert),
                       );
                     },
                   ),
@@ -95,7 +109,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 backgroundColor: Theme.of(context).colorScheme.surface,
                 flexibleSpace: Align(
                   alignment: Alignment.centerLeft,
-                  child: CustomSearchAnchor(
+                  child: AppSearchAnchor(
                     controller: _searchController,
                     onSubmitted: (text) {
                       _showSearchResults(text);
@@ -114,15 +128,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 pinned: true,
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 8.0)),
-              ExploreScreenCarouselView(
-                exploreViewModel: widget.exploreViewModel,
-              ),
-              const SliverPadding(
-                padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 8.0),
-                sliver: SliverToBoxAdapter(
-                  child: TextSectionDivider('Categorie'),
-                ),
-              ),
+              SuggestedCarouselView(exploreViewModel: widget.exploreViewModel),
+              const SliverToBoxAdapter(child: TextSectionDivider('Categorie')),
               SliverPadding(
                 padding: const EdgeInsetsDirectional.symmetric(
                   horizontal: 16.0,
@@ -158,10 +165,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 ),
               ),
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
-                sliver: SliverToBoxAdapter(
-                  child: TextSectionDivider('Prossimi eventi'),
+              const SliverToBoxAdapter(
+                child: TextSectionDivider(
+                  'Prossimi eventi',
+                  padding: EdgeInsets.symmetric(horizontal: 16.0),
                 ),
               ),
               ListenableBuilder(
@@ -170,11 +177,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   if (widget.eventViewModel.loadNext.completed) {
                     return SliverPadding(
                       padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-                      sliver: ContentAdaptiveListGridView(
+                      sliver: ContentSliverGrid(
                         widget.eventViewModel.next,
                         onPressed: (content) {
                           GoRouter.of(context).goNamed(
-                            RouteNames.homeDetails,
+                            RouteNames.homePost,
                             pathParameters: {'id': content.remoteId.toString()},
                             queryParameters: {
                               'isEvent': (content is EventContent
@@ -206,11 +213,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     );
                   }
 
-                  final length = widget.eventViewModel.nextIds.length;
-
-                  return WindowSizeProvider.of(context).isCompact
-                      ? SkeletonContentList.sliver(itemCount: length)
-                      : SkeletonContentGrid.sliver(itemCount: length);
+                  return const SkeletonContentSliverGrid();
                 },
               ),
               SliverPadding(
@@ -221,7 +224,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     spacing: 16.0,
                     children: [
                       const Expanded(
-                        child: TextSectionDivider('Ultimi aggiunti'),
+                        child: TextSectionDivider(
+                          'Ultimi aggiunti',
+                          padding: EdgeInsets.zero,
+                        ),
                       ),
                       OutlinedButton.icon(
                         onPressed: () => GoRouter.of(context).goNamed(
@@ -233,7 +239,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         style: const ButtonStyle(
                           visualDensity: VisualDensity.compact,
                         ),
-                        icon: const Icon(Icons.apps),
+                        icon: const Icon(Symbols.apps, grade: 500),
                         label: const Text('Mostra tutti'),
                       ),
                     ],
@@ -245,11 +251,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 listenable: widget.exploreViewModel.loadLatest,
                 builder: (context, child) {
                   if (widget.exploreViewModel.loadLatest.completed) {
-                    return ContentAdaptiveListGridView(
+                    return ContentSliverGrid(
                       widget.exploreViewModel.latest,
                       onPressed: (content) {
                         GoRouter.of(context).goNamed(
-                          RouteNames.homeDetails,
+                          RouteNames.homePost,
                           pathParameters: {'id': content.remoteId.toString()},
                           queryParameters: {
                             'isEvent': (content is EventContent
@@ -280,11 +286,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     );
                   }
 
-                  final length = widget.exploreViewModel.latestIds.length;
-
-                  return WindowSizeProvider.of(context).isCompact
-                      ? SkeletonContentList.sliver(itemCount: length)
-                      : SkeletonContentGrid.sliver(itemCount: length);
+                  return const SkeletonContentSliverGrid();
                 },
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
@@ -299,7 +301,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void _showSearchResults(String text) {
     if (text.isNotEmpty) {
       context.goNamed(
-        RouteNames.homeSearchResults,
+        RouteNames.homeSearchResult,
         pathParameters: {'query': text},
       );
     }

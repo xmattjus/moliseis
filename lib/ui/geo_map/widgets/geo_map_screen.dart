@@ -1,21 +1,21 @@
 import 'dart:collection' show UnmodifiableListView;
-import 'dart:ui' show clampDouble;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/ui/category/widgets/category_selection_list.dart';
+import 'package:moliseis/ui/category/widgets/category_content_and_type_selection.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
+import 'package:moliseis/ui/geo_map/widgets/components/scroll_animated_map_attribution.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
-import 'package:moliseis/ui/geo_map/widgets/geo_map_attribution.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
+import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/utils/debounceable.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class GeoMapScreen extends StatefulWidget {
   const GeoMapScreen({
@@ -49,8 +49,6 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   /// is vertically dragged above a certain threshold.
   final _scrimOpacity = ValueNotifier<double>(0);
 
-  final _moveMapAttribution = ValueNotifier<double>(0.35);
-
   /// Whether to schedule a callback on next frame build or not.
   ///
   /// The callback will be executed exactly once, and will be rescheduled on a
@@ -72,8 +70,6 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   @override
   void initState() {
     super.initState();
-
-    _sheetController.addListener(_bottomSheetListener);
 
     if (widget.contentExtra != null) {
       _selectedContent = widget.contentExtra;
@@ -104,7 +100,6 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
 
   @override
   void dispose() {
-    _sheetController.removeListener(_bottomSheetListener);
     _sheetController.dispose();
     _mapController.dispose();
     _searchController.dispose();
@@ -120,7 +115,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       // Schedules a callback to be fired once when the build phase of this
       // widget has ended.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Animates the bottom sheet up to show the content's details.
+        // Animates the bottom sheet up to show the content's post.
         _animateStateChange(coordinates: _currentCenter);
 
         // Prevents the scheduling of this callback on next frame builds.
@@ -197,73 +192,66 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     );
 
     final bottomSheet = SafeArea(
-      child: GeoMapBottomSheet(
-        content: _selectedContent,
-        controller: _sheetController,
-        currentCenter: _currentCenter,
-        onCloseButtonPressed: () {
-          setState(() {
-            _selectedContent = null;
-            _currentCenter = _mapController.camera.center;
-            _searchQuery = '';
-            _searchController.text = '';
-          });
+      bottom: false,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: context.appSizes.bottomSheetMaxWidth,
+          ),
+          child: GeoMapBottomSheet(
+            content: _selectedContent,
+            controller: _sheetController,
+            currentCenter: _currentCenter,
+            onCloseButtonPressed: () {
+              setState(() {
+                _selectedContent = null;
+                _currentCenter = _mapController.camera.center;
+                _searchQuery = '';
+                _searchController.text = '';
+              });
 
-          _animateBottomSheetTo(0.3);
-        },
-        onContentPressed: (content) {
-          _searchQuery = '';
-          _searchController.text = '';
+              _animateBottomSheetTo(0.3);
+            },
+            onContentPressed: (content) {
+              _searchQuery = '';
+              _searchController.text = '';
 
-          _animateStateChange(
-            coordinates: content.coordinates,
-            content: content,
-          );
-        },
-        onVerticalDragUpdate: (size) {
-          /// The maximum bottom sheet size above which the search bar will
-          /// be animated out of the screen.
-          const maxBottomSheetSize = 0.75;
+              _animateStateChange(
+                coordinates: content.coordinates,
+                content: content,
+              );
+            },
+            onVerticalDragUpdate: (size) {
+              /// The maximum bottom sheet size above which the search bar will
+              /// be animated out of the screen.
+              final maxBottomSheetSize = context.isLandscape ? 0.55 : 0.75;
 
-          /// Hides the search bar if the bottom sheet is being dragged above
-          /// the maximum bottom sheet size.
-          ///
-          /// Each ValueNotifier is set exactly once per state change.
-          if (size < maxBottomSheetSize && !_showSearchBar.value) {
-            _showSearchBar.value = true;
-          } else if (size > maxBottomSheetSize && _showSearchBar.value) {
-            _showSearchBar.value = false;
-          }
+              /// Hides the search bar if the bottom sheet is being dragged above
+              /// the maximum bottom sheet size.
+              ///
+              /// Each ValueNotifier is set exactly once per state change.
+              if (size < maxBottomSheetSize && !_showSearchBar.value) {
+                _showSearchBar.value = true;
+              } else if (size > maxBottomSheetSize && _showSearchBar.value) {
+                _showSearchBar.value = false;
+              }
 
-          if (size < maxBottomSheetSize && _scrimOpacity.value != 0) {
-            _scrimOpacity.value = 0;
-          } else if (size > maxBottomSheetSize && _scrimOpacity.value != 0.32) {
-            _scrimOpacity.value = 0.32;
-          }
-        },
-        searchQuery: _searchQuery,
-        viewModel: widget.viewModel,
-        searchViewModel: widget.searchViewModel,
-      ),
-    );
-
-    final mapAttribution = SafeArea(
-      child: AnimatedBuilder(
-        animation: _moveMapAttribution,
-        builder: (context, child) {
-          return AnimatedSlide(
-            offset: Offset(0, _moveMapAttribution.value * -1.0),
-            duration: Duration.zero,
-            child: child,
-          );
-        },
-        child: const Padding(
-          padding: EdgeInsetsDirectional.symmetric(vertical: 8.0),
-          child: GeoMapAttribution(),
+              if (size < maxBottomSheetSize && _scrimOpacity.value != 0) {
+                _scrimOpacity.value = 0;
+              } else if (size > maxBottomSheetSize &&
+                  _scrimOpacity.value != 0.32) {
+                _scrimOpacity.value = 0.32;
+              }
+            },
+            searchQuery: _searchQuery,
+            viewModel: widget.viewModel,
+            searchViewModel: widget.searchViewModel,
+          ),
         ),
       ),
     );
 
+    /*
     final scrimColor = Theme.of(context).colorScheme.scrim.withAlpha(82);
 
     final scrimLayer = IgnorePointer(
@@ -275,8 +263,9 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         child: ColoredBox(color: scrimColor, child: const SizedBox.expand()),
       ),
     );
+    */
 
-    final appSearchBar = CustomSearchAnchor(
+    final appSearchBar = AppSearchAnchor(
       controller: _searchController,
       onSubmitted: (text) {
         setState(() {
@@ -309,6 +298,8 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         });
 
         _animateBottomSheetTo(1.0);
+
+        widget.searchViewModel.loadResults.execute(content.name);
       },
       viewModel: widget.searchViewModel,
     );
@@ -324,8 +315,8 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
                 ? Curves.easeInOutCubicEmphasized
                 : Easing.emphasizedDecelerate,
             duration: _showSearchBar.value
-                ? Durations.medium2
-                : Durations.short3,
+                ? Durations.medium4
+                : Durations.medium1,
             child: child,
           ),
           child: Padding(
@@ -335,13 +326,15 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 appSearchBar,
-                CategorySelectionList(
-                  onCategoriesSelectionChanged: (selectedCategories) {
+                CategoryContentAndTypeSelection(
+                  selectedCategories: widget.viewModel.selectedCategories,
+                  selectedTypes: widget.viewModel.selectedTypes,
+                  onContentSelectionChanged: (selectedCategories) {
                     widget.viewModel.setSelectedCategories.execute(
                       selectedCategories,
                     );
                   },
-                  onTypesSelectionChanged: (selectedTypes) {
+                  onTypeSelectionChanged: (selectedTypes) {
                     widget.viewModel.setSelectedTypes.execute(selectedTypes);
                   },
                 ),
@@ -369,8 +362,8 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
           clipBehavior: Clip.none,
           children: <Widget>[
             map,
-            mapAttribution,
-            scrimLayer,
+            ScrollAnimatedMapAttribution(controller: _sheetController),
+            // scrimLayer,
             bottomSheet,
             searchBar,
           ],
@@ -407,22 +400,12 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     // screen.
     final offset = (bottomChromeHeight - topViewPadding) / -2;
 
-    // TODO(xmattjus): find out why the map does not load without a fake delay, https://github.com/fleaflet/flutter_map/issues/1813.
+    // TODO (xmattjus): find out why the map does not load without a fake delay, https://github.com/fleaflet/flutter_map/issues/1813.
     Future.delayed(Duration.zero, () {
       _mapController.move(_currentCenter, 16, offset: Offset(0, offset + 16.0));
     });
 
     _animateBottomSheetTo(0.5);
-  }
-
-  /// Listens to the bottom sheet controller movement.
-  void _bottomSheetListener() {
-    /// Clamps the [GeoMapAttribution] movement on the X-axis to prevent its
-    /// disappearing when the bottom sheet is completely closed.
-    // FIXME: setState() or markNeedsBuild() called during build.
-    Future.delayed(Duration.zero, () {
-      _moveMapAttribution.value = clampDouble(_sheetController.size, 0, 0.5);
-    });
   }
 
   /// Animates the attached sheet from its current size to the given [size], a

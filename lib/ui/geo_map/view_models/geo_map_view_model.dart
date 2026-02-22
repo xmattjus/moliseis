@@ -1,5 +1,4 @@
-import 'dart:collection' show UnmodifiableListView, UnmodifiableSetView;
-
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_base.dart';
@@ -9,7 +8,7 @@ import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/domain/use-cases/geo_map/geo_map_use_case.dart';
 import 'package:moliseis/utils/command.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class GeoMapViewModel extends ChangeNotifier {
@@ -23,6 +22,8 @@ class GeoMapViewModel extends ChangeNotifier {
   late Command1<void, int> showEvent;
   late Command1<void, int> showPlace;
 
+  late DeepCollectionEquality equality;
+
   GeoMapViewModel({required GeoMapUseCase geoMapUseCase})
     : _geoMapUseCase = geoMapUseCase {
     loadEvents = Command0(_loadEvents)..execute();
@@ -32,6 +33,8 @@ class GeoMapViewModel extends ChangeNotifier {
     setSelectedTypes = Command1(_setSelectedTypes);
     showEvent = Command1(_showEvent);
     showPlace = Command1(_showPlace);
+
+    equality = const DeepCollectionEquality();
   }
 
   var _allEvents = <ContentBase>[];
@@ -41,7 +44,7 @@ class GeoMapViewModel extends ChangeNotifier {
     ContentCategory.values.minusUnknown,
   );
   ContentBase? _selectedContent;
-  var _selectedTypes = {ContentType.place, ContentType.event};
+  var _selectedTypes = Set<ContentType>.from(ContentType.values);
 
   UnmodifiableListView<ContentBase> get allEvents =>
       UnmodifiableListView(_allEvents);
@@ -62,7 +65,7 @@ class GeoMapViewModel extends ChangeNotifier {
       case Success<List<EventContent>>():
         _allEvents = result.value
             .where((event) => _selectedCategories.contains(event.category))
-            .toList(growable: false);
+            .toList();
         notifyListeners();
       case Error<List<EventContent>>():
     }
@@ -77,7 +80,7 @@ class GeoMapViewModel extends ChangeNotifier {
       case Success<List<PlaceContent>>():
         _allPlaces = result.value
             .where((place) => _selectedCategories.contains(place.category))
-            .toList(growable: false);
+            .toList();
         notifyListeners();
       case Error<List<PlaceContent>>():
     }
@@ -115,9 +118,39 @@ class GeoMapViewModel extends ChangeNotifier {
     return result;
   }
 
-  Future<Result<void>> _selectType() async {
-    _allEvents = [];
-    _allPlaces = [];
+  Future<Result<void>> _setSelectedCategories(
+    Set<ContentCategory> categories,
+  ) async {
+    if (equality.equals(_selectedCategories, categories)) {
+      return const Result.success(null);
+    }
+
+    _selectedCategories = categories;
+
+    await _load();
+
+    notifyListeners();
+
+    return const Result.success(null);
+  }
+
+  Future<Result<void>> _setSelectedTypes(Set<ContentType> types) async {
+    if (equality.equals(_selectedTypes, types)) {
+      return const Result.success(null);
+    }
+
+    _selectedTypes = types;
+
+    await _load();
+
+    notifyListeners();
+
+    return const Result.success(null);
+  }
+
+  Future<Result<void>> _load() async {
+    _allEvents.clear();
+    _allPlaces.clear();
 
     if (_selectedTypes.containsAll({ContentType.place, ContentType.event})) {
       await loadEvents.execute();
@@ -127,28 +160,6 @@ class GeoMapViewModel extends ChangeNotifier {
     } else if (_selectedTypes.contains(ContentType.place)) {
       await loadPlaces.execute();
     }
-
-    return const Result.success(null);
-  }
-
-  Future<Result<void>> _setSelectedCategories(
-    Set<ContentCategory> categories,
-  ) async {
-    _selectedCategories = categories;
-
-    await _selectType();
-
-    notifyListeners();
-
-    return const Result.success(null);
-  }
-
-  Future<Result<void>> _setSelectedTypes(Set<ContentType> types) async {
-    _selectedTypes = types;
-
-    await _selectType();
-
-    notifyListeners();
 
     return const Result.success(null);
   }

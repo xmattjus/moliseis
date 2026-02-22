@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
-// TODO(xmattjus): draw inkwell on top of the image.
+// TODO (xmattjus): draw inkwell on top of the image.
 class ContentBaseListItem extends StatelessWidget {
   final ContentBase content;
   final void Function(ContentBase content)? onPressed;
@@ -49,7 +49,7 @@ class ContentBaseListItem extends StatelessWidget {
               ClipPath(
                 clipper: ShapeBorderClipper(
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(Shapes.medium),
+                    borderRadius: context.appShapes.circular.cornerMedium,
                   ),
                 ),
                 child: CustomImage.network(

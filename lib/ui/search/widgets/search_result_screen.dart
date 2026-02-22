@@ -7,7 +7,7 @@ import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-import 'package:moliseis/ui/search/widgets/custom_search_anchor.dart';
+import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 // import 'package:moliseis/ui/search/widgets/search_result_related_sliver_list.dart';
 import 'package:moliseis/ui/search/widgets/search_result_sliver_list.dart';
 
@@ -26,7 +26,14 @@ class SearchResultScreen extends StatefulWidget {
 }
 
 class _SearchResultScreenState extends State<SearchResultScreen> {
-  final SearchController _controller = SearchController();
+  late final SearchController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = SearchController();
+  }
 
   @override
   void dispose() {
@@ -47,15 +54,15 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
           children: [
             CustomScrollView(
               slivers: [
-                const SliverPadding(
-                  padding: EdgeInsetsDirectional.fromSTEB(
-                    16.0,
-                    kToolbarHeight + 16.0,
-                    16.0,
-                    8.0,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: TextSectionDivider('Risultati'),
+                const SliverToBoxAdapter(
+                  child: TextSectionDivider(
+                    'Risultati',
+                    padding: EdgeInsetsDirectional.fromSTEB(
+                      16.0,
+                      kToolbarHeight + 16.0,
+                      16.0,
+                      8.0,
+                    ),
                   ),
                 ),
                 SearchResultSliverList(
@@ -81,7 +88,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                 color: Theme.of(context).colorScheme.surface,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
-                  child: CustomSearchAnchor(
+                  child: AppSearchAnchor(
                     controller: _controller,
                     leading: const CustomBackButton(
                       padding: EdgeInsetsDirectional.zero,
@@ -113,7 +120,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     }
 
     GoRouter.of(context).goNamed(
-      RouteNames.homeSearchResultsDetails,
+      RouteNames.homeSearchResultPost,
       pathParameters: {
         'query': widget.query,
         'id': content.remoteId.toString(),

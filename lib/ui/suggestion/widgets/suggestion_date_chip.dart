@@ -2,7 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/ui/window_size_provider.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 /// Different display modes of [SuggestionDateChip].
 enum SuggestionDateChipMode { date, time }
@@ -44,7 +44,7 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
       label: widget.label,
       onPressed: () async {
         if (Platform.isIOS) {
-          if (WindowSizeProvider.of(context).isCompact) {
+          if (context.windowSizeClass.isCompact) {
             return _showDialog(
               context,
               Column(

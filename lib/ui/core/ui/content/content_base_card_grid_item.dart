@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/custom_image.dart';
-import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ContentBaseCardGridItem extends StatelessWidget {
   final ContentBase content;
   final double? width;
   final Color? color;
   final void Function(ContentBase content)? onPressed;
-  final Widget? verticalTrailing;
-  final Widget? horizontalTrailing;
+  final Widget? supportingText;
+  final Widget? trailing;
 
   const ContentBaseCardGridItem(
     this.content, {
@@ -20,30 +19,36 @@ class ContentBaseCardGridItem extends StatelessWidget {
     this.width,
     this.color,
     this.onPressed,
-    this.verticalTrailing,
-    this.horizontalTrailing,
+    this.supportingText,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
+    final appShapes = context.appShapes;
+
     return Stack(
       children: <Widget>[
         CardBase.filled(
+          shape: RoundedRectangleBorder(
+            borderRadius: appShapes.circular.cornerMedium,
+            side: BorderSide(
+              color: context.appColors.modalBorderColor,
+              width: context.appSizes.borderSide.medium,
+            ),
+          ),
           width: width,
           color: color,
           onPressed: onPressed != null ? () => onPressed!(content) : null,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 4.0,
+          child: Stack(
             children: <Widget>[
               if (content.media.isNotEmpty)
                 SizedBox(
-                  height: kGridViewCardHeight * 0.5,
                   child: LayoutBuilder(
                     builder: (_, constraints) => ClipPath(
                       clipper: ShapeBorderClipper(
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(Shapes.medium),
+                          borderRadius: appShapes.circular.cornerMedium,
                         ),
                       ),
                       child: CustomImage.network(
@@ -57,8 +62,10 @@ class ContentBaseCardGridItem extends StatelessWidget {
                     ),
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(8.0, 0, 8.0, 8.0),
+              Positioned(
+                bottom: 8.0,
+                left: 8.0,
+                right: 8.0,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -67,26 +74,20 @@ class ContentBaseCardGridItem extends StatelessWidget {
                     ContentNameAndCity(
                       name: content.name,
                       cityName: content.city.target?.name,
-                      // color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      color: Colors.white,
                     ),
-                    if (verticalTrailing != null) verticalTrailing!,
+                    if (supportingText != null) supportingText!,
                   ],
                 ),
               ),
             ],
           ),
         ),
-        if (horizontalTrailing != null)
+        if (trailing != null)
           Positioned(
             top: 8.0,
             right: 8.0,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(Shapes.small),
-              ),
-              child: horizontalTrailing,
-            ),
+            child: SizedBox(width: width, child: trailing),
           ),
       ],
     );

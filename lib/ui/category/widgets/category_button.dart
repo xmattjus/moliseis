@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/ui/core/themes/color_schemes.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class CategoryButton extends StatelessWidget {
   const CategoryButton({
@@ -14,19 +13,14 @@ class CategoryButton extends StatelessWidget {
   final ContentCategory contentCategory;
 
   @override
-  Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: CustomColorSchemes.fromContentCategory(
-          contentCategory,
-          Theme.of(context).brightness,
-        ),
-      ),
-      child: FilledButton.tonalIcon(
-        onPressed: onPressed,
-        icon: Icon(contentCategory.iconAlt),
-        label: Text(contentCategory.label, overflow: TextOverflow.ellipsis),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Theme(
+    data: context.theme.copyWith(
+      colorScheme: context.appColorSchemes.byCategory(contentCategory),
+    ),
+    child: FilledButton.tonalIcon(
+      onPressed: onPressed,
+      icon: Icon(contentCategory.icon, weight: 500),
+      label: Text(contentCategory.label, overflow: TextOverflow.ellipsis),
+    ),
+  );
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class CustomTextStyles {
-  const CustomTextStyles._();
+class AppTextStyles {
+  const AppTextStyles._();
 
   static TextStyle? subtitle(BuildContext context) =>
       Theme.of(context).textTheme.bodyMedium;
@@ -20,11 +20,19 @@ class CustomTextStyles {
   static TextStyle? titleSmaller(BuildContext context) =>
       Theme.of(context).textTheme.titleMedium;
 
-  static TextStyle? weekday(BuildContext context) {
+  static TextStyle? calendarWeekDay(BuildContext context) {
     final brightness = Theme.of(context).brightness;
 
     return DatePickerTheme.defaults(context).weekdayStyle?.copyWith(
       color: brightness == Brightness.light ? Colors.black45 : Colors.white54,
+    );
+  }
+
+  static TextStyle? calendarMonthSection(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+
+    return section(context)?.copyWith(
+      color: brightness == Brightness.light ? Colors.black87 : Colors.white70,
     );
   }
 }

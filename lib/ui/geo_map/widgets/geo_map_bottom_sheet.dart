@@ -4,18 +4,17 @@ import 'package:moliseis/data/sources/place.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
-import 'package:moliseis/ui/core/ui/bottom_sheet_drag_handle.dart';
-import 'package:moliseis/ui/core/ui/bottom_sheet_title.dart';
-import 'package:moliseis/ui/core/ui/content/nearby_content_horizontal_list.dart';
-import 'package:moliseis/ui/core/ui/skeletons/custom_pulse_effect.dart';
+import 'package:moliseis/ui/core/ui/app_bottom_sheet.dart';
+import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
+import 'package:moliseis/ui/core/ui/app_bottom_sheet_surface.dart';
+import 'package:moliseis/ui/core/ui/skeletons/app_pulse_effect.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
-import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_details.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_default.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_post.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_search.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-import 'package:moliseis/utils/constants.dart';
-import 'package:moliseis/utils/extensions.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 class GeoMapBottomSheet extends StatefulWidget {
@@ -41,7 +40,7 @@ class GeoMapBottomSheet extends StatefulWidget {
   /// The current map center.
   ///
   /// When both the [contentId] and [currentCenter] are defined, the first
-  /// will take priority, e.g. the details of that [Place] will be shown in
+  /// will take priority, e.g. the post of that [Place] will be shown in
   /// the bottom sheet.
   final LatLng currentCenter;
 
@@ -115,18 +114,16 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
   @override
   void dispose() {
     _controller.removeListener(_onVerticalDragUpdate);
-    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.35,
+    final colorScheme = context.colorScheme;
+
+    return AppBottomSheet(
       minChildSize: _minSize,
-      snap: true,
       snapSizes: _snapSizes,
-      snapAnimationDuration: Durations.short4,
       controller: _controller,
       builder: (context, scrollController) {
         Widget? child;
@@ -144,7 +141,7 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
                       widget.viewModel.showEvent.completed ||
                   widget.content! is PlaceContent &&
                       widget.viewModel.showPlace.completed) {
-                return GeoMapBottomSheetDetails(
+                return GeoMapBottomSheetPost(
                   widget.viewModel.selectedContent!,
                   onNearContentPressed: widget.onContentPressed,
                   onCloseButtonPressed: widget.onCloseButtonPressed,
@@ -153,7 +150,10 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
               }
 
               return SliverSkeletonizer(
-                effect: CustomPulseEffect(context: context),
+                effect: AppPulseEffect(
+                  from: colorScheme.surfaceContainerHigh,
+                  to: colorScheme.surfaceContainerLow,
+                ),
                 child: SliverPadding(
                   padding: const EdgeInsets.symmetric(
                     vertical: 18.0,
@@ -163,12 +163,12 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
                     children: <Widget>[
                       Text(
                         'Esplora Placeholder: nome di un luogo',
-                        style: CustomTextStyles.title(context),
+                        style: AppTextStyles.title(context),
                       ),
                       const SizedBox(height: 4.0),
                       Text(
                         'Placeholder: nome di un paese',
-                        style: CustomTextStyles.subtitle(context),
+                        style: AppTextStyles.subtitle(context),
                       ),
                     ],
                   ),
@@ -191,24 +191,16 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
           );
         }
 
-        return Material(
-          elevation: 1.0,
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(Shapes.extraLarge),
-          ),
-          clipBehavior: Clip.antiAlias,
+        return AppBottomSheetSurface(
           child: CustomScrollView(
             controller: scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: <Widget>[
-              const SliverToBoxAdapter(child: BottomSheetDragHandle()),
+              const SliverToBoxAdapter(child: AppBottomSheetDragHandle()),
               child,
 
-              // Adds some padding to prevent the bottom navigation bar
-              // from overlapping the bottom sheet content.
-              const SliverPadding(
-                padding: EdgeInsets.only(bottom: kNavigationBarHeight + 32.0),
+              SliverPadding(
+                padding: EdgeInsets.only(bottom: context.bottomPadding),
               ),
             ],
           ),
@@ -228,40 +220,5 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
     } else {
       _minSize = 0;
     }
-  }
-}
-
-class GeoMapBottomSheetDefault extends StatelessWidget {
-  const GeoMapBottomSheetDefault({
-    required this.currentMapCenter,
-    required this.onNearContentPressed,
-    required this.viewModel,
-  });
-
-  /// The current map center.
-  final LatLng currentMapCenter;
-
-  /// Returns the [Place] Id that has been tapped on.
-  final void Function(ContentBase content) onNearContentPressed;
-
-  final GeoMapViewModel viewModel;
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverList.list(
-      children: <Widget>[
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: BottomSheetTitle(title: 'Esplora i dintorni', icon: null),
-        ),
-        const SizedBox(height: 16.0),
-        NearbyContentHorizontalList(
-          coordinates: currentMapCenter,
-          onPressed: onNearContentPressed,
-          loadNearContentCommand: viewModel.loadNearContent,
-          nearContent: viewModel.nearContent,
-        ),
-      ],
-    );
   }
 }

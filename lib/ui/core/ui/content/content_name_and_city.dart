@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
 
@@ -33,15 +34,15 @@ class ContentNameAndCity extends StatelessWidget {
           Text(name),
           labelTextStyle:
               nameStyle ??
-              CustomTextStyles.titleSmaller(context)?.copyWith(color: color),
+              AppTextStyles.titleSmaller(context)?.copyWith(color: color),
           overflow: overflow,
         ),
         CustomRichText(
           Text(cityName ?? 'Molise'),
           labelTextStyle:
               cityNameStyle ??
-              CustomTextStyles.subtitle(context)?.copyWith(color: color),
-          icon: const Icon(Icons.place_outlined),
+              AppTextStyles.subtitle(context)?.copyWith(color: color),
+          icon: const Icon(Symbols.place),
           overflow: overflow,
         ),
       ],

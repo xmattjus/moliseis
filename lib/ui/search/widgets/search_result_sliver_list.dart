@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/ui/core/ui/content/content_adaptive_list_grid_view.dart';
+import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid.dart';
-import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_list.dart';
-import 'package:moliseis/ui/core/ui/window_size_provider.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-import 'package:moliseis/utils/extensions.dart';
 
 class SearchResultSliverList extends StatelessWidget {
   const SearchResultSliverList({
@@ -37,7 +34,7 @@ class SearchResultSliverList extends StatelessWidget {
               } else {
                 return SliverPadding(
                   padding: const EdgeInsets.only(bottom: 16.0),
-                  sliver: ContentAdaptiveListGridView(
+                  sliver: ContentSliverGrid(
                     viewModel.results,
                     onPressed: onResultPressed,
                   ),
@@ -59,11 +56,7 @@ class SearchResultSliverList extends StatelessWidget {
               );
             }
 
-            return WindowSizeProvider.of(context).isCompact
-                ? const SkeletonContentList.sliver(itemCount: 10)
-                : SkeletonContentGrid.sliver(
-                    itemCount: context.gridViewColumnCount,
-                  );
+            return const SkeletonContentSliverGrid();
           },
         ),
       ],

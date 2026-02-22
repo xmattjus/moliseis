@@ -46,7 +46,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
     final licenseButton = Padding(
       padding: const EdgeInsetsDirectional.only(top: 8.0),
       child: UrlTextButton.icon(
-        icon: const Icon(Icons.attribution),
+        icon: const Icon(Symbols.attribution),
         iconSize: 18.0,
         onPressed: licenseUrl.isNotEmpty
             ? () async {
@@ -109,7 +109,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
                     items: <Widget>[
                       ElevatedButton.icon(
                         onPressed: () => onSharePressed?.call(),
-                        icon: const Icon(Icons.share),
+                        icon: const Icon(Symbols.share),
                         label: const Text('Condividi'),
                       ),
                     ],

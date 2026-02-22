@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/shapes.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class SuggestionSendButton extends StatelessWidget {
   const SuggestionSendButton({
@@ -95,7 +96,7 @@ class SuggestionSendButton extends StatelessWidget {
                     )
                   : OutlinedButton.icon(
                       onPressed: onPressed,
-                      icon: const Icon(Icons.send),
+                      icon: const Icon(Symbols.send),
                       label: const Text('Invia'),
                       style: OutlinedButton.styleFrom(
                         backgroundColor: bgColor,
@@ -130,7 +131,7 @@ class _OutlinedCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: foregroundColor),
-        borderRadius: BorderRadius.circular(Shapes.medium),
+        borderRadius: context.appShapes.circular.cornerMedium,
       ),
       color: backgroundColor,
       child: Padding(

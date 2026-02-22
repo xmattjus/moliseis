@@ -1,6 +1,7 @@
 import 'dart:math' show pow;
 
 import 'package:flutter/material.dart';
+import 'package:material_color_utilities/blend/blend.dart';
 
 class AppColorUtils {
   AppColorUtils._();
@@ -44,5 +45,11 @@ class AppColorUtils {
     }
 
     return ys < flipYs ? Brightness.dark : Brightness.light;
+  }
+
+  static Color harmonize(Color from, Color to) {
+    if (from == to) return from;
+
+    return Color(Blend.harmonize(from.toARGB32(), to.toARGB32()));
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/ui/core/ui/bottom_sheet_adaptive_title.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 // import 'package:moliseis/ui/search/widgets/search_result_related_sliver_list.dart';
@@ -37,9 +36,13 @@ class GeoMapBottomSheetSearchState extends State<GeoMapBottomSheetSearch> {
                 onPressed: widget.onBackPressed,
                 backgroundColor: Colors.transparent,
               ),
-              const BottomSheetAdaptiveTitle(
-                'Risultati',
-                padding: EdgeInsets.zero,
+              Expanded(
+                child: Text(
+                  'Risultati',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

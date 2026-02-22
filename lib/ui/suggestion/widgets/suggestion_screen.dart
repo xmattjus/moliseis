@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
-import 'package:moliseis/ui/category/widgets/category_chip.dart';
+import 'package:moliseis/ui/category/widgets/category_content_wrap.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
 import 'package:moliseis/ui/suggestion/widgets/checkbox_form_field.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_date_chip.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_image_gallery.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_send_button.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 class SuggestionScreen extends StatefulWidget {
@@ -28,20 +29,15 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final contentCategories = widget.viewModel.categories;
-
-    final textStyle = Theme.of(context).textTheme.bodyLarge;
+    final textStyle = context.textTheme.bodyLarge;
 
     return AnnotatedRegion(
       value: SystemUiOverlayStyle(
-        systemNavigationBarColor: Theme.of(context).colorScheme.surface,
-        systemNavigationBarDividerColor: Theme.of(context).colorScheme.surface,
-        systemNavigationBarIconBrightness: switch (Theme.of(
-          context,
-        ).brightness) {
-          Brightness.dark => Brightness.light,
-          Brightness.light => Brightness.dark,
-        },
+        systemNavigationBarColor: context.colorScheme.surface,
+        systemNavigationBarDividerColor: context.colorScheme.surface,
+        systemNavigationBarIconBrightness: context.isDarkTheme
+            ? Brightness.light
+            : Brightness.dark,
       ),
       child: Scaffold(
         body: SafeArea(
@@ -52,34 +48,30 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 sliver: SliverList.list(
                   children: [
-                    const Padding(
+                    const TextSectionDivider(
+                      'Categoria',
                       padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: TextSectionDivider('Categoria'),
                     ),
-                    Wrap(
-                      spacing: 8.0,
-                      children: contentCategories.map<CategoryChip>((category) {
-                        final isSelected = widget.viewModel.type == category;
-
-                        return CategoryChip(
-                          category,
-                          isSelected: isSelected,
-                          onDeleted: isSelected
-                              ? () => setState(() {
-                                  widget.viewModel.type = null;
-                                })
-                              : null,
-                          onPressed: () {
-                            setState(() {
-                              widget.viewModel.type = category;
-                            });
-                          },
-                        );
-                      }).toList(),
+                    CategoryContentWrap(
+                      selectedCategory: widget.viewModel.type,
+                      onCategoryDeleted: (category) {
+                        setState(() {
+                          widget.viewModel.type = null;
+                        });
+                      },
+                      onCategorySelected: (category) {
+                        setState(() {
+                          widget.viewModel.type = category;
+                        });
+                      },
                     ),
-                    const SizedBox(height: 16.0),
-                    const TextSectionDivider('Dettagli'),
-                    const SizedBox(height: 8.0),
+                    const TextSectionDivider(
+                      'Dettagli',
+                      padding: EdgeInsetsDirectional.only(
+                        top: 16.0,
+                        bottom: 8.0,
+                      ),
+                    ),
                     Form(
                       key: _form1Key,
                       child: Column(

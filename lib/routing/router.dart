@@ -111,7 +111,7 @@ final appRouter = GoRouter(
               routes: <RouteBase>[
                 GoRoute(
                   path: RoutePaths.homeSearchResults,
-                  name: RouteNames.homeSearchResults,
+                  name: RouteNames.homeSearchResult,
                   builder: (_, state) {
                     final query = state.pathParameters['query'] ?? '';
 
@@ -138,13 +138,13 @@ final appRouter = GoRouter(
                     );
                   },
                   routes: <RouteBase>[
-                    detailRoute(name: RouteNames.homeSearchResultsDetails),
+                    postRoute(name: RouteNames.homeSearchResultPost),
                   ],
                 ),
-                detailRoute(name: RouteNames.homeDetails),
+                postRoute(name: RouteNames.homePost),
                 categoryRoute(
                   name: RouteNames.homeCategory,
-                  childName: RouteNames.homeCategoryDetails,
+                  childName: RouteNames.homeCategoryPost,
                 ),
                 GoRoute(
                   path: RoutePaths.suggestion,
@@ -173,10 +173,10 @@ final appRouter = GoRouter(
                 );
               },
               routes: <RouteBase>[
-                detailRoute(name: RouteNames.favouritesDetails),
+                postRoute(name: RouteNames.favouritesPost),
                 categoryRoute(
                   name: RouteNames.favouritesCategory,
-                  childName: RouteNames.favouritesCategoryDetails,
+                  childName: RouteNames.favouritesCategoryPost,
                 ),
               ],
             ),
@@ -201,10 +201,10 @@ final appRouter = GoRouter(
                 );
               },
               routes: <RouteBase>[
-                detailRoute(name: RouteNames.eventsDetails),
+                postRoute(name: RouteNames.eventsPost),
                 categoryRoute(
                   name: RouteNames.eventsCategory,
-                  childName: RouteNames.eventsCategoryDetails,
+                  childName: RouteNames.eventsCategoryPost,
                 ),
               ],
             ),
