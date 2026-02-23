@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_tile_layer.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class GeoMap extends StatefulWidget {
   /// Creates an interactive geographical map with flutter_map.
@@ -82,38 +83,30 @@ class _GeoMapState extends State<GeoMap> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-
-    final children = <Widget>[const GeoMapTileLayer()];
-
-    if (widget.markers.isNotEmpty) {
-      children.add(MarkerLayer(markers: widget.markers));
-    }
-
-    children.addAll(widget.children);
-
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: widget.initialCenter,
-        initialZoom: widget.initialZoom ?? 13.0,
-        minZoom: 9.0,
-        maxZoom: 18.0,
-        backgroundColor: brightness == Brightness.dark
-            ? const Color(0xFF2E2E2E)
-            : const Color(0xFFEAEADD),
-        onMapEvent: (event) {
-          if (event is MapEventMoveStart) {
-            widget.onPositionChangeStart?.call(_mapController.camera.center);
-          } else if (event is MapEventFlingAnimationEnd ||
-              event is MapEventMoveEnd) {
-            widget.onPositionChangeEnd?.call(_mapController.camera.center);
-          }
-        },
-        onTap: widget.onPressed,
-      ),
-      children: children,
-    );
-  }
+  Widget build(BuildContext context) => FlutterMap(
+    mapController: _mapController,
+    options: MapOptions(
+      initialCenter: widget.initialCenter,
+      initialZoom: widget.initialZoom ?? 13.0,
+      minZoom: 9.0,
+      maxZoom: 18.0,
+      backgroundColor: context.isDarkTheme
+          ? const Color(0xFF2E2E2E)
+          : const Color(0xFFEAEADD),
+      onMapEvent: (event) {
+        if (event is MapEventMoveStart) {
+          widget.onPositionChangeStart?.call(_mapController.camera.center);
+        } else if (event is MapEventFlingAnimationEnd ||
+            event is MapEventMoveEnd) {
+          widget.onPositionChangeEnd?.call(_mapController.camera.center);
+        }
+      },
+      onTap: widget.onPressed,
+    ),
+    children: <Widget>[
+      const GeoMapTileLayer(),
+      if (widget.markers.isNotEmpty) MarkerLayer(markers: widget.markers),
+      ...widget.children,
+    ],
+  );
 }
