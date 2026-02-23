@@ -4,16 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/ui/category/widgets/category_content_and_type_selection.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
+import 'package:moliseis/ui/geo_map/widgets/components/animated_geo_map_search_bar.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/scroll_animated_map_attribution.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/utils/debounceable.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
@@ -265,86 +267,6 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     );
     */
 
-    final appSearchBar = AppSearchAnchor(
-      controller: _searchController,
-      onSubmitted: (text) {
-        setState(() {
-          _searchQuery = text;
-        });
-
-        _animateBottomSheetTo(1.0);
-      },
-      onBackPressed: () {
-        final wasSearchViewOpen = _searchController.isOpen;
-
-        if (wasSearchViewOpen) {
-          _searchController.closeView(_searchController.text);
-        }
-
-        // If the search view close animation is running waits for it to finish
-        // before clearing the attached search controller to prevent graphical
-        // glitches.
-        Future.delayed(
-          Duration(milliseconds: wasSearchViewOpen ? 200 : 0),
-          () => _searchController.clear(),
-        );
-      },
-      elevation: 1.0,
-      onSuggestionPressed: (ContentBase content) {
-        _searchController.closeView(content.name);
-
-        setState(() {
-          _searchQuery = content.name;
-        });
-
-        _animateBottomSheetTo(1.0);
-
-        widget.searchViewModel.loadResults.execute(content.name);
-      },
-      viewModel: widget.searchViewModel,
-    );
-
-    final searchBar = SafeArea(
-      child: Align(
-        alignment: Alignment.topLeft,
-        child: AnimatedBuilder(
-          animation: _showSearchBar,
-          builder: (_, child) => AnimatedSlide(
-            offset: Offset(0, _showSearchBar.value ? 0 : -2.0),
-            curve: _showSearchBar.value
-                ? Curves.easeInOutCubicEmphasized
-                : Easing.emphasizedDecelerate,
-            duration: _showSearchBar.value
-                ? Durations.medium4
-                : Durations.medium1,
-            child: child,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                appSearchBar,
-                CategoryContentAndTypeSelection(
-                  selectedCategories: widget.viewModel.selectedCategories,
-                  selectedTypes: widget.viewModel.selectedTypes,
-                  onContentSelectionChanged: (selectedCategories) {
-                    widget.viewModel.setSelectedCategories.execute(
-                      selectedCategories,
-                    );
-                  },
-                  onTypeSelectionChanged: (selectedTypes) {
-                    widget.viewModel.setSelectedTypes.execute(selectedTypes);
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-
     return PopScope(
       canPop: _selectedContent == null && _searchQuery.isEmpty,
       onPopInvokedWithResult: (didPop, result) {
@@ -365,7 +287,23 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
             ScrollAnimatedMapAttribution(controller: _sheetController),
             // scrimLayer,
             bottomSheet,
-            searchBar,
+            AnimatedGeoMapSearchBar(
+              searchController: _searchController,
+              animation: _showSearchBar,
+              onSubmitted: (text) => _onSearchSubmitted(text),
+              onBackPressed: _onSeachBackPressed,
+              onSuggestionPressed: (ContentBase content) =>
+                  _onSearchSubmitted(content.name),
+              viewModel: widget.searchViewModel,
+              trailing: <Widget>[
+                CategoryContentAndTypeSelection(
+                  selectedCategories: widget.viewModel.selectedCategories,
+                  selectedTypes: widget.viewModel.selectedTypes,
+                  onContentSelectionChanged: _onCategorySelectionChanged,
+                  onTypeSelectionChanged: _onTypeSelectionChanged,
+                ),
+              ],
+            ),
           ],
         ),
         resizeToAvoidBottomInset: false,
@@ -373,6 +311,35 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       ),
     );
   }
+
+  void _onSearchSubmitted(String text) {
+    if (_searchController.isOpen) {
+      _searchController.closeView(text);
+    }
+
+    widget.searchViewModel.loadResults.execute(text);
+
+    setState(() {
+      _searchQuery = text;
+    });
+
+    _animateBottomSheetTo(1.0);
+  }
+
+  void _onSeachBackPressed() {
+    final wasSearchViewOpen = _searchController.isOpen;
+
+    if (wasSearchViewOpen) {
+      _searchController.closeView(null);
+      _searchController.clear();
+    }
+  }
+
+  void _onCategorySelectionChanged(Set<ContentCategory> selectedCategories) =>
+      widget.viewModel.setSelectedCategories.execute(selectedCategories);
+
+  void _onTypeSelectionChanged(Set<ContentType> selectedTypes) =>
+      widget.viewModel.setSelectedTypes.execute(selectedTypes);
 
   /// Animates various UI elements on requested widget rebuilds.
   void _animateStateChange({
