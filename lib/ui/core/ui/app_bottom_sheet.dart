@@ -3,8 +3,8 @@ import 'package:moliseis/ui/core/ui/app_bottom_sheet_surface.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class AppBottomSheet extends StatelessWidget {
-  final double initialChildSize;
-  final double minChildSize;
+  final double? initialChildSize;
+  final double? minChildSize;
   final double maxChildSize;
   final List<double>? snapSizes;
   final DraggableScrollableController? controller;
@@ -12,8 +12,8 @@ class AppBottomSheet extends StatelessWidget {
 
   const AppBottomSheet({
     super.key,
-    this.initialChildSize = 0.35,
-    this.minChildSize = 0.2,
+    this.initialChildSize,
+    this.minChildSize,
     this.maxChildSize = 1.0,
     this.snapSizes,
     this.controller,
@@ -26,17 +26,15 @@ class AppBottomSheet extends StatelessWidget {
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: appSizes.bottomSheetMaxWidth),
       child: DraggableScrollableSheet(
-        initialChildSize: initialChildSize,
-        minChildSize: minChildSize,
+        initialChildSize:
+            initialChildSize ?? appSizes.bottomSheetInitialSnapSize,
+        minChildSize: minChildSize ?? appSizes.bottomSheetMinSnapSize,
         maxChildSize: maxChildSize,
         snap: true,
-        snapSizes: snapSizes ?? appSizes.modalSnapSizes,
+        snapSizes: snapSizes ?? appSizes.bottomSheetSnapSizes,
         controller: controller,
-        builder: (context, scrollController) {
-          return AppBottomSheetSurface(
-            child: builder(context, scrollController),
-          );
-        },
+        builder: (context, scrollController) =>
+            AppBottomSheetSurface(child: builder(context, scrollController)),
       ),
     );
   }
