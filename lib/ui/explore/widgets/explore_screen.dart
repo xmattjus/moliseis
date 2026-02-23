@@ -11,14 +11,13 @@ import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart'
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
+import 'package:moliseis/ui/explore/widgets/components/responsive_overflow_menu.dart';
 import 'package:moliseis/ui/explore/widgets/components/suggested_carousel_view.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/ui/suggestion/widgets/suggestion_cta_button.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
-import 'package:moliseis/utils/enums.dart';
-import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -52,12 +51,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           edgeOffset: kToolbarHeight * 2.0 + 8.0,
-          onRefresh: () async {
-            context.read<SyncViewModel>().sync.execute(true);
-
-            // Redirects to the local app repositories synchronization screen.
-            GoRouter.of(context).refresh();
-          },
+          onRefresh: () async => _sync(),
           child: CustomScrollView(
             slivers: <Widget>[
               SliverAppBar(
@@ -66,40 +60,21 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   child: const Text('Molise Is'),
                 ),
                 actions: <Widget>[
-                  MenuAnchor(
-                    menuChildren: <Widget>[
-                      if (context.windowSizeClass.isAtLeast(
-                        WindowSizeClass.expanded,
-                      ))
-                        MenuItemButton(
-                          onPressed: () {
-                            context.read<SyncViewModel>().sync.execute(true);
-
-                            // Redirects to the local app repositories synchronization screen.
-                            GoRouter.of(context).refresh();
-                          },
-                          leadingIcon: const Icon(Symbols.sync),
-                          child: const Text('Aggiorna'),
-                        ),
-                      MenuItemButton(
-                        onPressed: () {
-                          context.pushNamed(RouteNames.settings);
-                        },
-                        leadingIcon: const Icon(Symbols.settings),
-                        child: const Text('Impostazioni'),
+                  ResponsiveOverflowMenu(
+                    items: <MenuItem>[
+                      MenuItem(
+                        title: const Text('Aggiorna'),
+                        icon: const Icon(Symbols.sync, weight: 500),
+                        tooltip: 'Aggiorna i contenuti',
+                        onPressed: _sync,
+                      ),
+                      MenuItem(
+                        title: const Text('Impostazioni'),
+                        icon: const Icon(Symbols.settings, weight: 500),
+                        tooltip: 'Apri le impostazioni',
+                        onPressed: () => context.pushNamed(RouteNames.settings),
                       ),
                     ],
-                    builder: (_, controller, _) {
-                      return IconButton(
-                        onPressed: () {
-                          controller.isOpen
-                              ? controller.close()
-                              : controller.open();
-                        },
-                        tooltip: 'Altro',
-                        icon: const Icon(Symbols.more_vert),
-                      );
-                    },
                   ),
                 ],
               ),
@@ -296,6 +271,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
       ),
       resizeToAvoidBottomInset: false,
     );
+  }
+
+  void _sync() {
+    final synchronizationViewModel = context.read<SyncViewModel>();
+    synchronizationViewModel.sync.execute(true);
+
+    // Redirects to the local app repositories synchronization screen.
+    GoRouter.of(context).refresh();
   }
 
   void _showSearchResults(String text) {
