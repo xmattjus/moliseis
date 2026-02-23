@@ -41,10 +41,12 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
 
   @override
   Widget build(BuildContext context) {
+    final appShapes = context.appShapes;
+
     final viewModel = widget.viewModel;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(25.0),
+      borderRadius: appShapes.circular.cornerExtraLarge,
       child: Container(
         decoration: BoxDecoration(
           color: widget.backgroundColor,
@@ -52,7 +54,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
             color: widget.borderColor,
             width: context.appSizes.borderSide.medium,
           ),
-          borderRadius: BorderRadius.circular(25.0),
+          borderRadius: appShapes.circular.cornerExtraLarge,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -192,8 +192,11 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
                       width: context.appSizes.borderSide.medium,
                     ),
                   ),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(25.0),
+                  borderRadius: BorderRadius.only(
+                    topLeft:
+                        context.appShapes.circular.cornerExtraLarge.topLeft,
+                    topRight:
+                        context.appShapes.circular.cornerExtraLarge.topRight,
                   ),
                   color: context.colorScheme.surface,
                 ),

@@ -116,8 +116,9 @@ class BaseThemeData {
 
   static WidgetStateProperty<OutlinedBorder?>? get _expressiveButtonShape =>
       WidgetStateProperty.resolveWith((states) {
-        // Get a reference to the Material 3 Expressive shape tokens.
+        final appSizes = AppSizesThemeExtension();
         final appShapes = AppShapesThemeExtension();
+
         if (states.contains(WidgetState.pressed)) {
           return RoundedRectangleBorder(
             borderRadius: appShapes.circular.cornerMedium,
@@ -126,7 +127,10 @@ class BaseThemeData {
 
         if (states.contains(WidgetState.focused)) {
           return RoundedRectangleBorder(
-            side: const BorderSide(color: Colors.black54, width: 2.0),
+            side: BorderSide(
+              // color: Colors.black54,
+              width: appSizes.borderSide.large,
+            ),
             borderRadius: appShapes.circular.cornerFull,
           );
         }

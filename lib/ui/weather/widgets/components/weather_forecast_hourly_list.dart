@@ -28,6 +28,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
   Widget build(BuildContext context) {
     final appEffects = context.appEffects;
     final appSizes = context.appSizes;
+    final appShapes = context.appShapes;
 
     final viewModel = widget.viewModel;
     final nowHour = DateTime.now().hour;
@@ -39,7 +40,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
     );
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(25.0),
+      borderRadius: appShapes.circular.cornerExtraLarge,
       child: Container(
         decoration: BoxDecoration(
           color: widget.backgroundColor,
@@ -47,7 +48,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
             color: widget.borderColor,
             width: appSizes.borderSide.medium,
           ),
-          borderRadius: BorderRadius.circular(25.0),
+          borderRadius: appShapes.circular.cornerExtraLarge,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
