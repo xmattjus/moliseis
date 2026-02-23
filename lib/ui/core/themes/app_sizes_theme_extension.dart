@@ -28,14 +28,14 @@ class _BorderSideTokens {
 }
 
 class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
+  final _BorderSideTokens borderSide;
+
   /// The minimum snap size all modals should have.
   final double modalMinSnapSize;
 
   /// The snap sizes, e.g. the screen percentages at which all modals should
   /// "snap" in place.
   final List<double> modalSnapSizes;
-
-  final _BorderSideTokens borderSide;
 
   final double bottomSheetMaxWidth;
 
@@ -45,9 +45,9 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
 
   factory AppSizesThemeExtension() {
     return const AppSizesThemeExtension._(
+      borderSide: _BorderSideTokens(),
       modalMinSnapSize: 0.20,
       modalSnapSizes: [0.20, 0.35, 0.50],
-      borderSide: _BorderSideTokens(),
       bottomSheetMaxWidth: 720.0,
       searchBarMinWidth: 360.0,
       searchBarMaxWidth: 720.0,
@@ -55,9 +55,9 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
   }
 
   const AppSizesThemeExtension._({
+    required this.borderSide,
     required this.modalMinSnapSize,
     required this.modalSnapSizes,
-    required this.borderSide,
     required this.bottomSheetMaxWidth,
     required this.searchBarMinWidth,
     required this.searchBarMaxWidth,
@@ -65,17 +65,17 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
 
   @override
   ThemeExtension<AppSizesThemeExtension> copyWith({
+    _BorderSideTokens? borderSide,
     double? modalMinSnapSize,
     List<double>? modalSnapSizes,
-    _BorderSideTokens? borderSide,
     double? bottomSheetMaxWidth,
     double? searchBarMinWidth,
     double? searchBarMaxWidth,
   }) {
     return AppSizesThemeExtension._(
+      borderSide: borderSide ?? this.borderSide,
       modalMinSnapSize: modalMinSnapSize ?? this.modalMinSnapSize,
       modalSnapSizes: modalSnapSizes ?? this.modalSnapSizes,
-      borderSide: borderSide ?? this.borderSide,
       bottomSheetMaxWidth: bottomSheetMaxWidth ?? this.bottomSheetMaxWidth,
       searchBarMinWidth: searchBarMinWidth ?? this.searchBarMinWidth,
       searchBarMaxWidth: searchBarMaxWidth ?? this.searchBarMaxWidth,
@@ -91,6 +91,17 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
       return this;
     }
     return AppSizesThemeExtension._(
+      borderSide: _BorderSideTokens(
+        none: ui.lerpDouble(borderSide.none, other.borderSide.none, t)!,
+        small: ui.lerpDouble(borderSide.small, other.borderSide.small, t)!,
+        medium: ui.lerpDouble(borderSide.medium, other.borderSide.medium, t)!,
+        large: ui.lerpDouble(borderSide.large, other.borderSide.large, t)!,
+        extraLarge: ui.lerpDouble(
+          borderSide.extraLarge,
+          other.borderSide.extraLarge,
+          t,
+        )!,
+      ),
       modalMinSnapSize: ui.lerpDouble(
         modalMinSnapSize,
         other.modalMinSnapSize,
@@ -101,17 +112,6 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
         (index) => ui.lerpDouble(
           modalSnapSizes[index],
           other.modalSnapSizes[index],
-          t,
-        )!,
-      ),
-      borderSide: _BorderSideTokens(
-        none: ui.lerpDouble(borderSide.none, other.borderSide.none, t)!,
-        small: ui.lerpDouble(borderSide.small, other.borderSide.small, t)!,
-        medium: ui.lerpDouble(borderSide.medium, other.borderSide.medium, t)!,
-        large: ui.lerpDouble(borderSide.large, other.borderSide.large, t)!,
-        extraLarge: ui.lerpDouble(
-          borderSide.extraLarge,
-          other.borderSide.extraLarge,
           t,
         )!,
       ),
