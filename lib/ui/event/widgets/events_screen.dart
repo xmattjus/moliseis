@@ -20,19 +20,20 @@ class EventsScreen extends StatefulWidget {
 }
 
 class _EventsScreenState extends State<EventsScreen> {
-  late DraggableScrollableController draggableScrollableController;
-  late DateSymbols dateSymbols;
+  late DraggableScrollableController _draggableScrollableController;
+  late DateSymbols _dateSymbols;
 
-  ValueNotifier<double> bottomPaddingExtent = ValueNotifier(16.0);
+  final _bottomPaddingAnimation = ValueNotifier<double>(0.0);
+  double get _bottomPadding => _bottomPaddingAnimation.value;
 
   @override
   void initState() {
     super.initState();
 
-    draggableScrollableController = DraggableScrollableController();
-    draggableScrollableController.addListener(_draggableScrollableListener);
-
     widget.viewModel.loadByDate.execute(DateTime.now());
+
+    _draggableScrollableController = DraggableScrollableController();
+    _draggableScrollableController.addListener(_draggableScrollableListener);
   }
 
   @override
@@ -41,13 +42,20 @@ class _EventsScreenState extends State<EventsScreen> {
 
     final currentLocale = Localizations.localeOf(context);
 
-    dateSymbols = intl.DateFormat(null, currentLocale.languageCode).dateSymbols;
+    _dateSymbols = intl.DateFormat(
+      null,
+      currentLocale.languageCode,
+    ).dateSymbols;
+
+    _bottomPaddingAnimation.value =
+        (MediaQuery.maybeSizeOf(context)?.height ?? 0) *
+        context.appSizes.bottomSheetInitialSnapSize;
   }
 
   @override
   void dispose() {
-    draggableScrollableController.removeListener(_draggableScrollableListener);
-    draggableScrollableController.dispose();
+    _draggableScrollableController.removeListener(_draggableScrollableListener);
+    _draggableScrollableController.dispose();
     super.dispose();
   }
 
@@ -57,19 +65,19 @@ class _EventsScreenState extends State<EventsScreen> {
       WindowSizeClass.medium,
     );
     return ResponsiveScaffold(
-      draggableScrollableController: draggableScrollableController,
+      draggableScrollableController: _draggableScrollableController,
       modalBuilder: (context, scrollController) => EventsModal(
-        localizedMonths: dateSymbols.MONTHS,
+        localizedMonths: _dateSymbols.MONTHS,
         selectedDate: widget.viewModel.selectedDate,
         viewModel: widget.viewModel,
         scrollController: scrollController,
       ),
       child: isAtMostMedium
           ? AnimatedBuilder(
-              animation: bottomPaddingExtent,
+              animation: _bottomPaddingAnimation,
               builder: (context, child) {
                 return Padding(
-                  padding: EdgeInsets.only(bottom: bottomPaddingExtent.value),
+                  padding: EdgeInsets.only(bottom: _bottomPadding),
                   child: child,
                 );
               },
@@ -87,10 +95,14 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   void _draggableScrollableListener() {
-    if (draggableScrollableController.isAttached) {
-      final extent = clampDouble(draggableScrollableController.size, 0.0, 0.5);
-      final test = draggableScrollableController.sizeToPixels(extent);
-      bottomPaddingExtent.value = test;
+    if (_draggableScrollableController.isAttached) {
+      final clampedSize = clampDouble(
+        _draggableScrollableController.size,
+        0.0,
+        0.5,
+      );
+      final extent = _draggableScrollableController.sizeToPixels(clampedSize);
+      _bottomPaddingAnimation.value = extent;
     }
   }
 }
