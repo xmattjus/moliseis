@@ -9,7 +9,7 @@ class AnimatedGeoMapSearchBar extends StatelessWidget {
   final void Function(String)? onSubmitted;
   final void Function()? onBackPressed;
   final void Function(ContentBase) onSuggestionPressed;
-  final List<Widget>? trailing;
+  final List<Widget> trailing;
   final SearchViewModel viewModel;
 
   const AnimatedGeoMapSearchBar({
@@ -19,7 +19,7 @@ class AnimatedGeoMapSearchBar extends StatelessWidget {
     this.onSubmitted,
     this.onBackPressed,
     required this.onSuggestionPressed,
-    this.trailing,
+    this.trailing = const <Widget>[],
     required this.viewModel,
   });
 
@@ -53,7 +53,7 @@ class AnimatedGeoMapSearchBar extends StatelessWidget {
                   onSuggestionPressed: onSuggestionPressed,
                   viewModel: viewModel,
                 ),
-                ...?trailing,
+                ...trailing,
               ],
             ),
           ),
