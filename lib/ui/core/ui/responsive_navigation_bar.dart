@@ -5,12 +5,12 @@ import 'package:moliseis/ui/core/ui/app_navigation_bar.dart' as app_nav;
 import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-class AdaptiveNavigationBar extends StatelessWidget {
+class ResponsiveNavigationBar extends StatelessWidget {
   final int selectedIndex;
   final List<NavigationDestination> destinations;
   final void Function(int)? onDestinationSelected;
 
-  const AdaptiveNavigationBar({
+  const ResponsiveNavigationBar({
     super.key,
     required this.selectedIndex,
     required this.destinations,

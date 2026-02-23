@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
-import 'package:moliseis/ui/core/ui/adaptive_navigation_bar.dart';
 import 'package:moliseis/ui/core/ui/app_navigation_rail.dart';
+import 'package:moliseis/ui/core/ui/responsive_navigation_bar.dart';
 import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
@@ -37,7 +37,7 @@ class ScaffoldShell extends StatelessWidget {
           ],
         ),
         bottomNavigationBar: windowSizeClass.isAtMost(WindowSizeClass.medium)
-            ? AdaptiveNavigationBar(
+            ? ResponsiveNavigationBar(
                 selectedIndex: _navigationShell.currentIndex,
                 onDestinationSelected: _onDestinationSelected,
                 destinations: _buildDestinations,
