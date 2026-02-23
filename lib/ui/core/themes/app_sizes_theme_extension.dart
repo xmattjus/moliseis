@@ -30,12 +30,15 @@ class _BorderSideTokens {
 class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
   final _BorderSideTokens borderSide;
 
-  /// The minimum snap size all modals should have.
-  final double modalMinSnapSize;
+  /// The minimum snap size all bottom sheets should have.
+  final double bottomSheetMinSnapSize;
 
-  /// The snap sizes, e.g. the screen percentages at which all modals should
-  /// "snap" in place.
-  final List<double> modalSnapSizes;
+  /// The initial snap size all bottom sheets should have.
+  final double bottomSheetInitialSnapSize;
+
+  /// The snap sizes, e.g. the screen percentages, at which all bottom sheets
+  /// should "snap" in place.
+  final List<double> bottomSheetSnapSizes;
 
   final double bottomSheetMaxWidth;
 
@@ -46,8 +49,9 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
   factory AppSizesThemeExtension() {
     return const AppSizesThemeExtension._(
       borderSide: _BorderSideTokens(),
-      modalMinSnapSize: 0.20,
-      modalSnapSizes: [0.20, 0.35, 0.50],
+      bottomSheetMinSnapSize: 0.20,
+      bottomSheetInitialSnapSize: 0.35,
+      bottomSheetSnapSizes: [0.20, 0.35, 0.50],
       bottomSheetMaxWidth: 720.0,
       searchBarMinWidth: 360.0,
       searchBarMaxWidth: 720.0,
@@ -56,8 +60,9 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
 
   const AppSizesThemeExtension._({
     required this.borderSide,
-    required this.modalMinSnapSize,
-    required this.modalSnapSizes,
+    required this.bottomSheetMinSnapSize,
+    required this.bottomSheetInitialSnapSize,
+    required this.bottomSheetSnapSizes,
     required this.bottomSheetMaxWidth,
     required this.searchBarMinWidth,
     required this.searchBarMaxWidth,
@@ -66,16 +71,20 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
   @override
   ThemeExtension<AppSizesThemeExtension> copyWith({
     _BorderSideTokens? borderSide,
-    double? modalMinSnapSize,
-    List<double>? modalSnapSizes,
+    double? bottomSheetMinSnapSize,
+    double? bottomSheetInitialSnapSize,
+    List<double>? bottomSheetSnapSizes,
     double? bottomSheetMaxWidth,
     double? searchBarMinWidth,
     double? searchBarMaxWidth,
   }) {
     return AppSizesThemeExtension._(
       borderSide: borderSide ?? this.borderSide,
-      modalMinSnapSize: modalMinSnapSize ?? this.modalMinSnapSize,
-      modalSnapSizes: modalSnapSizes ?? this.modalSnapSizes,
+      bottomSheetMinSnapSize:
+          bottomSheetMinSnapSize ?? this.bottomSheetMinSnapSize,
+      bottomSheetInitialSnapSize:
+          bottomSheetInitialSnapSize ?? this.bottomSheetInitialSnapSize,
+      bottomSheetSnapSizes: bottomSheetSnapSizes ?? this.bottomSheetSnapSizes,
       bottomSheetMaxWidth: bottomSheetMaxWidth ?? this.bottomSheetMaxWidth,
       searchBarMinWidth: searchBarMinWidth ?? this.searchBarMinWidth,
       searchBarMaxWidth: searchBarMaxWidth ?? this.searchBarMaxWidth,
@@ -102,16 +111,21 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
           t,
         )!,
       ),
-      modalMinSnapSize: ui.lerpDouble(
-        modalMinSnapSize,
-        other.modalMinSnapSize,
+      bottomSheetMinSnapSize: ui.lerpDouble(
+        bottomSheetMinSnapSize,
+        other.bottomSheetMinSnapSize,
         t,
       )!,
-      modalSnapSizes: List<double>.generate(
-        modalSnapSizes.length,
+      bottomSheetInitialSnapSize: ui.lerpDouble(
+        bottomSheetInitialSnapSize,
+        other.bottomSheetInitialSnapSize,
+        t,
+      )!,
+      bottomSheetSnapSizes: List<double>.generate(
+        bottomSheetSnapSizes.length,
         (index) => ui.lerpDouble(
-          modalSnapSizes[index],
-          other.modalSnapSizes[index],
+          bottomSheetSnapSizes[index],
+          other.bottomSheetSnapSizes[index],
           t,
         )!,
       ),
