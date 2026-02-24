@@ -11,7 +11,7 @@ import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/animated_geo_map_search_bar.dart';
-import 'package:moliseis/ui/geo_map/widgets/components/scroll_animated_map_attribution.dart';
+import 'package:moliseis/ui/geo_map/widgets/components/animated_map_attribution.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
@@ -284,7 +284,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
           clipBehavior: Clip.none,
           children: <Widget>[
             map,
-            ScrollAnimatedMapAttribution(controller: _sheetController),
+            AnimatedMapAttribution(controller: _sheetController),
             // scrimLayer,
             bottomSheet,
             AnimatedGeoMapSearchBar(

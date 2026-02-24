@@ -3,17 +3,15 @@ import 'dart:ui' show clampDouble;
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/map_attribution.dart';
 
-class ScrollAnimatedMapAttribution extends StatefulWidget {
+class AnimatedMapAttribution extends StatefulWidget {
   final DraggableScrollableController controller;
-  const ScrollAnimatedMapAttribution({super.key, required this.controller});
+  const AnimatedMapAttribution({super.key, required this.controller});
 
   @override
-  State<ScrollAnimatedMapAttribution> createState() =>
-      _ScrollAnimatedMapAttributionState();
+  State<AnimatedMapAttribution> createState() => _AnimatedMapAttributionState();
 }
 
-class _ScrollAnimatedMapAttributionState
-    extends State<ScrollAnimatedMapAttribution> {
+class _AnimatedMapAttributionState extends State<AnimatedMapAttribution> {
   DraggableScrollableController get _controller => widget.controller;
 
   final _positionAnimation = ValueNotifier<double>(0.35);
