@@ -275,7 +275,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _sync() {
     final synchronizationViewModel = context.read<SyncViewModel>();
-    synchronizationViewModel.sync.execute(true);
+    synchronizationViewModel.start.execute(true);
 
     // Redirects to the local app repositories synchronization screen.
     GoRouter.of(context).refresh();
