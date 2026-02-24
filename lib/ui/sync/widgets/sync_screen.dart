@@ -35,15 +35,15 @@ class _SyncScreenState extends State<SyncScreen> {
         body: Consumer<SyncViewModel>(
           builder: (_, viewModel, _) {
             return ListenableBuilder(
-              listenable: viewModel.sync,
+              listenable: viewModel.start,
               builder: (context, child) {
-                if (viewModel.sync.completed) {
+                if (viewModel.start.completed) {
                   _scheduleCallback(() {
                     GoRouter.of(context).refresh();
                   });
                 }
 
-                if (viewModel.sync.error) {
+                if (viewModel.start.error) {
                   if (viewModel.fatalError) {
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -61,7 +61,7 @@ class _SyncScreenState extends State<SyncScreen> {
                         TextButton(
                           onPressed: () {
                             _scheduleCallbackOnNextFrame = true;
-                            viewModel.sync.execute(true);
+                            viewModel.start.execute(true);
                           },
                           child: const Text('Riprova'),
                         ),

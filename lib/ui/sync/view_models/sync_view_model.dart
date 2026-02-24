@@ -20,10 +20,10 @@ class SyncViewModel extends ChangeNotifier {
   /// the last successful synchronization time.
   SyncViewModel({required SynchronizeRepositoriesUseCase syncRepoUseCase})
     : _useCase = syncRepoUseCase {
-    sync = Command1(_sync);
+    start = Command1(_start);
 
     if (_syncNeeded()) {
-      sync.execute(false);
+      start.execute(false);
     }
   }
 
@@ -41,7 +41,7 @@ class SyncViewModel extends ChangeNotifier {
   ///
   /// Takes a boolean parameter to indicate whether to force sync regardless
   /// of the last synchronization time.
-  late Command1<void, bool> sync;
+  late Command1<void, bool> start;
 
   /// Determines if synchronization is needed based on the last successful sync time.
   ///
@@ -71,7 +71,7 @@ class SyncViewModel extends ChangeNotifier {
   ///
   /// In case of error, sets [fatalError] to `true` if this is the first
   /// synchronization attempt (no previous successful sync exists).
-  Future<Result<void>> _sync(bool force) async {
+  Future<Result<void>> _start(bool force) async {
     final lastUpdate = _useCase.lastSuccessfullSynchronization;
 
     if (force || _syncNeeded()) {
