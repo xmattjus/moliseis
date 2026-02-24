@@ -71,7 +71,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       MenuItem(
                         title: const Text('Impostazioni'),
                         icon: const Icon(Symbols.settings, weight: 500),
-                        tooltip: 'Apri le impostazioni',
+                        tooltip: 'Impostazioni',
                         onPressed: () => context.pushNamed(RouteNames.settings),
                       ),
                     ],
