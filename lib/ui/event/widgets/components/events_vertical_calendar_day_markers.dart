@@ -26,7 +26,7 @@ class _EventsVerticalCalendarDayMarkersState
 
     colors = List.generate(
       markers,
-      (_) => RandomColor.getColorObject(Options()),
+      (_) => RandomColor.getColorObject(Options(luminosity: Luminosity.bright)),
     );
   }
 
