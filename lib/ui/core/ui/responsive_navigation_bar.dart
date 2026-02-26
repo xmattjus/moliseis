@@ -1,8 +1,7 @@
 import 'dart:collection' show UnmodifiableListView;
 
+import 'package:expressive_navigation_bar/expressive_navigation_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/ui/app_navigation_bar.dart' as app_nav;
-import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ResponsiveNavigationBar extends StatelessWidget {
@@ -18,52 +17,23 @@ class ResponsiveNavigationBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => switch (context.windowSizeClass) {
-    WindowSizeClass.medium => app_nav.AppNavigationBar(
-      labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-      selectedIndex: selectedIndex,
-      onDestinationSelected: onDestinationSelected,
-      indicatorShape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20.0),
-      ),
-      fixedDestinationWidth: true,
+  Widget build(BuildContext context) {
+    final showHorizontalLabel = context.windowSizeClass.isMedium;
+    return ExpressiveNavigationBar(
       destinations: UnmodifiableListView<Widget>(
-        destinations.map((destination) {
-          final isSelected =
-              destination.icon == destinations[selectedIndex].icon;
-          return app_nav.NavigationDestination(
-            icon: Wrap(
-              alignment: WrapAlignment.center,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 4.0,
-              children: [
-                if (isSelected)
-                  destination.selectedIcon ?? destination.icon
-                else
-                  destination.icon,
-                Text(
-                  destination.label,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-            label: '',
-            indicatorWidth: 104.0,
-            indicatorHeight: 40.0,
-          );
-        }),
+        destinations.map(
+          (destination) => ExpressiveNavigationDestination(
+            icon: destination.icon,
+            selectedIcon: destination.selectedIcon,
+            label: destination.label,
+            horizontalLabel: showHorizontalLabel,
+          ),
+        ),
       ),
-      height: 64.0,
-    ),
-    _ => NavigationBar(
-      destinations: destinations,
       selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
       height: 64.0,
-    ),
-  };
+      fixedDestinationWidth: showHorizontalLabel,
+    );
+  }
 }
