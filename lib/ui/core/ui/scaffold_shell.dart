@@ -22,6 +22,7 @@ class ScaffoldShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final windowSizeClass = context.windowSizeClass;
+    final destinations = _buildDestinations;
     return AnnotatedRegion(
       value: SystemUiOverlayStyles(context).scaffoldShell,
       child: Scaffold(
@@ -31,7 +32,7 @@ class ScaffoldShell extends StatelessWidget {
               AppNavigationRail(
                 selectedIndex: _navigationShell.currentIndex,
                 onDestinationSelected: _onDestinationSelected,
-                destinations: _buildDestinations,
+                destinations: destinations,
               ),
             Expanded(child: _navigationShell),
           ],
@@ -40,7 +41,7 @@ class ScaffoldShell extends StatelessWidget {
             ? ResponsiveNavigationBar(
                 selectedIndex: _navigationShell.currentIndex,
                 onDestinationSelected: _onDestinationSelected,
-                destinations: _buildDestinations,
+                destinations: destinations,
               )
             : null,
         resizeToAvoidBottomInset: false,
