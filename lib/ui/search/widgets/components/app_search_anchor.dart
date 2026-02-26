@@ -280,7 +280,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
           const TextSectionDivider('Recenti'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Wrap(spacing: 8.0, children: _lastHistory),
+            child: Wrap(spacing: 8.0, runSpacing: 8.0, children: _lastHistory),
           ),
         ]);
       }
