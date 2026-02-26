@@ -18,12 +18,11 @@ class FavouriteScreen extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              title: const Text('Preferiti'),
+          slivers: <Widget>[
+            const SliverAppBar(
+              title: Text('Preferiti'),
               elevation: 0,
               scrolledUnderElevation: 0,
-              backgroundColor: Theme.of(context).colorScheme.surface,
             ),
             ListenableBuilder(
               listenable: viewModel,
