@@ -12,10 +12,10 @@ import 'package:moliseis/data/repositories/settings_repository_impl.dart';
 import 'package:moliseis/data/repositories/suggestion_repository_impl.dart';
 import 'package:moliseis/data/services/api/cloudinary_client.dart';
 import 'package:moliseis/data/services/api/openstreetmap/openstreetmap_client.dart';
+import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
-import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/data/services/app_info_service.dart';
 import 'package:moliseis/data/services/external_url_service.dart';
 import 'package:moliseis/data/services/map_url_service.dart';
@@ -40,7 +40,6 @@ import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
-import 'package:moliseis/utils/lru_cache.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -200,37 +199,19 @@ List<SingleChildWidget> get providers {
       lazy: true,
       dispose: (_, value) => value.close(),
     ),
-    Provider<
-      LruCache<
-        String,
-        WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-      >
-    >(
+    Provider<WeatherForecastDataCache<CurrentWeatherForecastData>>(
       create: (_) =>
-          LruCache<
-            String,
-            WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-          >(maxSize: 50),
+          WeatherForecastDataCache<CurrentWeatherForecastData>(maxSize: 50),
       lazy: true,
     ),
-    Provider<
-      LruCache<String, WeatherForecastDataCacheEntry<HourlyWeatherForecastData>>
-    >(
+    Provider<WeatherForecastDataCache<HourlyWeatherForecastData>>(
       create: (_) =>
-          LruCache<
-            String,
-            WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
-          >(maxSize: 50),
+          WeatherForecastDataCache<HourlyWeatherForecastData>(maxSize: 50),
       lazy: true,
     ),
-    Provider<
-      LruCache<String, WeatherForecastDataCacheEntry<DailyWeatherForecastData>>
-    >(
+    Provider<WeatherForecastDataCache<DailyWeatherForecastData>>(
       create: (_) =>
-          LruCache<
-            String,
-            WeatherForecastDataCacheEntry<DailyWeatherForecastData>
-          >(maxSize: 50),
+          WeatherForecastDataCache<DailyWeatherForecastData>(maxSize: 50),
       lazy: true,
     ),
     //#endregion

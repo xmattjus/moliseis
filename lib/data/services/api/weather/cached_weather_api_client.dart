@@ -9,6 +9,9 @@ import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
 
+typedef WeatherForecastDataCache<T> =
+    LruCache<String, WeatherForecastDataCacheEntry<T>>;
+
 /// Wraps a weather API client with intelligent caching to reduce network
 /// traffic and API quota consumption.
 ///
@@ -20,40 +23,20 @@ import 'package:moliseis/utils/result.dart';
 /// reuse.
 class CachedWeatherApiClient {
   final WeatherApiClient _weatherApiClient;
-  final LruCache<
-    String,
-    WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-  >
+  final WeatherForecastDataCache<CurrentWeatherForecastData>
   _currentWeatherCache;
-  final LruCache<
-    String,
-    WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
-  >
-  _hourlyWeatherCache;
-  final LruCache<
-    String,
-    WeatherForecastDataCacheEntry<DailyWeatherForecastData>
-  >
-  _dailyWeatherCache;
+  final WeatherForecastDataCache<HourlyWeatherForecastData> _hourlyWeatherCache;
+  final WeatherForecastDataCache<DailyWeatherForecastData> _dailyWeatherCache;
 
   static const _cacheDuration = Duration(hours: 2);
 
   const CachedWeatherApiClient({
     required WeatherApiClient weatherApiClient,
-    required LruCache<
-      String,
-      WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-    >
+    required WeatherForecastDataCache<CurrentWeatherForecastData>
     currentWeatherCache,
-    required LruCache<
-      String,
-      WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
-    >
+    required WeatherForecastDataCache<HourlyWeatherForecastData>
     hourlyWeatherCache,
-    required LruCache<
-      String,
-      WeatherForecastDataCacheEntry<DailyWeatherForecastData>
-    >
+    required WeatherForecastDataCache<DailyWeatherForecastData>
     dailyWeatherCache,
   }) : _weatherApiClient = weatherApiClient,
        _currentWeatherCache = currentWeatherCache,
