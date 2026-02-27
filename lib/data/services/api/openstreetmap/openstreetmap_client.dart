@@ -27,10 +27,7 @@ class OpenStreetMapClient {
       final response = await http
           .get(
             uri,
-            headers: {
-              'Accept': 'application/json',
-              'User-Agent': 'com.benitomatteobercini.moliseis/2.0',
-            },
+            headers: {'Accept': 'application/json', 'User-Agent': kUserAgent},
           )
           .timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 

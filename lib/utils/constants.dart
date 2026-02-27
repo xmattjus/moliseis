@@ -21,3 +21,5 @@ const String kAssetMapTilerIconPath =
 
 /// The default network request timeout in seconds.
 const int kDefaultNetworkTimeoutSeconds = 10;
+
+const String kUserAgent = 'it.benitomatteobercini.moliseis/2.1';

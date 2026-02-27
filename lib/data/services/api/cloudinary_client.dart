@@ -38,9 +38,7 @@ class CloudinaryClient {
               transformation: Transformation().delivery(
                 Delivery.quality(Quality.autoEco()),
               ),
-              extraHeaders: {
-                'User-Agent': 'com.benitomatteobercini.moliseis/2.0',
-              },
+              extraHeaders: {'User-Agent': kUserAgent},
             ),
           )
           ?.timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));

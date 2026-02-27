@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:moliseis/utils/constants.dart';
 
 class GeoMapTileLayer extends StatelessWidget {
   const GeoMapTileLayer({super.key});
@@ -20,7 +21,7 @@ class GeoMapTileLayer extends StatelessWidget {
         'apiKey': 'ApYiPMeYThI0wnaG93zr',
       },
       retinaMode: RetinaMode.isHighDensity(context),
-      userAgentPackageName: 'com.benitomatteobercini.moliseis',
+      userAgentPackageName: kUserAgent,
     );
   }
 }
