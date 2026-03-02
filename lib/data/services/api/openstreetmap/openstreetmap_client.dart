@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/api/openstreetmap/geocoding_address.dart';
 import 'package:moliseis/data/services/api/openstreetmap/reverse_geocoding_response.dart';
+import 'package:moliseis/data/services/api/openstreetmap/model/geocoding_address.dart';
+import 'package:moliseis/data/services/api/openstreetmap/model/reverse_geocoding_response.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/result.dart';

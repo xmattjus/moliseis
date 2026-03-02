@@ -1,6 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:meta/meta.dart';
-import 'package:moliseis/data/services/api/openstreetmap/geocoding_address.dart';
+import 'package:moliseis/data/services/api/openstreetmap/model/geocoding_address.dart';
 
 part 'reverse_geocoding_response.g.dart';
 
