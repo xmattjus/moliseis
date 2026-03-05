@@ -41,9 +41,7 @@ class CategoryViewModel extends ChangeNotifier {
   }
 
   final _content = <ContentBase>[];
-  var _selectedCategories = Set<ContentCategory>.from(
-    ContentCategory.values.minusUnknown,
-  );
+  var _selectedCategories = <ContentCategory>{};
   var _selectedTypes = Set<ContentType>.from(ContentType.values);
   ContentSort? _sort;
 
