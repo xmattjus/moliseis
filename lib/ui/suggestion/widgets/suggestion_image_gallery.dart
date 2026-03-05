@@ -70,14 +70,13 @@ class SuggestionImageGallery extends StatelessWidget {
                           File(viewModel.mediaFileList[index].path),
                           width: 72.0,
                           height: 72.0,
+                          fit: BoxFit.cover,
                         ),
                       ),
                       RawMaterialButton(
                         onPressed: () =>
                             viewModel.removeImageAtIndex.execute(index),
-                        fillColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainer,
+                        fillColor: context.colorScheme.primaryFixedDim,
                         elevation: 0,
                         constraints: const BoxConstraints(
                           maxWidth: 56.0,
