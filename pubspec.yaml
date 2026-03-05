@@ -16,7 +16,7 @@ dependencies:
       ref: main
   # B
   # C
-  cached_network_image: ^3.4.1
+  cached_network_image_ce: ^4.6.2
   cloudinary_api: ^1.1.1
   cloudinary_url_gen: ^1.8.0
   collection: ^1.19.1

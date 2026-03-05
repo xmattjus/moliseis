@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
-import 'package:moliseis/ui/core/ui/custom_image.dart';
+import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 // TODO (xmattjus): draw inkwell on top of the image.
@@ -52,13 +52,12 @@ class ContentBaseListItem extends StatelessWidget {
                     borderRadius: context.appShapes.circular.cornerMedium,
                   ),
                 ),
-                child: CustomImage.network(
-                  content.media.first.url,
+                child: AppNetworkImage(
+                  url: content.media.first.url,
                   width: 72.0,
                   height: 72.0,
                   imageWidth: content.media.first.width,
                   imageHeight: content.media.first.height,
-                  fit: BoxFit.cover,
                 ),
               ),
             Expanded(

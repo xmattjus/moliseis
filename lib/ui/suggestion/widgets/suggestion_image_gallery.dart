@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
-import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -67,12 +66,10 @@ class SuggestionImageGallery extends StatelessWidget {
                     children: [
                       ClipRRect(
                         borderRadius: appShapes.circular.cornerMedium,
-                        child: CustomImage.file(
+                        child: Image.file(
                           File(viewModel.mediaFileList[index].path),
                           width: 72.0,
                           height: 72.0,
-                          imageWidth: 1000,
-                          imageHeight: 1000,
                         ),
                       ),
                       RawMaterialButton(

@@ -5,9 +5,9 @@ import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_close_button.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/content/nearby_content_horizontal_list.dart';
-import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
+import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal.dart';
@@ -108,13 +108,12 @@ class GeoMapBottomSheetPost extends StatelessWidget {
                     initialIndex: index,
                   );
                 },
-                child: CustomImage.network(
-                  content.media[index].url,
+                child: AppNetworkImage(
+                  url: content.media[index].url,
                   width: kGridViewCardWidth,
                   height: kGridViewCardHeight,
                   imageWidth: content.media[index].width,
                   imageHeight: content.media[index].height,
-                  fit: BoxFit.cover,
                 ),
               );
             },

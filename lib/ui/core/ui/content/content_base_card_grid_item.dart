@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
-import 'package:moliseis/ui/core/ui/custom_image.dart';
+import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ContentBaseCardGridItem extends StatelessWidget {
@@ -51,13 +51,12 @@ class ContentBaseCardGridItem extends StatelessWidget {
                           borderRadius: appShapes.circular.cornerMedium,
                         ),
                       ),
-                      child: CustomImage.network(
-                        content.media.first.url,
+                      child: AppNetworkImage(
+                        url: content.media.first.url,
                         width: constraints.maxWidth,
                         height: constraints.maxHeight,
                         imageWidth: content.media.first.width,
                         imageHeight: content.media.first.height,
-                        fit: BoxFit.cover,
                       ),
                     ),
                   ),

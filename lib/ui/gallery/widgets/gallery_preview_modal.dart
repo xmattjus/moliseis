@@ -2,7 +2,7 @@ import 'dart:async' show StreamController;
 
 import 'package:flutter/material.dart';
 import 'package:moliseis/data/sources/media.dart';
-import 'package:moliseis/ui/core/ui/custom_image.dart';
+import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal_overlay.dart';
 import 'package:provider/provider.dart';
 import 'package:swipe_image_gallery/swipe_image_gallery.dart';
@@ -20,12 +20,14 @@ class GalleryPreviewModal {
       await SwipeImageGallery(
         context: context,
         itemBuilder: (context, index) {
-          return CustomImage.network(
-            images[index].url,
+          return AppNetworkImage(
+            url: images[index].url,
             width: MediaQuery.sizeOf(context).width,
             height: MediaQuery.sizeOf(context).height,
             imageWidth: images[index].width,
             imageHeight: images[index].height,
+            fit: BoxFit.contain,
+            fullResolution: true,
           );
         },
         itemCount: images.length,
