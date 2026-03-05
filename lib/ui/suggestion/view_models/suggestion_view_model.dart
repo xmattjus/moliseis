@@ -48,20 +48,20 @@ class SuggestionViewModel extends ChangeNotifier {
 
   Future<Result<void>> _addImages() async {
     try {
-      // The hash function used to calculate the digest of images to upload.
+      // The hash function used to calculate the digest of media to upload.
       const hashFunc = sha1;
 
-      final pickedImages = await _imagePicker.pickMultiImage();
+      final pickedMedia = await _imagePicker.pickMultipleMedia();
 
-      for (final image in pickedImages) {
-        // Calculates the hash of each image to upload.
-        final digests = hashFunc.bind(image.openRead());
+      for (final media in pickedMedia) {
+        // Calculates the hash of each media to upload.
+        final digests = hashFunc.bind(media.openRead());
         final digest = await digests.first;
 
-        // Adds the image to the upload list only if it hasn't been added
+        // Adds the media to the upload list only if it hasn't been added
         // before already.
         if (!_mediaFileHashes.contains(digest.hashCode)) {
-          _mediaFileList.add(image);
+          _mediaFileList.add(media);
           _mediaFileHashes.add(digest.hashCode);
         }
       }
@@ -71,7 +71,7 @@ class SuggestionViewModel extends ChangeNotifier {
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
       _log.severe(
-        'An exception occurred while adding images to the upload list.',
+        'An exception occurred while adding media to the upload list.',
         error,
         stackTrace,
       );
@@ -90,7 +90,7 @@ class SuggestionViewModel extends ChangeNotifier {
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
       _log.severe(
-        'An exception occurred while removing image at index $index from the upload list.',
+        'An exception occurred while removing media at index $index from the upload list.',
         error,
         stackTrace,
       );
