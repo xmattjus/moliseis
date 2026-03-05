@@ -72,10 +72,10 @@ class MoliseIsApp extends StatelessWidget {
             routerConfig: appRouter,
             builder: (_, child) => child!,
             title: 'Molise Is',
-            localizationsDelegates: const [
+            localizationsDelegates: const <LocalizationsDelegate>[
+              GlobalCupertinoLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [
               Locale.fromSubtags(languageCode: 'en'),
