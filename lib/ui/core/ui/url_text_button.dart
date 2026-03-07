@@ -39,8 +39,11 @@ class UrlTextButton extends StatelessWidget {
 
     return TextButton.icon(
       onPressed: onPressed,
-      style: CustomButtonStyles.url(
-        textStyle?.copyWith(color: foregroundColor),
+      style: _buttonStyle(
+        textStyle?.copyWith(
+          color: foregroundColor,
+          decoration: TextDecoration.underline,
+        ),
         foregroundColor,
       ),
       icon: IconTheme(
@@ -52,6 +55,29 @@ class UrlTextButton extends StatelessWidget {
         child: icon ?? const EmptyBox(),
       ),
       label: label,
+    );
+  }
+
+  ButtonStyle _buttonStyle(TextStyle? textStyle, Color? color) {
+    return ButtonStyle(
+      textStyle: WidgetStatePropertyAll<TextStyle?>(textStyle),
+      foregroundColor: WidgetStatePropertyAll<Color?>(color),
+      overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
+        Color? overlayColor;
+        if (states.contains(WidgetState.focused) ||
+            states.contains(WidgetState.pressed)) {
+          overlayColor = color?.withValues(alpha: 0.10);
+        } else if (states.contains(WidgetState.hovered)) {
+          overlayColor = color?.withValues(alpha: 0.08);
+        }
+
+        return overlayColor;
+      }),
+      iconColor: WidgetStatePropertyAll<Color?>(color),
+      padding: const WidgetStatePropertyAll<EdgeInsets>(EdgeInsets.zero),
+      minimumSize: const WidgetStatePropertyAll<Size>(Size.zero),
+      // visualDensity: VisualDensity.compact,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 }
