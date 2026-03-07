@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 class LinkTextButton extends StatelessWidget {
@@ -32,17 +33,14 @@ class LinkTextButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textStyle = theme.textTheme.bodySmall;
+    final textStyle = AppTextStyles.link(context) ?? theme.textTheme.bodySmall;
     // The color the map attribution icons and texts will have.
-    final foregroundColor = color ?? textStyle?.color?.withValues(alpha: 0.7);
+    final foregroundColor = color ?? textStyle?.color;
 
     return TextButton.icon(
       onPressed: onPressed,
       style: _buttonStyle(
-        textStyle?.copyWith(
-          color: foregroundColor,
-          decoration: TextDecoration.underline,
-        ),
+        textStyle?.copyWith(color: foregroundColor),
         foregroundColor,
       ),
       icon: IconTheme(

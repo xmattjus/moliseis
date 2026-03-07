@@ -35,4 +35,15 @@ class AppTextStyles {
       color: brightness == Brightness.light ? Colors.black87 : Colors.white70,
     );
   }
+
+  static TextStyle? link(BuildContext context) {
+    final theme = Theme.of(context);
+    final defaultTextStyle = theme.textTheme.bodySmall;
+    final color = theme.colorScheme.secondary.withValues(alpha: 0.7);
+    return defaultTextStyle?.copyWith(
+      color: color,
+      decoration: TextDecoration.underline,
+      decorationColor: color,
+    );
+  }
 }

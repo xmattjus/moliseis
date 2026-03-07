@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/ui/category/widgets/category_content_wrap.dart';
+import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
 import 'package:moliseis/ui/user_contribution/widgets/checkbox_form_field.dart';
@@ -29,7 +30,12 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = context.textTheme.bodyLarge;
+    final textTheme = context.textTheme;
+    final textStyle = textTheme.bodyLarge;
+
+    final linkTextStyle = AppTextStyles.link(
+      context,
+    )?.copyWith(fontSize: textTheme.bodyMedium?.fontSize);
 
     return AnnotatedRegion(
       value: SystemUiOverlayStyle(
@@ -274,14 +280,9 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                                             await urlLauncher
                                                 .openTermsOfService();
                                           },
-                                          child: const Text(
+                                          child: Text(
                                             'Termini di Servizio',
-                                            style: TextStyle(
-                                              color: Colors.blue,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                              decorationColor: Colors.blue,
-                                            ),
+                                            style: linkTextStyle,
                                           ),
                                         ),
                                       ),
@@ -298,14 +299,9 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                                             await urlLauncher
                                                 .openPrivacyPolicy();
                                           },
-                                          child: const Text(
+                                          child: Text(
                                             'Informativa sulla privacy',
-                                            style: TextStyle(
-                                              color: Colors.blue,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                              decorationColor: Colors.blue,
-                                            ),
+                                            style: linkTextStyle,
                                           ),
                                         ),
                                       ),

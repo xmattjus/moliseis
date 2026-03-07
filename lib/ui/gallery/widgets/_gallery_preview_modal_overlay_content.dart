@@ -43,6 +43,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
 
     final licenseText = TextSpan(text: ' $license');
 
+    // TODO(xmattjus): handle license with no URL (e.g. public domain) and license with URL (e.g. CC BY-SA)
     final licenseButton = Padding(
       padding: const EdgeInsetsDirectional.only(top: 8.0),
       child: LinkTextButton.icon(
