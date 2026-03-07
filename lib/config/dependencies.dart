@@ -56,7 +56,6 @@ List<SingleChildWidget> get providers {
             )
             as PlaceRepository;
       },
-      lazy: true,
     ),
     Provider(
       create: (_) {
@@ -77,7 +76,6 @@ List<SingleChildWidget> get providers {
             )
             as MediaRepository;
       },
-      lazy: true,
     ),
     Provider(
       create: (_) {
@@ -88,20 +86,17 @@ List<SingleChildWidget> get providers {
             )
             as CityRepository;
       },
-      lazy: true,
     ),
     Provider(
       create: (_) {
         return SearchRepositoryImpl(objectBoxI: objectBox) as SearchRepository;
       },
-      lazy: true,
     ),
     Provider(
       create: (context) {
         return SettingsRepositoryImpl(objectBoxI: objectBox)
             as SettingsRepository;
       },
-      lazy: true,
     ),
     Provider<UserContributionRepository>(
       create: (_) {
@@ -124,7 +119,6 @@ List<SingleChildWidget> get providers {
         return GeoMapRepositoryImpl(openStreetMapClient: OpenStreetMapClient())
             as GeoMapRepository;
       },
-      lazy: true,
     ),
     //#endregion
 
@@ -133,7 +127,6 @@ List<SingleChildWidget> get providers {
       create: (context) {
         return ThemeViewModel(settingsRepository: context.read());
       },
-      lazy: true,
     ),
     ChangeNotifierProvider<SyncViewModel>(
       create: (context) {
@@ -147,13 +140,11 @@ List<SingleChildWidget> get providers {
 
         return SyncViewModel(syncRepoUseCase: useCase);
       },
-      lazy: true,
     ),
     ChangeNotifierProvider<SettingsViewModel>(
       create: (context) {
         return SettingsViewModel(settingsRepository: context.read());
       },
-      lazy: true,
     ),
     ChangeNotifierProvider<FavouriteViewModel>(
       create: (context) {
@@ -168,20 +159,15 @@ List<SingleChildWidget> get providers {
     //#endregion
 
     //#region URL Services
-    Provider<ExternalUrlService>(
-      create: (_) => ExternalUrlService(),
-      lazy: true,
-    ),
+    Provider<ExternalUrlService>(create: (_) => ExternalUrlService()),
     Provider<AppInfoService>(
       create: (context) => AppInfoService(
         externalUrlService: context.read<ExternalUrlService>(),
       ),
-      lazy: true,
     ),
     Provider<MapUrlService>(
       create: (context) =>
           MapUrlService(externalUrlService: context.read<ExternalUrlService>()),
-      lazy: true,
     ),
     Provider<UrlLaunchService>(
       create: (context) => UrlLaunchService(
@@ -189,30 +175,25 @@ List<SingleChildWidget> get providers {
         appInfoService: context.read<AppInfoService>(),
         mapUrlService: context.read<MapUrlService>(),
       ),
-      lazy: true,
     ),
     //#endregion
 
     //#region Other
     Provider<StreamController<Widget>>(
       create: (_) => StreamController<Widget>.broadcast(),
-      lazy: true,
       dispose: (_, value) => value.close(),
     ),
     Provider<WeatherForecastDataCache<CurrentWeatherForecastData>>(
       create: (_) =>
           WeatherForecastDataCache<CurrentWeatherForecastData>(maxSize: 50),
-      lazy: true,
     ),
     Provider<WeatherForecastDataCache<HourlyWeatherForecastData>>(
       create: (_) =>
           WeatherForecastDataCache<HourlyWeatherForecastData>(maxSize: 50),
-      lazy: true,
     ),
     Provider<WeatherForecastDataCache<DailyWeatherForecastData>>(
       create: (_) =>
           WeatherForecastDataCache<DailyWeatherForecastData>(maxSize: 50),
-      lazy: true,
     ),
     //#endregion
   ];
