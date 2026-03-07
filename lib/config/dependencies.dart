@@ -16,10 +16,8 @@ import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dar
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
-import 'package:moliseis/data/services/app_info_service.dart';
-import 'package:moliseis/data/services/external_url_service.dart';
-import 'package:moliseis/data/services/map_url_service.dart';
-import 'package:moliseis/data/services/url_launch_service.dart';
+import 'package:moliseis/data/services/objectbox.dart';
+import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/data/sources/city_supabase_table.dart';
 import 'package:moliseis/data/sources/event_supabase_table.dart';
 import 'package:moliseis/data/sources/media_supabase_table.dart';
@@ -158,27 +156,8 @@ List<SingleChildWidget> get providers {
     ),
     //#endregion
 
-    //#region URL Services
-    Provider<ExternalUrlService>(create: (_) => ExternalUrlService()),
-    Provider<AppInfoService>(
-      create: (context) => AppInfoService(
-        externalUrlService: context.read<ExternalUrlService>(),
-      ),
-    ),
-    Provider<MapUrlService>(
-      create: (context) =>
-          MapUrlService(externalUrlService: context.read<ExternalUrlService>()),
-    ),
-    Provider<UrlLaunchService>(
-      create: (context) => UrlLaunchService(
-        externalUrlService: context.read<ExternalUrlService>(),
-        appInfoService: context.read<AppInfoService>(),
-        mapUrlService: context.read<MapUrlService>(),
-      ),
-    ),
-    //#endregion
-
     //#region Other
+    Provider<UrlLaunchService>(create: (_) => UrlLaunchService()),
     Provider<StreamController<Widget>>(
       create: (_) => StreamController<Widget>.broadcast(),
       dispose: (_, value) => value.close(),

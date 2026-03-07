@@ -7,17 +7,15 @@ import 'package:moliseis/utils/result.dart';
 /// operations. This service combines functionality from specialized services
 /// to provide a single entry point for URL-related operations.
 class UrlLaunchService {
-  UrlLaunchService({
-    required ExternalUrlService externalUrlService,
-    required AppInfoService appInfoService,
-    required MapUrlService mapUrlService,
-  }) : _externalUrlService = externalUrlService,
-       _appInfoService = appInfoService,
-       _mapUrlService = mapUrlService;
+  UrlLaunchService() {
+    _externalUrlService = ExternalUrlService();
+    _appInfoService = AppInfoService(externalUrlService: _externalUrlService);
+    _mapUrlService = MapUrlService(externalUrlService: _externalUrlService);
+  }
 
-  final ExternalUrlService _externalUrlService;
-  final AppInfoService _appInfoService;
-  final MapUrlService _mapUrlService;
+  late final ExternalUrlService _externalUrlService;
+  late final AppInfoService _appInfoService;
+  late final MapUrlService _mapUrlService;
 
   /// Launches a generic URL.
   ///

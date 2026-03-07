@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/services/external_url_service.dart';
+import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_title.dart';
@@ -8,6 +8,7 @@ import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/widgets/components/weather_forecast_days_list.dart';
 import 'package:moliseis/ui/weather/widgets/components/weather_forecast_hourly_list.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:provider/provider.dart';
 
 class WeatherForecastModal extends StatefulWidget {
   final ContentBase content;
@@ -74,9 +75,9 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
             const SizedBox(height: 16.0),
             LinkTextButton(
               label: const Text('Dati meteo forniti da Open-Meteo.com'),
-              onPressed: () => ExternalUrlService().launchGenericUrl(
-                'https://open-meteo.com/',
-              ),
+              onPressed: () => context
+                  .read<UrlLaunchService>()
+                  .launchGenericUrl('https://open-meteo.com/'),
             ),
             SizedBox(height: context.bottomPadding),
           ],
