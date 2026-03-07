@@ -12,7 +12,7 @@ class UserContribution {
     this.description,
     this.startDate,
     this.endDate,
-    this.images,
+    this.media,
     this.authorEmail,
     this.authorName,
     this.createdAt,
@@ -33,7 +33,7 @@ class UserContribution {
 
   final DateTime? endDate;
 
-  final List<String>? images;
+  final List<String>? media;
 
   final String? authorEmail;
 
@@ -52,7 +52,7 @@ class UserContribution {
     String? description,
     DateTime? startDate,
     DateTime? endDate,
-    List<String>? images,
+    List<String>? media,
     String? authorEmail,
     String? authorName,
   }) => UserContribution(
@@ -63,7 +63,7 @@ class UserContribution {
     description: description ?? this.description,
     startDate: startDate ?? this.startDate,
     endDate: endDate ?? this.endDate,
-    images: images ?? this.images,
+    media: media ?? this.media,
     authorEmail: authorEmail ?? this.authorEmail,
     authorName: authorName ?? this.authorName,
     createdAt: createdAt,
@@ -79,7 +79,7 @@ class UserContribution {
       'UserContribution Description: $description, '
       'UserContribution Start Date: $startDate, '
       'UserContribution End Date: $endDate, '
-      'UserContribution Images length: ${images?.length}, '
+      'UserContribution Media length: ${media?.length}, '
       'UserContribution Author Email: $authorEmail, '
       'UserContribution Author Name: $authorName';
 }

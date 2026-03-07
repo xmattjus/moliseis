@@ -36,7 +36,7 @@ class UserContributionRepositoryImpl extends UserContributionRepository {
         _supabaseTable.idEndDate: userContribution.endDate?.toIso8601String(),
         _supabaseTable.idAuthorEmail: userContribution.authorEmail,
         _supabaseTable.idAuthorName: userContribution.authorName,
-        _supabaseTable.idImages: userContribution.images,
+        _supabaseTable.idImages: userContribution.media,
       });
 
       return const Result.success(null);

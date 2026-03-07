@@ -17,8 +17,8 @@ class UserContributionViewModel extends ChangeNotifier {
   UserContributionViewModel({
     required UserContributionRepository userContributionRepository,
   }) : _userContributionRepository = userContributionRepository {
-    addImages = Command0(_addImages);
-    removeImageAtIndex = Command1(_removeImageAtIndex);
+    addMedia = Command0(_addMedia);
+    removeMediaAt = Command1(_removeMediaAt);
     send = Command0(_send);
   }
 
@@ -43,14 +43,11 @@ class UserContributionViewModel extends ChangeNotifier {
       UnmodifiableListView<XFile>(_mediaFileList);
   DateTime? get startDate => _startDate;
 
-  // TODO(xmattjus): rename this method to addMedia.
-  late Command0<void> addImages;
-  // TODO(xmattjus): rename this method to removeMediaAt.
-  late Command1<void, int> removeImageAtIndex;
+  late Command0<void> addMedia;
+  late Command1<void, int> removeMediaAt;
   late Command0<void> send;
 
-  // TODO(xmattjus): rename this method to _addMedia.
-  Future<Result<void>> _addImages() async {
+  Future<Result<void>> _addMedia() async {
     try {
       // The hash function used to calculate the digest of media to upload.
       const hashFunc = sha1;
@@ -84,8 +81,7 @@ class UserContributionViewModel extends ChangeNotifier {
     }
   }
 
-  // TODO(xmattjus): rename this method to _removeMediaAt.
-  Future<Result<void>> _removeImageAtIndex(int index) async {
+  Future<Result<void>> _removeMediaAt(int index) async {
     try {
       _mediaFileList.removeAt(index);
       _mediaFileHashes.removeAt(index);
@@ -155,7 +151,7 @@ class UserContributionViewModel extends ChangeNotifier {
       endDate: _endDate,
       authorEmail: authorEmail,
       authorName: authorName,
-      images: mediaUrls,
+      media: mediaUrls,
     );
 
     final result = await _userContributionRepository.upload(userContribution);

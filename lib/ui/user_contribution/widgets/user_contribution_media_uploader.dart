@@ -29,8 +29,8 @@ class UserContributionMediaUploader extends StatelessWidget {
           height: 72.0,
           child: ListenableBuilder(
             listenable: Listenable.merge([
-              viewModel.addImages,
-              viewModel.removeImageAtIndex,
+              viewModel.addMedia,
+              viewModel.removeMediaAt,
             ]),
             builder: (context, child) {
               return ListView.separated(
@@ -40,7 +40,7 @@ class UserContributionMediaUploader extends StatelessWidget {
                   // The last widget of the list is a button to append new
                   // media to the user contribution.
                   if (viewModel.mediaFileList.length == index) {
-                    if (viewModel.addImages.running) {
+                    if (viewModel.addMedia.running) {
                       return const Padding(
                         padding: EdgeInsets.all(18.0),
                         child: CustomCircularProgressIndicator(size: 36.0),
@@ -54,8 +54,7 @@ class UserContributionMediaUploader extends StatelessWidget {
                       child: const Center(
                         child: Icon(Symbols.add_a_photo, size: 24.0),
                       ),
-                      onPressed: () async =>
-                          await viewModel.addImages.execute(),
+                      onPressed: () async => await viewModel.addMedia.execute(),
                     );
                   }
 
@@ -74,8 +73,7 @@ class UserContributionMediaUploader extends StatelessWidget {
                         ),
                       ),
                       RawMaterialButton(
-                        onPressed: () =>
-                            viewModel.removeImageAtIndex.execute(index),
+                        onPressed: () => viewModel.removeMediaAt.execute(index),
                         fillColor: context.colorScheme.primaryFixedDim,
                         elevation: 0,
                         constraints: const BoxConstraints(
