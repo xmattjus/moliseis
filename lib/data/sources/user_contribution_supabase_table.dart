@@ -1,6 +1,6 @@
 import 'package:moliseis/data/repositories/supabase_table_base.dart';
 
-class SuggestionSupabaseTable implements SupabaseTableBase {
+class UserContributionSupabaseTable implements SupabaseTableBase {
   @override
   String get tableName => 'suggestions';
 

@@ -15,8 +15,8 @@ import 'package:moliseis/ui/explore/widgets/components/responsive_overflow_menu.
 import 'package:moliseis/ui/explore/widgets/components/suggested_carousel_view.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
-import 'package:moliseis/ui/suggestion/widgets/suggestion_cta_button.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
+import 'package:moliseis/ui/user_contribution/widgets/user_contribution_cta_button.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
 
@@ -135,8 +135,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
               SliverPadding(
                 padding: const EdgeInsets.all(16.0),
                 sliver: SliverToBoxAdapter(
-                  child: SuggestionCTAButton(
-                    onPressed: () => context.goNamed(RouteNames.suggestion),
+                  child: UserContributionCTAButton(
+                    onPressed: () =>
+                        context.goNamed(RouteNames.userContribution),
                   ),
                 ),
               ),

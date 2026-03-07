@@ -3,9 +3,10 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 
-class SuggestionCTAButton extends StatelessWidget {
-  const SuggestionCTAButton({super.key, required this.onPressed});
+class UserContributionCTAButton extends StatelessWidget {
+  const UserContributionCTAButton({super.key, required this.onPressed});
 
+  // TODO(xmattjus): remove this method since the button always navigates to the same route.
   final void Function() onPressed;
 
   @override

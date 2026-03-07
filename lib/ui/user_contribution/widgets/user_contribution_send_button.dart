@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
+import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-class SuggestionSendButton extends StatelessWidget {
-  const SuggestionSendButton({
+class UserContributionSendButton extends StatelessWidget {
+  const UserContributionSendButton({
     super.key,
     required this.onPressed,
     required this.viewModel,
@@ -12,7 +12,7 @@ class SuggestionSendButton extends StatelessWidget {
 
   final void Function() onPressed;
 
-  final SuggestionViewModel viewModel;
+  final UserContributionViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -29,9 +29,9 @@ class SuggestionSendButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: ListenableBuilder(
-        listenable: viewModel.uploadSuggestion,
+        listenable: viewModel.send,
         builder: (context, child) {
-          if (viewModel.uploadSuggestion.error) {
+          if (viewModel.send.error) {
             return _OutlinedCard(
               backgroundColor: bgErrorColor,
               foregroundColor: fgErrorColor,
@@ -43,7 +43,7 @@ class SuggestionSendButton extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: () => viewModel.uploadSuggestion.execute(),
+                  onPressed: () => viewModel.send.execute(),
                   style: TextButton.styleFrom(
                     backgroundColor: bgErrorColor,
                     foregroundColor: fgErrorColor,
@@ -54,7 +54,7 @@ class SuggestionSendButton extends StatelessWidget {
             );
           }
 
-          if (viewModel.uploadSuggestion.completed) {
+          if (viewModel.send.completed) {
             return _OutlinedCard(
               backgroundColor: bgColor,
               foregroundColor: fgColor,
@@ -75,9 +75,9 @@ class SuggestionSendButton extends StatelessWidget {
               return FadeTransition(opacity: animation, child: child);
             },
             child: Align(
-              key: ValueKey<bool>(viewModel.uploadSuggestion.running),
+              key: ValueKey<bool>(viewModel.send.running),
               alignment: Alignment.centerRight,
-              child: viewModel.uploadSuggestion.running
+              child: viewModel.send.running
                   ? _OutlinedCard(
                       backgroundColor: bgColor,
                       foregroundColor: fgColor,

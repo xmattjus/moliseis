@@ -4,17 +4,16 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-/// Different display modes of [SuggestionDateChip].
-enum SuggestionDateChipMode { date, time }
+enum UserContributionDateChipMode { date, time }
 
-class SuggestionDateChip extends StatefulWidget {
-  const SuggestionDateChip({
+class UserContributionDateChip extends StatefulWidget {
+  const UserContributionDateChip({
     super.key,
     this.firstDate,
     this.initialDate,
     required this.label,
     this.leading,
-    this.mode = SuggestionDateChipMode.date,
+    this.mode = UserContributionDateChipMode.date,
     required this.onDatePicked,
   });
 
@@ -22,14 +21,15 @@ class SuggestionDateChip extends StatefulWidget {
   final DateTime? initialDate;
   final Widget label;
   final Widget? leading;
-  final SuggestionDateChipMode mode;
+  final UserContributionDateChipMode mode;
   final void Function(DateTime? date) onDatePicked;
 
   @override
-  State<SuggestionDateChip> createState() => _SuggestionDateChipState();
+  State<UserContributionDateChip> createState() =>
+      _UserContributionDateChipState();
 }
 
-class _SuggestionDateChipState extends State<SuggestionDateChip> {
+class _UserContributionDateChipState extends State<UserContributionDateChip> {
   DateTime? _selectedDateTime;
 
   @override
@@ -65,7 +65,7 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
                         ),
                         Expanded(
                           child: Text(
-                            widget.mode == SuggestionDateChipMode.date
+                            widget.mode == UserContributionDateChipMode.date
                                 ? 'Seleziona una data'
                                 : "Seleziona un'ora",
                             style: Theme.of(context).textTheme.titleMedium
@@ -92,7 +92,7 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
 
                   Expanded(
                     child: CupertinoDatePicker(
-                      mode: widget.mode == SuggestionDateChipMode.date
+                      mode: widget.mode == UserContributionDateChipMode.date
                           ? CupertinoDatePickerMode.date
                           : CupertinoDatePickerMode.time,
                       onDateTimeChanged: (value) => _selectedDateTime = value,
@@ -143,7 +143,7 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
     Duration durationLimit,
   ) async {
     switch (widget.mode) {
-      case SuggestionDateChipMode.date:
+      case UserContributionDateChipMode.date:
         final selectedDate = await showDatePicker(
           context: context,
           initialDate: widget.initialDate ?? now,
@@ -154,7 +154,7 @@ class _SuggestionDateChipState extends State<SuggestionDateChip> {
         if (selectedDate != null) {
           widget.onDatePicked.call(selectedDate);
         }
-      case SuggestionDateChipMode.time:
+      case UserContributionDateChipMode.time:
         final selectedTime = await showTimePicker(
           context: context,
           initialTime: TimeOfDay(hour: now.hour, minute: now.minute),

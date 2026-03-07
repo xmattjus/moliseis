@@ -5,13 +5,13 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
-import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
+import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-class SuggestionImageGallery extends StatelessWidget {
-  const SuggestionImageGallery({super.key, required this.viewModel});
+class UserContributionMediaUploader extends StatelessWidget {
+  const UserContributionMediaUploader({super.key, required this.viewModel});
 
-  final SuggestionViewModel viewModel;
+  final UserContributionViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +38,7 @@ class SuggestionImageGallery extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 itemBuilder: (context, index) {
                   // The last widget of the list is a button to append new
-                  // images to the suggestion.
+                  // media to the user contribution.
                   if (viewModel.mediaFileList.length == index) {
                     if (viewModel.addImages.running) {
                       return const Padding(

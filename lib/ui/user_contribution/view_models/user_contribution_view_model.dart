@@ -6,24 +6,25 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:logging/logging.dart';
-import 'package:moliseis/data/sources/suggestion.dart';
+import 'package:moliseis/data/sources/user_contribution.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/repositories/suggestion_repository.dart';
+import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
 
-class SuggestionViewModel extends ChangeNotifier {
-  SuggestionViewModel({required SuggestionRepository suggestionRepository})
-    : _suggestionRepository = suggestionRepository {
+class UserContributionViewModel extends ChangeNotifier {
+  UserContributionViewModel({
+    required UserContributionRepository userContributionRepository,
+  }) : _userContributionRepository = userContributionRepository {
     addImages = Command0(_addImages);
     removeImageAtIndex = Command1(_removeImageAtIndex);
-    uploadSuggestion = Command0(_uploadSuggestion);
+    send = Command0(_send);
   }
 
-  final _log = Logger('SuggestionViewModel');
+  final _log = Logger('UserContributionViewModel');
 
-  final SuggestionRepository _suggestionRepository;
+  final UserContributionRepository _userContributionRepository;
 
   String? authorEmail;
   String? authorName;
@@ -42,10 +43,13 @@ class SuggestionViewModel extends ChangeNotifier {
       UnmodifiableListView<XFile>(_mediaFileList);
   DateTime? get startDate => _startDate;
 
+  // TODO(xmattjus): rename this method to addMedia.
   late Command0<void> addImages;
+  // TODO(xmattjus): rename this method to removeMediaAt.
   late Command1<void, int> removeImageAtIndex;
-  late Command0<void> uploadSuggestion;
+  late Command0<void> send;
 
+  // TODO(xmattjus): rename this method to _addMedia.
   Future<Result<void>> _addImages() async {
     try {
       // The hash function used to calculate the digest of media to upload.
@@ -80,6 +84,7 @@ class SuggestionViewModel extends ChangeNotifier {
     }
   }
 
+  // TODO(xmattjus): rename this method to _removeMediaAt.
   Future<Result<void>> _removeImageAtIndex(int index) async {
     try {
       _mediaFileList.removeAt(index);
@@ -125,11 +130,13 @@ class SuggestionViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<Result<void>> _uploadSuggestion() async {
+  Future<Result<void>> _send() async {
     final mediaUrls = <String>[];
 
     for (final file in _mediaFileList) {
-      final result = await _suggestionRepository.uploadImage(File(file.path));
+      final result = await _userContributionRepository.uploadImage(
+        File(file.path),
+      );
 
       switch (result) {
         case Success<String>():
@@ -139,7 +146,7 @@ class SuggestionViewModel extends ChangeNotifier {
       }
     }
 
-    final suggestion = Suggestion(
+    final userContribution = UserContribution(
       city: city,
       place: place,
       description: description,
@@ -151,7 +158,7 @@ class SuggestionViewModel extends ChangeNotifier {
       images: mediaUrls,
     );
 
-    final result = await _suggestionRepository.upload(suggestion);
+    final result = await _userContributionRepository.upload(userContribution);
 
     switch (result) {
       case Success():

@@ -9,7 +9,7 @@ import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
 import 'package:moliseis/data/repositories/settings_repository_impl.dart';
-import 'package:moliseis/data/repositories/suggestion_repository_impl.dart';
+import 'package:moliseis/data/repositories/user_contribution_repository_impl.dart';
 import 'package:moliseis/data/services/api/cloudinary_client.dart';
 import 'package:moliseis/data/services/api/openstreetmap/openstreetmap_client.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -24,7 +24,7 @@ import 'package:moliseis/data/sources/city_supabase_table.dart';
 import 'package:moliseis/data/sources/event_supabase_table.dart';
 import 'package:moliseis/data/sources/media_supabase_table.dart';
 import 'package:moliseis/data/sources/place_supabase_table.dart';
-import 'package:moliseis/data/sources/suggestion_supabase_table.dart';
+import 'package:moliseis/data/sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/geo_map_repository.dart';
@@ -32,7 +32,7 @@ import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
-import 'package:moliseis/domain/repositories/suggestion_repository.dart';
+import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/sync/sync_repo_use_case.dart';
 import 'package:moliseis/main.dart';
@@ -103,7 +103,7 @@ List<SingleChildWidget> get providers {
       },
       lazy: true,
     ),
-    Provider<SuggestionRepository>(
+    Provider<UserContributionRepository>(
       create: (_) {
         final cloudinaryClient = CloudinaryClient(
           cloudName: Env.cloudinaryProdCloudName,
@@ -111,12 +111,12 @@ List<SingleChildWidget> get providers {
           apiSecret: Env.cloudinaryProdApiSecret,
         );
 
-        return SuggestionRepositoryImpl(
+        return UserContributionRepositoryImpl(
               supabase: Supabase.instance,
-              supabaseTable: SuggestionSupabaseTable(),
+              supabaseTable: UserContributionSupabaseTable(),
               cloudinaryClient: cloudinaryClient,
             )
-            as SuggestionRepository;
+            as UserContributionRepository;
       },
     ),
     Provider<GeoMapRepository>(

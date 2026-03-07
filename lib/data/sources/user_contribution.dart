@@ -3,8 +3,8 @@ import 'package:meta/meta.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
 @immutable
-class Suggestion {
-  const Suggestion({
+class UserContribution {
+  const UserContribution({
     this.id,
     this.type,
     this.city,
@@ -45,7 +45,7 @@ class Suggestion {
   @JsonKey(name: 'modified_at')
   final DateTime? modifiedAt;
 
-  Suggestion copyWith({
+  UserContribution copyWith({
     ContentCategory? type,
     String? city,
     String? place,
@@ -55,7 +55,7 @@ class Suggestion {
     List<String>? images,
     String? authorEmail,
     String? authorName,
-  }) => Suggestion(
+  }) => UserContribution(
     id: id,
     type: type ?? this.type,
     city: city ?? this.city,
@@ -72,14 +72,14 @@ class Suggestion {
 
   @override
   String toString() =>
-      'Suggestion Id: $id, '
-      'Suggestion Type: $type, '
-      'Suggestion City: $city, '
-      'Suggestion Place: $place, '
-      'Suggestion Description: $description, '
-      'Suggestion Start Date: $startDate, '
-      'Suggestion End Date: $endDate, '
-      'Suggestion Images length: ${images?.length}, '
-      'Suggestion Author Email: $authorEmail, '
-      'Suggestion Author Name: $authorName';
+      'UserContribution Id: $id, '
+      'UserContribution Type: $type, '
+      'UserContribution City: $city, '
+      'UserContribution Place: $place, '
+      'UserContribution Description: $description, '
+      'UserContribution Start Date: $startDate, '
+      'UserContribution End Date: $endDate, '
+      'UserContribution Images length: ${images?.length}, '
+      'UserContribution Author Email: $authorEmail, '
+      'UserContribution Author Name: $authorName';
 }

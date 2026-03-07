@@ -19,10 +19,10 @@ import 'package:moliseis/ui/geo_map/widgets/geo_map_screen.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/search_result_screen.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
-import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
-import 'package:moliseis/ui/suggestion/widgets/suggestion_screen.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
+import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
+import 'package:moliseis/ui/user_contribution/widgets/user_contribution_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
@@ -147,13 +147,13 @@ final appRouter = GoRouter(
                   childName: RouteNames.homeCategoryPost,
                 ),
                 GoRoute(
-                  path: RoutePaths.suggestion,
-                  name: RouteNames.suggestion,
+                  path: RoutePaths.userContribution,
+                  name: RouteNames.userContribution,
                   builder: (context, _) {
-                    final viewModel = SuggestionViewModel(
-                      suggestionRepository: context.read(),
+                    final viewModel = UserContributionViewModel(
+                      userContributionRepository: context.read(),
                     );
-                    return SuggestionScreen(viewModel: viewModel);
+                    return UserContributionScreen(viewModel: viewModel);
                   },
                   parentNavigatorKey: _rootNavigatorKey,
                 ),

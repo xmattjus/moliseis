@@ -9,5 +9,5 @@ abstract class RoutePaths {
   static const settings = '/settings';
   static const sync = '/sync';
   static const post = 'posts/:id';
-  static const suggestion = 'suggestion';
+  static const userContribution = 'userContribution';
 }

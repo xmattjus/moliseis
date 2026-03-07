@@ -3,28 +3,28 @@ import 'package:flutter/services.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/ui/category/widgets/category_content_wrap.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
-import 'package:moliseis/ui/suggestion/view_models/suggestion_view_model.dart';
-import 'package:moliseis/ui/suggestion/widgets/checkbox_form_field.dart';
-import 'package:moliseis/ui/suggestion/widgets/suggestion_date_chip.dart';
-import 'package:moliseis/ui/suggestion/widgets/suggestion_image_gallery.dart';
-import 'package:moliseis/ui/suggestion/widgets/suggestion_send_button.dart';
+import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
+import 'package:moliseis/ui/user_contribution/widgets/checkbox_form_field.dart';
+import 'package:moliseis/ui/user_contribution/widgets/user_contribution_date_chip.dart';
+import 'package:moliseis/ui/user_contribution/widgets/user_contribution_media_uploader.dart';
+import 'package:moliseis/ui/user_contribution/widgets/user_contribution_send_button.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
-class SuggestionScreen extends StatefulWidget {
-  const SuggestionScreen({super.key, required this.viewModel});
+class UserContributionScreen extends StatefulWidget {
+  const UserContributionScreen({super.key, required this.viewModel});
 
-  final SuggestionViewModel viewModel;
+  final UserContributionViewModel viewModel;
 
   @override
-  State<SuggestionScreen> createState() => _SuggestionScreenState();
+  State<UserContributionScreen> createState() => _UserContributionScreenState();
 }
 
-class _SuggestionScreenState extends State<SuggestionScreen> {
+class _UserContributionScreenState extends State<UserContributionScreen> {
   final _form1Key = GlobalKey<FormState>();
   final _form2Key = GlobalKey<FormState>();
 
-  /// Whether the current suggestion is an event or not.
+  /// Whether the current user contribution is an event or not.
   bool _isEvent = false;
 
   @override
@@ -149,7 +149,7 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                             crossAxisAlignment: WrapCrossAlignment.center,
                             spacing: 8.0,
                             children: [
-                              SuggestionDateChip(
+                              UserContributionDateChip(
                                 initialDate: startDate,
                                 label: Text(
                                   startDate != null
@@ -161,17 +161,17 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                                 },
                               ),
                               if (startDate != null)
-                                SuggestionDateChip(
+                                UserContributionDateChip(
                                   initialDate: startDate,
                                   label: Text(
                                     'Inizia alle ${widget.viewModel.formatTime(currentLocale, startDate)}',
                                   ),
-                                  mode: SuggestionDateChipMode.time,
+                                  mode: UserContributionDateChipMode.time,
                                   onDatePicked: (date) {
                                     widget.viewModel.setStartTime(date);
                                   },
                                 ),
-                              SuggestionDateChip(
+                              UserContributionDateChip(
                                 firstDate: startDate,
                                 initialDate: endDate ?? startDate,
                                 label: Text(
@@ -193,7 +193,7 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
               ),
               SliverList.list(
                 children: [
-                  SuggestionImageGallery(viewModel: widget.viewModel),
+                  UserContributionMediaUploader(viewModel: widget.viewModel),
                   const SizedBox(height: 16.0),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
@@ -329,13 +329,13 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                       ),
                     ),
                   ),
-                  SuggestionSendButton(
+                  UserContributionSendButton(
                     onPressed: () {
                       final isForm1Valid = _form1Key.currentState!.validate();
                       final isForm2Valid = _form2Key.currentState!.validate();
 
                       if (isForm1Valid && isForm2Valid) {
-                        widget.viewModel.uploadSuggestion.execute();
+                        widget.viewModel.send.execute();
                       }
                     },
                     viewModel: widget.viewModel,
