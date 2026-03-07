@@ -45,7 +45,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
 
     final licenseButton = Padding(
       padding: const EdgeInsetsDirectional.only(top: 8.0),
-      child: UrlTextButton.icon(
+      child: LinkTextButton.icon(
         icon: const Icon(Symbols.attribution),
         iconSize: 18.0,
         onPressed: licenseUrl.isNotEmpty

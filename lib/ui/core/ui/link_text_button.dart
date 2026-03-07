@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/ui/core/themes/button_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 
-class UrlTextButton extends StatelessWidget {
+class LinkTextButton extends StatelessWidget {
   final void Function()? onPressed;
   final Widget? icon;
   final double? iconSize;
   final Widget label;
   final Color? color;
 
-  /// Creates a Material [TextButton] with a fixed style appropriate for
-  /// launching URLs external to the app.
-  const UrlTextButton({
+  /// Creates a Material [TextButton] with a style appropriate for launching
+  /// URLs external to the app.
+  const LinkTextButton({
     super.key,
     this.onPressed,
     required this.label,
@@ -21,7 +20,7 @@ class UrlTextButton extends StatelessWidget {
 
   /// Creates a Material [TextButton.icon] with a fixed style appropriate for
   /// launching URLs external to the app.
-  const UrlTextButton.icon({
+  const LinkTextButton.icon({
     super.key,
     this.onPressed,
     this.iconSize,

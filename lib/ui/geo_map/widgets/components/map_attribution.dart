@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
-import 'package:moliseis/ui/core/ui/url_text_button.dart';
+import 'package:moliseis/ui/core/ui/link_text_button.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
 
@@ -20,7 +20,7 @@ class MapAttribution extends StatelessWidget {
           runAlignment: WrapAlignment.end,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
-            UrlTextButton.icon(
+            LinkTextButton.icon(
               onPressed: () async {
                 if (!await context
                     .read<UrlLaunchService>()
@@ -38,7 +38,7 @@ class MapAttribution extends StatelessWidget {
               iconSize: 24.0,
               label: const Text('© MapTiler'),
             ),
-            UrlTextButton(
+            LinkTextButton(
               onPressed: () async {
                 if (!await context
                     .read<UrlLaunchService>()

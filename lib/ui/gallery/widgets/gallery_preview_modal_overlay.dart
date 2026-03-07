@@ -12,7 +12,7 @@ import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
 import 'package:moliseis/ui/core/ui/linear_gradient_background.dart';
-import 'package:moliseis/ui/core/ui/url_text_button.dart';
+import 'package:moliseis/ui/core/ui/link_text_button.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
