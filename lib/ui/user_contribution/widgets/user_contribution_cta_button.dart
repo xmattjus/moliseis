@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 
 class UserContributionCTAButton extends StatelessWidget {
-  const UserContributionCTAButton({super.key, required this.onPressed});
-
-  // TODO(xmattjus): remove this method since the button always navigates to the same route.
-  final void Function() onPressed;
+  const UserContributionCTAButton({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +18,7 @@ class UserContributionCTAButton extends StatelessWidget {
         CardBase(
           color: bgColor,
           elevation: 0,
-          onPressed: onPressed,
+          onPressed: () => context.goNamed(RouteNames.userContribution),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(

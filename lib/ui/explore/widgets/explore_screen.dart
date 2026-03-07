@@ -132,14 +132,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 ),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.all(16.0),
-                sliver: SliverToBoxAdapter(
-                  child: UserContributionCTAButton(
-                    onPressed: () =>
-                        context.goNamed(RouteNames.userContribution),
-                  ),
-                ),
+              const SliverPadding(
+                padding: EdgeInsets.all(16.0),
+                sliver: SliverToBoxAdapter(child: UserContributionCTAButton()),
               ),
               const SliverToBoxAdapter(
                 child: TextSectionDivider(
