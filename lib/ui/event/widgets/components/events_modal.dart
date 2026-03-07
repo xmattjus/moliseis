@@ -35,20 +35,24 @@ class EventsModal extends StatelessWidget {
         ? 'Eventi di oggi ${selectedDate.day} $localizedSelectedMonth'
         : 'Eventi del ${selectedDate.day} $localizedSelectedMonth';
 
+    final showDragHandle = context.windowSizeClass.isAtMost(
+      WindowSizeClass.medium,
+    );
+
     return CustomScrollView(
       controller: scrollController,
       slivers: <Widget>[
         SliverList.list(
           children: <Widget>[
-            if (context.windowSizeClass.isAtMost(WindowSizeClass.medium))
-              const AppBottomSheetDragHandle(),
+            if (showDragHandle) const AppBottomSheetDragHandle(),
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: AppBottomSheetTitle(
-                title: bottomSheetTitle,
-                // onClose: () => Navigator.of(context).pop(),
-                icon: null,
+              padding: EdgeInsets.fromLTRB(
+                16.0,
+                showDragHandle ? 0.0 : 16.0,
+                16.0,
+                16.0,
               ),
+              child: AppBottomSheetTitle(title: bottomSheetTitle, icon: null),
             ),
           ],
         ),
