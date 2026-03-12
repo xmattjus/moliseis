@@ -50,6 +50,10 @@ class _EventsScreenState extends State<EventsScreen> {
     _bottomPaddingAnimation.value =
         (MediaQuery.maybeSizeOf(context)?.height ?? 0) *
         context.appSizes.bottomSheetInitialSnapSize;
+
+    if (context.windowSizeClass.isLargerThan(WindowSizeClass.medium)) {
+      _bottomPaddingAnimation.value = 0.0;
+    }
   }
 
   @override
@@ -60,39 +64,28 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isAtMostMedium = context.windowSizeClass.isAtMost(
-      WindowSizeClass.medium,
-    );
-    return ResponsiveScaffold(
-      draggableScrollableController: _draggableScrollableController,
-      modalBuilder: (context, scrollController) => EventsModal(
-        localizedMonths: _dateSymbols.MONTHS,
-        selectedDate: widget.viewModel.selectedDate,
+  Widget build(BuildContext context) => ResponsiveScaffold(
+    draggableScrollableController: _draggableScrollableController,
+    modalBuilder: (context, scrollController) => EventsModal(
+      localizedMonths: _dateSymbols.MONTHS,
+      selectedDate: widget.viewModel.selectedDate,
+      viewModel: widget.viewModel,
+      scrollController: scrollController,
+    ),
+    child: AnimatedBuilder(
+      animation: _bottomPaddingAnimation,
+      builder: (context, child) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: _bottomPadding),
+          child: child,
+        );
+      },
+      child: _CalendarWidget(
         viewModel: widget.viewModel,
-        scrollController: scrollController,
+        onDayPressed: (date) => widget.viewModel.loadByDate.execute(date),
       ),
-      child: isAtMostMedium
-          ? AnimatedBuilder(
-              animation: _bottomPaddingAnimation,
-              builder: (context, child) {
-                return Padding(
-                  padding: EdgeInsets.only(bottom: _bottomPadding),
-                  child: child,
-                );
-              },
-              child: _CalendarWidget(
-                viewModel: widget.viewModel,
-                onDayPressed: (date) =>
-                    widget.viewModel.loadByDate.execute(date),
-              ),
-            )
-          : _CalendarWidget(
-              viewModel: widget.viewModel,
-              onDayPressed: (date) => widget.viewModel.loadByDate.execute(date),
-            ),
-    );
-  }
+    ),
+  );
 
   void _draggableScrollableListener() {
     if (_draggableScrollableController.isAttached) {
@@ -116,7 +109,9 @@ class _CalendarWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: <Widget>[
-        const SliverAppBar(title: Text('Eventi')),
+        const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
+        if (context.windowSizeClass.isAtMost(WindowSizeClass.medium))
+          const SliverAppBar(title: Text('Eventi')),
         EventsCalendar(
           onDayPressed: (date) {
             onDayPressed?.call(date);
