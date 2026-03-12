@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -29,6 +30,7 @@ GoRoute categoryRoute({required String name, required String childName}) {
       );
 
       return ChangeNotifierProvider<CategoryViewModel>(
+        key: ValueKey(tabIndex),
         create: (context) {
           final viewModel = CategoryViewModel(
             categoryUseCase: CategoryUseCase(
