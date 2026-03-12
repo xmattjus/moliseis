@@ -50,16 +50,19 @@ class SyncViewModel extends ChangeNotifier {
   ///
   /// Returns `true` if sync is needed, `false` otherwise.
   bool _syncNeeded() {
-    final lastUpdate = _useCase.lastSuccessfullSynchronization;
+    final result = _useCase.modifiedAt;
 
-    final nextScheduledUpdate =
-        lastUpdate?.add(const Duration(days: 3)) ?? DateTime(2025);
+    if (result is Success<DateTime?>) {
+      if (result.value != null) {
+        final nextScheduledUpdate = result.value!.add(const Duration(days: 3));
 
-    if (DateTime.now().isAfter(nextScheduledUpdate)) {
-      return true;
+        if (DateTime.now().isBefore(nextScheduledUpdate)) {
+          return false;
+        }
+      }
     }
 
-    return false;
+    return true;
   }
 
   /// Synchronizes the local app repositories with the backend.
@@ -72,14 +75,12 @@ class SyncViewModel extends ChangeNotifier {
   /// In case of error, sets [fatalError] to `true` if this is the first
   /// synchronization attempt (no previous successful sync exists).
   Future<Result<void>> _start(bool force) async {
-    final lastUpdate = _useCase.lastSuccessfullSynchronization;
-
     if (force || _syncNeeded()) {
       final result = await _useCase.start();
 
       switch (result) {
         case Error<void>():
-          _fatalError = lastUpdate == null;
+          _fatalError = true;
         case Success<void>():
       }
 

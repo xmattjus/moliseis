@@ -83,7 +83,9 @@ class SettingsScreen extends StatelessWidget {
                         initialSelection: themeProvider.themeBrightness,
                         onSelected: (ThemeBrightness? brightness) {
                           if (brightness != null) {
-                            themeProvider.setThemeBrightness(brightness);
+                            themeProvider.setThemeBrightness.execute(
+                              brightness,
+                            );
                           }
                         },
                         dropdownMenuEntries:

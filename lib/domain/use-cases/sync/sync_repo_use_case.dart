@@ -49,11 +49,10 @@ class SynchronizeRepositoriesUseCase {
     }
 
     // If all repositories synchronized successfully, update the last sync time.
-    _settingsRepository.setModifiedAt(DateTime.now());
+    await _settingsRepository.setModifiedAt(DateTime.now());
 
     return const Result.success(null);
   }
 
-  DateTime? get lastSuccessfullSynchronization =>
-      _settingsRepository.modifiedAt;
+  Result<DateTime?> get modifiedAt => _settingsRepository.modifiedAt;
 }

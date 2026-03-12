@@ -37,13 +37,22 @@ class CategoryViewModel extends ChangeNotifier {
     setSort = Command1(_setSort);
     setSelectedTypes = Command1(_setSelectedTypes);
 
+    final contentSortResult = _settingsRepository.contentSort;
+
+    switch (contentSortResult) {
+      case Success<ContentSort>():
+        _sort = contentSortResult.value;
+      case Error<ContentSort>():
+        _sort = ContentSort.byName; // Default value in case of error.
+    }
+
     equality = const DeepCollectionEquality();
   }
 
   final _content = <ContentBase>[];
   var _selectedCategories = <ContentCategory>{};
   var _selectedTypes = Set<ContentType>.from(ContentType.values);
-  ContentSort? _sort;
+  late ContentSort _sort;
 
   UnmodifiableListView<ContentBase> get content =>
       UnmodifiableListView(_content);
@@ -51,7 +60,7 @@ class CategoryViewModel extends ChangeNotifier {
       UnmodifiableSetView(_selectedCategories);
   UnmodifiableSetView<ContentType> get selectedTypes =>
       UnmodifiableSetView(_selectedTypes);
-  ContentSort get sort => _sort ??= _settingsRepository.contentSort;
+  ContentSort get sort => _sort;
 
   Future<Result<void>> _load() async {
     if (!_selectedCategories.containsAll(ContentCategory.values.minusUnknown)) {

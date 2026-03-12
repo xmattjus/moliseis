@@ -26,33 +26,29 @@ class SettingsRepositoryImpl implements SettingsRepository {
   AppSettings get _appSettings => _settingsBox.get(settingsId) ?? AppSettings();
 
   @override
-  ThemeType get themeType => _appSettings.type;
-
-  @override
-  Future<Result<void>> setThemeType(ThemeType type) async {
-    try {
-      await _settingsBox.putAsync(_appSettings.copyWith(type: type));
-
-      return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.severe(
-        'An exception occurred while setting theme type to $type.',
-        error,
-        stackTrace,
-      );
-      return Result.error(error);
-    }
+  Result<ContentSort> get contentSort {
+    return Result.success(_appSettings.contentSort);
   }
 
   @override
-  ThemeBrightness get themeBrightness => _appSettings.brightness;
+  Result<bool> get crashReporting {
+    return Result.success(_appSettings.crashReporting);
+  }
 
   @override
-  Future<void> setThemeBrightness(ThemeBrightness brightness) =>
-      _settingsBox.putAsync(_appSettings.copyWith(brightness: brightness));
+  Result<DateTime?> get modifiedAt {
+    return Result.success(_appSettings.modifiedAt);
+  }
 
   @override
-  ContentSort get contentSort => _appSettings.contentSort;
+  Result<ThemeBrightness> get themeBrightness {
+    return Result.success(_appSettings.brightness);
+  }
+
+  @override
+  Result<ThemeType> get themeType {
+    return Result.success(_appSettings.type);
+  }
 
   @override
   Future<Result<void>> setContentSort(ContentSort sort) async {
@@ -70,16 +66,6 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   @override
-  DateTime? get modifiedAt => _appSettings.modifiedAt;
-
-  @override
-  void setModifiedAt(DateTime dateTime) =>
-      _settingsBox.put(_appSettings.copyWith(modifiedAt: dateTime));
-
-  @override
-  bool get crashReporting => _appSettings.crashReporting;
-
-  @override
   Future<Result<void>> setCrashReporting(bool enable) async {
     try {
       await _settingsBox.putAsync(
@@ -89,6 +75,53 @@ class SettingsRepositoryImpl implements SettingsRepository {
     } on Exception catch (error, stackTrace) {
       _log.severe(
         'An exception occurred while setting crash reporting to $enable.',
+        error,
+        stackTrace,
+      );
+      return Result.error(error);
+    }
+  }
+
+  @override
+  Future<Result<void>> setModifiedAt(DateTime dateTime) async {
+    try {
+      await _settingsBox.putAsync(_appSettings.copyWith(modifiedAt: dateTime));
+      return const Result.success(null);
+    } on Exception catch (error, stackTrace) {
+      _log.severe(
+        'An exception occurred while setting modified at to $dateTime.',
+        error,
+        stackTrace,
+      );
+      return Result.error(error);
+    }
+  }
+
+  @override
+  Future<Result<void>> setThemeBrightness(ThemeBrightness brightness) async {
+    try {
+      await _settingsBox.putAsync(
+        _appSettings.copyWith(brightness: brightness),
+      );
+      return const Result.success(null);
+    } on Exception catch (error, stackTrace) {
+      _log.severe(
+        'An exception occurred while setting theme brightness to $brightness.',
+        error,
+        stackTrace,
+      );
+      return Result.error(error);
+    }
+  }
+
+  @override
+  Future<Result<void>> setThemeType(ThemeType type) async {
+    try {
+      await _settingsBox.putAsync(_appSettings.copyWith(type: type));
+      return const Result.success(null);
+    } on Exception catch (error, stackTrace) {
+      _log.severe(
+        'An exception occurred while setting theme type to $type.',
         error,
         stackTrace,
       );

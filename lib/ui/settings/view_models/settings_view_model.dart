@@ -11,12 +11,20 @@ class SettingsViewModel extends ChangeNotifier {
   SettingsViewModel({required SettingsRepository settingsRepository})
     : _settingsRepository = settingsRepository {
     setCrashReporting = Command1(_setCrashReporting);
+
+    final result = _settingsRepository.crashReporting;
+
+    switch (result) {
+      case Success<bool>():
+        _crashReporting = result.value;
+      case Error<bool>():
+        _crashReporting = false; // Default value in case of error.
+    }
   }
 
-  bool? _crashReporting;
+  late bool _crashReporting;
 
-  bool get crashReporting =>
-      _crashReporting ??= _settingsRepository.crashReporting;
+  bool get crashReporting => _crashReporting;
 
   Future<Result<void>> _setCrashReporting(bool enable) async {
     _crashReporting = enable;
@@ -26,7 +34,7 @@ class SettingsViewModel extends ChangeNotifier {
     final result = await _settingsRepository.setCrashReporting(enable);
 
     if (result is Error) {
-      _crashReporting = !_crashReporting!; // Revert the change on error.
+      _crashReporting = !_crashReporting; // Revert the change on error.
 
       notifyListeners();
     }
