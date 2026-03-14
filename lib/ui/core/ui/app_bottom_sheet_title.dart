@@ -7,7 +7,7 @@ class AppBottomSheetTitle extends StatelessWidget {
   final String title;
   final String tooltipMessage;
   final IconData? icon;
-  final Function()? onClose;
+  final void Function()? onClose;
   final int maxLines;
 
   const AppBottomSheetTitle({
