@@ -1,25 +1,32 @@
 part of 'post_media_slideshow.dart';
 
-class _PostMediaSlideshowButton extends StatefulWidget {
-  /// Creates an animated button that expands and shrinks based on [expand].
-  const _PostMediaSlideshowButton({
+class _PostMediaSlideshowPauseButton extends StatefulWidget {
+  /// Creates an animated button that expands and shrinks based on [expanded].
+  const _PostMediaSlideshowPauseButton({
     required this.onPressed,
-    required this.expand,
+    required this.expanded,
     required this.tickerProvider,
   });
 
-  final void Function() onPressed;
-  final bool expand;
+  /// Called when the button is tapped or otherwise activated.
+  ///
+  /// If this callback is null, then the button will be disabled.
+  final void Function()? onPressed;
+
+  /// Whether the button is in its expanded state or not.
+  final bool expanded;
   final TickerProvider tickerProvider;
 
   @override
-  State<_PostMediaSlideshowButton> createState() =>
-      _PostMediaSlideshowButtonState();
+  State<_PostMediaSlideshowPauseButton> createState() =>
+      _PostMediaSlideshowPauseButtonState();
 }
 
-class _PostMediaSlideshowButtonState extends State<_PostMediaSlideshowButton> {
+class _PostMediaSlideshowPauseButtonState
+    extends State<_PostMediaSlideshowPauseButton> {
   late final AnimationController _animationController;
 
+  /// Animates the button alignment from center to left when expanding.
   late final Animation<Alignment> _alignmentAnimation;
 
   /// Animates the text opacity while the button is expanding/shrinking.
@@ -66,13 +73,10 @@ class _PostMediaSlideshowButtonState extends State<_PostMediaSlideshowButton> {
     ).animate(_defaultCurved);
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
+  double _calculateTextWidth(String text) {
     // Calculates the button's text total width before rendering it on screen.
     final textSpan = TextSpan(
-      text: 'Attiva scorrimento automatico',
+      text: text,
       style: TextTheme.of(context).labelLarge,
     );
 
@@ -83,7 +87,16 @@ class _PostMediaSlideshowButtonState extends State<_PostMediaSlideshowButton> {
 
     textPainter.layout();
 
+    return textPainter.width;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
     final iconTheme = IconTheme.of(context);
+
+    final textWidth = _calculateTextWidth('Attiva scorrimento automatico');
 
     // The maximum button width depends on the global text and icon themes.
     //
@@ -91,17 +104,19 @@ class _PostMediaSlideshowButtonState extends State<_PostMediaSlideshowButton> {
     // padding values per Material3 guidelines.
     _widthAnimation = Tween<double>(
       begin: 40.0,
-      end: textPainter.width + (iconTheme.size ?? 18.0) + 16.0 + 8.0 + 24.0,
+      end: textWidth + (iconTheme.size ?? 18.0) + 16.0 + 8.0 + 24.0,
     ).animate(_defaultCurved);
   }
 
   @override
-  void didUpdateWidget(covariant _PostMediaSlideshowButton oldWidget) {
+  void didUpdateWidget(covariant _PostMediaSlideshowPauseButton oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    /// Animates the button on parent state changes.
-    if (widget.expand != oldWidget.expand) {
-      _handleAnimation();
+    if (widget.expanded != oldWidget.expanded) {
+      /// Animates the button to its expanded or shrunk state.
+      widget.expanded
+          ? _animationController.forward()
+          : _animationController.reverse();
     }
   }
 
@@ -111,34 +126,34 @@ class _PostMediaSlideshowButtonState extends State<_PostMediaSlideshowButton> {
     super.dispose();
   }
 
-  /// Animates the button to its expanded or retracted state.
-  void _handleAnimation() => widget.expand
-      ? _animationController.forward()
-      : _animationController.reverse();
-
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = context.colorScheme.secondaryContainer;
+    final foregroundColor = context.colorScheme.onSecondaryContainer;
+
     return AnimatedBuilder(
       animation: _animationController.view,
       builder: (_, _) {
         return SizedBox(
           width: _widthAnimation.value,
-          child: OutlinedButton.icon(
+          child: FilledButton.tonalIcon(
             onPressed: widget.onPressed,
             style: ButtonStyle(
-              backgroundColor: const WidgetStatePropertyAll<Color>(
-                Colors.black38,
-              ),
-              foregroundColor: const WidgetStatePropertyAll<Color>(
-                Colors.white,
-              ),
+              backgroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.disabled)) {
+                  return backgroundColor.withValues(alpha: 0.45);
+                }
+
+                return backgroundColor;
+              }),
+              foregroundColor: WidgetStatePropertyAll<Color>(foregroundColor),
               padding: WidgetStatePropertyAll<EdgeInsets>(
                 EdgeInsets.only(
                   left: _paddingAnimation.value,
                   right: _paddingAnimation.value - 8.0,
                 ),
               ),
-              iconColor: const WidgetStatePropertyAll<Color>(Colors.white),
+              iconColor: WidgetStatePropertyAll<Color>(foregroundColor),
               fixedSize: WidgetStatePropertyAll(
                 Size(_widthAnimation.value, 40.0),
               ),

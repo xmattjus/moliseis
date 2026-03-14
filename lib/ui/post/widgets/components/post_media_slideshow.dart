@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:moliseis/data/sources/media.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
-import 'package:moliseis/ui/core/ui/custom_image.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
+import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-part '_post_media_slideshow_button.dart';
+part '_post_media_slideshow_pause_button.dart';
 
 class PostMediaSlideshow extends StatefulWidget {
-  const PostMediaSlideshow({required this.images});
+  const PostMediaSlideshow({
+    super.key,
+    required this.height,
+    required this.media,
+    required this.visibilityNotifier,
+  });
 
-  final List<Media> images;
+  final double height;
+  final List<Media> media;
+
+  /// A [ValueNotifier] that indicates whether the slideshow is visible or not.
+  final ValueNotifier<bool> visibilityNotifier;
 
   @override
   State<PostMediaSlideshow> createState() => _PostMediaSlideshowState();
@@ -20,16 +29,20 @@ class PostMediaSlideshow extends StatefulWidget {
 
 class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     with TickerProviderStateMixin {
+  static const _bottomChromeHeight = 50.0;
+  static const _pauseButtonOffset = 16.0;
+
   late final AnimationController _animationController;
-
-  late final Animation<Color?> _circularProgColorAnimation;
-
-  final _circularProgNotifier = ValueNotifier<double>(0);
 
   Duration _delta = Duration.zero;
 
-  final _autoScrollNotifier = ValueNotifier<bool>(false);
-  bool get _enableAutoScroll => !_autoScrollNotifier.value;
+  bool get _isSlideshowVisible => widget.visibilityNotifier.value;
+
+  final _autoPlayEnabledNotifier = ValueNotifier<bool>(true);
+  bool get _isAutoPlayEnabled => _autoPlayEnabledNotifier.value;
+
+  final _isMediaLoadingNotifier = ValueNotifier<bool>(true);
+  bool get _isMediaLoading => _isMediaLoadingNotifier.value;
 
   /// The duration required to automatically change slide.
   static const _durationToNextSlide = Duration(seconds: 5);
@@ -43,9 +56,12 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
   late Ticker _ticker;
 
   /// Whether [_ticker] must be initialized or not.
-  bool get _initTicker => widget.images.length > 1;
+  bool get _initTicker => widget.media.length > 1;
 
   int _lastPage = 0;
+
+  /// Whether the user has manually disabled the slideshow autoplay by scrolling or not.
+  bool _userDisabledScroll = false;
 
   @override
   void initState() {
@@ -60,11 +76,32 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
       duration: _durationToNextSlide,
       vsync: this,
     );
+  }
 
-    _circularProgColorAnimation = ColorTween(
-      begin: Colors.white54,
-      end: Colors.white,
-    ).animate(_animationController);
+  @override
+  void didUpdateWidget(covariant PostMediaSlideshow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // If the user has manually disabled the slideshow autoplay, we don't want to
+    // re-enable it when the widget updates.
+    if (_userDisabledScroll) return;
+
+    _syncAutoPlayWithVisibility();
+  }
+
+  @override
+  void dispose() {
+    if (_initTicker) _ticker.dispose();
+    _pageController.dispose();
+    _isMediaLoadingNotifier.dispose();
+    _autoPlayEnabledNotifier.dispose();
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  void _syncAutoPlayWithVisibility() {
+    _autoPlayEnabledNotifier.value = _isSlideshowVisible;
+    _isSlideshowVisible ? _startAutoPlay() : _stopAutoPlay();
   }
 
   void _onTick(Duration elapsed) {
@@ -75,32 +112,161 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     _elapsedTime = elapsed - _delta;
 
     if (_elapsedTime > _durationToNextSlide) {
-      _animateToNextOrInitialPage();
+      _animateToNextSlideLooped();
 
       _delta = elapsed;
     }
 
-    _circularProgNotifier.value =
-        _elapsedTime.inMilliseconds / _durationToNextSlide.inMilliseconds;
-
     _lastElapsed = elapsed;
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    if (_initTicker) _ticker.dispose();
-    _pageController.dispose();
-    _circularProgNotifier.dispose();
-    _autoScrollNotifier.dispose();
-    super.dispose();
+  void _toggleAutoScroll() {
+    _autoPlayEnabledNotifier.value = !_autoPlayEnabledNotifier.value;
+
+    _userDisabledScroll = !_userDisabledScroll;
+
+    !_isAutoPlayEnabled ? _stopAutoPlay() : _startAutoPlay();
   }
 
-  void _animateToNextOrInitialPage() {
+  void _disableAutoPlayByUserScroll() {
+    _autoPlayEnabledNotifier.value = false;
+    _userDisabledScroll = true;
+    _stopAutoPlay();
+  }
+
+  Future<void> _openGalleryPreview(int initialIndex) async {
+    if (_isAutoPlayEnabled) {
+      _stopAutoPlay();
+    }
+
+    const modal = GalleryPreviewModal();
+    final isDismissed = await modal(
+      context: context,
+      images: widget.media,
+      initialIndex: initialIndex,
+    );
+
+    if ((isDismissed ?? true) && _isAutoPlayEnabled) {
+      _startAutoPlay();
+    }
+  }
+
+  void _onImageLoadingChanged(bool isLoading) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _isMediaLoadingNotifier.value = isLoading;
+    });
+
+    if (_isAutoPlayEnabled) {
+      isLoading ? _stopAutoPlay() : _startAutoPlay();
+    }
+  }
+
+  Widget _buildMediaPager(BoxConstraints constraints) {
+    return SizedBox(
+      width: constraints.maxWidth,
+      height: widget.height,
+      child: NotificationListener(
+        onNotification: (notification) {
+          if (notification is UserScrollNotification) {
+            _disableAutoPlayByUserScroll();
+          }
+          return true;
+        },
+        child: PageView.builder(
+          controller: _pageController,
+          onPageChanged: (_) {
+            if (_isAutoPlayEnabled) {
+              _animationController.forward(from: 0);
+            }
+          },
+          itemBuilder: (_, index) {
+            return CardBase(
+              shape: const RoundedRectangleBorder(),
+              onPressed: () => _openGalleryPreview(index),
+              child: AppNetworkImage(
+                url: widget.media[index].url,
+                width: constraints.maxWidth,
+                height: widget.height,
+                imageWidth: widget.media[index].width,
+                imageHeight: widget.media[index].height,
+                onImageLoading: _onImageLoadingChanged,
+              ),
+            );
+          },
+          itemCount: widget.media.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomChrome(BuildContext context, BoxConstraints constraints) {
+    return Positioned(
+      bottom: -2.0, // Hides the gap at the bottom of the CustomPainter
+      child: Container(
+        width: constraints.maxWidth,
+        height: _bottomChromeHeight,
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: context.appColors.modalBorderColor,
+              width: context.appSizes.borderSide.medium,
+            ),
+          ),
+          borderRadius: BorderRadius.only(
+            topLeft: context.appShapes.circular.cornerExtraLarge.topLeft,
+            topRight: context.appShapes.circular.cornerExtraLarge.topRight,
+          ),
+          color: context.colorScheme.surface,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPauseButtonOverlay() {
+    return Positioned(
+      bottom: _bottomChromeHeight + _pauseButtonOffset,
+      right: _pauseButtonOffset,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          widget.visibilityNotifier,
+          _autoPlayEnabledNotifier,
+          _isMediaLoadingNotifier,
+        ]),
+        builder: (_, _) {
+          return _PostMediaSlideshowPauseButton(
+            onPressed: _isMediaLoading || !_isSlideshowVisible
+                ? null
+                : _toggleAutoScroll,
+            expanded: !_isAutoPlayEnabled,
+            tickerProvider: this,
+          );
+        },
+      ),
+    );
+  }
+
+  void _startAutoPlay() {
+    // Starts the slideshow autoplay only if there is more than 1 media to show
+    // and the ticker is not already active.
+    if (_initTicker && !_ticker.isActive) {
+      _delta = Duration.zero;
+      _ticker.start();
+      _animationController.forward();
+    }
+  }
+
+  void _stopAutoPlay() {
+    if (_initTicker && _ticker.isActive) {
+      _ticker.stop();
+      _animationController.reset();
+    }
+  }
+
+  void _animateToNextSlideLooped() {
     if (_pageController.hasClients) {
       final currentPage = _pageController.page?.toInt() ?? _lastPage;
 
-      final nextPage = currentPage < widget.images.length - 1
+      final nextPage = currentPage < widget.media.length - 1
           ? currentPage + 1
           : 0;
 
@@ -120,154 +286,12 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
       builder: (context, constraints) {
         return Stack(
           children: <Widget>[
-            SizedBox(
-              width: constraints.maxWidth,
-              height: 500,
-              child: NotificationListener(
-                onNotification: (notification) {
-                  if (notification is UserScrollNotification) {
-                    _autoScrollNotifier.value = true;
-                    _stopAutoPlay();
-                    _circularProgNotifier.value = 0;
-                  }
-                  return true;
-                },
-                child: PageView.builder(
-                  controller: _pageController,
-                  onPageChanged: (_) {
-                    if (_enableAutoScroll) {
-                      _animationController.forward(from: 0);
-                      _circularProgNotifier.value = 1;
-                    }
-                  },
-                  itemBuilder: (_, index) {
-                    return CardBase(
-                      shape: const RoundedRectangleBorder(),
-                      onPressed: () async {
-                        if (_enableAutoScroll) {
-                          _stopAutoPlay();
-                        }
-
-                        const modal = GalleryPreviewModal();
-                        final isDismissed = await modal(
-                          context: context,
-                          images: widget.images,
-                          initialIndex: index,
-                        );
-
-                        if (isDismissed ?? true) {
-                          if (_enableAutoScroll) {
-                            _startAutoPlay();
-                          }
-                        }
-                      },
-                      child: CustomImage.network(
-                        widget.images[index].url,
-                        width: constraints.maxWidth,
-                        height: 500.0,
-                        imageWidth: widget.images[index].width,
-                        imageHeight: widget.images[index].height,
-                        fit: BoxFit.cover,
-                        onImageLoading: (isLoading) {
-                          if (_enableAutoScroll) {
-                            isLoading ? _stopAutoPlay() : _startAutoPlay();
-                          }
-                        },
-                      ),
-                    );
-                  },
-                  itemCount: widget.images.length,
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -2.0, // Hides the gap at the bottom of the CustomPainter
-              child: Container(
-                width: constraints.maxWidth,
-                height: 50,
-                decoration: BoxDecoration(
-                  border: Border(
-                    top: BorderSide(
-                      color: context.appColors.modalBorderColor,
-                      width: context.appSizes.borderSide.medium,
-                    ),
-                  ),
-                  borderRadius: BorderRadius.only(
-                    topLeft:
-                        context.appShapes.circular.cornerExtraLarge.topLeft,
-                    topRight:
-                        context.appShapes.circular.cornerExtraLarge.topRight,
-                  ),
-                  color: context.colorScheme.surface,
-                ),
-              ),
-            ),
-            if (_initTicker)
-              Positioned(
-                bottom: 50.0 + 8.0,
-                right: 8.0,
-                child: Stack(
-                  children: [
-                    AnimatedBuilder(
-                      animation: _autoScrollNotifier,
-                      builder: (context, child) {
-                        return _PostMediaSlideshowButton(
-                          onPressed: () {
-                            _autoScrollNotifier.value =
-                                !_autoScrollNotifier.value;
-
-                            !_enableAutoScroll
-                                ? _stopAutoPlay()
-                                : _startAutoPlay();
-
-                            _circularProgNotifier.value = 0;
-                          },
-                          expand: !_enableAutoScroll,
-                          tickerProvider: this,
-                        );
-                      },
-                    ),
-                    AnimatedBuilder(
-                      animation: _circularProgNotifier,
-                      builder: (context, child) {
-                        return Positioned(
-                          left: -4.0,
-                          bottom: -4.0,
-                          child: IgnorePointer(
-                            child: Visibility(
-                              visible: _enableAutoScroll,
-                              child: CircularProgressIndicator(
-                                value: _circularProgNotifier.value,
-                                backgroundColor: Colors.white38,
-                                valueColor: _circularProgColorAnimation,
-                                trackGap: 0,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
+            _buildMediaPager(constraints),
+            _buildBottomChrome(context, constraints),
+            if (_initTicker) _buildPauseButtonOverlay(),
           ],
         );
       },
     );
-  }
-
-  void _startAutoPlay() {
-    if (_initTicker && !_ticker.isActive) {
-      _delta = Duration.zero;
-      _ticker.start();
-      _animationController.forward();
-    }
-  }
-
-  void _stopAutoPlay() {
-    if (_initTicker && _ticker.isActive) {
-      _ticker.stop();
-      _animationController.reset();
-    }
   }
 }
