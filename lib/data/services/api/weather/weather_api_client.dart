@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:http/http.dart';
 import 'package:logging/logging.dart';
+import 'package:moliseis/config/service_locator.dart';
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/exceptions.dart';
@@ -56,14 +57,8 @@ class WeatherApiClient {
     try {
       final uri = _buildApiUri(latitude, longitude, timezone: timezone);
 
-      final response = await http
-          .get(
-            uri,
-            headers: {
-              'Accept': 'application/json',
-              'User-Agent': 'it.benitomatteobercini.moliseis/2.0',
-            },
-          )
+      final response = await sl<Client>()
+          .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 
       if (response.statusCode == 200) {

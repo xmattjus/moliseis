@@ -1,46 +1,37 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:http/http.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/config/env/env.dart';
+import 'package:moliseis/config/service_locator.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/app_settings.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
+import 'package:moliseis/utils/http_client.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_logging/sentry_logging.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// The ObjectBox instance.
-late final ObjectBox objectBox;
+void main() async => await runWithClient(_main, () => httpClientFactory());
 
-void main() async {
+Future<void> _main() async {
   // Ensures the disk can be accessed before continuing app start-up.
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: Env.supabaseProdUrl,
-    anonKey: Env.supabaseProdApiKey,
-  );
-
-  objectBox = await ObjectBox.create();
+  await setupServiceLocator();
 
   // Retrieves the app settings to check whether the user has given his consent
   // to report exceptions or not.
-  final settings = objectBox.store.box<AppSettings>().get(settingsId);
+  final settings = sl<ObjectBox>().store.box<AppSettings>().get(settingsId);
 
-  final reportExceptions = (settings?.crashReporting ?? false) && !kDebugMode;
+  final enableSentry = (settings?.crashReporting ?? false) && !kDebugMode;
 
-  await _initializeSentry(enable: reportExceptions, app: const MoliseIsApp());
-}
+  const app = MoliseIsApp();
 
-Future<void> _initializeSentry({
-  required bool enable,
-  required Widget app,
-}) async {
-  if (enable) {
+  if (enableSentry) {
     await SentryFlutter.init((options) {
       options.dsn = Env.sentryUrl;
       options.addIntegration(LoggingIntegration());
@@ -53,6 +44,7 @@ Future<void> _initializeSentry({
       // Session Replay setup.
       options.replay.sessionSampleRate = 0.4;
       options.replay.onErrorSampleRate = 1.0;
+      options.httpClient = sl<Client>();
     }, appRunner: () => runApp(SentryWidget(child: app)));
   } else {
     runApp(app);

@@ -11,10 +11,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class CityRepositoryImpl implements CityRepository {
   CityRepositoryImpl({
     required Supabase supabaseI,
-    required CitySupabaseTable placeSupabaseTable,
+    required CitySupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
-       _supabaseTable = placeSupabaseTable,
+       _supabaseTable = supabaseTable,
        _cityBox = objectBoxI.store.box<City>();
 
   final _log = Logger('CityRepositoryImpl');

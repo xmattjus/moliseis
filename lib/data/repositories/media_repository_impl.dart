@@ -11,10 +11,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class MediaRepositoryImpl implements MediaRepository {
   MediaRepositoryImpl({
     required Supabase supabaseI,
-    required MediaSupabaseTable imageSupabaseTable,
+    required MediaSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
-       _supabaseTable = imageSupabaseTable,
+       _supabaseTable = supabaseTable,
        _mediaBox = objectBoxI.store.box<Media>();
 
   final _log = Logger('MediaRepositoryImpl');

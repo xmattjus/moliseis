@@ -1,9 +1,8 @@
 import 'dart:async' show TimeoutException;
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:http/http.dart';
 import 'package:logging/logging.dart';
-import 'package:moliseis/data/services/api/openstreetmap/geocoding_address.dart';
-import 'package:moliseis/data/services/api/openstreetmap/reverse_geocoding_response.dart';
+import 'package:moliseis/config/service_locator.dart';
 import 'package:moliseis/data/services/api/openstreetmap/model/geocoding_address.dart';
 import 'package:moliseis/data/services/api/openstreetmap/model/reverse_geocoding_response.dart';
 import 'package:moliseis/utils/constants.dart';
@@ -26,11 +25,8 @@ class OpenStreetMapClient {
         "lat=$latitude&lon=$longitude",
       );
 
-      final response = await http
-          .get(
-            uri,
-            headers: {'Accept': 'application/json', 'User-Agent': kUserAgent},
-          )
+      final response = await sl<Client>()
+          .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 
       if (response.statusCode == 200) {

@@ -1,7 +1,9 @@
 import 'dart:async' show StreamController;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:moliseis/config/env/env.dart';
+import 'package:moliseis/config/service_locator.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
@@ -33,7 +35,6 @@ import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/sync/sync_repo_use_case.dart';
-import 'package:moliseis/main.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
@@ -48,9 +49,9 @@ List<SingleChildWidget> get providers {
     Provider(
       create: (_) {
         return PlaceRepositoryImpl(
-              supabaseI: Supabase.instance,
+              supabaseI: sl<Supabase>(),
               supabaseTable: PlaceSupabaseTable(),
-              objectBoxI: objectBox,
+              objectBoxI: sl<ObjectBox>(),
             )
             as PlaceRepository;
       },
@@ -58,9 +59,9 @@ List<SingleChildWidget> get providers {
     Provider(
       create: (_) {
         return EventRepositoryImpl(
-              supabaseI: Supabase.instance,
+              supabaseI: sl<Supabase>(),
               supabaseTable: EventSupabaseTable(),
-              objectBoxI: objectBox,
+              objectBoxI: sl<ObjectBox>(),
             )
             as EventRepository;
       },
@@ -68,9 +69,9 @@ List<SingleChildWidget> get providers {
     Provider(
       create: (_) {
         return MediaRepositoryImpl(
-              supabaseI: Supabase.instance,
-              imageSupabaseTable: MediaSupabaseTable(),
-              objectBoxI: objectBox,
+              supabaseI: sl<Supabase>(),
+              supabaseTable: MediaSupabaseTable(),
+              objectBoxI: sl<ObjectBox>(),
             )
             as MediaRepository;
       },
@@ -78,21 +79,22 @@ List<SingleChildWidget> get providers {
     Provider(
       create: (_) {
         return CityRepositoryImpl(
-              supabaseI: Supabase.instance,
-              placeSupabaseTable: CitySupabaseTable(),
-              objectBoxI: objectBox,
+              supabaseI: sl<Supabase>(),
+              supabaseTable: CitySupabaseTable(),
+              objectBoxI: sl<ObjectBox>(),
             )
             as CityRepository;
       },
     ),
     Provider(
       create: (_) {
-        return SearchRepositoryImpl(objectBoxI: objectBox) as SearchRepository;
+        return SearchRepositoryImpl(objectBoxI: sl<ObjectBox>())
+            as SearchRepository;
       },
     ),
     Provider(
-      create: (context) {
-        return SettingsRepositoryImpl(objectBoxI: objectBox)
+      create: (_) {
+        return SettingsRepositoryImpl(objectBoxI: sl<ObjectBox>())
             as SettingsRepository;
       },
     ),
@@ -105,7 +107,7 @@ List<SingleChildWidget> get providers {
         );
 
         return UserContributionRepositoryImpl(
-              supabase: Supabase.instance,
+              supabase: sl<Supabase>(),
               supabaseTable: UserContributionSupabaseTable(),
               cloudinaryClient: cloudinaryClient,
             )
@@ -174,6 +176,7 @@ List<SingleChildWidget> get providers {
       create: (_) =>
           WeatherForecastDataCache<DailyWeatherForecastData>(maxSize: 50),
     ),
+    Provider<CacheManager>(create: (_) => sl<CacheManager>()),
     //#endregion
   ];
 }
