@@ -101,6 +101,7 @@ class _PostInnerScreenState extends State<PostInnerScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 16.0,
                 children: [
                   PostTitle(content: widget.content),
                   WeatherForecastButton(
