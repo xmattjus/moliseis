@@ -33,7 +33,9 @@ class _PostMediaSlideshowPauseButtonState
   late final Animation<double> _opacityAnimation;
 
   /// Animates the button width (expand/shrink) to accommodate the text length.
-  late Animation<double> _widthAnimation;
+  Animation<double> _widthAnimation = const AlwaysStoppedAnimation<double>(
+    40.0,
+  );
 
   late final Animation<double> _paddingAnimation;
 
@@ -100,8 +102,8 @@ class _PostMediaSlideshowPauseButtonState
 
     // The maximum button width depends on the global text and icon themes.
     //
-    // The constants being added at the end are the default outlined button
-    // padding values per Material3 guidelines.
+    // The constants being added at the end are the default button padding
+    // values per Material3 guidelines.
     _widthAnimation = Tween<double>(
       begin: 40.0,
       end: textWidth + (iconTheme.size ?? 18.0) + 16.0 + 8.0 + 24.0,
