@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
-import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
-import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/use-cases/category/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
@@ -72,12 +70,6 @@ GoRoute postRoute({required String name}) {
       );
 
       final postUseCase = PostUseCase(
-        cachedWeatherApiClient: CachedWeatherApiClient(
-          weatherApiClient: WeatherApiClient(),
-          currentWeatherCache: context.read(),
-          hourlyWeatherCache: context.read(),
-          dailyWeatherCache: context.read(),
-        ),
         eventRepository: context.read(),
         placeRepository: context.read(),
       );
@@ -85,7 +77,7 @@ GoRoute postRoute({required String name}) {
       final viewModel = PostViewModel(postUseCase: postUseCase);
 
       final weatherViewModel = WeatherViewModel(
-        postUseCase: postUseCase,
+        weatherApiClient: context.read(),
         weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
         weatherCodeIconMapper: const WmoWeatherIconMapper(),
       );

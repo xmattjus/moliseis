@@ -1,6 +1,3 @@
-import 'dart:async' show StreamController;
-
-import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/config/service_locator.dart';
@@ -18,6 +15,7 @@ import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dar
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
+import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/data/sources/city_supabase_table.dart';
@@ -160,21 +158,18 @@ List<SingleChildWidget> get providers {
 
     //#region Other
     Provider<UrlLaunchService>(create: (_) => UrlLaunchService()),
-    Provider<StreamController<Widget>>(
-      create: (_) => StreamController<Widget>.broadcast(),
-      dispose: (_, value) => value.close(),
-    ),
-    Provider<WeatherForecastDataCache<CurrentWeatherForecastData>>(
-      create: (_) =>
-          WeatherForecastDataCache<CurrentWeatherForecastData>(maxSize: 50),
-    ),
-    Provider<WeatherForecastDataCache<HourlyWeatherForecastData>>(
-      create: (_) =>
-          WeatherForecastDataCache<HourlyWeatherForecastData>(maxSize: 50),
-    ),
-    Provider<WeatherForecastDataCache<DailyWeatherForecastData>>(
-      create: (_) =>
-          WeatherForecastDataCache<DailyWeatherForecastData>(maxSize: 50),
+    Provider<CachedWeatherApiClient>(
+      create: (context) => CachedWeatherApiClient(
+        weatherApiClient: WeatherApiClient(),
+        currentWeatherCache:
+            WeatherForecastDataCache<CurrentWeatherForecastData>(maxSize: 50),
+        hourlyWeatherCache: WeatherForecastDataCache<HourlyWeatherForecastData>(
+          maxSize: 50,
+        ),
+        dailyWeatherCache: WeatherForecastDataCache<DailyWeatherForecastData>(
+          maxSize: 50,
+        ),
+      ),
     ),
     Provider<CacheManager>(create: (_) => sl<CacheManager>()),
     //#endregion

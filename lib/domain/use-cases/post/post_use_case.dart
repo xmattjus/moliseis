@@ -1,7 +1,3 @@
-import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
-import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
-import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
-import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/sources/event.dart';
 import 'package:moliseis/data/sources/place.dart';
 import 'package:moliseis/domain/models/content_base.dart';
@@ -12,16 +8,13 @@ import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/utils/result.dart';
 
 class PostUseCase {
-  final CachedWeatherApiClient _cachedWeatherApiClient;
   final EventRepository _eventRepository;
   final PlaceRepository _placeRepository;
 
   const PostUseCase({
-    required CachedWeatherApiClient cachedWeatherApiClient,
     required EventRepository eventRepository,
     required PlaceRepository placeRepository,
-  }) : _cachedWeatherApiClient = cachedWeatherApiClient,
-       _eventRepository = eventRepository,
+  }) : _eventRepository = eventRepository,
        _placeRepository = placeRepository;
 
   Future<Result<ContentBase>> getEventById(int id) async {
@@ -82,35 +75,5 @@ class PostUseCase {
       case Error<List<Place>>():
         return Result.error(result.error);
     }
-  }
-
-  Future<Result<CurrentWeatherForecastData>> getCurrentWeatherForecast(
-    double latitude,
-    double longitude,
-  ) {
-    return _cachedWeatherApiClient.getCurrentWeatherByCoordinates(
-      latitude,
-      longitude,
-    );
-  }
-
-  Future<Result<HourlyWeatherForecastData>> getHourlyWeatherForecast(
-    double latitude,
-    double longitude,
-  ) {
-    return _cachedWeatherApiClient.getHourlyWeatherByCoordinates(
-      latitude,
-      longitude,
-    );
-  }
-
-  Future<Result<DailyWeatherForecastData>> getDailyWeatherForecast(
-    double latitude,
-    double longitude,
-  ) {
-    return _cachedWeatherApiClient.getDailyWeatherByCoordinates(
-      latitude,
-      longitude,
-    );
   }
 }
