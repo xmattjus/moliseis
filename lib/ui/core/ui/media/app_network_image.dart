@@ -15,9 +15,19 @@ class AppNetworkImage extends StatefulWidget {
     required this.width,
     required this.height,
     this.fit = BoxFit.cover,
-    this.fullResolution = false,
     this.onImageLoading,
-  });
+  }) : _fullResolution = false;
+
+  const AppNetworkImage.fullResolution({
+    super.key,
+    required this.url,
+    required this.imageWidth,
+    required this.imageHeight,
+    this.fit = BoxFit.cover,
+    this.onImageLoading,
+  }) : width = 0,
+       height = 0,
+       _fullResolution = true;
 
   final String url;
   final double width;
@@ -28,11 +38,11 @@ class AppNetworkImage extends StatefulWidget {
   /// How to inscribe the image into the space allocated during layout.
   final BoxFit fit;
 
+  final void Function(bool isLoading)? onImageLoading;
+
   /// Whether to load the image at its full resolution, ignoring the device
   /// pixel ratio and logical dimensions.
-  final bool fullResolution;
-
-  final void Function(bool isLoading)? onImageLoading;
+  final bool _fullResolution;
 
   @override
   State<AppNetworkImage> createState() => _AppNetworkImageState();
@@ -52,7 +62,7 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
       cacheManager: context.read(),
     );
 
-    if (widget.fullResolution) {
+    if (widget._fullResolution) {
       return Image(image: cacheImageProvider, fit: widget.fit);
     }
 
