@@ -1,5 +1,6 @@
 part of 'gallery_preview_modal_overlay.dart';
 
+// TODO(xmattjus): merge this widget with the main gallery preview overlay widget.
 class _GalleryPreviewModalOverlayContent extends StatelessWidget {
   const _GalleryPreviewModalOverlayContent({
     required this.eventOrPlaceName,
@@ -9,6 +10,8 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
     this.licenseUrl = '',
     required this.cityName,
     this.onSharePressed,
+    required this.index,
+    required this.itemCount,
   });
 
   final String eventOrPlaceName;
@@ -18,6 +21,8 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
   final String licenseUrl;
   final String cityName;
   final void Function()? onSharePressed;
+  final int index;
+  final int itemCount;
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +103,15 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
+                  // TODO(xmattjus): refactor this to be placed in a Stack.
+                  if (itemCount > 1)
+                    Center(
+                      child: AppPageIndicator.animated(
+                        index: index,
+                        itemCount: itemCount,
+                      ),
+                    ),
+                  const SizedBox(height: 16.0),
                   ContentNameAndCity(
                     name: eventOrPlaceName,
                     cityName: cityName,

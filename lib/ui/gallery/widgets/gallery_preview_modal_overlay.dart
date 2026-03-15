@@ -6,6 +6,7 @@ import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/data/sources/media.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
+import 'package:moliseis/ui/core/ui/app_page_indicator.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
@@ -19,9 +20,41 @@ import 'package:share_plus/share_plus.dart';
 part '_gallery_preview_modal_overlay_content.dart';
 
 class GalleryPreviewModalOverlay extends StatelessWidget {
-  const GalleryPreviewModalOverlay({super.key, required this.image});
+  const GalleryPreviewModalOverlay({
+    super.key,
+    required this.media,
+    required this.index,
+    required this.itemCount,
+  });
 
-  final Media image;
+  final Media media;
+  final int index;
+  final int itemCount;
+
+  Future<void> _onSharePressed(BuildContext context) async {
+    try {
+      final cache = DefaultCacheManager();
+      final file = await cache.getSingleFile(media.url);
+      final sharedImage = XFile(file.path, mimeType: 'image/*');
+      await SharePlus.instance.share(ShareParams(files: [sharedImage]));
+    } on Exception catch (error, stackTrace) {
+      final log = Logger('GalleryPreviewModalOverlay');
+
+      log.warning(
+        'An exception occurred during image sharing.',
+        error,
+        stackTrace,
+      );
+
+      if (context.mounted) {
+        showSnackBar(
+          context: context,
+          textContent:
+              'Si è verificato un errore durante la condivisione, riprova.',
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,39 +64,18 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
         data: AppThemeData.photoViewer,
         child: _GalleryPreviewModalOverlayContent(
           eventOrPlaceName:
-              image.place.target?.name ?? image.event.target?.name ?? '',
-          title: image.title ?? '',
-          author: image.author ?? '',
-          license: image.license ?? '',
-          licenseUrl: image.licenseUrl ?? '',
+              media.place.target?.name ?? media.event.target?.name ?? '',
+          title: media.title ?? '',
+          author: media.author ?? '',
+          license: media.license ?? '',
+          licenseUrl: media.licenseUrl ?? '',
           cityName:
-              image.place.target?.city.target?.name ??
-              image.event.target?.city.target?.name ??
+              media.place.target?.city.target?.name ??
+              media.event.target?.city.target?.name ??
               '',
-          onSharePressed: () async {
-            try {
-              final cache = DefaultCacheManager();
-              final file = await cache.getSingleFile(image.url);
-              final sharedImage = XFile(file.path, mimeType: 'image/*');
-              await SharePlus.instance.share(ShareParams(files: [sharedImage]));
-            } on Exception catch (error, stackTrace) {
-              final log = Logger('GalleryPreviewModalOverlay');
-
-              log.warning(
-                'An exception occurred during image sharing.',
-                error,
-                stackTrace,
-              );
-
-              if (context.mounted) {
-                showSnackBar(
-                  context: context,
-                  textContent:
-                      'Si è verificato un errore durante la condivisione, riprova.',
-                );
-              }
-            }
-          },
+          onSharePressed: () async => await _onSharePressed(context),
+          index: index,
+          itemCount: itemCount,
         ),
       ),
     );

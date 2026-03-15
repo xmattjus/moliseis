@@ -100,14 +100,11 @@ class GeoMapBottomSheetPost extends StatelessWidget {
             itemBuilder: (context, index) {
               return CardBase(
                 elevation: 0,
-                onPressed: () async {
-                  const modal = GalleryPreviewModal();
-                  await modal(
-                    context: context,
-                    images: content.media,
-                    initialIndex: index,
-                  );
-                },
+                onPressed: () async => await GalleryPreviewModal.show(
+                  context: context,
+                  media: content.media,
+                  initialIndex: index,
+                ),
                 child: AppNetworkImage(
                   url: content.media[index].url,
                   width: kGridViewCardWidth,

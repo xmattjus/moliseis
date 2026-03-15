@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:moliseis/data/sources/media.dart';
+import 'package:moliseis/ui/core/ui/app_page_indicator.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
@@ -29,7 +30,9 @@ class PostMediaSlideshow extends StatefulWidget {
 
 class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     with TickerProviderStateMixin {
-  static const _bottomChromeHeight = 50.0;
+  static const _bottomChromeHeight = 40.0;
+  static const _bottomChromeOffset = -4.0;
+  static const _pageIndicatorBottomOffset = 8.0;
   static const _pauseButtonOffset = 16.0;
 
   late final AnimationController _animationController;
@@ -139,10 +142,9 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
       _stopAutoPlay();
     }
 
-    const modal = GalleryPreviewModal();
-    final isDismissed = await modal(
+    final isDismissed = await GalleryPreviewModal.show(
       context: context,
-      images: widget.media,
+      media: widget.media,
       initialIndex: initialIndex,
     );
 
@@ -161,89 +163,100 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     }
   }
 
-  Widget _buildMediaPager(BoxConstraints constraints) {
-    return SizedBox(
-      width: constraints.maxWidth,
-      height: widget.height,
-      child: NotificationListener(
-        onNotification: (notification) {
-          if (notification is UserScrollNotification) {
-            _disableAutoPlayByUserScroll();
+  Widget _buildMediaPager(BoxConstraints constraints) => SizedBox(
+    width: constraints.maxWidth,
+    height: widget.height,
+    child: NotificationListener(
+      onNotification: (notification) {
+        if (notification is UserScrollNotification) {
+          _disableAutoPlayByUserScroll();
+        }
+        return true;
+      },
+      child: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (_) {
+          if (_isAutoPlayEnabled) {
+            _animationController.forward(from: 0);
           }
-          return true;
         },
-        child: PageView.builder(
-          controller: _pageController,
-          onPageChanged: (_) {
-            if (_isAutoPlayEnabled) {
-              _animationController.forward(from: 0);
-            }
-          },
-          itemBuilder: (_, index) {
-            return CardBase(
-              shape: const RoundedRectangleBorder(),
-              onPressed: () => _openGalleryPreview(index),
-              child: AppNetworkImage(
-                url: widget.media[index].url,
-                width: constraints.maxWidth,
-                height: widget.height,
-                imageWidth: widget.media[index].width,
-                imageHeight: widget.media[index].height,
-                onImageLoading: _onImageLoadingChanged,
-              ),
-            );
-          },
-          itemCount: widget.media.length,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomChrome(BuildContext context, BoxConstraints constraints) {
-    return Positioned(
-      bottom: -2.0, // Hides the gap at the bottom of the CustomPainter
-      child: Container(
-        width: constraints.maxWidth,
-        height: _bottomChromeHeight,
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(
-              color: context.appColors.modalBorderColor,
-              width: context.appSizes.borderSide.medium,
+        itemBuilder: (_, index) {
+          return CardBase(
+            shape: const RoundedRectangleBorder(),
+            onPressed: () => _openGalleryPreview(index),
+            child: AppNetworkImage(
+              url: widget.media[index].url,
+              width: constraints.maxWidth,
+              height: widget.height,
+              imageWidth: widget.media[index].width,
+              imageHeight: widget.media[index].height,
+              onImageLoading: _onImageLoadingChanged,
             ),
-          ),
-          borderRadius: BorderRadius.only(
-            topLeft: context.appShapes.circular.cornerExtraLarge.topLeft,
-            topRight: context.appShapes.circular.cornerExtraLarge.topRight,
-          ),
-          color: context.colorScheme.surface,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPauseButtonOverlay() {
-    return Positioned(
-      bottom: _bottomChromeHeight + _pauseButtonOffset,
-      right: _pauseButtonOffset,
-      child: AnimatedBuilder(
-        animation: Listenable.merge([
-          widget.visibilityNotifier,
-          _autoPlayEnabledNotifier,
-          _isMediaLoadingNotifier,
-        ]),
-        builder: (_, _) {
-          return _PostMediaSlideshowPauseButton(
-            onPressed: _isMediaLoading || !_isSlideshowVisible
-                ? null
-                : _toggleAutoScroll,
-            expanded: !_isAutoPlayEnabled,
-            tickerProvider: this,
           );
         },
+        itemCount: widget.media.length,
       ),
-    );
-  }
+    ),
+  );
+
+  Widget _buildBottomChrome(BuildContext context, BoxConstraints constraints) =>
+      Positioned(
+        bottom: _bottomChromeOffset,
+        child: Container(
+          width: constraints.maxWidth,
+          height: _bottomChromeHeight,
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: context.appColors.modalBorderColor,
+                width: context.appSizes.borderSide.medium,
+              ),
+            ),
+            borderRadius: BorderRadius.only(
+              topLeft: context.appShapes.circular.cornerExtraLarge.topLeft,
+              topRight: context.appShapes.circular.cornerExtraLarge.topRight,
+            ),
+            color: context.colorScheme.surface,
+          ),
+        ),
+      );
+
+  Widget _buildPageIndicator(int itemCount) => Positioned(
+    left: 0,
+    right: 0,
+    bottom: _bottomChromeHeight + _pageIndicatorBottomOffset,
+    child: Center(
+      child: AppPageIndicator(
+        pageController: _pageController,
+        itemCount: itemCount,
+      ),
+    ),
+  );
+
+  Widget _buildPauseButtonOverlay() => Positioned(
+    bottom:
+        _bottomChromeHeight +
+        _pageIndicatorBottomOffset +
+        _pauseButtonOffset +
+        16.0,
+    right: _pauseButtonOffset,
+    child: AnimatedBuilder(
+      animation: Listenable.merge([
+        widget.visibilityNotifier,
+        _autoPlayEnabledNotifier,
+        _isMediaLoadingNotifier,
+      ]),
+      builder: (_, _) {
+        return _PostMediaSlideshowPauseButton(
+          onPressed: _isMediaLoading || !_isSlideshowVisible
+              ? null
+              : _toggleAutoScroll,
+          expanded: !_isAutoPlayEnabled,
+          tickerProvider: this,
+        );
+      },
+    ),
+  );
 
   void _startAutoPlay() {
     // Starts the slideshow autoplay only if there is more than 1 media to show
@@ -288,6 +301,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
           children: <Widget>[
             _buildMediaPager(constraints),
             _buildBottomChrome(context, constraints),
+            if (_initTicker) _buildPageIndicator(widget.media.length),
             if (_initTicker) _buildPauseButtonOverlay(),
           ],
         );
