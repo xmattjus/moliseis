@@ -5,8 +5,7 @@ import 'package:http/http.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/config/service_locator.dart';
-import 'package:moliseis/data/services/objectbox.dart';
-import 'package:moliseis/data/sources/app_settings.dart';
+import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
@@ -25,9 +24,7 @@ Future<void> _main() async {
 
   // Retrieves the app settings to check whether the user has given his consent
   // to report exceptions or not.
-  final settings = sl<ObjectBox>().store.box<AppSettings>().get(settingsId);
-
-  final enableSentry = (settings?.crashReporting ?? false) && !kDebugMode;
+  final enableSentry = sl<SettingsRepository>().crashReporting && !kDebugMode;
 
   const app = MoliseIsApp();
 

@@ -1,131 +1,97 @@
 import 'dart:async' show Future;
 
-import 'package:logging/logging.dart';
-import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/app_settings.dart';
+import 'package:moliseis/data/sources/settings_local_data_source.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
-import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
-  final Box<AppSettings> _settingsBox;
+  final ISettingsLocalDataSource _dataSource;
+  AppSettings? _settings;
 
-  SettingsRepositoryImpl({required ObjectBox objectBoxI})
-    : _settingsBox = objectBoxI.store.box<AppSettings>();
+  SettingsRepositoryImpl(this._dataSource);
 
-  final _log = Logger('SettingsRepositoryImpl');
-
-  /// Loads from the database (or creates) the [AppSettings] object.
-  ///
-  /// ObjectBox does not support the creation of a box with only one object
-  /// inside. As such, the [AppSettings.id] is not managed by ObjectBox and
-  /// is always set to constant [settingsId] during object instantiation.
-  AppSettings get _appSettings => _settingsBox.get(settingsId) ?? AppSettings();
-
-  @override
-  Result<ContentSort> get contentSort {
-    return Result.success(_appSettings.contentSort);
-  }
-
-  @override
-  Result<bool> get crashReporting {
-    return Result.success(_appSettings.crashReporting);
-  }
-
-  @override
-  Result<DateTime?> get modifiedAt {
-    return Result.success(_appSettings.modifiedAt);
-  }
-
-  @override
-  Result<ThemeBrightness> get themeBrightness {
-    return Result.success(_appSettings.brightness);
-  }
-
-  @override
-  Result<ThemeType> get themeType {
-    return Result.success(_appSettings.type);
-  }
-
-  @override
-  Future<Result<void>> setContentSort(ContentSort sort) async {
-    try {
-      await _settingsBox.putAsync(_appSettings.copyWith(contentSort: sort));
-      return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.severe(
-        'An exception occurred while setting content sort to $sort.',
-        error,
-        stackTrace,
+  AppSettings get _cache {
+    if (_settings == null) {
+      throw StateError(
+        'SettingsRepositoryImpl has not been initialized. '
+        'Call initialize() and await completion before accessing app settings.',
       );
-      return Result.error(error);
     }
+
+    return _settings!;
   }
 
   @override
-  Future<Result<void>> setCrashReporting(bool enable) async {
-    try {
-      await _settingsBox.putAsync(
-        _appSettings.copyWith(crashReporting: enable),
-      );
-      return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.severe(
-        'An exception occurred while setting crash reporting to $enable.',
-        error,
-        stackTrace,
-      );
-      return Result.error(error);
+  Future<Result<void>> initialize() async {
+    final result = await _dataSource.load();
+
+    switch (result) {
+      case Success<AppSettings>():
+        _settings = result.value;
+      case Error<AppSettings>():
+        // I/O failed but we have safe defaults — app can still run.
+        _settings = AppSettings();
     }
+
+    return result;
+  }
+
+  Future<Result<void>> _persistNewSettings(AppSettings newSettings) async {
+    final result = await _dataSource.save(newSettings);
+
+    if (result is Success<void>) {
+      _settings = newSettings;
+    }
+
+    return result;
   }
 
   @override
-  Future<Result<void>> setModifiedAt(DateTime dateTime) async {
-    try {
-      await _settingsBox.putAsync(_appSettings.copyWith(modifiedAt: dateTime));
-      return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.severe(
-        'An exception occurred while setting modified at to $dateTime.',
-        error,
-        stackTrace,
-      );
-      return Result.error(error);
-    }
+  ContentSort get contentSort => _cache.contentSort;
+
+  @override
+  bool get crashReporting => _cache.crashReporting;
+
+  @override
+  DateTime? get modifiedAt => _cache.modifiedAt;
+
+  @override
+  ThemeBrightness get themeBrightness => _cache.brightness;
+
+  @override
+  ThemeType get themeType => _cache.type;
+
+  @override
+  Future<Result<void>> setContentSort(ContentSort sort) {
+    final newSettings = _cache.copyWith(contentSort: sort);
+    return _persistNewSettings(newSettings);
   }
 
   @override
-  Future<Result<void>> setThemeBrightness(ThemeBrightness brightness) async {
-    try {
-      await _settingsBox.putAsync(
-        _appSettings.copyWith(brightness: brightness),
-      );
-      return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.severe(
-        'An exception occurred while setting theme brightness to $brightness.',
-        error,
-        stackTrace,
-      );
-      return Result.error(error);
-    }
+  Future<Result<void>> setCrashReporting(bool enable) {
+    final newSettings = _cache.copyWith(crashReporting: enable);
+    return _persistNewSettings(newSettings);
   }
 
   @override
-  Future<Result<void>> setThemeType(ThemeType type) async {
-    try {
-      await _settingsBox.putAsync(_appSettings.copyWith(type: type));
-      return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.severe(
-        'An exception occurred while setting theme type to $type.',
-        error,
-        stackTrace,
-      );
-      return Result.error(error);
-    }
+  Future<Result<void>> setModifiedAt(DateTime dateTime) {
+    final newSettings = _cache.copyWith(modifiedAt: dateTime);
+    return _persistNewSettings(newSettings);
+  }
+
+  @override
+  Future<Result<void>> setThemeBrightness(ThemeBrightness brightness) {
+    final newSettings = _cache.copyWith(brightness: brightness);
+    return _persistNewSettings(newSettings);
+  }
+
+  @override
+  Future<Result<void>> setThemeType(ThemeType type) {
+    final newSettings = _cache.copyWith(type: type);
+    return _persistNewSettings(newSettings);
   }
 }

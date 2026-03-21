@@ -36,15 +36,7 @@ class CategoryViewModel extends ChangeNotifier {
     setSelectedCategories = Command1(_setSelectedCategories);
     setSort = Command1(_setSort);
     setSelectedTypes = Command1(_setSelectedTypes);
-
-    final contentSortResult = _settingsRepository.contentSort;
-
-    switch (contentSortResult) {
-      case Success<ContentSort>():
-        _sort = contentSortResult.value;
-      case Error<ContentSort>():
-        _sort = ContentSort.byName; // Default value in case of error.
-    }
+    _sort = _settingsRepository.contentSort;
 
     equality = const DeepCollectionEquality();
   }

@@ -50,15 +50,13 @@ class SyncViewModel extends ChangeNotifier {
   ///
   /// Returns `true` if sync is needed, `false` otherwise.
   bool _syncNeeded() {
-    final result = _useCase.modifiedAt;
+    final modifiedAt = _useCase.modifiedAt;
 
-    if (result is Success<DateTime?>) {
-      if (result.value != null) {
-        final nextScheduledUpdate = result.value!.add(const Duration(days: 3));
+    if (modifiedAt != null) {
+      final nextScheduledUpdate = modifiedAt.add(const Duration(days: 3));
 
-        if (DateTime.now().isBefore(nextScheduledUpdate)) {
-          return false;
-        }
+      if (DateTime.now().isBefore(nextScheduledUpdate)) {
+        return false;
       }
     }
 

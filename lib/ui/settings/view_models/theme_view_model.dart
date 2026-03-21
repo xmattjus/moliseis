@@ -14,25 +14,8 @@ class ThemeViewModel extends ChangeNotifier {
     : _settingsRepository = settingsRepository {
     setThemeBrightness = Command1(_setThemeBrightness);
     setThemeType = Command1(_setThemeType);
-
-    final themeBrightnessResult = _settingsRepository.themeBrightness;
-
-    switch (themeBrightnessResult) {
-      case Success<ThemeBrightness>():
-        _themeBrightness = themeBrightnessResult.value;
-      case Error<ThemeBrightness>():
-        _themeBrightness =
-            ThemeBrightness.system; // Default value in case of error.
-    }
-
-    final themeTypeResult = _settingsRepository.themeType;
-
-    switch (themeTypeResult) {
-      case Success<ThemeType>():
-        _themeType = themeTypeResult.value;
-      case Error<ThemeType>():
-        _themeType = ThemeType.app; // Default value in case of error.
-    }
+    _themeBrightness = _settingsRepository.themeBrightness;
+    _themeType = _settingsRepository.themeType;
   }
 
   ThemeType get themeType => _themeType;
@@ -59,7 +42,7 @@ class ThemeViewModel extends ChangeNotifier {
       case Success<void>():
     }
 
-    return const Result.success(null);
+    return result;
   }
 
   /// Sets the app theme mode to the required value.
@@ -78,7 +61,7 @@ class ThemeViewModel extends ChangeNotifier {
       case Success<void>():
     }
 
-    return const Result.success(null);
+    return result;
   }
 
   /// Maps the app [ThemeBrightness] to the Flutter [ThemeMode] enum.

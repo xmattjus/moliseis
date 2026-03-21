@@ -11,15 +11,7 @@ class SettingsViewModel extends ChangeNotifier {
   SettingsViewModel({required SettingsRepository settingsRepository})
     : _settingsRepository = settingsRepository {
     setCrashReporting = Command1(_setCrashReporting);
-
-    final result = _settingsRepository.crashReporting;
-
-    switch (result) {
-      case Success<bool>():
-        _crashReporting = result.value;
-      case Error<bool>():
-        _crashReporting = false; // Default value in case of error.
-    }
+    _crashReporting = _settingsRepository.crashReporting;
   }
 
   late bool _crashReporting;

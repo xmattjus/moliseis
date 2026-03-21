@@ -54,5 +54,5 @@ class SynchronizeRepositoriesUseCase {
     return const Result.success(null);
   }
 
-  Result<DateTime?> get modifiedAt => _settingsRepository.modifiedAt;
+  DateTime? get modifiedAt => _settingsRepository.modifiedAt;
 }

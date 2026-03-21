@@ -7,7 +7,6 @@ import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
-import 'package:moliseis/data/repositories/settings_repository_impl.dart';
 import 'package:moliseis/data/repositories/user_contribution_repository_impl.dart';
 import 'package:moliseis/data/services/api/cloudinary_client.dart';
 import 'package:moliseis/data/services/api/openstreetmap/openstreetmap_client.dart';
@@ -90,12 +89,7 @@ List<SingleChildWidget> get providers {
             as SearchRepository;
       },
     ),
-    Provider(
-      create: (_) {
-        return SettingsRepositoryImpl(objectBoxI: sl<ObjectBox>())
-            as SettingsRepository;
-      },
-    ),
+    Provider<SettingsRepository>.value(value: sl<SettingsRepository>()),
     Provider<UserContributionRepository>(
       create: (_) {
         final cloudinaryClient = CloudinaryClient(
@@ -171,7 +165,7 @@ List<SingleChildWidget> get providers {
         ),
       ),
     ),
-    Provider<CacheManager>(create: (_) => sl<CacheManager>()),
+    Provider<CacheManager>.value(value: sl<CacheManager>()),
     //#endregion
   ];
 }

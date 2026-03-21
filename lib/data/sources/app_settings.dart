@@ -3,13 +3,15 @@ import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:objectbox/objectbox.dart';
 
-/// The id this will always have during ObjectBox transactions.
-const settingsId = 1;
+const _settingsId = 1;
 
 @Entity()
 class AppSettings {
+  /// Stable singleton id for the only settings entity.
+  static const int singletonId = _settingsId;
+
   @Id(assignable: true)
-  int id = settingsId;
+  int id;
 
   @Transient()
   ThemeType type;
@@ -85,7 +87,7 @@ class AppSettings {
     this.contentSort = ContentSort.byName,
     this.modifiedAt,
     this.crashReporting = true,
-  });
+  }) : id = _settingsId;
 
   AppSettings copyWith({
     ThemeType? type,
