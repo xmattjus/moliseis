@@ -1,19 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart';
-import 'package:logging/logging.dart';
-import 'package:moliseis/config/service_locator.dart';
+import 'package:http/http.dart' as http;
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 /// Low-level HTTP client for fetching weather forecasts from Open-Meteo API.
 ///
 /// This client handles network requests, timeout management, and error recovery
 /// to provide reliable data access for the caching layer.
 class WeatherApiClient {
-  final _log = Logger('WeatherApiClient');
+  WeatherApiClient({required Talker logger, required http.Client httpClient})
+    : _log = logger,
+      _httpClient = httpClient;
+
+  final Talker _log;
+  final http.Client _httpClient;
 
   Uri _buildApiUri(
     double latitude,
@@ -57,7 +61,7 @@ class WeatherApiClient {
     try {
       final uri = _buildApiUri(latitude, longitude, timezone: timezone);
 
-      final response = await sl<Client>()
+      final response = await _httpClient
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 

@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/sentry_logging_flag.dart';
 
 class SettingsViewModel extends ChangeNotifier {
   final SettingsRepository _settingsRepository;
 
+  final SentryLoggingFlag _sentryLoggingFlag;
+
   late Command1<void, bool> setCrashReporting;
 
-  SettingsViewModel({required SettingsRepository settingsRepository})
-    : _settingsRepository = settingsRepository {
+  SettingsViewModel({
+    required SettingsRepository settingsRepository,
+    required SentryLoggingFlag sentryLoggingFlag,
+  }) : _settingsRepository = settingsRepository,
+       _sentryLoggingFlag = sentryLoggingFlag {
     setCrashReporting = Command1(_setCrashReporting);
     _crashReporting = _settingsRepository.crashReporting;
   }
@@ -30,6 +36,8 @@ class SettingsViewModel extends ChangeNotifier {
 
       notifyListeners();
     }
+
+    _sentryLoggingFlag.enabled = _crashReporting;
 
     return result;
   }

@@ -66,3 +66,15 @@ class NetworkTimeoutException implements Exception {
     return 'Network request timed out after 10 seconds.';
   }
 }
+
+/// Thrown when ObjectBox cannot be created during app bootstrap.
+class ObjectBoxInitializationException implements Exception {
+  const ObjectBoxInitializationException(this.message);
+
+  final String message;
+
+  @override
+  String toString() {
+    return 'ObjectBox initialization failed, app can not start: $message';
+  }
+}

@@ -1,23 +1,25 @@
 import 'dart:io' show File;
 
-import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/api/cloudinary_client.dart';
 import 'package:moliseis/data/sources/user_contribution.dart';
 import 'package:moliseis/data/sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 class UserContributionRepositoryImpl extends UserContributionRepository {
   UserContributionRepositoryImpl({
+    required Talker logger,
     required Supabase supabase,
     required UserContributionSupabaseTable supabaseTable,
     required CloudinaryClient cloudinaryClient,
-  }) : _supabase = supabase,
+  }) : _log = logger,
+       _supabase = supabase,
        _supabaseTable = supabaseTable,
        _cloudinaryClient = cloudinaryClient;
 
-  final _log = Logger('UserContributionRepositoryImpl');
+  final Talker _log;
 
   final Supabase _supabase;
   final UserContributionSupabaseTable _supabaseTable;
@@ -41,7 +43,7 @@ class UserContributionRepositoryImpl extends UserContributionRepository {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while uploading user contribution.',
         error,
         stackTrace,

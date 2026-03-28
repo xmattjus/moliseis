@@ -1,14 +1,18 @@
-import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/external_url_service.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 /// Service responsible for handling app-specific information URLs
 /// such as privacy policy, terms of service, and legal information.
 class AppInfoService {
-  AppInfoService({required ExternalUrlService externalUrlService})
-    : _externalUrlService = externalUrlService;
+  AppInfoService({
+    required Talker logger,
+    required ExternalUrlService externalUrlService,
+  }) : _log = logger,
+       _externalUrlService = externalUrlService;
 
-  final _log = Logger('AppInfoService');
+  final Talker _log;
+
   final ExternalUrlService _externalUrlService;
 
   // App information URLs

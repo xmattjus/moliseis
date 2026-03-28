@@ -1,4 +1,3 @@
-import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/city.dart';
 import 'package:moliseis/data/sources/city_supabase_table.dart';
@@ -7,17 +6,20 @@ import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/messages.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 class CityRepositoryImpl implements CityRepository {
   CityRepositoryImpl({
+    required Talker logger,
     required Supabase supabaseI,
     required CitySupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
-  }) : _supabase = supabaseI,
+  }) : _log = logger,
+       _supabase = supabaseI,
        _supabaseTable = supabaseTable,
        _cityBox = objectBoxI.store.box<City>();
 
-  final _log = Logger('CityRepositoryImpl');
+  final Talker _log;
 
   final Supabase _supabase;
   final CitySupabaseTable _supabaseTable;
@@ -66,7 +68,7 @@ class CityRepositoryImpl implements CityRepository {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(Messages.repositoryUpdateException, error, stackTrace);
+      _log.error(Messages.repositoryUpdateException, error, stackTrace);
 
       return Result.error(error);
     }

@@ -25,6 +25,7 @@ import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view
 import 'package:moliseis/ui/user_contribution/widgets/user_contribution_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 final _eventsShellNavigatorKey = GlobalKey<NavigatorState>();
 final _exploreShellNavigatorKey = GlobalKey<NavigatorState>();

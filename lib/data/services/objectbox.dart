@@ -1,6 +1,5 @@
 import 'dart:io' show Platform;
 
-import 'package:logging/logging.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -34,9 +33,9 @@ void removeLeftovers<T extends dynamic>(Box<T> box, Set<T> remote) {
       .toList(growable: false);
 
   if (ids.isNotEmpty) {
-    final log = Logger('ObjectBox');
+    // final log = Logger('ObjectBox');
 
-    log.info('Removing leftovers: $ids');
+    // log.info('Removing leftovers: $ids');
 
     box.removeManyAsync(ids);
   }

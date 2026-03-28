@@ -43,7 +43,6 @@ dependencies:
   flutter_map: ^8.2.2
   flutter_randomcolor: ^1.0.18
   # G
-  get_it: ^9.2.1
   go_router: ^17.1.0
   # H
   http: ^1.6.0
@@ -55,7 +54,6 @@ dependencies:
   # K
   # L
   latlong2: ^0.9.1
-  logging: ^1.3.0
   # M
   markdown_widget: ^2.3.2+8
   material_color_utilities: ^0.11.1
@@ -75,7 +73,6 @@ dependencies:
   # S
   sentry: ^9.15.0
   sentry_flutter: ^9.15.0
-  sentry_logging: ^9.15.0
   sentry_supabase: ^9.15.0
   share_plus: ^12.0.1
   skeletonizer: ^2.1.3
@@ -85,6 +82,7 @@ dependencies:
   supabase_flutter: ^2.12.0
   swipe_image_gallery: ^0.11.0
   # T
+  talker_flutter: ^5.1.15
   # U
   url_launcher: ^6.3.2
   # V

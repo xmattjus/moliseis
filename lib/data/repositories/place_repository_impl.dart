@@ -1,4 +1,3 @@
-import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/place.dart';
 import 'package:moliseis/data/sources/place_supabase_table.dart';
@@ -10,17 +9,20 @@ import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/messages.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 class PlaceRepositoryImpl implements PlaceRepository {
   PlaceRepositoryImpl({
+    required Talker logger,
     required Supabase supabaseI,
     required PlaceSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
-  }) : _supabase = supabaseI,
+  }) : _log = logger,
+       _supabase = supabaseI,
        _supabaseTable = supabaseTable,
        _placeBox = objectBoxI.store.box<Place>();
 
-  final _log = Logger('PlaceRepositoryImpl');
+  final Talker _log;
 
   final Supabase _supabase;
   final PlaceSupabaseTable _supabaseTable;
@@ -44,7 +46,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
 
       return Result.success(places);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while loading all the places.',
         error,
         stackTrace,
@@ -70,7 +72,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
 
       return Result.success(results);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while loading places by category.',
         error,
         stackTrace,
@@ -102,7 +104,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
           .toList();
       return Result.success(results);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while loading places by coordinates.',
         error,
         stackTrace,
@@ -196,7 +198,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(Messages.repositoryUpdateException, error, stackTrace);
+      _log.error(Messages.repositoryUpdateException, error, stackTrace);
 
       return Result.error(error);
     }
@@ -214,7 +216,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
       builder.close();
       return Result.success(places);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while loading latest places.',
         error,
         stackTrace,
@@ -233,7 +235,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
       final places = query.findIds().toList();
       return Result.success(places);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while loading favourite places.',
         error,
         stackTrace,
@@ -259,7 +261,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while setting favourite for place with remote ID: $remoteId.',
         error,
         stackTrace,
@@ -280,7 +282,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
       builder.close();
       return Result.success(result);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while loading suggested places.',
         error,
         stackTrace,

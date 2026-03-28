@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:logging/logging.dart';
+import 'package:provider/provider.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 SnackBar _buildSnackBar(BuildContext context, String textContent) {
   return SnackBar(
@@ -24,9 +25,9 @@ void showSnackBar({
   final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
 
   if (scaffoldMessenger == null) {
-    final log = Logger('CustomSnackBar');
+    final log = Provider.of<Talker?>(context, listen: false);
 
-    log.warning('ScaffoldMessenger.maybeOf(context) is null.');
+    log?.warning('ScaffoldMessenger.maybeOf(context) is null.');
     return;
   }
 

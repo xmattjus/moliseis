@@ -1,4 +1,3 @@
-import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/event.dart';
 import 'package:moliseis/data/sources/event_supabase_table.dart';
@@ -9,21 +8,24 @@ import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/messages.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 class EventRepositoryImpl implements EventRepository {
   EventRepositoryImpl({
+    required Talker logger,
     required Supabase supabaseI,
     required EventSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
-  }) : _supabase = supabaseI,
+  }) : _log = logger,
+       _supabase = supabaseI,
        _supabaseTable = supabaseTable,
        _eventBox = objectBoxI.store.box<Event>();
+
+  final Talker _log;
 
   final Supabase _supabase;
   final EventSupabaseTable _supabaseTable;
   final Box<Event> _eventBox;
-
-  final _log = Logger('EventRepositoryImpl');
 
   List<Event>? _cache;
 
@@ -71,7 +73,7 @@ class EventRepositoryImpl implements EventRepository {
           return Result.error(result.error);
       }
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while getting all events.',
         error,
         stackTrace,
@@ -102,7 +104,7 @@ class EventRepositoryImpl implements EventRepository {
 
       return Result.success(results);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while getting events by categories: $categories.',
         error,
         stackTrace,
@@ -141,7 +143,7 @@ class EventRepositoryImpl implements EventRepository {
           .toList();
       return Result.success(results);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while loading events by coordinates.',
         error,
         stackTrace,
@@ -171,7 +173,7 @@ class EventRepositoryImpl implements EventRepository {
 
       return Result.success(results);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while getting events for date: $date.',
         error,
         stackTrace,
@@ -193,7 +195,7 @@ class EventRepositoryImpl implements EventRepository {
         return Result.error(Exception('Event is null'));
       }
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while getting event with remote ID: $id.',
         error,
         stackTrace,
@@ -222,7 +224,7 @@ class EventRepositoryImpl implements EventRepository {
       final results = query.findIds();
       return Result.success(results);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while getting next events.',
         error,
         stackTrace,
@@ -243,7 +245,7 @@ class EventRepositoryImpl implements EventRepository {
       final events = query.findIds().toList();
       return Result.success(events);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while getting favourite events.',
         error,
         stackTrace,
@@ -269,7 +271,7 @@ class EventRepositoryImpl implements EventRepository {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while setting favourite for event with remote ID: $remoteId.',
         error,
         stackTrace,
@@ -336,7 +338,7 @@ class EventRepositoryImpl implements EventRepository {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(Messages.repositoryUpdateException, error, stackTrace);
+      _log.error(Messages.repositoryUpdateException, error, stackTrace);
       return Result.error(error);
     }
   }

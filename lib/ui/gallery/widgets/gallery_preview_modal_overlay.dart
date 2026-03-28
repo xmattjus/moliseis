@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
-import 'package:logging/logging.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/data/sources/media.dart';
@@ -16,6 +15,7 @@ import 'package:moliseis/ui/core/ui/linear_gradient_background.dart';
 import 'package:moliseis/ui/core/ui/link_text_button.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 part '_gallery_preview_modal_overlay_content.dart';
 
@@ -38,15 +38,15 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
       final sharedImage = XFile(file.path, mimeType: 'image/*');
       await SharePlus.instance.share(ShareParams(files: [sharedImage]));
     } on Exception catch (error, stackTrace) {
-      final log = Logger('GalleryPreviewModalOverlay');
-
-      log.warning(
-        'An exception occurred during image sharing.',
-        error,
-        stackTrace,
-      );
-
       if (context.mounted) {
+        final log = Provider.of<Talker?>(context, listen: false);
+
+        log?.warning(
+          'An exception occurred during image sharing.',
+          error,
+          stackTrace,
+        );
+
         showSnackBar(
           context: context,
           textContent:

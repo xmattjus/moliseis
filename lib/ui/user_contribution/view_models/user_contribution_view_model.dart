@@ -5,24 +5,27 @@ import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:logging/logging.dart';
 import 'package:moliseis/data/sources/user_contribution.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 class UserContributionViewModel extends ChangeNotifier {
   UserContributionViewModel({
+    required Talker logger,
     required UserContributionRepository userContributionRepository,
-  }) : _userContributionRepository = userContributionRepository {
+  }) : _log = logger,
+
+       _userContributionRepository = userContributionRepository {
     addMedia = Command0(_addMedia);
     removeMediaAt = Command1(_removeMediaAt);
     send = Command0(_send);
   }
 
-  final _log = Logger('UserContributionViewModel');
+  final Talker _log;
 
   final UserContributionRepository _userContributionRepository;
 
@@ -71,7 +74,7 @@ class UserContributionViewModel extends ChangeNotifier {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while adding media to the upload list.',
         error,
         stackTrace,
@@ -90,7 +93,7 @@ class UserContributionViewModel extends ChangeNotifier {
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while removing media at index $index from the upload list.',
         error,
         stackTrace,

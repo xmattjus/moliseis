@@ -1,14 +1,18 @@
-import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/external_url_service.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 /// Service responsible for handling map-related external URL launches,
 /// including attribution pages and location searches.
 class MapUrlService {
-  MapUrlService({required ExternalUrlService externalUrlService})
-    : _externalUrlService = externalUrlService;
+  MapUrlService({
+    required Talker logger,
+    required ExternalUrlService externalUrlService,
+  }) : _log = logger,
+       _externalUrlService = externalUrlService;
 
-  final _log = Logger('MapUrlService');
+  final Talker _log;
+
   final ExternalUrlService _externalUrlService;
 
   // Map service URLs

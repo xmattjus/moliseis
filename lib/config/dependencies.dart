@@ -1,6 +1,6 @@
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:http/http.dart' as http;
 import 'package:moliseis/config/env/env.dart';
-import 'package:moliseis/config/service_locator.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
@@ -36,70 +36,106 @@ import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
+import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
-List<SingleChildWidget> get providers {
+/// Builds the root provider list using fully initialized dependencies.
+///
+/// Call this only after startup services are ready in the app entrypoint.
+List<SingleChildWidget> providers2(
+  Talker logger,
+  Supabase supabase,
+  ObjectBox objectBox,
+  http.Client httpClient,
+  SettingsRepository settingsRepository,
+  CacheManager cacheManager,
+  SentryLoggingFlag sentryLoggingFlag,
+) {
   return <SingleChildWidget>[
+    //#region Shared
+    Provider<CacheManager>.value(value: cacheManager),
+    Provider<Talker>.value(value: logger),
+    Provider<UrlLaunchService>(create: (_) => UrlLaunchService(logger: logger)),
+    Provider<CachedWeatherApiClient>(
+      create: (_) => CachedWeatherApiClient(
+        weatherApiClient: WeatherApiClient(
+          logger: logger,
+          httpClient: httpClient,
+        ),
+        currentWeatherCache:
+            WeatherForecastDataCache<CurrentWeatherForecastData>(maxSize: 50),
+        hourlyWeatherCache: WeatherForecastDataCache<HourlyWeatherForecastData>(
+          maxSize: 50,
+        ),
+        dailyWeatherCache: WeatherForecastDataCache<DailyWeatherForecastData>(
+          maxSize: 50,
+        ),
+      ),
+    ),
+    //#endregion
+
     //#region Repositories (sorted by name ascending)
-    Provider(
-      create: (_) {
-        return PlaceRepositoryImpl(
-              supabaseI: sl<Supabase>(),
-              supabaseTable: PlaceSupabaseTable(),
-              objectBoxI: sl<ObjectBox>(),
-            )
-            as PlaceRepository;
-      },
+    Provider<PlaceRepository>(
+      create: (_) =>
+          PlaceRepositoryImpl(
+                logger: logger,
+                supabaseI: supabase,
+                supabaseTable: PlaceSupabaseTable(),
+                objectBoxI: objectBox,
+              )
+              as PlaceRepository,
     ),
-    Provider(
-      create: (_) {
-        return EventRepositoryImpl(
-              supabaseI: sl<Supabase>(),
-              supabaseTable: EventSupabaseTable(),
-              objectBoxI: sl<ObjectBox>(),
-            )
-            as EventRepository;
-      },
+    Provider<EventRepository>(
+      create: (_) =>
+          EventRepositoryImpl(
+                logger: logger,
+                supabaseI: supabase,
+                supabaseTable: EventSupabaseTable(),
+                objectBoxI: objectBox,
+              )
+              as EventRepository,
     ),
-    Provider(
-      create: (_) {
-        return MediaRepositoryImpl(
-              supabaseI: sl<Supabase>(),
-              supabaseTable: MediaSupabaseTable(),
-              objectBoxI: sl<ObjectBox>(),
-            )
-            as MediaRepository;
-      },
+    Provider<MediaRepository>(
+      create: (_) =>
+          MediaRepositoryImpl(
+                logger: logger,
+                supabaseI: supabase,
+                supabaseTable: MediaSupabaseTable(),
+                objectBoxI: objectBox,
+              )
+              as MediaRepository,
     ),
-    Provider(
-      create: (_) {
-        return CityRepositoryImpl(
-              supabaseI: sl<Supabase>(),
-              supabaseTable: CitySupabaseTable(),
-              objectBoxI: sl<ObjectBox>(),
-            )
-            as CityRepository;
-      },
+    Provider<CityRepository>(
+      create: (_) =>
+          CityRepositoryImpl(
+                logger: logger,
+                supabaseI: supabase,
+                supabaseTable: CitySupabaseTable(),
+                objectBoxI: objectBox,
+              )
+              as CityRepository,
     ),
-    Provider(
-      create: (_) {
-        return SearchRepositoryImpl(objectBoxI: sl<ObjectBox>())
-            as SearchRepository;
-      },
+    Provider<SearchRepository>(
+      create: (_) =>
+          SearchRepositoryImpl(logger: logger, objectBoxI: objectBox)
+              as SearchRepository,
     ),
-    Provider<SettingsRepository>.value(value: sl<SettingsRepository>()),
+    Provider<SettingsRepository>.value(value: settingsRepository),
     Provider<UserContributionRepository>(
       create: (_) {
         final cloudinaryClient = CloudinaryClient(
+          logger: logger,
           cloudName: Env.cloudinaryProdCloudName,
           apiKey: Env.cloudinaryProdApiKey,
           apiSecret: Env.cloudinaryProdApiSecret,
         );
 
         return UserContributionRepositoryImpl(
-              supabase: sl<Supabase>(),
+              logger: logger,
+              supabase: supabase,
               supabaseTable: UserContributionSupabaseTable(),
               cloudinaryClient: cloudinaryClient,
             )
@@ -108,7 +144,12 @@ List<SingleChildWidget> get providers {
     ),
     Provider<GeoMapRepository>(
       create: (_) {
-        return GeoMapRepositoryImpl(openStreetMapClient: OpenStreetMapClient())
+        return GeoMapRepositoryImpl(
+              openStreetMapClient: OpenStreetMapClient(
+                logger: logger,
+                httpClient: httpClient,
+              ),
+            )
             as GeoMapRepository;
       },
     ),
@@ -135,7 +176,10 @@ List<SingleChildWidget> get providers {
     ),
     ChangeNotifierProvider<SettingsViewModel>(
       create: (context) {
-        return SettingsViewModel(settingsRepository: context.read());
+        return SettingsViewModel(
+          settingsRepository: context.read(),
+          sentryLoggingFlag: sentryLoggingFlag,
+        );
       },
     ),
     ChangeNotifierProvider<FavouriteViewModel>(
@@ -148,24 +192,6 @@ List<SingleChildWidget> get providers {
         );
       },
     ),
-    //#endregion
-
-    //#region Other
-    Provider<UrlLaunchService>(create: (_) => UrlLaunchService()),
-    Provider<CachedWeatherApiClient>(
-      create: (context) => CachedWeatherApiClient(
-        weatherApiClient: WeatherApiClient(),
-        currentWeatherCache:
-            WeatherForecastDataCache<CurrentWeatherForecastData>(maxSize: 50),
-        hourlyWeatherCache: WeatherForecastDataCache<HourlyWeatherForecastData>(
-          maxSize: 50,
-        ),
-        dailyWeatherCache: WeatherForecastDataCache<DailyWeatherForecastData>(
-          maxSize: 50,
-        ),
-      ),
-    ),
-    Provider<CacheManager>.value(value: sl<CacheManager>()),
     //#endregion
   ];
 }

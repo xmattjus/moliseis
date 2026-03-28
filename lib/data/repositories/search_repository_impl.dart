@@ -1,4 +1,3 @@
-import 'package:logging/logging.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/city.dart';
 import 'package:moliseis/data/sources/event.dart';
@@ -9,8 +8,18 @@ import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 class SearchRepositoryImpl implements SearchRepository {
+  SearchRepositoryImpl({required Talker logger, required ObjectBox objectBoxI})
+    : _log = logger,
+      _objectBox = objectBoxI,
+      _searchHistoryBox = objectBoxI.store.box<SearchQuery>() {
+    _init();
+  }
+
+  final Talker _log;
+
   late final Query<City> _cityQuery;
   late final Query<Event> _eventCategoryQuery;
   late final Query<Event> _eventQuery;
@@ -18,14 +27,6 @@ class SearchRepositoryImpl implements SearchRepository {
   late final Query<Place> _placeCategoryQuery;
   late final Query<Place> _placeQuery;
   final Box<SearchQuery> _searchHistoryBox;
-
-  SearchRepositoryImpl({required ObjectBox objectBoxI})
-    : _objectBox = objectBoxI,
-      _searchHistoryBox = objectBoxI.store.box<SearchQuery>() {
-    _init();
-  }
-
-  final _log = Logger('SearchRepositoryImpl');
 
   /// The list of the Event IDs returned by the last search.
   // var _lastEventResultIds = <int>[];
@@ -81,7 +82,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
       _searchHistoryBox.putAsync(SearchQuery(text));
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while adding $text to search history.',
         error,
         stackTrace,
@@ -227,7 +228,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
       return Result.success(diff);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while getting related results.',
         error,
         stackTrace,
@@ -245,7 +246,7 @@ class SearchRepositoryImpl implements SearchRepository {
         history.map<String>((element) => element.name).toList(),
       );
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while getting past searches.',
         error,
         stackTrace,
@@ -267,7 +268,7 @@ class SearchRepositoryImpl implements SearchRepository {
       }
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while removing $text from search history.',
         error,
         stackTrace,
@@ -300,7 +301,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
       return _placeCategoryQuery.find();
     } on Exception catch (error, stackTrace) {
-      _log.severe(
+      _log.error(
         'An exception occurred while loading related results.',
         error,
         stackTrace,

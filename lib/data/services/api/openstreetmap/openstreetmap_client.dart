@@ -1,19 +1,21 @@
 import 'dart:async' show TimeoutException;
 import 'dart:convert';
-import 'package:http/http.dart';
-import 'package:logging/logging.dart';
-import 'package:moliseis/config/service_locator.dart';
+import 'package:http/http.dart' as http;
 import 'package:moliseis/data/services/api/openstreetmap/model/geocoding_address.dart';
 import 'package:moliseis/data/services/api/openstreetmap/model/reverse_geocoding_response.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 /// Uses OpenStreetMap Nominatim service for reverse geocoding.
 class OpenStreetMapClient {
-  OpenStreetMapClient();
+  OpenStreetMapClient({required Talker logger, required http.Client httpClient})
+    : _log = logger,
+      _httpClient = httpClient;
 
-  final _log = Logger('OpenStreetMapClient');
+  final Talker _log;
+  final http.Client _httpClient;
 
   Future<Result<String?>> getAddressFromCoordinates(
     double latitude,
@@ -25,7 +27,7 @@ class OpenStreetMapClient {
         "lat=$latitude&lon=$longitude",
       );
 
-      final response = await sl<Client>()
+      final response = await _httpClient
           .get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 
