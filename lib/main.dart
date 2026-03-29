@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -52,7 +53,7 @@ Future<void> _main() async {
 
   await SentryFlutter.init(
     (options) {
-      options.dsn = Env.sentryUrl;
+      options.dsn = !kDebugMode ? Env.sentryUrl : '';
       // Set tracesSampleRate to 1.0 to capture 100% of transactions for
       // tracing.
       options.tracesSampleRate = 0.4;
@@ -63,6 +64,7 @@ Future<void> _main() async {
       options.replay.sessionSampleRate = 0.4;
       options.replay.onErrorSampleRate = 1.0;
       options.httpClient = httpClient;
+options.debug = kDebugMode;
     },
     appRunner: () async {
       final supabase = await Supabase.initialize(
