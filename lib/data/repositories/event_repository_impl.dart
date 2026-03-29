@@ -30,7 +30,13 @@ class EventRepositoryImpl implements EventRepository {
 
   List<Event>? _cache;
 
-  Future<Result<List<Event>>> _getByCurrentYear() async {
+  @override
+  Future<Result<List<Event>>> getByCurrentYear() async {
+    // Do not query the database again if the events are already cached.
+    if (_cache != null) {
+      return Result.success(_cache!);
+    }
+
     Query<Event>? query;
 
     try {
@@ -48,38 +54,20 @@ class EventRepositoryImpl implements EventRepository {
           .order(Event_.startDate, flags: Order.unsigned);
       query = builder.build();
       final results = await query.findAsync();
+
+      _cache = results;
+
       return Result.success(results);
-    } on Exception catch (error) {
-      return Result.error(error);
-    } finally {
-      query?.close();
-    }
-  }
-
-  @override
-  Future<Result<List<Event>>> getByCurrentYear() async {
-    try {
-      // Do not query the database again if the events are already cached.
-      if (_cache != null) {
-        return Result.success(_cache!);
-      }
-
-      final result = await _getByCurrentYear();
-
-      switch (result) {
-        case Success<List<Event>>():
-          _cache = result.value;
-          return Result.success(_cache!);
-        case Error<List<Event>>():
-          return Result.error(result.error);
-      }
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while getting all events.',
         error,
         stackTrace,
       );
+
       return Result.error(error);
+    } finally {
+      query?.close();
     }
   }
 
@@ -172,17 +160,18 @@ class EventRepositoryImpl implements EventRepository {
     _log.info('Getting events for date range: $startDate to $endDate.');
 
     try {
-      final Condition<Event> startCondition = Event_.startDate.lessOrEqualDate(
-        endDate,
+      final Condition<Event> multiDayCondition = Event_.startDate
+          .lessOrEqualDate(endDate)
+          .and(Event_.endDate.greaterOrEqualDate(startDate));
+
+      final Condition<Event> singleDayCondition = Event_.endDate.isNull().and(
+        Event_.startDate.betweenDate(startDate, endDate),
       );
 
-      final Condition<Event> endCondition = Event_.endDate
-          .greaterOrEqualDate(startDate)
-          .or(Event_.endDate.isNull());
-
       final builder = _eventBox
-          .query(startCondition.and(endCondition))
+          .query(multiDayCondition.or(singleDayCondition))
           .order(Event_.startDate, flags: Order.unsigned);
+
       query = builder.build();
       final results = await query.findAsync();
 
