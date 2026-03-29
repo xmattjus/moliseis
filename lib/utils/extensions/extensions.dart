@@ -5,6 +5,7 @@ export 'app_color_schemes_theme_extension_extensions.dart';
 export 'build_context_extensions.dart';
 export 'color_extensions.dart';
 export 'content_category_extensions.dart';
+export 'date_time_extensions.dart';
 export 'double_extensions.dart';
 export 'lat_lng_extensions.dart';
 export 'list_extensions.dart';

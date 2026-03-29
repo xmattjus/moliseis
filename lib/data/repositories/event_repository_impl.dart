@@ -5,6 +5,7 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/messages.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -36,13 +37,13 @@ class EventRepositoryImpl implements EventRepository {
       final currentYear = DateTime.now().year;
 
       final startDate = DateTime(currentYear);
-      final endDate = DateTime(currentYear, 12, 31, 23, 59, 59);
+      final endDate = DateTime(currentYear, 12, 31).endOfDay;
 
       final builder = _eventBox
           .query(
             Event_.startDate
                 .greaterOrEqualDate(startDate)
-                .and(Event_.startDate.lessThanDate(endDate)),
+                .and(Event_.startDate.lessOrEqualDate(endDate)),
           )
           .order(Event_.startDate, flags: Order.unsigned);
       query = builder.build();
@@ -90,14 +91,15 @@ class EventRepositoryImpl implements EventRepository {
     Query<Event>? query;
 
     final now = DateTime.now();
-    final nextYear = DateTime(now.year + 1);
+    final startOfYear = DateTime(now.year);
+    final endOfYear = DateTime(now.year, 12, 31).endOfDay;
 
     try {
       final condition = Event_.dbType
           .oneOf(categories.map((e) => e.index).toList())
           .andAll([
-            Event_.startDate.greaterOrEqualDate(now),
-            Event_.startDate.lessThanDate(nextYear),
+            Event_.startDate.greaterOrEqualDate(startOfYear),
+            Event_.startDate.lessOrEqualDate(endOfYear),
           ]);
       query = _eventBox.query(condition).build();
       final results = await query.findAsync();
@@ -120,14 +122,15 @@ class EventRepositoryImpl implements EventRepository {
     Query<Event>? query;
 
     final now = DateTime.now();
-    final nextYear = DateTime(now.year + 1);
+    final startOfYear = DateTime(now.year);
+    final endOfYear = DateTime(now.year, 12, 31).endOfDay;
 
     try {
       final condition = Event_.coordinates
           .nearestNeighborsF32(coordinates, 200)
           .andAll([
-            Event_.startDate.greaterOrEqualDate(now),
-            Event_.startDate.lessThanDate(nextYear),
+            Event_.startDate.greaterOrEqualDate(startOfYear),
+            Event_.startDate.lessOrEqualDate(endOfYear),
           ]);
       query = _eventBox.query(condition).build();
       query.limit = 2;
@@ -154,27 +157,39 @@ class EventRepositoryImpl implements EventRepository {
     }
   }
 
-  @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async {
+  Future<Result<List<Event>>> _getByDateRange({
+    required DateTime start,
+    DateTime? end,
+  }) async {
     Query<Event>? query;
+
+    // Normalizes the start and end dates to include the entire day.
+    final startDate = start.startOfDay;
+    final endDate = end != null
+        ? DateTime(end.year, end.month, end.day).endOfDay
+        : DateTime(start.year, start.month, start.day).endOfDay;
+
+    _log.info('Getting events for date range: $startDate to $endDate.');
+
     try {
-      final startDate = DateTime(date.year, date.month, date.day);
-      final endDate = DateTime(date.year, date.month, date.day + 1);
+      final Condition<Event> startCondition = Event_.startDate.lessOrEqualDate(
+        endDate,
+      );
+
+      final Condition<Event> endCondition = Event_.endDate
+          .greaterOrEqualDate(startDate)
+          .or(Event_.endDate.isNull());
 
       final builder = _eventBox
-          .query(
-            Event_.startDate
-                .greaterOrEqualDate(startDate)
-                .and(Event_.startDate.lessThanDate(endDate)),
-          )
+          .query(startCondition.and(endCondition))
           .order(Event_.startDate, flags: Order.unsigned);
       query = builder.build();
-      final results = query.find();
+      final results = await query.findAsync();
 
       return Result.success(results);
     } on Exception catch (error, stackTrace) {
       _log.error(
-        'An exception occurred while getting events for date: $date.',
+        'An exception occurred while getting events for date range: $startDate to $endDate.',
         error,
         stackTrace,
       );
@@ -184,8 +199,20 @@ class EventRepositoryImpl implements EventRepository {
     }
   }
 
+  /// Loads events that overlap a specific calendar day.
+  @override
+  Future<Result<List<Event>>> getByDate(DateTime date) =>
+      _getByDateRange(start: date);
+
+  /// Loads events that overlap the inclusive [start]-[end] date range.
+  @override
+  Future<Result<List<Event>>> getByDateRange(DateTime start, DateTime end) =>
+      _getByDateRange(start: start, end: end);
+
   @override
   Future<Result<Event>> getById(int id) async {
+    _log.info('Getting event with remote ID: $id.');
+
     try {
       final result = _eventBox.get(id);
 
@@ -211,13 +238,13 @@ class EventRepositoryImpl implements EventRepository {
     try {
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      final nextMonth = DateTime(now.year, now.month, now.day + 30);
+      final nextMonth = DateTime(now.year, now.month, now.day + 30).endOfDay;
 
       final builder = _eventBox
           .query(
             Event_.startDate
                 .greaterOrEqualDate(today)
-                .and(Event_.startDate.lessThanDate(nextMonth)),
+                .and(Event_.startDate.lessOrEqualDate(nextMonth)),
           )
           .order(Event_.startDate, flags: Order.unsigned);
       query = builder.build()..limit = 6;
