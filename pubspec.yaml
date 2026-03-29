@@ -41,7 +41,6 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_map: ^8.2.2
-  flutter_randomcolor: ^1.0.18
   # G
   go_router: ^17.1.0
   # H
@@ -71,6 +70,7 @@ dependencies:
   # Q
   # R
   # S
+  result_dart: ^2.2.0
   sentry: ^9.15.0
   sentry_flutter: ^9.15.0
   sentry_supabase: ^9.15.0
@@ -106,7 +106,7 @@ dev_dependencies:
   # H
   # I
   # J
-  json_serializable: ^6.13.0
+  json_serializable: ^6.13.1
   # K
   # L
   lint: ^2.8.0

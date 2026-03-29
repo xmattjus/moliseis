@@ -6,7 +6,7 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class EventsVerticalCalendarDay extends StatelessWidget {
   final DateTime date;
   final List<EventContent> events;
-  final Function() onPressed;
+  final void Function() onPressed;
   final bool isSelected;
 
   const EventsVerticalCalendarDay({

@@ -1,4 +1,3 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
@@ -41,15 +40,16 @@ class _EventsCalendarState extends State<EventsCalendar> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final minDate = DateTime(now.year);
+    final startDate = DateTime(now.year);
+    final endDate = DateTime(now.year, 12, 31, 23, 59, 59);
     return ListenableBuilder(
       listenable: widget.viewModel.loadAll,
       builder: (context, child) {
         if (widget.viewModel.loadAll.completed) {
           return SliverFillRemaining(
             child: PagedVerticalCalendar(
-              minDate: minDate,
-              maxDate: minDate.copyWith(month: 12, day: 31),
+              minDate: startDate,
+              maxDate: endDate,
               monthBuilder: (_, month, year) => EventsVerticalCalendarMonth(
                 dateSymbols: _dateSymbols,
                 month: month,
@@ -57,11 +57,7 @@ class _EventsCalendarState extends State<EventsCalendar> {
               ),
               dayBuilder: (_, date) => EventsVerticalCalendarDay(
                 date: date,
-                events: UnmodifiableListView(
-                  widget.viewModel.all.where((event) {
-                    return event.startDate.isSameDay(date);
-                  }),
-                ),
+                events: widget.viewModel.getEventsOnDay(date),
                 onPressed: () => widget.onDayPressed(date),
                 isSelected: date.isSameDay(widget.viewModel.selectedDate),
               ),
