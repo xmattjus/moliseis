@@ -12,8 +12,6 @@ class CurrentWeatherForecastData {
   final double temperature;
   @JsonKey(name: 'is_day')
   final int isDay;
-  @JsonKey(name: 'apparent_temperature')
-  final double? apparentTemperature;
   @JsonKey(name: 'weather_code')
   final int weatherCode;
   final double? precipitation;
@@ -23,7 +21,6 @@ class CurrentWeatherForecastData {
     required this.interval,
     required this.temperature,
     required this.isDay,
-    this.apparentTemperature,
     required this.weatherCode,
     this.precipitation,
   });

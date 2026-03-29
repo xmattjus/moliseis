@@ -32,9 +32,7 @@ class WeatherApiClient {
         'temperature_2m,weather_code,precipitation_probability,'
         'is_day';
 
-    const current =
-        'temperature_2m,is_day,apparent_temperature,'
-        'weather_code,precipitation';
+    const current = 'temperature_2m,is_day,weather_code,precipitation';
 
     return Uri.https('api.open-meteo.com', '/v1/forecast', {
       'latitude': latitude.toString(),

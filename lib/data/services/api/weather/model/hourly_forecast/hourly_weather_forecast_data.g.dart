@@ -13,15 +13,6 @@ HourlyWeatherForecastData _$HourlyWeatherForecastDataFromJson(
   temperature2m: (json['temperature_2m'] as List<dynamic>)
       .map((e) => (e as num).toDouble())
       .toList(),
-  relativeHumidity2m: (json['relative_humidity_2m'] as List<dynamic>?)
-      ?.map((e) => (e as num).toInt())
-      .toList(),
-  apparentTemperature: (json['apparent_temperature'] as List<dynamic>?)
-      ?.map((e) => (e as num).toDouble())
-      .toList(),
-  precipitation: (json['precipitation'] as List<dynamic>?)
-      ?.map((e) => (e as num).toDouble())
-      .toList(),
   precipitationProbability: (json['precipitation_probability'] as List<dynamic>)
       .map((e) => (e as num).toInt())
       .toList(),

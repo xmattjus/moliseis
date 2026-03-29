@@ -13,7 +13,6 @@ CurrentWeatherForecastData _$CurrentWeatherForecastDataFromJson(
   interval: (json['interval'] as num).toInt(),
   temperature: (json['temperature_2m'] as num).toDouble(),
   isDay: (json['is_day'] as num).toInt(),
-  apparentTemperature: (json['apparent_temperature'] as num?)?.toDouble(),
   weatherCode: (json['weather_code'] as num).toInt(),
   precipitation: (json['precipitation'] as num?)?.toDouble(),
 );
