@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:http/http.dart';
+import 'package:http/http.dart' as http;
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/repositories/settings_repository_impl.dart';
@@ -42,14 +42,14 @@ Result<void> handleSettingsRepositoryInitialization(Result<void> result) {
   return result;
 }
 
-void main() async => await runWithClient(_main, () => httpClientFactory());
+void main() async => await http.runWithClient(_main, () => httpClientFactory());
 
 Future<void> _main() async {
   // Ensures the disk can be accessed before continuing app start-up.
   SentryWidgetsFlutterBinding.ensureInitialized();
 
   // Retrieves an HTTP client instance initialized with the `runWithClient` method.
-  final httpClient = Client();
+  final httpClient = http.Client();
 
   await SentryFlutter.init(
     (options) {
@@ -64,7 +64,7 @@ Future<void> _main() async {
       options.replay.sessionSampleRate = 0.4;
       options.replay.onErrorSampleRate = 1.0;
       options.httpClient = httpClient;
-options.debug = kDebugMode;
+      options.debug = kDebugMode;
     },
     appRunner: () async {
       final supabase = await Supabase.initialize(

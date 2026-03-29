@@ -2,7 +2,7 @@ import 'dart:io' show HttpClient, Platform;
 
 import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart';
-import 'package:http/http.dart';
+import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:moliseis/utils/constants.dart';
 
@@ -10,7 +10,7 @@ HttpClient _fallbackClient = HttpClient()..userAgent = kUserAgent;
 
 const _maxCacheSize = 2 * 1024 * 1024;
 
-Client httpClientFactory() {
+http.Client httpClientFactory() {
   try {
     if (Platform.isAndroid) {
       final engine = CronetEngine.build(
