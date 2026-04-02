@@ -1,5 +1,3 @@
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/place.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';
@@ -7,6 +5,9 @@ import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/utils/result.dart';
 
+/// Provides content for the Explore area by mapping repository entities.
+///
+/// The use case keeps repository errors visible to callers through `Result`.
 class ExploreUseCase {
   final EventRepository _eventRepository;
   final PlaceRepository _placeRepository;
@@ -17,48 +18,30 @@ class ExploreUseCase {
   }) : _eventRepository = eventRepository,
        _placeRepository = placeRepository;
 
+  /// Returns events for the current year mapped to content models.
+  ///
+  /// Repository failures are propagated as `Result.error`.
   Future<Result<List<EventContent>>> getAllEvents() async {
-    final list = <EventContent>[];
-
     final result = await _eventRepository.getByCurrentYear();
 
-    switch (result) {
-      case Success<List<Event>>():
-        for (final event in result.value) {
-          list.add(EventContent.fromEvent(event));
-        }
-      case Error<List<Event>>():
-    }
-
-    return Result.success(list);
+    return result.map((events) => events.map(EventContent.fromEvent).toList());
   }
 
+  /// Returns places mapped to content models using the given [sort].
+  ///
+  /// Repository failures are propagated as `Result.error`.
   Future<Result<List<PlaceContent>>> getAllPlaces([
     ContentSort sort = ContentSort.byName,
   ]) async {
-    final list = <PlaceContent>[];
-
     final result = await _placeRepository.getAll(sort: sort);
 
-    switch (result) {
-      case Success<List<Place>>():
-        for (final place in result.value) {
-          list.add(PlaceContent.fromPlace(place));
-        }
-      case Error<List<Place>>():
-    }
-
-    return Result.success(list);
+    return result.map((places) => places.map(PlaceContent.fromPlace).toList());
   }
 
+  /// Returns one place by [id], mapped to a content model.
+  ///
+  /// Repository failures are propagated as `Result.error`.
   Future<Result<PlaceContent>> getById(int id) async {
-    final result = await _placeRepository.getById(id);
-
-    switch (result) {
-      case Success<Place>():
-        return Result.success(PlaceContent.fromPlace(result.value));
-      case Error<Place>():
-        return Result.error(result.error);
-    }
+    return (await _placeRepository.getById(id)).map(PlaceContent.fromPlace);
   }
 }

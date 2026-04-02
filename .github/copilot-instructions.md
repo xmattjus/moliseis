@@ -29,6 +29,7 @@ This project is a multi-platform application that allows users to explore the Mo
 - Use the `Provider` package for dependency injection and state management.
 - Use the `Repository` pattern for data access.
 - Use the `Command` and `Result` pattern for actions that can be executed asynchronously.
+- Use the `result-pattern` skill when changing `Result<T>` behavior or call sites.
 
 #### 4. Coding Standards
 
