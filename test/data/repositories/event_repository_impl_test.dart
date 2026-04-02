@@ -1,40 +1,49 @@
-// ignore_for_file: avoid_redundant_argument_values, override_on_non_overriding_member, always_declare_return_types, type_annotate_public_apis, use_setters_to_change_properties, unused_element_parameter
+// ignore_for_file: avoid_redundant_argument_values, always_declare_return_types, type_annotate_public_apis
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
-import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/city.dart';
 import 'package:moliseis/data/sources/event.dart';
 import 'package:moliseis/data/sources/event_supabase_table.dart';
-import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:objectbox/objectbox.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../support/objectbox_test_store.dart';
+
 void main() {
   group('EventRepositoryImpl - DateTime Overlap Logic', () {
-    late _FakeEventBox fakeEventBox;
-    late _FakeTalker fakeLogger;
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<Event> eventBox;
+    late Talker fakeLogger;
     late _FakeSupabase fakeSupabase;
     late _FakeEventSupabaseTable fakeSupabaseTable;
-    late _FakeObjectBox fakeObjectBox;
     late EventRepositoryImpl repository;
 
-    setUp(() {
-      fakeEventBox = _FakeEventBox();
-      fakeLogger = _FakeTalker();
+    setUp(() async {
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      eventBox = objectBoxEnvironment.store.box<Event>();
+      fakeLogger = Talker();
       fakeSupabase = _FakeSupabase();
       fakeSupabaseTable = _FakeEventSupabaseTable();
-      fakeObjectBox = _FakeObjectBox(fakeEventBox);
-
       repository = EventRepositoryImpl(
         logger: fakeLogger,
         supabaseI: fakeSupabase,
         supabaseTable: fakeSupabaseTable,
-        objectBoxI: fakeObjectBox,
+        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    Future<void> seedEvents(List<Event> events) async {
+      for (final event in events) {
+        eventBox.put(event);
+      }
+    }
 
     group('_getByDateRange with single-day events (endDate = null)', () {
       test(
@@ -50,7 +59,7 @@ void main() {
             endDate: null,
           );
 
-          fakeEventBox.setupResults([event]);
+          await seedEvents([event]);
 
           final result = await repository.getByDateRange(rangeStart, rangeEnd);
 
@@ -63,8 +72,6 @@ void main() {
       test(
         'excludes single-day event when start date is before range',
         () async {
-          fakeEventBox.setupResults([]);
-
           final result = await repository.getByDateRange(
             DateTime(2026, 3, 10),
             DateTime(2026, 3, 20),
@@ -79,8 +86,6 @@ void main() {
       test(
         'excludes single-day event when start date is after range',
         () async {
-          fakeEventBox.setupResults([]);
-
           final result = await repository.getByDateRange(
             DateTime(2026, 3, 10),
             DateTime(2026, 3, 20),
@@ -95,8 +100,6 @@ void main() {
       test(
         'prevents old single-day events from leaking into range queries',
         () async {
-          fakeEventBox.setupResults([]);
-
           final result = await repository.getByDateRange(
             DateTime(2026, 3, 10),
             DateTime(2026, 3, 20),
@@ -115,7 +118,7 @@ void main() {
           endDate: null,
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -134,7 +137,7 @@ void main() {
           endDate: null,
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -155,7 +158,7 @@ void main() {
           endDate: DateTime(2026, 3, 25),
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -174,7 +177,7 @@ void main() {
           endDate: DateTime(2026, 3, 15),
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -193,7 +196,7 @@ void main() {
           endDate: DateTime(2026, 3, 25),
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -212,7 +215,7 @@ void main() {
           endDate: DateTime(2026, 3, 31),
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -225,8 +228,6 @@ void main() {
       });
 
       test('excludes event before range', () async {
-        fakeEventBox.setupResults([]);
-
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
           DateTime(2026, 3, 20),
@@ -238,8 +239,6 @@ void main() {
       });
 
       test('excludes event after range', () async {
-        fakeEventBox.setupResults([]);
-
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
           DateTime(2026, 3, 20),
@@ -257,7 +256,7 @@ void main() {
           endDate: DateTime(2026, 3, 15),
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -276,7 +275,7 @@ void main() {
           endDate: DateTime(2026, 3, 20),
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -303,7 +302,7 @@ void main() {
           endDate: DateTime(2026, 3, 25),
         );
 
-        fakeEventBox.setupResults([singleDay, multiDay]);
+        await seedEvents([singleDay, multiDay]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -325,7 +324,7 @@ void main() {
           endDate: null,
         );
 
-        fakeEventBox.setupResults([event]);
+        await seedEvents([event]);
 
         final result = await repository.getByDate(DateTime(2026, 3, 15));
 
@@ -336,8 +335,8 @@ void main() {
     });
 
     group('Error handling', () {
-      test('returns error when query throws exception', () async {
-        fakeEventBox.setThrowException(true);
+      test('returns error when store is closed', () async {
+        objectBoxEnvironment.close();
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -346,17 +345,23 @@ void main() {
 
         expect(result, isA<Error<List<Event>>>());
       });
+
+      test('returns error when date-range query builder throws exception', () {
+        final result = Exception('Forced date-range failure');
+
+        expect(result, isA<Error<List<Event>>>());
+        final error = (result as Error<List<Event>>).error;
+        expect(error.toString(), contains('Forced date-range failure'));
+      });
     });
   });
 }
 
-// Helper: Create test Event
 Event _createEvent({
   required int remoteId,
   required DateTime startDate,
   required DateTime? endDate,
   String? name,
-  ContentCategory category = ContentCategory.unknown,
 }) {
   final now = DateTime.now();
   return Event(
@@ -371,123 +376,16 @@ Event _createEvent({
   );
 }
 
-// Fake: Box<Event>
-class _FakeEventBox implements Box<Event> {
-  List<Event> _results = [];
-  bool _shouldThrow = false;
-
-  void setupResults(List<Event> results) => _results = results;
-
-  void setThrowException(bool value) => _shouldThrow = value;
-
-  @override
-  QueryBuilder<Event> query([Condition<Event>? condition]) {
-    if (_shouldThrow) throw Exception('Database error');
-    return _FakeQueryBuilder(_results);
-  }
-
-  @override
-  noSuchMethod(Invocation invocation) => null;
-}
-
-// Fake: QueryBuilder<Event>
-class _FakeQueryBuilder implements QueryBuilder<Event> {
-  final List<Event> _results;
-
-  _FakeQueryBuilder(this._results);
-
-  @override
-  Query<Event> build() => _FakeQuery(_results);
-
+final class _FakeSupabase implements Supabase {
   @override
   noSuchMethod(Invocation invocation) {
-    // Handle order() by returning this for chaining
-    if (invocation.memberName == const Symbol('order')) {
-      return this;
-    }
-    return null;
+    throw UnsupportedError(
+      'Supabase should not be used in EventRepositoryImpl date-range tests.',
+    );
   }
 }
 
-// Fake: Query<Event>
-class _FakeQuery implements Query<Event> {
-  final List<Event> _results;
-  int _limit = 0;
-
-  _FakeQuery(this._results);
-
-  @override
-  Future<List<Event>> findAsync() async =>
-      _limit > 0 ? _results.take(_limit).toList() : _results.toList();
-
-  @override
-  List<Event> find() =>
-      _limit > 0 ? _results.take(_limit).toList() : _results.toList();
-
-  @override
-  Event? findFirst() => _results.isEmpty ? null : _results.first;
-
-  @override
-  Future<Event?> findFirstAsync() async => findFirst();
-
-  @override
-  int count() => _results.length;
-
-  @override
-  Future<int> countAsync() async => count();
-
-  @override
-  Query<Event> order(int property, {int flags = 0}) => this;
-
-  @override
-  set limit(int limit) => _limit = limit;
-
-  @override
-  void close() {}
-
-  @override
-  noSuchMethod(Invocation invocation) => null;
-}
-
-// Fake: Talker
-class _FakeTalker implements Talker {
-  @override
-  void info(dynamic message, [dynamic error, StackTrace? stackTrace]) {}
-
-  @override
-  void error(dynamic message, [dynamic error, StackTrace? stackTrace]) {}
-
-  @override
-  void warning(dynamic message, [dynamic error, StackTrace? stackTrace]) {}
-
-  @override
-  void critical(dynamic message, [dynamic error, StackTrace? stackTrace]) {}
-
-  @override
-  void debug(dynamic message, [dynamic error, StackTrace? stackTrace]) {}
-
-  @override
-  void logException(
-    Object exception, [
-    StackTrace? stackTrace,
-    dynamic customKey,
-  ]) {}
-
-  @override
-  Future<void> close() async {}
-
-  @override
-  void noSuchMethod(Invocation invocation) {}
-}
-
-// Fake: Supabase
-class _FakeSupabase implements Supabase {
-  @override
-  noSuchMethod(Invocation invocation) => null;
-}
-
-// Fake: EventSupabaseTable
-class _FakeEventSupabaseTable implements EventSupabaseTable {
+final class _FakeEventSupabaseTable implements EventSupabaseTable {
   @override
   String get tableName => 'events';
 
@@ -511,32 +409,4 @@ class _FakeEventSupabaseTable implements EventSupabaseTable {
 
   @override
   String get idPlace => 'place_id';
-}
-
-// Fake: ObjectBox
-class _FakeObjectBox implements ObjectBox {
-  @override
-  late final Store store;
-
-  _FakeObjectBox(_FakeEventBox eventBox) {
-    store = _FakeStore(eventBox);
-  }
-}
-
-// Fake: Store
-class _FakeStore implements Store {
-  final _FakeEventBox _eventBox;
-
-  _FakeStore(this._eventBox);
-
-  @override
-  Box<T> box<T>() {
-    if (T == Event) {
-      return _eventBox as Box<T>;
-    }
-    throw UnsupportedError('FakeStore only supports Event boxes');
-  }
-
-  @override
-  noSuchMethod(Invocation invocation) => null;
 }

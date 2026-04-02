@@ -13,13 +13,10 @@ abstract interface class ISettingsLocalDataSource {
 
 /// ObjectBox-backed implementation for app settings persistence.
 class SettingsLocalDataSource implements ISettingsLocalDataSource {
-  final ISettingsBox _settingsBox;
-
   SettingsLocalDataSource(Store store)
     : _settingsBox = _ObjectBoxSettingsBox(store.box<AppSettings>());
 
-  SettingsLocalDataSource.fromBox(ISettingsBox settingsBox)
-    : _settingsBox = settingsBox;
+  final ISettingsBox _settingsBox;
 
   @override
   Future<Result<AppSettings>> load() async {
