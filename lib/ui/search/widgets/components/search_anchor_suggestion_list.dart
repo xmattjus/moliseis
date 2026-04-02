@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_list_item.dart';
-import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
+import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
 
 class SearchAnchorSuggestionList extends StatelessWidget {
   final List<ContentBase> suggestions;
@@ -35,7 +35,7 @@ class SearchAnchorSuggestionList extends StatelessWidget {
               key: ValueKey('list-content:${content.remoteId}'),
               onPressed: onSuggestionPressed,
               verticalTrailing: content is EventContent
-                  ? EventContentStartDateTime(content)
+                  ? EventFormattedDateTime(event: content)
                   : null,
             );
           } else {

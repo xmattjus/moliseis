@@ -4,8 +4,8 @@ import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_list_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_event_card_grid_item.dart';
-import 'package:moliseis/ui/core/ui/content/event_content_start_date_time.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
+import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -50,7 +50,7 @@ class ContentSliverGrid extends StatelessWidget {
           onPressed: (ContentBase content) => onPressed(content),
           horizontalTrailing: FavouriteButton(content: content),
           verticalTrailing: content is EventContent
-              ? EventContentStartDateTime(content)
+              ? EventFormattedDateTime(event: content)
               : null,
         );
       }

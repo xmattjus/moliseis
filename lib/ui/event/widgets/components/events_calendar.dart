@@ -41,7 +41,7 @@ class _EventsCalendarState extends State<EventsCalendar> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final startDate = DateTime(now.year);
-    final endDate = DateTime(now.year, 12, 31, 23, 59, 59);
+    final endDate = DateTime(now.year, 12, 31);
     return ListenableBuilder(
       listenable: widget.viewModel.loadAll,
       builder: (context, child) {
