@@ -10,10 +10,11 @@ import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_surface.dart';
 import 'package:moliseis/ui/core/ui/skeletons/app_pulse_effect.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
-import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_default.dart';
-import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_post.dart';
-import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet_search.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_explore.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_post.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_search_results.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
+import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
@@ -30,6 +31,7 @@ class GeoMapBottomSheet extends StatefulWidget {
     this.searchQuery = '',
     required this.viewModel,
     required this.searchViewModel,
+    required this.weatherViewModel,
   });
 
   // final int contentId;
@@ -43,18 +45,13 @@ class GeoMapBottomSheet extends StatefulWidget {
   /// will take priority, e.g. the post of that [Place] will be shown in
   /// the bottom sheet.
   final LatLng currentCenter;
-
   final VoidCallback onCloseButtonPressed;
-
   final void Function(ContentBase content) onContentPressed;
-
   final void Function(double size) onVerticalDragUpdate;
-
   final String searchQuery;
-
   final GeoMapViewModel viewModel;
-
   final SearchViewModel searchViewModel;
+  final WeatherViewModel weatherViewModel;
 
   @override
   State<GeoMapBottomSheet> createState() => _GeoMapBottomSheetState();
@@ -141,11 +138,42 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
                       widget.viewModel.showEvent.completed ||
                   widget.content! is PlaceContent &&
                       widget.viewModel.showPlace.completed) {
-                return GeoMapBottomSheetPost(
-                  widget.viewModel.selectedContent!,
-                  onNearContentPressed: widget.onContentPressed,
+                return GeoMapModalPost(
+                  content: widget.viewModel.selectedContent!,
+                  onContentPressed: widget.onContentPressed,
                   onCloseButtonPressed: widget.onCloseButtonPressed,
                   viewModel: widget.viewModel,
+                  weatherViewModel: widget.weatherViewModel,
+                  scrollController: scrollController,
+                );
+              }
+
+              if (id > 0) {
+                return Skeletonizer(
+                  effect: AppPulseEffect(
+                    from: colorScheme.surfaceContainerHigh,
+                    to: colorScheme.surfaceContainerLow,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 18.0,
+                      horizontal: 16.0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          'Esplora Placeholder: nome di un luogo',
+                          style: AppTextStyles.title(context),
+                        ),
+                        const SizedBox(height: 4.0),
+                        Text(
+                          'Placeholder: nome di un paese',
+                          style: AppTextStyles.subtitle(context),
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               }
 
@@ -177,18 +205,22 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
             },
           );
         } else if (widget.searchQuery.isNotEmpty) {
-          child = GeoMapBottomSheetSearch(
+          child = GeoMapModalSearchResults(
             widget.searchQuery,
             onResultPressed: widget.onContentPressed,
             onBackPressed: widget.onCloseButtonPressed,
             viewModel: widget.searchViewModel,
           );
         } else {
-          child = GeoMapBottomSheetDefault(
+          child = GeoMapModalExplore(
             currentMapCenter: widget.currentCenter,
             onNearContentPressed: widget.onContentPressed,
             viewModel: widget.viewModel,
           );
+        }
+
+        if (id > 0 && widget.searchQuery.isEmpty) {
+          return AppBottomSheetSurface(child: child);
         }
 
         return AppBottomSheetSurface(

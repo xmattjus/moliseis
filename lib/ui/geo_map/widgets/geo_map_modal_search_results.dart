@@ -5,8 +5,9 @@ import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 // import 'package:moliseis/ui/search/widgets/search_result_related_sliver_list.dart';
 import 'package:moliseis/ui/search/widgets/search_result_sliver_list.dart';
 
-class GeoMapBottomSheetSearch extends StatefulWidget {
-  const GeoMapBottomSheetSearch(
+/// Shows search results inside the geo-map bottom sheet.
+class GeoMapModalSearchResults extends StatefulWidget {
+  const GeoMapModalSearchResults(
     this.query, {
     required this.onResultPressed,
     required this.onBackPressed,
@@ -19,11 +20,11 @@ class GeoMapBottomSheetSearch extends StatefulWidget {
   final SearchViewModel viewModel;
 
   @override
-  State<GeoMapBottomSheetSearch> createState() =>
-      GeoMapBottomSheetSearchState();
+  State<GeoMapModalSearchResults> createState() =>
+      GeoMapModalSearchResultsState();
 }
 
-class GeoMapBottomSheetSearchState extends State<GeoMapBottomSheetSearch> {
+class GeoMapModalSearchResultsState extends State<GeoMapModalSearchResults> {
   @override
   Widget build(BuildContext context) {
     return SliverMainAxisGroup(

@@ -16,6 +16,7 @@ import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
+import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/utils/debounceable.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
@@ -25,11 +26,13 @@ class GeoMapScreen extends StatefulWidget {
     required this.contentExtra,
     required this.viewModel,
     required this.searchViewModel,
+    required this.weatherViewModel,
   });
 
   final ContentBase? contentExtra;
   final GeoMapViewModel viewModel;
   final SearchViewModel searchViewModel;
+  final WeatherViewModel weatherViewModel;
 
   @override
   State<GeoMapScreen> createState() => _GeoMapScreenState();
@@ -248,6 +251,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
             searchQuery: _searchQuery,
             viewModel: widget.viewModel,
             searchViewModel: widget.searchViewModel,
+            weatherViewModel: widget.weatherViewModel,
           ),
         ),
       ),

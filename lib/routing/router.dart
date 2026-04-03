@@ -2,6 +2,7 @@ import 'package:animated_stateful_shell_route/animated_stateful_shell_route.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map/geo_map_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';
@@ -23,6 +24,9 @@ import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
 import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
 import 'package:moliseis/ui/user_contribution/widgets/user_contribution_screen.dart';
+import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
+import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
+import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -152,7 +156,9 @@ final appRouter = GoRouter(
                   name: RouteNames.userContribution,
                   builder: (context, _) {
                     final viewModel = UserContributionViewModel(
-                      userContributionRepository: context.read(),
+                      logger: context.read<Talker>(),
+                      userContributionRepository: context
+                          .read<UserContributionRepository>(),
                     );
                     return UserContributionScreen(viewModel: viewModel);
                   },
@@ -218,18 +224,15 @@ final appRouter = GoRouter(
               path: RoutePaths.geoMap,
               name: RouteNames.geoMap,
               builder: (context, state) {
-                /*
-                final mapState =
-                    state.extra as GeoMapState? ?? const GeoMapState(); */
                 final contentExtra = state.extra as ContentBase?;
 
                 final viewModel = GeoMapViewModel(
                   geoMapUseCase: GeoMapUseCase(
                     eventRepository: context.read(),
-                    geoMapRepository: context.read(),
                     placeRepository: context.read(),
                   ),
                 );
+
                 final searchViewModel = SearchViewModel(
                   eventRepository: context.read(),
                   exploreGetByIdUseCase: ExploreUseCase(
@@ -239,11 +242,18 @@ final appRouter = GoRouter(
                   searchRepository: context.read(),
                 );
 
+                final weatherViewModel = WeatherViewModel(
+                  weatherApiClient: context.read(),
+                  weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
+                  weatherCodeIconMapper: const WmoWeatherIconMapper(),
+                );
+
                 return GeoMapScreen(
                   // mapState: mapState,
                   contentExtra: contentExtra,
                   viewModel: viewModel,
                   searchViewModel: searchViewModel,
+                  weatherViewModel: weatherViewModel,
                 );
               },
             ),

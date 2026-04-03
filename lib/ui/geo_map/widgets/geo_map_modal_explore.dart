@@ -5,8 +5,9 @@ import 'package:moliseis/ui/core/ui/app_bottom_sheet_title.dart';
 import 'package:moliseis/ui/core/ui/content/nearby_content_horizontal_list.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 
-class GeoMapBottomSheetDefault extends StatelessWidget {
-  const GeoMapBottomSheetDefault({
+/// Shows the default geo-map explore view inside the bottom sheet.
+class GeoMapModalExplore extends StatelessWidget {
+  const GeoMapModalExplore({
     required this.currentMapCenter,
     required this.onNearContentPressed,
     required this.viewModel,

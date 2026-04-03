@@ -4,7 +4,7 @@ import 'dart:io' show File;
 import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart' show DateFormat;
+import 'package:intl/intl.dart' as intl;
 import 'package:moliseis/data/sources/user_contribution.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
@@ -168,10 +168,10 @@ class UserContributionViewModel extends ChangeNotifier {
   }
 
   String formatDate(Locale locale, DateTime date) =>
-      DateFormat.yMd(locale.languageCode).format(date);
+      intl.DateFormat.yMd(locale.languageCode).format(date);
 
   String formatTime(Locale locale, DateTime date) =>
-      DateFormat.Hm(locale.languageCode).format(date);
+      intl.DateFormat.jm(locale.languageCode).format(date);
 
   bool validateEmail(String? text) => StringValidator.isValidEmail(text);
 }
