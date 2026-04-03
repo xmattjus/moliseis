@@ -117,7 +117,7 @@ Future<void> _main() async {
         child: const MoliseIsApp(),
       );
 
-      if (settingsRepository.crashReporting) {
+      if (settingsRepository.crashReporting && !kDebugMode) {
         _logger.info('Crash reporting is enabled. Sentry will capture errors.');
 
         runApp(SentryWidget(child: app));
