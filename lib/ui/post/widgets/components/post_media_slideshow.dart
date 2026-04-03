@@ -34,6 +34,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
   static const _bottomChromeOffset = -4.0;
   static const _pageIndicatorBottomOffset = 8.0;
   static const _pauseButtonOffset = 16.0;
+  static const _pauseButtonAdditionalBottomSpacing = 24.0;
 
   late final AnimationController _animationController;
 
@@ -238,7 +239,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
         _bottomChromeHeight +
         _pageIndicatorBottomOffset +
         _pauseButtonOffset +
-        16.0,
+        _pauseButtonAdditionalBottomSpacing,
     right: _pauseButtonOffset,
     child: AnimatedBuilder(
       animation: Listenable.merge([

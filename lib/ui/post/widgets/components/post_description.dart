@@ -27,13 +27,9 @@ MarkdownConfig _appMarkdownConfig(BuildContext context) =>
     );
 
 class PostDescription extends StatefulWidget {
-  const PostDescription({super.key, required this.content}) : isSliver = false;
-
-  const PostDescription.sliver({super.key, required this.content})
-    : isSliver = true;
+  const PostDescription({super.key, required this.content});
 
   final ContentBase content;
-  final bool isSliver;
 
   @override
   State<PostDescription> createState() => _PostDescriptionState();
@@ -70,9 +66,7 @@ class _PostDescriptionState extends State<PostDescription> {
   @override
   Widget build(BuildContext context) {
     if (_markdownWidgets.isEmpty) {
-      return widget.isSliver
-          ? const SliverToBoxAdapter(child: EmptyBox())
-          : const EmptyBox();
+      return const SliverToBoxAdapter(child: EmptyBox());
     }
 
     final children = <Widget>[
@@ -80,12 +74,6 @@ class _PostDescriptionState extends State<PostDescription> {
       ..._markdownWidgets,
     ];
 
-    return widget.isSliver
-        ? SliverList.list(children: children)
-        : ListView(
-            physics: const NeverScrollableScrollPhysics(),
-            shrinkWrap: true,
-            children: children,
-          );
+    return SliverList.list(children: children);
   }
 }

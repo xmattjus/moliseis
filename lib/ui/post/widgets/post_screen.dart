@@ -4,14 +4,22 @@ import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
+import 'package:moliseis/ui/core/utils/slideshow_visibility_notifier.dart';
 import 'package:moliseis/ui/post/view_models/post_view_model.dart';
-import 'package:moliseis/ui/post/widgets/post_inner_screen.dart';
+import 'package:moliseis/ui/post/widgets/components/post_section_action_buttons.dart';
+import 'package:moliseis/ui/post/widgets/components/post_section_description.dart';
+import 'package:moliseis/ui/post/widgets/components/post_section_header.dart';
+import 'package:moliseis/ui/post/widgets/components/post_section_map_preview.dart';
+import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.dart';
+import 'package:moliseis/ui/post/widgets/components/post_section_slideshow.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
+
+const double _mediaSlideshowHeight = 450.0;
 
 class PostScreen extends StatefulWidget {
   const PostScreen({
@@ -32,6 +40,25 @@ class PostScreen extends StatefulWidget {
 class _PostScreenState extends State<PostScreen> {
   String _currentUri = '';
 
+  final ScrollController _scrollController = ScrollController();
+  late final SlideshowVisibilityNotifier _slideshowVisibilityNotifier =
+      SlideshowVisibilityNotifier(threshold: _mediaSlideshowHeight * 0.6);
+
+  @override
+  void dispose() {
+    _slideshowVisibilityNotifier.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  bool _onScrollNotification(ScrollNotification notification) {
+    _slideshowVisibilityNotifier.updateVisibilityFromNotification(notification);
+
+    // Returning false allows the notification to continue
+    // bubbling up to ancestor listeners.
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     _currentUri = GoRouterState.of(context).fullPath.toString();
@@ -51,34 +78,52 @@ class _PostScreenState extends State<PostScreen> {
           builder: (context, child) {
             if (widget.viewModel.loadEvent.completed ||
                 widget.viewModel.loadPlace.completed) {
-              final content = widget.viewModel.content is EventContent
-                  ? widget.viewModel.content as EventContent
-                  : widget.viewModel.content as PlaceContent;
+              final content = widget.viewModel.content;
 
-              return PostInnerScreen(
-                content: content,
-                onContentPressed: (content) => _buildPostRoute(content),
-                onCategoryPressed: () {
-                  _buildCategoriesRoute(content.category);
-                },
-                onMapPressed: () {
-                  // Sets a [UniqueKey] so that go_router
-                  // can notify [mapState] changes to the next
-                  // route.
-                  //
-                  // Removing the [key] query parameter will
-                  // prevent state changes for the next route
-                  // if it is already present in the
-                  // navigation stack.
-                  context.goNamed(
-                    RouteNames.geoMap,
-                    queryParameters: {"key": UniqueKey().toString()},
-                    extra: content,
-                  );
-                },
-                loadNearContent: widget.viewModel.loadNearContent,
-                nearContent: widget.viewModel.nearContent,
-                weatherViewModel: widget.weatherViewModel,
+              return NotificationListener<ScrollNotification>(
+                onNotification: _onScrollNotification,
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: <Widget>[
+                    PostSectionSlideshow(
+                      height: _mediaSlideshowHeight,
+                      media: content.media,
+                      visibilityNotifier: _slideshowVisibilityNotifier.notifier,
+                    ),
+                    PostSectionHeader(
+                      content: content,
+                      weatherViewModel: widget.weatherViewModel,
+                    ),
+                    PostSectionActionButtons(
+                      content: content,
+                      onCategoryPressed: () =>
+                          _buildCategoriesRoute(content.category),
+                    ),
+                    PostSectionDescription(content: content),
+                    PostSectionMapPreview(
+                      content: content,
+                      onMapPressed: () {
+                        // A unique query parameter forces go_router to
+                        // treat this as a fresh navigation update even
+                        // when the destination route is already in stack.
+                        context.goNamed(
+                          RouteNames.geoMap,
+                          queryParameters: {"key": UniqueKey().toString()},
+                          extra: content,
+                        );
+                      },
+                    ),
+                    PostSectionNearbyContent(
+                      coordinates: content.coordinates,
+                      onContentPressed: (content) => _buildPostRoute(content),
+                      loadNearContentCommand: widget.viewModel.loadNearContent,
+                      nearContent: widget.viewModel.nearContent,
+                    ),
+                    SliverPadding(
+                      padding: EdgeInsets.only(bottom: context.bottomPadding),
+                    ),
+                  ],
+                ),
               );
             }
 
