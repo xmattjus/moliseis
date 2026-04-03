@@ -9,7 +9,8 @@ class CategoryButton extends StatelessWidget {
     required this.contentCategory,
   });
 
-  final void Function() onPressed;
+  /// Callback when button is pressed, or null to disable button.
+  final void Function()? onPressed;
   final ContentCategory contentCategory;
 
   @override
