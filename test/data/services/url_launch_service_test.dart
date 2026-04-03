@@ -127,7 +127,7 @@ void main() {
 }
 
 final class _FakeExternalUrlService extends ExternalUrlService {
-  _FakeExternalUrlService({required Talker logger}) : super(logger: logger);
+  _FakeExternalUrlService({required super.logger});
 
   final List<String> launchedUrls = <String>[];
 
@@ -142,9 +142,9 @@ final class _FakeExternalUrlService extends ExternalUrlService {
 
 final class _FakeAppInfoService extends AppInfoService {
   _FakeAppInfoService({
-    required Talker logger,
-    required ExternalUrlService externalUrlService,
-  }) : super(logger: logger, externalUrlService: externalUrlService);
+    required super.logger,
+    required super.externalUrlService,
+  });
 
   int privacyPolicyCalls = 0;
 
@@ -162,9 +162,9 @@ final class _FakeAppInfoService extends AppInfoService {
 
 final class _FakeMapUrlService extends MapUrlService {
   _FakeMapUrlService({
-    required Talker logger,
-    required ExternalUrlService externalUrlService,
-  }) : super(logger: logger, externalUrlService: externalUrlService);
+    required super.logger,
+    required super.externalUrlService,
+  });
 
   int mapTilerCalls = 0;
 
