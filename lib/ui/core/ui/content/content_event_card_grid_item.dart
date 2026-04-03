@@ -20,7 +20,6 @@ class ContentEventCardGridItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final localizations = MaterialLocalizations.of(context);
     return ContentBaseCardGridItem(
       event,
       width: kGridViewCardWidth,
@@ -30,17 +29,16 @@ class ContentEventCardGridItem extends StatelessWidget {
         spacing: 4.0,
         runSpacing: 4.0,
         children: <Widget>[
-          Tooltip(
-            message:
-                'Data di inizio evento '
-                '${localizations.formatMediumDate(event.startDate)}',
-            child: BlurredBox(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10.0,
-                  horizontal: 8.0,
-                ),
-                child: EventFormattedDateTime(event: event),
+          BlurredBox(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                vertical: 10.0,
+                horizontal: 8.0,
+              ),
+              child: EventFormattedDateTime(
+                event: event,
+                iconColor: Colors.white,
+                textColor: Colors.white,
               ),
             ),
           ),
