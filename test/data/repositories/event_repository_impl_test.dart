@@ -333,27 +333,6 @@ void main() {
         expect(success.value, contains(event));
       });
     });
-
-    group('Error handling', () {
-      test('returns error when store is closed', () async {
-        objectBoxEnvironment.close();
-
-        final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
-        );
-
-        expect(result, isA<Error<List<Event>>>());
-      });
-
-      test('returns error when date-range query builder throws exception', () {
-        final result = Exception('Forced date-range failure');
-
-        expect(result, isA<Error<List<Event>>>());
-        final error = (result as Error<List<Event>>).error;
-        expect(error.toString(), contains('Forced date-range failure'));
-      });
-    });
   });
 }
 

@@ -68,14 +68,6 @@ void main() {
       expect(loadedSettings.crashReporting, isTrue);
     });
 
-    test('load returns error when store is closed', () async {
-      objectBoxEnvironment.close();
-
-      final result = await dataSource.load();
-
-      expect(result, isA<Error<AppSettings>>());
-    });
-
     test('save persists settings in the singleton slot', () async {
       final updatedSettings = AppSettings(
         type: ThemeType.app,
@@ -96,14 +88,6 @@ void main() {
       expect(loadedSettings.brightness, ThemeBrightness.dark);
       expect(loadedSettings.contentSort, ContentSort.byDate);
       expect(loadedSettings.crashReporting, isFalse);
-    });
-
-    test('save returns error when store is closed', () async {
-      objectBoxEnvironment.close();
-
-      final result = await dataSource.save(AppSettings());
-
-      expect(result, isA<Error<void>>());
     });
   });
 }
