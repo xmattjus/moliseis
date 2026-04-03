@@ -2,20 +2,53 @@ import 'package:moliseis/data/services/app_info_service.dart';
 import 'package:moliseis/data/services/external_url_service.dart';
 import 'package:moliseis/data/services/map_url_service.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
-/// Unified service that provides a simplified interface for all URL launching
-/// operations. This service combines functionality from specialized services
-/// to provide a single entry point for URL-related operations.
+/// Unified service for launching URLs and opening app information pages.
+///
+/// A [Talker] logger is required so the composed services share the same
+/// logging pipeline. Optional overrides are available for tests.
 class UrlLaunchService {
-  UrlLaunchService() {
-    _externalUrlService = ExternalUrlService();
-    _appInfoService = AppInfoService(externalUrlService: _externalUrlService);
-    _mapUrlService = MapUrlService(externalUrlService: _externalUrlService);
+  /// Creates a URL launching facade.
+  ///
+  /// Unspecified services are created with the provided [logger].
+  factory UrlLaunchService({
+    required Talker logger,
+    ExternalUrlService? externalUrlService,
+    AppInfoService? appInfoService,
+    MapUrlService? mapUrlService,
+  }) {
+    final resolvedExternalUrlService =
+        externalUrlService ?? ExternalUrlService(logger: logger);
+
+    return UrlLaunchService._(
+      externalUrlService: resolvedExternalUrlService,
+      appInfoService:
+          appInfoService ??
+          AppInfoService(
+            logger: logger,
+            externalUrlService: resolvedExternalUrlService,
+          ),
+      mapUrlService:
+          mapUrlService ??
+          MapUrlService(
+            logger: logger,
+            externalUrlService: resolvedExternalUrlService,
+          ),
+    );
   }
 
-  late final ExternalUrlService _externalUrlService;
-  late final AppInfoService _appInfoService;
-  late final MapUrlService _mapUrlService;
+  UrlLaunchService._({
+    required ExternalUrlService externalUrlService,
+    required AppInfoService appInfoService,
+    required MapUrlService mapUrlService,
+  }) : _externalUrlService = externalUrlService,
+       _appInfoService = appInfoService,
+       _mapUrlService = mapUrlService;
+
+  final ExternalUrlService _externalUrlService;
+  final AppInfoService _appInfoService;
+  final MapUrlService _mapUrlService;
 
   /// Launches a generic URL.
   ///
