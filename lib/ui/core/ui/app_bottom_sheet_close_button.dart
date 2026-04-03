@@ -21,29 +21,16 @@ class AppBottomSheetCloseButton extends StatelessWidget {
       return const EmptyBox();
     }
 
-    return Tooltip(
-      message: tooltipMessage,
-      child: RawMaterialButton(
-        onPressed: onClose,
-        elevation: 0,
-        focusElevation: 0,
-        hoverElevation: 0,
-        highlightElevation: 0,
-        constraints: const BoxConstraints.expand(width: 32, height: 32),
-        shape: RoundedRectangleBorder(
-          borderRadius: context.appShapes.circular.cornerFull,
-          side: BorderSide(
-            color: context.appColors.modalBorderColor,
-            width: context.appSizes.borderSide.medium,
-          ),
-        ),
-        fillColor: context.appEffects.containerColor(
-          context.colorScheme.primary,
-          context.colorScheme.surfaceContainer,
-        ),
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        child: Icon(icon, size: 16),
+    return IconButton(
+      iconSize: 16.0,
+      visualDensity: VisualDensity.compact,
+      onPressed: onClose,
+      tooltip: tooltipMessage,
+      color: context.colorScheme.onSecondaryContainer,
+      style: IconButton.styleFrom(
+        backgroundColor: context.colorScheme.surfaceContainerHighest,
       ),
+      icon: Icon(icon),
     );
   }
 }
