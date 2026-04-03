@@ -85,11 +85,13 @@ class _PostScreenState extends State<PostScreen> {
                 child: CustomScrollView(
                   controller: _scrollController,
                   slivers: <Widget>[
-                    PostSectionSlideshow(
-                      height: _mediaSlideshowHeight,
-                      media: content.media,
-                      visibilityNotifier: _slideshowVisibilityNotifier.notifier,
-                    ),
+                    if (content.media.isNotEmpty)
+                      PostSectionSlideshow(
+                        height: _mediaSlideshowHeight,
+                        media: content.media,
+                        visibilityNotifier:
+                            _slideshowVisibilityNotifier.notifier,
+                      ),
                     PostSectionHeader(
                       content: content,
                       weatherViewModel: widget.weatherViewModel,
