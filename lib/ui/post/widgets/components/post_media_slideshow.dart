@@ -16,6 +16,7 @@ class PostMediaSlideshow extends StatefulWidget {
     required this.height,
     required this.media,
     required this.visibilityNotifier,
+    this.chromeColor,
   });
 
   final double height;
@@ -23,6 +24,9 @@ class PostMediaSlideshow extends StatefulWidget {
 
   /// A [ValueNotifier] that indicates whether the slideshow is visible or not.
   final ValueNotifier<bool> visibilityNotifier;
+
+  /// The color the slideshow bottom chrome will have.
+  final Color? chromeColor;
 
   @override
   State<PostMediaSlideshow> createState() => _PostMediaSlideshowState();
@@ -217,7 +221,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
               topLeft: context.appShapes.circular.cornerExtraLarge.topLeft,
               topRight: context.appShapes.circular.cornerExtraLarge.topRight,
             ),
-            color: context.colorScheme.surface,
+            color: widget.chromeColor ?? context.colorScheme.surface,
           ),
         ),
       );

@@ -75,6 +75,7 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
               media: widget.content.media,
               visibilityNotifier: _slideshowVisibilityNotifier.notifier,
               overlayBuilder: (context) => _buildTopControls(context),
+              chromeColor: context.colorScheme.surfaceContainerLow,
             )
           else
             SliverToBoxAdapter(child: _buildTopControls(context)),

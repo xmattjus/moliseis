@@ -15,6 +15,7 @@ class PostSectionSlideshow extends StatelessWidget {
     required this.media,
     required this.visibilityNotifier,
     this.overlayBuilder,
+    this.chromeColor,
   });
 
   final double height;
@@ -28,6 +29,9 @@ class PostSectionSlideshow extends StatelessWidget {
   /// overlay widgets positioned on top. Used for modal-specific UI.
   final Widget Function(BuildContext context)? overlayBuilder;
 
+  /// The color the slideshow bottom chrome will have.
+  final Color? chromeColor;
+
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
@@ -38,6 +42,7 @@ class PostSectionSlideshow extends StatelessWidget {
             height: height,
             media: media,
             visibilityNotifier: visibilityNotifier,
+            chromeColor: chromeColor,
           );
 
           // If overlay is provided (e.g., for modal), stack it on top.
