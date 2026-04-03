@@ -46,9 +46,11 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
     return dateSymbols.format(date);
   }
 
-  String _localizeTimeOfDay(DateTime date) {
+  String _localizeTimeOfDay(DateTime date, bool alwaysUse24HourFormat) {
     // intl.DateFormat.jm localizes the time format based on the locale (e.g., 5:08 PM or 17:08).
-    final timeFormat = intl.DateFormat.jm(_currentLocale.toLanguageTag());
+    final timeFormat = alwaysUse24HourFormat
+        ? intl.DateFormat.Hm(_currentLocale.toLanguageTag())
+        : intl.DateFormat.jm(_currentLocale.toLanguageTag());
     return timeFormat.format(date);
   }
 
@@ -110,10 +112,13 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
       date = "${startDate.day} $startMonth";
     }
 
-    String time = _localizeTimeOfDay(startDate);
+    final alwaysUse24HourFormat =
+        MediaQuery.maybeAlwaysUse24HourFormatOf(context) ?? false;
+
+    String time = _localizeTimeOfDay(startDate, alwaysUse24HourFormat);
 
     if (isMultipleHours) {
-      time += " - ${_localizeTimeOfDay(endDate)}";
+      time += " - ${_localizeTimeOfDay(endDate, alwaysUse24HourFormat)}";
     }
 
     return Flex(
