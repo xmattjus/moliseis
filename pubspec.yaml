@@ -3,7 +3,7 @@ description: "La prima app multipiattaforma per il turismo in Molise."
 
 publish_to: 'none'
 
-version: 2.1.0+100
+version: 2.2.0+101
 
 environment:
   sdk: ^3.10.8
@@ -70,7 +70,6 @@ dependencies:
   # Q
   # R
   # S
-  result_dart: ^2.2.0
   sentry: ^9.15.0
   sentry_flutter: ^9.15.0
   sentry_supabase: ^9.15.0
