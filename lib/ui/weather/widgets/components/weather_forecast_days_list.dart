@@ -42,6 +42,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
   @override
   Widget build(BuildContext context) {
     final appShapes = context.appShapes;
+    const iconMapper = WmoWeatherIconMapper();
 
     final viewModel = widget.viewModel;
 
@@ -64,7 +65,12 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
               listenable: viewModel.loadDailyForecast,
               builder: (context, child) {
                 if (viewModel.loadDailyForecast.completed) {
-                  final dailyData = viewModel.getDailyForecastData!;
+                  final dailyData = viewModel.getDailyForecastData;
+
+                  if (dailyData == null) {
+                    return const SizedBox();
+                  }
+
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -116,7 +122,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                                   ],
                                 ),
                                 Icon(
-                                  const WmoWeatherIconMapper().iconForCode(
+                                  iconMapper.iconForCode(
                                     dailyData.weatherCode[index],
                                     true,
                                   ),

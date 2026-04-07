@@ -15,9 +15,9 @@ class WeatherViewModel extends ChangeNotifier {
   final WmoWeatherDescriptionMapper _weatherDescriptionMapper;
   final WmoWeatherIconMapper _weatherCodeIconMapper;
 
-  late Command1<void, LatLng> loadCurrentForecast;
-  late Command1<void, LatLng> loadHourlyForecast;
-  late Command1<void, LatLng> loadDailyForecast;
+  late Command1<CurrentWeatherForecastData, LatLng> loadCurrentForecast;
+  late Command1<HourlyWeatherForecastData, LatLng> loadHourlyForecast;
+  late Command1<DailyWeatherForecastData, LatLng> loadDailyForecast;
 
   WeatherViewModel({
     required CachedWeatherApiClient weatherApiClient,
@@ -44,11 +44,19 @@ class WeatherViewModel extends ChangeNotifier {
   String get currentWeatherDescription => _currentWeatherDescription;
   bool get isDay => _isDay;
 
+  /// The loaded hourly forecast data, or `null` if no successful load has
+  /// completed yet (i.e. before [loadHourlyForecast] succeeds).
   HourlyWeatherForecastData? get getHourlyForecastData => _hourlyForecastData;
 
+  /// The loaded daily forecast data, or `null` if no successful load has
+  /// completed yet (i.e. before [loadDailyForecast] succeeds).
   DailyWeatherForecastData? get getDailyForecastData => _dailyForecastData;
 
-  Future<Result<void>> _loadCurrentWeatherForecast(LatLng coordinates) async {
+  /// Fetches current weather for [coordinates] and updates the current
+  /// conditions state. Returns the raw [Result] so callers can surface errors.
+  Future<Result<CurrentWeatherForecastData>> _loadCurrentWeatherForecast(
+    LatLng coordinates,
+  ) async {
     final result = await _weatherApiClient.getCurrentWeatherByCoordinates(
       coordinates.latitude,
       coordinates.longitude,
@@ -66,10 +74,15 @@ class WeatherViewModel extends ChangeNotifier {
       _isDay = result.value.isDay == 1;
     }
 
-    return const Result.success(null);
+    return result;
   }
 
-  Future<Result<void>> _loadHourlyWeatherForecast(LatLng coordinates) async {
+  /// Fetches hourly forecast for [coordinates] and stores it in
+  /// [getHourlyForecastData]. Returns the raw [Result] so callers can surface
+  /// errors.
+  Future<Result<HourlyWeatherForecastData>> _loadHourlyWeatherForecast(
+    LatLng coordinates,
+  ) async {
     final result = await _weatherApiClient.getHourlyWeatherByCoordinates(
       coordinates.latitude,
       coordinates.longitude,
@@ -79,10 +92,15 @@ class WeatherViewModel extends ChangeNotifier {
       _hourlyForecastData = result.value;
     }
 
-    return const Result.success(null);
+    return result;
   }
 
-  Future<Result<void>> _loadDailyWeatherForecast(LatLng coordinates) async {
+  /// Fetches daily forecast for [coordinates] and stores it in
+  /// [getDailyForecastData]. Returns the raw [Result] so callers can surface
+  /// errors.
+  Future<Result<DailyWeatherForecastData>> _loadDailyWeatherForecast(
+    LatLng coordinates,
+  ) async {
     final result = await _weatherApiClient.getDailyWeatherByCoordinates(
       coordinates.latitude,
       coordinates.longitude,
@@ -92,6 +110,6 @@ class WeatherViewModel extends ChangeNotifier {
       _dailyForecastData = result.value;
     }
 
-    return const Result.success(null);
+    return result;
   }
 }

@@ -3,18 +3,26 @@ import 'package:flutter/scheduler.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 class WeatherForecastHourlyList extends StatefulWidget {
-  final Color borderColor;
-  final Color backgroundColor;
-  final WeatherViewModel viewModel;
-
   const WeatherForecastHourlyList({
     super.key,
     required this.borderColor,
     required this.backgroundColor,
     required this.viewModel,
+    this.currentHourOverride,
   });
+
+  final Color borderColor;
+  final Color backgroundColor;
+  final WeatherViewModel viewModel;
+
+  /// Overrides the current hour used to highlight the active slot.
+  ///
+  /// Only set this in tests to make the widget deterministic.
+  @visibleForTesting
+  final int? currentHourOverride;
 
   @override
   State<WeatherForecastHourlyList> createState() =>
@@ -22,22 +30,44 @@ class WeatherForecastHourlyList extends StatefulWidget {
 }
 
 class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
-  final _hourlyScrollController = ScrollController();
+  final _listController = ListController();
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _listController.dispose();
+    super.dispose();
+  }
+
+  // Scrolls the hourly forecast list to the current hour.
+  // Guard against the case where the ListView is not visible yet (e.g. still
+  // loading), which means no scroll view is attached to the controller.
+  void _animateToItem(int index) {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    _listController.animateToItem(
+      index: index,
+      scrollController: _scrollController,
+      alignment: 0.0,
+      // You can provide duration and curve depending on the estimated
+      // distance between currentPosition and the target item position.
+      duration: (estimatedDistance) => Durations.medium3,
+      curve: (estimatedDistance) => Curves.easeInOut,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final appEffects = context.appEffects;
     final appSizes = context.appSizes;
     final appShapes = context.appShapes;
+    const iconMapper = WmoWeatherIconMapper();
 
     final viewModel = widget.viewModel;
-    final nowHour = DateTime.now().hour;
-
-    // Schedules the hourly forecast list scroll to the current hour after
-    // the first frame is rendered.
-    SchedulerBinding.instance.addPostFrameCallback(
-      (_) => _scrollHourlyForecastToNow(nowHour),
-    );
+    final currentHour = widget.currentHourOverride ?? DateTime.now().hour;
 
     return ClipRRect(
       borderRadius: appShapes.circular.cornerExtraLarge,
@@ -65,16 +95,31 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
               listenable: viewModel.loadHourlyForecast,
               builder: (_, _) {
                 if (viewModel.loadHourlyForecast.completed) {
+                  final hourlyData = viewModel.getHourlyForecastData;
+
+                  if (hourlyData == null) {
+                    return const SizedBox();
+                  }
+
+                  // Shows at most 24 hours of the hourly weather forecast data.
+                  final itemCount = hourlyData.time.take(24).length;
+
+                  // Schedules the hourly forecast list scroll to the current hour
+                  // after the first frame has been rendered.
+                  SchedulerBinding.instance.addPostFrameCallback((_) {
+                    _animateToItem(currentHour);
+                  });
+
                   return ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 140.0),
-                    child: ListView.builder(
+                    constraints: const BoxConstraints(maxHeight: 160.0),
+                    child: SuperListView.builder(
                       scrollDirection: Axis.horizontal,
-                      controller: _hourlyScrollController,
+                      listController: _listController,
+                      controller: _scrollController,
                       padding: const EdgeInsets.all(8.0),
                       itemBuilder: (context, index) {
-                        final hourlyData = viewModel.getHourlyForecastData!;
                         final hour = () {
-                          if (index == nowHour) {
+                          if (index == currentHour) {
                             return 'Adesso';
                           } else if (index < 10) {
                             return '0$index';
@@ -99,13 +144,13 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                                 softWrap: false,
                               ),
                               icon: Icon(
-                                const WmoWeatherIconMapper().iconForCode(
+                                iconMapper.iconForCode(
                                   hourlyData.weatherCode[index],
                                   hourlyData.isDay?[index] == 1,
                                 ),
                               ),
                               label: Text(
-                                index == nowHour
+                                index == currentHour
                                     ? widget.viewModel.currentTemperatureCelsius
                                     : '${hourlyData.temperature2m[index].toStringAsFixed(1)}°',
                                 style: Theme.of(context).textTheme.bodyMedium,
@@ -113,7 +158,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                             ),
                           );
 
-                          if (index == nowHour) {
+                          if (index == currentHour) {
                             return DecoratedBox(
                               decoration: BoxDecoration(
                                 color: appEffects.containerColor2(
@@ -133,7 +178,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                           return child;
                         }();
                       },
-                      itemCount: 24,
+                      itemCount: itemCount,
                     ),
                   );
                 }
@@ -149,13 +194,6 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
       ),
     );
   }
-
-  // Scrolls the hourly forecast list to the current hour.
-  void _scrollHourlyForecastToNow(int now) => _hourlyScrollController.animateTo(
-    now * 68.0,
-    duration: Durations.medium3,
-    curve: Curves.easeInOut,
-  );
 }
 
 class _WeatherModalHourlyListItem extends StatelessWidget {
