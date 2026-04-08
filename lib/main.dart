@@ -142,6 +142,7 @@ class MoliseIsApp extends StatelessWidget {
     return Consumer<ThemeViewModel>(
       builder: (_, viewModel, _) {
         return MaterialApp.router(
+          restorationScopeId: 'app',
           routerConfig: appRouter,
           builder: (_, child) => child!,
           title: 'Molise Is',

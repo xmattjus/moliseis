@@ -38,6 +38,7 @@ final _mapShellNavigatorKey = GlobalKey<NavigatorState>();
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
+  restorationScopeId: 'router',
   navigatorKey: _rootNavigatorKey,
   redirect: (context, state) {
     final syncViewModel = context.read<SyncViewModel>();
@@ -80,9 +81,10 @@ final appRouter = GoRouter(
       },
     ),
     AnimatedStatefulShellRoute(
-      transitionBuilder: ShellRouteTransitions.fade,
+      restorationScopeId: 'appShell',
       branches: <StatefulShellBranch>[
         StatefulShellBranch(
+          restorationScopeId: 'exploreBranch',
           navigatorKey: _exploreShellNavigatorKey,
           routes: <RouteBase>[
             GoRoute(
@@ -168,6 +170,7 @@ final appRouter = GoRouter(
           ],
         ),
         StatefulShellBranch(
+          restorationScopeId: 'favouritesBranch',
           navigatorKey: _favouritesShellNavigatorKey,
           routes: [
             GoRoute(
@@ -189,6 +192,7 @@ final appRouter = GoRouter(
           ],
         ),
         StatefulShellBranch(
+          restorationScopeId: 'eventsBranch',
           navigatorKey: _eventsShellNavigatorKey,
           routes: <RouteBase>[
             GoRoute(
@@ -217,6 +221,7 @@ final appRouter = GoRouter(
           ],
         ),
         StatefulShellBranch(
+          restorationScopeId: 'mapBranch',
           navigatorKey: _mapShellNavigatorKey,
           routes: <RouteBase>[
             GoRoute(
@@ -259,9 +264,13 @@ final appRouter = GoRouter(
           ],
         ),
       ],
-      builder: (_, _, navigationShell) {
-        return ScaffoldShell(navigationShell: navigationShell);
+      pageBuilder: (_, _, navigationShell) {
+        return MaterialPage<void>(
+          restorationId: 'appShellPage',
+          child: ScaffoldShell(navigationShell: navigationShell),
+        );
       },
+      transitionBuilder: ShellRouteTransitions.fade,
     ),
   ],
 );

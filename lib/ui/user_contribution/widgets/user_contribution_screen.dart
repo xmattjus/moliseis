@@ -85,6 +85,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                         spacing: 12.0,
                         children: [
                           TextFormField(
+                            restorationId: "user-contribution-city",
                             decoration: const InputDecoration(
                               labelText: 'Città',
                               hintText: 'San Pietro Avellana',
@@ -99,6 +100,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                             autovalidateMode: AutovalidateMode.onUnfocus,
                           ),
                           TextFormField(
+                            restorationId: "user-contribution-attraction-name",
                             decoration: const InputDecoration(
                               labelText: 'Attrazione o evento',
                               hintText: 'Museo del Tartufo',
@@ -114,6 +116,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                             autovalidateMode: AutovalidateMode.onUnfocus,
                           ),
                           TextFormField(
+                            restorationId: "user-contribution-description",
                             decoration: const InputDecoration(
                               labelText: 'Descrizione',
                               hintText:
@@ -227,6 +230,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           TextFormField(
+                            restorationId: "user-contribution-email",
                             autovalidateMode: AutovalidateMode.onUnfocus,
                             decoration: const InputDecoration(
                               labelText: 'E-mail',
@@ -243,6 +247,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                           ),
                           const SizedBox(height: 12.0),
                           TextFormField(
+                            restorationId: "user-contribution-name",
                             decoration: const InputDecoration(
                               labelText: 'Autore',
                               hintText: 'Mario Rossi',
