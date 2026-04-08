@@ -67,6 +67,18 @@ final appRouter = GoRouter(
       name: RouteNames.settings,
       builder: (_, _) => const SettingsScreen(),
     ),
+    GoRoute(
+      path: RoutePaths.userContribution,
+      name: RouteNames.userContribution,
+      builder: (context, _) {
+        final viewModel = UserContributionViewModel(
+          logger: context.read<Talker>(),
+          userContributionRepository: context
+              .read<UserContributionRepository>(),
+        );
+        return UserContributionScreen(viewModel: viewModel);
+      },
+    ),
     AnimatedStatefulShellRoute(
       transitionBuilder: ShellRouteTransitions.fade,
       branches: <StatefulShellBranch>[
@@ -150,19 +162,6 @@ final appRouter = GoRouter(
                 categoryRoute(
                   name: RouteNames.homeCategory,
                   childName: RouteNames.homeCategoryPost,
-                ),
-                GoRoute(
-                  path: RoutePaths.userContribution,
-                  name: RouteNames.userContribution,
-                  builder: (context, _) {
-                    final viewModel = UserContributionViewModel(
-                      logger: context.read<Talker>(),
-                      userContributionRepository: context
-                          .read<UserContributionRepository>(),
-                    );
-                    return UserContributionScreen(viewModel: viewModel);
-                  },
-                  parentNavigatorKey: _rootNavigatorKey,
                 ),
               ],
             ),

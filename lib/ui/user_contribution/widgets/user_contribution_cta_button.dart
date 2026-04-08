@@ -18,7 +18,7 @@ class UserContributionCTAButton extends StatelessWidget {
         CardBase(
           color: bgColor,
           elevation: 0,
-          onPressed: () => context.goNamed(RouteNames.userContribution),
+          onPressed: () => context.pushNamed(RouteNames.userContribution),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
