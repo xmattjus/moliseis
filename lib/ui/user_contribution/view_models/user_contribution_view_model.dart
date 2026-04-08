@@ -2,7 +2,7 @@ import 'dart:collection' show UnmodifiableListView;
 import 'dart:io' show File;
 
 import 'package:crypto/crypto.dart' show sha1;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' as intl;
@@ -14,58 +14,60 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
+/// Pairs a picked [XFile] with its SHA-1 [digest] string for deduplication.
+typedef _MediaEntry = ({XFile file, String digest});
+
 class UserContributionViewModel extends ChangeNotifier {
   UserContributionViewModel({
     required Talker logger,
     required UserContributionRepository userContributionRepository,
+    ImagePicker? imagePicker,
   }) : _log = logger,
-
-       _userContributionRepository = userContributionRepository {
+       _userContributionRepository = userContributionRepository,
+       _imagePicker = imagePicker ?? ImagePicker() {
     addMedia = Command0(_addMedia);
     removeMediaAt = Command1(_removeMediaAt);
     send = Command0(_send);
-    retrieveLostMedia = Command0(_retrieveLostMedia)..execute();
+    retrieveLostMedia = Command0(_retrieveLostMedia);
   }
 
   final Talker _log;
-
   final UserContributionRepository _userContributionRepository;
+  final ImagePicker _imagePicker;
 
   String? authorEmail;
   String? authorName;
   String? city;
   String? description;
   DateTime? _endDate;
-  final _imagePicker = ImagePicker();
-  final _mediaFileList = <XFile>[];
-  final _mediaFileDigestStrings = <String>[];
+  final _mediaEntries = <_MediaEntry>[];
   String? place;
   DateTime? _startDate;
   ContentCategory? type;
 
   DateTime? get endDate => _endDate;
   UnmodifiableListView<XFile> get mediaFileList =>
-      UnmodifiableListView<XFile>(_mediaFileList);
+      UnmodifiableListView<XFile>(_mediaEntries.map((e) => e.file).toList());
   DateTime? get startDate => _startDate;
 
   late Command0<void> addMedia;
   late Command1<void, int> removeMediaAt;
   late Command0<void> send;
+
+  /// Recovers media files lost during a previous image-picker session due to
+  /// Android activity recreation. Only runs on Android; is a no-op on all
+  /// other platforms. Errors are not propagated to the UI because there is no
+  /// recoverable alternative path for the user to take.
   late Command0<void> retrieveLostMedia;
 
   Future<void> _calculateHashAndAdd(XFile media) async {
-    // The hash function used to calculate the digest of media to upload.
-    const hashFunc = sha1;
+    // SHA-1 is used purely for content-based deduplication; collision
+    // resistance beyond accidental duplicates is not required here.
+    final digest = await sha1.bind(media.openRead()).first;
+    final digestString = digest.toString();
 
-    // Calculates the hash of each media to upload.
-    final digests = hashFunc.bind(media.openRead());
-    final digest = await digests.first;
-
-    // Adds the media to the upload list only if it hasn't been added
-    // before already.
-    if (!_mediaFileDigestStrings.contains(digest.toString())) {
-      _mediaFileList.add(media);
-      _mediaFileDigestStrings.add(digest.toString());
+    if (!_mediaEntries.any((e) => e.digest == digestString)) {
+      _mediaEntries.add((file: media, digest: digestString));
     }
   }
 
@@ -93,8 +95,7 @@ class UserContributionViewModel extends ChangeNotifier {
 
   Future<Result<void>> _removeMediaAt(int index) async {
     try {
-      _mediaFileList.removeAt(index);
-      _mediaFileDigestStrings.removeAt(index);
+      _mediaEntries.removeAt(index);
 
       notifyListeners();
 
@@ -139,9 +140,9 @@ class UserContributionViewModel extends ChangeNotifier {
   Future<Result<void>> _send() async {
     final mediaUrls = <String>[];
 
-    for (final file in _mediaFileList) {
+    for (final entry in _mediaEntries) {
       final result = await _userContributionRepository.uploadImage(
-        File(file.path),
+        File(entry.file.path),
       );
 
       switch (result) {
@@ -176,13 +177,14 @@ class UserContributionViewModel extends ChangeNotifier {
 
   void _handleRetrieveLostMediaErrors(Object error, StackTrace? stackTrace) {
     _log.warning(
-      'An error occurred while retrieving lost media',
+      'An error occurred while retrieving lost media.',
       error,
       stackTrace,
     );
   }
 
-  /// Source: https://github.com/flutter/packages/blob/e37fa8ff337214ed3d5dc83f9ba229c6b9ccc1c0/packages/image_picker/image_picker/example/lib/main.dart#L308
+  /// Implements the lost-data recovery pattern recommended by image_picker.
+  /// See: https://github.com/flutter/packages/blob/e37fa8ff337214ed3d5dc83f9ba229c6b9ccc1c0/packages/image_picker/image_picker/example/lib/main.dart#L308
   Future<Result<void>> _retrieveLostMedia() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return const Result.success(null);
@@ -198,29 +200,27 @@ class UserContributionViewModel extends ChangeNotifier {
       _log.info('Retrieving lost media');
 
       try {
-        if (response.files != null) {
-          for (final file in response.files!) {
-            await _calculateHashAndAdd(file);
-          }
-        } else {
-          await _calculateHashAndAdd(response.file!);
+        // When files is non-null it contains all recovered files; file points
+        // to the first item. Fall back to file for single-result responses.
+        final files = response.files ?? [response.file!];
+        for (final file in files) {
+          await _calculateHashAndAdd(file);
         }
 
         notifyListeners();
-      } on Exception catch (error, stackTrace) {
+      } catch (error, stackTrace) {
         _handleRetrieveLostMediaErrors(error, stackTrace);
       }
-    } else {
-      if (response.exception != null) {
-        _handleRetrieveLostMediaErrors(
-          response.exception!,
-          StackTrace.fromString(response.exception!.stacktrace ?? ''),
-        );
-      }
+    } else if (response.exception != null) {
+      final exception = response.exception!;
+      _handleRetrieveLostMediaErrors(
+        exception,
+        StackTrace.fromString(exception.stacktrace ?? ''),
+      );
     }
 
-    // Never signal lost media retrieving errors to UI since there is no alternative
-    // path to take.
+    // Lost media recovery is best-effort; surfacing errors to the UI would
+    // block the flow with no actionable recovery step for the user.
     return const Result.success(null);
   }
 

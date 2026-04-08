@@ -29,6 +29,12 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
   bool _isEvent = false;
 
   @override
+  void initState() {
+    super.initState();
+    widget.viewModel.retrieveLostMedia.execute();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = context.textTheme;
     final textStyle = textTheme.bodyLarge;
