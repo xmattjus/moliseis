@@ -2,6 +2,7 @@ import 'dart:collection' show UnmodifiableListView;
 import 'dart:io' show File;
 
 import 'package:crypto/crypto.dart' show sha1;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' as intl;
@@ -23,6 +24,7 @@ class UserContributionViewModel extends ChangeNotifier {
     addMedia = Command0(_addMedia);
     removeMediaAt = Command1(_removeMediaAt);
     send = Command0(_send);
+    retrieveLostMedia = Command0(_retrieveLostMedia)..execute();
   }
 
   final Talker _log;
@@ -36,7 +38,7 @@ class UserContributionViewModel extends ChangeNotifier {
   DateTime? _endDate;
   final _imagePicker = ImagePicker();
   final _mediaFileList = <XFile>[];
-  final _mediaFileHashes = <int>[];
+  final _mediaFileDigestStrings = <String>[];
   String? place;
   DateTime? _startDate;
   ContentCategory? type;
@@ -49,25 +51,30 @@ class UserContributionViewModel extends ChangeNotifier {
   late Command0<void> addMedia;
   late Command1<void, int> removeMediaAt;
   late Command0<void> send;
+  late Command0<void> retrieveLostMedia;
+
+  Future<void> _calculateHashAndAdd(XFile media) async {
+    // The hash function used to calculate the digest of media to upload.
+    const hashFunc = sha1;
+
+    // Calculates the hash of each media to upload.
+    final digests = hashFunc.bind(media.openRead());
+    final digest = await digests.first;
+
+    // Adds the media to the upload list only if it hasn't been added
+    // before already.
+    if (!_mediaFileDigestStrings.contains(digest.toString())) {
+      _mediaFileList.add(media);
+      _mediaFileDigestStrings.add(digest.toString());
+    }
+  }
 
   Future<Result<void>> _addMedia() async {
     try {
-      // The hash function used to calculate the digest of media to upload.
-      const hashFunc = sha1;
-
       final pickedMedia = await _imagePicker.pickMultipleMedia();
 
       for (final media in pickedMedia) {
-        // Calculates the hash of each media to upload.
-        final digests = hashFunc.bind(media.openRead());
-        final digest = await digests.first;
-
-        // Adds the media to the upload list only if it hasn't been added
-        // before already.
-        if (!_mediaFileHashes.contains(digest.hashCode)) {
-          _mediaFileList.add(media);
-          _mediaFileHashes.add(digest.hashCode);
-        }
+        await _calculateHashAndAdd(media);
       }
 
       notifyListeners();
@@ -87,7 +94,7 @@ class UserContributionViewModel extends ChangeNotifier {
   Future<Result<void>> _removeMediaAt(int index) async {
     try {
       _mediaFileList.removeAt(index);
-      _mediaFileHashes.removeAt(index);
+      _mediaFileDigestStrings.removeAt(index);
 
       notifyListeners();
 
@@ -165,6 +172,56 @@ class UserContributionViewModel extends ChangeNotifier {
       case Error():
         return Result.error(result.error);
     }
+  }
+
+  void _handleRetrieveLostMediaErrors(Object error, StackTrace? stackTrace) {
+    _log.warning(
+      'An error occurred while retrieving lost media',
+      error,
+      stackTrace,
+    );
+  }
+
+  /// Source: https://github.com/flutter/packages/blob/e37fa8ff337214ed3d5dc83f9ba229c6b9ccc1c0/packages/image_picker/image_picker/example/lib/main.dart#L308
+  Future<Result<void>> _retrieveLostMedia() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return const Result.success(null);
+    }
+
+    final response = await _imagePicker.retrieveLostData();
+
+    if (response.isEmpty) {
+      return const Result.success(null);
+    }
+
+    if (response.file != null) {
+      _log.info('Retrieving lost media');
+
+      try {
+        if (response.files != null) {
+          for (final file in response.files!) {
+            await _calculateHashAndAdd(file);
+          }
+        } else {
+          await _calculateHashAndAdd(response.file!);
+        }
+
+        notifyListeners();
+      } on Exception catch (error, stackTrace) {
+        _handleRetrieveLostMediaErrors(error, stackTrace);
+      }
+    } else {
+      if (response.exception != null) {
+        _handleRetrieveLostMediaErrors(
+          response.exception!,
+          StackTrace.fromString(response.exception!.stacktrace ?? ''),
+        );
+      }
+    }
+
+    // Never signal lost media retrieving errors to UI since there is no alternative
+    // path to take.
+    return const Result.success(null);
   }
 
   String formatDate(Locale locale, DateTime date) =>

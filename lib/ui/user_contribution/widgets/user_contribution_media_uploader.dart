@@ -31,6 +31,7 @@ class UserContributionMediaUploader extends StatelessWidget {
             listenable: Listenable.merge([
               viewModel.addMedia,
               viewModel.removeMediaAt,
+              viewModel.retrieveLostMedia,
             ]),
             builder: (context, child) {
               return ListView.separated(
@@ -40,7 +41,8 @@ class UserContributionMediaUploader extends StatelessWidget {
                   // The last widget of the list is a button to append new
                   // media to the user contribution.
                   if (viewModel.mediaFileList.length == index) {
-                    if (viewModel.addMedia.running) {
+                    if (viewModel.addMedia.running ||
+                        viewModel.retrieveLostMedia.running) {
                       return const Padding(
                         padding: EdgeInsets.all(18.0),
                         child: CustomCircularProgressIndicator(size: 36.0),
