@@ -3,7 +3,7 @@ import 'dart:collection' show UnmodifiableListView;
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/use-cases/post/post_use_case.dart';
+import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 

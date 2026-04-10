@@ -13,7 +13,7 @@ import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
-import 'package:moliseis/domain/use-cases/favourite/favourite_get_ids_use_case.dart';
+import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/ui/core/ui/content/content_event_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';

@@ -10,9 +10,9 @@ import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
-import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
-import 'package:moliseis/domain/use-cases/geo_map/geo_map_use_case.dart';
-import 'package:moliseis/domain/use-cases/post/post_use_case.dart';
+import 'package:moliseis/domain/use-cases/explore_use_case.dart';
+import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
+import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:objectbox/objectbox.dart';
 

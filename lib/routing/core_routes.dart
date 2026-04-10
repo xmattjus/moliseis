@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/use-cases/category/category_use_case.dart';
-import 'package:moliseis/domain/use-cases/explore/explore_use_case.dart';
-import 'package:moliseis/domain/use-cases/post/post_use_case.dart';
+import 'package:moliseis/domain/use-cases/category_use_case.dart';
+import 'package:moliseis/domain/use-cases/explore_use_case.dart';
+import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/category/view_models/category_view_model.dart';
 import 'package:moliseis/ui/category/widgets/category_screen.dart';

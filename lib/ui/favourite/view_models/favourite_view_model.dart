@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';
-import 'package:moliseis/domain/use-cases/favourite/favourite_get_ids_use_case.dart';
+import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 

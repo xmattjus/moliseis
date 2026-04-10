@@ -6,7 +6,7 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';
-import 'package:moliseis/domain/use-cases/geo_map/geo_map_use_case.dart';
+import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
