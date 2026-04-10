@@ -31,7 +31,7 @@ import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
-import 'package:moliseis/domain/use-cases/sync_repo_use_case.dart';
+import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
@@ -163,7 +163,7 @@ List<SingleChildWidget> providers2(
     ),
     ChangeNotifierProvider<SyncViewModel>(
       create: (context) {
-        final useCase = SynchronizeRepositoriesUseCase(
+        final syncUseCase = SyncUseCase(
           cityRepository: context.read(),
           eventRepository: context.read(),
           mediaRepository: context.read(),
@@ -171,7 +171,7 @@ List<SingleChildWidget> providers2(
           settingsRepository: context.read(),
         );
 
-        return SyncViewModel(syncRepoUseCase: useCase);
+        return SyncViewModel(syncUseCase: syncUseCase);
       },
     ),
     ChangeNotifierProvider<SettingsViewModel>(

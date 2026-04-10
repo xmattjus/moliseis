@@ -15,10 +15,7 @@ class SyncScreen extends StatefulWidget {
 }
 
 class _SyncScreenState extends State<SyncScreen> {
-  /// Whether to schedule a callback on next frame build or not.
-  ///
-  /// The callback will be executed exactly once for the lifecycle of this
-  /// widget.
+  // Whether to schedule a callback on next frame build or not.
   bool _scheduleCallbackOnNextFrame = true;
 
   @override
@@ -35,15 +32,15 @@ class _SyncScreenState extends State<SyncScreen> {
         body: Consumer<SyncViewModel>(
           builder: (_, viewModel, _) {
             return ListenableBuilder(
-              listenable: viewModel.start,
+              listenable: viewModel.sync,
               builder: (context, child) {
-                if (viewModel.start.completed) {
+                if (viewModel.sync.completed) {
                   _scheduleCallback(() {
                     GoRouter.of(context).refresh();
                   });
                 }
 
-                if (viewModel.start.error) {
+                if (viewModel.sync.error) {
                   if (viewModel.fatalError) {
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -61,7 +58,7 @@ class _SyncScreenState extends State<SyncScreen> {
                         TextButton(
                           onPressed: () {
                             _scheduleCallbackOnNextFrame = true;
-                            viewModel.start.execute(true);
+                            viewModel.sync.execute(true);
                           },
                           child: const Text('Riprova'),
                         ),
@@ -93,15 +90,15 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 
   void _scheduleCallback(void Function() callback) {
-    /// Guards the addPostFrameCallback() from running multiple times
-    /// when it is not needed, e.g. when the app Brightness changes
-    /// and widgets are rebuilt.
+    // Guards the addPostFrameCallback() from running multiple times
+    // when it is not needed, e.g. when the app Brightness changes
+    // and widgets are rebuilt.
     if (_scheduleCallbackOnNextFrame) {
-      /// Schedules a callback to be fired once when the build phase
-      /// of this widget has ended.
-      ///
-      /// Shows a SnackBar signaling a recoverable error occurred
-      /// while refreshing the repositories.
+      // Schedules a callback to be fired once when the build phase
+      // of this widget has ended.
+      //
+      // Shows a SnackBar signaling a recoverable error occurred
+      // while refreshing the repositories.
       SchedulerBinding.instance.addPostFrameCallback((_) {
         callback();
 

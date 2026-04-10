@@ -51,7 +51,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           edgeOffset: kToolbarHeight * 2.0 + 8.0,
-          onRefresh: () async => _sync(),
+          onRefresh: () async => _startSync(),
           child: CustomScrollView(
             slivers: <Widget>[
               SliverAppBar(
@@ -66,7 +66,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         title: const Text('Aggiorna'),
                         icon: const Icon(Symbols.sync, weight: 500),
                         tooltip: 'Aggiorna i contenuti',
-                        onPressed: _sync,
+                        onPressed: _startSync,
                       ),
                       MenuItem(
                         title: const Text('Impostazioni'),
@@ -269,9 +269,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  void _sync() {
-    final synchronizationViewModel = context.read<SyncViewModel>();
-    synchronizationViewModel.start.execute(true);
+  void _startSync() {
+    final syncViewModel = context.read<SyncViewModel>();
+    syncViewModel.sync.execute(true);
 
     // Redirects to the local app repositories synchronization screen.
     GoRouter.of(context).refresh();

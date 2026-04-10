@@ -43,12 +43,12 @@ final appRouter = GoRouter(
   redirect: (context, state) {
     final syncViewModel = context.read<SyncViewModel>();
 
-    if (syncViewModel.start.running) {
+    if (syncViewModel.sync.running) {
       return RoutePaths.sync;
     }
 
-    if ((syncViewModel.start.completed ||
-            syncViewModel.start.error && !syncViewModel.fatalError) &&
+    if ((syncViewModel.sync.completed ||
+            syncViewModel.sync.error && !syncViewModel.fatalError) &&
         state.uri.toString().contains(RoutePaths.sync)) {
       return RoutePaths.home;
     }

@@ -1,33 +1,23 @@
-import 'dart:async' show Future;
-
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/use-cases/sync_repo_use_case.dart';
+import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Manages the synchronization state of the app repositories.
 ///
-/// This ViewModel handles the synchronization of local repositories with the backend,
-/// including automatic sync scheduling, error handling, and state management.
-///
-/// The sync operation is automatically triggered on startup if needed (based on
-/// last successful sync time), and can be manually triggered with force option.
+/// Automatically triggers a sync on construction when one is due, and exposes
+/// the [sync] command for manual or forced synchronization.
 class SyncViewModel extends ChangeNotifier {
-  /// Creates a new [SyncViewModel] instance.
-  ///
-  /// [syncRepoUseCase] is required for performing the actual synchronization.
-  /// The constructor will automatically start sync if it's needed based on
-  /// the last successful synchronization time.
-  SyncViewModel({required SynchronizeRepositoriesUseCase syncRepoUseCase})
-    : _useCase = syncRepoUseCase {
-    start = Command1(_start);
+  /// Creates a [SyncViewModel] and triggers an automatic sync if one is due.
+  SyncViewModel({required SyncUseCase syncUseCase}) : _useCase = syncUseCase {
+    sync = Command1(_sync);
 
-    if (_syncNeeded()) {
-      start.execute(false);
+    if (_useCase.isSyncRequired) {
+      sync.execute(false);
     }
   }
 
-  final SynchronizeRepositoriesUseCase _useCase;
+  final SyncUseCase _useCase;
 
   var _fatalError = false;
 
@@ -37,51 +27,20 @@ class SyncViewModel extends ChangeNotifier {
   /// synchronization, meaning the app has no cached data to fall back on.
   bool get fatalError => _fatalError;
 
-  /// Command for executing the synchronization operation.
+  /// Command for triggering synchronization.
   ///
-  /// Takes a boolean parameter to indicate whether to force sync regardless
-  /// of the last synchronization time.
-  late Command1<void, bool> start;
+  /// Pass `true` to force a sync regardless of schedule, or `false` to sync
+  /// only when one is due.
+  late Command1<void, bool> sync;
 
-  /// Determines if synchronization is needed based on the last successful sync time.
-  ///
-  /// Sync is needed if more than 3 days have passed since the last successful
-  /// synchronization, or if there was never a successful sync.
-  ///
-  /// Returns `true` if sync is needed, `false` otherwise.
-  bool _syncNeeded() {
-    final modifiedAt = _useCase.modifiedAt;
+  Future<Result<void>> _sync(bool force) async {
+    if (force || _useCase.isSyncRequired) {
+      final result = await _useCase.sync();
 
-    if (modifiedAt != null) {
-      final nextScheduledUpdate = modifiedAt.add(const Duration(days: 3));
-
-      if (DateTime.now().isBefore(nextScheduledUpdate)) {
-        return false;
+      if (result.isError && _useCase.lastSyncedAt == null) {
+        _fatalError = true;
+        notifyListeners();
       }
-    }
-
-    return true;
-  }
-
-  /// Synchronizes the local app repositories with the backend.
-  ///
-  /// [force] - If `true`, forces synchronization regardless of the last sync time.
-  ///           If `false`, only syncs if needed based on the schedule.
-  ///
-  /// Returns a [Result] indicating success or failure of the operation.
-  ///
-  /// In case of error, sets [fatalError] to `true` if this is the first
-  /// synchronization attempt (no previous successful sync exists).
-  Future<Result<void>> _start(bool force) async {
-    if (force || _syncNeeded()) {
-      final result = await _useCase.start();
-
-      switch (result) {
-        case Error<void>():
-          _fatalError = true;
-        case Success<void>():
-      }
-
       return result;
     }
 
