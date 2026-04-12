@@ -155,7 +155,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
             viewLeading: BackButton(onPressed: _handleOnBackPressed),
             viewHintText: widget.hintText,
             viewOnSubmitted: (query) {
-              widget.viewModel.addToHistory.execute(query);
+              widget.viewModel.addToPastSearches.execute(query);
 
               _searchController.closeView(query);
 
@@ -163,7 +163,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
             },
             suggestionsBuilder: (context, controller) async {
               if (controller.text.isEmpty) {
-                final history = widget.viewModel.history;
+                final history = widget.viewModel.pastSearches;
 
                 return _lastHistory = _buildChips(
                   texts: history,
@@ -196,7 +196,9 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                       return SearchAnchorSuggestionList(
                         suggestions: widget.viewModel.results,
                         onSuggestionPressed: (content) {
-                          widget.viewModel.addToHistory.execute(content.name);
+                          widget.viewModel.addToPastSearches.execute(
+                            content.name,
+                          );
 
                           widget.onSuggestionPressed(content);
                         },
@@ -238,12 +240,12 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
           onPressed: () {
             _searchController.text = e;
 
-            widget.viewModel.addToHistory.execute(e);
+            widget.viewModel.addToPastSearches.execute(e);
           },
           deleteIcon: const Icon(Symbols.close),
           onDeleted: showDeleteIcon
               ? () async {
-                  widget.viewModel.removeFromHistory.execute(e);
+                  widget.viewModel.removeFromPastSearches.execute(e);
                   _searchController.text = '\u200B';
                   await Future.delayed(Durations.medium1, () {
                     _searchController.text = '';
@@ -269,7 +271,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
             onCategorySelected: (category) {
               _searchController.text = category.label;
 
-              widget.viewModel.addToHistory.execute(category.label);
+              widget.viewModel.addToPastSearches.execute(category.label);
             },
           ),
         ),
@@ -310,7 +312,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
   // the call has been made obsolete.
   Future<Iterable<ContentBase>?> _search(String query) async {
     // If the query is too short, do not search.
-    if (query.length < 3) {
+    if (!SearchViewModel.isSearchQueryValid(query)) {
       // Resets the last shown options.
       _lastOptions = <Widget>[];
 

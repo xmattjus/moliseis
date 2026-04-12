@@ -28,9 +28,6 @@ class SearchRepositoryImpl implements SearchRepository {
   late final Query<Place> _placeQuery;
   final Box<SearchQuery> _searchHistoryBox;
 
-  /// The list of the Event IDs returned by the last search.
-  // var _lastEventResultIds = <int>[];
-
   /// The list of the Place IDs returned by the last search.
   var _lastPlaceResultIds = <int>[];
 
@@ -66,7 +63,7 @@ class SearchRepositoryImpl implements SearchRepository {
   }
 
   @override
-  Future<Result> addToHistory(String text) async {
+  Future<Result<void>> addToPastSearches(String text) async {
     if (text.isEmpty) {
       return const Result.success(null);
     }
@@ -80,7 +77,7 @@ class SearchRepositoryImpl implements SearchRepository {
         }
       }
 
-      _searchHistoryBox.putAsync(SearchQuery(text));
+      await _searchHistoryBox.putAsync(SearchQuery(text));
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while adding $text to search history.',
@@ -114,10 +111,9 @@ class SearchRepositoryImpl implements SearchRepository {
 
       results.addAll(eventQuery);
 
-      final test = _objectBox.store.box<City>().getMany(cityQuery);
+      final cities = _objectBox.store.box<City>().getMany(cityQuery);
 
-      for (var i = 0; i < test.length; i++) {
-        final city = test[i];
+      for (final city in cities) {
         if (city != null) {
           for (final event in city.events) {
             results.add(event.remoteId);
@@ -127,11 +123,8 @@ class SearchRepositoryImpl implements SearchRepository {
 
       results.addAll(categoryQuery);
 
-      // _lastEventResultIds = results;
-
       // Purges the query results from any duplicate.
-      final uniqueIds = <dynamic>{};
-      results.retainWhere((id) => uniqueIds.add(id));
+      _removeDuplicates(results);
 
       return Result.success(results);
     } on Exception catch (error, stackTrace) {
@@ -167,10 +160,9 @@ class SearchRepositoryImpl implements SearchRepository {
 
       results.addAll(placeQuery);
 
-      final test = _objectBox.store.box<City>().getMany(cityQuery);
+      final cities = _objectBox.store.box<City>().getMany(cityQuery);
 
-      for (var i = 0; i < test.length; i++) {
-        final city = test[i];
+      for (final city in cities) {
         if (city != null) {
           for (final place in city.places) {
             results.add(place.remoteId);
@@ -183,8 +175,7 @@ class SearchRepositoryImpl implements SearchRepository {
       results.addAll(categoryQuery);
 
       // Purges the query results from any duplicate.
-      final uniqueIds = <dynamic>{};
-      results.retainWhere((id) => uniqueIds.add(id));
+      _removeDuplicates(results);
 
       _lastPlaceResultIds = results;
 
@@ -238,7 +229,7 @@ class SearchRepositoryImpl implements SearchRepository {
   }
 
   @override
-  Future<Result<List<String>>> pastSearches() async {
+  Future<Result<List<String>>> getPastSearches() async {
     try {
       final history = await _searchHistoryBox.getAllAsync();
 
@@ -256,7 +247,7 @@ class SearchRepositoryImpl implements SearchRepository {
   }
 
   @override
-  Future<Result> removeFromHistory(String text) async {
+  Future<Result<void>> removeFromPastSearches(String text) async {
     try {
       final condition = SearchQuery_.name.equals(text);
       final queryBuilder = _searchHistoryBox.query(condition);
@@ -319,5 +310,10 @@ class SearchRepositoryImpl implements SearchRepository {
     final typeIndexes = matchingTypes.map((type) => type.index).toList();
 
     return typeIndexes;
+  }
+
+  void _removeDuplicates(List<int> ids) {
+    final uniqueIds = <int>{};
+    ids.retainWhere((id) => uniqueIds.add(id));
   }
 }
