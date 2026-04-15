@@ -1,7 +1,8 @@
-import 'package:moliseis/domain/repositories/repository_base.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/synchronizable.dart';
 
-abstract class CityRepository extends RepositoryBase {
+/// Domain interface for city data access.
+abstract class CityRepository implements Synchronizable {
   @override
   Future<Result<void>> synchronize();
 }
