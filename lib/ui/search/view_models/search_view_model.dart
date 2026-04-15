@@ -80,14 +80,10 @@ class SearchViewModel extends ChangeNotifier {
 
   var _pastSearches = <String>[];
   final _results = <ContentBase>[];
+  final _suggestions = <ContentBase>[];
   var _relatedResults = <ContentBase>[];
   var _relatedResultsIds = <int>[];
   final _types = ContentCategory.values.minusUnknown;
-
-  // Shared running flag to prevent [loadResults] and [loadSuggestions] from
-  // writing to [_results] concurrently, since both Commands delegate to
-  // [_search] and operate on the same list.
-  var _searchRunning = false;
 
   /// An unmodifiable view of the persisted past search queries.
   UnmodifiableListView<String> get pastSearches =>
@@ -96,6 +92,10 @@ class SearchViewModel extends ChangeNotifier {
   /// An unmodifiable view of the current search results.
   UnmodifiableListView<ContentBase> get results =>
       UnmodifiableListView(_results);
+
+  /// An unmodifiable view of the current search suggestions.
+  UnmodifiableListView<ContentBase> get suggestions =>
+      UnmodifiableListView(_suggestions);
 
   /// An unmodifiable view of the related content results.
   UnmodifiableListView<ContentBase> get relatedResults =>
@@ -150,7 +150,7 @@ class SearchViewModel extends ChangeNotifier {
     });
   }
 
-  Future<Result<void>> _loadResults(String query) => _search(query);
+  Future<Result<void>> _loadResults(String query) => _search(query, _results);
 
   Future<Result<void>> _loadRelatedResults() async {
     final relatedResults = <ContentBase>[];
@@ -196,37 +196,30 @@ class SearchViewModel extends ChangeNotifier {
     });
   }
 
-  Future<Result<void>> _loadSuggestions(String query) => _search(query);
+  Future<Result<void>> _loadSuggestions(String query) =>
+      _search(query, _suggestions);
 
-  Future<Result<void>> _search(String query) async {
-    if (_searchRunning) return const Result.success(null);
+  Future<Result<void>> _search(String query, List<ContentBase> list) async {
     if (!isSearchQueryValid(query)) return const Result.success(null);
 
-    _searchRunning = true;
-    _results.clear();
+    list.clear();
 
-    try {
-      return Result.zip2(
-        () => _searchRepository.getPlaceIdsByQuery(query),
-        () => _searchRepository.getEventIdsByQuery(query),
-        (placeIds, eventIds) async {
-          for (final id in placeIds) {
-            final getPlace = await _exploreGetByIdUseCase.getById(id);
-            getPlace.map((place) => _results.add(place));
-          }
+    return Result.zip2(
+      () => _searchRepository.getPlaceIdsByQuery(query),
+      () => _searchRepository.getEventIdsByQuery(query),
+      (placeIds, eventIds) async {
+        for (final id in placeIds) {
+          final getPlace = await _exploreGetByIdUseCase.getById(id);
+          getPlace.map((place) => list.add(place));
+        }
 
-          for (final id in eventIds) {
-            final getEvent = await _eventRepository.getById(id);
-            getEvent.map(
-              (event) => _results.add(EventContent.fromEvent(event)),
-            );
-          }
+        for (final id in eventIds) {
+          final getEvent = await _eventRepository.getById(id);
+          getEvent.map((event) => list.add(EventContent.fromEvent(event)));
+        }
 
-          return const Result.success(null);
-        },
-      );
-    } finally {
-      _searchRunning = false;
-    }
+        return const Result.success(null);
+      },
+    );
   }
 }

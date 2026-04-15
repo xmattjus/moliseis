@@ -31,7 +31,7 @@ class SettingsViewModel extends ChangeNotifier {
 
     final result = await _settingsRepository.setCrashReporting(enable);
 
-    if (result is Error) {
+    if (result.isError) {
       _crashReporting = !_crashReporting; // Revert the change on error.
 
       notifyListeners();

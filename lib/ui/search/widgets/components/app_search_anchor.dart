@@ -184,7 +184,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                   listenable: widget.viewModel.loadSuggestions,
                   builder: (context, _) {
                     if (widget.viewModel.loadSuggestions.completed) {
-                      if (widget.viewModel.results.isEmpty) {
+                      if (widget.viewModel.suggestions.isEmpty) {
                         return const Padding(
                           padding: EdgeInsets.all(16.0),
                           child: EmptyView(
@@ -194,7 +194,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                       }
 
                       return SearchAnchorSuggestionList(
-                        suggestions: widget.viewModel.results,
+                        suggestions: widget.viewModel.suggestions,
                         onSuggestionPressed: (content) {
                           widget.viewModel.addToPastSearches.execute(
                             content.name,
@@ -323,7 +323,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
 
     await widget.viewModel.loadSuggestions.execute(query);
 
-    final Iterable<ContentBase> options = widget.viewModel.results;
+    final Iterable<ContentBase> options = widget.viewModel.suggestions;
 
     // If another search happened after this one, throw away these options.
     if (_currentQuery != query) {

@@ -29,58 +29,40 @@ class PostViewModel extends ChangeNotifier {
       UnmodifiableListView(_nearContent);
 
   Future<Result<void>> _loadEvent(int id) async {
-    final result = await _postUseCase.getEventById(id);
-
-    switch (result) {
-      case Success<ContentBase>():
-        _content = result.value;
-        notifyListeners();
-      case Error<ContentBase>():
-    }
-
-    return result;
+    return (await _postUseCase.getEventById(id)).map((content) {
+      _content = content;
+      notifyListeners();
+    });
   }
 
   Future<Result<void>> _loadNearContent(LatLng coordinates) async {
     _nearContent.clear();
 
-    var result = await _postUseCase.getNearEventsByCoords(
+    final eventsResult = await _postUseCase.getNearEventsByCoords(
       coordinates.latitude,
       coordinates.longitude,
     );
+    final events = eventsResult.getOrNull();
+    if (events != null) _nearContent.addAll(events);
 
-    switch (result) {
-      case Success<List<ContentBase>>():
-        _nearContent.addAll(result.value);
-      case Error<List<ContentBase>>():
-    }
-
-    result = await _postUseCase.getNearPlacesByCoords(
+    final placesResult = await _postUseCase.getNearPlacesByCoords(
       coordinates.latitude,
       coordinates.longitude,
     );
-
-    switch (result) {
-      case Success<List<ContentBase>>():
-        _nearContent.addAll(result.value);
-      case Error<List<ContentBase>>():
-    }
+    final places = placesResult.getOrNull();
+    if (places != null) _nearContent.addAll(places);
 
     notifyListeners();
 
-    return result;
+    // Return the first error encountered, or the places result.
+    if (eventsResult.isError) return eventsResult;
+    return placesResult;
   }
 
   Future<Result<void>> _loadPlace(int id) async {
-    final result = await _postUseCase.getPlaceById(id);
-
-    switch (result) {
-      case Success<ContentBase>():
-        _content = result.value;
-        notifyListeners();
-      case Error<ContentBase>():
-    }
-
-    return result;
+    return (await _postUseCase.getPlaceById(id)).map((content) {
+      _content = content;
+      notifyListeners();
+    });
   }
 }

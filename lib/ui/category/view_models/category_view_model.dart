@@ -4,8 +4,6 @@ import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/content_type.dart';
-import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
@@ -55,53 +53,39 @@ class CategoryViewModel extends ChangeNotifier {
   ContentSort get sort => _sort;
 
   Future<Result<void>> _load() async {
+    _content.clear();
+
     if (!_selectedCategories.containsAll(ContentCategory.values.minusUnknown)) {
       if (_selectedTypes.contains(ContentType.place)) {
-        final job1 = await _categoryUseCase.getPlacesByCategories(
+        final result = await _categoryUseCase.getPlacesByCategories(
           _selectedCategories,
         );
-
-        switch (job1) {
-          case Success<List<PlaceContent>>():
-            _content.addAll(job1.value);
-          case Error<List<PlaceContent>>():
-            return Result.error(job1.error);
-        }
+        final places = result.getOrNull();
+        if (places != null) _content.addAll(places);
+        if (result.isError) return result;
       }
 
       if (_selectedTypes.contains(ContentType.event)) {
-        final job2 = await _categoryUseCase.getEventsByCategories(
+        final result = await _categoryUseCase.getEventsByCategories(
           _selectedCategories,
         );
-
-        switch (job2) {
-          case Success<List<EventContent>>():
-            _content.addAll(job2.value);
-          case Error<List<EventContent>>():
-            return Result.error(job2.error);
-        }
+        final events = result.getOrNull();
+        if (events != null) _content.addAll(events);
+        if (result.isError) return result;
       }
     } else {
       if (_selectedTypes.contains(ContentType.place)) {
-        final job1 = await _exploreGetByIdUseCase.getAllPlaces();
-
-        switch (job1) {
-          case Success<List<PlaceContent>>():
-            _content.addAll(job1.value);
-          case Error<List<PlaceContent>>():
-            return Result.error(job1.error);
-        }
+        final result = await _exploreGetByIdUseCase.getAllPlaces();
+        final places = result.getOrNull();
+        if (places != null) _content.addAll(places);
+        if (result.isError) return result;
       }
 
       if (_selectedTypes.contains(ContentType.event)) {
-        final job2 = await _exploreGetByIdUseCase.getAllEvents();
-
-        switch (job2) {
-          case Success<List<EventContent>>():
-            _content.addAll(job2.value);
-          case Error<List<EventContent>>():
-            return Result.error(job2.error);
-        }
+        final result = await _exploreGetByIdUseCase.getAllEvents();
+        final events = result.getOrNull();
+        if (events != null) _content.addAll(events);
+        if (result.isError) return result;
       }
     }
 
@@ -151,7 +135,7 @@ class CategoryViewModel extends ChangeNotifier {
 
     notifyListeners();
 
-    _settingsRepository.setContentSort(sort);
+    await _settingsRepository.setContentSort(sort);
 
     return const Result.success(null);
   }

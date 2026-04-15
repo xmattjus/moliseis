@@ -4,8 +4,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
-import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -61,13 +59,12 @@ class GeoMapViewModel extends ChangeNotifier {
   Future<Result<void>> _loadEvents() async {
     final result = await _geoMapUseCase.getAllEvents();
 
-    switch (result) {
-      case Success<List<EventContent>>():
-        _allEvents = result.value
-            .where((event) => _selectedCategories.contains(event.category))
-            .toList();
-        notifyListeners();
-      case Error<List<EventContent>>():
+    final events = result.getOrNull();
+    if (events != null) {
+      _allEvents = events
+          .where((event) => _selectedCategories.contains(event.category))
+          .toList();
+      notifyListeners();
     }
 
     return result;
@@ -76,13 +73,12 @@ class GeoMapViewModel extends ChangeNotifier {
   Future<Result<void>> _loadPlaces() async {
     final result = await _geoMapUseCase.getAllPlaces();
 
-    switch (result) {
-      case Success<List<PlaceContent>>():
-        _allPlaces = result.value
-            .where((place) => _selectedCategories.contains(place.category))
-            .toList();
-        notifyListeners();
-      case Error<List<PlaceContent>>():
+    final places = result.getOrNull();
+    if (places != null) {
+      _allPlaces = places
+          .where((place) => _selectedCategories.contains(place.category))
+          .toList();
+      notifyListeners();
     }
 
     return result;
@@ -91,31 +87,25 @@ class GeoMapViewModel extends ChangeNotifier {
   Future<Result<void>> _loadNearContent(LatLng coordinates) async {
     _nearContent.clear();
 
-    var result = await _geoMapUseCase.getNearPlacesByCoords(
+    final placesResult = await _geoMapUseCase.getNearPlacesByCoords(
       coordinates.latitude,
       coordinates.longitude,
     );
+    final places = placesResult.getOrNull();
+    if (places != null) _nearContent.addAll(places);
 
-    switch (result) {
-      case Success<List<ContentBase>>():
-        _nearContent.addAll(result.value);
-      case Error<List<ContentBase>>():
-    }
-
-    result = await _geoMapUseCase.getNearEventsByCoords(
+    final eventsResult = await _geoMapUseCase.getNearEventsByCoords(
       coordinates.latitude,
       coordinates.longitude,
     );
-
-    switch (result) {
-      case Success<List<ContentBase>>():
-        _nearContent.addAll(result.value);
-      case Error<List<ContentBase>>():
-    }
+    final events = eventsResult.getOrNull();
+    if (events != null) _nearContent.addAll(events);
 
     notifyListeners();
 
-    return result;
+    // Return the first error encountered, or the events result.
+    if (placesResult.isError) return placesResult;
+    return eventsResult;
   }
 
   Future<Result<void>> _setSelectedCategories(
@@ -166,27 +156,21 @@ class GeoMapViewModel extends ChangeNotifier {
 
   Future<Result<void>> _showEvent(int id) async {
     final result = await _geoMapUseCase.getEventById(id);
-
-    switch (result) {
-      case Success<ContentBase>():
-        _selectedContent = result.value;
-        notifyListeners();
-      case Error<ContentBase>():
+    final content = result.getOrNull();
+    if (content != null) {
+      _selectedContent = content;
+      notifyListeners();
     }
-
     return result;
   }
 
   Future<Result<void>> _showPlace(int id) async {
     final result = await _geoMapUseCase.getPlaceById(id);
-
-    switch (result) {
-      case Success<ContentBase>():
-        _selectedContent = result.value;
-        notifyListeners();
-      case Error<ContentBase>():
+    final content = result.getOrNull();
+    if (content != null) {
+      _selectedContent = content;
+      notifyListeners();
     }
-
     return result;
   }
 }

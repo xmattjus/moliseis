@@ -62,16 +62,17 @@ class WeatherViewModel extends ChangeNotifier {
       coordinates.longitude,
     );
 
-    if (result is Success<CurrentWeatherForecastData>) {
-      _currentTemperatureCelsius = result.value.temperature.toStringAsFixed(1);
+    final data = result.getOrNull();
+    if (data != null) {
+      _currentTemperatureCelsius = data.temperature.toStringAsFixed(1);
       _currentWeatherDescription = _weatherDescriptionMapper.descriptionForCode(
-        result.value.weatherCode,
+        data.weatherCode,
       );
       _currentWeatherCodeIcon = _weatherCodeIconMapper.iconForCode(
-        result.value.weatherCode,
-        result.value.isDay == 1,
+        data.weatherCode,
+        data.isDay == 1,
       );
-      _isDay = result.value.isDay == 1;
+      _isDay = data.isDay == 1;
     }
 
     return result;
@@ -88,9 +89,8 @@ class WeatherViewModel extends ChangeNotifier {
       coordinates.longitude,
     );
 
-    if (result is Success<HourlyWeatherForecastData>) {
-      _hourlyForecastData = result.value;
-    }
+    final data = result.getOrNull();
+    if (data != null) _hourlyForecastData = data;
 
     return result;
   }
@@ -106,9 +106,8 @@ class WeatherViewModel extends ChangeNotifier {
       coordinates.longitude,
     );
 
-    if (result is Success<DailyWeatherForecastData>) {
-      _dailyForecastData = result.value;
-    }
+    final data = result.getOrNull();
+    if (data != null) _dailyForecastData = data;
 
     return result;
   }

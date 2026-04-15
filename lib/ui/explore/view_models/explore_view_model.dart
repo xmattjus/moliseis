@@ -35,7 +35,6 @@ class ExploreViewModel extends ChangeNotifier {
   var _suggested = <PlaceContent>[];
 
   var _latestIds = <int>[];
-  var _nearIds = <int>[];
   var _suggestedIds = <int>[];
 
   UnmodifiableListView<PlaceContent> get latest =>
@@ -52,42 +51,29 @@ class ExploreViewModel extends ChangeNotifier {
       UnmodifiableListView(ContentCategory.values.minusUnknown);
 
   Future<Result<void>> _load() async {
-    final result1 = await _placeRepository.getLatestPlaceIds();
+    final latestResult = await _placeRepository.getLatestPlaceIds();
+    final latestIds = latestResult.getOrNull();
+    if (latestIds != null) _latestIds = latestIds;
 
-    switch (result1) {
-      case Success<List<int>>():
-        _latestIds = result1.value;
-      case Error<List<int>>():
-    }
-
-    final result2 = await _placeRepository.getSuggestedPlaceIds();
-
-    switch (result2) {
-      case Success<List<int>>():
-        _suggestedIds = result2.value;
-      case Error<List<int>>():
-    }
+    final suggestedResult = await _placeRepository.getSuggestedPlaceIds();
+    final suggestedIds = suggestedResult.getOrNull();
+    if (suggestedIds != null) _suggestedIds = suggestedIds;
 
     notifyListeners();
 
     loadLatest.execute();
-
     loadSuggested.execute();
 
-    return const Result.success(null);
+    if (latestResult.isError) return latestResult;
+    return suggestedResult;
   }
 
   Future<Result<void>> _loadLatest() async {
     _latest = [];
 
     for (final int id in _latestIds) {
-      final result = await _byIdUseCase.getById(id);
-
-      switch (result) {
-        case Success<PlaceContent>():
-          _latest.add(result.value);
-        case Error<PlaceContent>():
-      }
+      final place = (await _byIdUseCase.getById(id)).getOrNull();
+      if (place != null) _latest.add(place);
     }
 
     notifyListeners();
@@ -96,44 +82,27 @@ class ExploreViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _loadNear(List<double> coordinates) async {
-    final result = await _placeRepository.getIdsByCoordinates(coordinates);
+    return (await _placeRepository.getIdsByCoordinates(coordinates))
+        .asyncFlatMap((ids) async {
+          _near.clear();
 
-    switch (result) {
-      case Success<List<int>>():
-        _nearIds = result.value;
-        notifyListeners();
-      case Error<List<int>>():
-        return Result.error(result.error);
-    }
+          for (final id in ids) {
+            final place = (await _byIdUseCase.getById(id)).getOrNull();
+            if (place != null) _near.add(place);
+          }
 
-    _near.clear();
+          notifyListeners();
 
-    for (final id in _nearIds) {
-      final result2 = await _byIdUseCase.getById(id);
-
-      switch (result2) {
-        case Success<PlaceContent>():
-          _near.add(result2.value);
-        case Error<PlaceContent>():
-      }
-    }
-
-    notifyListeners();
-
-    return const Result.success(null);
+          return const Result.success(null);
+        });
   }
 
   Future<Result<void>> _loadSuggested() async {
     _suggested = [];
 
     for (final int id in _suggestedIds) {
-      final result = await _byIdUseCase.getById(id);
-
-      switch (result) {
-        case Success<PlaceContent>():
-          _suggested.add(result.value);
-        case Error<PlaceContent>():
-      }
+      final place = (await _byIdUseCase.getById(id)).getOrNull();
+      if (place != null) _suggested.add(place);
     }
 
     notifyListeners();

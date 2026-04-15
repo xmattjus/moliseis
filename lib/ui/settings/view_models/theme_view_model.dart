@@ -35,11 +35,9 @@ class ThemeViewModel extends ChangeNotifier {
 
     final result = await _settingsRepository.setThemeType(type);
 
-    switch (result) {
-      case Error<void>():
-        _themeType = oldType; // Revert the change on error.
-        notifyListeners();
-      case Success<void>():
+    if (result.isError) {
+      _themeType = oldType; // Revert the change on error.
+      notifyListeners();
     }
 
     return result;
@@ -54,11 +52,9 @@ class ThemeViewModel extends ChangeNotifier {
 
     final result = await _settingsRepository.setThemeBrightness(brightness);
 
-    switch (result) {
-      case Error<void>():
-        _themeBrightness = oldBrightness; // Revert the change on error.
-        notifyListeners();
-      case Success<void>():
+    if (result.isError) {
+      _themeBrightness = oldBrightness; // Revert the change on error.
+      notifyListeners();
     }
 
     return result;

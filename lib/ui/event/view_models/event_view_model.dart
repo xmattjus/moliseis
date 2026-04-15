@@ -1,7 +1,6 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/sources/event.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/utils/command.dart';
@@ -84,13 +83,8 @@ class EventViewModel extends ChangeNotifier {
   Future<Result<void>> _loadAll() async {
     final result = await _eventRepository.getByCurrentYear();
 
-    switch (result) {
-      case Success<List<Event>>():
-        _all = result.value
-            .map((event) => EventContent.fromEvent(event))
-            .toList();
-      case Error<List<Event>>():
-    }
+    final events = result.getOrNull();
+    if (events != null) _all = events.map(EventContent.fromEvent).toList();
 
     notifyListeners();
 
@@ -115,13 +109,8 @@ class EventViewModel extends ChangeNotifier {
 
     final result = await _eventRepository.getByDate(date);
 
-    switch (result) {
-      case Success<List<Event>>():
-        _byDate = result.value
-            .map((event) => EventContent.fromEvent(event))
-            .toList();
-      case Error<List<Event>>():
-    }
+    final events = result.getOrNull();
+    if (events != null) _byDate = events.map(EventContent.fromEvent).toList();
 
     notifyListeners();
 
@@ -131,21 +120,13 @@ class EventViewModel extends ChangeNotifier {
   Future<Result<void>> _loadNextIds() async {
     final result = await _eventRepository.getNextEventIds();
 
-    switch (result) {
-      case Success<List<int>>():
-        _nextIds = result.value;
-      case Error<List<int>>():
-    }
+    final ids = result.getOrNull();
+    if (ids != null) _nextIds = ids;
 
     notifyListeners();
 
-    loadNext.execute();
-
-    return result;
-  }
-
-  Future<Result<void>> refreshData() async {
-    final result = await _eventRepository.synchronize();
+    // Only trigger the next-events fetch when IDs were loaded successfully.
+    if (result.isSuccess) loadNext.execute();
 
     return result;
   }
@@ -154,13 +135,8 @@ class EventViewModel extends ChangeNotifier {
     _next.clear();
 
     for (final id in _nextIds) {
-      final result = await _eventRepository.getById(id);
-
-      switch (result) {
-        case Success<Event>():
-          _next.add(EventContent.fromEvent(result.value));
-        case Error<Event>():
-      }
+      final event = (await _eventRepository.getById(id)).getOrNull();
+      if (event != null) _next.add(EventContent.fromEvent(event));
     }
 
     notifyListeners();

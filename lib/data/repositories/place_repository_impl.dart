@@ -130,16 +130,25 @@ class PlaceRepositoryImpl implements PlaceRepository {
   Future<Result<List<int>>> getIdsByCoordinates(
     List<double> coordinates,
   ) async {
-    final query = _placeBox
-        .query(Place_.coordinates.nearestNeighborsF32(coordinates, 3))
-        .build();
-    final resultsWithScores = await query.findIdsWithScoresAsync();
-    query.close();
-    final results = resultsWithScores
-        .map<int>((element) => element.id)
-        .toList();
+    try {
+      final query = _placeBox
+          .query(Place_.coordinates.nearestNeighborsF32(coordinates, 3))
+          .build();
+      final resultsWithScores = await query.findIdsWithScoresAsync();
+      query.close();
 
-    return Result.success(results);
+      return Result.success(
+        resultsWithScores.map<int>((element) => element.id).toList(),
+      );
+    } on Exception catch (error, stackTrace) {
+      _log.error(
+        'An exception occurred while loading place IDs by coordinates.',
+        error,
+        stackTrace,
+      );
+
+      return Result.error(error);
+    }
   }
 
   @override

@@ -1,5 +1,3 @@
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/place.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';
@@ -20,36 +18,14 @@ class CategoryUseCase {
   Future<Result<List<EventContent>>> getEventsByCategories(
     Set<ContentCategory> categories,
   ) async {
-    final list = <EventContent>[];
-
-    final result = await _eventRepository.getByCategories(categories);
-
-    switch (result) {
-      case Success<List<Event>>():
-        for (final event in result.value) {
-          list.add(EventContent.fromEvent(event));
-        }
-      case Error<List<Event>>():
-    }
-
-    return Result.success(list);
+    return (await _eventRepository.getByCategories(categories))
+        .map((events) => events.map(EventContent.fromEvent).toList());
   }
 
   Future<Result<List<PlaceContent>>> getPlacesByCategories(
     Set<ContentCategory> categories,
   ) async {
-    final list = <PlaceContent>[];
-
-    final result = await _placeRepository.getByCategories(categories);
-
-    switch (result) {
-      case Success<List<Place>>():
-        for (final place in result.value) {
-          list.add(PlaceContent.fromPlace(place));
-        }
-      case Error<List<Place>>():
-    }
-
-    return Result.success(list);
+    return (await _placeRepository.getByCategories(categories))
+        .map((places) => places.map(PlaceContent.fromPlace).toList());
   }
 }
