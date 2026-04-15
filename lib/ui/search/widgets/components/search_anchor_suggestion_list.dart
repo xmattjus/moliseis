@@ -32,7 +32,7 @@ class SearchAnchorSuggestionList extends StatelessWidget {
           if (index.isEven) {
             return ContentBaseListItem(
               content,
-              key: ValueKey('list-content:${content.remoteId}'),
+              key: ValueKey<String>('list-item:${content.name}-$index'),
               onPressed: onSuggestionPressed,
               verticalTrailing: content is EventContent
                   ? EventFormattedDateTime(event: content)
