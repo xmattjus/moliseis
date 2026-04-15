@@ -26,7 +26,7 @@ class UserContributionRepositoryImpl extends UserContributionRepository {
   final CloudinaryClient _cloudinaryClient;
 
   @override
-  Future<Result> upload(UserContribution userContribution) async {
+  Future<Result<void>> upload(UserContribution userContribution) async {
     try {
       await _supabase.client.from(_supabaseTable.tableName).insert({
         _supabaseTable.idCity: userContribution.city,
