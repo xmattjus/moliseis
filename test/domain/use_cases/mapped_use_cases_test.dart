@@ -10,7 +10,9 @@ import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
+import 'package:moliseis/domain/use-cases/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
+import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/utils/result.dart';
@@ -367,18 +369,166 @@ void main() {
       expect((nearPlaces as Error<List<ContentBase>>).error, same(placeError));
     });
   });
+
+  group('CategoryUseCase', () {
+    test('getEventsByCategories maps success values to EventContent', () async {
+      final event = _event(remoteId: 40, name: 'Category Event');
+      final useCase = CategoryUseCase(
+        eventRepository: _FakeEventRepository(
+          getByCategoriesResult: Result.success([event]),
+        ),
+        placeRepository: _FakePlaceRepository(),
+      );
+
+      final result = await useCase.getEventsByCategories(
+        {ContentCategory.history},
+      );
+
+      expect(result.isSuccess, isTrue);
+      final content = result.getOrNull()!;
+      expect(content, hasLength(1));
+      expect(content.first, isA<EventContent>());
+      expect(content.first.remoteId, 40);
+      expect(content.first.name, 'Category Event');
+    });
+
+    test('getEventsByCategories propagates repository errors', () async {
+      final error = _TestException('events by category failed');
+      final useCase = CategoryUseCase(
+        eventRepository: _FakeEventRepository(
+          getByCategoriesResult: Result.error(error),
+        ),
+        placeRepository: _FakePlaceRepository(),
+      );
+
+      final result = await useCase.getEventsByCategories(
+        {ContentCategory.history},
+      );
+
+      expect(result.isError, isTrue);
+      expect((result as Error<List<EventContent>>).error, same(error));
+    });
+
+    test('getPlacesByCategories maps success values to PlaceContent', () async {
+      final place = _place(remoteId: 41, name: 'Category Place');
+      final useCase = CategoryUseCase(
+        eventRepository: _FakeEventRepository(),
+        placeRepository: _FakePlaceRepository(
+          getByCategoriesResult: Result.success([place]),
+        ),
+      );
+
+      final result = await useCase.getPlacesByCategories(
+        {ContentCategory.nature},
+      );
+
+      expect(result.isSuccess, isTrue);
+      final content = result.getOrNull()!;
+      expect(content, hasLength(1));
+      expect(content.first, isA<PlaceContent>());
+      expect(content.first.remoteId, 41);
+      expect(content.first.name, 'Category Place');
+    });
+
+    test('getPlacesByCategories propagates repository errors', () async {
+      final error = _TestException('places by category failed');
+      final useCase = CategoryUseCase(
+        eventRepository: _FakeEventRepository(),
+        placeRepository: _FakePlaceRepository(
+          getByCategoriesResult: Result.error(error),
+        ),
+      );
+
+      final result = await useCase.getPlacesByCategories(
+        {ContentCategory.nature},
+      );
+
+      expect(result.isError, isTrue);
+      expect((result as Error<List<PlaceContent>>).error, same(error));
+    });
+  });
+
+  group('FavouriteGetIdsUseCase', () {
+    test('getEventById maps success value to EventContent', () async {
+      final event = _event(remoteId: 50, name: 'Favourite Event');
+      final useCase = FavouriteGetIdsUseCase(
+        eventRepository: _FakeEventRepository(
+          getByIdResult: Result.success(event),
+        ),
+        placeRepository: _FakePlaceRepository(),
+      );
+
+      final result = await useCase.getEventById(50);
+
+      expect(result.isSuccess, isTrue);
+      final content = result.getOrNull()!;
+      expect(content, isA<EventContent>());
+      expect(content.remoteId, 50);
+      expect(content.name, 'Favourite Event');
+    });
+
+    test('getEventById propagates repository error', () async {
+      final error = _TestException('event not found');
+      final useCase = FavouriteGetIdsUseCase(
+        eventRepository: _FakeEventRepository(
+          getByIdResult: Result.error(error),
+        ),
+        placeRepository: _FakePlaceRepository(),
+      );
+
+      final result = await useCase.getEventById(50);
+
+      expect(result.isError, isTrue);
+      expect((result as Error<EventContent>).error, same(error));
+    });
+
+    test('getPlaceById maps success value to PlaceContent', () async {
+      final place = _place(remoteId: 51, name: 'Favourite Place');
+      final useCase = FavouriteGetIdsUseCase(
+        eventRepository: _FakeEventRepository(),
+        placeRepository: _FakePlaceRepository(
+          getByIdResult: Result.success(place),
+        ),
+      );
+
+      final result = await useCase.getPlaceById(51);
+
+      expect(result.isSuccess, isTrue);
+      final content = result.getOrNull()!;
+      expect(content, isA<PlaceContent>());
+      expect(content.remoteId, 51);
+      expect(content.name, 'Favourite Place');
+    });
+
+    test('getPlaceById propagates repository error', () async {
+      final error = _TestException('place not found');
+      final useCase = FavouriteGetIdsUseCase(
+        eventRepository: _FakeEventRepository(),
+        placeRepository: _FakePlaceRepository(
+          getByIdResult: Result.error(error),
+        ),
+      );
+
+      final result = await useCase.getPlaceById(51);
+
+      expect(result.isError, isTrue);
+      expect((result as Error<PlaceContent>).error, same(error));
+    });
+  });
 }
 
 final class _FakeEventRepository extends EventRepository {
   _FakeEventRepository({
     this.getByCurrentYearResult = const Result.success(<Event>[]),
     this.getByCoordinatesResult = const Result.success(<Event>[]),
+    this.getByCategoriesResult = const Result.success(<Event>[]),
     Result<Event>? getByIdResult,
   }) : _getByIdResult =
            getByIdResult ?? Result.error(_TestException('Not configured.'));
 
   final Result<List<Event>> getByCurrentYearResult;
   final Result<List<Event>> getByCoordinatesResult;
+  final Result<List<Event>> getByCategoriesResult;
   final Result<Event> _getByIdResult;
 
   List<double>? lastCoordinates;
@@ -401,7 +551,7 @@ final class _FakeEventRepository extends EventRepository {
   Future<Result<List<Event>>> getByCategories(
     Set<ContentCategory> categories, {
     ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Event>[]);
+  }) async => getByCategoriesResult;
 
   @override
   Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) async {
@@ -432,12 +582,14 @@ final class _FakePlaceRepository extends PlaceRepository {
   _FakePlaceRepository({
     this.getAllResult = const Result.success(<Place>[]),
     this.getByCoordinatesResult = const Result.success(<Place>[]),
+    this.getByCategoriesResult = const Result.success(<Place>[]),
     Result<Place>? getByIdResult,
   }) : _getByIdResult =
            getByIdResult ?? Result.error(_TestException('Not configured.'));
 
   final Result<List<Place>> getAllResult;
   final Result<List<Place>> getByCoordinatesResult;
+  final Result<List<Place>> getByCategoriesResult;
   final Result<Place> _getByIdResult;
 
   ContentSort? lastGetAllSort;
@@ -455,7 +607,7 @@ final class _FakePlaceRepository extends PlaceRepository {
   Future<Result<List<Place>>> getByCategories(
     Set<ContentCategory> categories, {
     ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Place>[]);
+  }) async => getByCategoriesResult;
 
   @override
   Future<Result<List<Place>>> getByCoordinates(List<double> coordinates) async {

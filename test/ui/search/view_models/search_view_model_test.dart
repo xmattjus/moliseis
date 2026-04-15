@@ -263,7 +263,7 @@ void main() {
         expect(vm.results, hasLength(1));
       });
 
-      test('clears previous results before each search', () async {
+      test('clears previous place results before each search', () async {
         final repo = _FakeSearchRepository(
           placeIdsByQueryResult: const Result.success([1]),
           eventIdsByQueryResult: const Result.success([]),
@@ -278,6 +278,25 @@ void main() {
 
         // Switch to empty results and search again on the same VM instance.
         repo._placeIdsByQueryResult = const Result.success([]);
+        await vm.loadSuggestions.execute('isernia');
+        expect(vm.results, isEmpty);
+      });
+
+      test('clears previous event results before each search', () async {
+        final repo = _FakeSearchRepository(
+          placeIdsByQueryResult: const Result.success([]),
+          eventIdsByQueryResult: const Result.success([2]),
+        );
+        final vm = await _buildLoaded(
+          searchRepository: repo,
+          eventResults: {2: Result.success(_makeEvent(2))},
+        );
+
+        await vm.loadSuggestions.execute('campobasso');
+        expect(vm.results, hasLength(1));
+
+        // Switch to empty results and search again on the same VM instance.
+        repo._eventIdsByQueryResult = const Result.success([]);
         await vm.loadSuggestions.execute('isernia');
         expect(vm.results, isEmpty);
       });
