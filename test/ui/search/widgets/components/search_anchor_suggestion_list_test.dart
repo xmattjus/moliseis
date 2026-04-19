@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/content_category.dart' show ContentCategory;
+import 'package:moliseis/domain/models/content_category.dart'
+    show ContentCategory;
 import 'package:moliseis/domain/models/place_content.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/widgets/components/search_anchor_suggestion_list.dart';
@@ -17,8 +18,9 @@ void main() {
       expect(find.text('Risultati rapidi'), findsOneWidget);
     });
 
-    testWidgets('renders no items and no dividers for an empty list',
-        (tester) async {
+    testWidgets('renders no items and no dividers for an empty list', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildTestApp([]));
 
       expect(find.byType(Divider), findsNothing);
@@ -26,8 +28,9 @@ void main() {
       expect(find.byKey(const ValueKey('Place 1')), findsNothing);
     });
 
-    testWidgets('renders one item without a divider for a single suggestion',
-        (tester) async {
+    testWidgets('renders one item without a divider for a single suggestion', (
+      tester,
+    ) async {
       final place = _makePlace(1);
 
       await tester.pumpWidget(_buildTestApp([place]));
@@ -58,8 +61,9 @@ void main() {
       expect(find.byType(Divider), findsNWidgets(2));
     });
 
-    testWidgets('calls onSuggestionPressed when an item is tapped',
-        (tester) async {
+    testWidgets('calls onSuggestionPressed when an item is tapped', (
+      tester,
+    ) async {
       final place = _makePlace(1);
       ContentBase? pressed;
 
@@ -73,8 +77,9 @@ void main() {
       expect(pressed, same(place));
     });
 
-    testWidgets('does not fire onSuggestionPressed when callback is null',
-        (tester) async {
+    testWidgets('does not fire onSuggestionPressed when callback is null', (
+      tester,
+    ) async {
       final place = _makePlace(1);
 
       await tester.pumpWidget(_buildTestApp([place]));

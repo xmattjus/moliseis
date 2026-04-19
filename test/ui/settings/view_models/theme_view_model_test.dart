@@ -19,17 +19,19 @@ void main() {
         expect(vm.themeType, ThemeType.app);
       });
 
-      test('reverts themeType to previous value when repository write fails',
-          () async {
-        final vm = buildViewModel(
-          setThemeTypeResult: Result.error(_TestException('write failed')),
-        );
+      test(
+        'reverts themeType to previous value when repository write fails',
+        () async {
+          final vm = buildViewModel(
+            setThemeTypeResult: Result.error(_TestException('write failed')),
+          );
 
-        await vm.setThemeType.execute(ThemeType.app);
+          await vm.setThemeType.execute(ThemeType.app);
 
-        expect(vm.setThemeType.error, isTrue);
-        expect(vm.themeType, ThemeType.system);
-      });
+          expect(vm.setThemeType.error, isTrue);
+          expect(vm.themeType, ThemeType.system);
+        },
+      );
     });
 
     group('setThemeBrightness', () {
@@ -43,18 +45,21 @@ void main() {
       });
 
       test(
-          'reverts themeBrightness to previous value when repository write fails',
-          () async {
-        final vm = buildViewModel(
-          initialBrightness: ThemeBrightness.light,
-          setThemeBrightnessResult: Result.error(_TestException('write failed')),
-        );
+        'reverts themeBrightness to previous value when repository write fails',
+        () async {
+          final vm = buildViewModel(
+            initialBrightness: ThemeBrightness.light,
+            setThemeBrightnessResult: Result.error(
+              _TestException('write failed'),
+            ),
+          );
 
-        await vm.setThemeBrightness.execute(ThemeBrightness.dark);
+          await vm.setThemeBrightness.execute(ThemeBrightness.dark);
 
-        expect(vm.setThemeBrightness.error, isTrue);
-        expect(vm.themeBrightness, ThemeBrightness.light);
-      });
+          expect(vm.setThemeBrightness.error, isTrue);
+          expect(vm.themeBrightness, ThemeBrightness.light);
+        },
+      );
     });
 
     group('themeMode', () {

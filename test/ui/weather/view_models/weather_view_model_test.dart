@@ -29,7 +29,10 @@ void main() {
   );
 
   final testHourlyData = HourlyWeatherForecastData(
-    time: List.generate(24, (i) => '2026-04-07T${i.toString().padLeft(2, '0')}:00'),
+    time: List.generate(
+      24,
+      (i) => '2026-04-07T${i.toString().padLeft(2, '0')}:00',
+    ),
     temperature2m: List.filled(24, 18.5),
     weatherCode: List.filled(24, 0),
     precipitationProbability: List.filled(24, 0),
@@ -64,18 +67,21 @@ void main() {
   WeatherViewModel buildViewModel(_FakeWeatherApiClient fakeClient) {
     final apiClient = CachedWeatherApiClient(
       weatherApiClient: fakeClient,
-      currentWeatherCache: LruCache<
-        String,
-        WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-      >(maxSize: 8),
-      hourlyWeatherCache: LruCache<
-        String,
-        WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
-      >(maxSize: 8),
-      dailyWeatherCache: LruCache<
-        String,
-        WeatherForecastDataCacheEntry<DailyWeatherForecastData>
-      >(maxSize: 8),
+      currentWeatherCache:
+          LruCache<
+            String,
+            WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
+          >(maxSize: 8),
+      hourlyWeatherCache:
+          LruCache<
+            String,
+            WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
+          >(maxSize: 8),
+      dailyWeatherCache:
+          LruCache<
+            String,
+            WeatherForecastDataCacheEntry<DailyWeatherForecastData>
+          >(maxSize: 8),
     );
 
     return WeatherViewModel(
@@ -102,13 +108,18 @@ void main() {
         expect(viewModel.currentTemperatureCelsius, '18.5');
         expect(viewModel.isDay, isTrue);
         // Clear sky day → sunny icon, not the default question mark.
-        expect(viewModel.currentWeatherCodeIcon, isNot(equals(Symbols.question_mark)));
+        expect(
+          viewModel.currentWeatherCodeIcon,
+          isNot(equals(Symbols.question_mark)),
+        );
         expect(viewModel.currentWeatherDescription, isNot('Meteo sconosciuto'));
       });
 
       test('leaves state at defaults and surfaces error on failure', () async {
         final viewModel = buildViewModel(
-          _FakeWeatherApiClient(result: Result.error(_TestException('network error'))),
+          _FakeWeatherApiClient(
+            result: Result.error(_TestException('network error')),
+          ),
         );
 
         await viewModel.loadCurrentForecast.execute(testCoordinates);
@@ -142,21 +153,26 @@ void main() {
         expect(viewModel.getHourlyForecastData!.time.length, 24);
       });
 
-      test('leaves getHourlyForecastData null and surfaces error on failure', () async {
-        final viewModel = buildViewModel(
-          _FakeWeatherApiClient(result: Result.error(_TestException('network error'))),
-        );
+      test(
+        'leaves getHourlyForecastData null and surfaces error on failure',
+        () async {
+          final viewModel = buildViewModel(
+            _FakeWeatherApiClient(
+              result: Result.error(_TestException('network error')),
+            ),
+          );
 
-        await viewModel.loadHourlyForecast.execute(testCoordinates);
+          await viewModel.loadHourlyForecast.execute(testCoordinates);
 
-        expect(viewModel.loadHourlyForecast.completed, isFalse);
-        expect(viewModel.loadHourlyForecast.error, isTrue);
-        expect(
-          viewModel.loadHourlyForecast.result,
-          isA<Error<HourlyWeatherForecastData>>(),
-        );
-        expect(viewModel.getHourlyForecastData, isNull);
-      });
+          expect(viewModel.loadHourlyForecast.completed, isFalse);
+          expect(viewModel.loadHourlyForecast.error, isTrue);
+          expect(
+            viewModel.loadHourlyForecast.result,
+            isA<Error<HourlyWeatherForecastData>>(),
+          );
+          expect(viewModel.getHourlyForecastData, isNull);
+        },
+      );
     });
 
     group('loadDailyForecast', () {
@@ -176,28 +192,33 @@ void main() {
         expect(viewModel.getDailyForecastData!.time.length, 3);
       });
 
-      test('leaves getDailyForecastData null and surfaces error on failure', () async {
-        final viewModel = buildViewModel(
-          _FakeWeatherApiClient(result: Result.error(_TestException('network error'))),
-        );
+      test(
+        'leaves getDailyForecastData null and surfaces error on failure',
+        () async {
+          final viewModel = buildViewModel(
+            _FakeWeatherApiClient(
+              result: Result.error(_TestException('network error')),
+            ),
+          );
 
-        await viewModel.loadDailyForecast.execute(testCoordinates);
+          await viewModel.loadDailyForecast.execute(testCoordinates);
 
-        expect(viewModel.loadDailyForecast.completed, isFalse);
-        expect(viewModel.loadDailyForecast.error, isTrue);
-        expect(
-          viewModel.loadDailyForecast.result,
-          isA<Error<DailyWeatherForecastData>>(),
-        );
-        expect(viewModel.getDailyForecastData, isNull);
-      });
+          expect(viewModel.loadDailyForecast.completed, isFalse);
+          expect(viewModel.loadDailyForecast.error, isTrue);
+          expect(
+            viewModel.loadDailyForecast.result,
+            isA<Error<DailyWeatherForecastData>>(),
+          );
+          expect(viewModel.getDailyForecastData, isNull);
+        },
+      );
     });
   });
 }
 
 final class _FakeWeatherApiClient extends WeatherApiClient {
   _FakeWeatherApiClient({required this.result})
-      : super(logger: Talker(), httpClient: http.Client());
+    : super(logger: Talker(), httpClient: http.Client());
 
   final Result<CombinedWeatherForecastResponse> result;
 

@@ -63,7 +63,8 @@ class FavouriteViewModel extends ChangeNotifier {
   Future<Result<void>> _addEvent(int id) {
     return _addFavourite(
       ids: _favouriteEventIds,
-      persist: (favId) => _favouriteGetIdsUseCase.setFavouriteEvent(favId, true),
+      persist: (favId) =>
+          _favouriteGetIdsUseCase.setFavouriteEvent(favId, true),
       fetchContent: _getEventFromRepository,
       id: id,
     );
@@ -72,7 +73,8 @@ class FavouriteViewModel extends ChangeNotifier {
   Future<Result<void>> _addPlace(int id) {
     return _addFavourite(
       ids: _favouritePlaceIds,
-      persist: (favId) => _favouriteGetIdsUseCase.setFavouritePlace(favId, true),
+      persist: (favId) =>
+          _favouriteGetIdsUseCase.setFavouritePlace(favId, true),
       fetchContent: _getPlaceFromRepository,
       id: id,
     );
@@ -155,7 +157,8 @@ class FavouriteViewModel extends ChangeNotifier {
     return _removeFavourite(
       ids: _favouriteEventIds,
       contents: _favouriteEvents,
-      persist: (favId) => _favouriteGetIdsUseCase.setFavouriteEvent(favId, false),
+      persist: (favId) =>
+          _favouriteGetIdsUseCase.setFavouriteEvent(favId, false),
       fetchContent: _getEventFromRepository,
       id: id,
     );
@@ -165,7 +168,8 @@ class FavouriteViewModel extends ChangeNotifier {
     return _removeFavourite(
       ids: _favouritePlaceIds,
       contents: _favouritePlaces,
-      persist: (favId) => _favouriteGetIdsUseCase.setFavouritePlace(favId, false),
+      persist: (favId) =>
+          _favouriteGetIdsUseCase.setFavouritePlace(favId, false),
       fetchContent: _getPlaceFromRepository,
       id: id,
     );

@@ -70,22 +70,27 @@ void main() {
     );
   });
 
-  WeatherViewModel buildViewModel(Result<CombinedWeatherForecastResponse> result) {
+  WeatherViewModel buildViewModel(
+    Result<CombinedWeatherForecastResponse> result,
+  ) {
     return WeatherViewModel(
       weatherApiClient: CachedWeatherApiClient(
         weatherApiClient: _FakeWeatherApiClient(result: result),
-        currentWeatherCache: LruCache<
-          String,
-          WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-        >(maxSize: 8),
-        hourlyWeatherCache: LruCache<
-          String,
-          WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
-        >(maxSize: 8),
-        dailyWeatherCache: LruCache<
-          String,
-          WeatherForecastDataCacheEntry<DailyWeatherForecastData>
-        >(maxSize: 8),
+        currentWeatherCache:
+            LruCache<
+              String,
+              WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
+            >(maxSize: 8),
+        hourlyWeatherCache:
+            LruCache<
+              String,
+              WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
+            >(maxSize: 8),
+        dailyWeatherCache:
+            LruCache<
+              String,
+              WeatherForecastDataCacheEntry<DailyWeatherForecastData>
+            >(maxSize: 8),
       ),
       weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
       weatherCodeIconMapper: const WmoWeatherIconMapper(),
@@ -141,7 +146,7 @@ void main() {
 
 final class _FakeWeatherApiClient extends WeatherApiClient {
   _FakeWeatherApiClient({required this.result})
-      : super(logger: Talker(), httpClient: http.Client());
+    : super(logger: Talker(), httpClient: http.Client());
 
   final Result<CombinedWeatherForecastResponse> result;
 

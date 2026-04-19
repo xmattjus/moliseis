@@ -18,14 +18,16 @@ class CategoryUseCase {
   Future<Result<List<EventContent>>> getEventsByCategories(
     Set<ContentCategory> categories,
   ) async {
-    return (await _eventRepository.getByCategories(categories))
-        .map((events) => events.map(EventContent.fromEvent).toList());
+    return (await _eventRepository.getByCategories(
+      categories,
+    )).map((events) => events.map(EventContent.fromEvent).toList());
   }
 
   Future<Result<List<PlaceContent>>> getPlacesByCategories(
     Set<ContentCategory> categories,
   ) async {
-    return (await _placeRepository.getByCategories(categories))
-        .map((places) => places.map(PlaceContent.fromPlace).toList());
+    return (await _placeRepository.getByCategories(
+      categories,
+    )).map((places) => places.map(PlaceContent.fromPlace).toList());
   }
 }

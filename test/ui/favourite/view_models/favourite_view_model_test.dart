@@ -32,48 +32,60 @@ void main() {
         expect(vm.favouritePlaces.first.remoteId, equals(10));
       });
 
-      test('leaves place list empty and surfaces error when places fetch fails',
-          () async {
-        final vm = await _buildLoaded(
-          _FakeFavouriteGetIdsUseCase(
-            favouritePlaceIdsResult: Result.error(_TestException('places failed')),
-            // Events are still fetched even when places fail.
-            favouriteEventIdsResult: const Result.success([1]),
-            eventResults: {1: Result.success(_makeEvent(1))},
-          ),
-        );
+      test(
+        'leaves place list empty and surfaces error when places fetch fails',
+        () async {
+          final vm = await _buildLoaded(
+            _FakeFavouriteGetIdsUseCase(
+              favouritePlaceIdsResult: Result.error(
+                _TestException('places failed'),
+              ),
+              // Events are still fetched even when places fail.
+              favouriteEventIdsResult: const Result.success([1]),
+              eventResults: {1: Result.success(_makeEvent(1))},
+            ),
+          );
 
-        expect(vm.load.error, isTrue);
-        expect(vm.load.result, isA<Error<void>>());
-        expect(vm.favouritePlaceIds, isEmpty);
-        expect(vm.favouritePlaces, isEmpty);
-        expect(vm.favouriteEventIds, equals([1]));
-        expect(vm.favouriteEvents, hasLength(1));
-      });
+          expect(vm.load.error, isTrue);
+          expect(vm.load.result, isA<Error<void>>());
+          expect(vm.favouritePlaceIds, isEmpty);
+          expect(vm.favouritePlaces, isEmpty);
+          expect(vm.favouriteEventIds, equals([1]));
+          expect(vm.favouriteEvents, hasLength(1));
+        },
+      );
 
-      test('leaves event list empty and surfaces error when events fetch fails',
-          () async {
-        final vm = await _buildLoaded(
-          _FakeFavouriteGetIdsUseCase(
-            favouritePlaceIdsResult: const Result.success([10]),
-            placeResults: {10: Result.success(_makePlace(10))},
-            favouriteEventIdsResult: Result.error(_TestException('events failed')),
-          ),
-        );
+      test(
+        'leaves event list empty and surfaces error when events fetch fails',
+        () async {
+          final vm = await _buildLoaded(
+            _FakeFavouriteGetIdsUseCase(
+              favouritePlaceIdsResult: const Result.success([10]),
+              placeResults: {10: Result.success(_makePlace(10))},
+              favouriteEventIdsResult: Result.error(
+                _TestException('events failed'),
+              ),
+            ),
+          );
 
-        expect(vm.load.error, isTrue);
-        expect(vm.load.result, isA<Error<void>>());
-        expect(vm.favouriteEventIds, isEmpty);
-        expect(vm.favouriteEvents, isEmpty);
-        expect(vm.favouritePlaceIds, equals([10]));
-        expect(vm.favouritePlaces, hasLength(1));
-      });
+          expect(vm.load.error, isTrue);
+          expect(vm.load.result, isA<Error<void>>());
+          expect(vm.favouriteEventIds, isEmpty);
+          expect(vm.favouriteEvents, isEmpty);
+          expect(vm.favouritePlaceIds, equals([10]));
+          expect(vm.favouritePlaces, hasLength(1));
+        },
+      );
 
       test('returns places error when both fetches fail', () async {
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
-            favouritePlaceIdsResult: Result.error(_TestException('places failed')),
-            favouriteEventIdsResult: Result.error(_TestException('events failed')),
+            favouritePlaceIdsResult: Result.error(
+              _TestException('places failed'),
+            ),
+            favouriteEventIdsResult: Result.error(
+              _TestException('events failed'),
+            ),
           ),
         );
 

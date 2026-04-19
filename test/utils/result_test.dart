@@ -170,9 +170,9 @@ void main() {
 
     group('mapError', () {
       test('leaves success unchanged', () {
-        final result = const Result.success(42).mapError(
-          (_) => _TestException('x'),
-        );
+        final result = const Result.success(
+          42,
+        ).mapError((_) => _TestException('x'));
 
         expect(result, isA<Success<int>>());
         expect((result as Success<int>).value, 42);
@@ -223,9 +223,9 @@ void main() {
 
     group('flatMapError', () {
       test('leaves success unchanged', () {
-        final result = const Result.success(42).flatMapError(
-          (_) => const Result.success(0),
-        );
+        final result = const Result.success(
+          42,
+        ).flatMapError((_) => const Result.success(0));
 
         expect(result, isA<Success<int>>());
         expect((result as Success<int>).value, 42);
@@ -286,9 +286,7 @@ void main() {
 
     group('asyncFold', () {
       test('returns success branch value', () async {
-        final result = await const Result.success(
-          'molise',
-        ).asyncFold(
+        final result = await const Result.success('molise').asyncFold(
           (value) => Future.value(value.toUpperCase()),
           (_) => Future.value('error'),
         );
@@ -297,12 +295,11 @@ void main() {
       });
 
       test('returns error branch value', () async {
-        final result = await Result<int>.error(
-          _TestException('failed'),
-        ).asyncFold(
-          (value) => Future.value(value * 2),
-          (error) => Future.value(error.toString()),
-        );
+        final result = await Result<int>.error(_TestException('failed'))
+            .asyncFold(
+              (value) => Future.value(value * 2),
+              (error) => Future.value(error.toString()),
+            );
 
         expect(result, 'failed');
       });

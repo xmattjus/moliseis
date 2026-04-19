@@ -82,19 +82,20 @@ class ExploreViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _loadNear(List<double> coordinates) async {
-    return (await _placeRepository.getIdsByCoordinates(coordinates))
-        .asyncFlatMap((ids) async {
-          _near.clear();
+    return (await _placeRepository.getIdsByCoordinates(
+      coordinates,
+    )).asyncFlatMap((ids) async {
+      _near.clear();
 
-          for (final id in ids) {
-            final place = (await _byIdUseCase.getById(id)).getOrNull();
-            if (place != null) _near.add(place);
-          }
+      for (final id in ids) {
+        final place = (await _byIdUseCase.getById(id)).getOrNull();
+        if (place != null) _near.add(place);
+      }
 
-          notifyListeners();
+      notifyListeners();
 
-          return const Result.success(null);
-        });
+      return const Result.success(null);
+    });
   }
 
   Future<Result<void>> _loadSuggested() async {
