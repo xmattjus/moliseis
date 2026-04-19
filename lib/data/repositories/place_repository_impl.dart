@@ -287,7 +287,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
       final builder = query.build();
       final places = builder.findIds();
       places.shuffle();
-      final result = places.sublist(0, 5);
+      final result = places.take(5).toList();
       builder.close();
       return Result.success(result);
     } on Exception catch (error, stackTrace) {
