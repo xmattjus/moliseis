@@ -61,7 +61,7 @@ class SyncUseCase {
   /// successful synchronization, or if there was never a successful
   /// synchronization.
   bool get isSyncRequired {
-    final lastSyncedAt = _settingsRepository.modifiedAt;
+    final lastSyncedAt = _settingsRepository.lastSyncedAt;
 
     if (lastSyncedAt != null) {
       final nextScheduledSync = lastSyncedAt.add(const Duration(days: 3));
@@ -76,5 +76,5 @@ class SyncUseCase {
 
   /// The timestamp of the last successful synchronization, or null if the app
   /// has never been synced.
-  DateTime? get lastSyncedAt => _settingsRepository.modifiedAt;
+  DateTime? get lastSyncedAt => _settingsRepository.lastSyncedAt;
 }

@@ -299,7 +299,7 @@ final class _FakeSettingsRepository implements SettingsRepository {
   ThemeType get themeType => ThemeType.system;
 
   @override
-  DateTime? get modifiedAt => null;
+  DateTime? get lastSyncedAt => null;
 
   @override
   Future<Result<void>> initialize() async => const Result.success(null);

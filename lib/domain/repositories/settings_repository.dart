@@ -25,7 +25,7 @@ abstract class SettingsRepository implements Initializable {
 
   /// Returns the last time the repositories have been successfully synchronized
   /// with the backend.
-  DateTime? get modifiedAt;
+  DateTime? get lastSyncedAt;
 
   /// Returns the user selected theme brightness (system, light, dark).
   ThemeBrightness get themeBrightness;

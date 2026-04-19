@@ -77,7 +77,7 @@ class AppSettings {
   }
 
   @Property(type: PropertyType.dateNano)
-  final DateTime? modifiedAt;
+  final DateTime? lastSyncedAt;
 
   final bool crashReporting;
 
@@ -85,7 +85,7 @@ class AppSettings {
     this.type = ThemeType.system,
     this.brightness = ThemeBrightness.system,
     this.contentSort = ContentSort.byName,
-    this.modifiedAt,
+    this.lastSyncedAt,
     this.crashReporting = true,
   }) : id = _settingsId;
 
@@ -93,14 +93,14 @@ class AppSettings {
     ThemeType? type,
     ThemeBrightness? brightness,
     ContentSort? contentSort,
-    DateTime? modifiedAt,
+    DateTime? lastSyncedAt,
     bool? crashReporting,
   }) {
     return AppSettings(
       type: type ?? this.type,
       brightness: brightness ?? this.brightness,
       contentSort: contentSort ?? this.contentSort,
-      modifiedAt: modifiedAt ?? this.modifiedAt,
+      lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
       crashReporting: crashReporting ?? this.crashReporting,
     );
   }

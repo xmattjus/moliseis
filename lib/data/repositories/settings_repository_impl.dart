@@ -57,7 +57,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
   bool get crashReporting => _cache.crashReporting;
 
   @override
-  DateTime? get modifiedAt => _cache.modifiedAt;
+  DateTime? get lastSyncedAt => _cache.lastSyncedAt;
 
   @override
   ThemeBrightness get themeBrightness => _cache.brightness;
@@ -79,7 +79,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   @override
   Future<Result<void>> setModifiedAt(DateTime dateTime) {
-    final newSettings = _cache.copyWith(modifiedAt: dateTime);
+    final newSettings = _cache.copyWith(lastSyncedAt: dateTime);
     return _persistNewSettings(newSettings);
   }
 

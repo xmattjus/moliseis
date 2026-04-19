@@ -299,7 +299,7 @@ final class _FakeSettingsRepository implements SettingsRepository {
   bool setModifiedAtCalled = false;
 
   @override
-  DateTime? get modifiedAt => _modifiedAt;
+  DateTime? get lastSyncedAt => _modifiedAt;
 
   @override
   bool get crashReporting => false;

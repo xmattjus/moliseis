@@ -62,7 +62,7 @@ final class _FakeSettingsRepository implements SettingsRepository {
   ContentSort get contentSort => ContentSort.byName;
 
   @override
-  DateTime? get modifiedAt => null;
+  DateTime? get lastSyncedAt => null;
 
   @override
   ThemeBrightness get themeBrightness => ThemeBrightness.system;

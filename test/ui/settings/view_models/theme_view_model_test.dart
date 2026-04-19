@@ -135,7 +135,7 @@ final class _FakeSettingsRepository implements SettingsRepository {
   ContentSort get contentSort => ContentSort.byName;
 
   @override
-  DateTime? get modifiedAt => null;
+  DateTime? get lastSyncedAt => null;
 
   @override
   Future<Result<void>> initialize() async => const Result.success(null);

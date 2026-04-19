@@ -49,7 +49,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(6, 8898619296747710534),
     name: 'AppSettings',
-    lastPropertyId: const obx_int.IdUid(9, 6564128004023016665),
+    lastPropertyId: const obx_int.IdUid(10, 398867547277998639),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -71,12 +71,6 @@ final _entities = <obx_int.ModelEntity>[
         flags: 0,
       ),
       obx_int.ModelProperty(
-        id: const obx_int.IdUid(6, 8698919519109082338),
-        name: 'modifiedAt',
-        type: 12,
-        flags: 0,
-      ),
-      obx_int.ModelProperty(
         id: const obx_int.IdUid(7, 7600004363329355930),
         name: 'crashReporting',
         type: 1,
@@ -86,6 +80,12 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(9, 6564128004023016665),
         name: 'dbContentSort',
         type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(10, 398867547277998639),
+        name: 'lastSyncedAt',
+        type: 12,
         flags: 0,
       ),
     ],
@@ -586,6 +586,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
       6094257660996527827,
       5541465206948084386,
       6813134625829058715,
+      8698919519109082338,
     ],
     retiredRelationUids: const [2557435973112971372, 6027552760664793313],
     modelVersion: 5,
@@ -631,33 +632,33 @@ obx_int.ModelDefinition getObjectBoxModel() {
         object.id = id;
       },
       objectToFB: (AppSettings object, fb.Builder fbb) {
-        fbb.startTable(10);
+        fbb.startTable(11);
         fbb.addInt64(0, object.id);
         fbb.addInt64(3, object.dbMode);
         fbb.addInt64(4, object.dbBrightness);
-        fbb.addInt64(
-          5,
-          object.modifiedAt == null
-              ? null
-              : object.modifiedAt!.microsecondsSinceEpoch * 1000,
-        );
         fbb.addBool(6, object.crashReporting);
         fbb.addInt64(8, object.dbContentSort);
+        fbb.addInt64(
+          9,
+          object.lastSyncedAt == null
+              ? null
+              : object.lastSyncedAt!.microsecondsSinceEpoch * 1000,
+        );
         fbb.finish(fbb.endTable());
         return object.id;
       },
       objectFromFB: (obx.Store store, ByteData fbData) {
         final buffer = fb.BufferContext(fbData);
         final rootOffset = buffer.derefObject(0);
-        final modifiedAtValue = const fb.Int64Reader().vTableGetNullable(
+        final lastSyncedAtValue = const fb.Int64Reader().vTableGetNullable(
           buffer,
           rootOffset,
-          14,
+          22,
         );
-        final modifiedAtParam = modifiedAtValue == null
+        final lastSyncedAtParam = lastSyncedAtValue == null
             ? null
             : DateTime.fromMicrosecondsSinceEpoch(
-                (modifiedAtValue / 1000).round(),
+                (lastSyncedAtValue / 1000).round(),
               );
         final crashReportingParam = const fb.BoolReader().vTableGet(
           buffer,
@@ -667,7 +668,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         );
         final object =
             AppSettings(
-                modifiedAt: modifiedAtParam,
+                lastSyncedAt: lastSyncedAtParam,
                 crashReporting: crashReportingParam,
               )
               ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0)
@@ -1208,18 +1209,18 @@ class AppSettings_ {
     _entities[1].properties[2],
   );
 
-  /// See [AppSettings.modifiedAt].
-  static final modifiedAt = obx.QueryDateNanoProperty<AppSettings>(
-    _entities[1].properties[3],
-  );
-
   /// See [AppSettings.crashReporting].
   static final crashReporting = obx.QueryBooleanProperty<AppSettings>(
-    _entities[1].properties[4],
+    _entities[1].properties[3],
   );
 
   /// See [AppSettings.dbContentSort].
   static final dbContentSort = obx.QueryIntegerProperty<AppSettings>(
+    _entities[1].properties[4],
+  );
+
+  /// See [AppSettings.lastSyncedAt].
+  static final lastSyncedAt = obx.QueryDateNanoProperty<AppSettings>(
     _entities[1].properties[5],
   );
 }
