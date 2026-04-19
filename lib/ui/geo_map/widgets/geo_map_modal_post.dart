@@ -86,7 +86,7 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
           PostSectionActionButtons(
             content: widget.content,
             onCategoryPressed: () {
-              // TODO(xmattjus): Implement category filtering when the category chip is pressed.
+              // TODO(xmattjus): implement category filtering when the category chip is pressed.
             },
           ),
           PostSectionDescription(content: widget.content),

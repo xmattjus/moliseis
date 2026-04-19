@@ -371,7 +371,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     // screen.
     final offset = (bottomChromeHeight - topViewPadding) / -2;
 
-    // TODO (xmattjus): find out why the map does not load without a fake delay, https://github.com/fleaflet/flutter_map/issues/1813.
+    // TODO(xmattjus): find out why the map does not load without a fake delay, https://github.com/fleaflet/flutter_map/issues/1813.
     Future.delayed(Duration.zero, () {
       _mapController.move(_currentCenter, 16, offset: Offset(0, offset + 16.0));
     });

@@ -1,4 +1,4 @@
-// TODO(xmattjus): Implement related results in search.
+// TODO(xmattjus): implement related results in search.
 /*
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/core/content_base.dart';

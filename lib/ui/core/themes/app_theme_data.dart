@@ -4,6 +4,7 @@ import 'package:moliseis/ui/core/themes/text_theme.dart';
 import 'package:moliseis/ui/core/themes/theme_extensions.dart';
 
 class AppThemeData {
+  // Private constructor to prevent class instantiation.
   const AppThemeData._();
 
   static ThemeData light({

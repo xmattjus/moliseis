@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppTextStyles {
+  // Private constructor to prevent class instantiation.
   const AppTextStyles._();
 
   static TextStyle? subtitle(BuildContext context) =>

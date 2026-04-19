@@ -2,6 +2,7 @@ import 'package:email_validator/email_validator.dart';
 import 'package:string_validator/string_validator.dart' show isURL;
 
 final class StringValidator {
+  // Private constructor to prevent class instantiation.
   StringValidator._();
 
   /// Whether [s] is a valid e-mail address or not.

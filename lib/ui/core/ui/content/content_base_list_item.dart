@@ -4,7 +4,7 @@ import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-// TODO (xmattjus): draw inkwell on top of the image.
+// TODO(xmattjus): draw inkwell on top of the image.
 class ContentBaseListItem extends StatelessWidget {
   final ContentBase content;
   final void Function(ContentBase content)? onPressed;

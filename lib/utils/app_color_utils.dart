@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:material_color_utilities/blend/blend.dart';
 
 class AppColorUtils {
+  // Private constructor to prevent class instantiation.
   AppColorUtils._();
 
   /// Source: https://stackoverflow.com/a/21682946.

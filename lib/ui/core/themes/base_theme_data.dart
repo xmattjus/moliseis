@@ -5,6 +5,7 @@ import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/text_theme.dart';
 
 class BaseThemeData {
+  // Private constructor to prevent class instantiation.
   BaseThemeData._();
 
   static ThemeData get({
@@ -16,7 +17,8 @@ class BaseThemeData {
     NavigationBarThemeData? navigationBarTheme,
     NavigationRailThemeData? navigationRailTheme,
   }) {
-    // Get a reference to the M3 Expressive shape tokens to use in the theme data below.
+    // Get a reference to the M3 Expressive shape tokens to use in the theme
+    // data below.
     final appShapes = AppShapesThemeExtension();
 
     return ThemeData(
