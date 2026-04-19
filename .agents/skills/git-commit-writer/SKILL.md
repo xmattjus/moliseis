@@ -1,7 +1,6 @@
 ---
 name: git-commit-writer
 description: Writes conventional commit messages by analyzing staged git changes. Use when the user asks to commit, write a commit message, or after completing code changes that need to be committed. Supports Conventional Commits format with scope detection and breaking change identification.
-_agensi: "3168d680-c73c-4c26-a779-b5c3477119fa"
 ---
 
 Write precise, informative commit messages following the Conventional Commits specification by analyzing the actual staged changes.

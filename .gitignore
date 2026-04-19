@@ -128,3 +128,5 @@ app.*.symbols
 **/android/app/release
 
 lib/libobjectbox.dylib
+# Added by code-review-graph
+.code-review-graph/
