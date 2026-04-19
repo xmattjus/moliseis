@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
+import 'package:moliseis/data/data-sources/media.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
-import 'package:moliseis/data/sources/media.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/ui/app_page_indicator.dart';

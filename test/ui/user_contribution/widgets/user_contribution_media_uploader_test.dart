@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:moliseis/data/sources/user_contribution.dart';
+import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
@@ -17,9 +17,7 @@ import 'package:talker_flutter/talker_flutter.dart';
 void main() {
   Widget buildTestApp(UserContributionViewModel viewModel) {
     return MaterialApp(
-      home: Scaffold(
-        body: UserContributionMediaUploader(viewModel: viewModel),
-      ),
+      home: Scaffold(body: UserContributionMediaUploader(viewModel: viewModel)),
     );
   }
 
@@ -32,7 +30,9 @@ void main() {
   }
 
   group('UserContributionMediaUploader', () {
-    testWidgets('shows add-photo button when idle with no media', (tester) async {
+    testWidgets('shows add-photo button when idle with no media', (
+      tester,
+    ) async {
       final vm = buildViewModel();
 
       await tester.pumpWidget(buildTestApp(vm));
@@ -65,7 +65,9 @@ void main() {
       expect(find.byIcon(Symbols.add_a_photo), findsOneWidget);
     });
 
-    testWidgets('shows spinner while retrieveLostMedia is running', (tester) async {
+    testWidgets('shows spinner while retrieveLostMedia is running', (
+      tester,
+    ) async {
       // testWidgets calls _verifyInvariants before addTearDown fires, so the
       // platform override must be cleared inside the test body via try/finally.
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -115,14 +117,13 @@ final class _FakeImagePicker extends ImagePicker {
     int? imageQuality,
     int? limit,
     bool requestFullMetadata = true,
-  }) async =>
-      onPickMultipleMedia != null ? await onPickMultipleMedia!() : [];
+  }) async => onPickMultipleMedia != null ? await onPickMultipleMedia!() : [];
 
   @override
   Future<LostDataResponse> retrieveLostData() async =>
       onRetrieveLostData != null
-          ? await onRetrieveLostData!()
-          : LostDataResponse.empty();
+      ? await onRetrieveLostData!()
+      : LostDataResponse.empty();
 }
 
 final class _FakeUserContributionRepository

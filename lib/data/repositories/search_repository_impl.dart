@@ -1,9 +1,9 @@
 import 'package:moliseis/data/core/object_box_conditions.dart';
+import 'package:moliseis/data/data-sources/city.dart';
+import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/place.dart';
+import 'package:moliseis/data/data-sources/search_query.dart';
 import 'package:moliseis/data/services/objectbox.dart';
-import 'package:moliseis/data/sources/city.dart';
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/place.dart';
-import 'package:moliseis/data/sources/search_query.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';

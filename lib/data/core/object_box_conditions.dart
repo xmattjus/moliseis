@@ -1,4 +1,4 @@
-import 'package:moliseis/data/sources/event.dart';
+import 'package:moliseis/data/data-sources/event.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 

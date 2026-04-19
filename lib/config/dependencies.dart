@@ -1,6 +1,11 @@
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/env/env.dart';
+import 'package:moliseis/data/data-sources/city_supabase_table.dart';
+import 'package:moliseis/data/data-sources/event_supabase_table.dart';
+import 'package:moliseis/data/data-sources/media_supabase_table.dart';
+import 'package:moliseis/data/data-sources/place_supabase_table.dart';
+import 'package:moliseis/data/data-sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
@@ -17,11 +22,6 @@ import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/services/services.dart';
-import 'package:moliseis/data/sources/city_supabase_table.dart';
-import 'package:moliseis/data/sources/event_supabase_table.dart';
-import 'package:moliseis/data/sources/media_supabase_table.dart';
-import 'package:moliseis/data/sources/place_supabase_table.dart';
-import 'package:moliseis/data/sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/geo_map_repository.dart';

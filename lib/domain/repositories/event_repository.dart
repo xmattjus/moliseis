@@ -1,4 +1,4 @@
-import 'package:moliseis/data/sources/event.dart';
+import 'package:moliseis/data/data-sources/event.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/utils/result.dart';

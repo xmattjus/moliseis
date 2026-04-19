@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/data/data-sources/app_settings.dart';
+import 'package:moliseis/data/data-sources/settings_local_data_source.dart';
 import 'package:moliseis/data/repositories/settings_repository_impl.dart';
-import 'package:moliseis/data/sources/app_settings.dart';
-import 'package:moliseis/data/sources/settings_local_data_source.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/utils/result.dart';
 

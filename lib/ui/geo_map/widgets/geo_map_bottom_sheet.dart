@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/data/data-sources/place.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/models/place_content.dart';

@@ -1,7 +1,7 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'package:meta/meta.dart';
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/place.dart';
 import 'package:objectbox/objectbox.dart';
 
 part 'media.g.dart';

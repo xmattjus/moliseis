@@ -1,6 +1,6 @@
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/sources/city.dart';
-import 'package:moliseis/data/sources/media.dart';
+import 'package:moliseis/data/data-sources/city.dart';
+import 'package:moliseis/data/data-sources/media.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:objectbox/objectbox.dart';
 

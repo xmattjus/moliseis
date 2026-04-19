@@ -1,6 +1,6 @@
+import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/data/data-sources/media_supabase_table.dart';
 import 'package:moliseis/data/services/objectbox.dart';
-import 'package:moliseis/data/sources/media.dart';
-import 'package:moliseis/data/sources/media_supabase_table.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/messages.dart';

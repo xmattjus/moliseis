@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/sources/media.dart';
+import 'package:moliseis/data/data-sources/media.dart';
 import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
 
 /// Encapsulates the post media slideshow with optional overlay controls.

@@ -1,9 +1,9 @@
 // ignore_for_file: avoid_redundant_argument_values
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/data/data-sources/city.dart';
+import 'package:moliseis/data/data-sources/event.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
-import 'package:moliseis/data/sources/city.dart';
-import 'package:moliseis/data/sources/event.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:talker_flutter/talker_flutter.dart';

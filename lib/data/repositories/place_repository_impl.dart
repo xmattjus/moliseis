@@ -1,6 +1,6 @@
+import 'package:moliseis/data/data-sources/place.dart';
+import 'package:moliseis/data/data-sources/place_supabase_table.dart';
 import 'package:moliseis/data/services/objectbox.dart';
-import 'package:moliseis/data/sources/place.dart';
-import 'package:moliseis/data/sources/place_supabase_table.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/media.dart';
-import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/data/data-sources/place.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
@@ -32,80 +32,90 @@ void main() {
   }
 
   group('SyncUseCase.sync', () {
-    test('returns success and records setModifiedAt when all repos succeed',
-        () async {
-      final settings = _FakeSettingsRepository(modifiedAt: null);
-      final useCase = buildUseCase(settings: settings);
+    test(
+      'returns success and records setModifiedAt when all repos succeed',
+      () async {
+        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final useCase = buildUseCase(settings: settings);
 
-      final result = await useCase.sync();
+        final result = await useCase.sync();
 
-      expect(result.isSuccess, isTrue);
-      expect(settings.setModifiedAtCalled, isTrue);
-    });
+        expect(result.isSuccess, isTrue);
+        expect(settings.setModifiedAtCalled, isTrue);
+      },
+    );
 
-    test('returns error and skips setModifiedAt when city repository fails',
-        () async {
-      final error = _TestException('city sync failed');
-      final settings = _FakeSettingsRepository(modifiedAt: null);
-      final useCase = buildUseCase(
-        cityResult: Result.error(error),
-        settings: settings,
-      );
+    test(
+      'returns error and skips setModifiedAt when city repository fails',
+      () async {
+        final error = _TestException('city sync failed');
+        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final useCase = buildUseCase(
+          cityResult: Result.error(error),
+          settings: settings,
+        );
 
-      final result = await useCase.sync();
+        final result = await useCase.sync();
 
-      expect(result.isError, isTrue);
-      expect((result as Error<void>).error, same(error));
-      expect(settings.setModifiedAtCalled, isFalse);
-    });
+        expect(result.isError, isTrue);
+        expect((result as Error<void>).error, same(error));
+        expect(settings.setModifiedAtCalled, isFalse);
+      },
+    );
 
-    test('returns error and skips setModifiedAt when place repository fails',
-        () async {
-      final error = _TestException('place sync failed');
-      final settings = _FakeSettingsRepository(modifiedAt: null);
-      final useCase = buildUseCase(
-        placeResult: Result.error(error),
-        settings: settings,
-      );
+    test(
+      'returns error and skips setModifiedAt when place repository fails',
+      () async {
+        final error = _TestException('place sync failed');
+        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final useCase = buildUseCase(
+          placeResult: Result.error(error),
+          settings: settings,
+        );
 
-      final result = await useCase.sync();
+        final result = await useCase.sync();
 
-      expect(result.isError, isTrue);
-      expect((result as Error<void>).error, same(error));
-      expect(settings.setModifiedAtCalled, isFalse);
-    });
+        expect(result.isError, isTrue);
+        expect((result as Error<void>).error, same(error));
+        expect(settings.setModifiedAtCalled, isFalse);
+      },
+    );
 
-    test('returns error and skips setModifiedAt when event repository fails',
-        () async {
-      final error = _TestException('event sync failed');
-      final settings = _FakeSettingsRepository(modifiedAt: null);
-      final useCase = buildUseCase(
-        eventResult: Result.error(error),
-        settings: settings,
-      );
+    test(
+      'returns error and skips setModifiedAt when event repository fails',
+      () async {
+        final error = _TestException('event sync failed');
+        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final useCase = buildUseCase(
+          eventResult: Result.error(error),
+          settings: settings,
+        );
 
-      final result = await useCase.sync();
+        final result = await useCase.sync();
 
-      expect(result.isError, isTrue);
-      expect((result as Error<void>).error, same(error));
-      expect(settings.setModifiedAtCalled, isFalse);
-    });
+        expect(result.isError, isTrue);
+        expect((result as Error<void>).error, same(error));
+        expect(settings.setModifiedAtCalled, isFalse);
+      },
+    );
 
-    test('returns error and skips setModifiedAt when media repository fails',
-        () async {
-      final error = _TestException('media sync failed');
-      final settings = _FakeSettingsRepository(modifiedAt: null);
-      final useCase = buildUseCase(
-        mediaResult: Result.error(error),
-        settings: settings,
-      );
+    test(
+      'returns error and skips setModifiedAt when media repository fails',
+      () async {
+        final error = _TestException('media sync failed');
+        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final useCase = buildUseCase(
+          mediaResult: Result.error(error),
+          settings: settings,
+        );
 
-      final result = await useCase.sync();
+        final result = await useCase.sync();
 
-      expect(result.isError, isTrue);
-      expect((result as Error<void>).error, same(error));
-      expect(settings.setModifiedAtCalled, isFalse);
-    });
+        expect(result.isError, isTrue);
+        expect((result as Error<void>).error, same(error));
+        expect(settings.setModifiedAtCalled, isFalse);
+      },
+    );
   });
 
   group('SyncUseCase.isSyncRequired', () {

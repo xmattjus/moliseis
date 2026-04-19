@@ -3,7 +3,7 @@
 import 'dart:async' show StreamController;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/data/sources/media.dart';
+import 'package:moliseis/data/data-sources/media.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal_overlay.dart';
 import 'package:swipe_image_gallery/swipe_image_gallery.dart';

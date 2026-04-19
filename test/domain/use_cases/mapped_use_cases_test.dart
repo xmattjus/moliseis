@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/sources/city.dart';
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/media.dart';
-import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/data/data-sources/city.dart';
+import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/data/data-sources/place.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -380,9 +380,9 @@ void main() {
         placeRepository: _FakePlaceRepository(),
       );
 
-      final result = await useCase.getEventsByCategories(
-        {ContentCategory.history},
-      );
+      final result = await useCase.getEventsByCategories({
+        ContentCategory.history,
+      });
 
       expect(result.isSuccess, isTrue);
       final content = result.getOrNull()!;
@@ -401,9 +401,9 @@ void main() {
         placeRepository: _FakePlaceRepository(),
       );
 
-      final result = await useCase.getEventsByCategories(
-        {ContentCategory.history},
-      );
+      final result = await useCase.getEventsByCategories({
+        ContentCategory.history,
+      });
 
       expect(result.isError, isTrue);
       expect((result as Error<List<EventContent>>).error, same(error));
@@ -418,9 +418,9 @@ void main() {
         ),
       );
 
-      final result = await useCase.getPlacesByCategories(
-        {ContentCategory.nature},
-      );
+      final result = await useCase.getPlacesByCategories({
+        ContentCategory.nature,
+      });
 
       expect(result.isSuccess, isTrue);
       final content = result.getOrNull()!;
@@ -439,9 +439,9 @@ void main() {
         ),
       );
 
-      final result = await useCase.getPlacesByCategories(
-        {ContentCategory.nature},
-      );
+      final result = await useCase.getPlacesByCategories({
+        ContentCategory.nature,
+      });
 
       expect(result.isError, isTrue);
       expect((result as Error<List<PlaceContent>>).error, same(error));

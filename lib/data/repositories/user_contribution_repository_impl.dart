@@ -1,8 +1,8 @@
 import 'dart:io' show File;
 
+import 'package:moliseis/data/data-sources/user_contribution.dart';
+import 'package:moliseis/data/data-sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/data/services/api/cloudinary_client.dart';
-import 'package:moliseis/data/sources/user_contribution.dart';
-import 'package:moliseis/data/sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

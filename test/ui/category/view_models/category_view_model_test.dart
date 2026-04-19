@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/sources/city.dart';
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/media.dart';
-import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/data/data-sources/city.dart';
+import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/data/data-sources/place.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/content_type.dart';
@@ -35,47 +35,51 @@ void main() {
         expect(vm.content, hasLength(2));
       });
 
-      test('early-returns and skips event fetch when place fetch fails',
-          () async {
-        final eventRepo = _FakeEventRepository();
-        final placeRepo = _FakePlaceRepository(
-          getByCategoriesResult: Result.error(
-            _TestException('places failed'),
-          ),
-        );
-        final vm = CategoryViewModel(
-          categoryUseCase: CategoryUseCase(
-            eventRepository: eventRepo,
-            placeRepository: placeRepo,
-          ),
-          exploreGetByIdUseCase: ExploreUseCase(
-            eventRepository: eventRepo,
-            placeRepository: placeRepo,
-          ),
-          settingsRepository: _FakeSettingsRepository(),
-        );
+      test(
+        'early-returns and skips event fetch when place fetch fails',
+        () async {
+          final eventRepo = _FakeEventRepository();
+          final placeRepo = _FakePlaceRepository(
+            getByCategoriesResult: Result.error(
+              _TestException('places failed'),
+            ),
+          );
+          final vm = CategoryViewModel(
+            categoryUseCase: CategoryUseCase(
+              eventRepository: eventRepo,
+              placeRepository: placeRepo,
+            ),
+            exploreGetByIdUseCase: ExploreUseCase(
+              eventRepository: eventRepo,
+              placeRepository: placeRepo,
+            ),
+            settingsRepository: _FakeSettingsRepository(),
+          );
 
-        await vm.load.execute();
+          await vm.load.execute();
 
-        expect(vm.load.error, isTrue);
-        expect(vm.content, isEmpty);
-        // Event repository must not have been queried for categories.
-        expect(eventRepo.getByCategoriesCallCount, 0);
-      });
+          expect(vm.load.error, isTrue);
+          expect(vm.content, isEmpty);
+          // Event repository must not have been queried for categories.
+          expect(eventRepo.getByCategoriesCallCount, 0);
+        },
+      );
 
-      test('surfaces error when event fetch fails after successful place fetch',
-          () async {
-        final vm = buildViewModel(
-          placesByCategoryResult: const Result.success(<Place>[]),
-          eventsByCategoryResult: Result.error(
-            _TestException('events failed'),
-          ),
-        );
+      test(
+        'surfaces error when event fetch fails after successful place fetch',
+        () async {
+          final vm = buildViewModel(
+            placesByCategoryResult: const Result.success(<Place>[]),
+            eventsByCategoryResult: Result.error(
+              _TestException('events failed'),
+            ),
+          );
 
-        await vm.load.execute();
+          await vm.load.execute();
 
-        expect(vm.load.error, isTrue);
-      });
+          expect(vm.load.error, isTrue);
+        },
+      );
     });
 
     group('setSelectedCategories', () {
@@ -108,19 +112,21 @@ void main() {
     });
 
     group('setSelectedTypes', () {
-      test('loads only places when only ContentType.place is selected',
-          () async {
-        final place1 = _place(remoteId: 2, name: 'Castle');
-        final vm = buildViewModel(
-          placesByCategoryResult: Result.success([place1]),
-          eventsByCategoryResult: const Result.success(<Event>[]),
-        );
+      test(
+        'loads only places when only ContentType.place is selected',
+        () async {
+          final place1 = _place(remoteId: 2, name: 'Castle');
+          final vm = buildViewModel(
+            placesByCategoryResult: Result.success([place1]),
+            eventsByCategoryResult: const Result.success(<Event>[]),
+          );
 
-        // setSelectedTypes internally triggers load; no extra execute needed.
-        await vm.setSelectedTypes.execute({ContentType.place});
+          // setSelectedTypes internally triggers load; no extra execute needed.
+          await vm.setSelectedTypes.execute({ContentType.place});
 
-        expect(vm.content.every((c) => c is PlaceContent), isTrue);
-      });
+          expect(vm.content.every((c) => c is PlaceContent), isTrue);
+        },
+      );
     });
   });
 }
@@ -142,8 +148,7 @@ CategoryViewModel buildViewModel({
   final eventRepo = _FakeEventRepository(
     getByCategoriesResult:
         eventsByCategoryResult ?? const Result.success(<Event>[]),
-    getByCurrentYearResult:
-        allEventsResult ?? const Result.success(<Event>[]),
+    getByCurrentYearResult: allEventsResult ?? const Result.success(<Event>[]),
   );
   final placeRepo = _FakePlaceRepository(
     getByCategoriesResult:

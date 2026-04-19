@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/sources/event.dart';
+import 'package:moliseis/data/data-sources/event.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/place_content.dart';
@@ -303,43 +303,37 @@ void main() {
     });
 
     group('loadRelatedResultsIds', () {
-      test(
-        'does not fetch results for queries shorter than 3 chars',
-        () async {
-          final vm = await _buildLoaded(
-            searchRepository: _FakeSearchRepository(
-              relatedResultsResult: const Result.success([1]),
-            ),
-            placeResults: {1: Result.success(_makePlaceContent(1))},
-          );
+      test('does not fetch results for queries shorter than 3 chars', () async {
+        final vm = await _buildLoaded(
+          searchRepository: _FakeSearchRepository(
+            relatedResultsResult: const Result.success([1]),
+          ),
+          placeResults: {1: Result.success(_makePlaceContent(1))},
+        );
 
-          await vm.loadRelatedResultsIds.execute('mo');
+        await vm.loadRelatedResultsIds.execute('mo');
 
-          expect(vm.loadRelatedResultsIds.completed, isTrue);
-          expect(vm.relatedResultIds, isEmpty);
-          expect(vm.relatedResults, isEmpty);
-        },
-      );
+        expect(vm.loadRelatedResultsIds.completed, isTrue);
+        expect(vm.relatedResultIds, isEmpty);
+        expect(vm.relatedResults, isEmpty);
+      });
 
-      test(
-        'fetches results for queries of exactly 3 chars',
-        () async {
-          final place = _makePlaceContent(1);
+      test('fetches results for queries of exactly 3 chars', () async {
+        final place = _makePlaceContent(1);
 
-          final vm = await _buildLoaded(
-            searchRepository: _FakeSearchRepository(
-              relatedResultsResult: const Result.success([1]),
-            ),
-            placeResults: {1: Result.success(place)},
-          );
+        final vm = await _buildLoaded(
+          searchRepository: _FakeSearchRepository(
+            relatedResultsResult: const Result.success([1]),
+          ),
+          placeResults: {1: Result.success(place)},
+        );
 
-          await vm.loadRelatedResultsIds.execute('mol');
+        await vm.loadRelatedResultsIds.execute('mol');
 
-          expect(vm.loadRelatedResultsIds.completed, isTrue);
-          expect(vm.relatedResultIds, equals([1]));
-          expect(vm.relatedResults, hasLength(1));
-        },
-      );
+        expect(vm.loadRelatedResultsIds.completed, isTrue);
+        expect(vm.relatedResultIds, equals([1]));
+        expect(vm.relatedResults, hasLength(1));
+      });
     });
 
     group('loadResults', () {

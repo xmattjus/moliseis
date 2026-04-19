@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' as intl;
-import 'package:moliseis/data/sources/user_contribution.dart';
+import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/utils/command.dart';

@@ -1,6 +1,6 @@
 import 'package:latlong2/latlong.dart';
 import 'package:meta/meta.dart';
-import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/data/data-sources/place.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 
 @immutable

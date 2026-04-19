@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/media.dart';
-import 'package:moliseis/data/sources/place.dart';
+import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/data/data-sources/place.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
@@ -39,7 +39,9 @@ void main() {
       final settings = _FakeSettingsRepository(
         modifiedAt: DateTime.now().subtract(const Duration(days: 1)),
       );
-      final viewModel = SyncViewModel(syncUseCase: buildUseCase(settings: settings));
+      final viewModel = SyncViewModel(
+        syncUseCase: buildUseCase(settings: settings),
+      );
 
       expect(viewModel.sync.running, isFalse);
       expect(viewModel.sync.completed, isFalse);
@@ -49,7 +51,9 @@ void main() {
     test('auto-executes and completes when isSyncRequired is true', () async {
       // modifiedAt null → isSyncRequired = true → constructor triggers execute
       final settings = _FakeSettingsRepository(modifiedAt: null);
-      final viewModel = SyncViewModel(syncUseCase: buildUseCase(settings: settings));
+      final viewModel = SyncViewModel(
+        syncUseCase: buildUseCase(settings: settings),
+      );
 
       await pumpEventQueue();
 
@@ -59,56 +63,64 @@ void main() {
   });
 
   group('SyncViewModel.sync success', () {
-    test('completed is true and fatalError is false after successful sync',
-        () async {
-      final settings = _FakeSettingsRepository(modifiedAt: null);
-      final viewModel = SyncViewModel(syncUseCase: buildUseCase(settings: settings));
+    test(
+      'completed is true and fatalError is false after successful sync',
+      () async {
+        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final viewModel = SyncViewModel(
+          syncUseCase: buildUseCase(settings: settings),
+        );
 
-      await pumpEventQueue();
+        await pumpEventQueue();
 
-      expect(viewModel.sync.completed, isTrue);
-      expect(viewModel.fatalError, isFalse);
-    });
+        expect(viewModel.sync.completed, isTrue);
+        expect(viewModel.fatalError, isFalse);
+      },
+    );
   });
 
   group('SyncViewModel.sync error', () {
-    test('sets fatalError when error occurs with no prior successful sync',
-        () async {
-      // modifiedAt null → isSyncRequired = true and no prior sync data
-      final error = _TestException('sync failed');
-      final settings = _FakeSettingsRepository(modifiedAt: null);
-      final viewModel = SyncViewModel(
-        syncUseCase: buildUseCase(
-          cityResult: Result.error(error),
-          settings: settings,
-        ),
-      );
+    test(
+      'sets fatalError when error occurs with no prior successful sync',
+      () async {
+        // modifiedAt null → isSyncRequired = true and no prior sync data
+        final error = _TestException('sync failed');
+        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final viewModel = SyncViewModel(
+          syncUseCase: buildUseCase(
+            cityResult: Result.error(error),
+            settings: settings,
+          ),
+        );
 
-      await pumpEventQueue();
+        await pumpEventQueue();
 
-      expect(viewModel.sync.error, isTrue);
-      expect(viewModel.fatalError, isTrue);
-    });
+        expect(viewModel.sync.error, isTrue);
+        expect(viewModel.fatalError, isTrue);
+      },
+    );
 
-    test('does not set fatalError when error occurs with a prior successful sync',
-        () async {
-      // modifiedAt 1 day ago → isSyncRequired = false, so force=true is needed
-      final error = _TestException('sync failed');
-      final settings = _FakeSettingsRepository(
-        modifiedAt: DateTime.now().subtract(const Duration(days: 1)),
-      );
-      final viewModel = SyncViewModel(
-        syncUseCase: buildUseCase(
-          cityResult: Result.error(error),
-          settings: settings,
-        ),
-      );
+    test(
+      'does not set fatalError when error occurs with a prior successful sync',
+      () async {
+        // modifiedAt 1 day ago → isSyncRequired = false, so force=true is needed
+        final error = _TestException('sync failed');
+        final settings = _FakeSettingsRepository(
+          modifiedAt: DateTime.now().subtract(const Duration(days: 1)),
+        );
+        final viewModel = SyncViewModel(
+          syncUseCase: buildUseCase(
+            cityResult: Result.error(error),
+            settings: settings,
+          ),
+        );
 
-      await viewModel.sync.execute(true);
+        await viewModel.sync.execute(true);
 
-      expect(viewModel.sync.error, isTrue);
-      expect(viewModel.fatalError, isFalse);
-    });
+        expect(viewModel.sync.error, isTrue);
+        expect(viewModel.fatalError, isFalse);
+      },
+    );
   });
 
   group('SyncViewModel.sync force flag', () {
@@ -117,7 +129,9 @@ void main() {
       final settings = _FakeSettingsRepository(
         modifiedAt: DateTime.now().subtract(const Duration(days: 1)),
       );
-      final viewModel = SyncViewModel(syncUseCase: buildUseCase(settings: settings));
+      final viewModel = SyncViewModel(
+        syncUseCase: buildUseCase(settings: settings),
+      );
 
       await viewModel.sync.execute(true);
 
@@ -126,20 +140,24 @@ void main() {
       expect(settings.setModifiedAtCalled, isTrue);
     });
 
-    test('force=false skips sync and returns success when isSyncRequired is false',
-        () async {
-      // modifiedAt 1 day ago → isSyncRequired = false → no auto-execute
-      final settings = _FakeSettingsRepository(
-        modifiedAt: DateTime.now().subtract(const Duration(days: 1)),
-      );
-      final viewModel = SyncViewModel(syncUseCase: buildUseCase(settings: settings));
+    test(
+      'force=false skips sync and returns success when isSyncRequired is false',
+      () async {
+        // modifiedAt 1 day ago → isSyncRequired = false → no auto-execute
+        final settings = _FakeSettingsRepository(
+          modifiedAt: DateTime.now().subtract(const Duration(days: 1)),
+        );
+        final viewModel = SyncViewModel(
+          syncUseCase: buildUseCase(settings: settings),
+        );
 
-      await viewModel.sync.execute(false);
+        await viewModel.sync.execute(false);
 
-      expect(viewModel.sync.completed, isTrue);
-      // No actual network sync occurred
-      expect(settings.setModifiedAtCalled, isFalse);
-    });
+        expect(viewModel.sync.completed, isTrue);
+        // No actual network sync occurred
+        expect(settings.setModifiedAtCalled, isFalse);
+      },
+    );
   });
 }
 

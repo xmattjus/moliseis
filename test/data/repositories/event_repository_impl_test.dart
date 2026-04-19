@@ -1,10 +1,10 @@
 // ignore_for_file: avoid_redundant_argument_values, always_declare_return_types, type_annotate_public_apis
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/data/data-sources/city.dart';
+import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/event_supabase_table.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
-import 'package:moliseis/data/sources/city.dart';
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/event_supabase_table.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
@@ -356,37 +356,41 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test('includes multi-day event that starts and ends within current year',
-        () async {
-      final now = DateTime.now();
-      final event = _createEvent(
-        remoteId: 1,
-        startDate: DateTime(now.year, 6, 1),
-        endDate: DateTime(now.year, 6, 10),
-      );
-      eventBox.put(event);
+    test(
+      'includes multi-day event that starts and ends within current year',
+      () async {
+        final now = DateTime.now();
+        final event = _createEvent(
+          remoteId: 1,
+          startDate: DateTime(now.year, 6, 1),
+          endDate: DateTime(now.year, 6, 10),
+        );
+        eventBox.put(event);
 
-      final result = await repository.getByCurrentYear();
+        final result = await repository.getByCurrentYear();
 
-      expect(result, isA<Success<List<Event>>>());
-      expect((result as Success<List<Event>>).value, contains(event));
-    });
+        expect(result, isA<Success<List<Event>>>());
+        expect((result as Success<List<Event>>).value, contains(event));
+      },
+    );
 
-    test('includes single-day event (null endDate) whose startDate is in current year',
-        () async {
-      final now = DateTime.now();
-      final event = _createEvent(
-        remoteId: 2,
-        startDate: DateTime(now.year, 5, 15),
-        endDate: null,
-      );
-      eventBox.put(event);
+    test(
+      'includes single-day event (null endDate) whose startDate is in current year',
+      () async {
+        final now = DateTime.now();
+        final event = _createEvent(
+          remoteId: 2,
+          startDate: DateTime(now.year, 5, 15),
+          endDate: null,
+        );
+        eventBox.put(event);
 
-      final result = await repository.getByCurrentYear();
+        final result = await repository.getByCurrentYear();
 
-      expect(result, isA<Success<List<Event>>>());
-      expect((result as Success<List<Event>>).value, contains(event));
-    });
+        expect(result, isA<Success<List<Event>>>());
+        expect((result as Success<List<Event>>).value, contains(event));
+      },
+    );
 
     test('excludes multi-day event from a past year', () async {
       final event = _createEvent(
@@ -444,41 +448,45 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test('includes current-year multi-day event matching the requested category',
-        () async {
-      final now = DateTime.now();
-      final event = _createEvent(
-        remoteId: 1,
-        startDate: DateTime(now.year, 7, 1),
-        endDate: DateTime(now.year, 7, 5),
-        category: ContentCategory.food,
-      );
-      eventBox.put(event);
+    test(
+      'includes current-year multi-day event matching the requested category',
+      () async {
+        final now = DateTime.now();
+        final event = _createEvent(
+          remoteId: 1,
+          startDate: DateTime(now.year, 7, 1),
+          endDate: DateTime(now.year, 7, 5),
+          category: ContentCategory.food,
+        );
+        eventBox.put(event);
 
-      final result = await repository.getByCategories({ContentCategory.food});
+        final result = await repository.getByCategories({ContentCategory.food});
 
-      expect(result, isA<Success<List<Event>>>());
-      expect((result as Success<List<Event>>).value, contains(event));
-    });
+        expect(result, isA<Success<List<Event>>>());
+        expect((result as Success<List<Event>>).value, contains(event));
+      },
+    );
 
     test(
-        'includes current-year single-day event (null endDate) matching the requested category',
-        () async {
-      final now = DateTime.now();
-      final event = _createEvent(
-        remoteId: 2,
-        startDate: DateTime(now.year, 9, 10),
-        endDate: null,
-        category: ContentCategory.folklore,
-      );
-      eventBox.put(event);
+      'includes current-year single-day event (null endDate) matching the requested category',
+      () async {
+        final now = DateTime.now();
+        final event = _createEvent(
+          remoteId: 2,
+          startDate: DateTime(now.year, 9, 10),
+          endDate: null,
+          category: ContentCategory.folklore,
+        );
+        eventBox.put(event);
 
-      final result =
-          await repository.getByCategories({ContentCategory.folklore});
+        final result = await repository.getByCategories({
+          ContentCategory.folklore,
+        });
 
-      expect(result, isA<Success<List<Event>>>());
-      expect((result as Success<List<Event>>).value, contains(event));
-    });
+        expect(result, isA<Success<List<Event>>>());
+        expect((result as Success<List<Event>>).value, contains(event));
+      },
+    );
 
     test('excludes past-year event even when category matches', () async {
       final event = _createEvent(
@@ -505,8 +513,7 @@ void main() {
       );
       eventBox.put(event);
 
-      final result =
-          await repository.getByCategories({ContentCategory.nature});
+      final result = await repository.getByCategories({ContentCategory.nature});
 
       expect(result, isA<Success<List<Event>>>());
       expect((result as Success<List<Event>>).value, isNot(contains(event)));

@@ -1,4 +1,4 @@
-import 'package:moliseis/data/sources/app_settings.dart';
+import 'package:moliseis/data/data-sources/app_settings.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
 

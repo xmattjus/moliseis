@@ -1,6 +1,6 @@
 import 'dart:io' show File;
 
-import 'package:moliseis/data/sources/user_contribution.dart';
+import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/utils/result.dart';
 
 abstract class UserContributionRepository {

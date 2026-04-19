@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:moliseis/data/sources/user_contribution.dart';
+import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
 import 'package:moliseis/utils/result.dart';
@@ -38,21 +38,24 @@ void main() {
         expect(vm.addMedia.completed, isTrue);
       });
 
-      test('deduplicates files with the same content in a single pick', () async {
-        final bytes = Uint8List.fromList([1, 2, 3]);
-        final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
-            onPickMultipleMedia: () async => [
-              XFile.fromData(bytes, name: 'a.jpg'),
-              XFile.fromData(bytes, name: 'a_copy.jpg'),
-            ],
-          ),
-        );
+      test(
+        'deduplicates files with the same content in a single pick',
+        () async {
+          final bytes = Uint8List.fromList([1, 2, 3]);
+          final vm = buildViewModel(
+            imagePicker: _FakeImagePicker(
+              onPickMultipleMedia: () async => [
+                XFile.fromData(bytes, name: 'a.jpg'),
+                XFile.fromData(bytes, name: 'a_copy.jpg'),
+              ],
+            ),
+          );
 
-        await vm.addMedia.execute();
+          await vm.addMedia.execute();
 
-        expect(vm.mediaFileList, hasLength(1));
-      });
+          expect(vm.mediaFileList, hasLength(1));
+        },
+      );
 
       test('does not add a file whose content was already added', () async {
         final bytes = Uint8List.fromList([1, 2, 3]);
@@ -77,8 +80,18 @@ void main() {
             onPickMultipleMedia: () async {
               callCount++;
               return callCount == 1
-                  ? [XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'a.jpg')]
-                  : [XFile.fromData(Uint8List.fromList([4, 5, 6]), name: 'b.jpg')];
+                  ? [
+                      XFile.fromData(
+                        Uint8List.fromList([1, 2, 3]),
+                        name: 'a.jpg',
+                      ),
+                    ]
+                  : [
+                      XFile.fromData(
+                        Uint8List.fromList([4, 5, 6]),
+                        name: 'b.jpg',
+                      ),
+                    ];
             },
           ),
         );
@@ -98,8 +111,18 @@ void main() {
             onPickMultipleMedia: () async {
               callCount++;
               return callCount == 1
-                  ? [XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'a.jpg')]
-                  : [XFile.fromData(Uint8List.fromList([4, 5, 6]), name: 'b.jpg')];
+                  ? [
+                      XFile.fromData(
+                        Uint8List.fromList([1, 2, 3]),
+                        name: 'a.jpg',
+                      ),
+                    ]
+                  : [
+                      XFile.fromData(
+                        Uint8List.fromList([4, 5, 6]),
+                        name: 'b.jpg',
+                      ),
+                    ];
             },
           ),
         );
@@ -200,14 +223,18 @@ void main() {
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
         addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
-        final fileA = XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'a.jpg');
-        final fileB = XFile.fromData(Uint8List.fromList([4, 5, 6]), name: 'b.jpg');
+        final fileA = XFile.fromData(
+          Uint8List.fromList([1, 2, 3]),
+          name: 'a.jpg',
+        );
+        final fileB = XFile.fromData(
+          Uint8List.fromList([4, 5, 6]),
+          name: 'b.jpg',
+        );
         final vm = buildViewModel(
           imagePicker: _FakeImagePicker(
-            onRetrieveLostData: () async => LostDataResponse(
-              file: fileA,
-              files: [fileA, fileB],
-            ),
+            onRetrieveLostData: () async =>
+                LostDataResponse(file: fileA, files: [fileA, fileB]),
           ),
         );
 
@@ -217,51 +244,57 @@ void main() {
         expect(vm.retrieveLostMedia.completed, isTrue);
       });
 
-      test('deduplicates recovered files against already-added files', () async {
-        debugDefaultTargetPlatformOverride = TargetPlatform.android;
-        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      test(
+        'deduplicates recovered files against already-added files',
+        () async {
+          debugDefaultTargetPlatformOverride = TargetPlatform.android;
+          addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
-        final bytes = Uint8List.fromList([1, 2, 3]);
-        final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
-            onPickMultipleMedia: () async => [
-              XFile.fromData(bytes, name: 'a.jpg'),
-            ],
-            onRetrieveLostData: () async => LostDataResponse(
-              // Same bytes as the already-added file — should be rejected.
-              file: XFile.fromData(bytes, name: 'a_recovered.jpg'),
-            ),
-          ),
-        );
-
-        await vm.addMedia.execute();
-        expect(vm.mediaFileList, hasLength(1));
-
-        await vm.retrieveLostMedia.execute();
-        expect(vm.mediaFileList, hasLength(1)); // no duplicate
-      });
-
-      test('returns success and clears error state when picker reports an exception', () async {
-        debugDefaultTargetPlatformOverride = TargetPlatform.android;
-        addTearDown(() => debugDefaultTargetPlatformOverride = null);
-
-        final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
-            onRetrieveLostData: () async => LostDataResponse(
-              exception: PlatformException(
-                code: 'MEDIA_ERROR',
-                message: 'test error',
+          final bytes = Uint8List.fromList([1, 2, 3]);
+          final vm = buildViewModel(
+            imagePicker: _FakeImagePicker(
+              onPickMultipleMedia: () async => [
+                XFile.fromData(bytes, name: 'a.jpg'),
+              ],
+              onRetrieveLostData: () async => LostDataResponse(
+                // Same bytes as the already-added file — should be rejected.
+                file: XFile.fromData(bytes, name: 'a_recovered.jpg'),
               ),
             ),
-          ),
-        );
+          );
 
-        await vm.retrieveLostMedia.execute();
+          await vm.addMedia.execute();
+          expect(vm.mediaFileList, hasLength(1));
 
-        expect(vm.mediaFileList, isEmpty);
-        expect(vm.retrieveLostMedia.error, isFalse);
-        expect(vm.retrieveLostMedia.completed, isTrue);
-      });
+          await vm.retrieveLostMedia.execute();
+          expect(vm.mediaFileList, hasLength(1)); // no duplicate
+        },
+      );
+
+      test(
+        'returns success and clears error state when picker reports an exception',
+        () async {
+          debugDefaultTargetPlatformOverride = TargetPlatform.android;
+          addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+          final vm = buildViewModel(
+            imagePicker: _FakeImagePicker(
+              onRetrieveLostData: () async => LostDataResponse(
+                exception: PlatformException(
+                  code: 'MEDIA_ERROR',
+                  message: 'test error',
+                ),
+              ),
+            ),
+          );
+
+          await vm.retrieveLostMedia.execute();
+
+          expect(vm.mediaFileList, isEmpty);
+          expect(vm.retrieveLostMedia.error, isFalse);
+          expect(vm.retrieveLostMedia.completed, isTrue);
+        },
+      );
     });
   });
 }
@@ -283,14 +316,13 @@ final class _FakeImagePicker extends ImagePicker {
     int? imageQuality,
     int? limit,
     bool requestFullMetadata = true,
-  }) async =>
-      onPickMultipleMedia != null ? await onPickMultipleMedia!() : [];
+  }) async => onPickMultipleMedia != null ? await onPickMultipleMedia!() : [];
 
   @override
   Future<LostDataResponse> retrieveLostData() async =>
       onRetrieveLostData != null
-          ? await onRetrieveLostData!()
-          : LostDataResponse.empty();
+      ? await onRetrieveLostData!()
+      : LostDataResponse.empty();
 }
 
 final class _FakeUserContributionRepository

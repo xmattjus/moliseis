@@ -1,7 +1,7 @@
 import 'package:moliseis/data/core/object_box_conditions.dart';
+import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/event_supabase_table.dart';
 import 'package:moliseis/data/services/objectbox.dart';
-import 'package:moliseis/data/sources/event.dart';
-import 'package:moliseis/data/sources/event_supabase_table.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
