@@ -1,3 +1,4 @@
+import 'package:moliseis/data/core/object_box_conditions.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/city.dart';
 import 'package:moliseis/data/sources/event.dart';
@@ -21,8 +22,6 @@ class SearchRepositoryImpl implements SearchRepository {
   final Talker _log;
 
   late final Query<City> _cityQuery;
-  late final Query<Event> _eventCategoryQuery;
-  late final Query<Event> _eventQuery;
   final ObjectBox _objectBox;
   late final Query<Place> _placeCategoryQuery;
   late final Query<Place> _placeQuery;
@@ -39,16 +38,6 @@ class SearchRepositoryImpl implements SearchRepository {
     _cityQuery = _objectBox.store
         .box<City>()
         .query(City_.name.contains('', caseSensitive: false))
-        .build();
-
-    _eventQuery = _objectBox.store
-        .box<Event>()
-        .query(Event_.name.contains('', caseSensitive: false))
-        .build();
-
-    _eventCategoryQuery = _objectBox.store
-        .box<Event>()
-        .query(Event_.dbType.oneOf(<int>[]))
         .build();
 
     _placeQuery = _objectBox.store
@@ -92,31 +81,60 @@ class SearchRepositoryImpl implements SearchRepository {
 
   @override
   Future<Result<List<int>>> getEventIdsByQuery(String text) async {
+    // Queries are built fresh each call so that the year-boundary values in
+    // ObjectBoxConditions.eventStartsEndsCurrentYear always reflect the current
+    // date rather than the date at construction time.
+    final eventQuery = _objectBox.store
+        .box<Event>()
+        .query(
+          Event_.name
+              .contains(text, caseSensitive: false)
+              .and(ObjectBoxConditions.eventStartsEndsCurrentYear),
+        )
+        .build();
+
+    final eventCategoryQuery = _objectBox.store
+        .box<Event>()
+        .query(
+          Event_.dbType
+              .oneOf(_getCategoryIndexes(text))
+              .and(ObjectBoxConditions.eventStartsEndsCurrentYear),
+        )
+        .build();
+
     try {
       _cityQuery.param(City_.name).value = text;
 
-      _eventQuery.param(Event_.name).value = text;
-
-      _eventCategoryQuery.param(Event_.dbType).values = _getCategoryIndexes(
-        text,
-      );
-
-      final (categoryQuery, cityQuery, eventQuery) = (
-        _eventCategoryQuery.findIds(),
+      final (categoryQuery, cityQuery, nameQuery) = (
+        eventCategoryQuery.findIds(),
         _cityQuery.findIds(),
-        _eventQuery.findIds(),
+        eventQuery.findIds(),
       );
 
       final results = <int>[];
 
-      results.addAll(eventQuery);
+      results.addAll(nameQuery);
 
       final cities = _objectBox.store.box<City>().getMany(cityQuery);
+
+      final now = DateTime.now();
+      final currentYearStart = DateTime(now.year);
+      final currentYearEnd = DateTime(now.year, 12, 31).endOfDay;
 
       for (final city in cities) {
         if (city != null) {
           for (final event in city.events) {
-            results.add(event.remoteId);
+            // Adds the event to results only if it starts and ends in the
+            // current year.
+            if (event.startDate.maybeGreaterOrEqualDate(currentYearStart)) {
+              final endDate = event.endDate;
+              // Single-day events (null endDate) are always included when
+              // their startDate is within the year.
+              if (endDate == null ||
+                  endDate.maybeLessOrEqualDate(currentYearEnd)) {
+                results.add(event.remoteId);
+              }
+            }
           }
         }
       }
@@ -134,6 +152,9 @@ class SearchRepositoryImpl implements SearchRepository {
         stackTrace,
       );
       return Result.error(error);
+    } finally {
+      eventQuery.close();
+      eventCategoryQuery.close();
     }
   }
 

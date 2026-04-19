@@ -1,3 +1,4 @@
+import 'package:moliseis/data/core/object_box_conditions.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/sources/event.dart';
 import 'package:moliseis/data/sources/event_supabase_table.dart';
@@ -40,17 +41,8 @@ class EventRepositoryImpl implements EventRepository {
     Query<Event>? query;
 
     try {
-      final currentYear = DateTime.now().year;
-
-      final startDate = DateTime(currentYear);
-      final endDate = DateTime(currentYear, 12, 31).endOfDay;
-
       final builder = _eventBox
-          .query(
-            Event_.startDate
-                .greaterOrEqualDate(startDate)
-                .and(Event_.startDate.lessOrEqualDate(endDate)),
-          )
+          .query(ObjectBoxConditions.eventStartsEndsCurrentYear)
           .order(Event_.startDate, flags: Order.unsigned);
       query = builder.build();
       final results = await query.findAsync();
@@ -78,17 +70,10 @@ class EventRepositoryImpl implements EventRepository {
   }) async {
     Query<Event>? query;
 
-    final now = DateTime.now();
-    final startOfYear = DateTime(now.year);
-    final endOfYear = DateTime(now.year, 12, 31).endOfDay;
-
     try {
       final condition = Event_.dbType
           .oneOf(categories.map((e) => e.index).toList())
-          .andAll([
-            Event_.startDate.greaterOrEqualDate(startOfYear),
-            Event_.startDate.lessOrEqualDate(endOfYear),
-          ]);
+          .and(ObjectBoxConditions.eventStartsEndsCurrentYear);
       query = _eventBox.query(condition).build();
       final results = await query.findAsync();
 
@@ -109,17 +94,10 @@ class EventRepositoryImpl implements EventRepository {
   Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) async {
     Query<Event>? query;
 
-    final now = DateTime.now();
-    final startOfYear = DateTime(now.year);
-    final endOfYear = DateTime(now.year, 12, 31).endOfDay;
-
     try {
       final condition = Event_.coordinates
           .nearestNeighborsF32(coordinates, 200)
-          .andAll([
-            Event_.startDate.greaterOrEqualDate(startOfYear),
-            Event_.startDate.lessOrEqualDate(endOfYear),
-          ]);
+          .and(ObjectBoxConditions.eventStartsEndsCurrentYear);
       query = _eventBox.query(condition).build();
       query.limit = 2;
       final resultsWithScores = await query.findWithScoresAsync();

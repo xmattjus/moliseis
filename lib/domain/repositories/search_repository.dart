@@ -7,7 +7,8 @@ abstract class SearchRepository {
   /// Does nothing if [text] is empty or already present (case-insensitive).
   Future<Result<void>> addToPastSearches(String text);
 
-  /// Returns event IDs whose names match [text].
+  /// Returns event IDs whose names match [text] starting and ending in the
+  /// current year.
   Future<Result<List<int>>> getEventIdsByQuery(String text);
 
   /// Returns place IDs whose names match [text].
