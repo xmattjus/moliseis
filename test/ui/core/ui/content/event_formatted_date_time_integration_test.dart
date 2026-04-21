@@ -4,13 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/event.dart';
-import 'package:moliseis/data/data-sources/media.dart';
-import 'package:moliseis/data/data-sources/place.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
@@ -20,7 +18,6 @@ import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.d
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/search_anchor_suggestion_list.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:objectbox/objectbox.dart';
 import 'package:provider/provider.dart';
 
 void main() {
@@ -55,7 +52,7 @@ void main() {
               child: Scaffold(
                 body: CustomScrollView(
                   slivers: <Widget>[
-                    ContentSliverGrid(<EventContent>[event], onPressed: (_) {}),
+                    ContentSliverGrid(<Event>[event], onPressed: (_) {}),
                   ],
                 ),
               ),
@@ -103,7 +100,7 @@ void main() {
             locale: const Locale('en'),
             home: Scaffold(
               body: SearchAnchorSuggestionList(
-                suggestions: <EventContent>[event],
+                suggestions: <Event>[event],
                 onSuggestionPressed: (_) {},
               ),
             ),
@@ -208,17 +205,21 @@ class _FakePlaceRepository extends PlaceRepository {
   Future<Result<void>> synchronize() async => const Result.success(null);
 }
 
-EventContent _buildEventContent({
-  required DateTime startDate,
-  DateTime? endDate,
-}) {
-  return EventContent(
+City _testCity() => City(
+  remoteId: 0,
+  name: 'Molise',
+  createdAt: DateTime(2026, 1, 1),
+  modifiedAt: DateTime(2026, 1, 1),
+);
+
+Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
+  return Event(
     category: ContentCategory.experience,
-    city: ToOne<City>(),
+    city: _testCity(),
     coordinates: const LatLng(0.0, 0.0),
     createdAt: DateTime(2026, 1, 1),
     description: 'Test event',
-    media: ToMany<Media>(),
+    media: const [],
     modifiedAt: DateTime(2026, 1, 1),
     name: 'Event',
     remoteId: 1,

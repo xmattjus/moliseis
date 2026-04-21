@@ -1,13 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/event.dart';
-import 'package:moliseis/data/data-sources/media.dart';
-import 'package:moliseis/data/data-sources/place.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
-import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/use-cases/category_use_case.dart';
@@ -16,7 +14,6 @@ import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:objectbox/objectbox.dart';
 
 void main() {
   // Fakes below intentionally return safe defaults for methods outside each
@@ -38,7 +35,7 @@ void main() {
       expect(result.isSuccess, isTrue);
       final content = result.getOrNull()!;
       expect(content, hasLength(1));
-      expect(content.first, isA<EventContent>());
+      expect(content.first, isA<Event>());
       expect(content.first.remoteId, 10);
       expect(content.first.name, 'Event Name');
     });
@@ -57,7 +54,7 @@ void main() {
       final result = await useCase.getAllEvents();
 
       expect(result.isError, isTrue);
-      expect((result as Error<List<EventContent>>).error, same(error));
+      expect((result as Error<List<Event>>).error, same(error));
     });
 
     test('getAllPlaces maps success values and forwards sort', () async {
@@ -76,7 +73,7 @@ void main() {
       expect(result.isSuccess, isTrue);
       final content = result.getOrNull()!;
       expect(content, hasLength(1));
-      expect(content.first, isA<PlaceContent>());
+      expect(content.first, isA<Place>());
       expect(content.first.remoteId, 20);
       expect(placeRepository.lastGetAllSort, ContentSort.byDate);
     });
@@ -95,7 +92,7 @@ void main() {
       final result = await useCase.getAllPlaces();
 
       expect(result.isError, isTrue);
-      expect((result as Error<List<PlaceContent>>).error, same(error));
+      expect((result as Error<List<Place>>).error, same(error));
       expect(placeRepository.lastGetAllSort, ContentSort.byName);
     });
 
@@ -112,7 +109,7 @@ void main() {
       final result = await useCase.getById(21);
 
       expect(result.isSuccess, isTrue);
-      expect(result.getOrNull(), isA<PlaceContent>());
+      expect(result.getOrNull(), isA<Place>());
       expect(result.getOrNull()!.remoteId, 21);
     });
 
@@ -130,7 +127,7 @@ void main() {
       final result = await useCase.getById(21);
 
       expect(result.isError, isTrue);
-      expect((result as Error<PlaceContent>).error, same(error));
+      expect((result as Error<Place>).error, same(error));
     });
   });
 
@@ -149,7 +146,7 @@ void main() {
 
       expect(result.isSuccess, isTrue);
       expect(result.getOrNull(), hasLength(1));
-      expect(result.getOrNull()!.first, isA<EventContent>());
+      expect(result.getOrNull()!.first, isA<Event>());
     });
 
     test('getAllEvents propagates repository errors', () async {
@@ -164,7 +161,7 @@ void main() {
       final result = await useCase.getAllEvents();
 
       expect(result.isError, isTrue);
-      expect((result as Error<List<EventContent>>).error, same(error));
+      expect((result as Error<List<Event>>).error, same(error));
     });
 
     test('getAllPlaces maps success values and forwards sort', () async {
@@ -180,7 +177,7 @@ void main() {
 
       expect(result.isSuccess, isTrue);
       expect(result.getOrNull(), hasLength(1));
-      expect(result.getOrNull()!.first, isA<PlaceContent>());
+      expect(result.getOrNull()!.first, isA<Place>());
       expect(placeRepository.lastGetAllSort, ContentSort.byDate);
     });
 
@@ -196,7 +193,7 @@ void main() {
       final result = await useCase.getAllPlaces();
 
       expect(result.isError, isTrue);
-      expect((result as Error<List<PlaceContent>>).error, same(error));
+      expect((result as Error<List<Place>>).error, same(error));
     });
 
     test('maps getById methods to content models', () async {
@@ -212,8 +209,8 @@ void main() {
       final eventResult = await useCase.getEventById(1);
       final placeResult = await useCase.getPlaceById(2);
 
-      expect(eventResult.getOrNull(), isA<EventContent>());
-      expect(placeResult.getOrNull(), isA<PlaceContent>());
+      expect(eventResult.getOrNull(), isA<Event>());
+      expect(placeResult.getOrNull(), isA<Place>());
     });
 
     test('propagates getById errors', () async {
@@ -258,8 +255,8 @@ void main() {
 
       expect(eventRepository.lastCoordinates, [41.9, 14.7]);
       expect(placeRepository.lastCoordinates, [41.9, 14.7]);
-      expect(nearEvents.getOrNull()!.first, isA<EventContent>());
-      expect(nearPlaces.getOrNull()!.first, isA<PlaceContent>());
+      expect(nearEvents.getOrNull()!.first, isA<Event>());
+      expect(nearPlaces.getOrNull()!.first, isA<Place>());
     });
 
     test('nearby methods propagate repository errors', () async {
@@ -298,8 +295,8 @@ void main() {
       final eventResult = await useCase.getEventById(30);
       final placeResult = await useCase.getPlaceById(31);
 
-      expect(eventResult.getOrNull(), isA<EventContent>());
-      expect(placeResult.getOrNull(), isA<PlaceContent>());
+      expect(eventResult.getOrNull(), isA<Event>());
+      expect(placeResult.getOrNull(), isA<Place>());
     });
 
     test('getEventById and getPlaceById propagate repository errors', () async {
@@ -344,8 +341,8 @@ void main() {
 
       expect(eventRepository.lastCoordinates, [41.2, 14.1]);
       expect(placeRepository.lastCoordinates, [41.2, 14.1]);
-      expect(nearEvents.getOrNull()!.first, isA<EventContent>());
-      expect(nearPlaces.getOrNull()!.first, isA<PlaceContent>());
+      expect(nearEvents.getOrNull()!.first, isA<Event>());
+      expect(nearPlaces.getOrNull()!.first, isA<Place>());
     });
 
     test('nearby methods propagate repository errors', () async {
@@ -387,7 +384,7 @@ void main() {
       expect(result.isSuccess, isTrue);
       final content = result.getOrNull()!;
       expect(content, hasLength(1));
-      expect(content.first, isA<EventContent>());
+      expect(content.first, isA<Event>());
       expect(content.first.remoteId, 40);
       expect(content.first.name, 'Category Event');
     });
@@ -406,7 +403,7 @@ void main() {
       });
 
       expect(result.isError, isTrue);
-      expect((result as Error<List<EventContent>>).error, same(error));
+      expect((result as Error<List<Event>>).error, same(error));
     });
 
     test('getPlacesByCategories maps success values to PlaceContent', () async {
@@ -425,7 +422,7 @@ void main() {
       expect(result.isSuccess, isTrue);
       final content = result.getOrNull()!;
       expect(content, hasLength(1));
-      expect(content.first, isA<PlaceContent>());
+      expect(content.first, isA<Place>());
       expect(content.first.remoteId, 41);
       expect(content.first.name, 'Category Place');
     });
@@ -444,7 +441,7 @@ void main() {
       });
 
       expect(result.isError, isTrue);
-      expect((result as Error<List<PlaceContent>>).error, same(error));
+      expect((result as Error<List<Place>>).error, same(error));
     });
   });
 
@@ -462,7 +459,7 @@ void main() {
 
       expect(result.isSuccess, isTrue);
       final content = result.getOrNull()!;
-      expect(content, isA<EventContent>());
+      expect(content, isA<Event>());
       expect(content.remoteId, 50);
       expect(content.name, 'Favourite Event');
     });
@@ -479,7 +476,7 @@ void main() {
       final result = await useCase.getEventById(50);
 
       expect(result.isError, isTrue);
-      expect((result as Error<EventContent>).error, same(error));
+      expect((result as Error<Event>).error, same(error));
     });
 
     test('getPlaceById maps success value to PlaceContent', () async {
@@ -495,7 +492,7 @@ void main() {
 
       expect(result.isSuccess, isTrue);
       final content = result.getOrNull()!;
-      expect(content, isA<PlaceContent>());
+      expect(content, isA<Place>());
       expect(content.remoteId, 51);
       expect(content.name, 'Favourite Place');
     });
@@ -512,7 +509,7 @@ void main() {
       final result = await useCase.getPlaceById(51);
 
       expect(result.isError, isTrue);
-      expect((result as Error<PlaceContent>).error, same(error));
+      expect((result as Error<Place>).error, same(error));
     });
   });
 }
@@ -643,36 +640,43 @@ final class _FakePlaceRepository extends PlaceRepository {
   Future<Result<void>> synchronize() async => const Result.success(null);
 }
 
+City _city() => City(
+  remoteId: 0,
+  name: 'Molise',
+  createdAt: DateTime.utc(2026),
+  modifiedAt: DateTime.utc(2026),
+);
+
 Event _event({required int remoteId, required String name}) {
   final now = DateTime.utc(2026, 4, 2);
-
   return Event(
     remoteId: remoteId,
     name: name,
     description: 'Description',
     startDate: now,
-    coordinates: const [41.9, 14.7],
     category: ContentCategory.history,
     createdAt: now,
     modifiedAt: now,
-    city: ToOne<City>(),
-    media: ToMany<Media>(),
+    city: _city(),
+    coordinates: const LatLng(41.9, 14.7),
+    media: const [],
+    isSaved: false,
   );
 }
 
 Place _place({required int remoteId, required String name}) {
   final now = DateTime.utc(2026, 4, 2);
-
   return Place(
     remoteId: remoteId,
     name: name,
     description: 'Description',
-    coordinates: const [41.9, 14.7],
     category: ContentCategory.nature,
     createdAt: now,
     modifiedAt: now,
-    city: ToOne<City>(),
-    media: ToMany<Media>(),
+    city: _city(),
+    coordinates: const LatLng(41.9, 14.7),
+    media: const [],
+    isSaved: false,
   );
 }
 

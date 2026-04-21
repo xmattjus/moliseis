@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/data-sources/event.dart';
-import 'package:moliseis/data/data-sources/media.dart';
-import 'package:moliseis/data/data-sources/place.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/media.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';

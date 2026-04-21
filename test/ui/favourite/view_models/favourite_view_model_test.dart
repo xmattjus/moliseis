@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:objectbox/objectbox.dart';
 
 void main() {
   group('FavouriteViewModel', () {
@@ -304,8 +304,8 @@ final class _FakeFavouriteGetIdsUseCase implements FavouriteGetIdsUseCase {
   _FakeFavouriteGetIdsUseCase({
     Result<List<int>>? favouriteEventIdsResult,
     Result<List<int>>? favouritePlaceIdsResult,
-    Map<int, Result<EventContent>> eventResults = const {},
-    Map<int, Result<PlaceContent>> placeResults = const {},
+    Map<int, Result<Event>> eventResults = const {},
+    Map<int, Result<Place>> placeResults = const {},
     Result<void>? setEventResult,
     Result<void>? setPlaceResult,
   }) : _favouriteEventIdsResult =
@@ -319,8 +319,8 @@ final class _FakeFavouriteGetIdsUseCase implements FavouriteGetIdsUseCase {
 
   final Result<List<int>> _favouriteEventIdsResult;
   final Result<List<int>> _favouritePlaceIdsResult;
-  final Map<int, Result<EventContent>> _eventResults;
-  final Map<int, Result<PlaceContent>> _placeResults;
+  final Map<int, Result<Event>> _eventResults;
+  final Map<int, Result<Place>> _placeResults;
   final Result<void> _setEventResult;
   final Result<void> _setPlaceResult;
 
@@ -333,12 +333,12 @@ final class _FakeFavouriteGetIdsUseCase implements FavouriteGetIdsUseCase {
       _favouritePlaceIdsResult;
 
   @override
-  Future<Result<EventContent>> getEventById(int id) async =>
+  Future<Result<Event>> getEventById(int id) async =>
       _eventResults[id] ??
       Result.error(_TestException('event $id not configured'));
 
   @override
-  Future<Result<PlaceContent>> getPlaceById(int id) async =>
+  Future<Result<Place>> getPlaceById(int id) async =>
       _placeResults[id] ??
       Result.error(_TestException('place $id not configured'));
 
@@ -355,30 +355,37 @@ final class _FakeFavouriteGetIdsUseCase implements FavouriteGetIdsUseCase {
 // Content fixtures
 // ---------------------------------------------------------------------------
 
-EventContent _makeEvent(int id) => EventContent(
+City _testCity() => City(
+  remoteId: 0,
+  name: 'Molise',
+  createdAt: DateTime(2025),
+  modifiedAt: DateTime(2025),
+);
+
+Event _makeEvent(int id) => Event(
   remoteId: id,
   name: 'Event $id',
   description: '',
   category: ContentCategory.unknown,
-  city: ToOne(),
+  city: _testCity(),
   coordinates: const LatLng(0, 0),
   createdAt: DateTime(2025),
   modifiedAt: DateTime(2025),
-  media: ToMany(),
+  media: const [],
   startDate: DateTime(2025),
   isSaved: false,
 );
 
-PlaceContent _makePlace(int id) => PlaceContent(
+Place _makePlace(int id) => Place(
   remoteId: id,
   name: 'Place $id',
   description: '',
   category: ContentCategory.unknown,
-  city: ToOne(),
+  city: _testCity(),
   coordinates: const LatLng(0, 0),
   createdAt: DateTime(2025),
   modifiedAt: DateTime(2025),
-  media: ToMany(),
+  media: const [],
   isSaved: false,
 );
 

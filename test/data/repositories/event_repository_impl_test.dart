@@ -1,11 +1,12 @@
 // ignore_for_file: avoid_redundant_argument_values, always_declare_return_types, type_annotate_public_apis
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/city_entity.dart';
+import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/event_supabase_table.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,7 +17,7 @@ import '../../support/objectbox_test_store.dart';
 void main() {
   group('EventRepositoryImpl - DateTime Overlap Logic', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
-    late Box<Event> eventBox;
+    late Box<EventEntity> eventBox;
     late Talker fakeLogger;
     late _FakeSupabase fakeSupabase;
     late _FakeEventSupabaseTable fakeSupabaseTable;
@@ -24,7 +25,7 @@ void main() {
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
-      eventBox = objectBoxEnvironment.store.box<Event>();
+      eventBox = objectBoxEnvironment.store.box<EventEntity>();
       fakeLogger = Talker();
       fakeSupabase = _FakeSupabase();
       fakeSupabaseTable = _FakeEventSupabaseTable();
@@ -40,7 +41,7 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    Future<void> seedEvents(List<Event> events) async {
+    Future<void> seedEvents(List<EventEntity> events) async {
       for (final event in events) {
         eventBox.put(event);
       }
@@ -66,7 +67,7 @@ void main() {
 
           expect(result, isA<Success<List<Event>>>());
           final success = result as Success<List<Event>>;
-          expect(success.value, contains(event));
+          expect(success.value, containsEventId(1));
         },
       );
 
@@ -128,7 +129,7 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
 
       test('includes single-day event at range end boundary', () async {
@@ -147,7 +148,7 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
     });
 
@@ -168,7 +169,7 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
 
       test('includes event overlapping range start', () async {
@@ -187,7 +188,7 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
 
       test('includes event overlapping range end', () async {
@@ -206,7 +207,7 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
 
       test('includes event fully containing range', () async {
@@ -225,7 +226,7 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
 
       test('excludes event before range', () async {
@@ -266,7 +267,7 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
 
       test('includes event at range end boundary', () async {
@@ -285,7 +286,7 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
     });
 
@@ -313,7 +314,8 @@ void main() {
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
         expect(success.value, hasLength(2));
-        expect(success.value, containsAll([singleDay, multiDay]));
+        expect(success.value, containsEventId(1));
+        expect(success.value, containsEventId(2));
       });
     });
 
@@ -331,19 +333,19 @@ void main() {
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
-        expect(success.value, contains(event));
+        expect(success.value, containsEventId(1));
       });
     });
   });
 
   group('EventRepositoryImpl - getByCurrentYear', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
-    late Box<Event> eventBox;
+    late Box<EventEntity> eventBox;
     late EventRepositoryImpl repository;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
-      eventBox = objectBoxEnvironment.store.box<Event>();
+      eventBox = objectBoxEnvironment.store.box<EventEntity>();
       repository = EventRepositoryImpl(
         logger: Talker(),
         supabaseI: _FakeSupabase(),
@@ -370,7 +372,10 @@ void main() {
         final result = await repository.getByCurrentYear();
 
         expect(result, isA<Success<List<Event>>>());
-        expect((result as Success<List<Event>>).value, contains(event));
+        expect(
+          (result as Success<List<Event>>).value.map((e) => e.remoteId),
+          contains(1),
+        );
       },
     );
 
@@ -388,7 +393,10 @@ void main() {
         final result = await repository.getByCurrentYear();
 
         expect(result, isA<Success<List<Event>>>());
-        expect((result as Success<List<Event>>).value, contains(event));
+        expect(
+          (result as Success<List<Event>>).value.map((e) => e.remoteId),
+          contains(2),
+        );
       },
     );
 
@@ -403,7 +411,10 @@ void main() {
       final result = await repository.getByCurrentYear();
 
       expect(result, isA<Success<List<Event>>>());
-      expect((result as Success<List<Event>>).value, isNot(contains(event)));
+      expect(
+        (result as Success<List<Event>>).value.map((e) => e.remoteId),
+        isNot(contains(3)),
+      );
     });
 
     test('excludes single-day event from a past year', () async {
@@ -417,7 +428,10 @@ void main() {
       final result = await repository.getByCurrentYear();
 
       expect(result, isA<Success<List<Event>>>());
-      expect((result as Success<List<Event>>).value, isNot(contains(event)));
+      expect(
+        (result as Success<List<Event>>).value.map((e) => e.remoteId),
+        isNot(contains(4)),
+      );
     });
 
     test('returns empty list when store is empty', () async {
@@ -430,12 +444,12 @@ void main() {
 
   group('EventRepositoryImpl - getByCategories', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
-    late Box<Event> eventBox;
+    late Box<EventEntity> eventBox;
     late EventRepositoryImpl repository;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
-      eventBox = objectBoxEnvironment.store.box<Event>();
+      eventBox = objectBoxEnvironment.store.box<EventEntity>();
       repository = EventRepositoryImpl(
         logger: Talker(),
         supabaseI: _FakeSupabase(),
@@ -463,7 +477,10 @@ void main() {
         final result = await repository.getByCategories({ContentCategory.food});
 
         expect(result, isA<Success<List<Event>>>());
-        expect((result as Success<List<Event>>).value, contains(event));
+        expect(
+          (result as Success<List<Event>>).value.map((e) => e.remoteId),
+          contains(1),
+        );
       },
     );
 
@@ -484,7 +501,10 @@ void main() {
         });
 
         expect(result, isA<Success<List<Event>>>());
-        expect((result as Success<List<Event>>).value, contains(event));
+        expect(
+          (result as Success<List<Event>>).value.map((e) => e.remoteId),
+          contains(2),
+        );
       },
     );
 
@@ -500,7 +520,10 @@ void main() {
       final result = await repository.getByCategories({ContentCategory.nature});
 
       expect(result, isA<Success<List<Event>>>());
-      expect((result as Success<List<Event>>).value, isNot(contains(event)));
+      expect(
+        (result as Success<List<Event>>).value.map((e) => e.remoteId),
+        isNot(contains(3)),
+      );
     });
 
     test('excludes current-year event whose category does not match', () async {
@@ -516,12 +539,18 @@ void main() {
       final result = await repository.getByCategories({ContentCategory.nature});
 
       expect(result, isA<Success<List<Event>>>());
-      expect((result as Success<List<Event>>).value, isNot(contains(event)));
+      expect(
+        (result as Success<List<Event>>).value.map((e) => e.remoteId),
+        isNot(contains(4)),
+      );
     });
   });
 }
 
-Event _createEvent({
+Matcher containsEventId(int remoteId) =>
+    contains(predicate<Event>((e) => e.remoteId == remoteId));
+
+EventEntity _createEvent({
   required int remoteId,
   required DateTime startDate,
   required DateTime? endDate,
@@ -529,7 +558,7 @@ Event _createEvent({
   ContentCategory category = ContentCategory.unknown,
 }) {
   final now = DateTime.now();
-  return Event(
+  return EventEntity(
     remoteId: remoteId,
     name: name ?? 'Test Event $remoteId',
     startDate: startDate,
@@ -537,7 +566,7 @@ Event _createEvent({
     category: category,
     createdAt: now,
     modifiedAt: now,
-    city: ToOne<City>(),
+    city: ToOne<CityEntity>(),
     media: ToMany(),
   );
 }

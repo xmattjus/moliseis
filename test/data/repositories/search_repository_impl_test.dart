@@ -1,8 +1,8 @@
 // ignore_for_file: avoid_redundant_argument_values
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/city_entity.dart';
+import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
@@ -13,14 +13,14 @@ import '../../support/objectbox_test_store.dart';
 void main() {
   group('SearchRepositoryImpl - getEventIdsByQuery', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
-    late Box<City> cityBox;
-    late Box<Event> eventBox;
+    late Box<CityEntity> cityBox;
+    late Box<EventEntity> eventBox;
     late SearchRepositoryImpl repository;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
-      cityBox = objectBoxEnvironment.store.box<City>();
-      eventBox = objectBoxEnvironment.store.box<Event>();
+      cityBox = objectBoxEnvironment.store.box<CityEntity>();
+      eventBox = objectBoxEnvironment.store.box<EventEntity>();
       repository = SearchRepositoryImpl(
         logger: Talker(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
@@ -218,7 +218,7 @@ void main() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-Event _createEvent({
+EventEntity _createEvent({
   required int remoteId,
   required String name,
   required DateTime startDate,
@@ -226,14 +226,14 @@ Event _createEvent({
   int? cityId,
 }) {
   final now = DateTime.now();
-  final event = Event(
+  final event = EventEntity(
     remoteId: remoteId,
     name: name,
     startDate: startDate,
     endDate: endDate,
     createdAt: now,
     modifiedAt: now,
-    city: ToOne<City>(),
+    city: ToOne<CityEntity>(),
     media: ToMany(),
   );
 
@@ -244,9 +244,9 @@ Event _createEvent({
   return event;
 }
 
-City _createCity({required int remoteId, required String name}) {
+CityEntity _createCity({required int remoteId, required String name}) {
   final now = DateTime.now();
-  return City(
+  return CityEntity(
     remoteId: remoteId,
     name: name,
     createdAt: now,

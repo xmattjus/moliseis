@@ -6,12 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
-import 'package:objectbox/objectbox.dart';
 
 void main() {
   setUpAll(() async {
@@ -22,7 +20,7 @@ void main() {
   group('EventFormattedDateTime', () {
     Future<void> pumpDateTime(
       WidgetTester tester,
-      EventContent event, {
+      Event event, {
       Locale locale = const Locale('en'),
       bool alwaysUse24HourFormat = false,
     }) async {
@@ -285,17 +283,21 @@ String _formatTimeOfDay(
   );
 }
 
-EventContent _buildEventContent({
-  required DateTime startDate,
-  DateTime? endDate,
-}) {
-  return EventContent(
+City _testCity() => City(
+  remoteId: 0,
+  name: 'Molise',
+  createdAt: DateTime(2026, 1, 1),
+  modifiedAt: DateTime(2026, 1, 1),
+);
+
+Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
+  return Event(
     category: ContentCategory.experience,
-    city: ToOne<City>(),
+    city: _testCity(),
     coordinates: const LatLng(0.0, 0.0),
     createdAt: DateTime(2026, 1, 1),
     description: 'Test event',
-    media: ToMany<Media>(),
+    media: const [],
     modifiedAt: DateTime(2026, 1, 1),
     name: 'Event',
     remoteId: 1,

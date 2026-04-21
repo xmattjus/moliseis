@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart'
     show ContentCategory;
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/widgets/components/search_anchor_suggestion_list.dart';
-import 'package:objectbox/objectbox.dart';
 
 void main() {
   group('SearchAnchorSuggestionList', () {
@@ -24,8 +24,7 @@ void main() {
       await tester.pumpWidget(_buildTestApp([]));
 
       expect(find.byType(Divider), findsNothing);
-      // No ContentBaseListItem keys present.
-      expect(find.byKey(const ValueKey('Place 1')), findsNothing);
+      expect(find.byKey(const ValueKey('list-item:Place 1-0')), findsNothing);
     });
 
     testWidgets('renders one item without a divider for a single suggestion', (
@@ -35,7 +34,8 @@ void main() {
 
       await tester.pumpWidget(_buildTestApp([place]));
 
-      expect(find.byKey(ValueKey(place.name)), findsOneWidget);
+      // index in List.generate for item 0 is 0
+      expect(find.byKey(ValueKey('list-item:${place.name}-0')), findsOneWidget);
       expect(find.byType(Divider), findsNothing);
     });
 
@@ -45,8 +45,15 @@ void main() {
 
       await tester.pumpWidget(_buildTestApp([place1, place2]));
 
-      expect(find.byKey(ValueKey(place1.name)), findsOneWidget);
-      expect(find.byKey(ValueKey(place2.name)), findsOneWidget);
+      // List.generate indices: item 0 → index 0, item 1 → index 2
+      expect(
+        find.byKey(ValueKey('list-item:${place1.name}-0')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('list-item:${place2.name}-2')),
+        findsOneWidget,
+      );
       expect(find.byType(Divider), findsOneWidget);
     });
 
@@ -55,8 +62,12 @@ void main() {
 
       await tester.pumpWidget(_buildTestApp(places));
 
-      for (final p in places) {
-        expect(find.byKey(ValueKey(p.name)), findsOneWidget);
+      // List.generate indices: item 0 → 0, item 1 → 2, item 2 → 4
+      for (final (itemIndex, p) in places.indexed) {
+        expect(
+          find.byKey(ValueKey('list-item:${p.name}-${itemIndex * 2}')),
+          findsOneWidget,
+        );
       }
       expect(find.byType(Divider), findsNWidgets(2));
     });
@@ -71,7 +82,7 @@ void main() {
         _buildTestApp([place], onSuggestionPressed: (c) => pressed = c),
       );
 
-      await tester.tap(find.byKey(ValueKey(place.name)));
+      await tester.tap(find.byKey(ValueKey('list-item:${place.name}-0')));
       await tester.pump();
 
       expect(pressed, same(place));
@@ -85,7 +96,7 @@ void main() {
       await tester.pumpWidget(_buildTestApp([place]));
 
       // Tapping should not throw even with no callback.
-      await tester.tap(find.byKey(ValueKey(place.name)));
+      await tester.tap(find.byKey(ValueKey('list-item:${place.name}-0')));
       await tester.pump();
     });
   });
@@ -115,15 +126,22 @@ Widget _buildTestApp(
 // Fixtures
 // ---------------------------------------------------------------------------
 
-PlaceContent _makePlace(int id) => PlaceContent(
+City _testCity() => City(
+  remoteId: 0,
+  name: 'Molise',
+  createdAt: DateTime(2025),
+  modifiedAt: DateTime(2025),
+);
+
+Place _makePlace(int id) => Place(
   remoteId: id,
   name: 'Place $id',
   description: '',
   category: ContentCategory.unknown,
-  city: ToOne(),
+  city: _testCity(),
   coordinates: const LatLng(41.56, 14.66),
   createdAt: DateTime(2025),
   modifiedAt: DateTime(2025),
-  media: ToMany(),
+  media: const [],
   isSaved: false,
 );

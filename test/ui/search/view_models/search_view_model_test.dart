@@ -1,15 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_get_by_id_use_case.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:objectbox/objectbox.dart';
 
 void main() {
   group('SearchViewModel', () {
@@ -167,7 +167,7 @@ void main() {
           await vm.loadSuggestions.execute('mo');
 
           expect(vm.loadSuggestions.completed, isTrue);
-          expect(vm.results, isEmpty);
+          expect(vm.suggestions, isEmpty);
         },
       );
 
@@ -189,7 +189,7 @@ void main() {
           await vm.loadSuggestions.execute('campobasso');
 
           expect(vm.loadSuggestions.completed, isTrue);
-          expect(vm.results, hasLength(2));
+          expect(vm.suggestions, hasLength(2));
         },
       );
 
@@ -206,7 +206,7 @@ void main() {
         await vm.loadSuggestions.execute('campobasso');
 
         expect(vm.loadSuggestions.error, isTrue);
-        expect(vm.results, isEmpty);
+        expect(vm.suggestions, isEmpty);
       });
 
       test('surfaces error when getEventIdsByQuery fails', () async {
@@ -222,7 +222,7 @@ void main() {
         await vm.loadSuggestions.execute('campobasso');
 
         expect(vm.loadSuggestions.error, isTrue);
-        expect(vm.results, isEmpty);
+        expect(vm.suggestions, isEmpty);
       });
 
       test('silently skips place when its getById fails', () async {
@@ -241,7 +241,7 @@ void main() {
 
         // Place 1 is silently skipped; only event 2 is added.
         expect(vm.loadSuggestions.completed, isTrue);
-        expect(vm.results, hasLength(1));
+        expect(vm.suggestions, hasLength(1));
       });
 
       test('silently skips event when its getById fails', () async {
@@ -260,7 +260,7 @@ void main() {
 
         // Event 2 is silently skipped; only place 1 is added.
         expect(vm.loadSuggestions.completed, isTrue);
-        expect(vm.results, hasLength(1));
+        expect(vm.suggestions, hasLength(1));
       });
 
       test('clears previous place results before each search', () async {
@@ -274,12 +274,12 @@ void main() {
         );
 
         await vm.loadSuggestions.execute('campobasso');
-        expect(vm.results, hasLength(1));
+        expect(vm.suggestions, hasLength(1));
 
         // Switch to empty results and search again on the same VM instance.
         repo._placeIdsByQueryResult = const Result.success([]);
         await vm.loadSuggestions.execute('isernia');
-        expect(vm.results, isEmpty);
+        expect(vm.suggestions, isEmpty);
       });
 
       test('clears previous event results before each search', () async {
@@ -293,12 +293,12 @@ void main() {
         );
 
         await vm.loadSuggestions.execute('campobasso');
-        expect(vm.results, hasLength(1));
+        expect(vm.suggestions, hasLength(1));
 
         // Switch to empty results and search again on the same VM instance.
         repo._eventIdsByQueryResult = const Result.success([]);
         await vm.loadSuggestions.execute('isernia');
-        expect(vm.results, isEmpty);
+        expect(vm.suggestions, isEmpty);
       });
     });
 
@@ -414,7 +414,7 @@ void main() {
 
 SearchViewModel _buildVm({
   required _FakeSearchRepository searchRepository,
-  Map<int, Result<PlaceContent>> placeResults = const {},
+  Map<int, Result<Place>> placeResults = const {},
   Map<int, Result<Event>> eventResults = const {},
 }) {
   final eventRepository = _FakeEventRepository(eventResults: eventResults);
@@ -430,7 +430,7 @@ SearchViewModel _buildVm({
 
 Future<SearchViewModel> _buildLoaded({
   required _FakeSearchRepository searchRepository,
-  Map<int, Result<PlaceContent>> placeResults = const {},
+  Map<int, Result<Place>> placeResults = const {},
   Map<int, Result<Event>> eventResults = const {},
 }) async {
   final vm = _buildVm(
@@ -505,10 +505,10 @@ final class _FakeSearchRepository implements SearchRepository {
 final class _FakeExploreGetByIdUseCase implements ExploreGetByIdUseCase {
   _FakeExploreGetByIdUseCase({this.placeResults = const {}});
 
-  final Map<int, Result<PlaceContent>> placeResults;
+  final Map<int, Result<Place>> placeResults;
 
   @override
-  Future<Result<PlaceContent>> getById(int id) async =>
+  Future<Result<Place>> getById(int id) async =>
       placeResults[id] ??
       Result.error(_TestException('place $id not configured'));
 }
@@ -567,14 +567,21 @@ final class _FakeEventRepository implements EventRepository {
 // Fixtures
 // ---------------------------------------------------------------------------
 
-PlaceContent _makePlaceContent(int id) => PlaceContent(
+City _testCity() => City(
+  remoteId: 0,
+  name: 'Molise',
+  createdAt: DateTime(2025),
+  modifiedAt: DateTime(2025),
+);
+
+Place _makePlaceContent(int id) => Place(
   category: ContentCategory.nature,
-  city: ToOne(),
+  city: _testCity(),
   coordinates: const LatLng(41.56, 14.66),
   createdAt: DateTime(2025),
   description: '',
   isSaved: false,
-  media: ToMany(),
+  media: const [],
   modifiedAt: DateTime(2025),
   name: 'Place $id',
   remoteId: id,
@@ -583,12 +590,15 @@ PlaceContent _makePlaceContent(int id) => PlaceContent(
 Event _makeEvent(int id) => Event(
   remoteId: id,
   name: 'Event $id',
-  coordinates: const [41.56, 14.66],
+  description: '',
+  category: ContentCategory.unknown,
+  city: _testCity(),
+  coordinates: const LatLng(41.56, 14.66),
   startDate: DateTime(2025),
   createdAt: DateTime(2025),
   modifiedAt: DateTime(2025),
-  city: ToOne(),
-  media: ToMany(),
+  media: const [],
+  isSaved: false,
 );
 
 final class _TestException implements Exception {

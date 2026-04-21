@@ -5,10 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/event.dart';
-import 'package:moliseis/data/data-sources/media.dart';
-import 'package:moliseis/data/data-sources/place.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
@@ -16,8 +13,11 @@ import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_we
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
@@ -31,7 +31,6 @@ import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:objectbox/objectbox.dart';
 import 'package:provider/provider.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
@@ -302,69 +301,37 @@ final class _FakePlaceRepository implements PlaceRepository {
   }
 }
 
-Event _buildEvent() {
-  final city = ToOne<City>();
-  city.target = _buildCity();
+City _buildCity() => City(
+  remoteId: 10,
+  name: 'Campobasso',
+  createdAt: DateTime(2026, 1, 1),
+  modifiedAt: DateTime(2026, 1, 1),
+);
 
-  final media = ToMany<Media>();
-  media.add(_buildMedia());
+Event _buildEvent() => Event(
+  remoteId: 1,
+  name: 'Evento demo',
+  description: 'Descrizione evento',
+  startDate: DateTime(2026, 4, 10, 10, 30),
+  endDate: DateTime(2026, 4, 10, 12, 0),
+  coordinates: const LatLng(41.56, 14.66),
+  category: ContentCategory.experience,
+  createdAt: DateTime(2026, 1, 1),
+  modifiedAt: DateTime(2026, 1, 1),
+  city: _buildCity(),
+  media: const [],
+  isSaved: false,
+);
 
-  return Event(
-    remoteId: 1,
-    name: 'Evento demo',
-    description: 'Descrizione evento',
-    startDate: DateTime(2026, 4, 10, 10, 30),
-    endDate: DateTime(2026, 4, 10, 12, 0),
-    coordinates: const <double>[41.56, 14.66],
-    category: ContentCategory.experience,
-    createdAt: DateTime(2026, 1, 1),
-    modifiedAt: DateTime(2026, 1, 1),
-    city: city,
-    media: media,
-  );
-}
-
-Place _buildPlace() {
-  final city = ToOne<City>();
-  city.target = _buildCity();
-
-  final media = ToMany<Media>();
-  media.add(_buildMedia());
-
-  return Place(
-    remoteId: 2,
-    name: 'Luogo demo',
-    description: 'Descrizione luogo',
-    coordinates: const <double>[41.57, 14.67],
-    category: ContentCategory.nature,
-    createdAt: DateTime(2026, 1, 1),
-    modifiedAt: DateTime(2026, 1, 1),
-    city: city,
-    media: media,
-  );
-}
-
-City _buildCity() {
-  return City(
-    remoteId: 10,
-    name: 'Campobasso',
-    createdAt: DateTime(2026, 1, 1),
-    modifiedAt: DateTime(2026, 1, 1),
-    places: ToMany<Place>(),
-    events: ToMany<Event>(),
-  );
-}
-
-Media _buildMedia() {
-  return Media(
-    remoteId: 20,
-    title: 'Media demo',
-    url: 'https://example.com/demo.jpg',
-    width: 1080,
-    height: 720,
-    createdAt: DateTime(2026, 1, 1),
-    modifiedAt: DateTime(2026, 1, 1),
-    place: ToOne<Place>(),
-    event: ToOne<Event>(),
-  );
-}
+Place _buildPlace() => Place(
+  remoteId: 2,
+  name: 'Luogo demo',
+  description: 'Descrizione luogo',
+  coordinates: const LatLng(41.57, 14.67),
+  category: ContentCategory.nature,
+  createdAt: DateTime(2026, 1, 1),
+  modifiedAt: DateTime(2026, 1, 1),
+  city: _buildCity(),
+  media: const [],
+  isSaved: false,
+);

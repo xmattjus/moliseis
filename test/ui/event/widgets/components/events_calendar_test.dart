@@ -3,18 +3,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/event.dart';
-import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day_markers.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:objectbox/objectbox.dart';
 
 void main() {
   group('EventViewModel.isEventOnDay', () {
@@ -247,6 +244,13 @@ Future<void> _waitForCommand(Command<void> command) async {
   }
 }
 
+City _testCity() => City(
+  remoteId: 0,
+  name: 'Molise',
+  createdAt: DateTime(2026, 1, 1),
+  modifiedAt: DateTime(2026, 1, 1),
+);
+
 Event _buildEvent({
   required int remoteId,
   required DateTime startDate,
@@ -255,27 +259,31 @@ Event _buildEvent({
   return Event(
     remoteId: remoteId,
     name: 'Event $remoteId',
+    description: '',
     startDate: startDate,
     endDate: endDate,
+    category: ContentCategory.unknown,
     createdAt: DateTime(2026, 1, 1),
     modifiedAt: DateTime(2026, 1, 1),
-    city: ToOne<City>(),
-    media: ToMany<Media>(),
+    city: _testCity(),
+    coordinates: const LatLng(0, 0),
+    media: const [],
+    isSaved: false,
   );
 }
 
-EventContent _buildEventContent({
+Event _buildEventContent({
   required DateTime startDate,
   DateTime? endDate,
   int remoteId = 1,
 }) {
-  return EventContent(
+  return Event(
     category: ContentCategory.experience,
-    city: ToOne<City>(),
+    city: _testCity(),
     coordinates: const LatLng(0.0, 0.0),
     createdAt: DateTime(2026, 1, 1),
     description: 'Test event',
-    media: ToMany<Media>(),
+    media: const [],
     modifiedAt: DateTime(2026, 1, 1),
     name: 'Event',
     remoteId: remoteId,

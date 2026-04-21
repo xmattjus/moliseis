@@ -2,16 +2,13 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/event.dart';
-import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:objectbox/objectbox.dart';
 
 void main() {
   group('EventViewModel', () {
@@ -209,6 +206,13 @@ final class _FakeEventRepository extends EventRepository {
 // Fixtures
 // ---------------------------------------------------------------------------
 
+City _testCity() => City(
+  remoteId: 0,
+  name: 'Molise',
+  createdAt: DateTime.utc(2026),
+  modifiedAt: DateTime.utc(2026),
+);
+
 Event _event({required int remoteId, required String name}) {
   final now = DateTime.utc(2026, 4, 7);
   return Event(
@@ -216,27 +220,28 @@ Event _event({required int remoteId, required String name}) {
     name: name,
     description: 'Description',
     startDate: now,
-    coordinates: const [41.9, 14.7],
+    coordinates: const LatLng(41.9, 14.7),
     category: ContentCategory.history,
     createdAt: now,
     modifiedAt: now,
-    city: ToOne<City>(),
-    media: ToMany<Media>(),
+    city: _testCity(),
+    media: const [],
+    isSaved: false,
   );
 }
 
-EventContent _eventContent({required DateTime startDate, DateTime? endDate}) {
+Event _eventContent({required DateTime startDate, DateTime? endDate}) {
   final now = DateTime(2026, 4, 1);
-  return EventContent(
+  return Event(
     remoteId: 1,
     name: 'Event',
     description: '',
     category: ContentCategory.unknown,
-    city: ToOne<City>(),
+    city: _testCity(),
     coordinates: const LatLng(0, 0),
     createdAt: now,
     modifiedAt: now,
-    media: ToMany<Media>(),
+    media: const [],
     startDate: startDate,
     endDate: endDate,
     isSaved: false,
