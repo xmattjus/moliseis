@@ -3,7 +3,7 @@ import 'dart:collection' show UnmodifiableListView;
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/utils/command.dart';
@@ -30,18 +30,16 @@ class ExploreViewModel extends ChangeNotifier {
     loadSuggested = Command0(_loadSuggested);
   }
 
-  var _latest = <PlaceContent>[];
+  var _latest = <Place>[];
   final _near = <ContentBase>[];
-  var _suggested = <PlaceContent>[];
+  var _suggested = <Place>[];
 
   var _latestIds = <int>[];
   var _suggestedIds = <int>[];
 
-  UnmodifiableListView<PlaceContent> get latest =>
-      UnmodifiableListView(_latest);
+  UnmodifiableListView<Place> get latest => UnmodifiableListView(_latest);
   UnmodifiableListView<ContentBase> get near => UnmodifiableListView(_near);
-  UnmodifiableListView<PlaceContent> get suggested =>
-      UnmodifiableListView(_suggested);
+  UnmodifiableListView<Place> get suggested => UnmodifiableListView(_suggested);
 
   UnmodifiableListView<int> get latestIds => UnmodifiableListView(_latestIds);
   UnmodifiableListView<int> get suggestedIds =>

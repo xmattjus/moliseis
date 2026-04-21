@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_list_item.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
@@ -34,7 +34,7 @@ class SearchAnchorSuggestionList extends StatelessWidget {
               content,
               key: ValueKey<String>('list-item:${content.name}-$index'),
               onPressed: onSuggestionPressed,
-              verticalTrailing: content is EventContent
+              verticalTrailing: content is Event
                   ? EventFormattedDateTime(event: content)
                   : null,
             );

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/ui/blurred_box.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -143,7 +143,7 @@ class FavouriteButton extends StatelessWidget {
     return () {
       HapticFeedback.lightImpact();
 
-      if (content is EventContent) {
+      if (content is Event) {
         if (isSaved) {
           viewModel.removeEvent.execute(content.remoteId);
         } else {

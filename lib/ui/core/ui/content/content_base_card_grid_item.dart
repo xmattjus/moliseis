@@ -72,7 +72,7 @@ class ContentBaseCardGridItem extends StatelessWidget {
                   children: <Widget>[
                     ContentNameAndCity(
                       name: content.name,
-                      cityName: content.city.target?.name,
+                      cityName: content.city?.name,
                       color: Colors.white,
                     ),
                     if (supportingText != null) supportingText!,

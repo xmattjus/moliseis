@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
@@ -19,7 +19,7 @@ class EventFormattedDateTime extends StatefulWidget {
   });
 
   /// The event used to build the date and time labels.
-  final EventContent event;
+  final Event event;
 
   /// Optional color for the calendar and clock icons.
   final Color? iconColor;

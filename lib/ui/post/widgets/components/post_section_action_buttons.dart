@@ -42,7 +42,7 @@ class PostSectionActionButtons extends StatelessWidget {
             onPressed: () async {
               if (!await context.read<UrlLaunchService>().openGoogleMaps(
                 content.name,
-                content.city.target?.name ?? 'Molise',
+                content.city?.name,
               )) {
                 if (context.mounted) {
                   showSnackBar(

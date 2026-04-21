@@ -3,7 +3,6 @@ import 'dart:collection' show UnmodifiableListView;
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/event_content.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_get_by_id_use_case.dart';
@@ -215,7 +214,7 @@ class SearchViewModel extends ChangeNotifier {
 
         for (final id in eventIds) {
           final getEvent = await _eventRepository.getById(id);
-          getEvent.map((event) => list.add(EventContent.fromEvent(event)));
+          getEvent.map((event) => list.add(event));
         }
 
         return const Result.success(null);

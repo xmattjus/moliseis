@@ -3,8 +3,8 @@ import 'dart:collection' show UnmodifiableListView;
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
@@ -120,7 +120,7 @@ class SuggestedCarouselView extends StatelessWidget {
   List<Widget> _buildCarouselItems(double height) =>
       UnmodifiableListView<Widget>(
         exploreViewModel.suggested.map<Widget>(
-          (PlaceContent content) =>
+          (Place content) =>
               _CarouselViewItem(content: content, height: height),
         ),
       );
@@ -129,7 +129,7 @@ class SuggestedCarouselView extends StatelessWidget {
 class _CarouselViewItem extends StatelessWidget {
   const _CarouselViewItem({required this.content, required this.height});
 
-  final PlaceContent content;
+  final Place content;
   final double height;
 
   @override
@@ -166,7 +166,7 @@ class _CarouselViewItem extends StatelessWidget {
                     RouteNames.homePost,
                     pathParameters: {'id': content.remoteId.toString()},
                     queryParameters: {
-                      'isEvent': (content is EventContent ? 'true' : 'false'),
+                      'isEvent': (content is Event ? 'true' : 'false'),
                     },
                   ),
                 ),
@@ -196,7 +196,7 @@ class _CarouselViewItem extends StatelessWidget {
                       padding: const EdgeInsets.all(16.0),
                       child: ContentNameAndCity(
                         name: content.name,
-                        cityName: content.city.target?.name,
+                        cityName: content.city?.name,
                         color: Colors.white,
                       ),
                     ),

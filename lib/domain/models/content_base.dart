@@ -1,14 +1,12 @@
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:objectbox/objectbox.dart';
+import 'package:moliseis/domain/models/media.dart';
 
 /// A base class representing a generic unit of content used in the application.
 ///
 /// This abstract class defines the core properties and behavior common to
-/// all content-related entities such as [EventContent], [PlaceContent], and
-/// [StoryContent].
+/// all content-related entities such as [Event] and [Place].
 ///
 /// It serves as the foundational model in the domain layer and should be
 /// extended by specific content types to add specialized fields or methods.
@@ -16,8 +14,8 @@ import 'package:objectbox/objectbox.dart';
 /// ### Example:
 /// ```dart
 /// @immutable
-/// class EventContent extends ContentBase {
-///   EventContent({
+/// class Event extends ContentBase {
+///   Event({
 ///     required super.category,
 ///     required super.city,
 ///     required super.coordinates,
@@ -29,9 +27,11 @@ import 'package:objectbox/objectbox.dart';
 ///     required super.remoteId,
 ///     required super.isSaved,
 ///     required this.startDate,
+///     this.endDate,
 ///   });
 ///
 ///   final DateTime startDate;
+///   final DateTime? endDate;
 /// }
 /// ```
 ///
@@ -39,27 +39,24 @@ import 'package:objectbox/objectbox.dart';
 /// Used in the domain layer to represent content in a clean, abstract form,
 /// decoupled from data sources or UI-specific formatting.
 ///
-// TODO(xmattjus): make [Place], [Event], etc. classes extends [ContentBase] when objectbox Entity inheritance lands, https://github.com/objectbox/objectbox-dart/issues/249.
 abstract class ContentBase {
   final ContentCategory category;
-  final ToOne<City> city;
-  final int? cityToOneId;
+  final City? city;
   final LatLng coordinates;
   final DateTime createdAt;
   final String description;
   final DateTime modifiedAt;
-  final ToMany<Media> media;
+  final List<Media> media;
   final String name;
   final int remoteId;
   final bool isSaved;
 
-  /// Creates a [ContentBase] with the given [city], [cityToOneId],
-  /// [coordinates], [createdAt], [description], [modifiedAt], [media],
-  /// [name] and [remoteId].
+  /// Creates a [ContentBase] with the given [category], [city], [coordinates],
+  /// [createdAt], [description], [modifiedAt], [media], [name], [remoteId] and
+  /// optionally [isSaved].
   const ContentBase({
     required this.category,
     required this.city,
-    this.cityToOneId,
     required this.coordinates,
     required this.createdAt,
     required this.description,

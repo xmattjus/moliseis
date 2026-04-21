@@ -5,7 +5,7 @@ import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/content_type.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/category/view_models/category_view_model.dart';
@@ -159,9 +159,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
       GoRouter.of(context).goNamed(
         nextRoute,
         pathParameters: map,
-        queryParameters: {
-          'isEvent': (content is EventContent ? 'true' : 'false'),
-        },
+        queryParameters: {'isEvent': (content is Event ? 'true' : 'false')},
       );
     }
   }

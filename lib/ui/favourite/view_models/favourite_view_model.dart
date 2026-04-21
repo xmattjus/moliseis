@@ -2,8 +2,8 @@ import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
@@ -116,9 +116,9 @@ class FavouriteViewModel extends ChangeNotifier {
 
   /// Returns whether [content] is currently marked as a favourite.
   bool isFavourite(ContentBase content) {
-    if (content is EventContent) {
+    if (content is Event) {
       return _favouriteEventIds.contains(content.remoteId);
-    } else if (content is PlaceContent) {
+    } else if (content is Place) {
       return _favouritePlaceIds.contains(content.remoteId);
     }
     // Unknown ContentBase subtype — not tracked as a favourite.

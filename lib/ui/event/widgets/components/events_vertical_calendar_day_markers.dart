@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 
 class EventsVerticalCalendarDayMarkers extends StatefulWidget {
-  final List<EventContent> events;
+  final List<Event> events;
 
   const EventsVerticalCalendarDayMarkers({super.key, required this.events});
 

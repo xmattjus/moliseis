@@ -75,7 +75,7 @@ class ContentBaseListItem extends StatelessWidget {
                   children: <Widget>[
                     ContentNameAndCity(
                       name: content.name,
-                      cityName: content.city.target?.name,
+                      cityName: content.city?.name,
                     ),
                     if (verticalTrailing != null) verticalTrailing!,
                   ],

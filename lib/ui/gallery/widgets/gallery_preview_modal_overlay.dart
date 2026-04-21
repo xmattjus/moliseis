@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
-import 'package:moliseis/data/data-sources/media.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
+import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/ui/app_page_indicator.dart';
@@ -63,16 +63,12 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
       child: Theme(
         data: AppThemeData.photoViewer,
         child: _GalleryPreviewModalOverlayContent(
-          eventOrPlaceName:
-              media.place.target?.name ?? media.event.target?.name ?? '',
+          eventOrPlaceName: media.areaName,
           title: media.title ?? '',
           author: media.author ?? '',
           license: media.license ?? '',
           licenseUrl: media.licenseUrl ?? '',
-          cityName:
-              media.place.target?.city.target?.name ??
-              media.event.target?.city.target?.name ??
-              '',
+          cityName: media.cityName,
           onSharePressed: () async => await _onSharePressed(context),
           index: index,
           itemCount: itemCount,

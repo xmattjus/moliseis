@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
@@ -40,12 +40,12 @@ class PostSectionHeader extends StatelessWidget {
                 children: <Widget>[
                   ContentNameAndCity(
                     name: content.name,
-                    cityName: content.city.target?.name,
+                    cityName: content.city?.name,
                     nameStyle: AppTextStyles.title(context),
                     cityNameStyle: AppTextStyles.subtitle(context),
                     overflow: TextOverflow.visible,
                   ),
-                  if (content case final EventContent event)
+                  if (content case final Event event)
                     EventFormattedDateTime(event: event),
                 ],
               ),

@@ -1,7 +1,7 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
@@ -23,16 +23,15 @@ class EventViewModel extends ChangeNotifier {
     loadNextIds = Command0(_loadNextIds);
   }
 
-  var _all = <EventContent>[];
-  var _byDate = <EventContent>[];
-  final _next = <EventContent>[];
+  var _all = <Event>[];
+  var _byDate = <Event>[];
+  final _next = <Event>[];
   var _nextIds = <int>[];
   var _selectedDate = DateTime.now();
 
-  UnmodifiableListView<EventContent> get all => UnmodifiableListView(_all);
-  UnmodifiableListView<EventContent> get byMonth =>
-      UnmodifiableListView(_byDate);
-  UnmodifiableListView<EventContent> get next => UnmodifiableListView(_next);
+  UnmodifiableListView<Event> get all => UnmodifiableListView(_all);
+  UnmodifiableListView<Event> get byMonth => UnmodifiableListView(_byDate);
+  UnmodifiableListView<Event> get next => UnmodifiableListView(_next);
   UnmodifiableListView<int> get nextIds => UnmodifiableListView(_nextIds);
   DateTime get selectedDate => _selectedDate;
 
@@ -40,7 +39,7 @@ class EventViewModel extends ChangeNotifier {
   ///
   /// The check is inclusive of both start and end dates and compares only
   /// calendar days, ignoring timestamp precision.
-  bool isEventOnDay(EventContent event, DateTime day) {
+  bool isEventOnDay(Event event, DateTime day) {
     final startDate = DateTime(
       event.startDate.year,
       event.startDate.month,
@@ -67,7 +66,7 @@ class EventViewModel extends ChangeNotifier {
   }
 
   /// Returns events for [day], sorted by start date and then remote id.
-  List<EventContent> getEventsOnDay(DateTime day) {
+  List<Event> getEventsOnDay(DateTime day) {
     return _all.where((event) => isEventOnDay(event, day)).toList()
       ..sort((a, b) {
         final startDateCompare = a.startDate.compareTo(b.startDate);
@@ -84,7 +83,7 @@ class EventViewModel extends ChangeNotifier {
     final result = await _eventRepository.getByCurrentYear();
 
     final events = result.getOrNull();
-    if (events != null) _all = events.map(EventContent.fromEvent).toList();
+    if (events != null) _all = events;
 
     notifyListeners();
 
@@ -110,7 +109,7 @@ class EventViewModel extends ChangeNotifier {
     final result = await _eventRepository.getByDate(date);
 
     final events = result.getOrNull();
-    if (events != null) _byDate = events.map(EventContent.fromEvent).toList();
+    if (events != null) _byDate = events;
 
     notifyListeners();
 
@@ -136,7 +135,7 @@ class EventViewModel extends ChangeNotifier {
 
     for (final id in _nextIds) {
       final event = (await _eventRepository.getById(id)).getOrNull();
-      if (event != null) _next.add(EventContent.fromEvent(event));
+      if (event != null) _next.add(event);
     }
 
     notifyListeners();

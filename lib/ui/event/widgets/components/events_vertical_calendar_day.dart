@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day_markers.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class EventsVerticalCalendarDay extends StatelessWidget {
   final DateTime date;
-  final List<EventContent> events;
+  final List<Event> events;
   final void Function() onPressed;
   final bool isSelected;
 

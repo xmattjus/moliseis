@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/ui/blurred_box.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_event_card_grid_item.dart';
@@ -100,7 +100,7 @@ class _NearbyContentHorizontalListState
                   itemBuilder: (_, index) {
                     final content = nearContent[index];
 
-                    if (content is EventContent) {
+                    if (content is Event) {
                       return ContentEventCardGridItem(
                         event: content,
                         onPressed: widget.onPressed,

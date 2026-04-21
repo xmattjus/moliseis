@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_list_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_event_card_grid_item.dart';
@@ -49,13 +49,13 @@ class ContentSliverGrid extends StatelessWidget {
           key: ValueKey<String>('list-item:${content.name}-$index'),
           onPressed: (ContentBase content) => onPressed(content),
           horizontalTrailing: FavouriteButton(content: content),
-          verticalTrailing: content is EventContent
+          verticalTrailing: content is Event
               ? EventFormattedDateTime(event: content)
               : null,
         );
       }
 
-      if (content is EventContent) {
+      if (content is Event) {
         return ContentEventCardGridItem(event: content, onPressed: onPressed);
       }
 

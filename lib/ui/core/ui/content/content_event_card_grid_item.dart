@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event_content.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/ui/blurred_box.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
@@ -9,7 +9,7 @@ import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ContentEventCardGridItem extends StatelessWidget {
-  final EventContent event;
+  final Event event;
   final void Function(ContentBase content) onPressed;
 
   const ContentEventCardGridItem({

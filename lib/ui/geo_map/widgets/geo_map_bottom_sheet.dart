@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/place.dart';
+import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
@@ -42,7 +42,7 @@ class GeoMapBottomSheet extends StatefulWidget {
   /// The current map center.
   ///
   /// When both the [contentId] and [currentCenter] are defined, the first
-  /// will take priority, e.g. the post of that [Place] will be shown in
+  /// will take priority, e.g. the post of that [PlaceEntity] will be shown in
   /// the bottom sheet.
   final LatLng currentCenter;
   final VoidCallback onCloseButtonPressed;
@@ -101,9 +101,9 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
   }
 
   void _showContent() {
-    if (widget.content! is EventContent) {
+    if (widget.content! is Event) {
       widget.viewModel.showEvent.execute(widget.content!.remoteId);
-    } else if (widget.content! is PlaceContent) {
+    } else if (widget.content! is Place) {
       widget.viewModel.showPlace.execute(widget.content!.remoteId);
     }
   }
@@ -134,9 +134,9 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
               widget.viewModel.showPlace,
             ]),
             builder: (_, _) {
-              if (widget.content! is EventContent &&
+              if (widget.content! is Event &&
                       widget.viewModel.showEvent.completed ||
-                  widget.content! is PlaceContent &&
+                  widget.content! is Place &&
                       widget.viewModel.showPlace.completed) {
                 return GeoMapModalPost(
                   content: widget.viewModel.selectedContent!,

@@ -39,7 +39,7 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
           children: <Widget>[
             const Align(child: AppBottomSheetDragHandle()),
             AppBottomSheetTitle(
-              title: 'Previsioni meteo per ${widget.content.city.target?.name}',
+              title: 'Previsioni meteo per ${widget.content.city?.name}',
               onClose: () => Navigator.of(context).pop(),
             ),
             const SizedBox(height: 32.0),

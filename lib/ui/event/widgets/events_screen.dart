@@ -66,7 +66,7 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   Widget build(BuildContext context) => ResponsiveScaffold(
     draggableScrollableController: _draggableScrollableController,
-    modalBuilder: (context, scrollController) => EventsModal(
+    modalBuilder: (_, scrollController) => EventsModal(
       localizedMonths: _dateSymbols.MONTHS,
       selectedDate: widget.viewModel.selectedDate,
       viewModel: widget.viewModel,
@@ -74,7 +74,7 @@ class _EventsScreenState extends State<EventsScreen> {
     ),
     child: AnimatedBuilder(
       animation: _bottomPaddingAnimation,
-      builder: (context, child) {
+      builder: (_, child) {
         return Padding(
           padding: EdgeInsets.only(bottom: _bottomPadding),
           child: child,
@@ -109,9 +109,10 @@ class _CalendarWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: <Widget>[
-        const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
         if (context.windowSizeClass.isAtMost(WindowSizeClass.medium))
           const SliverAppBar(title: Text('Eventi')),
+        if (context.windowSizeClass.isLargerThan(WindowSizeClass.medium))
+          const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
         EventsCalendar(
           onDayPressed: (date) {
             onDayPressed?.call(date);
