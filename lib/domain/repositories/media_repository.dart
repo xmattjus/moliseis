@@ -1,4 +1,4 @@
-import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/synchronizable.dart';
 

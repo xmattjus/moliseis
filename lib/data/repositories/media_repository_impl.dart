@@ -1,6 +1,8 @@
-import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/media_supabase_table.dart';
+import 'package:moliseis/data/mappers/media_entity_mapper.dart';
 import 'package:moliseis/data/services/objectbox.dart';
+import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/messages.dart';
@@ -17,13 +19,13 @@ class MediaRepositoryImpl implements MediaRepository {
   }) : _log = logger,
        _supabase = supabaseI,
        _supabaseTable = supabaseTable,
-       _mediaBox = objectBoxI.store.box<Media>();
+       _mediaBox = objectBoxI.store.box<MediaEntity>();
 
   final Talker _log;
 
   final Supabase _supabase;
   final MediaSupabaseTable _supabaseTable;
-  final Box<Media> _mediaBox;
+  final Box<MediaEntity> _mediaBox;
 
   @override
   Future<Result<void>> synchronize() async {
@@ -34,11 +36,11 @@ class MediaRepositoryImpl implements MediaRepository {
           .from(_supabaseTable.tableName)
           .select();
 
-      final remote = Set<Media>.unmodifiable(
-        media.map<Media>((element) => Media.fromJson(element)),
+      final remote = Set<MediaEntity>.unmodifiable(
+        media.map<MediaEntity>((element) => MediaEntity.fromJson(element)),
       );
 
-      final local = Set<Media>.unmodifiable(_mediaBox.getAll());
+      final local = Set<MediaEntity>.unmodifiable(_mediaBox.getAll());
 
       final mediaToPut = remote.difference(local);
 
@@ -91,14 +93,17 @@ class MediaRepositoryImpl implements MediaRepository {
 
   @override
   Future<Result<List<Media>>> getByEventId(int id) async {
-    Query<Media>? query;
+    Query<MediaEntity>? query;
 
     try {
       final builder = _mediaBox.query();
-      builder.link(Media_.event, Event_.remoteId.equals(id));
+      builder.link(MediaEntity_.event, EventEntity_.remoteId.equals(id));
       query = builder.build();
       final results = await query.findAsync();
-      return Result.success(results);
+      final mappedResults = results
+          .map<Media>((MediaEntity entity) => entity.toModel())
+          .toList();
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while getting media by event with remote ID: $id.',
@@ -113,14 +118,17 @@ class MediaRepositoryImpl implements MediaRepository {
 
   @override
   Future<Result<List<Media>>> getByPlaceId(int id) async {
-    Query<Media>? query;
+    Query<MediaEntity>? query;
 
     try {
       final builder = _mediaBox.query();
-      builder.link(Media_.place, Place_.remoteId.equals(id));
+      builder.link(MediaEntity_.place, PlaceEntity_.remoteId.equals(id));
       query = builder.build();
       final results = await query.findAsync();
-      return Result.success(results);
+      final mappedResults = results
+          .map<Media>((MediaEntity entity) => entity.toModel())
+          .toList();
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while getting media by place with remote ID: $id.',

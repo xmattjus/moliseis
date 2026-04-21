@@ -1,9 +1,11 @@
 import 'package:moliseis/data/core/object_box_conditions.dart';
-import 'package:moliseis/data/data-sources/event.dart';
+import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/event_supabase_table.dart';
+import 'package:moliseis/data/mappers/event_entity_mapper.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -21,13 +23,13 @@ class EventRepositoryImpl implements EventRepository {
   }) : _log = logger,
        _supabase = supabaseI,
        _supabaseTable = supabaseTable,
-       _eventBox = objectBoxI.store.box<Event>();
+       _eventBox = objectBoxI.store.box<EventEntity>();
 
   final Talker _log;
 
   final Supabase _supabase;
   final EventSupabaseTable _supabaseTable;
-  final Box<Event> _eventBox;
+  final Box<EventEntity> _eventBox;
 
   List<Event>? _cache;
 
@@ -35,21 +37,22 @@ class EventRepositoryImpl implements EventRepository {
   Future<Result<List<Event>>> getByCurrentYear() async {
     // Do not query the database again if the events are already cached.
     if (_cache != null) {
-      return Result.success(_cache!);
+      return Result.success(List.unmodifiable(_cache!));
     }
 
-    Query<Event>? query;
+    Query<EventEntity>? query;
 
     try {
       final builder = _eventBox
           .query(ObjectBoxConditions.eventStartsEndsCurrentYear)
-          .order(Event_.startDate, flags: Order.unsigned);
+          .order(EventEntity_.startDate, flags: Order.unsigned);
       query = builder.build();
       final results = await query.findAsync();
-
-      _cache = results;
-
-      return Result.success(results);
+      final mappedResults = results
+          .map<Event>((EventEntity entity) => entity.toModel())
+          .toList();
+      _cache = mappedResults;
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while getting all events.',
@@ -68,16 +71,18 @@ class EventRepositoryImpl implements EventRepository {
     Set<ContentCategory> categories, {
     ContentSort sort = ContentSort.byName,
   }) async {
-    Query<Event>? query;
+    Query<EventEntity>? query;
 
     try {
-      final condition = Event_.dbType
+      final condition = EventEntity_.dbType
           .oneOf(categories.map((e) => e.index).toList())
           .and(ObjectBoxConditions.eventStartsEndsCurrentYear);
       query = _eventBox.query(condition).build();
       final results = await query.findAsync();
-
-      return Result.success(results);
+      final mappedResults = results
+          .map<Event>((EventEntity entity) => entity.toModel())
+          .toList();
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while getting events by categories: $categories.',
@@ -92,25 +97,27 @@ class EventRepositoryImpl implements EventRepository {
 
   @override
   Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) async {
-    Query<Event>? query;
+    Query<EventEntity>? query;
 
     try {
-      final condition = Event_.coordinates
+      final condition = EventEntity_.coordinates
           .nearestNeighborsF32(coordinates, 200)
           .and(ObjectBoxConditions.eventStartsEndsCurrentYear);
       query = _eventBox.query(condition).build();
       query.limit = 2;
       final resultsWithScores = await query.findWithScoresAsync();
-      query.close();
       final results = resultsWithScores
-          .map<Event>((element) => element.object)
+          .map<EventEntity>((element) => element.object)
           .where(
             (event) =>
                 event.coordinates.first != coordinates.first ||
                 event.coordinates.last != coordinates.last,
           )
           .toList();
-      return Result.success(results);
+      final mappedResults = results
+          .map<Event>((EventEntity entity) => entity.toModel())
+          .toList();
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while loading events by coordinates.',
@@ -127,7 +134,7 @@ class EventRepositoryImpl implements EventRepository {
     required DateTime start,
     DateTime? end,
   }) async {
-    Query<Event>? query;
+    Query<EventEntity>? query;
 
     // Normalizes the start and end dates to include the entire day.
     final startDate = start.startOfDay;
@@ -138,22 +145,24 @@ class EventRepositoryImpl implements EventRepository {
     _log.info('Getting events for date range: $startDate to $endDate.');
 
     try {
-      final Condition<Event> multiDayCondition = Event_.startDate
+      final Condition<EventEntity> multiDayCondition = EventEntity_.startDate
           .lessOrEqualDate(endDate)
-          .and(Event_.endDate.greaterOrEqualDate(startDate));
+          .and(EventEntity_.endDate.greaterOrEqualDate(startDate));
 
-      final Condition<Event> singleDayCondition = Event_.endDate.isNull().and(
-        Event_.startDate.betweenDate(startDate, endDate),
-      );
+      final Condition<EventEntity> singleDayCondition = EventEntity_.endDate
+          .isNull()
+          .and(EventEntity_.startDate.betweenDate(startDate, endDate));
 
       final builder = _eventBox
           .query(multiDayCondition.or(singleDayCondition))
-          .order(Event_.startDate, flags: Order.unsigned);
+          .order(EventEntity_.startDate, flags: Order.unsigned);
 
       query = builder.build();
       final results = await query.findAsync();
-
-      return Result.success(results);
+      final mappedResults = results
+          .map<Event>((EventEntity entity) => entity.toModel())
+          .toList();
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while getting events for date range: $startDate to $endDate.',
@@ -184,7 +193,7 @@ class EventRepositoryImpl implements EventRepository {
       final result = _eventBox.get(id);
 
       if (result != null) {
-        return Result.success(result);
+        return Result.success(result.toModel());
       } else {
         return Result.error(Exception('Event is null'));
       }
@@ -200,7 +209,7 @@ class EventRepositoryImpl implements EventRepository {
 
   @override
   Future<Result<List<int>>> getNextEventIds() async {
-    Query<Event>? query;
+    Query<EventEntity>? query;
 
     try {
       final now = DateTime.now();
@@ -209,11 +218,11 @@ class EventRepositoryImpl implements EventRepository {
 
       final builder = _eventBox
           .query(
-            Event_.startDate
+            EventEntity_.startDate
                 .greaterOrEqualDate(today)
-                .and(Event_.startDate.lessOrEqualDate(nextMonth)),
+                .and(EventEntity_.startDate.lessOrEqualDate(nextMonth)),
           )
-          .order(Event_.startDate, flags: Order.unsigned);
+          .order(EventEntity_.startDate, flags: Order.unsigned);
       query = builder.build()..limit = 6;
       final results = query.findIds();
       return Result.success(results);
@@ -231,10 +240,10 @@ class EventRepositoryImpl implements EventRepository {
 
   @override
   Future<Result<List<int>>> getFavouriteEventIds() async {
-    Query<Event>? query;
+    Query<EventEntity>? query;
 
     try {
-      query = _eventBox.query(Event_.isSaved.equals(true)).build();
+      query = _eventBox.query(EventEntity_.isSaved.equals(true)).build();
       // Casts the query results to a growable list with toList().
       final events = query.findIds().toList();
       return Result.success(events);
@@ -286,11 +295,11 @@ class EventRepositoryImpl implements EventRepository {
           .from(_supabaseTable.tableName)
           .select();
 
-      final remote = Set<Event>.unmodifiable(
-        events.map<Event>((element) => Event.fromJson(element)),
+      final remote = Set<EventEntity>.unmodifiable(
+        events.map<EventEntity>((element) => EventEntity.fromJson(element)),
       );
 
-      final local = Set<Event>.unmodifiable(_eventBox.getAll());
+      final local = Set<EventEntity>.unmodifiable(_eventBox.getAll());
 
       final eventsToPut = remote.difference(local);
 

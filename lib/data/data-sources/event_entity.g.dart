@@ -1,12 +1,12 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'event.dart';
+part of 'event_entity.dart';
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-Event _$EventFromJson(Map<String, dynamic> json) => Event(
+EventEntity _$EventEntityFromJson(Map<String, dynamic> json) => EventEntity(
   remoteId: (json['id'] as num).toInt(),
   name: json['name'] as String?,
   description: json['description'] as String?,
@@ -33,20 +33,21 @@ Event _$EventFromJson(Map<String, dynamic> json) => Event(
   media: const MediaRelToManyConverter().fromJson(json['media'] as List?),
 );
 
-Map<String, dynamic> _$EventToJson(Event instance) => <String, dynamic>{
-  'id': instance.remoteId,
-  'name': instance.name,
-  'description': instance.description,
-  'start_date': instance.startDate?.toIso8601String(),
-  'end_date': instance.endDate?.toIso8601String(),
-  'coordinates': instance.coordinates,
-  'category': _$ContentCategoryEnumMap[instance.category]!,
-  'city_id': instance.cityToOneId,
-  'created_at': instance.createdAt.toIso8601String(),
-  'modified_at': instance.modifiedAt.toIso8601String(),
-  'city': const CityRelToOneConverter().toJson(instance.city),
-  'media': const MediaRelToManyConverter().toJson(instance.media),
-};
+Map<String, dynamic> _$EventEntityToJson(EventEntity instance) =>
+    <String, dynamic>{
+      'id': instance.remoteId,
+      'name': instance.name,
+      'description': instance.description,
+      'start_date': instance.startDate?.toIso8601String(),
+      'end_date': instance.endDate?.toIso8601String(),
+      'coordinates': instance.coordinates,
+      'category': _$ContentCategoryEnumMap[instance.category]!,
+      'city_id': instance.cityToOneId,
+      'created_at': instance.createdAt.toIso8601String(),
+      'modified_at': instance.modifiedAt.toIso8601String(),
+      'city': const CityRelToOneConverter().toJson(instance.city),
+      'media': const MediaRelToManyConverter().toJson(instance.media),
+    };
 
 const _$ContentCategoryEnumMap = {
   ContentCategory.unknown: 'unknown',

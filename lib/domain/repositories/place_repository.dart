@@ -1,6 +1,6 @@
-import 'package:moliseis/data/data-sources/place.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/synchronizable.dart';
 

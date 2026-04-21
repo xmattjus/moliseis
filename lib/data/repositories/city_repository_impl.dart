@@ -1,4 +1,4 @@
-import 'package:moliseis/data/data-sources/city.dart';
+import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/city_supabase_table.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
@@ -17,13 +17,13 @@ class CityRepositoryImpl implements CityRepository {
   }) : _log = logger,
        _supabase = supabaseI,
        _supabaseTable = supabaseTable,
-       _cityBox = objectBoxI.store.box<City>();
+       _cityBox = objectBoxI.store.box<CityEntity>();
 
   final Talker _log;
 
   final Supabase _supabase;
   final CitySupabaseTable _supabaseTable;
-  final Box<City> _cityBox;
+  final Box<CityEntity> _cityBox;
 
   @override
   Future<Result<void>> synchronize() async {
@@ -34,11 +34,11 @@ class CityRepositoryImpl implements CityRepository {
           .from(_supabaseTable.tableName)
           .select();
 
-      final remote = Set<City>.unmodifiable(
-        cities.map<City>((element) => City.fromJson(element)),
+      final remote = Set<CityEntity>.unmodifiable(
+        cities.map<CityEntity>((element) => CityEntity.fromJson(element)),
       );
 
-      final local = Set<City>.unmodifiable(_cityBox.getAll());
+      final local = Set<CityEntity>.unmodifiable(_cityBox.getAll());
 
       final citiesToPut = remote.difference(local);
 

@@ -1,12 +1,12 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'city.dart';
+part of 'city_entity.dart';
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-City _$CityFromJson(Map<String, dynamic> json) => City(
+CityEntity _$CityEntityFromJson(Map<String, dynamic> json) => CityEntity(
   remoteId: (json['id'] as num).toInt(),
   name: json['name'] as String,
   createdAt: DateTime.parse(json['created_at'] as String),
@@ -19,11 +19,12 @@ City _$CityFromJson(Map<String, dynamic> json) => City(
   ),
 );
 
-Map<String, dynamic> _$CityToJson(City instance) => <String, dynamic>{
-  'id': instance.remoteId,
-  'name': instance.name,
-  'created_at': instance.createdAt.toIso8601String(),
-  'modified_at': instance.modifiedAt.toIso8601String(),
-  'places': const PlaceRelToManyConverter().toJson(instance.places),
-  'events': const EventRelToManyConverter().toJson(instance.events),
-};
+Map<String, dynamic> _$CityEntityToJson(CityEntity instance) =>
+    <String, dynamic>{
+      'id': instance.remoteId,
+      'name': instance.name,
+      'created_at': instance.createdAt.toIso8601String(),
+      'modified_at': instance.modifiedAt.toIso8601String(),
+      'places': const PlaceRelToManyConverter().toJson(instance.places),
+      'events': const EventRelToManyConverter().toJson(instance.events),
+    };

@@ -1,12 +1,12 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'place.dart';
+part of 'place_entity.dart';
 
 // **************************************************************************
 // JsonSerializableGenerator
 // **************************************************************************
 
-Place _$PlaceFromJson(Map<String, dynamic> json) => Place(
+PlaceEntity _$PlaceEntityFromJson(Map<String, dynamic> json) => PlaceEntity(
   remoteId: (json['id'] as num).toInt(),
   name: json['name'] as String,
   description: json['description'] as String?,
@@ -27,18 +27,19 @@ Place _$PlaceFromJson(Map<String, dynamic> json) => Place(
   media: const MediaRelToManyConverter().fromJson(json['media'] as List?),
 );
 
-Map<String, dynamic> _$PlaceToJson(Place instance) => <String, dynamic>{
-  'id': instance.remoteId,
-  'name': instance.name,
-  'description': instance.description,
-  'coordinates': instance.coordinates,
-  'category': _$ContentCategoryEnumMap[instance.category]!,
-  'city_id': instance.cityToOneId,
-  'created_at': instance.createdAt.toIso8601String(),
-  'modified_at': instance.modifiedAt.toIso8601String(),
-  'city': const CityRelToOneConverter().toJson(instance.city),
-  'media': const MediaRelToManyConverter().toJson(instance.media),
-};
+Map<String, dynamic> _$PlaceEntityToJson(PlaceEntity instance) =>
+    <String, dynamic>{
+      'id': instance.remoteId,
+      'name': instance.name,
+      'description': instance.description,
+      'coordinates': instance.coordinates,
+      'category': _$ContentCategoryEnumMap[instance.category]!,
+      'city_id': instance.cityToOneId,
+      'created_at': instance.createdAt.toIso8601String(),
+      'modified_at': instance.modifiedAt.toIso8601String(),
+      'city': const CityRelToOneConverter().toJson(instance.city),
+      'media': const MediaRelToManyConverter().toJson(instance.media),
+    };
 
 const _$ContentCategoryEnumMap = {
   ContentCategory.unknown: 'unknown',

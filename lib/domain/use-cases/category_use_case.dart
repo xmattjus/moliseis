@@ -1,6 +1,6 @@
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/event_content.dart';
-import 'package:moliseis/domain/models/place_content.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/utils/result.dart';
@@ -15,19 +15,11 @@ class CategoryUseCase {
   }) : _eventRepository = eventRepository,
        _placeRepository = placeRepository;
 
-  Future<Result<List<EventContent>>> getEventsByCategories(
+  Future<Result<List<Event>>> getEventsByCategories(
     Set<ContentCategory> categories,
-  ) async {
-    return (await _eventRepository.getByCategories(
-      categories,
-    )).map((events) => events.map(EventContent.fromEvent).toList());
-  }
+  ) async => await _eventRepository.getByCategories(categories);
 
-  Future<Result<List<PlaceContent>>> getPlacesByCategories(
+  Future<Result<List<Place>>> getPlacesByCategories(
     Set<ContentCategory> categories,
-  ) async {
-    return (await _placeRepository.getByCategories(
-      categories,
-    )).map((places) => places.map(PlaceContent.fromPlace).toList());
-  }
+  ) async => await _placeRepository.getByCategories(categories);
 }

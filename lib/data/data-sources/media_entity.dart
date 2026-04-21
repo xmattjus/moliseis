@@ -1,16 +1,14 @@
 import 'package:json_annotation/json_annotation.dart';
-import 'package:meta/meta.dart';
-import 'package:moliseis/data/data-sources/event.dart';
-import 'package:moliseis/data/data-sources/place.dart';
+import 'package:moliseis/data/data-sources/event_entity.dart';
+import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:objectbox/objectbox.dart';
 
-part 'media.g.dart';
+part 'media_entity.g.dart';
 
-@immutable
 @Entity()
 @JsonSerializable()
-class Media {
-  const Media({
+class MediaEntity {
+  const MediaEntity({
     required this.remoteId,
     this.title,
     this.author,
@@ -61,14 +59,14 @@ class Media {
   final DateTime modifiedAt;
 
   @PlaceRelToOneConverter()
-  final ToOne<Place> place;
+  final ToOne<PlaceEntity> place;
 
   @EventRelToOneConverter()
-  final ToOne<Event> event;
+  final ToOne<EventEntity> event;
 
   @override
   bool operator ==(Object other) =>
-      other is Media &&
+      other is MediaEntity &&
       other.remoteId == remoteId &&
       other.title == title &&
       other.author == author &&
@@ -98,7 +96,7 @@ class Media {
     modifiedAt,
   );
 
-  Media copyWith({
+  MediaEntity copyWith({
     String? title,
     String? author,
     String? license,
@@ -120,7 +118,7 @@ class Media {
         ? eventToOneId()
         : this.eventToOneId;
 
-    final copy = Media(
+    final copy = MediaEntity(
       remoteId: remoteId,
       title: title ?? this.title,
       author: author ?? this.author,
@@ -144,26 +142,22 @@ class Media {
     return copy;
   }
 
-  @override
-  String toString() =>
-      'remotedId: $remoteId, title: $title, author: $author, '
-      'license: $license, licenseUrl: $licenseUrl, url: $url, width: $width, '
-      'height: $height, placeToOneId: $placeToOneId, eventToOneId: $eventToOneId '
-      'createdAt: $createdAt, modifiedAt: $modifiedAt';
+  factory MediaEntity.fromJson(Map<String, dynamic> json) =>
+      _$MediaEntityFromJson(json);
 
-  factory Media.fromJson(Map<String, dynamic> json) => _$MediaFromJson(json);
-
-  Map<String, dynamic> toJson() => _$MediaToJson(this);
+  Map<String, dynamic> toJson() => _$MediaEntityToJson(this);
 }
 
 class MediaRelToManyConverter
-    implements JsonConverter<ToMany<Media>, List<dynamic>?> {
+    implements JsonConverter<ToMany<MediaEntity>, List<dynamic>?> {
   const MediaRelToManyConverter();
 
   @override
-  ToMany<Media> fromJson(List<dynamic>? json) => ToMany<Media>(items: []);
+  // Media is always loaded via ObjectBox backlinks, never from embedded JSON.
+  ToMany<MediaEntity> fromJson(List<dynamic>? json) =>
+      ToMany<MediaEntity>(items: []);
 
   @override
-  List<Map<String, dynamic>>? toJson(ToMany<Media> rel) =>
-      rel.map((Media obj) => obj.toJson()).toList();
+  List<Map<String, dynamic>>? toJson(ToMany<MediaEntity> rel) =>
+      rel.map((MediaEntity obj) => obj.toJson()).toList();
 }

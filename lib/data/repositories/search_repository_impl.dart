@@ -1,7 +1,7 @@
 import 'package:moliseis/data/core/object_box_conditions.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/event.dart';
-import 'package:moliseis/data/data-sources/place.dart';
+import 'package:moliseis/data/data-sources/city_entity.dart';
+import 'package:moliseis/data/data-sources/event_entity.dart';
+import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/data-sources/search_query.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -21,10 +21,10 @@ class SearchRepositoryImpl implements SearchRepository {
 
   final Talker _log;
 
-  late final Query<City> _cityQuery;
+  late final Query<CityEntity> _cityQuery;
   final ObjectBox _objectBox;
-  late final Query<Place> _placeCategoryQuery;
-  late final Query<Place> _placeQuery;
+  late final Query<PlaceEntity> _placeCategoryQuery;
+  late final Query<PlaceEntity> _placeQuery;
   final Box<SearchQuery> _searchHistoryBox;
 
   /// The list of the Place IDs returned by the last search.
@@ -36,18 +36,18 @@ class SearchRepositoryImpl implements SearchRepository {
   /// Caches the ObjectBox queries.
   void _init() {
     _cityQuery = _objectBox.store
-        .box<City>()
-        .query(City_.name.contains('', caseSensitive: false))
+        .box<CityEntity>()
+        .query(CityEntity_.name.contains('', caseSensitive: false))
         .build();
 
     _placeQuery = _objectBox.store
-        .box<Place>()
-        .query(Place_.name.contains('', caseSensitive: false))
+        .box<PlaceEntity>()
+        .query(PlaceEntity_.name.contains('', caseSensitive: false))
         .build();
 
     _placeCategoryQuery = _objectBox.store
-        .box<Place>()
-        .query(Place_.dbType.oneOf(<int>[]))
+        .box<PlaceEntity>()
+        .query(PlaceEntity_.dbType.oneOf(<int>[]))
         .build();
   }
 
@@ -85,25 +85,25 @@ class SearchRepositoryImpl implements SearchRepository {
     // ObjectBoxConditions.eventStartsEndsCurrentYear always reflect the current
     // date rather than the date at construction time.
     final eventQuery = _objectBox.store
-        .box<Event>()
+        .box<EventEntity>()
         .query(
-          Event_.name
+          EventEntity_.name
               .contains(text, caseSensitive: false)
               .and(ObjectBoxConditions.eventStartsEndsCurrentYear),
         )
         .build();
 
     final eventCategoryQuery = _objectBox.store
-        .box<Event>()
+        .box<EventEntity>()
         .query(
-          Event_.dbType
+          EventEntity_.dbType
               .oneOf(_getCategoryIndexes(text))
               .and(ObjectBoxConditions.eventStartsEndsCurrentYear),
         )
         .build();
 
     try {
-      _cityQuery.param(City_.name).value = text;
+      _cityQuery.param(CityEntity_.name).value = text;
 
       final (categoryQuery, cityQuery, nameQuery) = (
         eventCategoryQuery.findIds(),
@@ -115,7 +115,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
       results.addAll(nameQuery);
 
-      final cities = _objectBox.store.box<City>().getMany(cityQuery);
+      final cities = _objectBox.store.box<CityEntity>().getMany(cityQuery);
 
       final now = DateTime.now();
       final currentYearStart = DateTime(now.year);
@@ -161,13 +161,12 @@ class SearchRepositoryImpl implements SearchRepository {
   @override
   Future<Result<List<int>>> getPlaceIdsByQuery(String text) async {
     try {
-      _cityQuery.param(City_.name).value = text;
+      _cityQuery.param(CityEntity_.name).value = text;
 
-      _placeQuery.param(Place_.name).value = text;
+      _placeQuery.param(PlaceEntity_.name).value = text;
 
-      _placeCategoryQuery.param(Place_.dbType).values = _getCategoryIndexes(
-        text,
-      );
+      _placeCategoryQuery.param(PlaceEntity_.dbType).values =
+          _getCategoryIndexes(text);
 
       // Generates a record.
       // Source: https://stackoverflow.com/a/77073846
@@ -181,7 +180,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
       results.addAll(placeQuery);
 
-      final cities = _objectBox.store.box<City>().getMany(cityQuery);
+      final cities = _objectBox.store.box<CityEntity>().getMany(cityQuery);
 
       for (final city in cities) {
         if (city != null) {
@@ -218,11 +217,11 @@ class SearchRepositoryImpl implements SearchRepository {
     }
 
     try {
-      final placeBox = _objectBox.store.box<Place>();
+      final placeBox = _objectBox.store.box<PlaceEntity>();
 
       final places = placeBox.getMany(_lastPlaceResultIds);
 
-      final places1 = <Place>[];
+      final places1 = <PlaceEntity>[];
 
       for (final place in places) {
         if (place != null) {
@@ -232,7 +231,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
       final related = _getRelatedResults(places1);
 
-      final results = related.map<int>((Place e) => e.remoteId).toList();
+      final results = related.map<int>((PlaceEntity e) => e.remoteId).toList();
 
       final set1 = results.toSet();
       final set2 = _lastPlaceResultIds.toSet();
@@ -289,14 +288,14 @@ class SearchRepositoryImpl implements SearchRepository {
     }
   }
 
-  List<Place> _getRelatedResults(List<Place> searchResults) {
+  List<PlaceEntity> _getRelatedResults(List<PlaceEntity> searchResults) {
     try {
       // Creates a frequency map from direct search results where each key is
       // a ContentCategory and the corresponding value represents how many
       // times that type appears in the results.
       final freqMap = searchResults.fold<Map<ContentCategory, int>>({}, (
         Map<ContentCategory, int> map,
-        Place element,
+        PlaceEntity element,
       ) {
         map[element.category] = (map[element.category] ?? 0) + 1;
         return map;
@@ -309,7 +308,9 @@ class SearchRepositoryImpl implements SearchRepository {
         );
 
       // Finds all places having the most appeared type.
-      _placeCategoryQuery.param(Place_.dbType).values = [sorted.first.index];
+      _placeCategoryQuery.param(PlaceEntity_.dbType).values = [
+        sorted.first.index,
+      ];
 
       return _placeCategoryQuery.find();
     } on Exception catch (error, stackTrace) {
@@ -319,7 +320,7 @@ class SearchRepositoryImpl implements SearchRepository {
         stackTrace,
       );
 
-      return <Place>[];
+      return <PlaceEntity>[];
     }
   }
 

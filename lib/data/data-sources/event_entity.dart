@@ -1,18 +1,20 @@
 import 'package:json_annotation/json_annotation.dart';
-import 'package:moliseis/data/data-sources/city.dart';
-import 'package:moliseis/data/data-sources/media.dart';
+import 'package:moliseis/data/data-sources/city_entity.dart';
+import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:objectbox/objectbox.dart';
 
-part 'place.g.dart';
+part 'event_entity.g.dart';
 
-@Entity()
 @JsonSerializable()
-class Place {
-  Place({
+@Entity()
+class EventEntity {
+  EventEntity({
     required this.remoteId,
-    required this.name,
+    this.name,
     this.description,
+    this.startDate,
+    this.endDate,
     this.coordinates = const [0, 0],
     this.category = ContentCategory.unknown,
     this.cityToOneId,
@@ -28,9 +30,17 @@ class Place {
   final int remoteId;
 
   @Index()
-  final String name;
+  final String? name;
 
   final String? description;
+
+  @JsonKey(name: 'start_date')
+  @Property(type: PropertyType.dateNano)
+  final DateTime? startDate;
+
+  @JsonKey(name: 'end_date')
+  @Property(type: PropertyType.dateNano)
+  final DateTime? endDate;
 
   /// Latitude x Longitude
   @HnswIndex(dimensions: 2, distanceType: VectorDistanceType.geo)
@@ -43,12 +53,12 @@ class Place {
   @JsonKey(name: 'city_id')
   final int? cityToOneId;
 
-  @Property(type: PropertyType.dateNano)
   @JsonKey(name: 'created_at')
+  @Property(type: PropertyType.dateNano)
   final DateTime createdAt;
 
-  @Property(type: PropertyType.dateNano)
   @JsonKey(name: 'modified_at')
+  @Property(type: PropertyType.dateNano)
   final DateTime modifiedAt;
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -69,26 +79,28 @@ class Place {
   }
 
   @CityRelToOneConverter()
-  final ToOne<City> city;
+  final ToOne<CityEntity> city;
 
-  @Backlink('place')
+  @Backlink('event')
   @MediaRelToManyConverter()
-  final ToMany<Media> media;
+  final ToMany<MediaEntity> media;
 
   @JsonKey(includeFromJson: false, includeToJson: false)
-  bool isSaved;
+  final bool isSaved;
 
   @override
   bool operator ==(Object other) =>
-      other is Place &&
+      other is EventEntity &&
       other.remoteId == remoteId &&
       other.name == name &&
       other.description == description &&
       // listEquals(other.coordinates, coordinates) &&
       other.category == category &&
+      _bothNullOrSameMoment(startDate, other.startDate) &&
+      _bothNullOrSameMoment(endDate, other.endDate) &&
+      _bothNullOrSameMoment(createdAt, other.createdAt) &&
+      _bothNullOrSameMoment(modifiedAt, other.modifiedAt) &&
       other.cityToOneId == cityToOneId &&
-      other.createdAt.isAtSameMomentAs(createdAt) &&
-      other.modifiedAt.isAtSameMomentAs(modifiedAt) &&
       other.isSaved == isSaved;
 
   @override
@@ -98,15 +110,19 @@ class Place {
     description,
     // Object.hashAll(coordinates),
     category,
+    startDate,
+    endDate,
     cityToOneId,
     createdAt,
     modifiedAt,
     isSaved,
   );
 
-  Place copyWith({
+  EventEntity copyWith({
     String? name,
     String? description,
+    DateTime? startDate,
+    DateTime? endDate,
     List<double>? coordinates,
     ContentCategory? category,
     int? Function()? cityToOneId,
@@ -119,15 +135,17 @@ class Place {
         ? cityToOneId()
         : this.cityToOneId;
 
-    final copy = Place(
+    final copy = EventEntity(
       remoteId: remoteId,
       name: name ?? this.name,
       description: description ?? this.description,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
       coordinates: coordinates ?? this.coordinates,
       category: category ?? this.category,
+      cityToOneId: newCityToOneId,
       createdAt: createdAt ?? this.createdAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
-      cityToOneId: newCityToOneId,
       city: city,
       media: media,
       isSaved: isSaved ?? this.isSaved,
@@ -138,32 +156,47 @@ class Place {
     return copy;
   }
 
-  factory Place.fromJson(Map<String, dynamic> json) => _$PlaceFromJson(json);
+  factory EventEntity.fromJson(Map<String, dynamic> json) =>
+      _$EventEntityFromJson(json);
 
-  Map<String, dynamic> toJson() => _$PlaceToJson(this);
+  Map<String, dynamic> toJson() => _$EventEntityToJson(this);
+
+  /// Whether both [dt] and [other] are null or occur at the same moment.
+  bool _bothNullOrSameMoment(DateTime? dt, DateTime? other) {
+    if (dt == null && other == null) return true;
+
+    if (dt != null && other != null && dt.isAtSameMomentAs(other)) {
+      return true;
+    }
+
+    return false;
+  }
 }
 
-class PlaceRelToOneConverter
-    implements JsonConverter<ToOne<Place>, Map<String, dynamic>?> {
-  const PlaceRelToOneConverter();
+class EventRelToOneConverter
+    implements JsonConverter<ToOne<EventEntity>, Map<String, dynamic>?> {
+  const EventRelToOneConverter();
 
   @override
-  ToOne<Place> fromJson(Map<String, dynamic>? json) =>
-      ToOne<Place>(target: json == null ? null : Place.fromJson(json));
+  ToOne<EventEntity> fromJson(Map<String, dynamic>? json) => ToOne<EventEntity>(
+    target: json == null ? null : EventEntity.fromJson(json),
+  );
 
   @override
-  Map<String, dynamic>? toJson(ToOne<Place> rel) => rel.target?.toJson();
+  Map<String, dynamic>? toJson(ToOne<EventEntity> rel) => rel.target?.toJson();
 }
 
-class PlaceRelToManyConverter
-    implements JsonConverter<ToMany<Place>, List<Map<String, dynamic>>?> {
-  const PlaceRelToManyConverter();
+class EventRelToManyConverter
+    implements JsonConverter<ToMany<EventEntity>, List<Map<String, dynamic>>?> {
+  const EventRelToManyConverter();
 
   @override
-  ToMany<Place> fromJson(List<Map<String, dynamic>>? json) =>
-      ToMany<Place>(items: json?.map<Place>((e) => Place.fromJson(e)).toList());
+  ToMany<EventEntity> fromJson(List<Map<String, dynamic>>? json) =>
+      ToMany<EventEntity>(
+        items: json?.map<EventEntity>((e) => EventEntity.fromJson(e)).toList(),
+      );
 
   @override
-  List<Map<String, dynamic>>? toJson(ToMany<Place> rel) =>
-      rel.map((Place obj) => obj.toJson()).toList();
+  List<Map<String, dynamic>>? toJson(ToMany<EventEntity> rel) =>
+      rel.map((EventEntity obj) => obj.toJson()).toList();
 }

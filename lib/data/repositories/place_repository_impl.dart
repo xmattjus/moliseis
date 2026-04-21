@@ -1,8 +1,10 @@
-import 'package:moliseis/data/data-sources/place.dart';
+import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/data-sources/place_supabase_table.dart';
+import 'package:moliseis/data/mappers/place_entity_mapper.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/exceptions.dart';
@@ -20,13 +22,13 @@ class PlaceRepositoryImpl implements PlaceRepository {
   }) : _log = logger,
        _supabase = supabaseI,
        _supabaseTable = supabaseTable,
-       _placeBox = objectBoxI.store.box<Place>();
+       _placeBox = objectBoxI.store.box<PlaceEntity>();
 
   final Talker _log;
 
   final Supabase _supabase;
   final PlaceSupabaseTable _supabaseTable;
-  final Box<Place> _placeBox;
+  final Box<PlaceEntity> _placeBox;
 
   List<Place>? _cache;
 
@@ -35,16 +37,23 @@ class PlaceRepositoryImpl implements PlaceRepository {
     ContentSort sort = ContentSort.byName,
   }) async {
     try {
-      final places = _cache ??= await _placeBox.getAllAsync();
+      if (_cache == null) {
+        final entities = await _placeBox.getAllAsync();
+        _cache = entities
+            .map<Place>((PlaceEntity entity) => entity.toModel())
+            .toList();
+      }
 
-      places.sort(
+      final mappedResults = List<Place>.of(_cache!);
+
+      mappedResults.sort(
         (a, b) => switch (sort) {
           ContentSort.byName => a.name.compareTo(b.name),
           ContentSort.byDate => b.modifiedAt.compareTo(a.modifiedAt),
         },
       );
 
-      return Result.success(places);
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while loading all the places.',
@@ -60,17 +69,21 @@ class PlaceRepositoryImpl implements PlaceRepository {
     Set<ContentCategory> categories, {
     ContentSort sort = ContentSort.byName,
   }) async {
-    Query<Place>? query;
+    Query<PlaceEntity>? query;
 
     try {
-      final condition = Place_.dbType.oneOf(
+      final condition = PlaceEntity_.dbType.oneOf(
         categories.map((e) => e.index).toList(),
       );
       final builder = _placeBox.query(condition);
       query = builder.build();
       final results = await query.findAsync();
 
-      return Result.success(results);
+      final mappedResults = results
+          .map<Place>((PlaceEntity entity) => entity.toModel())
+          .toList();
+
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while loading places by category.',
@@ -85,24 +98,28 @@ class PlaceRepositoryImpl implements PlaceRepository {
 
   @override
   Future<Result<List<Place>>> getByCoordinates(List<double> coordinates) async {
-    Query<Place>? query;
+    Query<PlaceEntity>? query;
 
     try {
       query = _placeBox
-          .query(Place_.coordinates.nearestNeighborsF32(coordinates, 300))
+          .query(PlaceEntity_.coordinates.nearestNeighborsF32(coordinates, 300))
           .build();
       query.limit = 3;
       final resultsWithScores = await query.findWithScoresAsync();
-      query.close();
       final results = resultsWithScores
-          .map<Place>((element) => element.object)
+          .map<PlaceEntity>((element) => element.object)
           .where(
             (place) =>
                 place.coordinates.first != coordinates.first ||
                 place.coordinates.last != coordinates.last,
           )
           .toList();
-      return Result.success(results);
+
+      final mappedResults = results
+          .map<Place>((PlaceEntity entity) => entity.toModel())
+          .toList();
+
+      return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
         'An exception occurred while loading places by coordinates.',
@@ -117,10 +134,10 @@ class PlaceRepositoryImpl implements PlaceRepository {
 
   @override
   Future<Result<Place>> getById(int id) async {
-    final place = await _placeBox.getAsync(id);
+    final result = await _placeBox.getAsync(id);
 
-    if (place != null) {
-      return Result.success(place);
+    if (result != null) {
+      return Result.success(result.toModel());
     } else {
       return Result.error(PlaceNullException(id));
     }
@@ -132,7 +149,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
   ) async {
     try {
       final query = _placeBox
-          .query(Place_.coordinates.nearestNeighborsF32(coordinates, 3))
+          .query(PlaceEntity_.coordinates.nearestNeighborsF32(coordinates, 3))
           .build();
       final resultsWithScores = await query.findIdsWithScoresAsync();
       query.close();
@@ -163,11 +180,11 @@ class PlaceRepositoryImpl implements PlaceRepository {
           .from(_supabaseTable.tableName)
           .select();
 
-      final remote = Set<Place>.unmodifiable(
-        places.map<Place>((element) => Place.fromJson(element)),
+      final remote = Set<PlaceEntity>.unmodifiable(
+        places.map<PlaceEntity>((element) => PlaceEntity.fromJson(element)),
       );
 
-      final local = Set<Place>.unmodifiable(_placeBox.getAll());
+      final local = Set<PlaceEntity>.unmodifiable(_placeBox.getAll());
 
       final placesToPut = remote.difference(local);
 
@@ -217,7 +234,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
   Future<Result<List<int>>> getLatestPlaceIds() async {
     try {
       final query = _placeBox.query().order(
-        Place_.createdAt,
+        PlaceEntity_.createdAt,
         flags: Order.descending,
       );
       final builder = query.build()..limit = 6;
@@ -236,10 +253,10 @@ class PlaceRepositoryImpl implements PlaceRepository {
 
   @override
   Future<Result<List<int>>> getFavouritePlaceIds() async {
-    Query<Place>? query;
+    Query<PlaceEntity>? query;
 
     try {
-      query = _placeBox.query(Place_.isSaved.equals(true)).build();
+      query = _placeBox.query(PlaceEntity_.isSaved.equals(true)).build();
       // Casts the query results to a growable list with toList().
       final places = query.findIds().toList();
       return Result.success(places);
