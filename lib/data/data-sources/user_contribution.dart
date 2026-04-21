@@ -69,17 +69,4 @@ class UserContribution {
     createdAt: createdAt,
     modifiedAt: modifiedAt,
   );
-
-  @override
-  String toString() =>
-      'UserContribution Id: $id, '
-      'UserContribution Type: $type, '
-      'UserContribution City: $city, '
-      'UserContribution Place: $place, '
-      'UserContribution Description: $description, '
-      'UserContribution Start Date: $startDate, '
-      'UserContribution End Date: $endDate, '
-      'UserContribution Media length: ${media?.length}, '
-      'UserContribution Author Email: $authorEmail, '
-      'UserContribution Author Name: $authorName';
 }
