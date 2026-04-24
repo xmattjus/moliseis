@@ -1,9 +1,0 @@
-.dart_tool/**
-
-build/**
-
-test/**
-
-# IDE files
-.idea/**
-.vscode/**

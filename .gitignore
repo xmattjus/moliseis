@@ -127,6 +127,14 @@ app.*.symbols
 **/android/app/profile
 **/android/app/release
 
+# ObjectBox native library
 lib/libobjectbox.dylib
+
+# AI
+**/.agents
+**/.claude
+.code-review-graphignore
+.mcp.json
+CLAUDE.md
 # Added by code-review-graph
 .code-review-graph/
