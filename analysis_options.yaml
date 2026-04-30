@@ -10,3 +10,7 @@ linter:
   rules:
     - discarded_futures: true
     - unawaited_futures: true
+
+plugins:
+  app_lints:
+    path: packages/app_lints
