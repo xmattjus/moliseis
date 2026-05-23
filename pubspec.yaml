@@ -86,6 +86,7 @@ dependencies:
   # U
   url_launcher: ^6.3.2
   # V
+  very_good_analysis: ^10.2.0
   # W
   # X
   # Y
@@ -109,7 +110,6 @@ dev_dependencies:
   json_serializable: ^6.14.0
   # K
   # L
-  lint: ^2.8.0
   # M
   # N
   # O
