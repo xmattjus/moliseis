@@ -3,22 +3,22 @@ import 'package:moliseis/ui/core/ui/app_bottom_sheet_surface.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class AppBottomSheet extends StatelessWidget {
-  final double? initialChildSize;
-  final double? minChildSize;
-  final double maxChildSize;
-  final List<double>? snapSizes;
-  final DraggableScrollableController? controller;
-  final ScrollableWidgetBuilder builder;
-
   const AppBottomSheet({
-    super.key,
+    required this.builder,
     this.initialChildSize,
     this.minChildSize,
     this.maxChildSize = 1.0,
     this.snapSizes,
     this.controller,
-    required this.builder,
+    super.key,
   });
+
+  final ScrollableWidgetBuilder builder;
+  final double? initialChildSize;
+  final double? minChildSize;
+  final double maxChildSize;
+  final List<double>? snapSizes;
+  final DraggableScrollableController? controller;
 
   @override
   Widget build(BuildContext context) {

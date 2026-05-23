@@ -7,6 +7,27 @@ part 'reverse_geocoding_response.g.dart';
 @immutable
 @JsonSerializable(createToJson: false, explicitToJson: true)
 class ReverseGeocodingResponse {
+  const ReverseGeocodingResponse({
+    required this.placeId,
+    required this.licence,
+    required this.osmType,
+    required this.osmId,
+    required this.lat,
+    required this.lon,
+    required this.category,
+    required this.type,
+    required this.placeRank,
+    required this.importance,
+    required this.addressType,
+    required this.name,
+    required this.displayName,
+    required this.geocodingAddress,
+    required this.boundingBox,
+  });
+
+  factory ReverseGeocodingResponse.fromJson(Map<String, dynamic> json) =>
+      _$ReverseGeocodingResponseFromJson(json);
+
   @JsonKey(name: 'place_id')
   final int placeId;
   final String licence;
@@ -30,25 +51,4 @@ class ReverseGeocodingResponse {
   final GeocodingAddress geocodingAddress;
   @JsonKey(name: 'boundingbox')
   final List<String> boundingBox;
-
-  const ReverseGeocodingResponse({
-    required this.placeId,
-    required this.licence,
-    required this.osmType,
-    required this.osmId,
-    required this.lat,
-    required this.lon,
-    required this.category,
-    required this.type,
-    required this.placeRank,
-    required this.importance,
-    required this.addressType,
-    required this.name,
-    required this.displayName,
-    required this.geocodingAddress,
-    required this.boundingBox,
-  });
-
-  factory ReverseGeocodingResponse.fromJson(Map<String, dynamic> json) =>
-      _$ReverseGeocodingResponseFromJson(json);
 }

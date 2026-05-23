@@ -11,9 +11,6 @@ part 'daily_weather_forecast_response.g.dart';
 @immutable
 @JsonSerializable(createToJson: false, explicitToJson: true)
 class DailyWeatherForecastResponse extends BaseWeatherForecastResponse {
-  @JsonKey(name: 'daily')
-  final DailyWeatherForecastData data;
-
   const DailyWeatherForecastResponse({
     required super.latitude,
     required super.longitude,
@@ -27,4 +24,7 @@ class DailyWeatherForecastResponse extends BaseWeatherForecastResponse {
 
   factory DailyWeatherForecastResponse.fromJson(Map<String, dynamic> json) =>
       _$DailyWeatherForecastResponseFromJson(json);
+
+  @JsonKey(name: 'daily')
+  final DailyWeatherForecastData data;
 }

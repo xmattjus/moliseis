@@ -14,8 +14,8 @@ extension WindowSizeClassExtensions on WindowSizeClass {
   bool isAtMost(WindowSizeClass other) => index <= other.index;
 
   double get spacing {
-    if (isCompact) return 16.0;
+    if (isCompact) return 16;
 
-    return 24.0;
+    return 24;
   }
 }

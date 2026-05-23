@@ -18,11 +18,11 @@ import 'package:moliseis/utils/result.dart';
 void main() {
   // Builds a SyncUseCase with configurable synchronize() results and settings.
   SyncUseCase buildUseCase({
+    required _FakeSettingsRepository settings,
     Result<void> cityResult = const Result.success(null),
     Result<void> eventResult = const Result.success(null),
     Result<void> mediaResult = const Result.success(null),
     Result<void> placeResult = const Result.success(null),
-    required _FakeSettingsRepository settings,
   }) {
     return SyncUseCase(
       cityRepository: _FakeCityRepository(synchronizeResult: cityResult),
@@ -103,7 +103,8 @@ void main() {
     test(
       'does not set fatalError when error occurs with a prior successful sync',
       () async {
-        // modifiedAt 1 day ago → isSyncRequired = false, so force=true is needed
+        // modifiedAt 1 day ago → isSyncRequired = false, so force=true
+        // is needed
         final error = _TestException('sync failed');
         final settings = _FakeSettingsRepository(
           modifiedAt: DateTime.now().subtract(const Duration(days: 1)),

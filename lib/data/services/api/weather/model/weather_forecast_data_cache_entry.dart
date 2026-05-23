@@ -4,15 +4,15 @@
 /// usage. Each entry tracks the fetch timestamp to enable intelligent cache
 /// invalidation based on data freshness requirements.
 class WeatherForecastDataCacheEntry<T> {
-  final T data;
-  final DateTime fetchedAt;
-  final String locationKey;
-
   WeatherForecastDataCacheEntry({
     required this.data,
     required this.fetchedAt,
     required this.locationKey,
   });
+
+  final T data;
+  final DateTime fetchedAt;
+  final String locationKey;
 
   /// Determines if this cached entry has exceeded its maximum age threshold.
   ///

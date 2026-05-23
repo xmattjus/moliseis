@@ -4,14 +4,6 @@ import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 
 class AnimatedGeoMapSearchBar extends StatelessWidget {
-  final SearchController searchController;
-  final ValueNotifier<bool> animation;
-  final void Function(String)? onSubmitted;
-  final void Function()? onBackPressed;
-  final void Function(ContentBase) onSuggestionPressed;
-  final List<Widget> trailing;
-  final SearchViewModel viewModel;
-
   const AnimatedGeoMapSearchBar({
     super.key,
     required this.searchController,
@@ -22,6 +14,14 @@ class AnimatedGeoMapSearchBar extends StatelessWidget {
     this.trailing = const <Widget>[],
     required this.viewModel,
   });
+
+  final SearchController searchController;
+  final ValueNotifier<bool> animation;
+  final void Function(String)? onSubmitted;
+  final void Function()? onBackPressed;
+  final void Function(ContentBase) onSuggestionPressed;
+  final List<Widget> trailing;
+  final SearchViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +41,7 @@ class AnimatedGeoMapSearchBar extends StatelessWidget {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -49,7 +49,7 @@ class AnimatedGeoMapSearchBar extends StatelessWidget {
                   controller: searchController,
                   onSubmitted: onSubmitted,
                   onBackPressed: onBackPressed,
-                  elevation: 1.0,
+                  elevation: 1,
                   onSuggestionPressed: onSuggestionPressed,
                   viewModel: viewModel,
                 ),

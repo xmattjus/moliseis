@@ -12,10 +12,10 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class EventFormattedDateTime extends StatefulWidget {
   /// Creates a date and time summary for the provided [event].
   const EventFormattedDateTime({
-    super.key,
     required this.event,
     this.iconColor,
     this.textColor,
+    super.key,
   });
 
   /// The event used to build the date and time labels.
@@ -47,7 +47,8 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
   }
 
   String _localizeTimeOfDay(DateTime date, bool alwaysUse24HourFormat) {
-    // intl.DateFormat.jm localizes the time format based on the locale (e.g., 5:08 PM or 17:08).
+    // intl.DateFormat.jm localizes the time format based on the locale
+    // (e.g., 5:08 PM or 17:08).
     final timeFormat = alwaysUse24HourFormat
         ? intl.DateFormat.Hm(_currentLocale.toLanguageTag())
         : intl.DateFormat.jm(_currentLocale.toLanguageTag());
@@ -56,8 +57,8 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
 
   @override
   Widget build(BuildContext context) {
-    DateTime startDate = widget.event.startDate;
-    DateTime endDate = widget.event.endDate ?? widget.event.startDate;
+    var startDate = widget.event.startDate;
+    var endDate = widget.event.endDate ?? widget.event.startDate;
 
     final color = widget.iconColor ?? context.colorScheme.primary;
 
@@ -88,7 +89,7 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
         endDate.hour != startDate.hour ||
         endDate.minute != startDate.minute;
 
-    String startMonth = _localizeMonth(startDate);
+    var startMonth = _localizeMonth(startDate);
     String? endMonth;
 
     if (isMultipleMonths) {
@@ -96,37 +97,37 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
     }
 
     if (isMultipleYears) {
-      startMonth = "$startMonth ${startDate.year}";
-      endMonth = "$endMonth ${endDate.year}";
+      startMonth = '$startMonth ${startDate.year}';
+      endMonth = '$endMonth ${endDate.year}';
     }
 
-    String date = "";
+    var date = '';
 
     if (isMultipleDays) {
       if (isMultipleMonths) {
-        date = "${startDate.day} $startMonth - ${endDate.day} $endMonth";
+        date = '${startDate.day} $startMonth - ${endDate.day} $endMonth';
       } else {
-        date = "${startDate.day} - ${endDate.day} $startMonth";
+        date = '${startDate.day} - ${endDate.day} $startMonth';
       }
     } else {
-      date = "${startDate.day} $startMonth";
+      date = '${startDate.day} $startMonth';
     }
 
     final alwaysUse24HourFormat =
         MediaQuery.maybeAlwaysUse24HourFormatOf(context) ?? false;
 
-    String time = _localizeTimeOfDay(startDate, alwaysUse24HourFormat);
+    var time = _localizeTimeOfDay(startDate, alwaysUse24HourFormat);
 
     if (isMultipleHours) {
-      time += " - ${_localizeTimeOfDay(endDate, alwaysUse24HourFormat)}";
+      time += ' - ${_localizeTimeOfDay(endDate, alwaysUse24HourFormat)}';
     }
 
     return Flex(
       direction: Axis.horizontal,
       mainAxisSize: MainAxisSize.min,
-      spacing: 4.0,
+      spacing: 4,
       children: <Widget>[
-        Icon(Symbols.calendar_month, size: 18.0, color: color),
+        Icon(Symbols.calendar_month, size: 18, color: color),
         Flexible(
           flex: 2,
           child: Text(
@@ -136,8 +137,8 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
             overflow: TextOverflow.fade,
           ),
         ),
-        const SizedBox(width: 4.0),
-        Icon(Symbols.schedule, size: 18.0, color: color),
+        const SizedBox(width: 4),
+        Icon(Symbols.schedule, size: 18, color: color),
         Flexible(
           flex: 2,
           child: Text(

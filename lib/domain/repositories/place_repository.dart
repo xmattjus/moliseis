@@ -5,7 +5,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/synchronizable.dart';
 
 /// Domain interface for place data access.
-abstract class PlaceRepository implements Synchronizable {
+abstract class PlaceRepository with Synchronizable {
   /// Returns all places.
   Future<Result<List<Place>>> getAll({ContentSort sort = ContentSort.byName});
 
@@ -38,7 +38,4 @@ abstract class PlaceRepository implements Synchronizable {
   /// Pass [save] as `true` to add the place to favourites, or `false` to
   /// remove it.
   Future<Result<void>> setFavouritePlace(int id, bool save);
-
-  @override
-  Future<Result<void>> synchronize();
 }

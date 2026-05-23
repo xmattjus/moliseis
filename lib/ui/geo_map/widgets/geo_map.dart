@@ -88,8 +88,8 @@ class _GeoMapState extends State<GeoMap> {
     options: MapOptions(
       initialCenter: widget.initialCenter,
       initialZoom: widget.initialZoom ?? 13.0,
-      minZoom: 9.0,
-      maxZoom: 18.0,
+      minZoom: 9,
+      maxZoom: 18,
       backgroundColor: context.isDarkTheme
           ? const Color(0xFF2E2E2E)
           : const Color(0xFFEAEADD),

@@ -11,8 +11,8 @@ SnackBar _buildSnackBar(BuildContext context, String textContent) {
       ),
     ),
     backgroundColor: Theme.of(context).colorScheme.inverseSurface,
-    elevation: 3.0,
-    margin: const EdgeInsetsDirectional.fromSTEB(24.0, 0, 24.0, 16.0),
+    elevation: 3,
+    margin: const EdgeInsetsDirectional.fromSTEB(24, 0, 24, 16),
     behavior: SnackBarBehavior.floating,
   );
 }

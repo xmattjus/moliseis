@@ -8,23 +8,6 @@ part 'geocoding_address.g.dart';
 @immutable
 @JsonSerializable(createToJson: false)
 class GeocodingAddress {
-  final String? amenity;
-  final String? road;
-  final String? neighbourhood;
-  final String? hamlet;
-  final String? village;
-  final String? town;
-  final String county;
-  @JsonKey(name: 'ISO3166-2-lvl6')
-  final String iso3166_2_lvl6;
-  final String state;
-  @JsonKey(name: 'ISO3166-2-lvl4')
-  final String iso3166_2_lvl4;
-  final String? postcode;
-  final String country;
-  @JsonKey(name: 'country_code')
-  final String countryCode;
-
   const GeocodingAddress({
     this.amenity,
     this.road,
@@ -43,4 +26,21 @@ class GeocodingAddress {
 
   factory GeocodingAddress.fromJson(Map<String, dynamic> json) =>
       _$GeocodingAddressFromJson(json);
+
+  final String? amenity;
+  final String? road;
+  final String? neighbourhood;
+  final String? hamlet;
+  final String? village;
+  final String? town;
+  final String county;
+  @JsonKey(name: 'ISO3166-2-lvl6')
+  final String iso3166_2_lvl6;
+  final String state;
+  @JsonKey(name: 'ISO3166-2-lvl4')
+  final String iso3166_2_lvl4;
+  final String? postcode;
+  final String country;
+  @JsonKey(name: 'country_code')
+  final String countryCode;
 }

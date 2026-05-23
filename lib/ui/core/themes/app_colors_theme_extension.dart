@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
 class AppColorsThemeExtension extends ThemeExtension<AppColorsThemeExtension> {
-  final Color blurredBoxBackgroundColor;
-  final Color modalBorderColor;
-  final Color paneColor;
-
   const AppColorsThemeExtension._({
     required this.blurredBoxBackgroundColor,
     required this.modalBorderColor,
@@ -34,6 +30,9 @@ class AppColorsThemeExtension extends ThemeExtension<AppColorsThemeExtension> {
       paneColor: colorScheme.surfaceContainerLowest,
     );
   }
+  final Color blurredBoxBackgroundColor;
+  final Color modalBorderColor;
+  final Color paneColor;
 
   @override
   ThemeExtension<AppColorsThemeExtension> copyWith({

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_base.dart';
@@ -7,10 +9,10 @@ import 'package:moliseis/ui/weather/widgets/components/weather_forecast_modal.da
 
 class WeatherForecastButton extends StatefulWidget {
   const WeatherForecastButton({
-    super.key,
     required this.content,
     required this.coordinates,
     required this.viewModel,
+    super.key,
   });
 
   final ContentBase content;
@@ -37,7 +39,7 @@ class _WeatherForecastButtonState extends State<WeatherForecastButton> {
 
     return ListenableBuilder(
       listenable: viewModel.loadCurrentForecast,
-      builder: (BuildContext context, Widget? child) {
+      builder: (context, child) {
         final icon = Icon(viewModel.currentWeatherCodeIcon);
         final temperatureText = Text(
           '${viewModel.currentTemperatureCelsius} °C',
@@ -45,13 +47,17 @@ class _WeatherForecastButtonState extends State<WeatherForecastButton> {
 
         if (viewModel.loadCurrentForecast.completed) {
           return FilledButton.tonalIcon(
-            onPressed: () {
+            onPressed: () async {
               // Start loading the hourly and daily weather forecast before
               // showing the modal.
-              viewModel.loadHourlyForecast.execute(widget.coordinates);
-              viewModel.loadDailyForecast.execute(widget.coordinates);
+              unawaited(
+                viewModel.loadHourlyForecast.execute(widget.coordinates),
+              );
+              unawaited(
+                viewModel.loadDailyForecast.execute(widget.coordinates),
+              );
 
-              appShowModalBottomSheet(
+              await appShowModalBottomSheet<void>(
                 context: context,
                 builder: (_) {
                   return WeatherForecastModal(

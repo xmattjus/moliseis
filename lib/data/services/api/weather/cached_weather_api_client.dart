@@ -22,14 +22,6 @@ typedef WeatherForecastDataCache<T> =
 /// all forecast types at once, and results are cached individually for later
 /// reuse.
 class CachedWeatherApiClient {
-  final WeatherApiClient _weatherApiClient;
-  final WeatherForecastDataCache<CurrentWeatherForecastData>
-  _currentWeatherCache;
-  final WeatherForecastDataCache<HourlyWeatherForecastData> _hourlyWeatherCache;
-  final WeatherForecastDataCache<DailyWeatherForecastData> _dailyWeatherCache;
-
-  static const _cacheDuration = Duration(hours: 2);
-
   const CachedWeatherApiClient({
     required WeatherApiClient weatherApiClient,
     required WeatherForecastDataCache<CurrentWeatherForecastData>
@@ -42,6 +34,14 @@ class CachedWeatherApiClient {
        _currentWeatherCache = currentWeatherCache,
        _hourlyWeatherCache = hourlyWeatherCache,
        _dailyWeatherCache = dailyWeatherCache;
+
+  final WeatherApiClient _weatherApiClient;
+  final WeatherForecastDataCache<CurrentWeatherForecastData>
+  _currentWeatherCache;
+  final WeatherForecastDataCache<HourlyWeatherForecastData> _hourlyWeatherCache;
+  final WeatherForecastDataCache<DailyWeatherForecastData> _dailyWeatherCache;
+
+  static const _cacheDuration = Duration(hours: 2);
 
   /// Fetches combined weather data and caches all three forecast types.
   ///

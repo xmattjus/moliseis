@@ -1,6 +1,5 @@
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
-import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/mappers/city_entity_mapper.dart';
 import 'package:moliseis/data/mappers/media_entity_mapper.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -16,7 +15,7 @@ extension EventEntityExtensions on EventEntity {
     createdAt: createdAt,
     description: description ?? '',
     media: media
-        .map<Media>((MediaEntity entity) => entity.toModel())
+        .map<Media>((entity) => entity.toModel())
         .toList(growable: false),
     modifiedAt: modifiedAt,
     name: name ?? 'Evento Senza Nome',

@@ -1,5 +1,3 @@
-// ignore_for_file: avoid_classes_with_only_static_members
-
 import 'dart:async' show StreamController;
 
 import 'package:flutter/material.dart';
@@ -16,7 +14,7 @@ class GalleryPreviewModal {
   }) async {
     if (context.mounted) {
       final streamController = StreamController<Widget>();
-      await SwipeImageGallery(
+      await SwipeImageGallery<void>(
         context: context,
         itemBuilder: (context, index) {
           return AppNetworkImage.fullResolution(

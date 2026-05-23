@@ -12,17 +12,6 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class CategoryViewModel extends ChangeNotifier {
-  final CategoryUseCase _categoryUseCase;
-  final ExploreUseCase _exploreGetByIdUseCase;
-  final SettingsRepository _settingsRepository;
-
-  late Command0<void> load;
-  late Command1<void, Set<ContentCategory>> setSelectedCategories;
-  late Command1<void, ContentSort> setSort;
-  late Command1<void, Set<ContentType>> setSelectedTypes;
-
-  late DeepCollectionEquality equality;
-
   CategoryViewModel({
     required CategoryUseCase categoryUseCase,
     required ExploreUseCase exploreGetByIdUseCase,
@@ -38,6 +27,17 @@ class CategoryViewModel extends ChangeNotifier {
 
     equality = const DeepCollectionEquality();
   }
+
+  final CategoryUseCase _categoryUseCase;
+  final ExploreUseCase _exploreGetByIdUseCase;
+  final SettingsRepository _settingsRepository;
+
+  late Command0<void> load;
+  late Command1<void, Set<ContentCategory>> setSelectedCategories;
+  late Command1<void, ContentSort> setSort;
+  late Command1<void, Set<ContentType>> setSelectedTypes;
+
+  late DeepCollectionEquality equality;
 
   final _content = <ContentBase>[];
   var _selectedCategories = <ContentCategory>{};

@@ -56,7 +56,8 @@ void main() {
 
   group('EventViewModel.loadByDate', () {
     test(
-      'includes multi-day event on middle day when repository getByDate is empty',
+      'includes multi-day event on middle day when repository getByDate is '
+      'empty',
       () async {
         final event = _buildEvent(
           remoteId: 42,
@@ -280,7 +281,7 @@ Event _buildEventContent({
   return Event(
     category: ContentCategory.experience,
     city: _testCity(),
-    coordinates: const LatLng(0.0, 0.0),
+    coordinates: const LatLng(0, 0),
     createdAt: DateTime(2026, 1, 1),
     description: 'Test event',
     media: const [],

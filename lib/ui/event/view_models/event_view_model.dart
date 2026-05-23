@@ -8,13 +8,6 @@ import 'package:moliseis/utils/result.dart';
 import 'package:paged_vertical_calendar/utils/date_utils.dart';
 
 class EventViewModel extends ChangeNotifier {
-  final EventRepository _eventRepository;
-
-  late Command0<void> loadAll;
-  late Command1<void, DateTime> loadByDate;
-  late Command0<void> loadNext;
-  late Command0<void> loadNextIds;
-
   EventViewModel({required EventRepository repository})
     : _eventRepository = repository {
     loadAll = Command0(_loadAll)..execute();
@@ -22,6 +15,13 @@ class EventViewModel extends ChangeNotifier {
     loadNext = Command0(_loadNext);
     loadNextIds = Command0(_loadNextIds);
   }
+
+  final EventRepository _eventRepository;
+
+  late Command0<void> loadAll;
+  late Command1<void, DateTime> loadByDate;
+  late Command0<void> loadNext;
+  late Command0<void> loadNextIds;
 
   var _all = <Event>[];
   var _byDate = <Event>[];

@@ -4,16 +4,16 @@ import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ResponsiveScaffold extends StatefulWidget {
+  const ResponsiveScaffold({
+    required this.modalBuilder,
+    required this.child,
+    this.draggableScrollableController,
+    super.key,
+  });
+
   final DraggableScrollableController? draggableScrollableController;
   final ScrollableWidgetBuilder modalBuilder;
   final Widget child;
-
-  const ResponsiveScaffold({
-    super.key,
-    this.draggableScrollableController,
-    required this.modalBuilder,
-    required this.child,
-  });
 
   @override
   State<ResponsiveScaffold> createState() => _ResponsiveScaffoldState();
@@ -56,7 +56,7 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
     if (!showBottomSheet) {
       return _InnerScaffold(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           child: Row(
             children: <Widget>[
               ConstrainedBox(
@@ -98,8 +98,9 @@ class _ResponsiveScaffoldState extends State<ResponsiveScaffold> {
 }
 
 class _InnerScaffold extends StatelessWidget {
-  final Widget child;
   const _InnerScaffold({required this.child});
+
+  final Widget child;
 
   @override
   Widget build(BuildContext context) =>
@@ -107,8 +108,9 @@ class _InnerScaffold extends StatelessWidget {
 }
 
 class _DecoratedBox extends StatelessWidget {
-  final Widget child;
   const _DecoratedBox({required this.child});
+
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {

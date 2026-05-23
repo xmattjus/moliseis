@@ -8,14 +8,15 @@ class CheckboxFormField extends FormField<bool> {
     super.validator,
     bool super.initialValue = false,
     super.autovalidateMode,
+    super.key,
   }) : super(
-         builder: (FormFieldState<bool> state) {
+         builder: (state) {
            return Column(
              crossAxisAlignment: CrossAxisAlignment.start,
              children: [
                Row(
                  crossAxisAlignment: CrossAxisAlignment.start,
-                 spacing: 24.0,
+                 spacing: 24,
                  children: [
                    Checkbox(
                      value: state.value,
@@ -32,9 +33,9 @@ class CheckboxFormField extends FormField<bool> {
                if (state.hasError)
                  Padding(
                    padding: const EdgeInsetsDirectional.fromSTEB(
-                     12.0,
-                     2.0,
-                     12.0,
+                     12,
+                     2,
+                     12,
                      0,
                    ),
                    child: Builder(

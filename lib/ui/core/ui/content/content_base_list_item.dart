@@ -6,11 +6,6 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 
 // TODO(xmattjus): draw inkwell on top of the image.
 class ContentBaseListItem extends StatelessWidget {
-  final ContentBase content;
-  final void Function(ContentBase content)? onPressed;
-  final Widget? verticalTrailing;
-  final Widget? horizontalTrailing;
-
   const ContentBaseListItem(
     this.content, {
     super.key,
@@ -18,6 +13,11 @@ class ContentBaseListItem extends StatelessWidget {
     this.verticalTrailing,
     this.horizontalTrailing,
   });
+
+  final ContentBase content;
+  final void Function(ContentBase content)? onPressed;
+  final Widget? verticalTrailing;
+  final Widget? horizontalTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +28,7 @@ class ContentBaseListItem extends StatelessWidget {
     final textScaleFactor =
         MediaQuery.textScalerOf(
           context,
-        ).clamp(maxScaleFactor: 3.0).scale(minHeight) /
+        ).clamp(maxScaleFactor: 3).scale(minHeight) /
         minHeight;
 
     // Calculates the height this widget should have based on the device text
@@ -41,7 +41,7 @@ class ContentBaseListItem extends StatelessWidget {
       onTap: onPressed != null ? () => onPressed!(content) : null,
       child: Container(
         height: finalHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
@@ -54,8 +54,8 @@ class ContentBaseListItem extends StatelessWidget {
                 ),
                 child: AppNetworkImage(
                   url: content.media.first.url,
-                  width: 72.0,
-                  height: 72.0,
+                  width: 72,
+                  height: 72,
                   imageWidth: content.media.first.width,
                   imageHeight: content.media.first.height,
                 ),
@@ -63,15 +63,15 @@ class ContentBaseListItem extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsetsDirectional.fromSTEB(
-                  16.0,
-                  8.0,
-                  8.0,
-                  8.0,
+                  16,
+                  8,
+                  8,
+                  8,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
-                  spacing: 8.0,
+                  spacing: 8,
                   children: <Widget>[
                     ContentNameAndCity(
                       name: content.name,

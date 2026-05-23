@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
@@ -13,7 +15,7 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 class UserContributionScreen extends StatefulWidget {
-  const UserContributionScreen({super.key, required this.viewModel});
+  const UserContributionScreen({required this.viewModel, super.key});
 
   final UserContributionViewModel viewModel;
 
@@ -31,7 +33,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
   @override
   void initState() {
     super.initState();
-    widget.viewModel.retrieveLostMedia.execute();
+    unawaited(widget.viewModel.retrieveLostMedia.execute());
   }
 
   @override
@@ -57,12 +59,12 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
             slivers: <Widget>[
               const SliverAppBar(title: Text('Suggerimento')),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverList.list(
                   children: [
                     const TextSectionDivider(
                       'Categoria',
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      padding: EdgeInsets.symmetric(vertical: 8),
                     ),
                     CategoryContentWrap(
                       selectedCategory: widget.viewModel.type,
@@ -80,18 +82,18 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                     const TextSectionDivider(
                       'Dettagli',
                       padding: EdgeInsetsDirectional.only(
-                        top: 16.0,
-                        bottom: 8.0,
+                        top: 16,
+                        bottom: 8,
                       ),
                     ),
                     Form(
                       key: _form1Key,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        spacing: 12.0,
+                        spacing: 12,
                         children: [
                           TextFormField(
-                            restorationId: "user-contribution-city",
+                            restorationId: 'user-contribution-city',
                             decoration: const InputDecoration(
                               labelText: 'Città',
                               hintText: 'San Pietro Avellana',
@@ -106,7 +108,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                             autovalidateMode: AutovalidateMode.onUnfocus,
                           ),
                           TextFormField(
-                            restorationId: "user-contribution-attraction-name",
+                            restorationId: 'user-contribution-attraction-name',
                             decoration: const InputDecoration(
                               labelText: 'Attrazione o evento',
                               hintText: 'Museo del Tartufo',
@@ -115,18 +117,20 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                                 widget.viewModel.place = value,
                             validator: (value) {
                               if (value != null && value.isEmpty) {
-                                return "Inserisci il nome di un'attrazione o evento.";
+                                return 'Inserisci il nome di un luogo o '
+                                    'evento.';
                               }
                               return null;
                             },
                             autovalidateMode: AutovalidateMode.onUnfocus,
                           ),
                           TextFormField(
-                            restorationId: "user-contribution-description",
+                            restorationId: 'user-contribution-description',
                             decoration: const InputDecoration(
                               labelText: 'Descrizione',
                               hintText:
-                                  'Raccontaci qualcosa di questo luogo o evento',
+                                  'Raccontaci qualcosa di questo luogo o '
+                                  'evento',
                             ),
                             maxLines: 5,
                             minLines: 2,
@@ -136,10 +140,10 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8.0),
+                    const SizedBox(height: 8),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      spacing: 16.0,
+                      spacing: 16,
                       children: [
                         Text('È un evento?', style: textStyle),
                         Checkbox(
@@ -162,7 +166,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
 
                           return Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8.0,
+                            spacing: 8,
                             children: [
                               UserContributionDateChip(
                                 initialDate: startDate,
@@ -202,22 +206,22 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                           );
                         },
                       ),
-                    if (_isEvent) const SizedBox(height: 8.0),
+                    if (_isEvent) const SizedBox(height: 8),
                   ],
                 ),
               ),
               SliverList.list(
                 children: [
                   UserContributionMediaUploader(viewModel: widget.viewModel),
-                  const SizedBox(height: 16.0),
+                  const SizedBox(height: 16),
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 8.0,
+                      spacing: 8,
                       children: [
                         Text(
-                          "Il servizio è completamente gratuito.",
+                          'Il servizio è completamente gratuito.',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text(
@@ -227,16 +231,16 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16.0),
+                  const SizedBox(height: 16),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Form(
                       key: _form2Key,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           TextFormField(
-                            restorationId: "user-contribution-email",
+                            restorationId: 'user-contribution-email',
                             autovalidateMode: AutovalidateMode.onUnfocus,
                             decoration: const InputDecoration(
                               labelText: 'E-mail',
@@ -251,9 +255,9 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 12.0),
+                          const SizedBox(height: 12),
                           TextFormField(
-                            restorationId: "user-contribution-name",
+                            restorationId: 'user-contribution-name',
                             decoration: const InputDecoration(
                               labelText: 'Autore',
                               hintText: 'Mario Rossi',
@@ -268,7 +272,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                             },
                             autovalidateMode: AutovalidateMode.onUnfocus,
                           ),
-                          const SizedBox(height: 16.0),
+                          const SizedBox(height: 16),
                           CheckboxFormField(
                             title: MergeSemantics(
                               child: RichText(
@@ -326,7 +330,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                             ),
                             validator: (value) {
                               if (value != null && !value) {
-                                return "Devi accettare i Termini di Servizio e "
+                                return 'Devi accettare i Termini di Servizio e '
                                     "l'Informativa sulla privacy.";
                               }
                               return null;
@@ -342,7 +346,7 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                       final isForm2Valid = _form2Key.currentState!.validate();
 
                       if (isForm1Valid && isForm2Valid) {
-                        widget.viewModel.send.execute();
+                        unawaited(widget.viewModel.send.execute());
                       }
                     },
                     viewModel: widget.viewModel,

@@ -1,17 +1,6 @@
 import 'package:flutter/material.dart';
 
 class _BorderRadiusTokens {
-  final BorderRadius cornerNone;
-  final BorderRadius cornerExtraSmall;
-  final BorderRadius cornerSmall;
-  final BorderRadius cornerMedium;
-  final BorderRadius cornerLarge;
-  final BorderRadius cornerLargeIncreased;
-  final BorderRadius cornerExtraLarge;
-  final BorderRadius cornerExtraLargeIncreased;
-  final BorderRadius cornerExtraExtraLarge;
-  final BorderRadius cornerFull;
-
   const _BorderRadiusTokens({
     required this.cornerNone,
     required this.cornerExtraSmall,
@@ -24,12 +13,22 @@ class _BorderRadiusTokens {
     required this.cornerExtraExtraLarge,
     required this.cornerFull,
   });
+
+  final BorderRadius cornerNone;
+  final BorderRadius cornerExtraSmall;
+  final BorderRadius cornerSmall;
+  final BorderRadius cornerMedium;
+  final BorderRadius cornerLarge;
+  final BorderRadius cornerLargeIncreased;
+  final BorderRadius cornerExtraLarge;
+  final BorderRadius cornerExtraLargeIncreased;
+  final BorderRadius cornerExtraExtraLarge;
+  final BorderRadius cornerFull;
 }
 
 class AppShapesThemeExtension extends ThemeExtension<AppShapesThemeExtension> {
-  final _BorderRadiusTokens circular;
-
-  /// Creates a [AppShapesThemeExtension] with the Material 3 Expressive shape tokens.
+  /// Creates a [AppShapesThemeExtension] with the Material 3 Expressive shape
+  /// tokens.
   factory AppShapesThemeExtension() {
     return const AppShapesThemeExtension._(
       circular: _BorderRadiusTokens(
@@ -48,6 +47,7 @@ class AppShapesThemeExtension extends ThemeExtension<AppShapesThemeExtension> {
   }
 
   const AppShapesThemeExtension._({required this.circular});
+  final _BorderRadiusTokens circular;
 
   @override
   ThemeExtension<AppShapesThemeExtension> copyWith({

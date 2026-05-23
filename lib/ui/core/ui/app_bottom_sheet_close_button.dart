@@ -4,16 +4,16 @@ import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class AppBottomSheetCloseButton extends StatelessWidget {
-  final String? tooltipMessage;
-  final IconData? icon;
-  final Function()? onClose;
-
   const AppBottomSheetCloseButton({
     super.key,
     this.tooltipMessage = 'Chiudi',
     this.icon = Symbols.close,
     this.onClose,
   });
+
+  final String? tooltipMessage;
+  final IconData? icon;
+  final void Function()? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +22,7 @@ class AppBottomSheetCloseButton extends StatelessWidget {
     }
 
     return IconButton(
-      iconSize: 16.0,
+      iconSize: 16,
       visualDensity: VisualDensity.compact,
       onPressed: onClose,
       tooltip: tooltipMessage,

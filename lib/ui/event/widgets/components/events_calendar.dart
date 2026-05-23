@@ -9,14 +9,14 @@ import 'package:paged_vertical_calendar/paged_vertical_calendar.dart';
 import 'package:paged_vertical_calendar/utils/date_utils.dart';
 
 class EventsCalendar extends StatefulWidget {
-  final Function(DateTime date) onDayPressed;
-  final EventViewModel viewModel;
-
   const EventsCalendar({
-    super.key,
     required this.onDayPressed,
     required this.viewModel,
+    super.key,
   });
+
+  final void Function(DateTime date) onDayPressed;
+  final EventViewModel viewModel;
 
   @override
   State<EventsCalendar> createState() => _EventsCalendarState();

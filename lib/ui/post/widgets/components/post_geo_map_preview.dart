@@ -7,26 +7,26 @@ import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
 
 class PostGeoMapPreview extends StatelessWidget {
-  const PostGeoMapPreview({required this.content});
+  const PostGeoMapPreview({required this.content, super.key});
 
   final ContentBase content;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints.tightForFinite(height: 400.0),
+      constraints: const BoxConstraints.tightForFinite(height: 400),
       child: CardBase(
         child: Stack(
           children: <Widget>[
             IgnorePointer(
               child: GeoMap(
                 initialCenter: content.coordinates,
-                initialZoom: 16.0,
+                initialZoom: 16,
                 markers: <Marker>[generateMapMarker(content)],
               ),
             ),
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
+              padding: EdgeInsets.symmetric(vertical: 8),
               child: MapAttribution(),
             ),
           ],

@@ -6,14 +6,6 @@ part 'hourly_weather_forecast_data_units.g.dart';
 @immutable
 @JsonSerializable(createToJson: false)
 class HourlyWeatherForecastDataUnits {
-  final String time;
-  @JsonKey(name: 'temperature_2m')
-  final String temperature2m;
-  @JsonKey(name: 'precipitation_probability')
-  final String precipitationProbability;
-  @JsonKey(name: 'weather_code')
-  final String weatherCode;
-
   const HourlyWeatherForecastDataUnits({
     required this.time,
     required this.temperature2m,
@@ -23,4 +15,12 @@ class HourlyWeatherForecastDataUnits {
 
   factory HourlyWeatherForecastDataUnits.fromJson(Map<String, dynamic> json) =>
       _$HourlyWeatherForecastDataUnitsFromJson(json);
+
+  final String time;
+  @JsonKey(name: 'temperature_2m')
+  final String temperature2m;
+  @JsonKey(name: 'precipitation_probability')
+  final String precipitationProbability;
+  @JsonKey(name: 'weather_code')
+  final String weatherCode;
 }

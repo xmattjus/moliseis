@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class AppBottomSheetSurface extends StatelessWidget {
-  final Widget child;
+  const AppBottomSheetSurface({required this.child, super.key});
 
-  const AppBottomSheetSurface({super.key, required this.child});
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +21,7 @@ class AppBottomSheetSurface extends StatelessWidget {
           width: context.appSizes.borderSide.medium,
         ),
       ),
-      elevation: 1.0,
+      elevation: 1,
       clipBehavior: Clip.hardEdge,
       child: child,
     );

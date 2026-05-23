@@ -13,7 +13,8 @@ class CustomBackButton extends StatelessWidget {
 
   final EdgeInsetsGeometry? padding;
 
-  /// The callback that is called when the button is tapped or otherwise activated.
+  /// The callback that is called when the button is tapped or otherwise
+  /// activated.
   ///
   /// If this is set to null, [Navigator.pop] will be called instead.
   final void Function()? onPressed;
@@ -25,7 +26,7 @@ class CustomBackButton extends StatelessWidget {
     return Tooltip(
       message: 'Indietro',
       child: Padding(
-        padding: padding ?? const EdgeInsets.all(8.0),
+        padding: padding ?? const EdgeInsets.all(8),
         child: IconButton(
           onPressed: onPressed ?? () => Navigator.pop(context),
           style: IconButton.styleFrom(

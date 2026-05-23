@@ -11,12 +11,12 @@ class MapAttribution extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Align(
         alignment: Alignment.bottomRight,
         child: Wrap(
           alignment: WrapAlignment.end,
-          spacing: 8.0,
+          spacing: 8,
           runAlignment: WrapAlignment.end,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
@@ -35,7 +35,7 @@ class MapAttribution extends StatelessWidget {
                 }
               },
               icon: const ImageIcon(AssetImage(kAssetMapTilerIconPath)),
-              iconSize: 24.0,
+              iconSize: 24,
               label: const Text('© MapTiler'),
             ),
             LinkTextButton(

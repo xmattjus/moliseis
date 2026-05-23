@@ -5,13 +5,13 @@ import 'dart:collection';
 /// This cache stores key-value pairs with a maximum capacity. When the capacity
 /// is exceeded, the least recently used item is automatically evicted.
 class LruCache<K, V> {
-  final int _maxSize;
-  final LinkedHashMap<K, V> _cache = LinkedHashMap<K, V>();
-
   /// Creates an LRU cache with the specified maximum size.
   ///
   /// The [maxSize] must be greater than 0.
   LruCache({required int maxSize}) : _maxSize = maxSize;
+
+  final int _maxSize;
+  final LinkedHashMap<K, V> _cache = LinkedHashMap<K, V>();
 
   /// Returns the value associated with [key], or null if not found.
   ///

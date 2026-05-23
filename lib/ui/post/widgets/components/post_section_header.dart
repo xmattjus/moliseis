@@ -14,9 +14,9 @@ import 'package:moliseis/ui/weather/widgets/weather_forecast_button.dart';
 /// post contexts.
 class PostSectionHeader extends StatelessWidget {
   const PostSectionHeader({
-    super.key,
     required this.content,
     required this.weatherViewModel,
+    super.key,
   });
 
   final ContentBase content;
@@ -25,18 +25,18 @@ class PostSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       sliver: SliverToBoxAdapter(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 16.0,
+          spacing: 16,
           children: <Widget>[
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 8.0,
+                spacing: 8,
                 children: <Widget>[
                   ContentNameAndCity(
                     name: content.name,

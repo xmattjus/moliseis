@@ -46,9 +46,9 @@ class SuggestedCarouselView extends StatelessWidget {
         const TextSectionDivider(
           'Suggeriti',
           padding: EdgeInsetsDirectional.fromSTEB(
-            16.0,
+            16,
             0,
-            16.0,
+            16,
             sectionTextBottomPadding,
           ),
         ),
@@ -72,15 +72,14 @@ class SuggestedCarouselView extends StatelessWidget {
 
               // Generates a list of placeholders while loading the suggested
               // places from the repository.
-              final List<Widget> children =
-                  exploreViewModel.loadSuggested.running
+              final children = exploreViewModel.loadSuggested.running
                   ? _buildPlaceholders(length, height)
                   : _buildCarouselItems(height);
 
               return Padding(
                 padding: const EdgeInsetsDirectional.only(
-                  start: 8.0,
-                  end: 16.0,
+                  start: 8,
+                  end: 16,
                 ),
                 child: Skeletonizer(
                   enabled: exploreViewModel.loadSuggested.running,
@@ -89,7 +88,7 @@ class SuggestedCarouselView extends StatelessWidget {
                     to: colorScheme.surfaceContainerLow,
                   ),
                   child: CarouselView.weighted(
-                    padding: const EdgeInsets.only(left: 8.0),
+                    padding: const EdgeInsets.only(left: 8),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: context.appShapes.circular.cornerExtraLarge,
@@ -136,7 +135,8 @@ class _CarouselViewItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Whether to show the content name, city, etc. on top of the image or not.
+        // Whether to show the content name, city, etc. on top of the image or
+        // not.
         final show = constraints.maxWidth > 100.0;
 
         // Forbids the width from being too small to prevent image pixelation.
@@ -181,7 +181,7 @@ class _CarouselViewItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Padding(
-                    padding: const EdgeInsetsDirectional.all(8.0),
+                    padding: const EdgeInsetsDirectional.all(8),
                     child: Align(
                       alignment: Alignment.topRight,
                       child: FavouriteButton(
@@ -193,7 +193,7 @@ class _CarouselViewItem extends StatelessWidget {
                   ),
                   IgnorePointer(
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(16),
                       child: ContentNameAndCity(
                         name: content.name,
                         cityName: content.city?.name,

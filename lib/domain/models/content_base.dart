@@ -1,7 +1,9 @@
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/media.dart';
+import 'package:moliseis/domain/models/place.dart';
 
 /// A base class representing a generic unit of content used in the application.
 ///
@@ -40,17 +42,6 @@ import 'package:moliseis/domain/models/media.dart';
 /// decoupled from data sources or UI-specific formatting.
 ///
 abstract class ContentBase {
-  final ContentCategory category;
-  final City? city;
-  final LatLng coordinates;
-  final DateTime createdAt;
-  final String description;
-  final DateTime modifiedAt;
-  final List<Media> media;
-  final String name;
-  final int remoteId;
-  final bool isSaved;
-
   /// Creates a [ContentBase] with the given [category], [city], [coordinates],
   /// [createdAt], [description], [modifiedAt], [media], [name], [remoteId] and
   /// optionally [isSaved].
@@ -66,4 +57,15 @@ abstract class ContentBase {
     required this.remoteId,
     this.isSaved = false,
   });
+
+  final ContentCategory category;
+  final City? city;
+  final LatLng coordinates;
+  final DateTime createdAt;
+  final String description;
+  final DateTime modifiedAt;
+  final List<Media> media;
+  final String name;
+  final int remoteId;
+  final bool isSaved;
 }

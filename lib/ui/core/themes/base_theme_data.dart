@@ -33,11 +33,11 @@ class BaseThemeData {
           navigationBarTheme ??
           NavigationBarThemeData(
             backgroundColor: colorScheme?.surfaceContainer,
-            elevation: 3.0,
+            elevation: 3,
           ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colorScheme?.surfaceContainerLow,
-        elevation: 1.0,
+        elevation: 1,
       ),
       navigationRailTheme:
           navigationRailTheme ??
@@ -65,10 +65,10 @@ class BaseThemeData {
           chipTheme ??
           const ChipThemeData(
             padding: EdgeInsets.only(
-              left: 12.0,
-              top: 8.0,
-              bottom: 8.0,
-              right: 8.0,
+              left: 12,
+              top: 8,
+              bottom: 8,
+              right: 8,
             ),
           ),
       dividerTheme: DividerThemeData(
@@ -101,12 +101,12 @@ class BaseThemeData {
         style: ButtonStyle(shape: _expressiveButtonShape),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
-        strokeWidth: 3.0,
+        strokeWidth: 3,
         // ignore: deprecated_member_use
         year2023: false,
       ),
       searchBarTheme: const SearchBarThemeData(
-        constraints: BoxConstraints(minHeight: 56.0),
+        constraints: BoxConstraints(minHeight: 56),
         elevation: WidgetStatePropertyAll<double>(0),
       ),
       tabBarTheme: const TabBarThemeData(

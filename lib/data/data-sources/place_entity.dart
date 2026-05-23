@@ -23,6 +23,11 @@ class PlaceEntity {
     this.isSaved = false,
   });
 
+  factory PlaceEntity.fromJson(Map<String, dynamic> json) =>
+      _$PlaceEntityFromJson(json);
+
+  Map<String, dynamic> toJson() => _$PlaceEntityToJson(this);
+
   @JsonKey(name: 'id')
   @Id(assignable: true)
   final int remoteId;
@@ -53,12 +58,12 @@ class PlaceEntity {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   int? get dbType {
-    ensureStableEnumValues();
+    assertStableContentCategoryEnumValues();
     return category.index;
   }
 
   set dbType(int? value) {
-    ensureStableEnumValues();
+    assertStableContentCategoryEnumValues();
     if (value == null) {
       category = ContentCategory.unknown;
     } else {
@@ -137,11 +142,6 @@ class PlaceEntity {
 
     return copy;
   }
-
-  factory PlaceEntity.fromJson(Map<String, dynamic> json) =>
-      _$PlaceEntityFromJson(json);
-
-  Map<String, dynamic> toJson() => _$PlaceEntityToJson(this);
 }
 
 class PlaceRelToOneConverter
@@ -164,10 +164,10 @@ class PlaceRelToManyConverter
   @override
   ToMany<PlaceEntity> fromJson(List<Map<String, dynamic>>? json) =>
       ToMany<PlaceEntity>(
-        items: json?.map<PlaceEntity>((e) => PlaceEntity.fromJson(e)).toList(),
+        items: json?.map<PlaceEntity>(PlaceEntity.fromJson).toList(),
       );
 
   @override
   List<Map<String, dynamic>>? toJson(ToMany<PlaceEntity> rel) =>
-      rel.map((PlaceEntity obj) => obj.toJson()).toList();
+      rel.map((obj) => obj.toJson()).toList();
 }

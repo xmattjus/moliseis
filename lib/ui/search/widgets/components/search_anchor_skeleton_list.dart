@@ -17,7 +17,7 @@ class SearchAnchorSkeletonList extends StatelessWidget {
     final item = Container(
       color: Colors.black,
       width: double.maxFinite,
-      height: 88.0,
+      height: 88,
     );
 
     return Skeletonizer(

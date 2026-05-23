@@ -19,14 +19,14 @@ import 'package:moliseis/ui/post/widgets/components/post_section_slideshow.dart'
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-const double _mediaSlideshowHeight = 450.0;
+const double _mediaSlideshowHeight = 450;
 
 class PostScreen extends StatefulWidget {
   const PostScreen({
-    super.key,
     required this.isEvent,
     required this.viewModel,
     required this.weatherViewModel,
+    super.key,
   });
 
   final bool isEvent;

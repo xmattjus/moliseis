@@ -16,13 +16,6 @@ part 'combined_weather_forecast_response.g.dart';
 @immutable
 @JsonSerializable(createToJson: false, explicitToJson: true)
 class CombinedWeatherForecastResponse extends BaseWeatherForecastResponse {
-  @JsonKey(name: 'current')
-  final CurrentWeatherForecastData currentData;
-  @JsonKey(name: 'hourly')
-  final HourlyWeatherForecastData hourlyData;
-  @JsonKey(name: 'daily')
-  final DailyWeatherForecastData dailyData;
-
   const CombinedWeatherForecastResponse({
     required super.latitude,
     required super.longitude,
@@ -38,4 +31,11 @@ class CombinedWeatherForecastResponse extends BaseWeatherForecastResponse {
 
   factory CombinedWeatherForecastResponse.fromJson(Map<String, dynamic> json) =>
       _$CombinedWeatherForecastResponseFromJson(json);
+
+  @JsonKey(name: 'current')
+  final CurrentWeatherForecastData currentData;
+  @JsonKey(name: 'hourly')
+  final HourlyWeatherForecastData hourlyData;
+  @JsonKey(name: 'daily')
+  final DailyWeatherForecastData dailyData;
 }

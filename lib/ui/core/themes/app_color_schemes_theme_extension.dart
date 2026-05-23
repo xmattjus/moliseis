@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 final class _AppSeeds {
+  const _AppSeeds();
+
   Color get main => const Color(0xFF10A549);
   Color get nature => const Color(0xFF52EA3E);
   Color get history => const Color(0XFFe83c70);
@@ -8,20 +10,10 @@ final class _AppSeeds {
   Color get food => const Color(0XFF3fa1ec);
   Color get allure => const Color(0XFFe9863a);
   Color get experience => const Color(0XFF3ce9e6);
-
-  const _AppSeeds();
 }
 
 class AppColorSchemesThemeExtension
     extends ThemeExtension<AppColorSchemesThemeExtension> {
-  final ColorScheme main;
-  final ColorScheme nature;
-  final ColorScheme history;
-  final ColorScheme folklore;
-  final ColorScheme food;
-  final ColorScheme allure;
-  final ColorScheme experience;
-
   const AppColorSchemesThemeExtension._internal({
     required this.main,
     required this.nature,
@@ -73,6 +65,13 @@ class AppColorSchemesThemeExtension
       ),
     );
   }
+  final ColorScheme main;
+  final ColorScheme nature;
+  final ColorScheme history;
+  final ColorScheme folklore;
+  final ColorScheme food;
+  final ColorScheme allure;
+  final ColorScheme experience;
 
   @override
   ThemeExtension<AppColorSchemesThemeExtension> copyWith({

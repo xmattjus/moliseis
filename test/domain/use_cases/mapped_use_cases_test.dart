@@ -271,8 +271,8 @@ void main() {
         ),
       );
 
-      final nearEvents = await useCase.getNearEventsByCoords(41.0, 14.0);
-      final nearPlaces = await useCase.getNearPlacesByCoords(41.0, 14.0);
+      final nearEvents = await useCase.getNearEventsByCoords(41, 14);
+      final nearPlaces = await useCase.getNearPlacesByCoords(41, 14);
 
       expect(nearEvents.isError, isTrue);
       expect((nearEvents as Error<List<ContentBase>>).error, same(eventError));
@@ -357,8 +357,8 @@ void main() {
         ),
       );
 
-      final nearEvents = await useCase.getNearEventsByCoords(41.0, 14.0);
-      final nearPlaces = await useCase.getNearPlacesByCoords(41.0, 14.0);
+      final nearEvents = await useCase.getNearEventsByCoords(41, 14);
+      final nearPlaces = await useCase.getNearPlacesByCoords(41, 14);
 
       expect(nearEvents.isError, isTrue);
       expect((nearEvents as Error<List<ContentBase>>).error, same(eventError));

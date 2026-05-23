@@ -77,7 +77,7 @@ class FavouriteScreen extends StatelessWidget {
                 return const SkeletonContentSliverGrid();
               },
             ),
-            const SliverPadding(padding: EdgeInsets.only(bottom: 16.0)),
+            const SliverPadding(padding: EdgeInsets.only(bottom: 16)),
           ],
         ),
       ),

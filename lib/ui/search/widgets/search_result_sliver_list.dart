@@ -33,7 +33,7 @@ class SearchResultSliverList extends StatelessWidget {
                 );
               } else {
                 return SliverPadding(
-                  padding: const EdgeInsets.only(bottom: 16.0),
+                  padding: const EdgeInsets.only(bottom: 16),
                   sliver: ContentSliverGrid(
                     viewModel.results,
                     onPressed: onResultPressed,

@@ -16,8 +16,7 @@ import 'package:moliseis/utils/result.dart';
 /// Write methods return [Result] because persistence can fail and the caller
 /// may need to react, for example by reverting optimistic UI updates.
 abstract class SettingsRepository implements Initializable {
-  /// Whether the user has given his consent to log app Exceptions to Sentry
-  /// or not.
+  /// Whether the user has given his consent to log app events to Sentry or not.
   bool get crashReporting;
 
   /// Returns the user selected content sort order.

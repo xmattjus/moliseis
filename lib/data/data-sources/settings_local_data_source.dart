@@ -54,9 +54,9 @@ abstract interface class ISettingsBox {
 }
 
 final class _ObjectBoxSettingsBox implements ISettingsBox {
-  final Box<AppSettings> _box;
-
   _ObjectBoxSettingsBox(this._box);
+
+  final Box<AppSettings> _box;
 
   @override
   AppSettings? get(int id) => _box.get(id);

@@ -3,10 +3,10 @@ import 'package:moliseis/domain/repositories/geo_map_repository.dart';
 import 'package:moliseis/utils/result.dart';
 
 class GeoMapRepositoryImpl implements GeoMapRepository {
-  final OpenStreetMapClient _openStreetMapClient;
-
   const GeoMapRepositoryImpl({required OpenStreetMapClient openStreetMapClient})
     : _openStreetMapClient = openStreetMapClient;
+
+  final OpenStreetMapClient _openStreetMapClient;
 
   @override
   Future<Result<String?>> getStreetAddreFromCoords(

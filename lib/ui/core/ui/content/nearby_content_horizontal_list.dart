@@ -21,6 +21,14 @@ import 'package:skeletonizer/skeletonizer.dart';
 /// - A [Command1] for loading nearby content by coordinates
 /// - A list of nearby content items
 class NearbyContentHorizontalList extends StatefulWidget {
+  const NearbyContentHorizontalList({
+    required this.coordinates,
+    required this.onPressed,
+    required this.loadNearContentCommand,
+    required this.nearContent,
+    super.key,
+  });
+
   /// The coordinates to search nearby content from.
   final LatLng coordinates;
 
@@ -32,14 +40,6 @@ class NearbyContentHorizontalList extends StatefulWidget {
 
   /// The list of nearby content items.
   final List<ContentBase> nearContent;
-
-  const NearbyContentHorizontalList({
-    super.key,
-    required this.coordinates,
-    required this.onPressed,
-    required this.loadNearContentCommand,
-    required this.nearContent,
-  });
 
   @override
   State<NearbyContentHorizontalList> createState() =>
@@ -69,7 +69,7 @@ class _NearbyContentHorizontalListState
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
 
-    const padding = EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 4.0);
+    const padding = EdgeInsetsDirectional.fromSTEB(16, 0, 16, 4);
     const skeletonItems = 5;
 
     return Column(
@@ -78,7 +78,7 @@ class _NearbyContentHorizontalListState
       children: <Widget>[
         const TextSectionDivider(
           'Nelle vicinanze',
-          padding: EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 8.0),
+          padding: EdgeInsetsDirectional.fromSTEB(16, 0, 16, 8),
         ),
         SizedBox(
           height: kGridViewCardHeight,
@@ -110,12 +110,11 @@ class _NearbyContentHorizontalListState
                     return ContentBaseCardGridItem(
                       content,
                       width: kGridViewCardWidth,
-                      onPressed: (ContentBase content) =>
-                          widget.onPressed(content),
+                      onPressed: (content) => widget.onPressed(content),
                       trailing: Wrap(
                         alignment: WrapAlignment.end,
-                        spacing: 4.0,
-                        runSpacing: 4.0,
+                        spacing: 4,
+                        runSpacing: 4,
                         verticalDirection: VerticalDirection.up,
                         children: <Widget>[
                           BlurredBox(
@@ -130,7 +129,7 @@ class _NearbyContentHorizontalListState
                       ),
                     );
                   },
-                  separatorBuilder: (_, _) => const SizedBox(width: 8.0),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemCount: nearContent.length,
                 );
               }
@@ -156,7 +155,7 @@ class _NearbyContentHorizontalListState
                     height: kGridViewCardHeight,
                     elevation: 0,
                   ),
-                  separatorBuilder: (_, _) => const SizedBox(width: 8.0),
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemCount: skeletonItems,
                 ),
               );

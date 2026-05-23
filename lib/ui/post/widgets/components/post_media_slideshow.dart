@@ -68,7 +68,8 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
 
   int _lastPage = 0;
 
-  /// Whether the user has manually disabled the slideshow autoplay by scrolling or not.
+  /// Whether the user has manually disabled the slideshow autoplay by
+  /// scrolling or not.
   bool _userDisabledScroll = false;
 
   @override
@@ -90,8 +91,8 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
   void didUpdateWidget(covariant PostMediaSlideshow oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // If the user has manually disabled the slideshow autoplay, we don't want to
-    // re-enable it when the widget updates.
+    // If the user has manually disabled the slideshow autoplay, we don't want
+    // to re-enable it when the widget updates.
     if (_userDisabledScroll) return;
 
     _syncAutoPlayWithVisibility();

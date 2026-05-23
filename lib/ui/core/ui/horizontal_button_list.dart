@@ -23,7 +23,7 @@ class HorizontalButtonList extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: padding,
         itemBuilder: (context, index) => items[index],
-        separatorBuilder: (context, index) => const SizedBox(width: 8.0),
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemCount: items.length,
         clipBehavior: Clip.none,
       ),

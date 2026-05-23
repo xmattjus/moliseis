@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ResponsiveNavigationBar extends StatelessWidget {
-  final int selectedIndex;
-  final List<NavigationDestination> destinations;
-  final void Function(int)? onDestinationSelected;
-
   const ResponsiveNavigationBar({
-    super.key,
     required this.selectedIndex,
     required this.destinations,
     this.onDestinationSelected,
+    super.key,
   });
+
+  final int selectedIndex;
+  final List<NavigationDestination> destinations;
+  final void Function(int)? onDestinationSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,7 @@ class ResponsiveNavigationBar extends StatelessWidget {
       ),
       selectedIndex: selectedIndex,
       onDestinationSelected: onDestinationSelected,
-      height: 64.0,
+      height: 64,
       fixedDestinationWidth: showHorizontalLabel,
     );
   }

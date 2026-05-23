@@ -23,7 +23,7 @@ class SettingsScreen extends StatelessWidget {
   ///
   Widget _buildSectionText(BuildContext context, String s) {
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(16),
       child: Text(s, style: AppTextStyles.section(context)),
     );
   }
@@ -81,9 +81,9 @@ class SettingsScreen extends StatelessWidget {
                       subtitle: Text(darkModeSubtitle),
                       trailing: DropdownMenu<ThemeBrightness>(
                         initialSelection: themeProvider.themeBrightness,
-                        onSelected: (ThemeBrightness? brightness) {
+                        onSelected: (brightness) async {
                           if (brightness != null) {
-                            themeProvider.setThemeBrightness.execute(
+                            await themeProvider.setThemeBrightness.execute(
                               brightness,
                             );
                           }
@@ -91,11 +91,10 @@ class SettingsScreen extends StatelessWidget {
                         dropdownMenuEntries:
                             UnmodifiableListView<_ThemeBrightnessEntry>(
                               ThemeBrightness.values.map<_ThemeBrightnessEntry>(
-                                (ThemeBrightness listItem) =>
-                                    _ThemeBrightnessEntry(
-                                      value: listItem,
-                                      label: listItem.readableName,
-                                    ),
+                                (listItem) => _ThemeBrightnessEntry(
+                                  value: listItem,
+                                  label: listItem.readableName,
+                                ),
                               ),
                             ),
                       ),
@@ -104,20 +103,18 @@ class SettingsScreen extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 16),
             _buildSectionText(context, 'Altro'),
             Consumer<SettingsViewModel>(
               builder: (_, viewModel, _) {
-                /// Whether to log app Exceptions to the Sentry service or
-                /// not.
-                final reportCrashes = viewModel.crashReporting;
+                final sentryLoggingEnabled = viewModel.crashReporting;
 
                 return SwitchListTile(
-                  value: reportCrashes,
-                  onChanged: (value) {
-                    viewModel.setCrashReporting.execute(value);
+                  value: sentryLoggingEnabled,
+                  onChanged: (value) async {
+                    await viewModel.setCrashReporting.execute(value);
 
-                    if (value == true) {
+                    if (value && context.mounted) {
                       showSnackBar(
                         context: context,
                         textContent:
@@ -128,7 +125,7 @@ class SettingsScreen extends StatelessWidget {
                   },
                   title: const Text('Segnalazione errori'),
                   subtitle: Text(
-                    reportCrashes == true
+                    sentryLoggingEnabled
                         ? "Gli errori dell'app verranno inviati "
                               'automaticamente agli sviluppatori'
                         : "Gli errori dell'app non verranno inviati agli "
@@ -140,7 +137,7 @@ class SettingsScreen extends StatelessWidget {
             ListTile(
               title: const Text('Riguardo Molise Is'),
               onTap: () async {
-                await showDialog(
+                await showDialog<void>(
                   context: context,
                   builder: (context) {
                     return AlertDialog(
@@ -153,7 +150,7 @@ class SettingsScreen extends StatelessWidget {
                         TextButton(
                           onPressed: () async {
                             Navigator.pop(context);
-                            await Future.delayed(Durations.short3);
+                            await Future<void>.delayed(Durations.short3);
                             if (context.mounted) {
                               showLicensePage(context: context);
                             }

@@ -6,10 +6,6 @@ import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 
 class ThemeViewModel extends ChangeNotifier {
-  final SettingsRepository _settingsRepository;
-  late ThemeType _themeType;
-  late ThemeBrightness _themeBrightness;
-
   ThemeViewModel({required SettingsRepository settingsRepository})
     : _settingsRepository = settingsRepository {
     setThemeBrightness = Command1(_setThemeBrightness);
@@ -17,6 +13,10 @@ class ThemeViewModel extends ChangeNotifier {
     _themeBrightness = _settingsRepository.themeBrightness;
     _themeType = _settingsRepository.themeType;
   }
+
+  final SettingsRepository _settingsRepository;
+  late ThemeType _themeType;
+  late ThemeBrightness _themeBrightness;
 
   ThemeType get themeType => _themeType;
 

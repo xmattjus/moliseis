@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
-import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -15,7 +13,7 @@ import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 
 class CategoryScreen extends StatefulWidget {
-  const CategoryScreen({super.key, required this.viewModel});
+  const CategoryScreen({required this.viewModel, super.key});
 
   final CategoryViewModel viewModel;
 
@@ -33,7 +31,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     return Scaffold(
       body: SafeArea(
         child: NestedScrollView(
-          headerSliverBuilder: (BuildContext context, _) {
+          headerSliverBuilder: (context, _) {
             return <Widget>[
               SliverOverlapAbsorber(
                 handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
@@ -97,12 +95,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
                   background: CategoryContentAndTypeSelection(
                     selectedCategories: widget.viewModel.selectedCategories,
                     selectedTypes: widget.viewModel.selectedTypes,
-                    onContentSelectionChanged:
-                        (Set<ContentCategory> categories) => widget
-                            .viewModel
-                            .setSelectedCategories
-                            .execute(categories),
-                    onTypeSelectionChanged: (Set<ContentType> types) =>
+                    onCategorySelectionChanged: (categories) => widget
+                        .viewModel
+                        .setSelectedCategories
+                        .execute(categories),
+                    onTypeSelectionChanged: (types) =>
                         widget.viewModel.setSelectedTypes.execute(types),
                   ),
                 ),
@@ -123,15 +120,14 @@ class _CategoryScreenState extends State<CategoryScreen> {
                       widget.viewModel.setSort.completed) {
                     return ContentSliverGrid(
                       widget.viewModel.content,
-                      onPressed: (ContentBase content) =>
-                          _buildStoryRoute(content),
+                      onPressed: _buildStoryRoute,
                     );
                   }
 
                   return const SkeletonContentSliverGrid();
                 },
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
             ],
           ),
         ),

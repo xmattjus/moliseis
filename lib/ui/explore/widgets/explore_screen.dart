@@ -86,10 +86,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   alignment: Alignment.centerLeft,
                   child: AppSearchAnchor(
                     controller: _searchController,
-                    onSubmitted: (text) {
-                      _showSearchResults(text);
-                    },
-                    onSuggestionPressed: (ContentBase content) {
+                    onSubmitted: _showSearchResults,
+                    onSuggestionPressed: (content) {
                       _searchController.closeView(null);
                       _showSearchResults(content.name);
                     },
@@ -102,12 +100,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 expandedHeight: kToolbarHeight,
                 pinned: true,
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 8.0)),
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
               SuggestedCarouselView(exploreViewModel: widget.exploreViewModel),
               const SliverToBoxAdapter(child: TextSectionDivider('Categorie')),
               SliverPadding(
                 padding: const EdgeInsetsDirectional.symmetric(
-                  horizontal: 16.0,
+                  horizontal: 16,
                 ),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate((context, index) {
@@ -126,20 +124,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   }, childCount: widget.exploreViewModel.types.length),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    mainAxisSpacing: 8.0,
-                    crossAxisSpacing: 8.0,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
                     mainAxisExtent: kButtonHeight,
                   ),
                 ),
               ),
               const SliverPadding(
-                padding: EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(16),
                 sliver: SliverToBoxAdapter(child: UserContributionCTAButton()),
               ),
               const SliverToBoxAdapter(
                 child: TextSectionDivider(
                   'Prossimi eventi',
-                  padding: EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: EdgeInsets.symmetric(horizontal: 16),
                 ),
               ),
               ListenableBuilder(
@@ -147,7 +145,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 builder: (context, child) {
                   if (widget.eventViewModel.loadNext.completed) {
                     return SliverPadding(
-                      padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
+                      padding: const EdgeInsets.only(top: 8, bottom: 16),
                       sliver: ContentSliverGrid(
                         widget.eventViewModel.next,
                         onPressed: (content) {
@@ -165,7 +163,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
                   if (widget.eventViewModel.loadNext.error) {
                     return SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       sliver: SliverToBoxAdapter(
                         child: EmptyView.error(
                           text: const Text(
@@ -186,11 +184,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 },
               ),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverToBoxAdapter(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    spacing: 16.0,
+                    spacing: 16,
                     children: [
                       const Expanded(
                         child: TextSectionDivider(
@@ -215,7 +213,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 8.0)),
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
               ListenableBuilder(
                 listenable: widget.exploreViewModel.loadLatest,
                 builder: (context, child) {
@@ -236,7 +234,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
                   if (widget.exploreViewModel.loadLatest.error) {
                     return SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       sliver: SliverToBoxAdapter(
                         child: EmptyView.error(
                           text: const Text(

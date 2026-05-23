@@ -6,13 +6,6 @@ import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ContentBaseCardGridItem extends StatelessWidget {
-  final ContentBase content;
-  final double? width;
-  final Color? color;
-  final void Function(ContentBase content)? onPressed;
-  final Widget? supportingText;
-  final Widget? trailing;
-
   const ContentBaseCardGridItem(
     this.content, {
     super.key,
@@ -22,6 +15,13 @@ class ContentBaseCardGridItem extends StatelessWidget {
     this.supportingText,
     this.trailing,
   });
+
+  final ContentBase content;
+  final double? width;
+  final Color? color;
+  final void Function(ContentBase content)? onPressed;
+  final Widget? supportingText;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -62,13 +62,13 @@ class ContentBaseCardGridItem extends StatelessWidget {
                   ),
                 ),
               Positioned(
-                bottom: 8.0,
-                left: 8.0,
-                right: 8.0,
+                bottom: 8,
+                left: 8,
+                right: 8,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
-                  spacing: 8.0,
+                  spacing: 8,
                   children: <Widget>[
                     ContentNameAndCity(
                       name: content.name,
@@ -84,8 +84,8 @@ class ContentBaseCardGridItem extends StatelessWidget {
         ),
         if (trailing != null)
           Positioned(
-            top: 8.0,
-            right: 8.0,
+            top: 8,
+            right: 8,
             child: SizedBox(width: width, child: trailing),
           ),
       ],

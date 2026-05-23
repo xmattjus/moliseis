@@ -7,17 +7,17 @@ import 'package:moliseis/ui/core/ui/empty_box.dart';
 MarkdownConfig _appMarkdownConfig(BuildContext context) =>
     MarkdownConfig.defaultConfig.copy(
       configs: <WidgetConfig>[
-        const H1Config(style: TextStyle(fontSize: 48, height: 1.0)),
-        const H2Config(style: TextStyle(fontSize: 36, height: 1.0)),
-        const H3Config(style: TextStyle(fontSize: 24, height: 1.0)),
+        const H1Config(style: TextStyle(fontSize: 48, height: 1)),
+        const H2Config(style: TextStyle(fontSize: 36, height: 1)),
+        const H3Config(style: TextStyle(fontSize: 24, height: 1)),
         const H4Config(style: TextStyle(fontSize: 16, height: 20 / 16)),
-        const H5Config(style: TextStyle(fontSize: 14, height: 1.0)),
-        const H6Config(style: TextStyle(fontSize: 13, height: 1.0)),
+        const H5Config(style: TextStyle(fontSize: 14, height: 1)),
+        const H6Config(style: TextStyle(fontSize: 13, height: 1)),
         LinkConfig(
           style:
               AppTextStyles.link(
                 context,
-              )?.copyWith(fontSize: 14, height: 1.0) ??
+              )?.copyWith(fontSize: 14, height: 1) ??
               const TextStyle(
                 color: Color(0xff0969da),
                 decoration: TextDecoration.underline,

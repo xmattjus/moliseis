@@ -113,7 +113,7 @@ class _UserContributionDateChipState extends State<UserContributionDateChip> {
           }
         }
 
-        return await _showMaterialDatePicker(now, durationLimit);
+        return _showMaterialDatePicker(now, durationLimit);
       },
     );
   }
@@ -123,8 +123,8 @@ class _UserContributionDateChipState extends State<UserContributionDateChip> {
   void _showDialog(BuildContext context, Widget child) {
     showCupertinoModalPopup<void>(
       context: context,
-      builder: (BuildContext context) => Container(
-        constraints: const BoxConstraints.expand(height: 216.0),
+      builder: (context) => Container(
+        constraints: const BoxConstraints.expand(height: 216),
         // The Bottom margin is provided to align the popup above the system
         // navigation bar.
         margin: EdgeInsets.only(

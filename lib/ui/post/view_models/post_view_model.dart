@@ -8,18 +8,18 @@ import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 
 class PostViewModel extends ChangeNotifier {
-  final PostUseCase _postUseCase;
-
-  late Command1<void, int> loadEvent;
-  late Command1<void, LatLng> loadNearContent;
-  late Command1<void, int> loadPlace;
-
   PostViewModel({required PostUseCase postUseCase})
     : _postUseCase = postUseCase {
     loadEvent = Command1(_loadEvent);
     loadNearContent = Command1(_loadNearContent);
     loadPlace = Command1(_loadPlace);
   }
+
+  final PostUseCase _postUseCase;
+
+  late Command1<void, int> loadEvent;
+  late Command1<void, LatLng> loadNearContent;
+  late Command1<void, int> loadPlace;
 
   late ContentBase _content;
   final _nearContent = <ContentBase>[];

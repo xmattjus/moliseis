@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// A utility class that provides theme-aware [SystemUiOverlayStyle] configurations
-/// for different UI scenarios in the application.
+/// A utility class that provides theme-aware [SystemUiOverlayStyle]
+/// configurations for different UI scenarios in the application.
 ///
 /// NOTE: Setting the [SystemUiOverlayStyle] directly on the [AppBar] using its
 /// `systemOverlayStyle` property while also having an `AnnotatedRegion` in the
@@ -17,17 +17,19 @@ import 'package:flutter/services.dart';
 /// Example usage with AppBar:
 /// ```dart
 /// final overlayStyles = SystemUiOverlayStyles(context);
-/// return Scaffold(appBar: AppBar(title: ..., systemOverlayStyle: overlayStyles.surface));
+/// return Scaffold(
+///   appBar: AppBar(title: ..., systemOverlayStyle: overlayStyles.surface),
+/// );
 /// ```
 class SystemUiOverlayStyles {
-  /// The build context used to access the current theme.
-  final BuildContext context;
-
   /// Creates a new [SystemUiOverlayStyles] instance.
   ///
   /// The [context] parameter is required to access the current theme
   /// and determine appropriate colors and brightness values.
   SystemUiOverlayStyles(this.context);
+
+  /// The build context used to access the current theme.
+  final BuildContext context;
 
   SystemUiOverlayStyle get surface {
     final theme = Theme.of(context);

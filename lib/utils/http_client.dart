@@ -8,7 +8,7 @@ import 'package:moliseis/utils/constants.dart';
 
 HttpClient _fallbackClient = HttpClient()..userAgent = kUserAgent;
 
-const _maxCacheSize = 2 * 1024 * 1024;
+const int _maxCacheSize = 2 * 1024 * 1024;
 
 http.Client httpClientFactory() {
   try {
@@ -29,9 +29,11 @@ http.Client httpClientFactory() {
         ..httpAdditionalHeaders = {'User-Agent': kUserAgent};
       return CupertinoClient.fromSessionConfiguration(config);
     }
-  } catch (_) {
-    /// in case no Cronet is available which can happen on Android without Google Play Services
-    /// not sure if there is a similar case for Cupertino but better safe than sorry
+  } on Object catch (_) {
+    /// in case no Cronet is available which can happen on Android without
+    /// Google Play Services
+    /// not sure if there is a similar case for Cupertino but better safe than
+    /// sorry
     return IOClient(_fallbackClient);
   }
   final httpClient = _fallbackClient;

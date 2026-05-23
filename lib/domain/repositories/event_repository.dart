@@ -5,7 +5,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/synchronizable.dart';
 
 /// Domain interface for event data access.
-abstract class EventRepository implements Synchronizable {
+abstract class EventRepository with Synchronizable {
   /// Returns all events occurring in the current calendar year.
   Future<Result<List<Event>>> getByCurrentYear();
 
@@ -46,7 +46,4 @@ abstract class EventRepository implements Synchronizable {
   /// Pass [save] as `true` to add the event to favourites, or `false` to
   /// remove it.
   Future<Result<void>> setFavouriteEvent(int id, bool save);
-
-  @override
-  Future<Result<void>> synchronize();
 }

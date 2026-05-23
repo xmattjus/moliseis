@@ -8,11 +8,11 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 Marker generateMapMarker(ContentBase content, {void Function()? onPressed}) {
   return Marker(
     point: content.coordinates,
-    width: 60.0,
-    height: 60.0,
+    width: 60,
+    height: 60,
     child: _GeoMapMarkerIcon(
       content.category.icon,
-      size: 60.0,
+      size: 60,
       onPressed: onPressed,
       tooltip: content.name,
     ),
@@ -46,11 +46,11 @@ class _GeoMapMarkerIcon extends StatelessWidget {
             size: Size(size * 0.45, size),
           ),
           Positioned(
-            top: 5.0,
+            top: 5,
             child: Icon(
               icon,
               size: size * 0.30,
-              fill: 1.0,
+              fill: 1,
               weight: 500,
               color: Colors.white,
             ),

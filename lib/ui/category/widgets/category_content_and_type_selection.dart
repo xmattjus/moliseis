@@ -11,21 +11,21 @@ import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class CategoryContentAndTypeSelection extends StatefulWidget {
-  final Color? chipBackgroundColor;
+  const CategoryContentAndTypeSelection({
+    required this.selectedCategories,
+    required this.selectedTypes,
+    required this.onCategorySelectionChanged,
+    required this.onTypeSelectionChanged,
+    this.chipBackgroundColor,
+    super.key,
+  });
+
   final Set<ContentCategory> selectedCategories;
   final Set<ContentType> selectedTypes;
   final void Function(Set<ContentCategory> categories)
-  onContentSelectionChanged;
+  onCategorySelectionChanged;
   final void Function(Set<ContentType> types) onTypeSelectionChanged;
-
-  const CategoryContentAndTypeSelection({
-    super.key,
-    this.chipBackgroundColor,
-    required this.selectedCategories,
-    required this.selectedTypes,
-    required this.onContentSelectionChanged,
-    required this.onTypeSelectionChanged,
-  });
+  final Color? chipBackgroundColor;
 
   @override
   State<CategoryContentAndTypeSelection> createState() =>
@@ -60,10 +60,10 @@ class _CategoryContentAndTypeSelectionState
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: Wrap(
-        spacing: 8.0,
-        runSpacing: 8.0,
+        spacing: 8,
+        runSpacing: 8,
         children: <Widget>[
           InputChip(
             label: Text(
@@ -99,7 +99,7 @@ class _CategoryContentAndTypeSelectionState
   }
 
   Future<void> _onTypeChipPressed() async {
-    await _showAdaptiveSelectionWidget(
+    await _showAdaptiveSelectionWidget<void>(
       title: 'Seleziona per tipo',
       children: UnmodifiableListView(
         ContentType.values.map<Widget>(
@@ -127,7 +127,7 @@ class _CategoryContentAndTypeSelectionState
   }
 
   Future<void> _onCategoryChipPressed() async {
-    await _showAdaptiveSelectionWidget(
+    await _showAdaptiveSelectionWidget<void>(
       title: 'Seleziona per categoria',
       children: UnmodifiableListView(
         ContentCategory.values.minusUnknown.map<Widget>(
@@ -151,7 +151,7 @@ class _CategoryContentAndTypeSelectionState
         }
       });
 
-      widget.onContentSelectionChanged.call(Set.from(_selectedCategories));
+      widget.onCategorySelectionChanged.call(Set.from(_selectedCategories));
     }
   }
 
@@ -160,12 +160,12 @@ class _CategoryContentAndTypeSelectionState
     required List<Widget> children,
   }) async {
     if (context.windowSizeClass.isAtMost(WindowSizeClass.medium)) {
-      return await _showGenericSelectionBottomSheet<T>(
+      return _showGenericSelectionBottomSheet<T>(
         title: title,
         children: children,
       );
     } else {
-      return await showDialog<T?>(
+      return showDialog<T?>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(title, style: context.textTheme.bodyLarge),
@@ -190,19 +190,19 @@ class _CategoryContentAndTypeSelectionState
     context: context,
     builder: (context) => SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             const Align(child: AppBottomSheetDragHandle()),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 16),
             AppBottomSheetTitle(
               title: title,
               tooltipMessage: 'Salva',
               icon: Symbols.check,
               onClose: () => Navigator.of(context).pop(),
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 16),
             ...children,
             SizedBox(height: context.bottomPadding),
           ],
@@ -221,7 +221,7 @@ class _CategoryContentAndTypeSelectionState
     var selected = isSelected;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      spacing: 16.0,
+      spacing: 16,
       children: <Widget>[
         Text(label),
         StatefulBuilder(

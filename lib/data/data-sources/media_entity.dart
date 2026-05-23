@@ -25,6 +25,11 @@ class MediaEntity {
     required this.event,
   });
 
+  factory MediaEntity.fromJson(Map<String, dynamic> json) =>
+      _$MediaEntityFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MediaEntityToJson(this);
+
   @JsonKey(name: 'id')
   @Id(assignable: true)
   final int remoteId;
@@ -141,11 +146,6 @@ class MediaEntity {
 
     return copy;
   }
-
-  factory MediaEntity.fromJson(Map<String, dynamic> json) =>
-      _$MediaEntityFromJson(json);
-
-  Map<String, dynamic> toJson() => _$MediaEntityToJson(this);
 }
 
 class MediaRelToManyConverter
@@ -159,5 +159,5 @@ class MediaRelToManyConverter
 
   @override
   List<Map<String, dynamic>>? toJson(ToMany<MediaEntity> rel) =>
-      rel.map((MediaEntity obj) => obj.toJson()).toList();
+      rel.map((obj) => obj.toJson()).toList();
 }

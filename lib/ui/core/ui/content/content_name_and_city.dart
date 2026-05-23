@@ -28,7 +28,7 @@ class ContentNameAndCity extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 4.0,
+      spacing: 4,
       children: <Widget>[
         CustomRichText(
           Text(name),

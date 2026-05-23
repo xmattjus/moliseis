@@ -6,24 +6,24 @@ import 'package:moliseis/ui/category/widgets/category_chip.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class CategoryContentWrap extends StatelessWidget {
-  final Color? chipBackgroundColor;
-  final ContentCategory? selectedCategory;
-  final void Function(ContentCategory)? onCategoryDeleted;
-  final void Function(ContentCategory) onCategorySelected;
-
   const CategoryContentWrap({
-    super.key,
+    required this.onCategorySelected,
     this.chipBackgroundColor,
     this.selectedCategory,
     this.onCategoryDeleted,
-    required this.onCategorySelected,
+    super.key,
   });
+
+  final void Function(ContentCategory) onCategorySelected;
+  final Color? chipBackgroundColor;
+  final ContentCategory? selectedCategory;
+  final void Function(ContentCategory)? onCategoryDeleted;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8.0,
-      runSpacing: 8.0,
+      spacing: 8,
+      runSpacing: 8,
       children: UnmodifiableListView(
         ContentCategory.values.minusUnknown.map((category) {
           final isSelected = selectedCategory == category;

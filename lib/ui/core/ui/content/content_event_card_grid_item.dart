@@ -9,14 +9,14 @@ import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ContentEventCardGridItem extends StatelessWidget {
-  final Event event;
-  final void Function(ContentBase content) onPressed;
-
   const ContentEventCardGridItem({
-    super.key,
     required this.event,
     required this.onPressed,
+    super.key,
   });
+
+  final Event event;
+  final void Function(ContentBase content) onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -26,14 +26,14 @@ class ContentEventCardGridItem extends StatelessWidget {
       onPressed: onPressed,
       trailing: Wrap(
         alignment: WrapAlignment.end,
-        spacing: 4.0,
-        runSpacing: 4.0,
+        spacing: 4,
+        runSpacing: 4,
         children: <Widget>[
           BlurredBox(
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                vertical: 10.0,
-                horizontal: 8.0,
+                vertical: 10,
+                horizontal: 8,
               ),
               child: EventFormattedDateTime(
                 event: event,

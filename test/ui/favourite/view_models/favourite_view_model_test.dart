@@ -94,19 +94,23 @@ void main() {
         expect(vm.favouriteEventIds, isEmpty);
       });
 
-      test('leaves content list empty when getById fails (id is kept)', () async {
-        final vm = await _buildLoaded(
-          _FakeFavouriteGetIdsUseCase(
-            favouriteEventIdsResult: const Result.success([1]),
-            // getEventById fails → content not added, but ID is still in the list.
-            eventResults: {1: Result.error(_TestException('not found'))},
-          ),
-        );
+      test(
+        'leaves content list empty when getById fails (id is kept)',
+        () async {
+          final vm = await _buildLoaded(
+            _FakeFavouriteGetIdsUseCase(
+              favouriteEventIdsResult: const Result.success([1]),
+              // getEventById fails → content not added, but ID is still in the
+              // list.
+              eventResults: {1: Result.error(_TestException('not found'))},
+            ),
+          );
 
-        expect(vm.load.completed, isTrue);
-        expect(vm.favouriteEventIds, equals([1]));
-        expect(vm.favouriteEvents, isEmpty);
-      });
+          expect(vm.load.completed, isTrue);
+          expect(vm.favouriteEventIds, equals([1]));
+          expect(vm.favouriteEvents, isEmpty);
+        },
+      );
     });
 
     group('addEvent', () {

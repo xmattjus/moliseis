@@ -96,7 +96,7 @@ class CustomRichText extends StatelessWidget {
                 child: icon!,
               ),
             ),
-            const WidgetSpan(child: SizedBox(width: 4.0)),
+            const WidgetSpan(child: SizedBox(width: 4)),
           ],
         ),
       );
@@ -121,7 +121,7 @@ class CustomRichText extends StatelessWidget {
           children: <InlineSpan>[
             WidgetSpan(
               child: Padding(
-                padding: const EdgeInsetsDirectional.only(top: 8.0),
+                padding: const EdgeInsetsDirectional.only(top: 8),
                 child: DefaultTextStyle(
                   style: contentTextStyle ?? defaults,
                   child: content!,

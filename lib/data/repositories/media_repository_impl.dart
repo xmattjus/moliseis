@@ -81,8 +81,6 @@ class MediaRepositoryImpl implements MediaRepository {
         }
       }
 
-      removeLeftovers(_mediaBox, remote);
-
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
       _log.error(Messages.repositoryUpdateException, error, stackTrace);
@@ -96,12 +94,12 @@ class MediaRepositoryImpl implements MediaRepository {
     Query<MediaEntity>? query;
 
     try {
-      final builder = _mediaBox.query();
-      builder.link(MediaEntity_.event, EventEntity_.remoteId.equals(id));
+      final builder = _mediaBox.query()
+        ..link(MediaEntity_.event, EventEntity_.remoteId.equals(id));
       query = builder.build();
       final results = await query.findAsync();
       final mappedResults = results
-          .map<Media>((MediaEntity entity) => entity.toModel())
+          .map<Media>((entity) => entity.toModel())
           .toList();
       return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
@@ -121,12 +119,12 @@ class MediaRepositoryImpl implements MediaRepository {
     Query<MediaEntity>? query;
 
     try {
-      final builder = _mediaBox.query();
-      builder.link(MediaEntity_.place, PlaceEntity_.remoteId.equals(id));
+      final builder = _mediaBox.query()
+        ..link(MediaEntity_.place, PlaceEntity_.remoteId.equals(id));
       query = builder.build();
       final results = await query.findAsync();
       final mappedResults = results
-          .map<Media>((MediaEntity entity) => entity.toModel())
+          .map<Media>((entity) => entity.toModel())
           .toList();
       return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {

@@ -20,7 +20,7 @@ class AppColorUtils {
       hash = hash & hash;
     }
 
-    final hslColor = HSLColor.fromAHSL(1.0, hash % 360, saturation, lightness);
+    final hslColor = HSLColor.fromAHSL(1, hash % 360, saturation, lightness);
 
     return hslColor.toColor();
   }

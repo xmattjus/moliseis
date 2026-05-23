@@ -4,6 +4,39 @@ import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
 enum _CardBaseType { elevated, filled, outlined }
 
 class CardBase extends StatelessWidget {
+  const CardBase({
+    required this.child,
+    super.key,
+    this.width,
+    this.height,
+    this.color,
+    this.elevation,
+    this.shape,
+    this.onPressed,
+  }) : _variant = _CardBaseType.elevated;
+
+  const CardBase.filled({
+    required this.child,
+    super.key,
+    this.width,
+    this.height,
+    this.color,
+    this.elevation,
+    this.shape,
+    this.onPressed,
+  }) : _variant = _CardBaseType.filled;
+
+  const CardBase.outlined({
+    required this.child,
+    super.key,
+    this.width,
+    this.height,
+    this.color,
+    this.elevation,
+    this.shape,
+    this.onPressed,
+  }) : _variant = _CardBaseType.outlined;
+
   /// If non-null, requires the child to have exactly this width.
   final double? width;
 
@@ -41,39 +74,6 @@ class CardBase extends StatelessWidget {
   final Widget child;
 
   final _CardBaseType _variant;
-
-  const CardBase({
-    super.key,
-    this.width,
-    this.height,
-    this.color,
-    this.elevation,
-    this.shape,
-    this.onPressed,
-    required this.child,
-  }) : _variant = _CardBaseType.elevated;
-
-  const CardBase.filled({
-    super.key,
-    this.width,
-    this.height,
-    this.color,
-    this.elevation,
-    this.shape,
-    this.onPressed,
-    required this.child,
-  }) : _variant = _CardBaseType.filled;
-
-  const CardBase.outlined({
-    super.key,
-    this.width,
-    this.height,
-    this.color,
-    this.elevation,
-    this.shape,
-    this.onPressed,
-    required this.child,
-  }) : _variant = _CardBaseType.outlined;
 
   @override
   Widget build(BuildContext context) {

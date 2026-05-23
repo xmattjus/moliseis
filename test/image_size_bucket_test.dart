@@ -34,7 +34,7 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('ImageSizeBucket.resolve – width', () {
-    const List<int> widthBuckets = [
+    const widthBuckets = <int>[
       72,
       144,
       216,
@@ -59,7 +59,7 @@ void main() {
       devicePixelRatio: dpr,
     );
 
-    for (final int w in widthBuckets) {
+    for (final w in widthBuckets) {
       test('snaps at bucket width $w', () {
         expect(r(w.toDouble(), 1).width, equals(w));
       });
@@ -81,7 +81,7 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('ImageSizeBucket.resolve – height', () {
-    const List<int> heightBuckets = [
+    const heightBuckets = <int>[
       72,
       144,
       216,
@@ -107,7 +107,7 @@ void main() {
       devicePixelRatio: dpr,
     );
 
-    for (final int h in heightBuckets) {
+    for (final h in heightBuckets) {
       test('snaps at bucket height $h', () {
         expect(r(1, h.toDouble()).height, equals(h));
       });
@@ -135,7 +135,8 @@ void main() {
       devicePixelRatio: dpr,
     );
 
-    // Portrait widget (width < height): landscape image decoded at height bucket.
+    // Portrait widget (width < height): landscape image decoded at height
+    // bucket.
     // With ResizeImagePolicy.fit the tighter axis wins automatically, but we
     // verify that the height bucket is at least large enough to cover the slot.
     test('portrait widget returns wider height bucket than width', () {
@@ -172,7 +173,7 @@ void main() {
       final size = ImageSizeBucket.resolve(
         logicalWidth: 300,
         logicalHeight: 300,
-        devicePixelRatio: 2.0,
+        devicePixelRatio: 2,
       );
       expect(size.width, equals(720));
       expect(size.height, equals(720));
@@ -183,7 +184,7 @@ void main() {
       final size = ImageSizeBucket.resolve(
         logicalWidth: 480.1,
         logicalHeight: 480.1,
-        devicePixelRatio: 1.0,
+        devicePixelRatio: 1,
       );
       expect(size.width, equals(576));
       expect(size.height, equals(576));
@@ -199,7 +200,7 @@ void main() {
       final size = ImageSizeBucket.resolveAndClamp(
         logicalWidth: 2560,
         logicalHeight: 1440,
-        devicePixelRatio: 1.0,
+        devicePixelRatio: 1,
       );
       expect(size.width, equals(1728));
       expect(size.height, equals(1440));
@@ -209,12 +210,12 @@ void main() {
       final resolved = ImageSizeBucket.resolve(
         logicalWidth: 640,
         logicalHeight: 400,
-        devicePixelRatio: 1.0,
+        devicePixelRatio: 1,
       );
       final clamped = ImageSizeBucket.resolveAndClamp(
         logicalWidth: 640,
         logicalHeight: 400,
-        devicePixelRatio: 1.0,
+        devicePixelRatio: 1,
       );
       expect(clamped.width, equals(resolved.width));
       expect(clamped.height, equals(resolved.height));

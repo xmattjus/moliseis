@@ -26,7 +26,7 @@ class CustomCircularProgressIndicator extends StatelessWidget {
 
     if (_delay != null) {
       return FutureBuilder(
-        future: Future.delayed(_delay),
+        future: Future<void>.delayed(_delay),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             return child;

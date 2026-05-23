@@ -5,9 +5,9 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 
 class UserContributionSendButton extends StatelessWidget {
   const UserContributionSendButton({
-    super.key,
     required this.onPressed,
     required this.viewModel,
+    super.key,
   });
 
   final void Function() onPressed;
@@ -27,7 +27,7 @@ class UserContributionSendButton extends StatelessWidget {
     final fgErrorColor = theme.onErrorContainer;
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(16),
       child: ListenableBuilder(
         listenable: viewModel.send,
         builder: (context, child) {
@@ -84,7 +84,7 @@ class UserContributionSendButton extends StatelessWidget {
                       children: [
                         CircularProgressIndicator(
                           constraints: BoxConstraints.tight(
-                            const Size.square(20.0),
+                            const Size.square(20),
                           ),
                           color: fgColor,
                         ),
@@ -101,8 +101,8 @@ class UserContributionSendButton extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         backgroundColor: bgColor,
                         foregroundColor: fgColor,
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        minimumSize: const Size(80.0, 56.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        minimumSize: const Size(80, 56),
                       ),
                     ),
             ),
@@ -135,10 +135,10 @@ class _OutlinedCard extends StatelessWidget {
       ),
       color: backgroundColor,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 24.0),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          spacing: 8.0,
+          spacing: 8,
           children: children,
         ),
       ),

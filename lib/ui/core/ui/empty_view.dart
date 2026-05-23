@@ -20,20 +20,20 @@ class EmptyView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             if (icon != null)
               Padding(
                 padding: const EdgeInsetsDirectional.fromSTEB(
-                  16.0,
-                  16.0,
-                  16.0,
-                  8.0,
+                  16,
+                  16,
+                  16,
+                  8,
                 ),
                 child: IconTheme.merge(
-                  data: const IconThemeData(size: 40.0, opticalSize: 80.0),
+                  data: const IconThemeData(size: 40, opticalSize: 80),
                   child: icon!,
                 ),
               ),

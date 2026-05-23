@@ -38,7 +38,7 @@ class SkeletonContentSliverGrid extends StatelessWidget {
 
     final padding = isCompact
         ? EdgeInsets.zero
-        : const EdgeInsets.symmetric(horizontal: 16.0);
+        : const EdgeInsets.symmetric(horizontal: 16);
 
     final childrenDelegate = SliverChildBuilderDelegate((_, _) {
       if (isCompact) {
@@ -58,8 +58,8 @@ class SkeletonContentSliverGrid extends StatelessWidget {
 
     final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
       maxCrossAxisExtent: itemWidth,
-      mainAxisSpacing: 8.0,
-      crossAxisSpacing: 8.0,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
       mainAxisExtent: itemHeight,
     );
 

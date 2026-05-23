@@ -43,7 +43,7 @@ void main() {
     }
 
     testWidgets('renders single-day event with one date and one time', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 10, 15),
@@ -59,7 +59,7 @@ void main() {
     });
 
     testWidgets('renders same-day event range with end time', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 10, 15),
@@ -77,7 +77,7 @@ void main() {
     });
 
     testWidgets('renders time range when minutes differ in same hour', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 10, 15),
@@ -93,7 +93,7 @@ void main() {
     });
 
     testWidgets('uses 24-hour time format when requested by MediaQuery', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 13, 5),
@@ -117,7 +117,7 @@ void main() {
     });
 
     testWidgets('applies custom icon and text colors', (
-      WidgetTester tester,
+      tester,
     ) async {
       const iconColor = Color(0xFF123456);
       const textColor = Color(0xFF654321);
@@ -161,7 +161,7 @@ void main() {
     });
 
     testWidgets('updates month labels when the locale changes', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 10, 15),
@@ -179,7 +179,7 @@ void main() {
     });
 
     testWidgets('renders multi-day event in same month', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 10, 15),
@@ -200,7 +200,7 @@ void main() {
     });
 
     testWidgets('renders multi-month and multi-year date ranges', (
-      WidgetTester tester,
+      tester,
     ) async {
       final multiMonth = _buildEventContent(
         startDate: DateTime(2026, 4, 30, 10, 15),
@@ -246,7 +246,7 @@ void main() {
     });
 
     testWidgets('normalizes inverted start and end dates', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 12, 18, 0),
@@ -294,7 +294,7 @@ Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
   return Event(
     category: ContentCategory.experience,
     city: _testCity(),
-    coordinates: const LatLng(0.0, 0.0),
+    coordinates: const LatLng(0, 0),
     createdAt: DateTime(2026, 1, 1),
     description: 'Test event',
     media: const [],

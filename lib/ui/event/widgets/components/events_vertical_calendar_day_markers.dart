@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/event.dart';
 
 class EventsVerticalCalendarDayMarkers extends StatefulWidget {
-  final List<Event> events;
+  const EventsVerticalCalendarDayMarkers({required this.events, super.key});
 
-  const EventsVerticalCalendarDayMarkers({super.key, required this.events});
+  final List<Event> events;
 
   @override
   State<EventsVerticalCalendarDayMarkers> createState() =>
@@ -60,12 +60,12 @@ class _EventsVerticalCalendarDayMarkersState
   @override
   Widget build(BuildContext context) => Row(
     mainAxisAlignment: MainAxisAlignment.center,
-    spacing: 2.0,
+    spacing: 2,
     children: <Widget>[
       for (var i = 0; i < _markers; i++)
         SizedBox(
-          width: 6.0,
-          height: 6.0,
+          width: 6,
+          height: 6,
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: _colors[i],

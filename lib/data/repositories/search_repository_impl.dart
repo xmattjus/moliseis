@@ -111,9 +111,7 @@ class SearchRepositoryImpl implements SearchRepository {
         eventQuery.findIds(),
       );
 
-      final results = <int>[];
-
-      results.addAll(nameQuery);
+      final results = <int>[...nameQuery];
 
       final cities = _objectBox.store.box<CityEntity>().getMany(cityQuery);
 
@@ -176,9 +174,7 @@ class SearchRepositoryImpl implements SearchRepository {
         _placeQuery.findIds(),
       );
 
-      final results = <int>[];
-
-      results.addAll(placeQuery);
+      final results = <int>[...placeQuery];
 
       final cities = _objectBox.store.box<CityEntity>().getMany(cityQuery);
 
@@ -231,7 +227,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
       final related = _getRelatedResults(places1);
 
-      final results = related.map<int>((PlaceEntity e) => e.remoteId).toList();
+      final results = related.map<int>((entity) => entity.remoteId).toList();
 
       final set1 = results.toSet();
       final set2 = _lastPlaceResultIds.toSet();
@@ -336,6 +332,6 @@ class SearchRepositoryImpl implements SearchRepository {
 
   void _removeDuplicates(List<int> ids) {
     final uniqueIds = <int>{};
-    ids.retainWhere((id) => uniqueIds.add(id));
+    ids.retainWhere(uniqueIds.add);
   }
 }

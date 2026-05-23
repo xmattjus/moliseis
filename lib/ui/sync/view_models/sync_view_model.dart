@@ -21,7 +21,8 @@ class SyncViewModel extends ChangeNotifier {
 
   var _fatalError = false;
 
-  /// Whether a fatal error occurred while synchronizing the repositories or not.
+  /// Whether a fatal error occurred while synchronizing the repositories or
+  /// not.
   ///
   /// A fatal error is one that occurs when there's no previous successful
   /// synchronization, meaning the app has no cached data to fall back on.

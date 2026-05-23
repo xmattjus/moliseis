@@ -4,15 +4,15 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 class AppPageIndicator extends StatelessWidget {
   const AppPageIndicator({
-    super.key,
     required this.pageController,
     required this.itemCount,
+    super.key,
   }) : index = null;
 
   const AppPageIndicator.animated({
-    super.key,
     required this.index,
     required this.itemCount,
+    super.key,
   }) : pageController = null;
 
   final PageController? pageController;
@@ -26,8 +26,8 @@ class AppPageIndicator extends StatelessWidget {
     final dotColor = activeDotColor.withValues(alpha: 0.45);
 
     final effect = WormEffect(
-      dotHeight: 8.0,
-      dotWidth: 8.0,
+      dotHeight: 8,
+      dotWidth: 8,
       activeDotColor: activeDotColor,
       dotColor: dotColor,
     );
@@ -50,7 +50,7 @@ class AppPageIndicator extends StatelessWidget {
         borderRadius: context.appShapes.circular.cornerFull,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         child: pageIndicator,
       ),
     );

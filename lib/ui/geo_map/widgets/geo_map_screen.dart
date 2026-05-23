@@ -231,8 +231,8 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
               /// be animated out of the screen.
               final maxBottomSheetSize = context.isLandscape ? 0.55 : 0.75;
 
-              /// Hides the search bar if the bottom sheet is being dragged above
-              /// the maximum bottom sheet size.
+              /// Hides the search bar if the bottom sheet is being dragged
+              /// above the maximum bottom sheet size.
               ///
               /// Each ValueNotifier is set exactly once per state change.
               if (size < maxBottomSheetSize && !_showSearchBar.value) {
@@ -303,7 +303,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
                 CategoryContentAndTypeSelection(
                   selectedCategories: widget.viewModel.selectedCategories,
                   selectedTypes: widget.viewModel.selectedTypes,
-                  onContentSelectionChanged: _onCategorySelectionChanged,
+                  onCategorySelectionChanged: _onCategorySelectionChanged,
                   onTypeSelectionChanged: _onTypeSelectionChanged,
                 ),
               ],
@@ -327,15 +327,16 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       _searchQuery = text;
     });
 
-    _animateBottomSheetTo(1.0);
+    _animateBottomSheetTo(1);
   }
 
   void _onSeachBackPressed() {
     final wasSearchViewOpen = _searchController.isOpen;
 
     if (wasSearchViewOpen) {
-      _searchController.closeView(null);
-      _searchController.clear();
+      _searchController
+        ..closeView(null)
+        ..clear();
     }
   }
 

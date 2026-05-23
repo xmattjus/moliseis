@@ -10,39 +10,39 @@ import 'package:moliseis/utils/result.dart';
 ///
 /// This use case depends on event and place repositories, not GeoMapRepository.
 class GeoMapUseCase {
-  final EventRepository _eventRepository;
-  final PlaceRepository _placeRepository;
-
   const GeoMapUseCase({
     required EventRepository eventRepository,
     required PlaceRepository placeRepository,
   }) : _eventRepository = eventRepository,
        _placeRepository = placeRepository;
 
+  final EventRepository _eventRepository;
+  final PlaceRepository _placeRepository;
+
   /// Returns events for the current year mapped to content models.
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<List<Event>>> getAllEvents() async =>
-      await _eventRepository.getByCurrentYear();
+      _eventRepository.getByCurrentYear();
 
   /// Returns places mapped to content models using the given [sort].
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<List<Place>>> getAllPlaces([
     ContentSort sort = ContentSort.byName,
-  ]) async => await _placeRepository.getAll(sort: sort);
+  ]) async => _placeRepository.getAll(sort: sort);
 
   /// Returns one event by [id], mapped to a content model.
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<ContentBase>> getEventById(int id) async =>
-      await _eventRepository.getById(id);
+      _eventRepository.getById(id);
 
   /// Returns one place by [id], mapped to a content model.
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<ContentBase>> getPlaceById(int id) async =>
-      await _placeRepository.getById(id);
+      _placeRepository.getById(id);
 
   /// Returns nearby events for the given coordinates.
   ///
@@ -50,7 +50,7 @@ class GeoMapUseCase {
   Future<Result<List<ContentBase>>> getNearEventsByCoords(
     double latitude,
     double longitude,
-  ) async => await _eventRepository.getByCoordinates([latitude, longitude]);
+  ) async => _eventRepository.getByCoordinates([latitude, longitude]);
 
   /// Returns nearby places for the given coordinates.
   ///
@@ -58,5 +58,5 @@ class GeoMapUseCase {
   Future<Result<List<ContentBase>>> getNearPlacesByCoords(
     double latitude,
     double longitude,
-  ) async => await _placeRepository.getByCoordinates([latitude, longitude]);
+  ) async => _placeRepository.getByCoordinates([latitude, longitude]);
 }

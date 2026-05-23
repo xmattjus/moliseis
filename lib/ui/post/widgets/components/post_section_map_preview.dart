@@ -10,9 +10,9 @@ import 'package:moliseis/ui/post/widgets/components/post_geo_map_preview.dart';
 /// content location along with a button to navigate to the full map view.
 class PostSectionMapPreview extends StatelessWidget {
   const PostSectionMapPreview({
-    super.key,
     required this.content,
     required this.onMapPressed,
+    super.key,
   });
 
   final ContentBase content;
@@ -21,12 +21,12 @@ class PostSectionMapPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SliverPadding(
-      padding: const EdgeInsetsDirectional.fromSTEB(16.0, 0, 16.0, 16.0),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 16),
       sliver: SliverList.list(
         children: <Widget>[
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            spacing: 16.0,
+            spacing: 16,
             children: [
               Text('Mappa', style: AppTextStyles.section(context)),
               OutlinedButton.icon(
@@ -37,7 +37,7 @@ class PostSectionMapPreview extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8.0),
+          const SizedBox(height: 8),
           PostGeoMapPreview(content: content),
         ],
       ),

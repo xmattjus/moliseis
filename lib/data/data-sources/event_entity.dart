@@ -25,6 +25,11 @@ class EventEntity {
     this.isSaved = false,
   });
 
+  factory EventEntity.fromJson(Map<String, dynamic> json) =>
+      _$EventEntityFromJson(json);
+
+  Map<String, dynamic> toJson() => _$EventEntityToJson(this);
+
   @JsonKey(name: 'id')
   @Id(assignable: true)
   final int remoteId;
@@ -63,12 +68,12 @@ class EventEntity {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   int? get dbType {
-    ensureStableEnumValues();
+    assertStableContentCategoryEnumValues();
     return category.index;
   }
 
   set dbType(int? value) {
-    ensureStableEnumValues();
+    assertStableContentCategoryEnumValues();
     if (value == null) {
       category = ContentCategory.unknown;
     } else {
@@ -156,11 +161,6 @@ class EventEntity {
     return copy;
   }
 
-  factory EventEntity.fromJson(Map<String, dynamic> json) =>
-      _$EventEntityFromJson(json);
-
-  Map<String, dynamic> toJson() => _$EventEntityToJson(this);
-
   /// Whether both [dt] and [other] are null or occur at the same moment.
   bool _bothNullOrSameMoment(DateTime? dt, DateTime? other) {
     if (dt == null && other == null) return true;
@@ -193,10 +193,10 @@ class EventRelToManyConverter
   @override
   ToMany<EventEntity> fromJson(List<Map<String, dynamic>>? json) =>
       ToMany<EventEntity>(
-        items: json?.map<EventEntity>((e) => EventEntity.fromJson(e)).toList(),
+        items: json?.map<EventEntity>(EventEntity.fromJson).toList(),
       );
 
   @override
   List<Map<String, dynamic>>? toJson(ToMany<EventEntity> rel) =>
-      rel.map((EventEntity obj) => obj.toJson()).toList();
+      rel.map((obj) => obj.toJson()).toList();
 }

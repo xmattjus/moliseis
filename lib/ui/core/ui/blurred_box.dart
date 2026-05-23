@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class BlurredBox extends StatelessWidget {
+  const BlurredBox({
+    required this.child,
+    this.backgroundColor,
+    this.borderRadius,
+    super.key,
+  });
+
   final Color? backgroundColor;
   final BorderRadius? borderRadius;
   final Widget child;
-
-  const BlurredBox({
-    super.key,
-    this.backgroundColor,
-    this.borderRadius,
-    required this.child,
-  });
 
   @override
   Widget build(BuildContext context) {

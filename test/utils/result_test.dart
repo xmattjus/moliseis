@@ -599,7 +599,7 @@ void main() {
 
       test('propagates exception thrown in onSuccess', () async {
         await expectLater(
-          () => Result.zip2(
+          () => Result.zip2<int, int, Exception>(
             () async => const Result.success(1),
             () async => const Result.success(2),
             (a, b) => throw _TestException('onSuccess threw'),

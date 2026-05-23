@@ -12,8 +12,8 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ScaffoldShell extends StatelessWidget {
   const ScaffoldShell({
-    Key? key,
     required StatefulNavigationShell navigationShell,
+    Key? key,
   }) : _navigationShell = navigationShell,
        super(key: key ?? const ValueKey('ScaffoldShell'));
 
@@ -53,22 +53,22 @@ class ScaffoldShell extends StatelessWidget {
   List<NavigationDestination> get _buildDestinations => const [
     NavigationDestination(
       icon: Icon(Symbols.home),
-      selectedIcon: Icon(Symbols.home, fill: 1.0),
+      selectedIcon: Icon(Symbols.home, fill: 1),
       label: 'Esplora',
     ),
     NavigationDestination(
       icon: Icon(Symbols.favorite_rounded),
-      selectedIcon: Icon(Symbols.favorite_rounded, fill: 1.0),
+      selectedIcon: Icon(Symbols.favorite_rounded, fill: 1),
       label: 'Preferiti',
     ),
     NavigationDestination(
       icon: Icon(Symbols.event),
-      selectedIcon: Icon(Symbols.event, fill: 1.0),
+      selectedIcon: Icon(Symbols.event, fill: 1),
       label: 'Eventi',
     ),
     NavigationDestination(
       icon: Icon(Symbols.map),
-      selectedIcon: Icon(Symbols.map, fill: 1.0),
+      selectedIcon: Icon(Symbols.map, fill: 1),
       label: 'Mappa',
     ),
   ];

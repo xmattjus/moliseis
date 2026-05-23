@@ -6,20 +6,20 @@ import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/utils/result.dart';
 
 class CategoryUseCase {
-  final EventRepository _eventRepository;
-  final PlaceRepository _placeRepository;
-
   CategoryUseCase({
     required EventRepository eventRepository,
     required PlaceRepository placeRepository,
   }) : _eventRepository = eventRepository,
        _placeRepository = placeRepository;
 
+  final EventRepository _eventRepository;
+  final PlaceRepository _placeRepository;
+
   Future<Result<List<Event>>> getEventsByCategories(
     Set<ContentCategory> categories,
-  ) async => await _eventRepository.getByCategories(categories);
+  ) async => _eventRepository.getByCategories(categories);
 
   Future<Result<List<Place>>> getPlacesByCategories(
     Set<ContentCategory> categories,
-  ) async => await _placeRepository.getByCategories(categories);
+  ) async => _placeRepository.getByCategories(categories);
 }

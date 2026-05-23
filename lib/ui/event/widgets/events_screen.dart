@@ -23,7 +23,7 @@ class _EventsScreenState extends State<EventsScreen> {
   late DraggableScrollableController _draggableScrollableController;
   late DateSymbols _dateSymbols;
 
-  final _bottomPaddingAnimation = ValueNotifier<double>(0.0);
+  final _bottomPaddingAnimation = ValueNotifier<double>(0);
   double get _bottomPadding => _bottomPaddingAnimation.value;
 
   @override
@@ -91,7 +91,7 @@ class _EventsScreenState extends State<EventsScreen> {
     if (_draggableScrollableController.isAttached) {
       final clampedSize = clampDouble(
         _draggableScrollableController.size,
-        0.0,
+        0,
         0.5,
       );
       final extent = _draggableScrollableController.sizeToPixels(clampedSize);
@@ -101,9 +101,10 @@ class _EventsScreenState extends State<EventsScreen> {
 }
 
 class _CalendarWidget extends StatelessWidget {
+  const _CalendarWidget({required this.viewModel, this.onDayPressed});
+
   final EventViewModel viewModel;
   final void Function(DateTime date)? onDayPressed;
-  const _CalendarWidget({required this.viewModel, this.onDayPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +113,7 @@ class _CalendarWidget extends StatelessWidget {
         if (context.windowSizeClass.isAtMost(WindowSizeClass.medium))
           const SliverAppBar(title: Text('Eventi')),
         if (context.windowSizeClass.isLargerThan(WindowSizeClass.medium))
-          const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
         EventsCalendar(
           onDayPressed: (date) {
             onDayPressed?.call(date);

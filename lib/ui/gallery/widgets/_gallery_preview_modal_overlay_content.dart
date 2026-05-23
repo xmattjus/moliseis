@@ -28,7 +28,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageTitleText = title.isNotEmpty
         ? Padding(
-            padding: const EdgeInsetsDirectional.only(top: 8.0),
+            padding: const EdgeInsetsDirectional.only(top: 8),
             child: Text(
               title,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -50,10 +50,10 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
 
     // TODO(xmattjus): handle license with no URL (e.g. public domain) and license with URL (e.g. CC BY-SA).
     final licenseButton = Padding(
-      padding: const EdgeInsetsDirectional.only(top: 8.0),
+      padding: const EdgeInsetsDirectional.only(top: 8),
       child: LinkTextButton.icon(
         icon: const Icon(Symbols.attribution),
-        iconSize: 18.0,
+        iconSize: 18,
         onPressed: licenseUrl.isNotEmpty
             ? () async {
                 if (!await context.read<UrlLaunchService>().launchGenericUrl(
@@ -93,10 +93,10 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
             top: false,
             child: Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(
-                16.0,
-                16.0,
+                16,
+                16,
                 0,
-                16.0,
+                16,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -111,7 +111,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
                         itemCount: itemCount,
                       ),
                     ),
-                  const SizedBox(height: 16.0),
+                  const SizedBox(height: 16),
                   ContentNameAndCity(
                     name: eventOrPlaceName,
                     cityName: cityName,
@@ -119,7 +119,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
                   ),
                   imageTitleText,
                   licenseButton,
-                  const SizedBox(height: 16.0),
+                  const SizedBox(height: 16),
                   HorizontalButtonList(
                     items: <Widget>[
                       ElevatedButton.icon(

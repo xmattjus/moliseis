@@ -6,16 +6,16 @@ import 'package:flutter/material.dart';
 /// It is used to improve system UI readability against a non-uniform background
 /// (e.g. images or complex patterns).
 class LinearGradientBackground extends StatelessWidget {
+  const LinearGradientBackground({
+    required this.child,
+    this.begin = Alignment.topCenter,
+    this.end = Alignment.bottomCenter,
+    super.key,
+  });
+
   final AlignmentGeometry begin;
   final AlignmentGeometry end;
   final Widget child;
-
-  const LinearGradientBackground({
-    super.key,
-    this.begin = Alignment.topCenter,
-    this.end = Alignment.bottomCenter,
-    required this.child,
-  });
 
   @override
   Widget build(BuildContext context) {

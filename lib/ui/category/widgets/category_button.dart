@@ -4,9 +4,9 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 
 class CategoryButton extends StatelessWidget {
   const CategoryButton({
-    super.key,
     required this.onPressed,
     required this.contentCategory,
+    super.key,
   });
 
   /// Callback when button is pressed, or null to disable button.

@@ -20,12 +20,12 @@ class CustomInkWell extends StatelessWidget {
   Widget build(BuildContext context) {
     final boxShape =
         shape ??
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0));
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
 
     return InkWell(
       onTap: onPressed,
       overlayColor: WidgetStateProperty.resolveWith<Color?>((
-        Set<WidgetState> states,
+        states,
       ) {
         Color? color;
 

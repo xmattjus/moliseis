@@ -31,7 +31,8 @@ extension ColorExtensions on Color? {
   /// ```
   Color? lighten(double amount) => _changeLightness(amount);
 
-  /// Internal method that changes the lightness of the color by the specified [amount].
+  /// Internal method that changes the lightness of the color by the
+  /// specified [amount].
   ///
   /// The [amount] can be positive (to lighten) or negative (to darken).
   /// The absolute value of [amount] must not exceed 1.0.

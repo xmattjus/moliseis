@@ -3,6 +3,14 @@ import 'dart:ui' as ui show lerpDouble;
 import 'package:flutter/material.dart';
 
 class _BorderSideTokens {
+  const _BorderSideTokens({
+    this.none = 0,
+    this.small = 0.6,
+    this.medium = 1.2,
+    this.large = 2.0,
+    this.extraLarge = 2.6,
+  });
+
   /// Defaults to `0`.
   final double none;
 
@@ -17,17 +25,31 @@ class _BorderSideTokens {
 
   /// Defaults to `2.6`.
   final double extraLarge;
-
-  const _BorderSideTokens({
-    this.none = 0,
-    this.small = 0.6,
-    this.medium = 1.2,
-    this.large = 2.0,
-    this.extraLarge = 2.6,
-  });
 }
 
 class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
+  factory AppSizesThemeExtension() {
+    return const AppSizesThemeExtension._(
+      borderSide: _BorderSideTokens(),
+      bottomSheetMinSnapSize: 0.20,
+      bottomSheetInitialSnapSize: 0.35,
+      bottomSheetSnapSizes: [0.20, 0.35, 0.50],
+      bottomSheetMaxWidth: 720,
+      searchBarMinWidth: 360,
+      searchBarMaxWidth: 720,
+    );
+  }
+
+  const AppSizesThemeExtension._({
+    required this.borderSide,
+    required this.bottomSheetMinSnapSize,
+    required this.bottomSheetInitialSnapSize,
+    required this.bottomSheetSnapSizes,
+    required this.bottomSheetMaxWidth,
+    required this.searchBarMinWidth,
+    required this.searchBarMaxWidth,
+  });
+
   final _BorderSideTokens borderSide;
 
   /// The minimum snap size all bottom sheets should have.
@@ -45,28 +67,6 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
   final double searchBarMinWidth;
 
   final double searchBarMaxWidth;
-
-  factory AppSizesThemeExtension() {
-    return const AppSizesThemeExtension._(
-      borderSide: _BorderSideTokens(),
-      bottomSheetMinSnapSize: 0.20,
-      bottomSheetInitialSnapSize: 0.35,
-      bottomSheetSnapSizes: [0.20, 0.35, 0.50],
-      bottomSheetMaxWidth: 720.0,
-      searchBarMinWidth: 360.0,
-      searchBarMaxWidth: 720.0,
-    );
-  }
-
-  const AppSizesThemeExtension._({
-    required this.borderSide,
-    required this.bottomSheetMinSnapSize,
-    required this.bottomSheetInitialSnapSize,
-    required this.bottomSheetSnapSizes,
-    required this.bottomSheetMaxWidth,
-    required this.searchBarMinWidth,
-    required this.searchBarMaxWidth,
-  });
 
   @override
   ThemeExtension<AppSizesThemeExtension> copyWith({

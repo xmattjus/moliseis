@@ -8,16 +8,16 @@ import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class WeatherForecastDaysList extends StatefulWidget {
-  final Color borderColor;
-  final Color backgroundColor;
-  final WeatherViewModel viewModel;
-
   const WeatherForecastDaysList({
-    super.key,
     required this.borderColor,
     required this.backgroundColor,
     required this.viewModel,
+    super.key,
   });
+
+  final Color borderColor;
+  final Color backgroundColor;
+  final WeatherViewModel viewModel;
 
   @override
   State<WeatherForecastDaysList> createState() =>
@@ -74,7 +74,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(8.0),
+                    padding: const EdgeInsets.all(8),
                     itemCount: dailyData.time.length,
                     itemBuilder: (context, index) {
                       final date = DateTime.parse(dailyData.time[index]);
@@ -85,7 +85,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                       final weekday = weekDays[date.weekday - 1];
 
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Table(
                           columnWidths: const {
                             0: FlexColumnWidth(0.7),
@@ -110,8 +110,8 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                                   children: <Widget>[
                                     const Icon(
                                       Symbols.water_drop,
-                                      size: 16.0,
-                                      fill: 1.0,
+                                      size: 16,
+                                      fill: 1,
                                     ),
                                     Text(
                                       ' ${dailyData.precipitationProbabilityMax[index]}%',
@@ -126,7 +126,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                                     dailyData.weatherCode[index],
                                     true,
                                   ),
-                                  size: 24.0,
+                                  size: 24,
                                 ),
                                 _temperatureForecast(
                                   temperature:
@@ -138,7 +138,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                                       dailyData.temperature2mMax[index],
                                   iconData: Symbols.north_east,
                                 ),
-                                const SizedBox(height: 40.0),
+                                const SizedBox(height: 40),
                               ],
                             ),
                           ],
@@ -164,9 +164,9 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       mainAxisSize: MainAxisSize.min,
-      spacing: 4.0,
+      spacing: 4,
       children: <Widget>[
-        Icon(iconData, size: 16.0),
+        Icon(iconData, size: 16),
         Text(
           '${temperature.toStringAsFixed(0)}°',
           style: Theme.of(

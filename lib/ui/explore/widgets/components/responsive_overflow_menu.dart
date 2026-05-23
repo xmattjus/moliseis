@@ -5,22 +5,23 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class MenuItem {
-  final Widget title;
-  final Widget icon;
-  final String? tooltip;
-  final void Function() onPressed;
-
   MenuItem({
     required this.title,
     required this.icon,
-    this.tooltip,
     required this.onPressed,
+    this.tooltip,
   });
+
+  final Widget title;
+  final Widget icon;
+  final void Function() onPressed;
+  final String? tooltip;
 }
 
 class ResponsiveOverflowMenu extends StatelessWidget {
+  const ResponsiveOverflowMenu({required this.items, super.key});
+
   final List<MenuItem> items;
-  const ResponsiveOverflowMenu({super.key, required this.items});
 
   @override
   Widget build(BuildContext context) {

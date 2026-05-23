@@ -34,14 +34,14 @@ class _PostMediaSlideshowPauseButtonState
 
   /// Animates the button width (expand/shrink) to accommodate the text length.
   Animation<double> _widthAnimation = const AlwaysStoppedAnimation<double>(
-    40.0,
+    40,
   );
 
   late final Animation<double> _paddingAnimation;
 
   CurvedAnimation get _defaultCurved => CurvedAnimation(
     parent: _animationController,
-    curve: const Interval(0.000, 1.000, curve: Curves.easeInOutCubicEmphasized),
+    curve: const Interval(0, 1, curve: Curves.easeInOutCubicEmphasized),
   );
 
   @override
@@ -66,7 +66,7 @@ class _PostMediaSlideshowPauseButtonState
 
     _paddingAnimation = Tween<double>(
       begin: 7.95,
-      end: 16.0,
+      end: 16,
     ).animate(_defaultCurved);
 
     _alignmentAnimation = Tween<Alignment>(
@@ -105,7 +105,7 @@ class _PostMediaSlideshowPauseButtonState
     // The constants being added at the end are the default button padding
     // values per Material3 guidelines.
     _widthAnimation = Tween<double>(
-      begin: 40.0,
+      begin: 40,
       end: textWidth + (iconTheme.size ?? 18.0) + 16.0 + 8.0 + 24.0,
     ).animate(_defaultCurved);
   }
@@ -157,7 +157,7 @@ class _PostMediaSlideshowPauseButtonState
               ),
               iconColor: WidgetStatePropertyAll<Color>(foregroundColor),
               fixedSize: WidgetStatePropertyAll(
-                Size(_widthAnimation.value, 40.0),
+                Size(_widthAnimation.value, 40),
               ),
               alignment: _alignmentAnimation.value,
             ),

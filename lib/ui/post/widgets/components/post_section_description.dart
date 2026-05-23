@@ -7,14 +7,14 @@ import 'package:moliseis/ui/post/widgets/components/post_description.dart';
 /// Provides a reusable section for displaying content description wrapped in
 /// a sliver with standard horizontal padding.
 class PostSectionDescription extends StatelessWidget {
-  const PostSectionDescription({super.key, required this.content});
+  const PostSectionDescription({required this.content, super.key});
 
   final ContentBase content;
 
   @override
   Widget build(BuildContext context) {
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       sliver: PostDescription(content: content),
     );
   }

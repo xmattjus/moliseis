@@ -17,6 +17,22 @@ import 'package:moliseis/utils/result.dart';
 /// UI widgets can observe running, completed, and error states without
 /// direct async/await wiring.
 class SearchViewModel extends ChangeNotifier {
+  SearchViewModel({
+    required EventRepository eventRepository,
+    required ExploreGetByIdUseCase exploreGetByIdUseCase,
+    required SearchRepository searchRepository,
+  }) : _eventRepository = eventRepository,
+       _exploreGetByIdUseCase = exploreGetByIdUseCase,
+       _searchRepository = searchRepository {
+    addToPastSearches = Command1(_addToPastSearches);
+    loadPastSearches = Command0(_loadPastSearches)..execute();
+    loadResults = Command1(_loadResults);
+    loadRelatedResults = Command0(_loadRelatedResults);
+    loadRelatedResultsIds = Command1(_loadRelatedResultsIds);
+    removeFromPastSearches = Command1(_removeFromPastSearches);
+    loadSuggestions = Command1(_loadSuggestions);
+  }
+
   final EventRepository _eventRepository;
   final ExploreGetByIdUseCase _exploreGetByIdUseCase;
   final SearchRepository _searchRepository;
@@ -61,28 +77,12 @@ class SearchViewModel extends ChangeNotifier {
   /// underlying search logic as [loadResults].
   late Command1<void, String> loadSuggestions;
 
-  SearchViewModel({
-    required EventRepository eventRepository,
-    required ExploreGetByIdUseCase exploreGetByIdUseCase,
-    required SearchRepository searchRepository,
-  }) : _eventRepository = eventRepository,
-       _exploreGetByIdUseCase = exploreGetByIdUseCase,
-       _searchRepository = searchRepository {
-    addToPastSearches = Command1(_addToPastSearches);
-    loadPastSearches = Command0(_loadPastSearches)..execute();
-    loadResults = Command1(_loadResults);
-    loadRelatedResults = Command0(_loadRelatedResults);
-    loadRelatedResultsIds = Command1(_loadRelatedResultsIds);
-    removeFromPastSearches = Command1(_removeFromPastSearches);
-    loadSuggestions = Command1(_loadSuggestions);
-  }
-
   var _pastSearches = <String>[];
   final _results = <ContentBase>[];
   final _suggestions = <ContentBase>[];
   var _relatedResults = <ContentBase>[];
   var _relatedResultsIds = <int>[];
-  final _types = ContentCategory.values.minusUnknown;
+  final List<ContentCategory> _types = ContentCategory.values.minusUnknown;
 
   /// An unmodifiable view of the persisted past search queries.
   UnmodifiableListView<String> get pastSearches =>
@@ -157,7 +157,7 @@ class SearchViewModel extends ChangeNotifier {
     for (final id in _relatedResultsIds) {
       final result = await _exploreGetByIdUseCase.getById(id);
 
-      result.map((place) => relatedResults.add(place));
+      result.map(relatedResults.add);
     }
 
     _relatedResults = relatedResults;

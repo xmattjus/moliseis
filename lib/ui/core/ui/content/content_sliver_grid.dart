@@ -11,10 +11,14 @@ import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ContentSliverGrid extends StatelessWidget {
+  const ContentSliverGrid(
+    this.items, {
+    required this.onPressed,
+    super.key,
+  });
+
   final List<ContentBase> items;
   final void Function(ContentBase content) onPressed;
-
-  const ContentSliverGrid(this.items, {super.key, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +42,7 @@ class ContentSliverGrid extends StatelessWidget {
 
     final padding = isCompact
         ? EdgeInsets.zero
-        : const EdgeInsets.symmetric(horizontal: 16.0);
+        : const EdgeInsets.symmetric(horizontal: 16);
 
     final childrenDelegate = SliverChildBuilderDelegate((_, index) {
       final content = items[index];
@@ -47,7 +51,7 @@ class ContentSliverGrid extends StatelessWidget {
         return ContentBaseListItem(
           content,
           key: ValueKey<String>('list-item:${content.name}-$index'),
-          onPressed: (ContentBase content) => onPressed(content),
+          onPressed: onPressed,
           horizontalTrailing: FavouriteButton(content: content),
           verticalTrailing: content is Event
               ? EventFormattedDateTime(event: content)
@@ -73,8 +77,8 @@ class ContentSliverGrid extends StatelessWidget {
 
     final gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
       maxCrossAxisExtent: itemWidth,
-      mainAxisSpacing: 8.0,
-      crossAxisSpacing: 8.0,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
       mainAxisExtent: itemHeight,
     );
 

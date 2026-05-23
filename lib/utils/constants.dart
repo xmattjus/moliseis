@@ -1,12 +1,12 @@
-const double kGridViewCardWidth = 288.0; // 356.0;
+const double kGridViewCardWidth = 288; // 356.0;
 
-const double kGridViewCardHeight = 216.0; // 276.0;
+const double kGridViewCardHeight = 216; // 276.0;
 
-const double kListViewCardWidth = 600.0;
+const double kListViewCardWidth = 600;
 
-const double kListViewCardHeight = 96.0;
+const double kListViewCardHeight = 96;
 
-const double kButtonHeight = 40.0;
+const double kButtonHeight = 40;
 
 const int kcategoryScreenNoIndex = -1;
 

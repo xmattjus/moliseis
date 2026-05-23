@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_base.dart';
@@ -13,9 +15,9 @@ import 'package:moliseis/ui/search/widgets/search_result_sliver_list.dart';
 
 class SearchResultScreen extends StatefulWidget {
   const SearchResultScreen({
-    super.key,
     required this.query,
     required this.viewModel,
+    super.key,
   });
 
   final String query;
@@ -58,10 +60,10 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                   child: TextSectionDivider(
                     'Risultati',
                     padding: EdgeInsetsDirectional.fromSTEB(
-                      16.0,
+                      16,
                       kToolbarHeight + 16.0,
-                      16.0,
-                      8.0,
+                      16,
+                      8,
                     ),
                   ),
                 ),
@@ -87,7 +89,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
               child: ColoredBox(
                 color: Theme.of(context).colorScheme.surface,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
+                  padding: const EdgeInsets.only(top: 4, bottom: 4),
                   child: AppSearchAnchor(
                     controller: _controller,
                     leading: const CustomBackButton(
@@ -95,13 +97,19 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                       backgroundColor: Colors.transparent,
                     ),
                     onSubmitted: (text) {
-                      widget.viewModel.loadResults.execute(text);
+                      unawaited(widget.viewModel.loadResults.execute(text));
                       // widget.viewModel.loadRelatedResultsIds.execute(text);
                     },
                     onSuggestionPressed: (_) {
                       _controller.closeView(_controller.text);
-                      widget.viewModel.loadResults.execute(_controller.text);
-                      // widget.viewModel.loadRelatedResultsIds.execute(_controller.text);
+                      unawaited(
+                        widget.viewModel.loadResults.execute(
+                          _controller.text,
+                        ),
+                      );
+                      // widget.viewModel.loadRelatedResultsIds.execute(
+                      //   _controller.text,
+                      // );
                     },
                     viewModel: widget.viewModel,
                   ),

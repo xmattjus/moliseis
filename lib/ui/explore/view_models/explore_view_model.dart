@@ -11,14 +11,6 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class ExploreViewModel extends ChangeNotifier {
-  final ExploreUseCase _byIdUseCase;
-  final PlaceRepository _placeRepository;
-
-  late Command0<void> load;
-  late Command0<void> loadLatest;
-  late Command1<void, List<double>> loadNear;
-  late Command0<void> loadSuggested;
-
   ExploreViewModel({
     required ExploreUseCase byIdUseCase,
     required PlaceRepository placeRepository,
@@ -29,6 +21,14 @@ class ExploreViewModel extends ChangeNotifier {
     loadNear = Command1(_loadNear);
     loadSuggested = Command0(_loadSuggested);
   }
+
+  final ExploreUseCase _byIdUseCase;
+  final PlaceRepository _placeRepository;
+
+  late Command0<void> load;
+  late Command0<void> loadLatest;
+  late Command1<void, List<double>> loadNear;
+  late Command0<void> loadSuggested;
 
   var _latest = <Place>[];
   final _near = <ContentBase>[];

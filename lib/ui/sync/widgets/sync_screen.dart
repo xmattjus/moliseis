@@ -44,12 +44,13 @@ class _SyncScreenState extends State<SyncScreen> {
                   if (viewModel.fatalError) {
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      spacing: 8.0,
+                      spacing: 8,
                       children: <Widget>[
                         const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.0),
+                          padding: EdgeInsets.symmetric(horizontal: 16),
                           child: Text(
-                            'Molise Is necessita di una connessione ad internet '
+                            'Molise Is necessita di una connessione ad '
+                            'internet '
                             "per l'aggiornamento dei contenuti. Controlla le "
                             'impostazioni di rete.',
                             textAlign: TextAlign.center,

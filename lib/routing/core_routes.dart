@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -44,10 +46,12 @@ GoRoute categoryRoute({required String name, required String childName}) {
 
           final allCategories = ContentCategory.values.minusUnknown;
 
-          viewModel.setSelectedCategories.execute(
-            tabIndex != kcategoryScreenNoIndex
-                ? {allCategories.elementAt(tabIndex)}
-                : {...allCategories},
+          unawaited(
+            viewModel.setSelectedCategories.execute(
+              tabIndex != kcategoryScreenNoIndex
+                  ? {allCategories.elementAt(tabIndex)}
+                  : {...allCategories},
+            ),
           );
 
           return viewModel;
@@ -83,9 +87,9 @@ GoRoute postRoute({required String name}) {
       );
 
       if (isEvent) {
-        viewModel.loadEvent.execute(id);
+        unawaited(viewModel.loadEvent.execute(id));
       } else {
-        viewModel.loadPlace.execute(id);
+        unawaited(viewModel.loadPlace.execute(id));
       }
 
       return PostScreen(
@@ -107,9 +111,12 @@ GoRoute postRoute({required String name}) {
               'Si è verificato un errore durante il caricamento, riprova più '
               'tardi.',
         );
+
+        // Redirects to the Home route since the contentId could not be parsed.
         return RoutePaths.home;
       }
 
+      // Returns null to not block redirection to the Post route.
       return null;
     },
   );

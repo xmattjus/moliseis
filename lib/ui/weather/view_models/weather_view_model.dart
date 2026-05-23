@@ -11,14 +11,6 @@ import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 
 class WeatherViewModel extends ChangeNotifier {
-  final CachedWeatherApiClient _weatherApiClient;
-  final WmoWeatherDescriptionMapper _weatherDescriptionMapper;
-  final WmoWeatherIconMapper _weatherCodeIconMapper;
-
-  late Command1<CurrentWeatherForecastData, LatLng> loadCurrentForecast;
-  late Command1<HourlyWeatherForecastData, LatLng> loadHourlyForecast;
-  late Command1<DailyWeatherForecastData, LatLng> loadDailyForecast;
-
   WeatherViewModel({
     required CachedWeatherApiClient weatherApiClient,
     required WmoWeatherDescriptionMapper weatherDescriptionMapper,
@@ -30,6 +22,14 @@ class WeatherViewModel extends ChangeNotifier {
     loadHourlyForecast = Command1(_loadHourlyWeatherForecast);
     loadDailyForecast = Command1(_loadDailyWeatherForecast);
   }
+
+  final CachedWeatherApiClient _weatherApiClient;
+  final WmoWeatherDescriptionMapper _weatherDescriptionMapper;
+  final WmoWeatherIconMapper _weatherCodeIconMapper;
+
+  late Command1<CurrentWeatherForecastData, LatLng> loadCurrentForecast;
+  late Command1<HourlyWeatherForecastData, LatLng> loadHourlyForecast;
+  late Command1<DailyWeatherForecastData, LatLng> loadDailyForecast;
 
   var _currentTemperatureCelsius = '--.-';
   IconData _currentWeatherCodeIcon = Symbols.question_mark;

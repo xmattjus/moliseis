@@ -80,14 +80,14 @@ class FavouriteButton extends StatelessWidget {
                     hoverColor: feedbackColor.withValues(alpha: 0.08),
                     splashColor: splashColor.withValues(alpha: 0.1),
                     constraints: const BoxConstraints.expand(
-                      width: 40.0,
-                      height: 40.0,
+                      width: 40,
+                      height: 40,
                     ),
                     icon: Icon(
                       isSaved ? Symbols.favorite : Symbols.favorite_border,
                       fill: isSaved ? 1.0 : 0.0,
                       color: isSaved ? Colors.redAccent : color,
-                      size: 24.0,
+                      size: 24,
                     ),
                   ),
                 ),

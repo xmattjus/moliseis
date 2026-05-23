@@ -9,10 +9,10 @@ import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
+  SettingsRepositoryImpl(this._dataSource);
+
   final ISettingsLocalDataSource _dataSource;
   AppSettings? _settings;
-
-  SettingsRepositoryImpl(this._dataSource);
 
   AppSettings get _cache {
     if (_settings == null) {

@@ -128,7 +128,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
             viewBuilder: _buildViewBuilder,
             builder: (context, controller) {
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SearchBar(
                   controller: controller,
                   hintText: widget.hintText,
@@ -136,7 +136,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                   trailing: <Widget>[
                     Icon(
                       Symbols.search,
-                      size: 24.0,
+                      size: 24,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ],
@@ -146,8 +146,8 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                   ),
                   padding: WidgetStatePropertyAll<EdgeInsets>(
                     widget.leading == null
-                        ? const EdgeInsets.symmetric(horizontal: 16.0)
-                        : const EdgeInsets.only(left: 4.0, right: 16.0),
+                        ? const EdgeInsets.symmetric(horizontal: 16)
+                        : const EdgeInsets.only(left: 4, right: 16),
                   ),
                 ),
               );
@@ -171,7 +171,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                 );
               }
 
-              final List<ContentBase>? options = (await _debouncedSearch(
+              final options = (await _debouncedSearch(
                 controller.text,
               ))?.toList();
 
@@ -186,7 +186,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                     if (widget.viewModel.loadSuggestions.completed) {
                       if (widget.viewModel.suggestions.isEmpty) {
                         return const Padding(
-                          padding: EdgeInsets.all(16.0),
+                          padding: EdgeInsets.all(16),
                           child: EmptyView(
                             text: Text('Non è stato trovato alcun risultato.'),
                           ),
@@ -265,7 +265,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
       children.addAll([
         const TextSectionDivider('Categorie'),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: CategoryContentWrap(
             chipBackgroundColor: context.colorScheme.surfaceContainerLow,
             onCategorySelected: (category) {
@@ -281,8 +281,8 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
         children.addAll([
           const TextSectionDivider('Recenti'),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Wrap(spacing: 8.0, runSpacing: 8.0, children: _lastHistory),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(spacing: 8, runSpacing: 8, children: _lastHistory),
           ),
         ]);
       }

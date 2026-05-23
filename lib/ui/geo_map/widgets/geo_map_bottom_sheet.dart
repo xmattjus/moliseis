@@ -156,8 +156,8 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      vertical: 18.0,
-                      horizontal: 16.0,
+                      vertical: 18,
+                      horizontal: 16,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +166,7 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
                           'Esplora Placeholder: nome di un luogo',
                           style: AppTextStyles.title(context),
                         ),
-                        const SizedBox(height: 4.0),
+                        const SizedBox(height: 4),
                         Text(
                           'Placeholder: nome di un paese',
                           style: AppTextStyles.subtitle(context),
@@ -184,8 +184,8 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
                 ),
                 child: SliverPadding(
                   padding: const EdgeInsets.symmetric(
-                    vertical: 18.0,
-                    horizontal: 16.0,
+                    vertical: 18,
+                    horizontal: 16,
                   ),
                   sliver: SliverList.list(
                     children: <Widget>[
@@ -193,7 +193,7 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
                         'Esplora Placeholder: nome di un luogo',
                         style: AppTextStyles.title(context),
                       ),
-                      const SizedBox(height: 4.0),
+                      const SizedBox(height: 4),
                       Text(
                         'Placeholder: nome di un paese',
                         style: AppTextStyles.subtitle(context),

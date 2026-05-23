@@ -4,11 +4,6 @@ import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_da
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class EventsVerticalCalendarDay extends StatelessWidget {
-  final DateTime date;
-  final List<Event> events;
-  final void Function() onPressed;
-  final bool isSelected;
-
   const EventsVerticalCalendarDay({
     super.key,
     required this.date,
@@ -16,6 +11,11 @@ class EventsVerticalCalendarDay extends StatelessWidget {
     required this.onPressed,
     this.isSelected = false,
   });
+
+  final DateTime date;
+  final List<Event> events;
+  final void Function() onPressed;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {

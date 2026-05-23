@@ -39,19 +39,16 @@ class PlaceRepositoryImpl implements PlaceRepository {
     try {
       if (_cache == null) {
         final entities = await _placeBox.getAllAsync();
-        _cache = entities
-            .map<Place>((PlaceEntity entity) => entity.toModel())
-            .toList();
+        _cache = entities.map<Place>((entity) => entity.toModel()).toList();
       }
 
-      final mappedResults = List<Place>.of(_cache!);
-
-      mappedResults.sort(
-        (a, b) => switch (sort) {
-          ContentSort.byName => a.name.compareTo(b.name),
-          ContentSort.byDate => b.modifiedAt.compareTo(a.modifiedAt),
-        },
-      );
+      final mappedResults = List<Place>.of(_cache!)
+        ..sort(
+          (a, b) => switch (sort) {
+            ContentSort.byName => a.name.compareTo(b.name),
+            ContentSort.byDate => b.modifiedAt.compareTo(a.modifiedAt),
+          },
+        );
 
       return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
@@ -80,8 +77,17 @@ class PlaceRepositoryImpl implements PlaceRepository {
       final results = await query.findAsync();
 
       final mappedResults = results
-          .map<Place>((PlaceEntity entity) => entity.toModel())
+          .map<Place>((entity) => entity.toModel())
           .toList();
+
+      // Code readability benefits from separate statements over cascades.
+      // ignore: cascade_invocations
+      mappedResults.sort(
+        (a, b) => switch (sort) {
+          ContentSort.byName => a.name.compareTo(b.name),
+          ContentSort.byDate => b.modifiedAt.compareTo(a.modifiedAt),
+        },
+      );
 
       return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
@@ -104,6 +110,8 @@ class PlaceRepositoryImpl implements PlaceRepository {
       query = _placeBox
           .query(PlaceEntity_.coordinates.nearestNeighborsF32(coordinates, 300))
           .build();
+      // Duplication of receiver favors code readability.
+      // ignore: cascade_invocations
       query.limit = 3;
       final resultsWithScores = await query.findWithScoresAsync();
       final results = resultsWithScores
@@ -116,7 +124,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
           .toList();
 
       final mappedResults = results
-          .map<Place>((PlaceEntity entity) => entity.toModel())
+          .map<Place>((entity) => entity.toModel())
           .toList();
 
       return Result.success(mappedResults);

@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/map_attribution.dart';
 
 class AnimatedMapAttribution extends StatefulWidget {
+  const AnimatedMapAttribution({required this.controller, super.key});
+
   final DraggableScrollableController controller;
-  const AnimatedMapAttribution({super.key, required this.controller});
 
   @override
   State<AnimatedMapAttribution> createState() => _AnimatedMapAttributionState();
@@ -53,7 +54,7 @@ class _AnimatedMapAttributionState extends State<AnimatedMapAttribution> {
         );
       },
       child: const Padding(
-        padding: EdgeInsetsDirectional.symmetric(vertical: 8.0),
+        padding: EdgeInsetsDirectional.symmetric(vertical: 8),
         child: MapAttribution(),
       ),
     );
@@ -65,7 +66,7 @@ class _AnimatedMapAttributionState extends State<AnimatedMapAttribution> {
     if (_controller.isAttached) {
       Future.delayed(Duration.zero, () {
         if (context.mounted) {
-          _positionAnimation.value = clampDouble(_controller.size, 0, 1.0);
+          _positionAnimation.value = clampDouble(_controller.size, 0, 1);
         }
       });
     }

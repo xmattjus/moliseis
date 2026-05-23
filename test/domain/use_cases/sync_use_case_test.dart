@@ -16,11 +16,11 @@ import 'package:moliseis/utils/result.dart';
 
 void main() {
   SyncUseCase buildUseCase({
+    required _FakeSettingsRepository settings,
     Result<void> cityResult = const Result.success(null),
     Result<void> eventResult = const Result.success(null),
     Result<void> mediaResult = const Result.success(null),
     Result<void> placeResult = const Result.success(null),
-    required _FakeSettingsRepository settings,
   }) {
     return SyncUseCase(
       cityRepository: _FakeCityRepository(synchronizeResult: cityResult),

@@ -6,18 +6,18 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class CategoryChip extends StatelessWidget {
   const CategoryChip(
     this.category, {
-    super.key,
-    this.backgroundColor,
     required this.isSelected,
-    this.onDeleted,
     required this.onPressed,
+    this.backgroundColor,
+    this.onDeleted,
+    super.key,
   });
 
-  final Color? backgroundColor;
   final ContentCategory category;
   final bool isSelected;
-  final void Function()? onDeleted;
   final void Function() onPressed;
+  final Color? backgroundColor;
+  final void Function()? onDeleted;
 
   @override
   Widget build(BuildContext context) => Theme(

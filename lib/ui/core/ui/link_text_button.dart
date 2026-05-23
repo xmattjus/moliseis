@@ -3,32 +3,32 @@ import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 class LinkTextButton extends StatelessWidget {
-  final void Function()? onPressed;
-  final Widget? icon;
-  final double? iconSize;
-  final Widget label;
-  final Color? color;
-
   /// Creates a Material [TextButton] with a style appropriate for launching
   /// URLs external to the app.
   const LinkTextButton({
-    super.key,
-    this.onPressed,
     required this.label,
+    this.onPressed,
     this.color,
+    super.key,
   }) : icon = null,
        iconSize = null;
 
   /// Creates a Material [TextButton.icon] with a fixed style appropriate for
   /// launching URLs external to the app.
   const LinkTextButton.icon({
-    super.key,
+    required this.label,
     this.onPressed,
     this.iconSize,
     this.icon,
-    required this.label,
     this.color,
+    super.key,
   });
+
+  final void Function()? onPressed;
+  final Widget? icon;
+  final double? iconSize;
+  final Widget label;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {

@@ -3,10 +3,6 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 class AppPulseEffect extends PaintingEffect {
-  final Color? from;
-  final Color? to;
-  final Color? color;
-
   const AppPulseEffect({
     this.from,
     this.to,
@@ -20,6 +16,10 @@ class AppPulseEffect extends PaintingEffect {
          'Either declare both `from` and `to` or only `color`.',
        ),
        super(reverse: true);
+
+  final Color? from;
+  final Color? to;
+  final Color? color;
 
   @override
   Paint createPaint(double t, Rect rect, TextDirection? textDirection) {

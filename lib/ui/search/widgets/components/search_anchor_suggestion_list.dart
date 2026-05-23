@@ -8,14 +8,14 @@ import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
 
 class SearchAnchorSuggestionList extends StatelessWidget {
-  final List<ContentBase> suggestions;
-  final void Function(ContentBase content)? onSuggestionPressed;
-
   const SearchAnchorSuggestionList({
-    super.key,
     required this.suggestions,
     this.onSuggestionPressed,
+    super.key,
   });
+
+  final List<ContentBase> suggestions;
+  final void Function(ContentBase content)? onSuggestionPressed;
 
   @override
   Widget build(BuildContext context) {

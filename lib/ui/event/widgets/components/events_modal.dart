@@ -12,18 +12,18 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:paged_vertical_calendar/utils/date_utils.dart';
 
 class EventsModal extends StatelessWidget {
+  const EventsModal({
+    required this.localizedMonths,
+    required this.selectedDate,
+    required this.viewModel,
+    this.scrollController,
+    super.key,
+  });
+
   final List<String> localizedMonths;
   final DateTime selectedDate;
   final EventViewModel viewModel;
   final ScrollController? scrollController;
-
-  const EventsModal({
-    super.key,
-    required this.localizedMonths,
-    required this.selectedDate,
-    this.scrollController,
-    required this.viewModel,
-  });
 
   @override
   Widget build(BuildContext context) {
@@ -47,10 +47,10 @@ class EventsModal extends StatelessWidget {
             if (showDragHandle) const AppBottomSheetDragHandle(),
             Padding(
               padding: EdgeInsets.fromLTRB(
-                16.0,
+                16,
                 showDragHandle ? 0.0 : 16.0,
-                16.0,
-                16.0,
+                16,
+                16,
               ),
               child: AppBottomSheetTitle(title: bottomSheetTitle, icon: null),
             ),

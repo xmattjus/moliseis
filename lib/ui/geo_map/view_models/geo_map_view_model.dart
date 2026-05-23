@@ -10,18 +10,6 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 class GeoMapViewModel extends ChangeNotifier {
-  final GeoMapUseCase _geoMapUseCase;
-
-  late Command0<void> loadEvents;
-  late Command1<void, LatLng> loadNearContent;
-  late Command0<void> loadPlaces;
-  late Command1<void, Set<ContentCategory>> setSelectedCategories;
-  late Command1<void, Set<ContentType>> setSelectedTypes;
-  late Command1<void, int> showEvent;
-  late Command1<void, int> showPlace;
-
-  late DeepCollectionEquality equality;
-
   GeoMapViewModel({required GeoMapUseCase geoMapUseCase})
     : _geoMapUseCase = geoMapUseCase {
     loadEvents = Command0(_loadEvents)..execute();
@@ -34,6 +22,18 @@ class GeoMapViewModel extends ChangeNotifier {
 
     equality = const DeepCollectionEquality();
   }
+
+  final GeoMapUseCase _geoMapUseCase;
+
+  late Command0<void> loadEvents;
+  late Command1<void, LatLng> loadNearContent;
+  late Command0<void> loadPlaces;
+  late Command1<void, Set<ContentCategory>> setSelectedCategories;
+  late Command1<void, Set<ContentType>> setSelectedTypes;
+  late Command1<void, int> showEvent;
+  late Command1<void, int> showPlace;
+
+  late DeepCollectionEquality equality;
 
   var _allEvents = <ContentBase>[];
   var _allPlaces = <ContentBase>[];

@@ -31,7 +31,7 @@ class GeoMapModalSearchResultsState extends State<GeoMapModalSearchResults> {
       slivers: <Widget>[
         SliverToBoxAdapter(
           child: Row(
-            spacing: 16.0,
+            spacing: 16,
             children: <Widget>[
               CustomBackButton(
                 onPressed: widget.onBackPressed,

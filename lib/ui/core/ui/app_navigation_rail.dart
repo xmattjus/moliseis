@@ -7,17 +7,17 @@ import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class AppNavigationRail extends StatefulWidget {
-  final int selectedIndex;
-  final void Function(int value)? onDestinationSelected;
-  final List<NavigationDestination> destinations;
-
   /// Creates a Material Design navigation rail.
   const AppNavigationRail({
-    super.key,
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.destinations,
+    super.key,
   });
+
+  final int selectedIndex;
+  final void Function(int value)? onDestinationSelected;
+  final List<NavigationDestination> destinations;
 
   @override
   State<AppNavigationRail> createState() => _AppNavigationRailState();
@@ -34,7 +34,7 @@ class _AppNavigationRailState extends State<AppNavigationRail> {
     super.didChangeDependencies();
 
     // Prevent the navigation rail from automatically collapsing/extending when
-    // the window size changes after the user has manually extended it at least once.
+    // the window size changes after the user has manually extended it.
     if (!_hasBeenExtended) {
       _isExtended = context.windowSizeClass.isAtLeast(WindowSizeClass.large);
     }
@@ -75,20 +75,20 @@ class _AppNavigationRailState extends State<AppNavigationRail> {
       labelType: _isExtended
           ? NavigationRailLabelType.none
           : NavigationRailLabelType.all,
-      minWidth: 96.0,
-      minExtendedWidth: 220.0,
+      minWidth: 96,
+      minExtendedWidth: 220,
     );
   }
 }
 
 class _AppNavigationRailMenuButton extends StatelessWidget {
-  final void Function()? onPressed;
-
   /// Creates a widget that animates its position when the parent navigation
   /// rail extends or collapses.
   ///
   /// Source: https://stackoverflow.com/a/73851023
   const _AppNavigationRailMenuButton({this.onPressed});
+
+  final void Function()? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -105,11 +105,11 @@ class _AppNavigationRailMenuButton extends StatelessWidget {
 
     return AnimatedBuilder(
       animation: animation,
-      builder: (BuildContext context, Widget? child) {
+      builder: (context, child) {
         final isExtended = animation.status.isForwardOrCompleted;
         return Container(
           padding: EdgeInsets.only(
-            top: 44.0,
+            top: 44,
             right: !isExtended
                 ? 0
                 : ui.lerpDouble(0, maxIconRightPadding + 2.0, animation.value)!,

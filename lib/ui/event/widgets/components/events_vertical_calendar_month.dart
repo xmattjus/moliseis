@@ -4,16 +4,16 @@ import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class EventsVerticalCalendarMonth extends StatelessWidget {
-  final DateSymbols dateSymbols;
-  final int month;
-  final int year;
-
   const EventsVerticalCalendarMonth({
-    super.key,
     required this.dateSymbols,
     required this.month,
     required this.year,
+    super.key,
   });
+
+  final DateSymbols dateSymbols;
+  final int month;
+  final int year;
 
   @override
   Widget build(BuildContext context) {

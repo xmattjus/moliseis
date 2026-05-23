@@ -5,12 +5,6 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 
 class SettingsViewModel extends ChangeNotifier {
-  final SettingsRepository _settingsRepository;
-
-  final SentryLoggingFlag _sentryLoggingFlag;
-
-  late Command1<void, bool> setCrashReporting;
-
   SettingsViewModel({
     required SettingsRepository settingsRepository,
     required SentryLoggingFlag sentryLoggingFlag,
@@ -19,6 +13,12 @@ class SettingsViewModel extends ChangeNotifier {
     setCrashReporting = Command1(_setCrashReporting);
     _crashReporting = _settingsRepository.crashReporting;
   }
+
+  final SettingsRepository _settingsRepository;
+
+  final SentryLoggingFlag _sentryLoggingFlag;
+
+  late Command1<void, bool> setCrashReporting;
 
   late bool _crashReporting;
 

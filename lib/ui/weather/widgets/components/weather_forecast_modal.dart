@@ -11,14 +11,14 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 class WeatherForecastModal extends StatefulWidget {
-  final ContentBase content;
-  final WeatherViewModel viewModel;
-
   const WeatherForecastModal({
-    super.key,
     required this.content,
     required this.viewModel,
+    super.key,
   });
+
+  final ContentBase content;
+  final WeatherViewModel viewModel;
 
   @override
   State<WeatherForecastModal> createState() => _WeatherForecastModalState();
@@ -33,7 +33,7 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
 
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -42,19 +42,19 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
               title: 'Previsioni meteo per ${widget.content.city?.name}',
               onClose: () => Navigator.of(context).pop(),
             ),
-            const SizedBox(height: 32.0),
+            const SizedBox(height: 32),
             Text(
               '${viewModel.currentTemperatureCelsius}°',
               style: Theme.of(
                 context,
               ).textTheme.displayMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 8),
             Text(
               viewModel.currentWeatherDescription,
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 16),
             WeatherForecastHourlyList(
               borderColor: appColors.modalBorderColor,
               backgroundColor: appEffects.containerColor(
@@ -63,7 +63,7 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
               ),
               viewModel: viewModel,
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 8),
             WeatherForecastDaysList(
               borderColor: appColors.modalBorderColor,
               backgroundColor: appEffects.containerColor(
@@ -72,7 +72,7 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
               ),
               viewModel: viewModel,
             ),
-            const SizedBox(height: 16.0),
+            const SizedBox(height: 16),
             LinkTextButton(
               label: const Text('Dati meteo forniti da Open-Meteo.com'),
               onPressed: () => context

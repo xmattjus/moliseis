@@ -36,7 +36,7 @@ void main() {
 
   group('EventFormattedDateTime integrations', () {
     testWidgets('is used by compact ContentSliverGrid for EventContent', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 10, 15),
@@ -65,7 +65,7 @@ void main() {
     });
 
     testWidgets('is used by ContentEventCardGridItem trailing content', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 10, 15),
@@ -87,7 +87,7 @@ void main() {
     });
 
     testWidgets('is used by SearchAnchorSuggestionList for EventContent', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEventContent(
         startDate: DateTime(2026, 4, 10, 10, 15),
@@ -216,7 +216,7 @@ Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
   return Event(
     category: ContentCategory.experience,
     city: _testCity(),
-    coordinates: const LatLng(0.0, 0.0),
+    coordinates: const LatLng(0, 0),
     createdAt: DateTime(2026, 1, 1),
     description: 'Test event',
     media: const [],

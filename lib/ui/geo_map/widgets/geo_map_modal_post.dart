@@ -12,7 +12,7 @@ import 'package:moliseis/ui/post/widgets/components/post_section_slideshow.dart'
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/utils/extensions/build_context_extensions.dart';
 
-const double _mediaSlideshowHeight = 450.0;
+const double _mediaSlideshowHeight = 450;
 
 /// Shows a post inside the geo-map bottom sheet.
 ///
@@ -74,7 +74,7 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
               height: _mediaSlideshowHeight,
               media: widget.content.media,
               visibilityNotifier: _slideshowVisibilityNotifier.notifier,
-              overlayBuilder: (context) => _buildTopControls(context),
+              overlayBuilder: _buildTopControls,
               chromeColor: context.colorScheme.surfaceContainerLow,
             )
           else
@@ -106,7 +106,7 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
 
   Widget _buildTopControls(BuildContext context) {
     return SizedBox(
-      height: 64.0,
+      height: 64,
       child: Stack(
         children: <Widget>[
           Positioned(
@@ -120,8 +120,8 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
             ),
           ),
           Positioned(
-            top: 8.0,
-            right: 16.0,
+            top: 8,
+            right: 16,
             child: AppBottomSheetCloseButton(
               onClose: widget.onCloseButtonPressed,
             ),

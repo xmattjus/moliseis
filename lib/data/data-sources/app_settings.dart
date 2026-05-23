@@ -7,6 +7,14 @@ const _settingsId = 1;
 
 @Entity()
 class AppSettings {
+  AppSettings({
+    this.type = ThemeType.system,
+    this.brightness = ThemeBrightness.system,
+    this.contentSort = ContentSort.byName,
+    this.lastSyncedAt,
+    this.crashReporting = true,
+  }) : id = _settingsId;
+
   /// Stable singleton id for the only settings entity.
   static const int singletonId = _settingsId;
 
@@ -81,14 +89,6 @@ class AppSettings {
 
   final bool crashReporting;
 
-  AppSettings({
-    this.type = ThemeType.system,
-    this.brightness = ThemeBrightness.system,
-    this.contentSort = ContentSort.byName,
-    this.lastSyncedAt,
-    this.crashReporting = true,
-  }) : id = _settingsId;
-
   AppSettings copyWith({
     ThemeType? type,
     ThemeBrightness? brightness,
@@ -106,18 +106,33 @@ class AppSettings {
   }
 
   void _assertThemeTypeEnumValues() {
-    assert(ThemeType.system.index == 0);
-    assert(ThemeType.app.index == 1);
+    assert(ThemeType.system.index == 0, 'ThemeType.system must have index 0');
+    assert(ThemeType.app.index == 1, 'ThemeType.app must have index 1');
   }
 
   void _assertThemeBrightnessEnumValues() {
-    assert(ThemeBrightness.system.index == 0);
-    assert(ThemeBrightness.light.index == 1);
-    assert(ThemeBrightness.dark.index == 2);
+    assert(
+      ThemeBrightness.system.index == 0,
+      'ThemeBrightness.system must have index 0',
+    );
+    assert(
+      ThemeBrightness.light.index == 1,
+      'ThemeBrightness.light must have index 1',
+    );
+    assert(
+      ThemeBrightness.dark.index == 2,
+      'ThemeBrightness.dark must have index 2',
+    );
   }
 
   void _assertContentSortEnumValues() {
-    assert(ContentSort.byName.index == 0);
-    assert(ContentSort.byDate.index == 1);
+    assert(
+      ContentSort.byName.index == 0,
+      'ContentSort.byName must have index 0',
+    );
+    assert(
+      ContentSort.byDate.index == 1,
+      'ContentSort.byDate must have index 1',
+    );
   }
 }

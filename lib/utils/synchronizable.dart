@@ -1,7 +1,7 @@
 import 'package:moliseis/utils/result.dart';
 
 /// Defines an asynchronous synchronization contract.
-abstract interface class Synchronizable {
+mixin Synchronizable {
   /// Synchronizes local data with the remote source.
   ///
   /// Returns [Result.success] when synchronization completes without error,

@@ -51,7 +51,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
     _listController.animateToItem(
       index: index,
       scrollController: _scrollController,
-      alignment: 0.0,
+      alignment: 0,
       // You can provide duration and curve depending on the estimated
       // distance between currentPosition and the target item position.
       duration: (estimatedDistance) => Durations.medium3,
@@ -85,7 +85,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(16.0, 8.0, 16.0, 0),
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 0),
               child: Text(
                 'Nelle prossime ore',
                 style: Theme.of(context).textTheme.bodyMedium,
@@ -104,19 +104,19 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                   // Shows at most 24 hours of the hourly weather forecast data.
                   final itemCount = hourlyData.time.take(24).length;
 
-                  // Schedules the hourly forecast list scroll to the current hour
-                  // after the first frame has been rendered.
+                  // Schedules the hourly forecast list scroll to the current
+                  // hour after the first frame has been rendered.
                   SchedulerBinding.instance.addPostFrameCallback((_) {
                     _animateToItem(currentHour);
                   });
 
                   return ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 160.0),
+                    constraints: const BoxConstraints(maxHeight: 160),
                     child: SuperListView.builder(
                       scrollDirection: Axis.horizontal,
                       listController: _listController,
                       controller: _scrollController,
-                      padding: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.all(8),
                       itemBuilder: (context, index) {
                         final hour = () {
                           if (index == currentHour) {
@@ -129,8 +129,8 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                         return () {
                           final child = Padding(
                             padding: const EdgeInsets.symmetric(
-                              vertical: 16.0,
-                              horizontal: 4.0,
+                              vertical: 16,
+                              horizontal: 4,
                             ),
                             child: _WeatherModalHourlyListItem(
                               hourLabel: Text(
@@ -169,7 +169,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                                   color: context.appColors.modalBorderColor,
                                   width: appSizes.borderSide.medium,
                                 ),
-                                borderRadius: BorderRadius.circular(16.0),
+                                borderRadius: BorderRadius.circular(16),
                               ),
                               child: child,
                             );
@@ -184,7 +184,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                 }
 
                 return const Padding(
-                  padding: EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(16),
                   child: Center(child: CircularProgressIndicator()),
                 );
               },
@@ -197,27 +197,27 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
 }
 
 class _WeatherModalHourlyListItem extends StatelessWidget {
-  final Widget hourLabel;
-  final Widget icon;
-  final Widget label;
-
   const _WeatherModalHourlyListItem({
     required this.hourLabel,
     required this.icon,
     required this.label,
   });
 
+  final Widget hourLabel;
+  final Widget icon;
+  final Widget label;
+
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: const BoxConstraints.tightFor(width: 60.0),
+      constraints: const BoxConstraints.tightFor(width: 60),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           hourLabel,
-          const SizedBox(height: 12.0),
+          const SizedBox(height: 12),
           icon,
-          const SizedBox(height: 16.0),
+          const SizedBox(height: 16),
           label,
         ],
       ),

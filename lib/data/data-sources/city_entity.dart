@@ -17,6 +17,11 @@ class CityEntity {
     required this.events,
   });
 
+  factory CityEntity.fromJson(Map<String, dynamic> json) =>
+      _$CityEntityFromJson(json);
+
+  Map<String, dynamic> toJson() => _$CityEntityToJson(this);
+
   @JsonKey(name: 'id')
   @Id(assignable: true)
   final int remoteId;
@@ -62,11 +67,6 @@ class CityEntity {
     places: places,
     events: events,
   );
-
-  factory CityEntity.fromJson(Map<String, dynamic> json) =>
-      _$CityEntityFromJson(json);
-
-  Map<String, dynamic> toJson() => _$CityEntityToJson(this);
 }
 
 class CityRelToOneConverter

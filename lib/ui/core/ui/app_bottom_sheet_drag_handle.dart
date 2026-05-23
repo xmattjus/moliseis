@@ -17,8 +17,8 @@ class AppBottomSheetDragHandle extends StatelessWidget {
       height: kMinInteractiveDimension,
       child: Center(
         child: Container(
-          width: 32.0,
-          height: 4.0,
+          width: 32,
+          height: 4,
           decoration: BoxDecoration(
             color: color ?? context.colorScheme.onSurfaceVariant.withAlpha(51),
             borderRadius: context.appShapes.circular.cornerSmall,

@@ -2,17 +2,17 @@ import 'package:flutter/material.dart';
 
 /// Source: https://stackoverflow.com/a/79555444
 class PulsePainter extends CustomPainter {
-  final Animation<double> animation;
-  final Color color;
-
   PulsePainter({required this.animation, this.color = Colors.purple})
     : super(repaint: animation);
 
-  void drawPulse(Canvas canvas, Rect rect, double value) {
-    final double opacity = (1.0 - value).clamp(0, 1.0);
-    final Color colorWithOpacity = color.withValues(alpha: opacity);
+  final Animation<double> animation;
+  final Color color;
 
-    final Paint paint = Paint()..color = colorWithOpacity;
+  void drawPulse(Canvas canvas, Rect rect, double value) {
+    final opacity = (1.0 - value).clamp(0, 1.0).toDouble();
+    final colorWithOpacity = color.withValues(alpha: opacity);
+
+    final paint = Paint()..color = colorWithOpacity;
 
     final maxSide = rect.longestSide;
     final minSide = rect.shortestSide;
@@ -37,7 +37,7 @@ class PulsePainter extends CustomPainter {
       height = rect.height + differenceWidth;
     }
 
-    final Rect scaledRect = Rect.fromCenter(
+    final scaledRect = Rect.fromCenter(
       center: rect.center,
       width: width,
       height: height,
@@ -51,7 +51,7 @@ class PulsePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Rect rect = Rect.fromLTRB(0.0, 0.0, size.width, size.height);
+    final rect = Rect.fromLTRB(0, 0, size.width, size.height);
 
     drawPulse(canvas, rect, animation.value);
   }

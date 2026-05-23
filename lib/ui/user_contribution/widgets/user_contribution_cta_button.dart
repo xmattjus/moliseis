@@ -20,16 +20,16 @@ class UserContributionCTAButton extends StatelessWidget {
           elevation: 0,
           onPressed: () => context.pushNamed(RouteNames.userContribution),
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 16.0),
+                    padding: const EdgeInsetsDirectional.only(end: 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: 4.0,
+                      spacing: 4,
                       children: <Widget>[
                         Text(
                           'Suggerisci un luogo o un evento',

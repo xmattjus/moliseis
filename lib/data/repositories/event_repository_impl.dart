@@ -49,7 +49,7 @@ class EventRepositoryImpl implements EventRepository {
       query = builder.build();
       final results = await query.findAsync();
       final mappedResults = results
-          .map<Event>((EventEntity entity) => entity.toModel())
+          .map<Event>((entity) => entity.toModel())
           .toList();
       _cache = mappedResults;
       return Result.success(mappedResults);
@@ -79,9 +79,19 @@ class EventRepositoryImpl implements EventRepository {
           .and(ObjectBoxConditions.eventStartsEndsCurrentYear);
       query = _eventBox.query(condition).build();
       final results = await query.findAsync();
+
       final mappedResults = results
-          .map<Event>((EventEntity entity) => entity.toModel())
+          .map<Event>((entity) => entity.toModel())
           .toList();
+
+      // Code readability benefits from separate statements over cascades.
+      // ignore: cascade_invocations
+      mappedResults.sort(
+        (a, b) => switch (sort) {
+          ContentSort.byName => a.name.compareTo(b.name),
+          ContentSort.byDate => b.modifiedAt.compareTo(a.modifiedAt),
+        },
+      );
       return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
       _log.error(
@@ -103,8 +113,9 @@ class EventRepositoryImpl implements EventRepository {
       final condition = EventEntity_.coordinates
           .nearestNeighborsF32(coordinates, 200)
           .and(ObjectBoxConditions.eventStartsEndsCurrentYear);
-      query = _eventBox.query(condition).build();
-      query.limit = 2;
+
+      query = _eventBox.query(condition).build()..limit = 2;
+
       final resultsWithScores = await query.findWithScoresAsync();
       final results = resultsWithScores
           .map<EventEntity>((element) => element.object)
@@ -115,7 +126,7 @@ class EventRepositoryImpl implements EventRepository {
           )
           .toList();
       final mappedResults = results
-          .map<Event>((EventEntity entity) => entity.toModel())
+          .map<Event>((entity) => entity.toModel())
           .toList();
       return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
@@ -149,9 +160,9 @@ class EventRepositoryImpl implements EventRepository {
           .lessOrEqualDate(endDate)
           .and(EventEntity_.endDate.greaterOrEqualDate(startDate));
 
-      final Condition<EventEntity> singleDayCondition = EventEntity_.endDate
-          .isNull()
-          .and(EventEntity_.startDate.betweenDate(startDate, endDate));
+      final singleDayCondition = EventEntity_.endDate.isNull().and(
+        EventEntity_.startDate.betweenDate(startDate, endDate),
+      );
 
       final builder = _eventBox
           .query(multiDayCondition.or(singleDayCondition))
@@ -160,7 +171,7 @@ class EventRepositoryImpl implements EventRepository {
       query = builder.build();
       final results = await query.findAsync();
       final mappedResults = results
-          .map<Event>((EventEntity entity) => entity.toModel())
+          .map<Event>((entity) => entity.toModel())
           .toList();
       return Result.success(mappedResults);
     } on Exception catch (error, stackTrace) {
@@ -296,7 +307,7 @@ class EventRepositoryImpl implements EventRepository {
           .select();
 
       final remote = Set<EventEntity>.unmodifiable(
-        events.map<EventEntity>((element) => EventEntity.fromJson(element)),
+        events.map<EventEntity>(EventEntity.fromJson),
       );
 
       final local = Set<EventEntity>.unmodifiable(_eventBox.getAll());
@@ -336,8 +347,6 @@ class EventRepositoryImpl implements EventRepository {
           }
         }
       }
-
-      removeLeftovers(_eventBox, remote);
 
       return const Result.success(null);
     } on Exception catch (error, stackTrace) {
