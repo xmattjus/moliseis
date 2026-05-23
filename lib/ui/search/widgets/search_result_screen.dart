@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';

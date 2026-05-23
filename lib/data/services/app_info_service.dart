@@ -1,17 +1,17 @@
 import 'package:moliseis/data/services/external_url_service.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 /// Service responsible for handling app-specific information URLs
 /// such as privacy policy, terms of service, and legal information.
 class AppInfoService {
   AppInfoService({
-    required Talker logger,
+    required Logger logger,
     required ExternalUrlService externalUrlService,
-  }) : _log = logger,
+  }) : _logger = logger,
        _externalUrlService = externalUrlService;
 
-  final Talker _log;
+  final Logger _logger;
 
   final ExternalUrlService _externalUrlService;
 
@@ -25,7 +25,9 @@ class AppInfoService {
   ///
   /// Returns a [Result] containing success or failure information.
   Future<Result<void>> openPrivacyPolicy() {
-    _log.info('Opening privacy policy');
+    _logger.log(
+      const UrlLaunchStarted(_privacyPolicyUrl, method: 'openPrivacyPolicy'),
+    );
     return _externalUrlService.launchGenericUrl(_privacyPolicyUrl);
   }
 
@@ -33,7 +35,9 @@ class AppInfoService {
   ///
   /// Returns a [Result] containing success or failure information.
   Future<Result<void>> openTermsOfService() {
-    _log.info('Opening terms of service');
+    _logger.log(
+      const UrlLaunchStarted(_termsOfServiceUrl, method: 'openTermsOfService'),
+    );
     return _externalUrlService.launchGenericUrl(_termsOfServiceUrl);
   }
 }

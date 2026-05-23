@@ -1,22 +1,21 @@
-import 'dart:async';
+import 'dart:async' show TimeoutException;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/utils/constants.dart';
-import 'package:moliseis/utils/exceptions.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 /// Low-level HTTP client for fetching weather forecasts from Open-Meteo API.
 ///
 /// This client handles network requests, timeout management, and error recovery
 /// to provide reliable data access for the caching layer.
 class WeatherApiClient {
-  WeatherApiClient({required Talker logger, required http.Client httpClient})
-    : _log = logger,
+  WeatherApiClient({required Logger logger, required http.Client httpClient})
+    : _logger = logger,
       _httpClient = httpClient;
 
-  final Talker _log;
+  final Logger _logger;
   final http.Client _httpClient;
 
   Uri _buildApiUri(
@@ -56,6 +55,10 @@ class WeatherApiClient {
     double longitude, {
     String timezone = 'Europe/Rome',
   }) async {
+    _logger.log(
+      WeatherForecastFetchStarted(latitude: latitude, longitude: longitude),
+    );
+
     try {
       final uri = _buildApiUri(latitude, longitude, timezone: timezone);
 
@@ -75,15 +78,15 @@ class WeatherApiClient {
         );
       }
     } on TimeoutException catch (error) {
-      _log.warning(const NetworkTimeoutException());
+      _logger.log(const NetworkRequestTimeout());
       return Result.error(error);
-    } on Exception catch (error, stackTrace) {
-      _log.warning(
-        'An exception occurred while getting combined weather forecast.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        WeatherForecastFetchFailed(latitude: latitude, longitude: longitude),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 }

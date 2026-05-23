@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:animated_stateful_shell_route/animated_stateful_shell_route.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -5,9 +7,11 @@ import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
+import 'package:moliseis/main.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/ui/core/ui/logging_screen.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/events_screen.dart';
@@ -27,6 +31,7 @@ import 'package:moliseis/ui/user_contribution/widgets/user_contribution_screen.d
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -38,8 +43,6 @@ final _mapShellNavigatorKey = GlobalKey<NavigatorState>();
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
-  restorationScopeId: 'router',
-  navigatorKey: _rootNavigatorKey,
   redirect: (context, state) {
     final syncViewModel = context.read<SyncViewModel>();
 
@@ -73,11 +76,18 @@ final appRouter = GoRouter(
       name: RouteNames.userContribution,
       builder: (context, _) {
         final viewModel = UserContributionViewModel(
-          logger: context.read<Talker>(),
+          logger: context.read<Logger>(),
           userContributionRepository: context
               .read<UserContributionRepository>(),
         );
         return UserContributionScreen(viewModel: viewModel);
+      },
+    ),
+    GoRoute(
+      path: RoutePaths.logging,
+      name: RouteNames.logging,
+      builder: (_, _) {
+        return LoggingScreen(talker: talker);
       },
     ),
     AnimatedStatefulShellRoute(
@@ -145,8 +155,7 @@ final appRouter = GoRouter(
                           searchRepository: context.read(),
                         );
 
-                        viewModel.loadResults.execute(query);
-                        // viewModel.loadRelatedResultsIds.execute(query);
+                        unawaited(viewModel.loadResults.execute(query));
 
                         return viewModel;
                       },
@@ -273,4 +282,9 @@ final appRouter = GoRouter(
       transitionBuilder: ShellRouteTransitions.fade,
     ),
   ],
+  observers: [
+    TalkerRouteObserver(talker),
+  ],
+  navigatorKey: _rootNavigatorKey,
+  restorationScopeId: 'router',
 );

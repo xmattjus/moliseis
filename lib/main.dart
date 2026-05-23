@@ -11,11 +11,10 @@ import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
-import 'package:moliseis/utils/exceptions.dart';
 import 'package:moliseis/utils/http_client.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
-import 'package:moliseis/utils/sentry_talker_observer.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_supabase/sentry_supabase.dart';
@@ -23,49 +22,47 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
 final _sentryLoggingFlag = SentryLoggingFlag(initialValue: false);
-
-final Talker _logger = TalkerFlutter.init(
-  observer: SentryTalkerObserver(flag: _sentryLoggingFlag),
+final Talker talker = TalkerFlutter.init();
+final AppLogger _logger = AppLogger(
+  talker,
+  sentryFlag: _sentryLoggingFlag,
 );
 
 /// Logs settings initialization failures while preserving startup fallback.
 @visibleForTesting
-Result<void> handleSettingsRepositoryInitialization(Result<void> result) {
+void handleSettingsRepositoryInitialization(Result<void> result) {
   if (result is Error<void>) {
-    _logger.error(
-      'Settings repository initialization failed. '
-      'App will continue with fallback defaults.',
-      result.error,
+    _logger.log(
+      const LocalPersistenceSettingsInitFailed(),
+      error: result.error,
     );
   }
-
-  return result;
 }
 
-void main() async => await http.runWithClient(_main, () => httpClientFactory());
+void main() async => await http.runWithClient(_main, httpClientFactory);
 
 Future<void> _main() async {
   // Ensures the disk can be accessed before continuing app start-up.
   SentryWidgetsFlutterBinding.ensureInitialized();
 
-  // Retrieves an HTTP client instance initialized with the `runWithClient` method.
+  // Retrieves an HTTP client instance initialized with the `runWithClient`
+  // method.
   final httpClient = http.Client();
 
   await SentryFlutter.init(
-    (options) {
-      options.dsn = !kDebugMode ? Env.sentryUrl : '';
+    (options) => options
+      ..dsn = Env.sentryUrl
+      ..environment = kDebugMode ? 'debug' : 'production'
       // Set tracesSampleRate to 1.0 to capture 100% of transactions for
       // tracing.
-      options.tracesSampleRate = 0.4;
+      ..tracesSampleRate = 0.4
       // The sampling rate for profiling is relative to tracesSampleRate
       // Setting to 1.0 will profile 100% of sampled transactions:
-      options.profilesSampleRate = 1.0;
+      ..profilesSampleRate = 1.0
       // Session Replay setup.
-      options.replay.sessionSampleRate = 0.4;
-      options.replay.onErrorSampleRate = 1.0;
-      options.httpClient = httpClient;
-      options.debug = kDebugMode;
-    },
+      ..replay.sessionSampleRate = 0.4
+      ..replay.onErrorSampleRate = 1.0
+      ..httpClient = httpClient,
     appRunner: () async {
       final supabase = await Supabase.initialize(
         url: Env.supabaseProdUrl,
@@ -77,11 +74,11 @@ Future<void> _main() async {
 
       try {
         objectBox = await ObjectBox.create();
-      } catch (exception, stackTrace) {
-        _logger.critical(
-          ObjectBoxInitializationException(
-            'Error: $exception, StackTrace: $stackTrace',
-          ),
+      } on Object catch (error, stackTrace) {
+        _logger.log(
+          const LocalPersistenceInitFailed(),
+          error: error,
+          stackTrace: stackTrace,
         );
         runApp(const SetupErrorApp());
         return;
@@ -105,8 +102,9 @@ Future<void> _main() async {
       );
 
       final app = MultiProvider(
-        providers: providers2(
+        providers: providers(
           _logger,
+          talker,
           supabase,
           objectBox,
           httpClient,
@@ -117,16 +115,18 @@ Future<void> _main() async {
         child: const MoliseIsApp(),
       );
 
-      if (settingsRepository.crashReporting && !kDebugMode) {
-        _logger.info('Crash reporting is enabled. Sentry will capture errors.');
+      if (settingsRepository.crashReporting) {
+        _logger.log(
+          const SentryLoggingEnabled(
+            environment: kDebugMode ? 'debug' : 'production',
+          ),
+        );
 
         runApp(SentryWidget(child: app));
       } else {
         await Sentry.close();
 
-        _logger.info(
-          'Crash reporting is disabled. Errors will not be sent to Sentry.',
-        );
+        _logger.log(const SentryLoggingDisabled());
 
         runApp(app);
       }
@@ -146,7 +146,7 @@ class MoliseIsApp extends StatelessWidget {
           routerConfig: appRouter,
           builder: (_, child) => child!,
           title: 'Molise Is',
-          localizationsDelegates: const <LocalizationsDelegate>[
+          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
             GlobalCupertinoLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,

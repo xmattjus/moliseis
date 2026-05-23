@@ -1,0 +1,231 @@
+part of 'package:moliseis/utils/logging/log_event.dart';
+
+/// Fired when a Cloudinary upload request fails.
+class CloudinaryRequestFailed extends LogEvent {
+  /// Creates an event with a [detail] describing the Cloudinary error.
+  const CloudinaryRequestFailed({required this.detail});
+
+  /// Error message or description returned by the Cloudinary API.
+  final String detail;
+
+  @override
+  Map<String, Object?> get data => {'detail': detail};
+
+  @override
+  AppLogLevel get level => AppLogLevel.error;
+
+  @override
+  String get name => 'cloudinary_request_failed';
+}
+
+/// Fired when a Cloudinary upload request started.
+class CloudinaryRequestStarted extends LogEvent {
+  /// Creates an event for a Cloudinary request start.
+  const CloudinaryRequestStarted();
+
+  @override
+  Map<String, Object?> get data => const {};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'cloudinary_request_started';
+}
+
+/// Fired when an image sharing attempt fails.
+class ImageSharingFailed extends LogEvent {
+  /// Creates an event for a failed image sharing attempt.
+  const ImageSharingFailed();
+
+  @override
+  Map<String, Object?> get data => const {};
+
+  @override
+  AppLogLevel get level => AppLogLevel.warning;
+
+  @override
+  String get name => 'image_sharing_failed';
+}
+
+/// Fired when a reverse geocoding fetch failed.
+class ReverseGeocodingFetchFailed extends LogEvent {
+  /// Creates an event for a failed reverse-geocode lookup
+  /// at [latitude], [longitude].
+  const ReverseGeocodingFetchFailed({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  /// Latitude coordinate of the failed geocoding request.
+  final double latitude;
+
+  /// Longitude coordinate of the failed geocoding request.
+  final double longitude;
+
+  @override
+  Map<String, Object?> get data => {
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  @override
+  AppLogLevel get level => AppLogLevel.error;
+
+  @override
+  String get name => 'reverse_geocoding_fetch_failed';
+}
+
+/// Fired when a reverse geocoding fetch started.
+class ReverseGeocodingFetchStarted extends LogEvent {
+  /// Creates an event for a reverse-geocode lookup started
+  /// at [latitude], [longitude].
+  const ReverseGeocodingFetchStarted({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  /// Latitude coordinate being reverse-geocoded.
+  final double latitude;
+
+  /// Longitude coordinate being reverse-geocoded.
+  final double longitude;
+
+  @override
+  Map<String, Object?> get data => {
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'reverse_geocoding_fetch_started';
+}
+
+/// Fired when Sentry logging is confirmed as disabled.
+class SentryLoggingDisabled extends LogEvent {
+  const SentryLoggingDisabled();
+
+  @override
+  Map<String, Object?> get data => const {};
+
+  @override
+  AppLogLevel get level => AppLogLevel.debug;
+
+  @override
+  String get name => 'sentry_crash_reporting_disabled';
+}
+
+/// Fired when Sentry logging is confirmed as enabled.
+class SentryLoggingEnabled extends LogEvent {
+  const SentryLoggingEnabled({this.environment});
+
+  final String? environment;
+
+  @override
+  Map<String, Object?> get data => {'environment': environment};
+
+  @override
+  AppLogLevel get level => AppLogLevel.debug;
+
+  @override
+  String get name => 'sentry_crash_reporting_enabled';
+}
+
+/// Fired before attempting to open a URL via the system launcher.
+class UrlLaunchStarted extends LogEvent {
+  /// Creates an event for launching [url] using the given [method].
+  const UrlLaunchStarted(this.url, {this.method = 'unknown'});
+
+  /// The URL that will be opened by the system launcher.
+  final String url;
+
+  /// Calling method or context (e.g. `openPrivacyPolicy'`,
+  /// `'searchInGoogleMaps'`).
+  final String method;
+
+  @override
+  Map<String, Object?> get data => {'url': url, 'method': method};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'url_launch_started';
+}
+
+/// Fired when opening a URL via the system launcher fails.
+class UrlLaunchFailed extends LogEvent {
+  /// Creates an event for a failed launch of [url].
+  const UrlLaunchFailed(this.url);
+
+  /// The URL that could not be opened.
+  final String url;
+
+  @override
+  Map<String, Object?> get data => {'url': url};
+
+  @override
+  AppLogLevel get level => AppLogLevel.warning;
+
+  @override
+  String get name => 'url_launch_failed';
+}
+
+/// Fired when a weather forecast fetch failed.
+class WeatherForecastFetchFailed extends LogEvent {
+  /// Creates an event for a failed weather forecast request
+  /// at [latitude], [longitude].
+  const WeatherForecastFetchFailed({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  /// Latitude coordinate of the failed forecast request.
+  final double latitude;
+
+  /// Longitude coordinate of the failed forecast request.
+  final double longitude;
+
+  @override
+  Map<String, Object?> get data => {
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  @override
+  AppLogLevel get level => AppLogLevel.error;
+
+  @override
+  String get name => 'weather_forecast_fetch_failed';
+}
+
+/// Fired when a weather forecast fetch started.
+class WeatherForecastFetchStarted extends LogEvent {
+  /// Creates an event for a weather forecast request started
+  /// at [latitude], [longitude].
+  const WeatherForecastFetchStarted({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  /// Latitude coordinate of the forecast request.
+  final double latitude;
+
+  /// Longitude coordinate of the forecast request.
+  final double longitude;
+
+  @override
+  Map<String, Object?> get data => {
+    'latitude': latitude,
+    'longitude': longitude,
+  };
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'weather_forecast_fetch_started';
+}

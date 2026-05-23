@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 SnackBar _buildSnackBar(BuildContext context, String textContent) {
   return SnackBar(
@@ -25,11 +25,22 @@ void showSnackBar({
   final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
 
   if (scaffoldMessenger == null) {
-    final log = Provider.of<Talker?>(context, listen: false);
+    context.read<Logger?>()?.log(
+      const SnackBarShowFailed(reason: 'ScaffoldMessenger is null'),
+    );
 
-    log?.warning('ScaffoldMessenger.maybeOf(context) is null.');
     return;
   }
 
-  scaffoldMessenger.showSnackBar(_buildSnackBar(context, textContent));
+  try {
+    scaffoldMessenger.showSnackBar(_buildSnackBar(context, textContent));
+  } on Exception catch (exception, stackTrace) {
+    context.read<Logger?>()?.log(
+      const SnackBarShowFailed(),
+      error: exception,
+      stackTrace: stackTrace,
+    );
+  }
+
+  return;
 }

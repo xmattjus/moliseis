@@ -1,7 +1,9 @@
+import 'dart:async' show unawaited;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/category/widgets/category_button.dart';
@@ -22,10 +24,10 @@ import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({
-    super.key,
     required this.eventViewModel,
     required this.exploreViewModel,
     required this.searchViewModel,
+    super.key,
   });
 
   final EventViewModel eventViewModel;
@@ -74,6 +76,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         tooltip: 'Impostazioni',
                         onPressed: () => context.pushNamed(RouteNames.settings),
                       ),
+                      if (kDebugMode)
+                        MenuItem(
+                          title: const Text('Debug'),
+                          icon: const Icon(Symbols.bug_report, weight: 500),
+                          tooltip: 'Debug',
+                          onPressed: () =>
+                              context.pushNamed(RouteNames.logging),
+                        ),
                     ],
                   ),
                 ],
@@ -170,9 +180,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             'Si è verificato un errore durante il caricamento.',
                           ),
                           action: TextButton(
-                            onPressed: () {
-                              widget.eventViewModel.loadNext.execute();
-                            },
+                            onPressed: () => unawaited(
+                              widget.eventViewModel.loadNext.execute(),
+                            ),
                             child: const Text('Riprova'),
                           ),
                         ),
@@ -241,9 +251,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             'Si è verificato un errore durante il caricamento.',
                           ),
                           action: TextButton(
-                            onPressed: () {
-                              widget.exploreViewModel.loadLatest.execute();
-                            },
+                            onPressed: () => unawaited(
+                              widget.exploreViewModel.loadLatest.execute(),
+                            ),
                             child: const Text('Riprova'),
                           ),
                         ),
@@ -254,7 +264,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   return const SkeletonContentSliverGrid();
                 },
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
             ],
           ),
         ),
@@ -265,7 +275,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _startSync() {
     final syncViewModel = context.read<SyncViewModel>();
-    syncViewModel.sync.execute(true);
+    unawaited(syncViewModel.sync.execute(true));
 
     // Redirects to the local app repositories synchronization screen.
     GoRouter.of(context).refresh();

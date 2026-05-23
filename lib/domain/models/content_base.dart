@@ -1,9 +1,9 @@
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/event.dart'; // Import added to fix the comment_references lint.
 import 'package:moliseis/domain/models/media.dart';
-import 'package:moliseis/domain/models/place.dart';
+import 'package:moliseis/domain/models/place.dart'; // Import added to fix the comment_references lint.
 
 /// A base class representing a generic unit of content used in the application.
 ///

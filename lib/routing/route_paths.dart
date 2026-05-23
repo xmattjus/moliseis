@@ -10,4 +10,5 @@ abstract class RoutePaths {
   static const sync = '/sync';
   static const post = 'posts/:id';
   static const userContribution = '/userContribution';
+  static const logging = '/logging';
 }

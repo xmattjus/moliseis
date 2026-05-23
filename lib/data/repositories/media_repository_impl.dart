@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/media_supabase_table.dart';
 import 'package:moliseis/data/mappers/media_entity_mapper.dart';
@@ -5,23 +6,22 @@ import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
-import 'package:moliseis/utils/messages.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 class MediaRepositoryImpl implements MediaRepository {
   MediaRepositoryImpl({
-    required Talker logger,
+    required Logger logger,
     required Supabase supabaseI,
     required MediaSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
-  }) : _log = logger,
+  }) : _logger = logger,
        _supabase = supabaseI,
        _supabaseTable = supabaseTable,
        _mediaBox = objectBoxI.store.box<MediaEntity>();
 
-  final Talker _log;
+  final Logger _logger;
 
   final Supabase _supabase;
   final MediaSupabaseTable _supabaseTable;
@@ -29,15 +29,15 @@ class MediaRepositoryImpl implements MediaRepository {
 
   @override
   Future<Result<void>> synchronize() async {
-    try {
-      _log.info(Messages.repositoryUpdate);
+    _logger.log(const RepositorySyncStarted('media'));
 
+    try {
       final media = await _supabase.client
           .from(_supabaseTable.tableName)
           .select();
 
       final remote = Set<MediaEntity>.unmodifiable(
-        media.map<MediaEntity>((element) => MediaEntity.fromJson(element)),
+        media.map<MediaEntity>(MediaEntity.fromJson),
       );
 
       final local = Set<MediaEntity>.unmodifiable(_mediaBox.getAll());
@@ -45,24 +45,20 @@ class MediaRepositoryImpl implements MediaRepository {
       final mediaToPut = remote.difference(local);
 
       for (final media in mediaToPut) {
-        final existingMedia = local.where(
+        final existingMedia = local.firstWhereOrNull(
           (test) => test.remoteId == media.remoteId,
         );
 
-        if (existingMedia.isEmpty) {
-          _log.info(Messages.objectInsert('media', media.remoteId));
-
+        if (existingMedia == null) {
           media.place.targetId = media.placeToOneId;
           media.event.targetId = media.eventToOneId;
 
           _mediaBox.put(media);
-        } else if (existingMedia.length == 1) {
-          if (existingMedia.first != media) {
-            _log.info(
-              Messages.objectUpdate('media', existingMedia.first.remoteId),
-            );
 
-            final copy = existingMedia.first.copyWith(
+          _logger.log(EntityInsertSuccess('media', media.remoteId));
+        } else {
+          if (existingMedia != media) {
+            final copy = existingMedia.copyWith(
               title: media.title,
               author: media.author,
               license: media.license,
@@ -77,15 +73,23 @@ class MediaRepositoryImpl implements MediaRepository {
             );
 
             _mediaBox.put(copy);
+
+            _logger.log(
+              EntityUpdateSuccess('media', media.remoteId),
+            );
           }
         }
       }
 
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(Messages.repositoryUpdateException, error, stackTrace);
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const RepositorySyncFailed('media'),
+        error: exception,
+        stackTrace: stackTrace,
+      );
 
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
@@ -102,13 +106,13 @@ class MediaRepositoryImpl implements MediaRepository {
           .map<Media>((entity) => entity.toModel())
           .toList();
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting media by event with remote ID: $id.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('media', method: 'getByEventId'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
@@ -127,13 +131,13 @@ class MediaRepositoryImpl implements MediaRepository {
           .map<Media>((entity) => entity.toModel())
           .toList();
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting media by place with remote ID: $id.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('media', method: 'getByPlaceId'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }

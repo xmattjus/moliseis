@@ -8,18 +8,18 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 class SearchRepositoryImpl implements SearchRepository {
-  SearchRepositoryImpl({required Talker logger, required ObjectBox objectBoxI})
-    : _log = logger,
+  SearchRepositoryImpl({required Logger logger, required ObjectBox objectBoxI})
+    : _logger = logger,
       _objectBox = objectBoxI,
       _searchHistoryBox = objectBoxI.store.box<SearchQuery>() {
     _init();
   }
 
-  final Talker _log;
+  final Logger _logger;
 
   late final Query<CityEntity> _cityQuery;
   final ObjectBox _objectBox;
@@ -67,13 +67,13 @@ class SearchRepositoryImpl implements SearchRepository {
       }
 
       await _searchHistoryBox.putAsync(SearchQuery(text));
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while adding $text to search history.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityInsertFailed('search', 0),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
 
     return const Result.success(null);
@@ -143,13 +143,14 @@ class SearchRepositoryImpl implements SearchRepository {
       _removeDuplicates(results);
 
       return Result.success(results);
-    } on Exception catch (error, stackTrace) {
-      _log.warning(
-        'An exception occurred while getting event ids by query: $text.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('search', method: 'getEventIdsByQuery'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+
+      return Result.error(exception);
     } finally {
       eventQuery.close();
       eventCategoryQuery.close();
@@ -196,13 +197,14 @@ class SearchRepositoryImpl implements SearchRepository {
       _lastPlaceResultIds = results;
 
       return Result.success(results);
-    } on Exception catch (error, stackTrace) {
-      _log.warning(
-        'An exception occurred while getting place ids by query: $text.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('search', method: 'getPlaceIdsByQuery'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+
+      return Result.error(exception);
     }
   }
 
@@ -234,13 +236,14 @@ class SearchRepositoryImpl implements SearchRepository {
       final diff = set1.difference(set2).toList();
 
       return Result.success(diff);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting related results.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('search', method: 'getRelatedResults'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+
+      return Result.error(exception);
     }
   }
 
@@ -252,13 +255,14 @@ class SearchRepositoryImpl implements SearchRepository {
       return Result.success(
         history.map<String>((element) => element.name).toList(),
       );
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting past searches.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('search', method: 'getPastSearches'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+
+      return Result.error(exception);
     }
   }
 
@@ -274,50 +278,40 @@ class SearchRepositoryImpl implements SearchRepository {
         _searchHistoryBox.remove(result.id);
       }
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while removing $text from search history.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityRemoveFailed('search'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
   List<PlaceEntity> _getRelatedResults(List<PlaceEntity> searchResults) {
-    try {
-      // Creates a frequency map from direct search results where each key is
-      // a ContentCategory and the corresponding value represents how many
-      // times that type appears in the results.
-      final freqMap = searchResults.fold<Map<ContentCategory, int>>({}, (
-        Map<ContentCategory, int> map,
-        PlaceEntity element,
-      ) {
-        map[element.category] = (map[element.category] ?? 0) + 1;
-        return map;
-      });
+    // Creates a frequency map from direct search results where each key is
+    // a ContentCategory and the corresponding value represents how many
+    // times that type appears in the results.
+    final freqMap = searchResults.fold<Map<ContentCategory, int>>({}, (
+      map,
+      element,
+    ) {
+      map[element.category] = (map[element.category] ?? 0) + 1;
+      return map;
+    });
 
-      // Sorts the frequency map from the most to the least appeared type.
-      final sorted = freqMap.keys.toList()
-        ..sort(
-          (k1, k2) => (freqMap[k2]! as num).compareTo(freqMap[k1]! as num),
-        );
+    // Sorts the frequency map from the most to the least appeared type.
+    final sorted = freqMap.keys.toList()
+      ..sort((k1, k2) => (freqMap[k2]!).compareTo(freqMap[k1]!));
 
-      // Finds all places having the most appeared type.
-      _placeCategoryQuery.param(PlaceEntity_.dbType).values = [
-        sorted.first.index,
-      ];
+    if (sorted.isEmpty) return const [];
 
-      return _placeCategoryQuery.find();
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading related results.',
-        error,
-        stackTrace,
-      );
+    // Finds all places having the most appeared type.
+    _placeCategoryQuery.param(PlaceEntity_.dbType).values = [
+      sorted.first.index,
+    ];
 
-      return <PlaceEntity>[];
-    }
+    return _placeCategoryQuery.find();
   }
 
   List<int> _getCategoryIndexes(String query) {

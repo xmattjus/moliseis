@@ -1,6 +1,9 @@
-// ignore_for_file: avoid_redundant_argument_values
+// Tests seed multiple entities of the same type consecutively; the explicit
+// multi-statement form is preferred for readability over cascade notation.
+// ignore_for_file: avoid_redundant_argument_values, cascade_invocations
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
@@ -10,14 +13,21 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
-import 'package:moliseis/utils/exceptions.dart';
+import 'package:moliseis/utils/logging/log_event.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../support/mock_logger.dart';
+import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
+  setUpAll(() {
+    setUpMockLogger();
+    setUpMockSupabase();
+  });
+
   // ---------------------------------------------------------------------------
   // getAll
   // ---------------------------------------------------------------------------
@@ -93,40 +103,39 @@ void main() {
     });
 
     test(
-      'does not mutate cached order on consecutive calls with different sorts',
+      'consecutive calls with different sorts return independently sorted '
+      'results on the same repository instance',
       () async {
-        placeBox.put(_createPlace(remoteId: 1, name: 'Zeta'));
-        placeBox.put(_createPlace(remoteId: 2, name: 'Alpha'));
-
-        // First call sorts by name.
-        await repository.getAll(sort: ContentSort.byName);
-
-        // Second call with different sort should return a fresh sort, not a
-        // re-sort of the already-sorted result.
+        // Zeta is newer; Alpha is older.
         placeBox.put(
           _createPlace(
             remoteId: 1,
             name: 'Zeta',
-            modifiedAt: DateTime(2025, 1, 1),
+            modifiedAt: DateTime(2026, 6, 1),
           ),
         );
         placeBox.put(
           _createPlace(
             remoteId: 2,
             name: 'Alpha',
-            modifiedAt: DateTime(2026, 6, 1),
+            modifiedAt: DateTime(2025, 1, 1),
           ),
         );
 
-        // Create a fresh repository (no cache) to get a clean byDate sort.
-        final freshRepo = _makeRepository(objectBoxEnvironment);
-        final result = await freshRepo.getAll(sort: ContentSort.byDate);
+        // First call sorts by name — expects [Alpha, Zeta].
+        final byNameResult = await repository.getAll(sort: ContentSort.byName);
+        expect(
+          (byNameResult as Success<List<Place>>).value.map((p) => p.name),
+          equals(['Alpha', 'Zeta']),
+        );
 
-        expect(result, isA<Success<List<Place>>>());
-        final names = (result as Success<List<Place>>).value
-            .map((p) => p.name)
-            .toList();
-        expect(names.first, equals('Alpha'));
+        // Second call on the same instance sorts by date — must not be
+        // contaminated by the first call's sort. Expects [Zeta, Alpha].
+        final byDateResult = await repository.getAll(sort: ContentSort.byDate);
+        expect(
+          (byDateResult as Success<List<Place>>).value.map((p) => p.name).first,
+          equals('Zeta'),
+        );
       },
     );
   });
@@ -159,15 +168,12 @@ void main() {
       expect((result as Success<Place>).value.remoteId, equals(42));
     });
 
-    test(
-      'returns Error with PlaceNullException when place is not found',
-      () async {
-        final result = await repository.getById(999);
+    test('returns Error when place is not found', () async {
+      final result = await repository.getById(999);
 
-        expect(result, isA<Error<Place>>());
-        expect((result as Error<Place>).error, isA<PlaceNullException>());
-      },
-    );
+      expect(result, isA<Error<Place>>());
+      expect((result as Error<Place>).error, isA<Exception>());
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -257,6 +263,79 @@ void main() {
         expect((result as Success<List<Place>>).value, isEmpty);
       },
     );
+
+    test('sorts by name ascending when sort is byName', () async {
+      placeBox.put(
+        _createPlace(
+          remoteId: 1,
+          name: 'Zeta',
+          category: ContentCategory.nature,
+        ),
+      );
+      placeBox.put(
+        _createPlace(
+          remoteId: 2,
+          name: 'Alpha',
+          category: ContentCategory.nature,
+        ),
+      );
+      placeBox.put(
+        _createPlace(
+          remoteId: 3,
+          name: 'Middle',
+          category: ContentCategory.nature,
+        ),
+      );
+
+      final result = await repository.getByCategories(
+        {ContentCategory.nature},
+        sort: ContentSort.byName,
+      );
+
+      expect(result, isA<Success<List<Place>>>());
+      final names = (result as Success<List<Place>>).value
+          .map((p) => p.name)
+          .toList();
+      expect(names, equals(['Alpha', 'Middle', 'Zeta']));
+    });
+
+    test('sorts by modifiedAt descending when sort is byDate', () async {
+      placeBox.put(
+        _createPlace(
+          remoteId: 1,
+          name: 'Older',
+          category: ContentCategory.nature,
+          modifiedAt: DateTime(2025, 1, 1),
+        ),
+      );
+      placeBox.put(
+        _createPlace(
+          remoteId: 2,
+          name: 'Newer',
+          category: ContentCategory.nature,
+          modifiedAt: DateTime(2026, 6, 1),
+        ),
+      );
+      placeBox.put(
+        _createPlace(
+          remoteId: 3,
+          name: 'Middle',
+          category: ContentCategory.nature,
+          modifiedAt: DateTime(2025, 12, 1),
+        ),
+      );
+
+      final result = await repository.getByCategories(
+        {ContentCategory.nature},
+        sort: ContentSort.byDate,
+      );
+
+      expect(result, isA<Success<List<Place>>>());
+      final names = (result as Success<List<Place>>).value
+          .map((p) => p.name)
+          .toList();
+      expect(names, equals(['Newer', 'Middle', 'Older']));
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -349,7 +428,7 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test('returns at most 6 IDs', () async {
+    test('returns at most 6 IDs ordered by most recently created', () async {
       for (var i = 1; i <= 10; i++) {
         placeBox.put(
           _createPlace(
@@ -363,7 +442,15 @@ void main() {
       final result = await repository.getLatestPlaceIds();
 
       expect(result, isA<Success<List<int>>>());
-      expect((result as Success<List<int>>).value.length, lessThanOrEqualTo(6));
+      final ids = (result as Success<List<int>>).value;
+      // Returns exactly 6 items (the cap).
+      expect(ids.length, lessThanOrEqualTo(6));
+      // The 6 most recent places are IDs 10..5 (createdAt Jan 10..5).
+      expect(ids, containsAll([10, 9, 8, 7, 6, 5]));
+      expect(ids, isNot(contains(4)));
+      expect(ids, isNot(contains(3)));
+      // Ordered descending by createdAt.
+      expect(ids, equals([10, 9, 8, 7, 6, 5]));
     });
 
     test('returns empty list when store is empty', () async {
@@ -375,18 +462,63 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // synchronize error handling
+  // getSuggestedPlaceIds
+  // ---------------------------------------------------------------------------
+
+  group('PlaceRepositoryImpl - getSuggestedPlaceIds', () {
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<PlaceEntity> placeBox;
+    late PlaceRepositoryImpl repository;
+
+    setUp(() async {
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      placeBox = objectBoxEnvironment.store.box<PlaceEntity>();
+      repository = _makeRepository(objectBoxEnvironment);
+    });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    test('returns at most 5 place IDs from the store', () async {
+      for (var i = 1; i <= 8; i++) {
+        placeBox.put(_createPlace(remoteId: i, name: 'Place $i'));
+      }
+
+      final result = await repository.getSuggestedPlaceIds();
+
+      expect(result, isA<Success<List<int>>>());
+      final ids = (result as Success<List<int>>).value;
+      expect(ids.length, lessThanOrEqualTo(5));
+      // All returned IDs belong to the seeded set.
+      expect(ids, everyElement(inInclusiveRange(1, 8)));
+    });
+
+    test('returns empty list when store is empty', () async {
+      final result = await repository.getSuggestedPlaceIds();
+
+      expect(result, isA<Success<List<int>>>());
+      expect((result as Success<List<int>>).value, isEmpty);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // synchronize — error path
   // ---------------------------------------------------------------------------
 
   group('PlaceRepositoryImpl - synchronize error handling', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late PlaceRepositoryImpl repository;
+    late MockLogger mockLogger;
+    late MockSupabaseEnvironment supabaseEnv;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      mockLogger = MockLogger();
+      supabaseEnv = MockSupabaseEnvironment()..stubUnavailable();
       repository = PlaceRepositoryImpl(
-        logger: Talker(),
-        supabaseI: _ThrowingSupabase(),
+        logger: mockLogger,
+        supabaseI: supabaseEnv.mockSupabase,
         supabaseTable: PlaceSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
@@ -400,6 +532,165 @@ void main() {
       final result = await repository.synchronize();
 
       expect(result, isA<Error<void>>());
+      verify(
+        () => mockLogger.log(const RepositorySyncStarted('place')),
+      ).called(1);
+      verify(
+        () => mockLogger.log(
+          const RepositorySyncFailed('place'),
+          error: any(named: 'error'),
+          stackTrace: any(named: 'stackTrace'),
+        ),
+      ).called(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // synchronize — success path
+  // ---------------------------------------------------------------------------
+
+  group('PlaceRepositoryImpl - synchronize success path', () {
+    late MockLogger mockLogger;
+    late MockSupabaseEnvironment supabaseEnv;
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<PlaceEntity> placeBox;
+    late PlaceRepositoryImpl repository;
+
+    setUp(() async {
+      mockLogger = MockLogger();
+      supabaseEnv = MockSupabaseEnvironment();
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      placeBox = objectBoxEnvironment.store.box<PlaceEntity>();
+      repository = PlaceRepositoryImpl(
+        logger: mockLogger,
+        supabaseI: supabaseEnv.mockSupabase,
+        supabaseTable: PlaceSupabaseTable(),
+        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+      );
+    });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    test('inserts a new place that is absent from the local store', () async {
+      supabaseEnv.stubSelectResponse([
+        {
+          'id': 1,
+          'name': 'Campobasso',
+          'created_at': '2024-01-01T00:00:00.000',
+          'modified_at': '2024-01-01T00:00:00.000',
+        },
+      ]);
+
+      final result = await repository.synchronize();
+
+      expect(result, isA<Success<void>>());
+      expect(placeBox.get(1)?.name, equals('Campobasso'));
+      verify(
+        () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
+      ).called(1);
+    });
+
+    test('skips a place that already matches the local copy', () async {
+      placeBox.put(
+        _createPlace(
+          remoteId: 1,
+          name: 'Campobasso',
+          createdAt: DateTime(2024, 1, 1),
+          modifiedAt: DateTime(2024, 1, 1),
+        ),
+      );
+
+      supabaseEnv.stubSelectResponse([
+        {
+          'id': 1,
+          'name': 'Campobasso',
+          'created_at': '2024-01-01T00:00:00.000',
+          'modified_at': '2024-01-01T00:00:00.000',
+        },
+      ]);
+
+      final result = await repository.synchronize();
+
+      expect(result, isA<Success<void>>());
+      expect(placeBox.get(1)?.name, equals('Campobasso'));
+      verifyNever(
+        () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
+      );
+      verifyNever(
+        () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
+      );
+    });
+
+    test('updates an existing place when remote data differs', () async {
+      placeBox.put(
+        _createPlace(
+          remoteId: 1,
+          name: 'Campobasso',
+          modifiedAt: DateTime(2024, 1, 1),
+        ),
+      );
+
+      supabaseEnv.stubSelectResponse([
+        {
+          'id': 1,
+          'name': 'Campobasso Aggiornato',
+          'created_at': '2024-01-01T00:00:00.000',
+          'modified_at': '2025-06-01T00:00:00.000',
+        },
+      ]);
+
+      final result = await repository.synchronize();
+
+      expect(result, isA<Success<void>>());
+      expect(placeBox.get(1)?.name, equals('Campobasso Aggiornato'));
+      verify(
+        () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
+      ).called(1);
+    });
+
+    test('invalidates the in-memory cache after a successful sync', () async {
+      // Populate the cache via getAll().
+      placeBox.put(_createPlace(remoteId: 1, name: 'Old'));
+      await repository.getAll();
+
+      // Sync adds a new place from remote.
+      supabaseEnv.stubSelectResponse([
+        {
+          'id': 2,
+          'name': 'New Place',
+          'created_at': '2024-01-01T00:00:00.000',
+          'modified_at': '2024-01-01T00:00:00.000',
+        },
+      ]);
+      await repository.synchronize();
+
+      // A subsequent getAll() must reflect the new place, not the stale cache.
+      final result = await repository.getAll();
+      final names = (result as Success<List<Place>>).value
+          .map((p) => p.name)
+          .toList();
+      expect(names, contains('New Place'));
+    });
+
+    test('returns Error when Supabase query fails', () async {
+      supabaseEnv.stubSelectError(
+        const PostgrestException(
+          message: 'relation "places_v2" does not exist',
+        ),
+      );
+
+      final result = await repository.synchronize();
+
+      expect(result, isA<Error<void>>());
+      verify(
+        () => mockLogger.log(
+          const RepositorySyncFailed('place'),
+          error: any(named: 'error'),
+          stackTrace: any(named: 'stackTrace'),
+        ),
+      ).called(1);
     });
   });
 }
@@ -410,8 +701,8 @@ void main() {
 
 PlaceRepositoryImpl _makeRepository(TestObjectBoxEnvironment env) =>
     PlaceRepositoryImpl(
-      logger: Talker(),
-      supabaseI: _FakeSupabase(),
+      logger: MockLogger(),
+      supabaseI: MockSupabase(),
       supabaseTable: PlaceSupabaseTable(),
       objectBoxI: TestObjectBox(env.store),
     );
@@ -435,44 +726,4 @@ PlaceEntity _createPlace({
     city: ToOne<CityEntity>(),
     media: ToMany<MediaEntity>(),
   );
-}
-
-// ---------------------------------------------------------------------------
-// Fakes
-// ---------------------------------------------------------------------------
-
-final class _ThrowingSupabase implements Supabase {
-  @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      throw Exception('Supabase unavailable');
-}
-
-final class _FakeSupabase implements Supabase {
-  List<Map<String, dynamic>> response = [];
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) {
-    if (invocation.memberName == #client) {
-      return _FakeSupabaseClient(response);
-    }
-    return super.noSuchMethod(invocation);
-  }
-}
-
-// Not implementing SupabaseClient — see city_repository_impl_test.dart comment.
-final class _FakeSupabaseClient {
-  _FakeSupabaseClient(this._response);
-
-  final List<Map<String, dynamic>> _response;
-
-  _FakeQueryBuilder from(String table) => _FakeQueryBuilder(_response);
-}
-
-final class _FakeQueryBuilder {
-  _FakeQueryBuilder(this._response);
-
-  final List<Map<String, dynamic>> _response;
-
-  Future<List<Map<String, dynamic>>> select([String columns = '*']) =>
-      Future.value(_response);
 }

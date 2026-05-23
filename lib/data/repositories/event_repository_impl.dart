@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:moliseis/data/core/object_box_conditions.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/event_supabase_table.dart';
@@ -9,23 +10,22 @@ import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
-import 'package:moliseis/utils/messages.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 class EventRepositoryImpl implements EventRepository {
   EventRepositoryImpl({
-    required Talker logger,
+    required Logger logger,
     required Supabase supabaseI,
     required EventSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
-  }) : _log = logger,
+  }) : _logger = logger,
        _supabase = supabaseI,
        _supabaseTable = supabaseTable,
        _eventBox = objectBoxI.store.box<EventEntity>();
 
-  final Talker _log;
+  final Logger _logger;
 
   final Supabase _supabase;
   final EventSupabaseTable _supabaseTable;
@@ -53,14 +53,14 @@ class EventRepositoryImpl implements EventRepository {
           .toList();
       _cache = mappedResults;
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting all events.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('event', method: 'getByCurrentYear'),
+        error: exception,
+        stackTrace: stackTrace,
       );
 
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
@@ -93,13 +93,13 @@ class EventRepositoryImpl implements EventRepository {
         },
       );
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting events by categories: $categories.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('event', method: 'getByCategories'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
@@ -129,18 +129,19 @@ class EventRepositoryImpl implements EventRepository {
           .map<Event>((entity) => entity.toModel())
           .toList();
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading events by coordinates.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('event', method: 'getByCoordinates'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
   }
 
+  // TODO(xmattjus): remove the try / catch block here since callers also wrap this function in a try / catch block.
   Future<Result<List<Event>>> _getByDateRange({
     required DateTime start,
     DateTime? end,
@@ -153,10 +154,9 @@ class EventRepositoryImpl implements EventRepository {
         ? DateTime(end.year, end.month, end.day).endOfDay
         : DateTime(start.year, start.month, start.day).endOfDay;
 
-    _log.info('Getting events for date range: $startDate to $endDate.');
-
     try {
-      final Condition<EventEntity> multiDayCondition = EventEntity_.startDate
+      // TODO(xmattjus): small modifications to ObjectBoxConditions.eventStartsEndCurrentYear could unlock usage in situations like below.
+      final multiDayCondition = EventEntity_.startDate
           .lessOrEqualDate(endDate)
           .and(EventEntity_.endDate.greaterOrEqualDate(startDate));
 
@@ -174,13 +174,11 @@ class EventRepositoryImpl implements EventRepository {
           .map<Event>((entity) => entity.toModel())
           .toList();
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting events for date range: $startDate to $endDate.',
-        error,
-        stackTrace,
-      );
-      return Result.error(error);
+    } on Exception catch (_) {
+      // Allow Result pattern violation here because the callers also wrap
+      // this function in a try / catch block.
+      // See getByDate, getByDateRange.
+      rethrow;
     } finally {
       query?.close();
     }
@@ -188,17 +186,66 @@ class EventRepositoryImpl implements EventRepository {
 
   /// Loads events that overlap a specific calendar day.
   @override
-  Future<Result<List<Event>>> getByDate(DateTime date) =>
-      _getByDateRange(start: date);
+  Future<Result<List<Event>>> getByDate(DateTime date) async {
+    try {
+      _logger.log(
+        EntityLoadStarted(
+          'event',
+          method: 'getByDate',
+          extra: {
+            'startDate': date.toIso8601String(),
+          },
+        ),
+      );
+
+      return await _getByDateRange(start: date);
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('event', method: 'getByDate'),
+        error: exception,
+        stackTrace: stackTrace,
+      );
+
+      return Result.error(exception);
+    }
+  }
 
   /// Loads events that overlap the inclusive [start]-[end] date range.
   @override
-  Future<Result<List<Event>>> getByDateRange(DateTime start, DateTime end) =>
-      _getByDateRange(start: start, end: end);
+  Future<Result<List<Event>>> getByDateRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      _logger.log(
+        EntityLoadStarted(
+          'event',
+          method: 'getByDateRange',
+          extra: {
+            'startDate': start.toIso8601String(),
+            'endDate': end.toIso8601String(),
+          },
+        ),
+      );
+
+      return await _getByDateRange(start: start, end: end);
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('event', method: 'getByDateRange'),
+        error: exception,
+        stackTrace: stackTrace,
+      );
+
+      return Result.error(exception);
+    }
+  }
 
   @override
   Future<Result<Event>> getById(int id) async {
-    _log.info('Getting event with remote ID: $id.');
+    _logger.log(
+      const EntityLoadStarted('event', method: 'getById'),
+      extra: {'id': id},
+    );
 
     try {
       final result = _eventBox.get(id);
@@ -208,13 +255,13 @@ class EventRepositoryImpl implements EventRepository {
       } else {
         return Result.error(Exception('Event is null'));
       }
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting event with remote ID: $id.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('event', method: 'getById'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
@@ -222,11 +269,11 @@ class EventRepositoryImpl implements EventRepository {
   Future<Result<List<int>>> getNextEventIds() async {
     Query<EventEntity>? query;
 
-    try {
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final nextMonth = DateTime(now.year, now.month, now.day + 30).endOfDay;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final nextMonth = DateTime(now.year, now.month, now.day + 30).endOfDay;
 
+    try {
       final builder = _eventBox
           .query(
             EventEntity_.startDate
@@ -237,13 +284,13 @@ class EventRepositoryImpl implements EventRepository {
       query = builder.build()..limit = 6;
       final results = query.findIds();
       return Result.success(results);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting next events.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('event', method: 'getNextEventIds'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
@@ -258,13 +305,13 @@ class EventRepositoryImpl implements EventRepository {
       // Casts the query results to a growable list with toList().
       final events = query.findIds().toList();
       return Result.success(events);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while getting favourite events.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('event', method: 'getFavouriteEventIds'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
@@ -284,19 +331,19 @@ class EventRepositoryImpl implements EventRepository {
       _eventBox.put(copy);
 
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while setting favourite for event with remote ID: $remoteId.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        EntityUpdateFailed('event', remoteId, method: 'setFavouriteEvent'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
   @override
   Future<Result<void>> synchronize() async {
-    _log.info(Messages.repositoryUpdate);
+    _logger.log(const RepositorySyncStarted('event'));
 
     // Resets the list of cached events before synchronizing.
     _cache = null;
@@ -315,23 +362,19 @@ class EventRepositoryImpl implements EventRepository {
       final eventsToPut = remote.difference(local);
 
       for (final event in eventsToPut) {
-        final existingEvent = local.where(
+        final existingEvent = local.firstWhereOrNull(
           (test) => test.remoteId == event.remoteId,
         );
 
-        if (existingEvent.isEmpty) {
-          _log.info(Messages.objectInsert('event', event.remoteId));
-
+        if (existingEvent == null) {
           event.city.targetId = event.cityToOneId;
 
           _eventBox.put(event);
-        } else if (existingEvent.length == 1) {
-          if (existingEvent.first != event) {
-            _log.info(
-              Messages.objectUpdate('event', existingEvent.first.remoteId),
-            );
 
-            final copy = existingEvent.first.copyWith(
+          _logger.log(EntityInsertSuccess('event', event.remoteId));
+        } else {
+          if (existingEvent != event) {
+            final copy = existingEvent.copyWith(
               name: event.name,
               description: event.description,
               startDate: event.startDate,
@@ -344,14 +387,22 @@ class EventRepositoryImpl implements EventRepository {
             );
 
             _eventBox.put(copy);
+
+            _logger.log(
+              EntityUpdateSuccess('event', event.remoteId),
+            );
           }
         }
       }
 
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(Messages.repositoryUpdateException, error, stackTrace);
-      return Result.error(error);
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const RepositorySyncFailed('event'),
+        error: exception,
+        stackTrace: stackTrace,
+      );
+      return Result.error(exception);
     }
   }
 }

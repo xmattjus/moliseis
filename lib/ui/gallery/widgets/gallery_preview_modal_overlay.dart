@@ -13,18 +13,18 @@ import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
 import 'package:moliseis/ui/core/ui/linear_gradient_background.dart';
 import 'package:moliseis/ui/core/ui/link_text_button.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 part '_gallery_preview_modal_overlay_content.dart';
 
 class GalleryPreviewModalOverlay extends StatelessWidget {
   const GalleryPreviewModalOverlay({
-    super.key,
     required this.media,
     required this.index,
     required this.itemCount,
+    super.key,
   });
 
   final Media media;
@@ -37,14 +37,12 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
       final file = await cache.getSingleFile(media.url);
       final sharedImage = XFile(file.path, mimeType: 'image/*');
       await SharePlus.instance.share(ShareParams(files: [sharedImage]));
-    } on Exception catch (error, stackTrace) {
+    } on Exception catch (exception, stackTrace) {
       if (context.mounted) {
-        final log = Provider.of<Talker?>(context, listen: false);
-
-        log?.warning(
-          'An exception occurred during image sharing.',
-          error,
-          stackTrace,
+        context.read<Logger?>()?.log(
+          const ImageSharingFailed(),
+          error: exception,
+          stackTrace: stackTrace,
         );
 
         showSnackBar(
@@ -69,7 +67,7 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
           license: media.license ?? '',
           licenseUrl: media.licenseUrl ?? '',
           cityName: media.cityName,
-          onSharePressed: () async => await _onSharePressed(context),
+          onSharePressed: () async => _onSharePressed(context),
           index: index,
           itemCount: itemCount,
         ),

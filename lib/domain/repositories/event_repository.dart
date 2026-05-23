@@ -7,6 +7,7 @@ import 'package:moliseis/utils/synchronizable.dart';
 /// Domain interface for event data access.
 abstract class EventRepository with Synchronizable {
   /// Returns all events occurring in the current calendar year.
+  // TODO(xmattjus): remove getByCurrentYear and use getByDateRange.
   Future<Result<List<Event>>> getByCurrentYear();
 
   /// Returns all events that overlap the provided [date].
@@ -36,6 +37,7 @@ abstract class EventRepository with Synchronizable {
   Future<Result<Event>> getById(int id);
 
   /// Returns the IDs of the upcoming events.
+  // TODO(xmattjus): remove getNextEventIds and use getByDateRange.
   Future<Result<List<int>>> getNextEventIds();
 
   /// Returns the IDs of all events marked as favourites.

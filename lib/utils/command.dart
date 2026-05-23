@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 
 import 'package:moliseis/utils/result.dart';
@@ -41,7 +39,7 @@ abstract class Command<T> extends ChangeNotifier {
   bool get completed => _result is Success;
 
   /// Get last action result
-  Result? get result => _result;
+  Result<T>? get result => _result;
 
   /// Clear last action result
   void clearResult() {

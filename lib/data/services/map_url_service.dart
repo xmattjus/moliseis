@@ -1,17 +1,17 @@
 import 'package:moliseis/data/services/external_url_service.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 /// Service responsible for handling map-related external URL launches,
 /// including attribution pages and location searches.
 class MapUrlService {
   MapUrlService({
-    required Talker logger,
+    required Logger logger,
     required ExternalUrlService externalUrlService,
-  }) : _log = logger,
+  }) : _logger = logger,
        _externalUrlService = externalUrlService;
 
-  final Talker _log;
+  final Logger _logger;
 
   final ExternalUrlService _externalUrlService;
 
@@ -24,7 +24,9 @@ class MapUrlService {
   ///
   /// Returns a [Result] containing success or failure information.
   Future<Result<void>> openMapTilerAttribution() {
-    _log.info('Opening MapTiler attribution page');
+    _logger.log(
+      const UrlLaunchStarted(_mapTilerUrl, method: 'openMapTilerAttribution'),
+    );
     return _externalUrlService.launchGenericUrl(_mapTilerUrl);
   }
 
@@ -33,7 +35,12 @@ class MapUrlService {
   ///
   /// Returns a [Result] containing success or failure information.
   Future<Result<void>> openOpenStreetMapAttribution() {
-    _log.info('Opening OpenStreetMap attribution page');
+    _logger.log(
+      const UrlLaunchStarted(
+        _openStreetMapUrl,
+        method: 'openOpenStreetMapAttribution',
+      ),
+    );
     return _externalUrlService.launchGenericUrl(_openStreetMapUrl);
   }
 
@@ -53,7 +60,7 @@ class MapUrlService {
 
     final searchUrl = '$_googleMapsBaseUrl&query=$query';
 
-    _log.info('Opening Google Maps search for: $query');
+    _logger.log(UrlLaunchStarted(searchUrl, method: 'searchInGoogleMaps'));
     return _externalUrlService.launchGenericUrl(searchUrl);
   }
 }

@@ -1,19 +1,19 @@
 import 'package:moliseis/data/services/app_info_service.dart';
 import 'package:moliseis/data/services/external_url_service.dart';
 import 'package:moliseis/data/services/map_url_service.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 /// Unified service for launching URLs and opening app information pages.
 ///
-/// A [Talker] logger is required so the composed services share the same
+/// A [Logger] logger is required so the composed services share the same
 /// logging pipeline. Optional overrides are available for tests.
 class UrlLaunchService {
   /// Creates a URL launching facade.
   ///
   /// Unspecified services are created with the provided [logger].
   factory UrlLaunchService({
-    required Talker logger,
+    required Logger logger,
     ExternalUrlService? externalUrlService,
     AppInfoService? appInfoService,
     MapUrlService? mapUrlService,

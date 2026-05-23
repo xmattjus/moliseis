@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/media/image_size_bucket.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 class AppNetworkImage extends StatefulWidget {
   const AppNetworkImage({
@@ -101,14 +101,16 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
         );
       },
       errorBuilder: (context, error, stackTrace) {
-        final log = Provider.of<Talker?>(context, listen: false);
-
-        log?.error('An error during image loading.', error, stackTrace);
+        context.read<Logger?>()?.log(
+          const ImageLoadFailed(),
+          error: error,
+          stackTrace: stackTrace,
+        );
 
         const color = Colors.grey;
 
         const child = Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
+          padding: EdgeInsets.symmetric(horizontal: 16),
           child: Text(
             'Si è verificato un errore durante il caricamento.',
             overflow: TextOverflow.fade,

@@ -10,19 +10,19 @@ import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/utils/command.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 /// Pairs a picked [XFile] with its SHA-1 [digest] string for deduplication.
 typedef _MediaEntry = ({XFile file, String digest});
 
 class UserContributionViewModel extends ChangeNotifier {
   UserContributionViewModel({
-    required Talker logger,
+    required Logger logger,
     required UserContributionRepository userContributionRepository,
     ImagePicker? imagePicker,
-  }) : _log = logger,
+  }) : _logger = logger,
        _userContributionRepository = userContributionRepository,
        _imagePicker = imagePicker ?? ImagePicker() {
     addMedia = Command0(_addMedia);
@@ -31,7 +31,7 @@ class UserContributionViewModel extends ChangeNotifier {
     retrieveLostMedia = Command0(_retrieveLostMedia);
   }
 
-  final Talker _log;
+  final Logger _logger;
   final UserContributionRepository _userContributionRepository;
   final ImagePicker _imagePicker;
 
@@ -82,14 +82,14 @@ class UserContributionViewModel extends ChangeNotifier {
       notifyListeners();
 
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while adding media to the upload list.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const UserContributionMediaAddFailed(),
+        error: exception,
+        stackTrace: stackTrace,
       );
 
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
@@ -100,14 +100,14 @@ class UserContributionViewModel extends ChangeNotifier {
       notifyListeners();
 
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while removing media at index $index from the upload list.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const UserContributionMediaRemovalFailed(),
+        error: exception,
+        stackTrace: stackTrace,
       );
 
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
@@ -176,10 +176,10 @@ class UserContributionViewModel extends ChangeNotifier {
   }
 
   void _handleRetrieveLostMediaErrors(Object error, StackTrace? stackTrace) {
-    _log.warning(
-      'An error occurred while retrieving lost media.',
-      error,
-      stackTrace,
+    _logger.log(
+      const UserContributionMediaRetrievalFailed(),
+      error: error,
+      stackTrace: stackTrace,
     );
   }
 
@@ -197,7 +197,7 @@ class UserContributionViewModel extends ChangeNotifier {
     }
 
     if (response.file != null) {
-      _log.info('Retrieving lost media');
+      _logger.log(const UserContributionMediaRetrievalStarted());
 
       try {
         // When files is non-null it contains all recovered files; file points
@@ -208,7 +208,7 @@ class UserContributionViewModel extends ChangeNotifier {
         }
 
         notifyListeners();
-      } catch (error, stackTrace) {
+      } on Object catch (error, stackTrace) {
         _handleRetrieveLostMediaErrors(error, stackTrace);
       }
     } else if (response.exception != null) {

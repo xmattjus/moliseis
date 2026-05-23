@@ -1,38 +1,46 @@
-// ignore_for_file: avoid_redundant_argument_values, always_declare_return_types, type_annotate_public_apis
+// Tests seed multiple entities of the same type consecutively; the explicit
+// multi-statement form is preferred for readability over cascade notation.
+// ignore_for_file: avoid_redundant_argument_values, cascade_invocations
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/event_supabase_table.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
+import 'package:moliseis/data/services/objectbox.dart' as app_objectbox;
 import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
+import 'package:objectbox/objectbox.dart';
 
+import '../../support/mock_logger.dart';
+import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
+  setUpAll(() {
+    setUpMockLogger();
+    setUpMockSupabase();
+  });
+
   group('EventRepositoryImpl - DateTime Overlap Logic', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late Box<EventEntity> eventBox;
-    late Talker fakeLogger;
-    late _FakeSupabase fakeSupabase;
-    late _FakeEventSupabaseTable fakeSupabaseTable;
+    late Logger fakeLogger;
     late EventRepositoryImpl repository;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
       eventBox = objectBoxEnvironment.store.box<EventEntity>();
-      fakeLogger = Talker();
-      fakeSupabase = _FakeSupabase();
-      fakeSupabaseTable = _FakeEventSupabaseTable();
+      fakeLogger = MockLogger();
       repository = EventRepositoryImpl(
         logger: fakeLogger,
-        supabaseI: fakeSupabase,
-        supabaseTable: fakeSupabaseTable,
+        supabaseI: MockSupabase(),
+        supabaseTable: EventSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -41,10 +49,8 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    Future<void> seedEvents(List<EventEntity> events) async {
-      for (final event in events) {
-        eventBox.put(event);
-      }
+    void seedEvents(List<EventEntity> events) {
+      events.forEach(eventBox.put);
     }
 
     group('_getByDateRange with single-day events (endDate = null)', () {
@@ -61,7 +67,7 @@ void main() {
             endDate: null,
           );
 
-          await seedEvents([event]);
+          seedEvents([event]);
 
           final result = await repository.getByDateRange(rangeStart, rangeEnd);
 
@@ -74,6 +80,14 @@ void main() {
       test(
         'excludes single-day event when start date is before range',
         () async {
+          seedEvents([
+            _createEvent(
+              remoteId: 1,
+              startDate: DateTime(2026, 3, 5), // before rangeStart
+              endDate: null,
+            ),
+          ]);
+
           final result = await repository.getByDateRange(
             DateTime(2026, 3, 10),
             DateTime(2026, 3, 20),
@@ -88,6 +102,14 @@ void main() {
       test(
         'excludes single-day event when start date is after range',
         () async {
+          seedEvents([
+            _createEvent(
+              remoteId: 1,
+              startDate: DateTime(2026, 3, 25), // after rangeEnd
+              endDate: null,
+            ),
+          ]);
+
           final result = await repository.getByDateRange(
             DateTime(2026, 3, 10),
             DateTime(2026, 3, 20),
@@ -102,6 +124,14 @@ void main() {
       test(
         'prevents old single-day events from leaking into range queries',
         () async {
+          seedEvents([
+            _createEvent(
+              remoteId: 1,
+              startDate: DateTime(2020), // years before the range
+              endDate: null,
+            ),
+          ]);
+
           final result = await repository.getByDateRange(
             DateTime(2026, 3, 10),
             DateTime(2026, 3, 20),
@@ -120,7 +150,7 @@ void main() {
           endDate: null,
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -139,7 +169,7 @@ void main() {
           endDate: null,
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -160,7 +190,7 @@ void main() {
           endDate: DateTime(2026, 3, 25),
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -179,7 +209,7 @@ void main() {
           endDate: DateTime(2026, 3, 15),
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -198,7 +228,7 @@ void main() {
           endDate: DateTime(2026, 3, 25),
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -213,11 +243,11 @@ void main() {
       test('includes event fully containing range', () async {
         final event = _createEvent(
           remoteId: 1,
-          startDate: DateTime(2026, 3, 1),
+          startDate: DateTime(2026, 3),
           endDate: DateTime(2026, 3, 31),
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -230,6 +260,14 @@ void main() {
       });
 
       test('excludes event before range', () async {
+        seedEvents([
+          _createEvent(
+            remoteId: 1,
+            startDate: DateTime(2026, 3),
+            endDate: DateTime(2026, 3, 8), // ends before rangeStart
+          ),
+        ]);
+
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
           DateTime(2026, 3, 20),
@@ -241,6 +279,14 @@ void main() {
       });
 
       test('excludes event after range', () async {
+        seedEvents([
+          _createEvent(
+            remoteId: 1,
+            startDate: DateTime(2026, 3, 22), // starts after rangeEnd
+            endDate: DateTime(2026, 3, 28),
+          ),
+        ]);
+
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
           DateTime(2026, 3, 20),
@@ -258,7 +304,7 @@ void main() {
           endDate: DateTime(2026, 3, 15),
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -277,7 +323,7 @@ void main() {
           endDate: DateTime(2026, 3, 20),
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -304,7 +350,7 @@ void main() {
           endDate: DateTime(2026, 3, 25),
         );
 
-        await seedEvents([singleDay, multiDay]);
+        seedEvents([singleDay, multiDay]);
 
         final result = await repository.getByDateRange(
           DateTime(2026, 3, 10),
@@ -319,6 +365,61 @@ void main() {
       });
     });
 
+    group('exception propagation from _getByDateRange', () {
+      late MockLogger mockLogger;
+      late EventRepositoryImpl mockRepository;
+
+      setUp(() {
+        mockLogger = MockLogger();
+        final mockBox = _MockEventEntityBox();
+        when(() => mockBox.query(any())).thenThrow(Exception('query failed'));
+
+        final mockStore = _MockStore(mockBox);
+
+        mockRepository = EventRepositoryImpl(
+          logger: mockLogger,
+          supabaseI: MockSupabase(),
+          supabaseTable: EventSupabaseTable(),
+          objectBoxI: _MockObjectBox(mockStore),
+        );
+      });
+
+      test(
+        'getByDate returns Result.error when _getByDateRange rethrows',
+        () async {
+          final result = await mockRepository.getByDate(DateTime(2026, 3, 15));
+
+          expect(result, isA<Error<List<Event>>>());
+          verify(
+            () => mockLogger.log(
+              const EntityLoadFailed('event', method: 'getByDate'),
+              error: any(named: 'error'),
+              stackTrace: any(named: 'stackTrace'),
+            ),
+          ).called(1);
+        },
+      );
+
+      test(
+        'getByDateRange returns Result.error when _getByDateRange rethrows',
+        () async {
+          final result = await mockRepository.getByDateRange(
+            DateTime(2026, 3, 10),
+            DateTime(2026, 3, 20),
+          );
+
+          expect(result, isA<Error<List<Event>>>());
+          verify(
+            () => mockLogger.log(
+              const EntityLoadFailed('event', method: 'getByDateRange'),
+              error: any(named: 'error'),
+              stackTrace: any(named: 'stackTrace'),
+            ),
+          ).called(1);
+        },
+      );
+    });
+
     group('getByDate - single day normalization', () {
       test('normalizes date to full day range', () async {
         final event = _createEvent(
@@ -327,13 +428,29 @@ void main() {
           endDate: null,
         );
 
-        await seedEvents([event]);
+        seedEvents([event]);
 
         final result = await repository.getByDate(DateTime(2026, 3, 15));
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
         expect(success.value, containsEventId(1));
+      });
+
+      test('excludes event that starts on the following day', () async {
+        seedEvents([
+          _createEvent(
+            remoteId: 2,
+            startDate: DateTime(2026, 3, 16), // midnight of next day
+            endDate: null,
+          ),
+        ]);
+
+        final result = await repository.getByDate(DateTime(2026, 3, 15));
+
+        expect(result, isA<Success<List<Event>>>());
+        final success = result as Success<List<Event>>;
+        expect(success.value, isEmpty);
       });
     });
   });
@@ -347,9 +464,9 @@ void main() {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
       eventBox = objectBoxEnvironment.store.box<EventEntity>();
       repository = EventRepositoryImpl(
-        logger: Talker(),
-        supabaseI: _FakeSupabase(),
-        supabaseTable: _FakeEventSupabaseTable(),
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        supabaseTable: EventSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -364,7 +481,7 @@ void main() {
         final now = DateTime.now();
         final event = _createEvent(
           remoteId: 1,
-          startDate: DateTime(now.year, 6, 1),
+          startDate: DateTime(now.year, 6),
           endDate: DateTime(now.year, 6, 10),
         );
         eventBox.put(event);
@@ -380,7 +497,8 @@ void main() {
     );
 
     test(
-      'includes single-day event (null endDate) whose startDate is in current year',
+      'includes single-day event (null endDate) whose startDate is in current '
+      'year',
       () async {
         final now = DateTime.now();
         final event = _createEvent(
@@ -403,7 +521,7 @@ void main() {
     test('excludes multi-day event from a past year', () async {
       final event = _createEvent(
         remoteId: 3,
-        startDate: DateTime(2020, 8, 1),
+        startDate: DateTime(2020, 8),
         endDate: DateTime(2020, 8, 10),
       );
       eventBox.put(event);
@@ -451,9 +569,9 @@ void main() {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
       eventBox = objectBoxEnvironment.store.box<EventEntity>();
       repository = EventRepositoryImpl(
-        logger: Talker(),
-        supabaseI: _FakeSupabase(),
-        supabaseTable: _FakeEventSupabaseTable(),
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        supabaseTable: EventSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -468,7 +586,7 @@ void main() {
         final now = DateTime.now();
         final event = _createEvent(
           remoteId: 1,
-          startDate: DateTime(now.year, 7, 1),
+          startDate: DateTime(now.year, 7),
           endDate: DateTime(now.year, 7, 5),
           category: ContentCategory.food,
         );
@@ -485,7 +603,8 @@ void main() {
     );
 
     test(
-      'includes current-year single-day event (null endDate) matching the requested category',
+      'includes current-year single-day event (null endDate) matching the '
+      'requested category',
       () async {
         final now = DateTime.now();
         final event = _createEvent(
@@ -511,7 +630,7 @@ void main() {
     test('excludes past-year event even when category matches', () async {
       final event = _createEvent(
         remoteId: 3,
-        startDate: DateTime(2020, 4, 1),
+        startDate: DateTime(2020, 4),
         endDate: DateTime(2020, 4, 5),
         category: ContentCategory.nature,
       );
@@ -530,7 +649,7 @@ void main() {
       final now = DateTime.now();
       final event = _createEvent(
         remoteId: 4,
-        startDate: DateTime(now.year, 6, 1),
+        startDate: DateTime(now.year, 6),
         endDate: DateTime(now.year, 6, 5),
         category: ContentCategory.history,
       );
@@ -544,6 +663,168 @@ void main() {
         isNot(contains(4)),
       );
     });
+
+    test('sorts by name ascending when sort is byName', () async {
+      final now = DateTime.now();
+      eventBox.put(
+        _createEvent(
+          remoteId: 1,
+          name: 'Zeta Festival',
+          startDate: DateTime(now.year, 7),
+          endDate: DateTime(now.year, 7, 5),
+          category: ContentCategory.folklore,
+        ),
+      );
+      eventBox.put(
+        _createEvent(
+          remoteId: 2,
+          name: 'Alpha Fair',
+          startDate: DateTime(now.year, 8),
+          endDate: DateTime(now.year, 8, 5),
+          category: ContentCategory.folklore,
+        ),
+      );
+      eventBox.put(
+        _createEvent(
+          remoteId: 3,
+          name: 'Middle Market',
+          startDate: DateTime(now.year, 9),
+          endDate: null,
+          category: ContentCategory.folklore,
+        ),
+      );
+
+      final result = await repository.getByCategories(
+        {ContentCategory.folklore},
+        sort: ContentSort.byName,
+      );
+
+      expect(result, isA<Success<List<Event>>>());
+      final names = (result as Success<List<Event>>).value
+          .map((e) => e.name)
+          .toList();
+      expect(names, equals(['Alpha Fair', 'Middle Market', 'Zeta Festival']));
+    });
+
+    test('sorts by modifiedAt descending when sort is byDate', () async {
+      final now = DateTime.now();
+      eventBox.put(
+        _createEvent(
+          remoteId: 1,
+          name: 'Older',
+          startDate: DateTime(now.year, 7),
+          endDate: null,
+          category: ContentCategory.food,
+          modifiedAt: DateTime(2025, 1, 1),
+        ),
+      );
+      eventBox.put(
+        _createEvent(
+          remoteId: 2,
+          name: 'Newer',
+          startDate: DateTime(now.year, 8),
+          endDate: null,
+          category: ContentCategory.food,
+          modifiedAt: DateTime(2026, 6, 1),
+        ),
+      );
+      eventBox.put(
+        _createEvent(
+          remoteId: 3,
+          name: 'Middle',
+          startDate: DateTime(now.year, 9),
+          endDate: null,
+          category: ContentCategory.food,
+          modifiedAt: DateTime(2025, 12, 1),
+        ),
+      );
+
+      final result = await repository.getByCategories(
+        {ContentCategory.food},
+        sort: ContentSort.byDate,
+      );
+
+      expect(result, isA<Success<List<Event>>>());
+      final names = (result as Success<List<Event>>).value
+          .map((e) => e.name)
+          .toList();
+      expect(names, equals(['Newer', 'Middle', 'Older']));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // getByCurrentYear — cache invalidation
+  // ---------------------------------------------------------------------------
+
+  group('EventRepositoryImpl - getByCurrentYear cache invalidation', () {
+    late MockLogger mockLogger;
+    late MockSupabaseEnvironment supabaseEnv;
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<EventEntity> eventBox;
+    late EventRepositoryImpl repository;
+
+    setUp(() async {
+      mockLogger = MockLogger();
+      supabaseEnv = MockSupabaseEnvironment();
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      eventBox = objectBoxEnvironment.store.box<EventEntity>();
+      repository = EventRepositoryImpl(
+        logger: mockLogger,
+        supabaseI: supabaseEnv.mockSupabase,
+        supabaseTable: EventSupabaseTable(),
+        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+      );
+    });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    test(
+      'reflects newly synced events after synchronize invalidates cache',
+      () async {
+        final now = DateTime.now();
+
+        // Seed a current-year event in the local store.
+        eventBox.put(
+          _createEvent(
+            remoteId: 1,
+            name: 'Existing Event',
+            startDate: DateTime(now.year, 6),
+            endDate: DateTime(now.year, 6, 5),
+          ),
+        );
+
+        // Populate the cache via getByCurrentYear().
+        final firstCall = await repository.getByCurrentYear();
+        expect(firstCall, isA<Success<List<Event>>>());
+        expect(
+          (firstCall as Success<List<Event>>).value,
+          hasLength(1),
+        );
+
+        // Sync adds a new event from remote.
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 2,
+            'name': 'Synced Event',
+            'start_date': '${now.year}-07-01T00:00:00.000',
+            'end_date': '${now.year}-07-05T00:00:00.000',
+            'created_at': '2026-01-01T00:00:00.000',
+            'modified_at': '2026-01-01T00:00:00.000',
+          },
+        ]);
+        await repository.synchronize();
+
+        // Cache was invalidated; getByCurrentYear() must reflect the new event.
+        final secondCall = await repository.getByCurrentYear();
+        expect(secondCall, isA<Success<List<Event>>>());
+        expect(
+          (secondCall as Success<List<Event>>).value,
+          hasLength(2),
+        );
+      },
+    );
   });
 }
 
@@ -556,6 +837,7 @@ EventEntity _createEvent({
   required DateTime? endDate,
   String? name,
   ContentCategory category = ContentCategory.unknown,
+  DateTime? modifiedAt,
 }) {
   final now = DateTime.now();
   return EventEntity(
@@ -565,43 +847,38 @@ EventEntity _createEvent({
     endDate: endDate,
     category: category,
     createdAt: now,
-    modifiedAt: now,
+    modifiedAt: modifiedAt ?? now,
     city: ToOne<CityEntity>(),
     media: ToMany(),
   );
 }
 
-final class _FakeSupabase implements Supabase {
+final class _MockStore extends Mock implements Store {
+  _MockStore(this._mockBox);
+
+  final Box<EventEntity> _mockBox;
+
   @override
-  noSuchMethod(Invocation invocation) {
-    throw UnsupportedError(
-      'Supabase should not be used in EventRepositoryImpl date-range tests.',
+  Box<T> box<T>() {
+    if (T == EventEntity) return _mockBox as Box<T>;
+    throw StateError(
+      '_MockStore only supports Box<EventEntity>, got Box<$T>',
     );
   }
 }
 
-final class _FakeEventSupabaseTable implements EventSupabaseTable {
-  @override
-  String get tableName => 'events';
+final class _MockEventEntityBox extends Mock implements Box<EventEntity> {}
+
+final class _MockObjectBox implements app_objectbox.ObjectBox {
+  _MockObjectBox(this._mockStore);
+
+  final Store _mockStore;
 
   @override
-  String get idTitle => 'title';
+  Store get store => _mockStore;
 
   @override
-  String get idDescription => 'description';
-
-  @override
-  String get startDate => 'start_date';
-
-  @override
-  String get endDate => 'end_date';
-
-  @override
-  String get idCreatedAt => 'created_at';
-
-  @override
-  String get idModifiedAt => 'modified_at';
-
-  @override
-  String get idPlace => 'place_id';
+  set store(Store value) {
+    throw UnsupportedError('_MockObjectBox store is immutable.');
+  }
 }

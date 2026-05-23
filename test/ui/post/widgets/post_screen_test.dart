@@ -32,7 +32,8 @@ import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
-import 'package:talker_flutter/talker_flutter.dart';
+
+import '../../../support/mock_logger.dart';
 
 void main() {
   setUpAll(() async {
@@ -41,7 +42,7 @@ void main() {
 
   group('PostScreen', () {
     testWidgets('renders EventFormattedDateTime for event content', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEvent();
       final place = _buildPlace();
@@ -72,7 +73,7 @@ void main() {
     });
 
     testWidgets('does not render EventFormattedDateTime for place content', (
-      WidgetTester tester,
+      tester,
     ) async {
       final event = _buildEvent();
       final place = _buildPlace();
@@ -168,7 +169,8 @@ WeatherViewModel _buildWeatherViewModel() {
 }
 
 final class _FakeWeatherApiClient extends WeatherApiClient {
-  _FakeWeatherApiClient() : super(logger: Talker(), httpClient: http.Client());
+  _FakeWeatherApiClient()
+    : super(logger: MockLogger(), httpClient: http.Client());
 
   @override
   Future<Result<CombinedWeatherForecastResponse>> getCombinedWeatherForecast(

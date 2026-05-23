@@ -1,21 +1,34 @@
-// ignore_for_file: avoid_redundant_argument_values
+// Tests seed multiple entities of the same type consecutively; the explicit
+// multi-statement form is preferred for readability over cascade notation.
+// ignore_for_file: avoid_redundant_argument_values, cascade_invocations
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/media_supabase_table.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
+import 'package:moliseis/data/services/objectbox.dart' as app_objectbox;
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
+import 'package:moliseis/utils/logging/log_event.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:objectbox/objectbox.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../support/mock_logger.dart';
+import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
+  setUpAll(() {
+    setUpMockLogger();
+    setUpMockSupabase();
+  });
+
   // ---------------------------------------------------------------------------
   // getByEventId
   // ---------------------------------------------------------------------------
@@ -31,8 +44,8 @@ void main() {
       eventBox = objectBoxEnvironment.store.box<EventEntity>();
       mediaBox = objectBoxEnvironment.store.box<MediaEntity>();
       repository = MediaRepositoryImpl(
-        logger: Talker(),
-        supabaseI: _FakeSupabase(),
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
         supabaseTable: MediaSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
@@ -47,7 +60,6 @@ void main() {
       eventBox.put(event);
 
       final media = _createMedia(remoteId: 10, eventId: event.remoteId);
-      media.event.targetId = event.remoteId;
       mediaBox.put(media);
 
       final result = await repository.getByEventId(1);
@@ -65,7 +77,6 @@ void main() {
       eventBox.put(event2);
 
       final media = _createMedia(remoteId: 10, eventId: event2.remoteId);
-      media.event.targetId = event2.remoteId;
       mediaBox.put(media);
 
       final result = await repository.getByEventId(1);
@@ -90,8 +101,6 @@ void main() {
 
       final media1 = _createMedia(remoteId: 10, eventId: event.remoteId);
       final media2 = _createMedia(remoteId: 11, eventId: event.remoteId);
-      media1.event.targetId = event.remoteId;
-      media2.event.targetId = event.remoteId;
       mediaBox.put(media1);
       mediaBox.put(media2);
 
@@ -118,8 +127,8 @@ void main() {
       placeBox = objectBoxEnvironment.store.box<PlaceEntity>();
       mediaBox = objectBoxEnvironment.store.box<MediaEntity>();
       repository = MediaRepositoryImpl(
-        logger: Talker(),
-        supabaseI: _FakeSupabase(),
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
         supabaseTable: MediaSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
@@ -134,7 +143,6 @@ void main() {
       placeBox.put(place);
 
       final media = _createMedia(remoteId: 20, placeId: place.remoteId);
-      media.place.targetId = place.remoteId;
       mediaBox.put(media);
 
       final result = await repository.getByPlaceId(1);
@@ -152,7 +160,6 @@ void main() {
       placeBox.put(place2);
 
       final media = _createMedia(remoteId: 20, placeId: place2.remoteId);
-      media.place.targetId = place2.remoteId;
       mediaBox.put(media);
 
       final result = await repository.getByPlaceId(1);
@@ -177,8 +184,6 @@ void main() {
 
       final media1 = _createMedia(remoteId: 20, placeId: place.remoteId);
       final media2 = _createMedia(remoteId: 21, placeId: place.remoteId);
-      media1.place.targetId = place.remoteId;
-      media2.place.targetId = place.remoteId;
       mediaBox.put(media1);
       mediaBox.put(media2);
 
@@ -191,18 +196,22 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // synchronize error handling
+  // synchronize — error path
   // ---------------------------------------------------------------------------
 
   group('MediaRepositoryImpl - synchronize error handling', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late MediaRepositoryImpl repository;
+    late MockLogger mockLogger;
+    late MockSupabaseEnvironment supabaseEnv;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      mockLogger = MockLogger();
+      supabaseEnv = MockSupabaseEnvironment()..stubUnavailable();
       repository = MediaRepositoryImpl(
-        logger: Talker(),
-        supabaseI: _ThrowingSupabase(),
+        logger: mockLogger,
+        supabaseI: supabaseEnv.mockSupabase,
         supabaseTable: MediaSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
@@ -216,6 +225,218 @@ void main() {
       final result = await repository.synchronize();
 
       expect(result, isA<Error<void>>());
+      verify(
+        () => mockLogger.log(const RepositorySyncStarted('media')),
+      ).called(1);
+      verify(
+        () => mockLogger.log(
+          const RepositorySyncFailed('media'),
+          error: any(named: 'error'),
+          stackTrace: any(named: 'stackTrace'),
+        ),
+      ).called(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // synchronize — success path
+  // ---------------------------------------------------------------------------
+
+  group('MediaRepositoryImpl - synchronize success path', () {
+    late MockLogger mockLogger;
+    late MockSupabaseEnvironment supabaseEnv;
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<MediaEntity> mediaBox;
+    late MediaRepositoryImpl repository;
+
+    setUp(() async {
+      mockLogger = MockLogger();
+      supabaseEnv = MockSupabaseEnvironment();
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      mediaBox = objectBoxEnvironment.store.box<MediaEntity>();
+      repository = MediaRepositoryImpl(
+        logger: mockLogger,
+        supabaseI: supabaseEnv.mockSupabase,
+        supabaseTable: MediaSupabaseTable(),
+        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+      );
+    });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    test(
+      'inserts a new media item that is absent from the local store',
+      () async {
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 10,
+            'url': 'https://example.com/img.jpg',
+            'width': 800,
+            'height': 600,
+            'created_at': '2024-01-01T00:00:00.000',
+            'modified_at': '2024-01-01T00:00:00.000',
+          },
+        ]);
+
+        final result = await repository.synchronize();
+
+        expect(result, isA<Success<void>>());
+        expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
+        verify(
+          () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
+        ).called(1);
+      },
+    );
+
+    test('wires place and event relations when inserting new media', () async {
+      supabaseEnv.stubSelectResponse([
+        {
+          'id': 10,
+          'url': 'https://example.com/img.jpg',
+          'width': 800,
+          'height': 600,
+          'place_id': 5,
+          'event_id': 7,
+          'created_at': '2024-01-01T00:00:00.000',
+          'modified_at': '2024-01-01T00:00:00.000',
+        },
+      ]);
+
+      await repository.synchronize();
+
+      final entity = mediaBox.get(10)!;
+      expect(entity.place.targetId, equals(5));
+      expect(entity.event.targetId, equals(7));
+    });
+
+    test('skips a media item that already matches the local copy', () async {
+      mediaBox.put(
+        _createMedia(
+          remoteId: 10,
+          url: 'https://example.com/img.jpg',
+        ),
+      );
+
+      supabaseEnv.stubSelectResponse([
+        {
+          'id': 10,
+          'url': 'https://example.com/img.jpg',
+          'width': 800,
+          'height': 600,
+          'created_at': '2026-01-01T00:00:00.000',
+          'modified_at': '2026-01-01T00:00:00.000',
+        },
+      ]);
+
+      final result = await repository.synchronize();
+
+      expect(result, isA<Success<void>>());
+      expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
+      verifyNever(
+        () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
+      );
+      verifyNever(
+        () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
+      );
+    });
+
+    test('updates existing media when remote data differs', () async {
+      mediaBox.put(
+        _createMedia(
+          remoteId: 10,
+          url: 'https://example.com/old.jpg',
+        ),
+      );
+
+      supabaseEnv.stubSelectResponse([
+        {
+          'id': 10,
+          'url': 'https://example.com/new.jpg',
+          'width': 1920,
+          'height': 1080,
+          'created_at': '2024-01-01T00:00:00.000',
+          'modified_at': '2025-06-01T00:00:00.000',
+        },
+      ]);
+
+      final result = await repository.synchronize();
+
+      expect(result, isA<Success<void>>());
+      expect(mediaBox.get(10)?.url, equals('https://example.com/new.jpg'));
+      verify(
+        () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
+      ).called(1);
+    });
+
+    test('returns Error when Supabase query fails', () async {
+      supabaseEnv.stubSelectError(
+        const PostgrestException(
+          message: 'relation "media" does not exist',
+        ),
+      );
+
+      final result = await repository.synchronize();
+
+      expect(result, isA<Error<void>>());
+      verify(
+        () => mockLogger.log(
+          const RepositorySyncFailed('media'),
+          error: any(named: 'error'),
+          stackTrace: any(named: 'stackTrace'),
+        ),
+      ).called(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // getByEventId / getByPlaceId — error path
+  // ---------------------------------------------------------------------------
+
+  group('MediaRepositoryImpl - query error propagation', () {
+    late MockLogger mockLogger;
+    late MediaRepositoryImpl repository;
+
+    setUp(() {
+      mockLogger = MockLogger();
+      final mockBox = _MockMediaEntityBox();
+      when(mockBox.query).thenThrow(Exception('query failed'));
+
+      final mockStore = _MockStore(mockBox);
+
+      repository = MediaRepositoryImpl(
+        logger: mockLogger,
+        supabaseI: MockSupabase(),
+        supabaseTable: MediaSupabaseTable(),
+        objectBoxI: _MockObjectBox(mockStore),
+      );
+    });
+
+    test('getByEventId returns Error when query throws', () async {
+      final result = await repository.getByEventId(1);
+
+      expect(result, isA<Error<List<Media>>>());
+      verify(
+        () => mockLogger.log(
+          const EntityLoadFailed('media', method: 'getByEventId'),
+          error: any(named: 'error'),
+          stackTrace: any(named: 'stackTrace'),
+        ),
+      ).called(1);
+    });
+
+    test('getByPlaceId returns Error when query throws', () async {
+      final result = await repository.getByPlaceId(1);
+
+      expect(result, isA<Error<List<Media>>>());
+      verify(
+        () => mockLogger.log(
+          const EntityLoadFailed('media', method: 'getByPlaceId'),
+          error: any(named: 'error'),
+          stackTrace: any(named: 'stackTrace'),
+        ),
+      ).called(1);
     });
   });
 }
@@ -248,6 +469,10 @@ PlaceEntity _createPlace({required int remoteId}) {
   );
 }
 
+// Sets both the JSON-serialization field (`eventToOneId`/`placeToOneId`) and
+// the ObjectBox relation ID (`event.targetId`/`place.targetId`). Both are
+// required: the former is the plain Dart field used in JSON; the latter is
+// what ObjectBox uses to build the in-store relation for `.link()` queries.
 MediaEntity _createMedia({
   required int remoteId,
   int? eventId,
@@ -255,7 +480,7 @@ MediaEntity _createMedia({
   String url = 'https://example.com/1.jpg',
 }) {
   final now = DateTime(2026, 1, 1);
-  return MediaEntity(
+  final entity = MediaEntity(
     remoteId: remoteId,
     url: url,
     width: 800,
@@ -267,44 +492,37 @@ MediaEntity _createMedia({
     place: ToOne<PlaceEntity>(),
     event: ToOne<EventEntity>(),
   );
+  if (eventId != null) entity.event.targetId = eventId;
+  if (placeId != null) entity.place.targetId = placeId;
+  return entity;
 }
 
-// ---------------------------------------------------------------------------
-// Fakes
-// ---------------------------------------------------------------------------
+final class _MockStore extends Mock implements Store {
+  _MockStore(this._mockBox);
 
-final class _ThrowingSupabase implements Supabase {
-  @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      throw Exception('Supabase unavailable');
-}
-
-final class _FakeSupabase implements Supabase {
-  List<Map<String, dynamic>> response = [];
+  final Box<MediaEntity> _mockBox;
 
   @override
-  dynamic noSuchMethod(Invocation invocation) {
-    if (invocation.memberName == #client) {
-      return _FakeSupabaseClient(response);
-    }
-    return super.noSuchMethod(invocation);
+  Box<T> box<T>() {
+    if (T == MediaEntity) return _mockBox as Box<T>;
+    throw StateError(
+      '_MockStore only supports Box<MediaEntity>, got Box<$T>',
+    );
   }
 }
 
-// Not implementing SupabaseClient — see city_repository_impl_test.dart comment.
-final class _FakeSupabaseClient {
-  _FakeSupabaseClient(this._response);
+final class _MockMediaEntityBox extends Mock implements Box<MediaEntity> {}
 
-  final List<Map<String, dynamic>> _response;
+final class _MockObjectBox implements app_objectbox.ObjectBox {
+  _MockObjectBox(this._mockStore);
 
-  _FakeQueryBuilder from(String table) => _FakeQueryBuilder(_response);
-}
+  final Store _mockStore;
 
-final class _FakeQueryBuilder {
-  _FakeQueryBuilder(this._response);
+  @override
+  Store get store => _mockStore;
 
-  final List<Map<String, dynamic>> _response;
-
-  Future<List<Map<String, dynamic>>> select([String columns = '*']) =>
-      Future.value(_response);
+  @override
+  set store(Store value) {
+    throw UnsupportedError('_MockObjectBox store is immutable.');
+  }
 }

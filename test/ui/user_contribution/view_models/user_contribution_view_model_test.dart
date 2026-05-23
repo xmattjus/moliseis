@@ -8,12 +8,13 @@ import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
+
+import '../../../support/mock_logger.dart';
 
 void main() {
   UserContributionViewModel buildViewModel({_FakeImagePicker? imagePicker}) {
     return UserContributionViewModel(
-      logger: Talker(),
+      logger: MockLogger(),
       userContributionRepository: _FakeUserContributionRepository(),
       imagePicker: imagePicker ?? _FakeImagePicker(),
     );
@@ -74,7 +75,7 @@ void main() {
       });
 
       test('adds two files with different content', () async {
-        int callCount = 0;
+        var callCount = 0;
         final vm = buildViewModel(
           imagePicker: _FakeImagePicker(
             onPickMultipleMedia: () async {
@@ -105,7 +106,7 @@ void main() {
 
     group('removeMediaAt', () {
       test('removes the file at the specified index', () async {
-        int callCount = 0;
+        var callCount = 0;
         final vm = buildViewModel(
           imagePicker: _FakeImagePicker(
             onPickMultipleMedia: () async {
@@ -272,7 +273,8 @@ void main() {
       );
 
       test(
-        'returns success and clears error state when picker reports an exception',
+        'returns success and clears error state when picker reports an '
+        'exception',
         () async {
           debugDefaultTargetPlatformOverride = TargetPlatform.android;
           addTearDown(() => debugDefaultTargetPlatformOverride = null);

@@ -1,13 +1,11 @@
-// ignore_for_file: avoid_redundant_argument_values
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../support/mock_logger.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
@@ -22,7 +20,7 @@ void main() {
       cityBox = objectBoxEnvironment.store.box<CityEntity>();
       eventBox = objectBoxEnvironment.store.box<EventEntity>();
       repository = SearchRepositoryImpl(
-        logger: Talker(),
+        logger: MockLogger(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });

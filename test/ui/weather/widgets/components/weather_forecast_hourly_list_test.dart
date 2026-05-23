@@ -16,7 +16,8 @@ import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
-import 'package:talker_flutter/talker_flutter.dart';
+
+import '../../../../support/mock_logger.dart';
 
 void main() {
   const testCoordinates = LatLng(41.56, 14.66);
@@ -54,7 +55,7 @@ void main() {
     successResponse = CombinedWeatherForecastResponse(
       latitude: 41.56,
       longitude: 14.66,
-      generationTimeMs: 1.0,
+      generationTimeMs: 1,
       utcOffsetSeconds: 7200,
       timezone: 'Europe/Rome',
       timezoneAbbreviation: 'CEST',
@@ -143,7 +144,7 @@ void main() {
 
 final class _FakeWeatherApiClient extends WeatherApiClient {
   _FakeWeatherApiClient({required this.result})
-    : super(logger: Talker(), httpClient: http.Client());
+    : super(logger: MockLogger(), httpClient: http.Client());
 
   final Result<CombinedWeatherForecastResponse> result;
 

@@ -4,22 +4,22 @@ import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/data/data-sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/data/services/api/cloudinary_client.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 class UserContributionRepositoryImpl extends UserContributionRepository {
   UserContributionRepositoryImpl({
-    required Talker logger,
+    required Logger logger,
     required Supabase supabase,
     required UserContributionSupabaseTable supabaseTable,
     required CloudinaryClient cloudinaryClient,
-  }) : _log = logger,
+  }) : _logger = logger,
        _supabase = supabase,
        _supabaseTable = supabaseTable,
        _cloudinaryClient = cloudinaryClient;
 
-  final Talker _log;
+  final Logger _logger;
 
   final Supabase _supabase;
   final UserContributionSupabaseTable _supabaseTable;
@@ -27,6 +27,8 @@ class UserContributionRepositoryImpl extends UserContributionRepository {
 
   @override
   Future<Result<void>> upload(UserContribution userContribution) async {
+    _logger.log(const UserContributionUploadStarted());
+
     try {
       await _supabase.client.from(_supabaseTable.tableName).insert({
         _supabaseTable.idCity: userContribution.city,
@@ -42,13 +44,13 @@ class UserContributionRepositoryImpl extends UserContributionRepository {
       });
 
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while uploading user contribution.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const UserContributionUploadFailed(),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 

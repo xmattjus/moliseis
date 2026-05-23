@@ -3,16 +3,18 @@ import 'package:moliseis/data/services/app_info_service.dart';
 import 'package:moliseis/data/services/external_url_service.dart';
 import 'package:moliseis/data/services/map_url_service.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
+
+import '../../support/mock_logger.dart';
 
 void main() {
   group('UrlLaunchService', () {
-    late Talker logger;
+    late Logger logger;
     late _FakeExternalUrlService externalUrlService;
 
     setUp(() {
-      logger = Talker();
+      logger = MockLogger();
       externalUrlService = _FakeExternalUrlService(logger: logger);
     });
 

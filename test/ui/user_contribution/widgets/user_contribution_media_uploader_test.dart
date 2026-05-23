@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' show Completer, unawaited;
 import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
@@ -12,7 +12,8 @@ import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
 import 'package:moliseis/ui/user_contribution/widgets/user_contribution_media_uploader.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:talker_flutter/talker_flutter.dart';
+
+import '../../../support/mock_logger.dart';
 
 void main() {
   Widget buildTestApp(UserContributionViewModel viewModel) {
@@ -23,7 +24,7 @@ void main() {
 
   UserContributionViewModel buildViewModel({_FakeImagePicker? imagePicker}) {
     return UserContributionViewModel(
-      logger: Talker(),
+      logger: MockLogger(),
       userContributionRepository: _FakeUserContributionRepository(),
       imagePicker: imagePicker ?? _FakeImagePicker(),
     );

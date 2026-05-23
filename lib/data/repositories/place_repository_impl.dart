@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/data-sources/place_supabase_table.dart';
 import 'package:moliseis/data/mappers/place_entity_mapper.dart';
@@ -7,24 +8,22 @@ import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
-import 'package:moliseis/utils/exceptions.dart';
-import 'package:moliseis/utils/messages.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 class PlaceRepositoryImpl implements PlaceRepository {
   PlaceRepositoryImpl({
-    required Talker logger,
+    required Logger logger,
     required Supabase supabaseI,
     required PlaceSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
-  }) : _log = logger,
+  }) : _logger = logger,
        _supabase = supabaseI,
        _supabaseTable = supabaseTable,
        _placeBox = objectBoxI.store.box<PlaceEntity>();
 
-  final Talker _log;
+  final Logger _logger;
 
   final Supabase _supabase;
   final PlaceSupabaseTable _supabaseTable;
@@ -51,13 +50,13 @@ class PlaceRepositoryImpl implements PlaceRepository {
         );
 
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading all the places.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('place', method: 'getAll'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
@@ -90,13 +89,13 @@ class PlaceRepositoryImpl implements PlaceRepository {
       );
 
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading places by category.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('place', method: 'getByCategories'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
@@ -128,13 +127,13 @@ class PlaceRepositoryImpl implements PlaceRepository {
           .toList();
 
       return Result.success(mappedResults);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading places by coordinates.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('place', method: 'getByCoordinates'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
@@ -147,7 +146,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
     if (result != null) {
       return Result.success(result.toModel());
     } else {
-      return Result.error(PlaceNullException(id));
+      return Result.error(Exception('Place not found: $id'));
     }
   }
 
@@ -165,20 +164,20 @@ class PlaceRepositoryImpl implements PlaceRepository {
       return Result.success(
         resultsWithScores.map<int>((element) => element.id).toList(),
       );
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading place IDs by coordinates.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('place', method: 'getIdsByCoordinates'),
+        error: exception,
+        stackTrace: stackTrace,
       );
 
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
   @override
   Future<Result<void>> synchronize() async {
-    _log.info(Messages.repositoryUpdate);
+    _logger.log(const RepositorySyncStarted('place'));
 
     // Resets the list of cached places before synchronizing.
     _cache = null;
@@ -189,7 +188,7 @@ class PlaceRepositoryImpl implements PlaceRepository {
           .select();
 
       final remote = Set<PlaceEntity>.unmodifiable(
-        places.map<PlaceEntity>((element) => PlaceEntity.fromJson(element)),
+        places.map<PlaceEntity>(PlaceEntity.fromJson),
       );
 
       final local = Set<PlaceEntity>.unmodifiable(_placeBox.getAll());
@@ -197,23 +196,19 @@ class PlaceRepositoryImpl implements PlaceRepository {
       final placesToPut = remote.difference(local);
 
       for (final place in placesToPut) {
-        final existingPlace = local.where(
+        final existingPlace = local.firstWhereOrNull(
           (test) => test.remoteId == place.remoteId,
         );
 
-        if (existingPlace.isEmpty) {
-          _log.info(Messages.objectInsert('place', place.remoteId));
-
+        if (existingPlace == null) {
           place.city.targetId = place.cityToOneId;
 
           _placeBox.put(place);
-        } else if (existingPlace.length == 1) {
-          if (existingPlace.first != place) {
-            _log.info(
-              Messages.objectUpdate('place', existingPlace.first.remoteId),
-            );
 
-            final copy = existingPlace.first.copyWith(
+          _logger.log(EntityInsertSuccess('place', place.remoteId));
+        } else {
+          if (existingPlace != place) {
+            final copy = existingPlace.copyWith(
               name: place.name,
               description: place.description,
               coordinates: place.coordinates,
@@ -224,17 +219,23 @@ class PlaceRepositoryImpl implements PlaceRepository {
             );
 
             _placeBox.put(copy);
+
+            _logger.log(
+              EntityUpdateSuccess('place', place.remoteId),
+            );
           }
         }
       }
 
-      removeLeftovers(_placeBox, remote);
-
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(Messages.repositoryUpdateException, error, stackTrace);
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const RepositorySyncFailed('place'),
+        error: exception,
+        stackTrace: stackTrace,
+      );
 
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
@@ -249,13 +250,13 @@ class PlaceRepositoryImpl implements PlaceRepository {
       final places = await builder.findIdsAsync();
       builder.close();
       return Result.success(places);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading latest places.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('place', method: 'getLatestPlaceIds'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
@@ -268,13 +269,13 @@ class PlaceRepositoryImpl implements PlaceRepository {
       // Casts the query results to a growable list with toList().
       final places = query.findIds().toList();
       return Result.success(places);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading favourite places.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('place', method: 'getFavouritePlaceIds'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     } finally {
       query?.close();
     }
@@ -294,14 +295,14 @@ class PlaceRepositoryImpl implements PlaceRepository {
       _placeBox.put(copy);
 
       return const Result.success(null);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while setting favourite for place with remote ID: $remoteId.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        EntityUpdateFailed('place', remoteId, method: 'setFavouritePlace'),
+        error: exception,
+        stackTrace: stackTrace,
       );
 
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 
@@ -310,18 +311,17 @@ class PlaceRepositoryImpl implements PlaceRepository {
     try {
       final query = _placeBox.query();
       final builder = query.build();
-      final places = builder.findIds();
-      places.shuffle();
+      final places = builder.findIds()..shuffle();
       final result = places.take(5).toList();
       builder.close();
       return Result.success(result);
-    } on Exception catch (error, stackTrace) {
-      _log.error(
-        'An exception occurred while loading suggested places.',
-        error,
-        stackTrace,
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('place', method: 'getSuggestedPlaceIds'),
+        error: exception,
+        stackTrace: stackTrace,
       );
-      return Result.error(error);
+      return Result.error(exception);
     }
   }
 }

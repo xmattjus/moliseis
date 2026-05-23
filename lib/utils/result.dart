@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:async';
+import 'dart:async' show FutureOr;
 
 /// Represents either a successful value or an exception.
 sealed class Result<T> {
@@ -20,9 +20,9 @@ sealed class Result<T> {
     R Function(Exception error) onError,
   ) {
     switch (this) {
-      case Success<T>(value: final value):
+      case Success<T>(:final value):
         return onSuccess(value);
-      case Error<T>(error: final error):
+      case Error<T>(:final error):
         return onError(error);
     }
   }
@@ -53,7 +53,7 @@ sealed class Result<T> {
   Result<T> mapError(Exception Function(Exception error) mapper) {
     return switch (this) {
       Success<T>() => this,
-      Error<T>(error: final error) => Result.error(mapper(error)),
+      Error<T>(:final error) => Result.error(mapper(error)),
     };
   }
 
@@ -63,7 +63,7 @@ sealed class Result<T> {
   Result<T> flatMapError(Result<T> Function(Exception error) mapper) {
     return switch (this) {
       Success<T>() => this,
-      Error<T>(error: final error) => mapper(error),
+      Error<T>(:final error) => mapper(error),
     };
   }
 
@@ -83,9 +83,9 @@ sealed class Result<T> {
     FutureOr<R> Function(Exception error) onError,
   ) async {
     switch (this) {
-      case Success<T>(value: final value):
+      case Success<T>(:final value):
         return onSuccess(value);
-      case Error<T>(error: final error):
+      case Error<T>(:final error):
         return onError(error);
     }
   }
@@ -95,8 +95,8 @@ sealed class Result<T> {
   /// If [mapper] throws, the exception is propagated.
   Future<Result<R>> asyncMap<R>(FutureOr<R> Function(T value) mapper) async {
     return switch (this) {
-      Success<T>(value: final value) => Result.success(await mapper(value)),
-      Error<T>(error: final error) => Result.error(error),
+      Success<T>(:final value) => Result.success(await mapper(value)),
+      Error<T>(:final error) => Result.error(error),
     };
   }
 
@@ -107,8 +107,8 @@ sealed class Result<T> {
     FutureOr<Result<R>> Function(T value) mapper,
   ) async {
     return switch (this) {
-      Success<T>(value: final value) => mapper(value),
-      Error<T>(error: final error) => Result.error(error),
+      Success<T>(:final value) => mapper(value),
+      Error<T>(:final error) => Result.error(error),
     };
   }
 
@@ -121,7 +121,7 @@ sealed class Result<T> {
   ) async {
     return switch (this) {
       Success<T>() => this,
-      Error<T>(error: final error) => Result.error(await mapper(error)),
+      Error<T>(:final error) => Result.error(await mapper(error)),
     };
   }
 
@@ -133,7 +133,7 @@ sealed class Result<T> {
   ) async {
     return switch (this) {
       Success<T>() => this,
-      Error<T>(error: final error) => mapper(error),
+      Error<T>(:final error) => mapper(error),
     };
   }
 
@@ -141,7 +141,7 @@ sealed class Result<T> {
   /// asynchronously.
   Future<T> asyncGetOrElse(FutureOr<T> Function() defaultValue) async {
     return switch (this) {
-      Success<T>(value: final value) => value,
+      Success<T>(:final value) => value,
       Error<T>() => defaultValue(),
     };
   }

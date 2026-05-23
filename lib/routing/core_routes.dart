@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -17,8 +17,8 @@ import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 GoRoute categoryRoute({required String name, required String childName}) {
   return GoRoute(
@@ -101,10 +101,17 @@ GoRoute postRoute({required String name}) {
     redirect: (context, state) {
       final contentId = state.pathParameters['id'];
 
-      if (contentId == null || int.tryParse(contentId) == null) {
-        final log = context.read<Talker>();
+      final id = contentId != null ? int.tryParse(contentId) : null;
 
-        log.error('Content Id $contentId is not a parsable integer.');
+      if (id == null) {
+        context.read<Logger?>()?.log(
+          PostRouteContentIdParseFailed(
+            reason: contentId == null
+                ? 'contentId is null'
+                : '$contentId is not a parsable integer',
+          ),
+        );
+
         showSnackBar(
           context: context,
           textContent:
