@@ -67,8 +67,8 @@ void main() {
       expect(entity().toModel().endDate, isNull);
     });
 
-    test('null name falls back to empty string', () {
-      expect(entity(name: null).toModel().name, '');
+    test('null name falls back to placeholder string', () {
+      expect(entity(name: null).toModel().name, 'Evento Senza Nome');
     });
 
     test('null description falls back to empty string', () {
