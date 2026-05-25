@@ -38,16 +38,23 @@ import '../../../support/mock_logger.dart';
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('it');
+    setUpMockLogger();
   });
 
   group('PostScreen', () {
+    late MockLogger mockLogger;
+
+    setUp(() {
+      mockLogger = MockLogger();
+    });
+
     testWidgets('renders EventFormattedDateTime for event content', (
       tester,
     ) async {
       final event = _buildEvent();
       final place = _buildPlace();
       final viewModel = _buildPostViewModel(event: event, place: place);
-      final weatherViewModel = _buildWeatherViewModel();
+      final weatherViewModel = _buildWeatherViewModel(mockLogger);
       final favouriteViewModel = _buildFavouriteViewModel(
         event: event,
         place: place,
@@ -78,7 +85,7 @@ void main() {
       final event = _buildEvent();
       final place = _buildPlace();
       final viewModel = _buildPostViewModel(event: event, place: place);
-      final weatherViewModel = _buildWeatherViewModel();
+      final weatherViewModel = _buildWeatherViewModel(mockLogger);
       final favouriteViewModel = _buildFavouriteViewModel(
         event: event,
         place: place,
@@ -141,7 +148,7 @@ PostViewModel _buildPostViewModel({
   );
 }
 
-WeatherViewModel _buildWeatherViewModel() {
+WeatherViewModel _buildWeatherViewModel(MockLogger mockLogger) {
   final weatherApiClient = CachedWeatherApiClient(
     weatherApiClient: _FakeWeatherApiClient(),
     currentWeatherCache:
@@ -159,6 +166,7 @@ WeatherViewModel _buildWeatherViewModel() {
           String,
           WeatherForecastDataCacheEntry<DailyWeatherForecastData>
         >(maxSize: 8),
+    logger: mockLogger,
   );
 
   return WeatherViewModel(

@@ -18,6 +18,8 @@ import 'package:moliseis/utils/result.dart';
 import '../../../support/mock_logger.dart';
 
 void main() {
+  late MockLogger mockLogger;
+
   const testCoordinates = LatLng(41.56, 14.66);
 
   final testCurrentData = CurrentWeatherForecastData(
@@ -51,6 +53,8 @@ void main() {
   late CombinedWeatherForecastResponse testCombinedResponse;
 
   setUp(() {
+    mockLogger = MockLogger();
+
     testCombinedResponse = CombinedWeatherForecastResponse(
       latitude: 41.56,
       longitude: 14.66,
@@ -83,6 +87,7 @@ void main() {
             String,
             WeatherForecastDataCacheEntry<DailyWeatherForecastData>
           >(maxSize: 8),
+      logger: mockLogger,
     );
 
     return WeatherViewModel(

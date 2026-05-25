@@ -1,5 +1,80 @@
 part of 'package:moliseis/utils/logging/log_event.dart';
 
+/// Fired when an entry has been added to a cache.
+class CacheEntryAdded extends LogEvent {
+  /// Creates an event when an entry with [key] has been added to [cache].
+  /// Also registers when the entry has been added to the cache with [addedAt].
+  const CacheEntryAdded({
+    required this.cache,
+    required this.key,
+    required this.addedAt,
+  });
+
+  final String cache;
+  final String key;
+  final DateTime addedAt;
+
+  @override
+  Map<String, Object?> get data => {
+    'cache': cache,
+    'key': key,
+    'addedAt': addedAt.toUtc(),
+  };
+
+  @override
+  AppLogLevel get level => AppLogLevel.debug;
+
+  @override
+  String get name => 'cache_entry_added';
+}
+
+/// Fired when an entry has been retrieved from a cache.
+class CacheEntryFetched extends LogEvent {
+  /// Creates an event when an entry with [key] has been retrieved from [cache].
+  const CacheEntryFetched({required this.cache, required this.key});
+
+  final String cache;
+  final String key;
+
+  @override
+  Map<String, Object?> get data => {'cache': cache, 'key': key};
+
+  @override
+  AppLogLevel get level => AppLogLevel.debug;
+
+  @override
+  String get name => 'cache_entry_fetched';
+}
+
+/// Fired when an entry has been evicted from a cache.
+class CacheEntryEvicted extends LogEvent {
+  /// Creates an event when an entry with [key] has been evicted from [cache].
+  /// Also registers when the entry has been added to the cache
+  /// with [fetchedAt].
+  const CacheEntryEvicted({
+    required this.cache,
+    required this.key,
+    required this.fetchedAt,
+  });
+
+  final String cache;
+  final String key;
+  final DateTime fetchedAt;
+
+  @override
+  Map<String, Object?> get data => {
+    'cache': cache,
+    'key': key,
+    'fetchedAt': fetchedAt.toUtc(),
+  };
+
+  @override
+  AppLogLevel get level => AppLogLevel.debug;
+
+  @override
+  String get name => 'cache_entry_evicted';
+}
+
 /// Fired when a Cloudinary upload request fails.
 class CloudinaryRequestFailed extends LogEvent {
   /// Creates an event with a [detail] describing the Cloudinary error.

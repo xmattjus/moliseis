@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
@@ -6,6 +5,7 @@ import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_
 import 'package:moliseis/data/services/api/weather/model/location_key.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -30,16 +30,19 @@ class CachedWeatherApiClient {
     hourlyWeatherCache,
     required WeatherForecastDataCache<DailyWeatherForecastData>
     dailyWeatherCache,
+    required Logger logger,
   }) : _weatherApiClient = weatherApiClient,
        _currentWeatherCache = currentWeatherCache,
        _hourlyWeatherCache = hourlyWeatherCache,
-       _dailyWeatherCache = dailyWeatherCache;
+       _dailyWeatherCache = dailyWeatherCache,
+       _logger = logger;
 
   final WeatherApiClient _weatherApiClient;
   final WeatherForecastDataCache<CurrentWeatherForecastData>
   _currentWeatherCache;
   final WeatherForecastDataCache<HourlyWeatherForecastData> _hourlyWeatherCache;
   final WeatherForecastDataCache<DailyWeatherForecastData> _dailyWeatherCache;
+  final Logger _logger;
 
   static const _cacheDuration = Duration(hours: 2);
 
@@ -91,7 +94,13 @@ class CachedWeatherApiClient {
         ),
       );
 
-      debugPrint('Cache added for key: $cacheKey');
+      _logger.log(
+        CacheEntryAdded(
+          cache: 'weather',
+          key: cacheKey,
+          addedAt: DateTime.now().toUtc(),
+        ),
+      );
     }
 
     return result;
@@ -113,14 +122,23 @@ class CachedWeatherApiClient {
 
     if (cachedEntry != null) {
       if (!cachedEntry.isExpired(_cacheDuration)) {
-        debugPrint('Cache hit for current weather key: $cacheKey');
+        _logger.log(
+          CacheEntryFetched(
+            cache: 'weather',
+            key: cacheKey,
+          ),
+        );
         return Result.success(cachedEntry.data);
       } else {
         // Remove stale data.
         _currentWeatherCache.remove(cacheKey);
-        debugPrint(
-          'Cache stale for key: $cacheKey added at '
-          '${cachedEntry.fetchedAt.toUtc()}',
+
+        _logger.log(
+          CacheEntryEvicted(
+            cache: 'weather',
+            key: cacheKey,
+            fetchedAt: cachedEntry.fetchedAt,
+          ),
         );
       }
     }
@@ -151,14 +169,23 @@ class CachedWeatherApiClient {
 
     if (cachedEntry != null) {
       if (!cachedEntry.isExpired(_cacheDuration)) {
-        debugPrint('Cache hit for hourly weather key: $cacheKey');
+        _logger.log(
+          CacheEntryFetched(
+            cache: 'weather',
+            key: cacheKey,
+          ),
+        );
         return Result.success(cachedEntry.data);
       } else {
         // Remove stale data.
         _hourlyWeatherCache.remove(cacheKey);
-        debugPrint(
-          'Cache stale for key: $cacheKey added at '
-          '${cachedEntry.fetchedAt.toUtc()}',
+
+        _logger.log(
+          CacheEntryEvicted(
+            cache: 'weather',
+            key: cacheKey,
+            fetchedAt: cachedEntry.fetchedAt,
+          ),
         );
       }
     }
@@ -189,14 +216,24 @@ class CachedWeatherApiClient {
 
     if (cachedEntry != null) {
       if (!cachedEntry.isExpired(_cacheDuration)) {
-        debugPrint('Cache hit for daily weather key: $cacheKey');
+        _logger.log(
+          CacheEntryFetched(
+            cache: 'weather',
+            key: cacheKey,
+          ),
+        );
+
         return Result.success(cachedEntry.data);
       } else {
         // Remove stale data.
         _dailyWeatherCache.remove(cacheKey);
-        debugPrint(
-          'Cache stale for key: $cacheKey added at '
-          '${cachedEntry.fetchedAt.toUtc()}',
+
+        _logger.log(
+          CacheEntryEvicted(
+            cache: 'weather',
+            key: cacheKey,
+            fetchedAt: cachedEntry.fetchedAt,
+          ),
         );
       }
     }

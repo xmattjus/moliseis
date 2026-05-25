@@ -67,6 +67,7 @@ void main() {
   });
 
   WeatherViewModel buildViewModel(
+    MockLogger mockLogger,
     Result<CombinedWeatherForecastResponse> result,
   ) {
     return WeatherViewModel(
@@ -87,6 +88,7 @@ void main() {
               String,
               WeatherForecastDataCacheEntry<DailyWeatherForecastData>
             >(maxSize: 8),
+        logger: mockLogger,
       ),
       weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
       weatherCodeIconMapper: const WmoWeatherIconMapper(),
@@ -108,8 +110,17 @@ void main() {
   }
 
   group('WeatherForecastHourlyList', () {
+    late MockLogger mockLogger;
+
+    setUp(() {
+      mockLogger = MockLogger();
+    });
+
     testWidgets('shows loading indicator before command runs', (tester) async {
-      final viewModel = buildViewModel(Result.success(successResponse));
+      final viewModel = buildViewModel(
+        mockLogger,
+        Result.success(successResponse),
+      );
 
       await tester.pumpWidget(buildTestWidget(viewModel));
 
@@ -118,7 +129,10 @@ void main() {
     });
 
     testWidgets('shows list after successful load', (tester) async {
-      final viewModel = buildViewModel(Result.success(successResponse));
+      final viewModel = buildViewModel(
+        mockLogger,
+        Result.success(successResponse),
+      );
       await viewModel.loadHourlyForecast.execute(testCoordinates);
 
       await tester.pumpWidget(buildTestWidget(viewModel));
@@ -130,6 +144,7 @@ void main() {
 
     testWidgets('shows loading indicator after failed load', (tester) async {
       final viewModel = buildViewModel(
+        mockLogger,
         Result.error(Exception('network error')),
       );
       await viewModel.loadHourlyForecast.execute(testCoordinates);

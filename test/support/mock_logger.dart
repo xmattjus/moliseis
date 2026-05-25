@@ -6,6 +6,26 @@ class MockLogger extends Mock implements Logger {}
 /// Registers fallback values for [MockLogger] verification with mocktail.
 /// Call once per test suite in `setUpAll`.
 void setUpMockLogger() {
+  registerFallbackValue(
+    CacheEntryAdded(
+      cache: 'weather',
+      key: '0, 0',
+      addedAt: DateTime.now(),
+    ),
+  );
+  registerFallbackValue(
+    const CacheEntryFetched(
+      cache: 'weather',
+      key: '0, 0',
+    ),
+  );
+  registerFallbackValue(
+    CacheEntryEvicted(
+      cache: 'weather',
+      key: '0, 0',
+      fetchedAt: DateTime.now(),
+    ),
+  );
   registerFallbackValue(const CloudinaryRequestFailed(detail: ''));
   registerFallbackValue(const CloudinaryRequestStarted());
   registerFallbackValue(const EntityInsertFailed(''));
