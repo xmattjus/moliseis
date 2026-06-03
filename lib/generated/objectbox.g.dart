@@ -95,7 +95,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(15, 789366488649937453),
     name: 'MediaEntity',
-    lastPropertyId: const obx_int.IdUid(14, 5807263220332414539),
+    lastPropertyId: const obx_int.IdUid(15, 7933325563720313603),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -188,6 +188,12 @@ final _entities = <obx_int.ModelEntity>[
         relationField: 'event',
         relationTarget: 'EventEntity',
       ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(15, 7933325563720313603),
+        name: 'isDeleted',
+        type: 1,
+        flags: 0,
+      ),
     ],
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[],
@@ -195,7 +201,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(16, 8997816155422886265),
     name: 'CityEntity',
-    lastPropertyId: const obx_int.IdUid(4, 7216293297951087590),
+    lastPropertyId: const obx_int.IdUid(5, 1717979632115563282),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -222,6 +228,12 @@ final _entities = <obx_int.ModelEntity>[
         type: 12,
         flags: 0,
       ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 1717979632115563282),
+        name: 'isDeleted',
+        type: 1,
+        flags: 0,
+      ),
     ],
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[
@@ -240,7 +252,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(17, 7285695363865824884),
     name: 'EventEntity',
-    lastPropertyId: const obx_int.IdUid(12, 8503059518440331862),
+    lastPropertyId: const obx_int.IdUid(13, 7054880704473750215),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -321,6 +333,12 @@ final _entities = <obx_int.ModelEntity>[
         type: 1,
         flags: 0,
       ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(13, 7054880704473750215),
+        name: 'isDeleted',
+        type: 1,
+        flags: 0,
+      ),
     ],
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[
@@ -334,7 +352,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(18, 7465876784755698809),
     name: 'PlaceEntity',
-    lastPropertyId: const obx_int.IdUid(10, 4703108708007619239),
+    lastPropertyId: const obx_int.IdUid(11, 3114563146177949760),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -400,6 +418,12 @@ final _entities = <obx_int.ModelEntity>[
       obx_int.ModelProperty(
         id: const obx_int.IdUid(10, 4703108708007619239),
         name: 'isSaved',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(11, 3114563146177949760),
+        name: 'isDeleted',
         type: 1,
         flags: 0,
       ),
@@ -765,7 +789,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
             ? null
             : fbb.writeString(object.licenseUrl!);
         final urlOffset = fbb.writeString(object.url);
-        fbb.startTable(15);
+        fbb.startTable(16);
         fbb.addInt64(0, object.remoteId);
         fbb.addOffset(1, titleOffset);
         fbb.addOffset(2, authorOffset);
@@ -780,6 +804,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addInt64(11, object.modifiedAt.microsecondsSinceEpoch * 1000);
         fbb.addInt64(12, object.place.targetId);
         fbb.addInt64(13, object.event.targetId);
+        fbb.addBool(14, object.isDeleted);
         fbb.finish(fbb.endTable());
         return object.remoteId;
       },
@@ -819,15 +844,15 @@ obx_int.ModelDefinition getObjectBoxModel() {
           18,
           0,
         );
-        final placeToOneIdParam = const fb.Int64Reader().vTableGetNullable(
-          buffer,
-          rootOffset,
-          20,
-        );
         final eventToOneIdParam = const fb.Int64Reader().vTableGetNullable(
           buffer,
           rootOffset,
           22,
+        );
+        final placeToOneIdParam = const fb.Int64Reader().vTableGetNullable(
+          buffer,
+          rootOffset,
+          20,
         );
         final createdAtParam = DateTime.fromMicrosecondsSinceEpoch(
           (const fb.Int64Reader().vTableGet(buffer, rootOffset, 24, 0) / 1000)
@@ -843,6 +868,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final eventParam = obx.ToOne<EventEntity>(
           targetId: const fb.Int64Reader().vTableGet(buffer, rootOffset, 30, 0),
         );
+        final isDeletedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          32,
+          false,
+        );
         final object = MediaEntity(
           remoteId: remoteIdParam,
           title: titleParam,
@@ -852,12 +883,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
           url: urlParam,
           width: widthParam,
           height: heightParam,
-          placeToOneId: placeToOneIdParam,
           eventToOneId: eventToOneIdParam,
+          placeToOneId: placeToOneIdParam,
           createdAt: createdAtParam,
           modifiedAt: modifiedAtParam,
           place: placeParam,
           event: eventParam,
+          isDeleted: isDeletedParam,
         );
         object.place.attach(store);
         object.event.attach(store);
@@ -893,11 +925,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
       },
       objectToFB: (CityEntity object, fb.Builder fbb) {
         final nameOffset = fbb.writeString(object.name);
-        fbb.startTable(5);
+        fbb.startTable(6);
         fbb.addInt64(0, object.remoteId);
         fbb.addOffset(1, nameOffset);
         fbb.addInt64(2, object.createdAt.microsecondsSinceEpoch * 1000);
         fbb.addInt64(3, object.modifiedAt.microsecondsSinceEpoch * 1000);
+        fbb.addBool(4, object.isDeleted);
         fbb.finish(fbb.endTable());
         return object.remoteId;
       },
@@ -923,6 +956,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
         );
         final placesParam = obx.ToMany<PlaceEntity>();
         final eventsParam = obx.ToMany<EventEntity>();
+        final isDeletedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          12,
+          false,
+        );
         final object = CityEntity(
           remoteId: remoteIdParam,
           name: nameParam,
@@ -930,6 +969,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           modifiedAt: modifiedAtParam,
           places: placesParam,
           events: eventsParam,
+          isDeleted: isDeletedParam,
         );
         obx_int.InternalToManyAccess.setRelInfo<CityEntity>(
           object.places,
@@ -982,7 +1022,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
             ? null
             : fbb.writeString(object.description!);
         final coordinatesOffset = fbb.writeListFloat32(object.coordinates);
-        fbb.startTable(13);
+        fbb.startTable(14);
         fbb.addInt64(0, object.remoteId);
         fbb.addOffset(1, nameOffset);
         fbb.addOffset(2, descriptionOffset);
@@ -1005,6 +1045,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addInt64(9, object.dbType);
         fbb.addInt64(10, object.city.targetId);
         fbb.addBool(11, object.isSaved);
+        fbb.addBool(12, object.isDeleted);
         fbb.finish(fbb.endTable());
         return object.remoteId;
       },
@@ -1070,6 +1111,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
           26,
           false,
         );
+        final isDeletedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          28,
+          false,
+        );
         final object =
             EventEntity(
                 remoteId: remoteIdParam,
@@ -1084,6 +1131,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
                 city: cityParam,
                 media: mediaParam,
                 isSaved: isSavedParam,
+                isDeleted: isDeletedParam,
               )
               ..dbType = const fb.Int64Reader().vTableGetNullable(
                 buffer,
@@ -1131,7 +1179,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
             ? null
             : fbb.writeString(object.description!);
         final coordinatesOffset = fbb.writeListFloat32(object.coordinates);
-        fbb.startTable(11);
+        fbb.startTable(12);
         fbb.addInt64(0, object.remoteId);
         fbb.addOffset(1, nameOffset);
         fbb.addOffset(2, descriptionOffset);
@@ -1142,6 +1190,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addInt64(7, object.dbType);
         fbb.addInt64(8, object.city.targetId);
         fbb.addBool(9, object.isSaved);
+        fbb.addBool(10, object.isDeleted);
         fbb.finish(fbb.endTable());
         return object.remoteId;
       },
@@ -1187,6 +1236,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
           22,
           false,
         );
+        final isDeletedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          24,
+          false,
+        );
         final object =
             PlaceEntity(
                 remoteId: remoteIdParam,
@@ -1199,6 +1254,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
                 city: cityParam,
                 media: mediaParam,
                 isSaved: isSavedParam,
+                isDeleted: isDeletedParam,
               )
               ..dbType = const fb.Int64Reader().vTableGetNullable(
                 buffer,
@@ -1340,6 +1396,11 @@ class MediaEntity_ {
   static final event = obx.QueryRelationToOne<MediaEntity, EventEntity>(
     _entities[2].properties[13],
   );
+
+  /// See [MediaEntity.isDeleted].
+  static final isDeleted = obx.QueryBooleanProperty<MediaEntity>(
+    _entities[2].properties[14],
+  );
 }
 
 /// [CityEntity] entity fields to define ObjectBox queries.
@@ -1362,6 +1423,11 @@ class CityEntity_ {
   /// See [CityEntity.modifiedAt].
   static final modifiedAt = obx.QueryDateNanoProperty<CityEntity>(
     _entities[3].properties[3],
+  );
+
+  /// See [CityEntity.isDeleted].
+  static final isDeleted = obx.QueryBooleanProperty<CityEntity>(
+    _entities[3].properties[4],
   );
 
   /// see [CityEntity.places]
@@ -1437,6 +1503,11 @@ class EventEntity_ {
     _entities[4].properties[11],
   );
 
+  /// See [EventEntity.isDeleted].
+  static final isDeleted = obx.QueryBooleanProperty<EventEntity>(
+    _entities[4].properties[12],
+  );
+
   /// see [EventEntity.media]
   static final media = obx.QueryBacklinkToMany<MediaEntity, EventEntity>(
     MediaEntity_.event,
@@ -1493,6 +1564,11 @@ class PlaceEntity_ {
   /// See [PlaceEntity.isSaved].
   static final isSaved = obx.QueryBooleanProperty<PlaceEntity>(
     _entities[5].properties[9],
+  );
+
+  /// See [PlaceEntity.isDeleted].
+  static final isDeleted = obx.QueryBooleanProperty<PlaceEntity>(
+    _entities[5].properties[10],
   );
 
   /// see [PlaceEntity.media]

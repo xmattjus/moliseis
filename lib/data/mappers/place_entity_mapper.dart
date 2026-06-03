@@ -1,12 +1,11 @@
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/mappers/city_entity_mapper.dart';
 import 'package:moliseis/data/mappers/media_entity_mapper.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/domain/models/place.dart';
 
-/// Conversion helpers from [PlaceEntity] to the [Place] domain model.
+/// Conversion extensions from [PlaceEntity] to the [Place] domain model.
 extension PlaceEntityExtensions on PlaceEntity {
   /// Maps a [PlaceEntity] to a [Place] domain model.
   Place toModel() => Place(
@@ -16,7 +15,8 @@ extension PlaceEntityExtensions on PlaceEntity {
     createdAt: createdAt,
     description: description ?? '',
     media: media
-        .map<Media>((MediaEntity entity) => entity.toModel())
+        .where((entity) => !entity.isDeleted)
+        .map<Media>((entity) => entity.toModel())
         .toList(growable: false),
     modifiedAt: modifiedAt,
     name: name,

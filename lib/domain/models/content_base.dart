@@ -1,9 +1,21 @@
+import 'package:collection/collection.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:meta/meta.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/event.dart'; // Import added to fix the comment_references lint.
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/domain/models/place.dart'; // Import added to fix the comment_references lint.
+
+/// The decimal places a [LatLng] ContentBase field will be rounded to.
+/// Equals to street/building precision. Coordinates updates requiring higher
+/// precision are unlikely.
+const int _roundingDecimalPlaces = 4;
+
+/// Rounds a [LatLng] coordinates to prevent precision issues during equality
+/// checks.
+LatLng _round(LatLng coordinates) =>
+    coordinates.round(decimals: _roundingDecimalPlaces);
 
 /// A base class representing a generic unit of content used in the application.
 ///
@@ -40,7 +52,7 @@ import 'package:moliseis/domain/models/place.dart'; // Import added to fix the c
 /// ### Usage:
 /// Used in the domain layer to represent content in a clean, abstract form,
 /// decoupled from data sources or UI-specific formatting.
-///
+@immutable
 abstract class ContentBase {
   /// Creates a [ContentBase] with the given [category], [city], [coordinates],
   /// [createdAt], [description], [modifiedAt], [media], [name], [remoteId] and
@@ -68,4 +80,35 @@ abstract class ContentBase {
   final String name;
   final int remoteId;
   final bool isSaved;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is ContentBase &&
+        other.category == category &&
+        other.city == city &&
+        _round(other.coordinates) == _round(coordinates) &&
+        other.createdAt.isAtSameMomentAs(createdAt) &&
+        other.description == description &&
+        other.modifiedAt.isAtSameMomentAs(modifiedAt) &&
+        const ListEquality<Media>().equals(other.media, media) &&
+        other.name == name &&
+        other.remoteId == remoteId &&
+        other.isSaved == isSaved;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    category,
+    city,
+    _round(coordinates),
+    createdAt.millisecondsSinceEpoch,
+    description,
+    modifiedAt.millisecondsSinceEpoch,
+    Object.hashAll(media),
+    name,
+    remoteId,
+    isSaved,
+  );
 }

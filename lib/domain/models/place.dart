@@ -1,7 +1,7 @@
 import 'package:meta/meta.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 
-/// A point of interest in the Molise region.
+/// A point of interest.
 @immutable
 class Place extends ContentBase {
   const Place({

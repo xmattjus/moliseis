@@ -63,7 +63,7 @@
     },
     {
       "id": "15:789366488649937453",
-      "lastPropertyId": "14:5807263220332414539",
+      "lastPropertyId": "15:7933325563720313603",
       "name": "MediaEntity",
       "properties": [
         {
@@ -142,13 +142,18 @@
           "type": 11,
           "flags": 520,
           "relationTarget": "EventEntity"
+        },
+        {
+          "id": "15:7933325563720313603",
+          "name": "isDeleted",
+          "type": 1
         }
       ],
       "relations": []
     },
     {
       "id": "16:8997816155422886265",
-      "lastPropertyId": "4:7216293297951087590",
+      "lastPropertyId": "5:1717979632115563282",
       "name": "CityEntity",
       "properties": [
         {
@@ -171,13 +176,18 @@
           "id": "4:7216293297951087590",
           "name": "modifiedAt",
           "type": 12
+        },
+        {
+          "id": "5:1717979632115563282",
+          "name": "isDeleted",
+          "type": 1
         }
       ],
       "relations": []
     },
     {
       "id": "17:7285695363865824884",
-      "lastPropertyId": "12:8503059518440331862",
+      "lastPropertyId": "13:7054880704473750215",
       "name": "EventEntity",
       "properties": [
         {
@@ -247,13 +257,18 @@
           "id": "12:8503059518440331862",
           "name": "isSaved",
           "type": 1
+        },
+        {
+          "id": "13:7054880704473750215",
+          "name": "isDeleted",
+          "type": 1
         }
       ],
       "relations": []
     },
     {
       "id": "18:7465876784755698809",
-      "lastPropertyId": "10:4703108708007619239",
+      "lastPropertyId": "11:3114563146177949760",
       "name": "PlaceEntity",
       "properties": [
         {
@@ -312,6 +327,11 @@
         {
           "id": "10:4703108708007619239",
           "name": "isSaved",
+          "type": 1
+        },
+        {
+          "id": "11:3114563146177949760",
+          "name": "isDeleted",
           "type": 1
         }
       ],

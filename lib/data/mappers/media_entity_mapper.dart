@@ -1,12 +1,12 @@
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/domain/models/media.dart';
 
-/// Conversion helpers from [MediaEntity] to the [Media] domain model.
+/// Conversion extensions from [MediaEntity] to the [Media] domain model.
 extension MediaEntityExtensions on MediaEntity {
   /// Maps a [MediaEntity] to a [Media] domain model.
   Media toModel() {
-    String areaName = '';
-    String cityName = '';
+    var areaName = '';
+    var cityName = '';
 
     if (place.hasValue && !event.hasValue) {
       areaName = place.target?.name ?? '';

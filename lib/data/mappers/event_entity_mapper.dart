@@ -5,7 +5,7 @@ import 'package:moliseis/data/mappers/media_entity_mapper.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/media.dart';
 
-/// Conversion helpers from [EventEntity] to the [Event] domain model.
+/// Conversion extensions from [EventEntity] to the [Event] domain model.
 extension EventEntityExtensions on EventEntity {
   /// Maps an [EventEntity] to an [Event] domain model.
   Event toModel() => Event(
@@ -15,6 +15,7 @@ extension EventEntityExtensions on EventEntity {
     createdAt: createdAt,
     description: description ?? '',
     media: media
+        .where((entity) => !entity.isDeleted)
         .map<Media>((entity) => entity.toModel())
         .toList(growable: false),
     modifiedAt: modifiedAt,

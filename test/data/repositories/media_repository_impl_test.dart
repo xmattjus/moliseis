@@ -357,7 +357,7 @@ void main() {
           'width': 1920,
           'height': 1080,
           'created_at': '2024-01-01T00:00:00.000',
-          'modified_at': '2025-06-01T00:00:00.000',
+          'modified_at': '2027-06-01T00:00:00.000',
         },
       ]);
 
@@ -401,7 +401,7 @@ void main() {
     setUp(() {
       mockLogger = MockLogger();
       final mockBox = _MockMediaEntityBox();
-      when(mockBox.query).thenThrow(Exception('query failed'));
+      when(() => mockBox.query(any())).thenThrow(Exception('query failed'));
 
       final mockStore = _MockStore(mockBox);
 

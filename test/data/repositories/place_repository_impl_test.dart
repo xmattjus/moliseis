@@ -578,6 +578,9 @@ void main() {
         {
           'id': 1,
           'name': 'Campobasso',
+          'description': '',
+          'coordinates': [0, 0],
+          'category': 'unknown',
           'created_at': '2024-01-01T00:00:00.000',
           'modified_at': '2024-01-01T00:00:00.000',
         },
@@ -606,6 +609,9 @@ void main() {
         {
           'id': 1,
           'name': 'Campobasso',
+          'description': '',
+          'coordinates': [0, 0],
+          'category': 'unknown',
           'created_at': '2024-01-01T00:00:00.000',
           'modified_at': '2024-01-01T00:00:00.000',
         },
@@ -636,6 +642,9 @@ void main() {
         {
           'id': 1,
           'name': 'Campobasso Aggiornato',
+          'description': '',
+          'coordinates': [0, 0],
+          'category': 'unknown',
           'created_at': '2024-01-01T00:00:00.000',
           'modified_at': '2025-06-01T00:00:00.000',
         },
@@ -660,6 +669,9 @@ void main() {
         {
           'id': 2,
           'name': 'New Place',
+          'description': '',
+          'coordinates': [0, 0],
+          'category': 'unknown',
           'created_at': '2024-01-01T00:00:00.000',
           'modified_at': '2024-01-01T00:00:00.000',
         },
@@ -719,6 +731,7 @@ PlaceEntity _createPlace({
   return PlaceEntity(
     remoteId: remoteId,
     name: name,
+    description: 'Franco',
     category: category,
     isSaved: isSaved,
     createdAt: createdAt ?? now,

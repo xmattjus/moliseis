@@ -1,80 +1,66 @@
-import 'package:collection/collection.dart';
+import 'package:moliseis/data/core/base_sync_repository.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/city_supabase_table.dart';
+import 'package:moliseis/data/dtos/city_dto.dart';
+import 'package:moliseis/data/mappers/mappers.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/logging/logging.dart';
-import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class CityRepositoryImpl implements CityRepository {
+class CityRepositoryImpl extends BaseSyncRepository<CityDto, CityEntity>
+    implements CityRepository {
   CityRepositoryImpl({
     required Logger logger,
     required Supabase supabaseI,
     required CitySupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
-  }) : _logger = logger,
-       _supabase = supabaseI,
-       _supabaseTable = supabaseTable,
-       _cityBox = objectBoxI.store.box<CityEntity>();
-
-  final Logger _logger;
+  }) : _supabase = supabaseI,
+       _table = supabaseTable,
+       _objectBox = objectBoxI,
+       _box = objectBoxI.store.box<CityEntity>(),
+       super(logger);
 
   final Supabase _supabase;
-  final CitySupabaseTable _supabaseTable;
-  final Box<CityEntity> _cityBox;
+  final CitySupabaseTable _table;
+  final ObjectBox _objectBox;
+  final Box<CityEntity> _box;
 
   @override
-  Future<Result<void>> synchronize() async {
-    _logger.log(const RepositorySyncStarted('city'));
+  String get entityName => 'city';
 
-    try {
-      final cities = await _supabase.client
-          .from(_supabaseTable.tableName)
-          .select();
+  @override
+  void runInWriteTransaction(void Function() fn) =>
+      _objectBox.store.runInTransaction(TxMode.write, fn);
 
-      final remote = Set<CityEntity>.unmodifiable(
-        cities.map<CityEntity>(CityEntity.fromJson),
-      );
+  @override
+  Future<List<CityDto>> fetchRemote() async {
+    final response = await _supabase.client.from(_table.tableName).select();
 
-      final local = Set<CityEntity>.unmodifiable(_cityBox.getAll());
+    return response.map<CityDto>(CityDtoMapper.fromMap).toList();
+  }
 
-      final citiesToPut = remote.difference(local);
+  @override
+  CityEntity? getLocalById(int id) => _box.get(id);
 
-      for (final city in citiesToPut) {
-        final existingCity = local.firstWhereOrNull(
-          (test) => test.remoteId == city.remoteId,
-        );
+  @override
+  void put(CityEntity entity) => _box.put(entity);
 
-        if (existingCity == null) {
-          _cityBox.put(city);
+  @override
+  void putMany(List<CityEntity> entities) => _box.putMany(entities);
 
-          _logger.log(EntityInsertSuccess('city', city.remoteId));
-        } else {
-          if (existingCity != city) {
-            final copy = existingCity.copyWith(
-              name: city.name,
-              createdAt: city.createdAt,
-              modifiedAt: city.modifiedAt,
-            );
+  @override
+  CityEntity createEntity(CityDto dto) => dto.toEntity();
 
-            _cityBox.put(copy);
+  @override
+  CityEntity mergeEntity(CityDto dto, CityEntity existing) =>
+      dto.mergeInto(existing);
 
-            _logger.log(EntityUpdateSuccess('city', city.remoteId));
-          }
-        }
-      }
-
-      return const Result.success(null);
-    } on Exception catch (exception, stackTrace) {
-      _logger.log(
-        const RepositorySyncFailed('city'),
-        error: exception,
-        stackTrace: stackTrace,
-      );
-
-      return Result.error(exception);
-    }
+  @override
+  CityEntity markEntityDeleted(CityEntity existing) {
+    return existing.copyWith(
+      isDeleted: true,
+    );
   }
 }

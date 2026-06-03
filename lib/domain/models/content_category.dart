@@ -8,8 +8,8 @@ enum ContentCategory {
   experience,
 }
 
-/// Asserts [ContentCategory] enum values indexes have not changed.
-void assertStableContentCategoryEnumValues() {
+/// Verifies the index of each [ContentCategory] enum has not changed.
+void assertStableContentCategoryEnumIndexes() {
   assert(
     ContentCategory.unknown.index == 0,
     'ContentCategory.unknown must have index 0',
@@ -37,5 +37,15 @@ void assertStableContentCategoryEnumValues() {
   assert(
     ContentCategory.experience.index == 6,
     'ContentCategory.experience must have index 6',
+  );
+}
+
+/// Verifies no value has been added or removed from [ContentCategory].
+void assertStableContentCategoryEnum() {
+  assert(
+    ContentCategory.values.length == 7,
+    'ContentCategory has ${ContentCategory.values.length} values. '
+    'Update ContentCategoryMapper.decode() and '
+    'assertStableContentCategoryEnumValues() to handle the new value.',
   );
 }

@@ -1,13 +1,10 @@
-import 'package:json_annotation/json_annotation.dart';
+import 'package:moliseis/data/core/sync_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:objectbox/objectbox.dart';
 
-part 'city_entity.g.dart';
-
 @Entity()
-@JsonSerializable()
-class CityEntity {
+class CityEntity implements SyncEntity {
   const CityEntity({
     required this.remoteId,
     required this.name,
@@ -15,69 +12,43 @@ class CityEntity {
     required this.modifiedAt,
     required this.places,
     required this.events,
+    this.isDeleted = false,
   });
 
-  factory CityEntity.fromJson(Map<String, dynamic> json) =>
-      _$CityEntityFromJson(json);
-
-  Map<String, dynamic> toJson() => _$CityEntityToJson(this);
-
-  @JsonKey(name: 'id')
+  @override
   @Id(assignable: true)
   final int remoteId;
 
   final String name;
 
   @Property(type: PropertyType.dateNano)
-  @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
+  @override
   @Property(type: PropertyType.dateNano)
-  @JsonKey(name: 'modified_at')
   final DateTime modifiedAt;
 
+  @override
+  final bool isDeleted;
+
   @Backlink('city')
-  @PlaceRelToManyConverter()
   final ToMany<PlaceEntity> places;
 
   @Backlink('city')
-  @EventRelToManyConverter()
   final ToMany<EventEntity> events;
-
-  @override
-  bool operator ==(Object other) =>
-      other is CityEntity &&
-      other.remoteId == remoteId &&
-      other.name == name &&
-      other.createdAt.isAtSameMomentAs(createdAt) &&
-      other.modifiedAt.isAtSameMomentAs(modifiedAt);
-
-  @override
-  int get hashCode => Object.hash(remoteId, name, createdAt, modifiedAt);
 
   CityEntity copyWith({
     String? name,
     DateTime? createdAt,
     DateTime? modifiedAt,
+    bool? isDeleted,
   }) => CityEntity(
     remoteId: remoteId,
     name: name ?? this.name,
     createdAt: createdAt ?? this.createdAt,
     modifiedAt: modifiedAt ?? this.modifiedAt,
+    isDeleted: isDeleted ?? this.isDeleted,
     places: places,
     events: events,
   );
-}
-
-class CityRelToOneConverter
-    implements JsonConverter<ToOne<CityEntity>, Map<String, dynamic>?> {
-  const CityRelToOneConverter();
-
-  @override
-  ToOne<CityEntity> fromJson(Map<String, dynamic>? json) => ToOne<CityEntity>(
-    target: json == null ? null : CityEntity.fromJson(json),
-  );
-
-  @override
-  Map<String, dynamic>? toJson(ToOne<CityEntity> rel) => rel.target?.toJson();
 }

@@ -1,7 +1,7 @@
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/domain/models/city.dart';
 
-/// Conversion helpers from [CityEntity] to the [City] domain model.
+/// Conversion extensions from [CityEntity] to the [City] domain model.
 ///
 /// Declared on [CityEntity]? so callers can write `relation.target.toModel()`
 /// without a prior null check.

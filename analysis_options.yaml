@@ -5,6 +5,8 @@ analyzer:
     todo: info
   exclude:
     - '**.g.dart'
+    - '**.init.dart'
+    - '**.mapper.dart'
 
 linter:
   rules:
