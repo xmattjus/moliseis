@@ -25,7 +25,7 @@ void main() {
   final testCurrentData = CurrentWeatherForecastData(
     time: DateTime.utc(2026, 4, 7, 10),
     interval: 900,
-    temperature: 18.5,
+    temperature2m: 18.5,
     isDay: 1,
     weatherCode: 0,
     precipitation: 0,
@@ -63,9 +63,9 @@ void main() {
       timezone: 'Europe/Rome',
       timezoneAbbreviation: 'CEST',
       elevation: 700,
-      currentData: testCurrentData,
-      hourlyData: testHourlyData,
-      dailyData: testDailyData,
+      current: testCurrentData,
+      hourly: testHourlyData,
+      daily: testDailyData,
     );
   });
 

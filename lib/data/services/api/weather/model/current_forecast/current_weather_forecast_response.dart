@@ -1,13 +1,15 @@
-import 'package:json_annotation/json_annotation.dart';
-import 'package:meta/meta.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:moliseis/data/services/api/weather/model/base_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 
-part 'current_weather_forecast_response.g.dart';
+part 'generated/current_weather_forecast_response.mapper.dart';
 
-@immutable
-@JsonSerializable(createToJson: false, explicitToJson: true)
-class CurrentWeatherForecastResponse extends BaseWeatherForecastResponse {
+@MappableClass(
+  caseStyle: CaseStyle.snakeCase,
+  generateMethods: GenerateMethods.decode | GenerateMethods.stringify,
+)
+class CurrentWeatherForecastResponse extends BaseWeatherForecastResponse
+    with CurrentWeatherForecastResponseMappable {
   const CurrentWeatherForecastResponse({
     required super.latitude,
     required super.longitude,
@@ -19,9 +21,6 @@ class CurrentWeatherForecastResponse extends BaseWeatherForecastResponse {
     required this.data,
   });
 
-  factory CurrentWeatherForecastResponse.fromJson(Map<String, dynamic> json) =>
-      _$CurrentWeatherForecastResponseFromJson(json);
-
-  @JsonKey(name: 'current')
+  @MappableField(key: 'current')
   final CurrentWeatherForecastData data;
 }

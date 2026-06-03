@@ -68,7 +68,7 @@ class CachedWeatherApiClient {
       _currentWeatherCache.put(
         cacheKey,
         WeatherForecastDataCacheEntry(
-          data: result.value.currentData,
+          data: result.value.current,
           fetchedAt: fetchedAt,
           locationKey: cacheKey,
         ),
@@ -78,7 +78,7 @@ class CachedWeatherApiClient {
       _hourlyWeatherCache.put(
         cacheKey,
         WeatherForecastDataCacheEntry(
-          data: result.value.hourlyData,
+          data: result.value.hourly,
           fetchedAt: fetchedAt,
           locationKey: cacheKey,
         ),
@@ -88,7 +88,7 @@ class CachedWeatherApiClient {
       _dailyWeatherCache.put(
         cacheKey,
         WeatherForecastDataCacheEntry(
-          data: result.value.dailyData,
+          data: result.value.daily,
           fetchedAt: fetchedAt,
           locationKey: cacheKey,
         ),
@@ -147,7 +147,7 @@ class CachedWeatherApiClient {
     final result = await _fetchAndCacheAll(latitude, longitude);
 
     if (result is Success<CombinedWeatherForecastResponse>) {
-      return Result.success(result.value.currentData);
+      return Result.success(result.value.current);
     } else {
       return Result.error(Exception('Failed to fetch current weather data.'));
     }
@@ -194,7 +194,7 @@ class CachedWeatherApiClient {
     final result = await _fetchAndCacheAll(latitude, longitude);
 
     if (result is Success<CombinedWeatherForecastResponse>) {
-      return Result.success(result.value.hourlyData);
+      return Result.success(result.value.hourly);
     } else {
       return Result.error(Exception('Failed to fetch hourly weather data.'));
     }
@@ -242,7 +242,7 @@ class CachedWeatherApiClient {
     final result = await _fetchAndCacheAll(latitude, longitude);
 
     if (result is Success<CombinedWeatherForecastResponse>) {
-      return Result.success(result.value.dailyData);
+      return Result.success(result.value.daily);
     } else {
       return Result.error(Exception('Failed to fetch daily weather data.'));
     }

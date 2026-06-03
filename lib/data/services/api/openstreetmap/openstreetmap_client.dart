@@ -35,7 +35,7 @@ class OpenStreetMapClient {
           .timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 
       if (response.statusCode == 200) {
-        final jsonData = ReverseGeocodingResponse.fromJson(
+        final jsonData = ReverseGeocodingResponseMapper.fromMap(
           jsonDecode(response.body) as Map<String, dynamic>,
         );
 

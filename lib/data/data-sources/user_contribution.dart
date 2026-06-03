@@ -1,9 +1,12 @@
-import 'package:json_annotation/json_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:meta/meta.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
+part 'generated/user_contribution.mapper.dart';
+
 @immutable
-class UserContribution {
+@MappableClass(caseStyle: CaseStyle.snakeCase)
+class UserContribution with UserContributionMappable {
   const UserContribution({
     this.id,
     this.type,
@@ -39,34 +42,7 @@ class UserContribution {
 
   final String? authorName;
 
-  @JsonKey(name: 'created_at')
   final DateTime? createdAt;
 
-  @JsonKey(name: 'modified_at')
   final DateTime? modifiedAt;
-
-  UserContribution copyWith({
-    ContentCategory? type,
-    String? city,
-    String? place,
-    String? description,
-    DateTime? startDate,
-    DateTime? endDate,
-    List<String>? media,
-    String? authorEmail,
-    String? authorName,
-  }) => UserContribution(
-    id: id,
-    type: type ?? this.type,
-    city: city ?? this.city,
-    place: place ?? this.place,
-    description: description ?? this.description,
-    startDate: startDate ?? this.startDate,
-    endDate: endDate ?? this.endDate,
-    media: media ?? this.media,
-    authorEmail: authorEmail ?? this.authorEmail,
-    authorName: authorName ?? this.authorName,
-    createdAt: createdAt,
-    modifiedAt: modifiedAt,
-  );
 }

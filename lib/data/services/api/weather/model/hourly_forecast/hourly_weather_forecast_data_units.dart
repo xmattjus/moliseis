@@ -1,11 +1,15 @@
-import 'package:json_annotation/json_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:meta/meta.dart';
 
-part 'hourly_weather_forecast_data_units.g.dart';
+part 'generated/hourly_weather_forecast_data_units.mapper.dart';
 
 @immutable
-@JsonSerializable(createToJson: false)
-class HourlyWeatherForecastDataUnits {
+@MappableClass(
+  caseStyle: CaseStyle.snakeCase,
+  generateMethods: GenerateMethods.decode | GenerateMethods.stringify,
+)
+class HourlyWeatherForecastDataUnits
+    with HourlyWeatherForecastDataUnitsMappable {
   const HourlyWeatherForecastDataUnits({
     required this.time,
     required this.temperature2m,
@@ -13,14 +17,8 @@ class HourlyWeatherForecastDataUnits {
     required this.weatherCode,
   });
 
-  factory HourlyWeatherForecastDataUnits.fromJson(Map<String, dynamic> json) =>
-      _$HourlyWeatherForecastDataUnitsFromJson(json);
-
   final String time;
-  @JsonKey(name: 'temperature_2m')
   final String temperature2m;
-  @JsonKey(name: 'precipitation_probability')
   final String precipitationProbability;
-  @JsonKey(name: 'weather_code')
   final String weatherCode;
 }

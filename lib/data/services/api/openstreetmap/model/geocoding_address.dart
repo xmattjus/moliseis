@@ -1,13 +1,15 @@
+// Names follow poorly formatted json response keys.
 // ignore_for_file: non_constant_identifier_names
 
-import 'package:json_annotation/json_annotation.dart';
-import 'package:meta/meta.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
-part 'geocoding_address.g.dart';
+part 'generated/geocoding_address.mapper.dart';
 
-@immutable
-@JsonSerializable(createToJson: false)
-class GeocodingAddress {
+@MappableClass(
+  caseStyle: CaseStyle.snakeCase,
+  generateMethods: GenerateMethods.decode | GenerateMethods.stringify,
+)
+class GeocodingAddress with GeocodingAddressMappable {
   const GeocodingAddress({
     this.amenity,
     this.road,
@@ -24,9 +26,6 @@ class GeocodingAddress {
     required this.countryCode,
   });
 
-  factory GeocodingAddress.fromJson(Map<String, dynamic> json) =>
-      _$GeocodingAddressFromJson(json);
-
   final String? amenity;
   final String? road;
   final String? neighbourhood;
@@ -34,13 +33,12 @@ class GeocodingAddress {
   final String? village;
   final String? town;
   final String county;
-  @JsonKey(name: 'ISO3166-2-lvl6')
+  @MappableField(key: 'ISO3166-2-lvl6')
   final String iso3166_2_lvl6;
   final String state;
-  @JsonKey(name: 'ISO3166-2-lvl4')
+  @MappableField(key: 'ISO3166-2-lvl4')
   final String iso3166_2_lvl4;
   final String? postcode;
   final String country;
-  @JsonKey(name: 'country_code')
   final String countryCode;
 }

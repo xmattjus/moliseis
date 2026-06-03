@@ -1,14 +1,18 @@
-import 'package:json_annotation/json_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:meta/meta.dart';
 import 'package:moliseis/data/services/api/weather/model/base_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data_units.dart';
 
-part 'hourly_weather_forecast_response.g.dart';
+part 'generated/hourly_weather_forecast_response.mapper.dart';
 
 @immutable
-@JsonSerializable(createToJson: false, explicitToJson: true)
-class HourlyWeatherForecastResponse extends BaseWeatherForecastResponse {
+@MappableClass(
+  caseStyle: CaseStyle.snakeCase,
+  generateMethods: GenerateMethods.decode | GenerateMethods.stringify,
+)
+class HourlyWeatherForecastResponse extends BaseWeatherForecastResponse
+    with HourlyWeatherForecastResponseMappable {
   const HourlyWeatherForecastResponse({
     required super.latitude,
     required super.longitude,
@@ -17,14 +21,10 @@ class HourlyWeatherForecastResponse extends BaseWeatherForecastResponse {
     required super.timezone,
     required super.timezoneAbbreviation,
     required super.elevation,
-    required this.units,
+    required this.hourlyUnits,
     required this.data,
   });
 
-  factory HourlyWeatherForecastResponse.fromJson(Map<String, dynamic> json) =>
-      _$HourlyWeatherForecastResponseFromJson(json);
-
-  @JsonKey(name: 'hourly_units')
-  final HourlyWeatherForecastDataUnits units;
+  final HourlyWeatherForecastDataUnits hourlyUnits;
   final HourlyWeatherForecastData data;
 }

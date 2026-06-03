@@ -67,7 +67,7 @@ class WeatherApiClient {
           .timeout(const Duration(seconds: kDefaultNetworkTimeoutSeconds));
 
       if (response.statusCode == 200) {
-        final jsonData = CombinedWeatherForecastResponse.fromJson(
+        final jsonData = CombinedWeatherForecastResponseMapper.fromMap(
           jsonDecode(response.body) as Map<String, dynamic>,
         );
 

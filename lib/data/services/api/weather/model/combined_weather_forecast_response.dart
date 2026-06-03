@@ -1,11 +1,11 @@
-import 'package:json_annotation/json_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:meta/meta.dart';
 import 'package:moliseis/data/services/api/weather/model/base_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 
-part 'combined_weather_forecast_response.g.dart';
+part 'generated/combined_weather_forecast_response.mapper.dart';
 
 /// Unified response model for combined weather forecast API calls.
 ///
@@ -14,8 +14,12 @@ part 'combined_weather_forecast_response.g.dart';
 /// all weather data at once instead of making separate requests for each
 /// forecast type.
 @immutable
-@JsonSerializable(createToJson: false, explicitToJson: true)
-class CombinedWeatherForecastResponse extends BaseWeatherForecastResponse {
+@MappableClass(
+  caseStyle: CaseStyle.snakeCase,
+  generateMethods: GenerateMethods.decode | GenerateMethods.stringify,
+)
+class CombinedWeatherForecastResponse extends BaseWeatherForecastResponse
+    with CombinedWeatherForecastResponseMappable {
   const CombinedWeatherForecastResponse({
     required super.latitude,
     required super.longitude,
@@ -24,18 +28,12 @@ class CombinedWeatherForecastResponse extends BaseWeatherForecastResponse {
     required super.timezone,
     required super.timezoneAbbreviation,
     required super.elevation,
-    required this.currentData,
-    required this.hourlyData,
-    required this.dailyData,
+    required this.current,
+    required this.hourly,
+    required this.daily,
   });
 
-  factory CombinedWeatherForecastResponse.fromJson(Map<String, dynamic> json) =>
-      _$CombinedWeatherForecastResponseFromJson(json);
-
-  @JsonKey(name: 'current')
-  final CurrentWeatherForecastData currentData;
-  @JsonKey(name: 'hourly')
-  final HourlyWeatherForecastData hourlyData;
-  @JsonKey(name: 'daily')
-  final DailyWeatherForecastData dailyData;
+  final CurrentWeatherForecastData current;
+  final HourlyWeatherForecastData hourly;
+  final DailyWeatherForecastData daily;
 }

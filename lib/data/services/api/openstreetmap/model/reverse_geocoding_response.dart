@@ -1,12 +1,13 @@
-import 'package:json_annotation/json_annotation.dart';
-import 'package:meta/meta.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:moliseis/data/services/api/openstreetmap/model/geocoding_address.dart';
 
-part 'reverse_geocoding_response.g.dart';
+part 'generated/reverse_geocoding_response.mapper.dart';
 
-@immutable
-@JsonSerializable(createToJson: false, explicitToJson: true)
-class ReverseGeocodingResponse {
+@MappableClass(
+  caseStyle: CaseStyle.snakeCase,
+  generateMethods: GenerateMethods.decode | GenerateMethods.stringify,
+)
+class ReverseGeocodingResponse with ReverseGeocodingResponseMappable {
   const ReverseGeocodingResponse({
     required this.placeId,
     required this.licence,
@@ -25,30 +26,22 @@ class ReverseGeocodingResponse {
     required this.boundingBox,
   });
 
-  factory ReverseGeocodingResponse.fromJson(Map<String, dynamic> json) =>
-      _$ReverseGeocodingResponseFromJson(json);
-
-  @JsonKey(name: 'place_id')
   final int placeId;
   final String licence;
-  @JsonKey(name: 'osm_type')
   final String osmType;
-  @JsonKey(name: 'osm_id')
   final int osmId;
   final String lat;
   final String lon;
   final String category;
   final String type;
-  @JsonKey(name: 'place_rank')
   final int placeRank;
   final double importance;
-  @JsonKey(name: 'addresstype')
+  @MappableField(key: 'addresstype')
   final String addressType;
   final String name;
-  @JsonKey(name: 'display_name')
   final String displayName;
-  @JsonKey(name: 'address')
+  @MappableField(key: 'address')
   final GeocodingAddress geocodingAddress;
-  @JsonKey(name: 'boundingbox')
+  @MappableField(key: 'boundingbox')
   final List<String> boundingBox;
 }

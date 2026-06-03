@@ -64,7 +64,7 @@ class WeatherViewModel extends ChangeNotifier {
 
     final data = result.getOrNull();
     if (data != null) {
-      _currentTemperatureCelsius = data.temperature.toStringAsFixed(1);
+      _currentTemperatureCelsius = data.temperature2m.toStringAsFixed(1);
       _currentWeatherDescription = _weatherDescriptionMapper.descriptionForCode(
         data.weatherCode,
       );
