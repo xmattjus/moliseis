@@ -4,6 +4,7 @@ import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Orchestrates synchronization of all local repositories with the backend.
 ///
@@ -36,6 +37,12 @@ class SyncUseCase {
   /// On success, records the current timestamp as the last successful sync
   /// time. Returns [Result.error] if any repository fails.
   Future<Result<void>> sync() async {
+    final transaction = Sentry.startTransaction(
+      'sync',
+      'task',
+      bindToScope: true,
+    );
+
     for (final repo in [
       _cityRepository,
       _placeRepository,
@@ -45,11 +52,15 @@ class SyncUseCase {
       final result = await repo.synchronize();
 
       if (result.isError) {
+        await transaction.finish(status: const SpanStatus.internalError());
+
         return result;
       }
     }
 
     await _settingsRepository.setModifiedAt(DateTime.now());
+
+    await transaction.finish(status: const SpanStatus.ok());
 
     return const Result.success(null);
   }

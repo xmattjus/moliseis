@@ -55,7 +55,7 @@ Future<void> _main() async {
       ..environment = kDebugMode ? 'debug' : 'production'
       // Set tracesSampleRate to 1.0 to capture 100% of transactions for
       // tracing.
-      ..tracesSampleRate = 0.4
+      ..tracesSampleRate = kDebugMode ? 1.0 : 0.4
       // The sampling rate for profiling is relative to tracesSampleRate
       // Setting to 1.0 will profile 100% of sampled transactions:
       ..profilesSampleRate = 1.0
