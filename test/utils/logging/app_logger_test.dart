@@ -95,7 +95,7 @@ void main() {
           minLevel: AppLogLevel.info,
         );
 
-        logger.log(SentryLoggingEnabled());
+        logger.log(const SentryLoggingEnabled());
 
         verifyNever(
           () => mockTalker.log(
@@ -151,7 +151,7 @@ void main() {
           sentryFlag: sentryFlag,
         );
 
-        logger.log(SentryLoggingEnabled());
+        logger.log(const SentryLoggingEnabled());
 
         verify(
           () => mockTalker.log(
@@ -351,7 +351,7 @@ void main() {
           sentryFlag: sentryFlag,
         );
 
-        logger.log(SentryLoggingEnabled());
+        logger.log(const SentryLoggingEnabled());
 
         // Allow microtask queue to flush.
         await Future<void>.delayed(Duration.zero);

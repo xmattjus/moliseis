@@ -104,9 +104,13 @@ final appRouter = GoRouter(
                 return MultiProvider(
                   providers: <SingleChildWidget>[
                     ChangeNotifierProvider<EventViewModel>(
-                      create: (context) =>
-                          EventViewModel(repository: context.read())
-                            ..loadNextIds.execute(),
+                      create: (context) {
+                        final viewModel = EventViewModel(
+                          repository: context.read(),
+                        );
+                        unawaited(viewModel.loadNextIds.execute());
+                        return viewModel;
+                      },
                     ),
                     ChangeNotifierProvider<ExploreViewModel>(
                       create: (context) => ExploreViewModel(

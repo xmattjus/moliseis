@@ -30,11 +30,11 @@ Future<T?> appShowModalBottomSheet<T>({
   assert(debugCheckHasMediaQuery(context));
   assert(debugCheckHasMaterialLocalizations(context));
 
-  final NavigatorState navigator = Navigator.of(
+  final navigator = Navigator.of(
     context,
     rootNavigator: useRootNavigator,
   );
-  final MaterialLocalizations localizations = MaterialLocalizations.of(context);
+  final localizations = MaterialLocalizations.of(context);
   return navigator.push(
     ModalBottomSheetRoute<T>(
       builder: builder,

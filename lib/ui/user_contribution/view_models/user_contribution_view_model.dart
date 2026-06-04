@@ -14,7 +14,7 @@ import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
 
-/// Pairs a picked [XFile] with its SHA-1 [digest] string for deduplication.
+/// Pairs a picked [XFile] with its SHA-1 [String] digest for deduplication.
 typedef _MediaEntry = ({XFile file, String digest});
 
 class UserContributionViewModel extends ChangeNotifier {

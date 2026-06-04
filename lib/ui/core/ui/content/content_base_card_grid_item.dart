@@ -75,7 +75,7 @@ class ContentBaseCardGridItem extends StatelessWidget {
                       cityName: content.city?.name,
                       color: Colors.white,
                     ),
-                    if (supportingText != null) supportingText!,
+                    ?supportingText,
                   ],
                 ),
               ),

@@ -245,7 +245,7 @@ void main() {
       });
 
       test('SentryLoggingEnabled has correct contract', () {
-        final event = SentryLoggingEnabled();
+        const event = SentryLoggingEnabled();
 
         expect(event.name, 'sentry_crash_reporting_enabled');
         expect(event.level, AppLogLevel.debug);
