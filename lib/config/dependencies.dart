@@ -43,12 +43,19 @@ import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
+/// The global [Talker] instance.
+///
+/// The Dependency Injection pattern is intentionally not used here because
+/// go_router route observers do not have access to the build context.
+/// The `$` character in the name is used to clearly indicate that this
+/// instance is intentionally global/static.
+final Talker $talker = TalkerFlutter.init();
+
 /// Builds the root provider list using fully initialized dependencies.
 ///
 /// Call this only after startup services are ready in the app entrypoint.
 List<SingleChildWidget> providers(
   Logger logger,
-  Talker talker,
   Supabase supabase,
   ObjectBox objectBox,
   http.Client httpClient,
@@ -59,12 +66,15 @@ List<SingleChildWidget> providers(
   //#region Shared
   Provider<CacheManager>.value(value: cacheManager),
   Provider<Logger>.value(value: logger),
-  Provider<Talker>.value(value: talker),
-  Provider<UrlLaunchService>(create: (_) => UrlLaunchService(logger: logger)),
+  Provider<UrlLaunchService>(
+    create: (context) => UrlLaunchService(
+      logger: context.read(),
+    ),
+  ),
   Provider<CachedWeatherApiClient>(
-    create: (_) => CachedWeatherApiClient(
+    create: (context) => CachedWeatherApiClient(
       weatherApiClient: WeatherApiClient(
-        logger: logger,
+        logger: context.read(),
         httpClient: httpClient,
       ),
       currentWeatherCache: WeatherForecastDataCache<CurrentWeatherForecastData>(
@@ -76,15 +86,16 @@ List<SingleChildWidget> providers(
       dailyWeatherCache: WeatherForecastDataCache<DailyWeatherForecastData>(
         maxSize: 50,
       ),
+      logger: context.read(),
     ),
   ),
   //#endregion
 
   //#region Repositories (sorted by name ascending)
   Provider<PlaceRepository>(
-    create: (_) =>
+    create: (context) =>
         PlaceRepositoryImpl(
-              logger: logger,
+              logger: context.read(),
               supabaseI: supabase,
               supabaseTable: PlaceSupabaseTable(),
               objectBoxI: objectBox,
@@ -92,9 +103,9 @@ List<SingleChildWidget> providers(
             as PlaceRepository,
   ),
   Provider<EventRepository>(
-    create: (_) =>
+    create: (context) =>
         EventRepositoryImpl(
-              logger: logger,
+              logger: context.read(),
               supabaseI: supabase,
               supabaseTable: EventSupabaseTable(),
               objectBoxI: objectBox,
@@ -102,9 +113,9 @@ List<SingleChildWidget> providers(
             as EventRepository,
   ),
   Provider<MediaRepository>(
-    create: (_) =>
+    create: (context) =>
         MediaRepositoryImpl(
-              logger: logger,
+              logger: context.read(),
               supabaseI: supabase,
               supabaseTable: MediaSupabaseTable(),
               objectBoxI: objectBox,
@@ -112,9 +123,9 @@ List<SingleChildWidget> providers(
             as MediaRepository,
   ),
   Provider<CityRepository>(
-    create: (_) =>
+    create: (context) =>
         CityRepositoryImpl(
-              logger: logger,
+              logger: context.read(),
               supabaseI: supabase,
               supabaseTable: CitySupabaseTable(),
               objectBoxI: objectBox,
@@ -122,22 +133,22 @@ List<SingleChildWidget> providers(
             as CityRepository,
   ),
   Provider<SearchRepository>(
-    create: (_) =>
-        SearchRepositoryImpl(logger: logger, objectBoxI: objectBox)
+    create: (context) =>
+        SearchRepositoryImpl(logger: context.read(), objectBoxI: objectBox)
             as SearchRepository,
   ),
   Provider<SettingsRepository>.value(value: settingsRepository),
   Provider<UserContributionRepository>(
-    create: (_) {
+    create: (context) {
       final cloudinaryClient = CloudinaryClient(
-        logger: logger,
+        logger: context.read(),
         cloudName: Env.cloudinaryProdCloudName,
         apiKey: Env.cloudinaryProdApiKey,
         apiSecret: Env.cloudinaryProdApiSecret,
       );
 
       return UserContributionRepositoryImpl(
-            logger: logger,
+            logger: context.read(),
             supabase: supabase,
             supabaseTable: UserContributionSupabaseTable(),
             cloudinaryClient: cloudinaryClient,
@@ -146,10 +157,10 @@ List<SingleChildWidget> providers(
     },
   ),
   Provider<GeoMapRepository>(
-    create: (_) {
+    create: (context) {
       return GeoMapRepositoryImpl(
             openStreetMapClient: OpenStreetMapClient(
-              logger: logger,
+              logger: context.read(),
               httpClient: httpClient,
             ),
           )

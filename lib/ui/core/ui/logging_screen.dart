@@ -10,7 +10,7 @@ class LoggingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return TalkerScreen(
       talker: talker,
-      appBarTitle: 'Debug',
+      appBarTitle: 'Logs',
     );
   }
 }

@@ -3,11 +3,11 @@ import 'dart:async' show unawaited;
 import 'package:animated_stateful_shell_route/animated_stateful_shell_route.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
-import 'package:moliseis/main.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -87,7 +87,7 @@ final appRouter = GoRouter(
       path: RoutePaths.logging,
       name: RouteNames.logging,
       builder: (_, _) {
-        return LoggingScreen(talker: talker);
+        return LoggingScreen(talker: $talker);
       },
     ),
     AnimatedStatefulShellRoute(
@@ -283,7 +283,7 @@ final appRouter = GoRouter(
     ),
   ],
   observers: [
-    TalkerRouteObserver(talker),
+    TalkerRouteObserver($talker),
   ],
   navigatorKey: _rootNavigatorKey,
   restorationScopeId: 'router',

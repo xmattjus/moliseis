@@ -19,12 +19,11 @@ import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_supabase/sentry_supabase.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:talker_flutter/talker_flutter.dart';
 
 final _sentryLoggingFlag = SentryLoggingFlag(initialValue: false);
-final Talker talker = TalkerFlutter.init();
+
 final AppLogger _logger = AppLogger(
-  talker,
+  $talker,
   sentryFlag: _sentryLoggingFlag,
 );
 
@@ -104,7 +103,6 @@ Future<void> _main() async {
       final app = MultiProvider(
         providers: providers(
           _logger,
-          talker,
           supabase,
           objectBox,
           httpClient,
