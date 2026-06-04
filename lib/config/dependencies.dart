@@ -1,6 +1,7 @@
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/env/env.dart';
+import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';
 import 'package:moliseis/data/data-sources/city_supabase_table.dart';
 import 'package:moliseis/data/data-sources/event_supabase_table.dart';
 import 'package:moliseis/data/data-sources/media_supabase_table.dart';
@@ -183,6 +184,9 @@ List<SingleChildWidget> providers(
         mediaRepository: context.read(),
         placeRepository: context.read(),
         settingsRepository: context.read(),
+        transactionCoordinator: ObjectBoxSyncTransactionCoordinator(
+          objectBox.store,
+        ),
       );
 
       return SyncViewModel(syncUseCase: syncUseCase);

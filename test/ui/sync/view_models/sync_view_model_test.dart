@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
+import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -16,20 +18,21 @@ import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 
 void main() {
-  // Builds a SyncUseCase with configurable synchronize() results and settings.
+  // Builds a SyncUseCase with configurable prepareSync() results and settings.
   SyncUseCase buildUseCase({
     required _FakeSettingsRepository settings,
-    Result<void> cityResult = const Result.success(null),
-    Result<void> eventResult = const Result.success(null),
-    Result<void> mediaResult = const Result.success(null),
-    Result<void> placeResult = const Result.success(null),
+    Result<List<SyncDto>> cityResult = const Result.success([]),
+    Result<List<SyncDto>> eventResult = const Result.success([]),
+    Result<List<SyncDto>> mediaResult = const Result.success([]),
+    Result<List<SyncDto>> placeResult = const Result.success([]),
   }) {
     return SyncUseCase(
-      cityRepository: _FakeCityRepository(synchronizeResult: cityResult),
-      eventRepository: _FakeEventRepository(synchronizeResult: eventResult),
-      mediaRepository: _FakeMediaRepository(synchronizeResult: mediaResult),
-      placeRepository: _FakePlaceRepository(synchronizeResult: placeResult),
+      cityRepository: _FakeCityRepository(prepareResult: cityResult),
+      eventRepository: _FakeEventRepository(prepareResult: eventResult),
+      mediaRepository: _FakeMediaRepository(prepareResult: mediaResult),
+      placeRepository: _FakePlaceRepository(prepareResult: placeResult),
       settingsRepository: settings,
+      transactionCoordinator: _FakeTransactionCoordinator(),
     );
   }
 
@@ -166,22 +169,49 @@ void main() {
 // Fakes
 // ---------------------------------------------------------------------------
 
-final class _FakeCityRepository extends CityRepository {
-  _FakeCityRepository({this.synchronizeResult = const Result.success(null)});
+final class _FakeTransactionCoordinator implements SyncTransactionCoordinator {
+  @override
+  Result<void> runInWriteTransaction(Result<void> Function() fn) => fn();
+}
 
-  final Result<void> synchronizeResult;
+final class _FakeCityRepository extends CityRepository {
+  _FakeCityRepository({
+    this.prepareResult = const Result.success([]),
+  });
+
+  final Result<List<SyncDto>> prepareResult;
+  bool commitCalled = false;
+  List<SyncDto>? committedDtos;
 
   @override
-  Future<Result<void>> synchronize() async => synchronizeResult;
+  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) {
+    commitCalled = true;
+    committedDtos = dtos;
+    return const Result.success(null);
+  }
 }
 
 final class _FakeEventRepository extends EventRepository {
-  _FakeEventRepository({this.synchronizeResult = const Result.success(null)});
+  _FakeEventRepository({
+    this.prepareResult = const Result.success([]),
+  });
 
-  final Result<void> synchronizeResult;
+  final Result<List<SyncDto>> prepareResult;
+  bool commitCalled = false;
+  List<SyncDto>? committedDtos;
 
   @override
-  Future<Result<void>> synchronize() async => synchronizeResult;
+  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) {
+    commitCalled = true;
+    committedDtos = dtos;
+    return const Result.success(null);
+  }
 
   @override
   Future<Result<List<Event>>> getByCurrentYear() async =>
@@ -226,12 +256,23 @@ final class _FakeEventRepository extends EventRepository {
 }
 
 final class _FakeMediaRepository extends MediaRepository {
-  _FakeMediaRepository({this.synchronizeResult = const Result.success(null)});
+  _FakeMediaRepository({
+    this.prepareResult = const Result.success([]),
+  });
 
-  final Result<void> synchronizeResult;
+  final Result<List<SyncDto>> prepareResult;
+  bool commitCalled = false;
+  List<SyncDto>? committedDtos;
 
   @override
-  Future<Result<void>> synchronize() async => synchronizeResult;
+  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) {
+    commitCalled = true;
+    committedDtos = dtos;
+    return const Result.success(null);
+  }
 
   @override
   Future<Result<List<Media>>> getByEventId(int id) async =>
@@ -243,12 +284,23 @@ final class _FakeMediaRepository extends MediaRepository {
 }
 
 final class _FakePlaceRepository extends PlaceRepository {
-  _FakePlaceRepository({this.synchronizeResult = const Result.success(null)});
+  _FakePlaceRepository({
+    this.prepareResult = const Result.success([]),
+  });
 
-  final Result<void> synchronizeResult;
+  final Result<List<SyncDto>> prepareResult;
+  bool commitCalled = false;
+  List<SyncDto>? committedDtos;
 
   @override
-  Future<Result<void>> synchronize() async => synchronizeResult;
+  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) {
+    commitCalled = true;
+    committedDtos = dtos;
+    return const Result.success(null);
+  }
 
   @override
   Future<Result<List<Place>>> getAll({

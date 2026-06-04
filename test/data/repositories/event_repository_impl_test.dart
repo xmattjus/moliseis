@@ -1,6 +1,5 @@
-// Tests seed multiple entities of the same type consecutively; the explicit
-// multi-statement form is preferred for readability over cascade notation.
-// ignore_for_file: avoid_redundant_argument_values, cascade_invocations
+// Test readability benefits from separate statements over cascades.
+// ignore_for_file: cascade_invocations
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,6 +8,7 @@ import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/event_supabase_table.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/data/services/objectbox.dart' as app_objectbox;
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -696,7 +696,6 @@ void main() {
 
       final result = await repository.getByCategories(
         {ContentCategory.folklore},
-        sort: ContentSort.byName,
       );
 
       expect(result, isA<Success<List<Event>>>());
@@ -715,7 +714,7 @@ void main() {
           startDate: DateTime(now.year, 7),
           endDate: null,
           category: ContentCategory.food,
-          modifiedAt: DateTime(2025, 1, 1),
+          modifiedAt: DateTime(2025),
         ),
       );
       eventBox.put(
@@ -725,7 +724,7 @@ void main() {
           startDate: DateTime(now.year, 8),
           endDate: null,
           category: ContentCategory.food,
-          modifiedAt: DateTime(2026, 6, 1),
+          modifiedAt: DateTime(2026, 6),
         ),
       );
       eventBox.put(
@@ -735,7 +734,7 @@ void main() {
           startDate: DateTime(now.year, 9),
           endDate: null,
           category: ContentCategory.food,
-          modifiedAt: DateTime(2025, 12, 1),
+          modifiedAt: DateTime(2025, 12),
         ),
       );
 
@@ -817,7 +816,9 @@ void main() {
             'category': 'unknown',
           },
         ]);
-        await repository.synchronize();
+        final prepareResult = await repository.prepareSync();
+        final dtos = (prepareResult as Success<List<SyncDto>>).value;
+        repository.commitSync(dtos);
 
         // Cache was invalidated; getByCurrentYear() must reflect the new event.
         final secondCall = await repository.getByCurrentYear();

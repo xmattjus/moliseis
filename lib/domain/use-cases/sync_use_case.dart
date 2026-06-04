@@ -1,3 +1,5 @@
+import 'package:moliseis/domain/core/sync_dto.dart';
+import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
@@ -8,10 +10,13 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Orchestrates synchronization of all local repositories with the backend.
 ///
-/// Repositories are synced sequentially in dependency order: cities first,
-/// then places, events, and media. Synchronization short-circuits on the first
-/// error. On success, the last-synced timestamp is persisted via
-/// [SettingsRepository].
+/// Sync uses a two-phase approach:
+/// 1. All repositories fetch remote data concurrently (Phase 1).
+/// 2. All fetched DTOs are committed atomically inside a single write
+///    transaction (Phase 2).
+///
+/// This ensures cross-repository atomicity: either all repos are written or
+/// none are.
 class SyncUseCase {
   SyncUseCase({
     required CityRepository cityRepository,
@@ -19,23 +24,29 @@ class SyncUseCase {
     required MediaRepository mediaRepository,
     required PlaceRepository placeRepository,
     required SettingsRepository settingsRepository,
+    required SyncTransactionCoordinator transactionCoordinator,
   }) : _cityRepository = cityRepository,
        _eventRepository = eventRepository,
        _mediaRepository = mediaRepository,
        _placeRepository = placeRepository,
-       _settingsRepository = settingsRepository;
+       _settingsRepository = settingsRepository,
+       _transactionCoordinator = transactionCoordinator;
 
   final CityRepository _cityRepository;
   final EventRepository _eventRepository;
   final MediaRepository _mediaRepository;
   final PlaceRepository _placeRepository;
   final SettingsRepository _settingsRepository;
+  final SyncTransactionCoordinator _transactionCoordinator;
 
-  /// Synchronizes all repositories in sequence, short-circuiting on the first
-  /// error.
+  /// Synchronizes all repositories using a two-phase protocol.
+  ///
+  /// **Phase 1** – Fetches remote DTOs from all 4 repositories concurrently.
+  /// **Phase 2** – Commits all DTOs atomically inside a single write
+  /// transaction.
   ///
   /// On success, records the current timestamp as the last successful sync
-  /// time. Returns [Result.error] if any repository fails.
+  /// time. Returns [Result.error] if any phase fails.
   Future<Result<void>> sync() async {
     final transaction = Sentry.startTransaction(
       'sync',
@@ -43,26 +54,65 @@ class SyncUseCase {
       bindToScope: true,
     );
 
-    for (final repo in [
-      _cityRepository,
-      _placeRepository,
-      _eventRepository,
-      _mediaRepository,
-    ]) {
-      final result = await repo.synchronize();
+    var spanStatus = const SpanStatus.internalError();
 
-      if (result.isError) {
-        await transaction.finish(status: const SpanStatus.internalError());
+    try {
+      // Phase 1: fetch all remote data concurrently
+      final cityResult = _cityRepository.prepareSync();
+      final placeResult = _placeRepository.prepareSync();
+      final eventResult = _eventRepository.prepareSync();
+      final mediaResult = _mediaRepository.prepareSync();
 
-        return result;
+      final results = await Future.wait([
+        cityResult,
+        placeResult,
+        eventResult,
+        mediaResult,
+      ]);
+
+      for (final result in results) {
+        switch (result) {
+          case Error<List<SyncDto>>():
+            spanStatus = const SpanStatus.internalError();
+            return Result.error(result.error);
+          case Success<List<SyncDto>>():
+        }
       }
+
+      final cityDtos = (results[0] as Success<List<SyncDto>>).value;
+      final placeDtos = (results[1] as Success<List<SyncDto>>).value;
+      final eventDtos = (results[2] as Success<List<SyncDto>>).value;
+      final mediaDtos = (results[3] as Success<List<SyncDto>>).value;
+
+      // Phase 2: commit all repos in a single write transaction,
+      // short-circuiting on the first commit error
+      final commitResult = _transactionCoordinator.runInWriteTransaction(() {
+        final cityCommit = _cityRepository.commitSync(cityDtos);
+        if (cityCommit.isError) return cityCommit;
+
+        final placeCommit = _placeRepository.commitSync(placeDtos);
+        if (placeCommit.isError) return placeCommit;
+
+        final eventCommit = _eventRepository.commitSync(eventDtos);
+        if (eventCommit.isError) return eventCommit;
+
+        final mediaCommit = _mediaRepository.commitSync(mediaDtos);
+        if (mediaCommit.isError) return mediaCommit;
+
+        return const Result.success(null);
+      });
+
+      if (commitResult.isError) {
+        spanStatus = const SpanStatus.internalError();
+        return commitResult;
+      }
+
+      await _settingsRepository.setModifiedAt(DateTime.now());
+      spanStatus = const SpanStatus.ok();
+      return const Result.success(null);
+    } finally {
+      await transaction.finish(status: spanStatus);
     }
-
-    await _settingsRepository.setModifiedAt(DateTime.now());
-
-    await transaction.finish(status: const SpanStatus.ok());
-
-    return const Result.success(null);
   }
 
   /// Whether synchronization is needed or not based on the last successful

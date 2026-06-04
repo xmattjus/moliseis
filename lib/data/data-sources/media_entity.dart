@@ -1,6 +1,6 @@
-import 'package:moliseis/data/core/sync_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
+import 'package:moliseis/domain/core/sync_entity.dart';
 import 'package:objectbox/objectbox.dart';
 
 @Entity()

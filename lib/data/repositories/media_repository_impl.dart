@@ -20,21 +20,15 @@ class MediaRepositoryImpl extends BaseSyncRepository<MediaDto, MediaEntity>
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
        _table = supabaseTable,
-       _objectBox = objectBoxI,
        _box = objectBoxI.store.box<MediaEntity>(),
        super(logger);
 
   final Supabase _supabase;
   final MediaSupabaseTable _table;
-  final ObjectBox _objectBox;
   final Box<MediaEntity> _box;
 
   @override
   String get entityName => 'media';
-
-  @override
-  void runInWriteTransaction(void Function() fn) =>
-      _objectBox.store.runInTransaction(TxMode.write, fn);
 
   @override
   Future<List<MediaDto>> fetchRemote() async {

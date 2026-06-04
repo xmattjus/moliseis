@@ -2,8 +2,8 @@ import 'package:dart_mappable/dart_mappable.dart';
 import 'package:moliseis/data/core/relation_update.dart';
 import 'package:moliseis/data/core/relation_update_hook.dart';
 import 'package:moliseis/data/core/relation_update_resolver_hook.dart';
-import 'package:moliseis/data/core/sync_dto.dart';
 import 'package:moliseis/data/mappers/content_category_mapper.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
 part 'generated/place_dto.mapper.dart';

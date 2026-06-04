@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -572,7 +573,11 @@ final class _FakeEventRepository extends EventRepository {
       const Result.success(null);
 
   @override
-  Future<Result<void>> synchronize() async => const Result.success(null);
+  Future<Result<List<SyncDto>>> prepareSync() async =>
+      const Result.success(<SyncDto>[]);
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
 }
 
 final class _FakePlaceRepository extends PlaceRepository {
@@ -637,7 +642,11 @@ final class _FakePlaceRepository extends PlaceRepository {
       const Result.success(null);
 
   @override
-  Future<Result<void>> synchronize() async => const Result.success(null);
+  Future<Result<List<SyncDto>>> prepareSync() async =>
+      const Result.success(<SyncDto>[]);
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
 }
 
 City _city() => City(

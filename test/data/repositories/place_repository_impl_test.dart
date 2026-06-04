@@ -1,6 +1,5 @@
-// Tests seed multiple entities of the same type consecutively; the explicit
-// multi-statement form is preferred for readability over cascade notation.
-// ignore_for_file: avoid_redundant_argument_values, cascade_invocations
+// Test readability benefits from separate statements over cascades.
+// ignore_for_file: cascade_invocations
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,6 +8,7 @@ import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/data-sources/place_supabase_table.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/place.dart';
@@ -68,7 +68,7 @@ void main() {
       placeBox.put(_createPlace(remoteId: 1, name: 'Zeta'));
       placeBox.put(_createPlace(remoteId: 2, name: 'Alpha'));
 
-      final result = await repository.getAll(sort: ContentSort.byName);
+      final result = await repository.getAll();
 
       expect(result, isA<Success<List<Place>>>());
       final names = (result as Success<List<Place>>).value
@@ -82,14 +82,14 @@ void main() {
         _createPlace(
           remoteId: 1,
           name: 'Older',
-          modifiedAt: DateTime(2025, 1, 1),
+          modifiedAt: DateTime(2025),
         ),
       );
       placeBox.put(
         _createPlace(
           remoteId: 2,
           name: 'Newer',
-          modifiedAt: DateTime(2026, 6, 1),
+          modifiedAt: DateTime(2026, 6),
         ),
       );
 
@@ -111,19 +111,19 @@ void main() {
           _createPlace(
             remoteId: 1,
             name: 'Zeta',
-            modifiedAt: DateTime(2026, 6, 1),
+            modifiedAt: DateTime(2026, 6),
           ),
         );
         placeBox.put(
           _createPlace(
             remoteId: 2,
             name: 'Alpha',
-            modifiedAt: DateTime(2025, 1, 1),
+            modifiedAt: DateTime(2025),
           ),
         );
 
         // First call sorts by name — expects [Alpha, Zeta].
-        final byNameResult = await repository.getAll(sort: ContentSort.byName);
+        final byNameResult = await repository.getAll();
         expect(
           (byNameResult as Success<List<Place>>).value.map((p) => p.name),
           equals(['Alpha', 'Zeta']),
@@ -289,7 +289,6 @@ void main() {
 
       final result = await repository.getByCategories(
         {ContentCategory.nature},
-        sort: ContentSort.byName,
       );
 
       expect(result, isA<Success<List<Place>>>());
@@ -305,7 +304,7 @@ void main() {
           remoteId: 1,
           name: 'Older',
           category: ContentCategory.nature,
-          modifiedAt: DateTime(2025, 1, 1),
+          modifiedAt: DateTime(2025),
         ),
       );
       placeBox.put(
@@ -313,7 +312,7 @@ void main() {
           remoteId: 2,
           name: 'Newer',
           category: ContentCategory.nature,
-          modifiedAt: DateTime(2026, 6, 1),
+          modifiedAt: DateTime(2026, 6),
         ),
       );
       placeBox.put(
@@ -321,7 +320,7 @@ void main() {
           remoteId: 3,
           name: 'Middle',
           category: ContentCategory.nature,
-          modifiedAt: DateTime(2025, 12, 1),
+          modifiedAt: DateTime(2025, 12),
         ),
       );
 
@@ -359,7 +358,7 @@ void main() {
 
     test('getFavouritePlaceIds returns only saved place IDs', () async {
       placeBox.put(_createPlace(remoteId: 1, isSaved: true));
-      placeBox.put(_createPlace(remoteId: 2, isSaved: false));
+      placeBox.put(_createPlace(remoteId: 2));
 
       final result = await repository.getFavouritePlaceIds();
 
@@ -372,7 +371,7 @@ void main() {
     test(
       'getFavouritePlaceIds returns empty list when no places are saved',
       () async {
-        placeBox.put(_createPlace(remoteId: 1, isSaved: false));
+        placeBox.put(_createPlace(remoteId: 1));
 
         final result = await repository.getFavouritePlaceIds();
 
@@ -382,7 +381,7 @@ void main() {
     );
 
     test('setFavouritePlace saves a place', () async {
-      placeBox.put(_createPlace(remoteId: 1, isSaved: false));
+      placeBox.put(_createPlace(remoteId: 1));
 
       final result = await repository.setFavouritePlace(1, true);
 
@@ -503,10 +502,10 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // synchronize — error path
+  // prepareSync — error path
   // ---------------------------------------------------------------------------
 
-  group('PlaceRepositoryImpl - synchronize error handling', () {
+  group('PlaceRepositoryImpl - prepareSync error handling', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late PlaceRepositoryImpl repository;
     late MockLogger mockLogger;
@@ -529,12 +528,9 @@ void main() {
     });
 
     test('returns Error when Supabase throws an exception', () async {
-      final result = await repository.synchronize();
+      final result = await repository.prepareSync();
 
-      expect(result, isA<Error<void>>());
-      verify(
-        () => mockLogger.log(const RepositorySyncStarted('place')),
-      ).called(1);
+      expect(result, isA<Error<List<SyncDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('place'),
@@ -546,10 +542,10 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // synchronize — success path
+  // commitSync — success path
   // ---------------------------------------------------------------------------
 
-  group('PlaceRepositoryImpl - synchronize success path', () {
+  group('PlaceRepositoryImpl - commitSync', () {
     late MockLogger mockLogger;
     late MockSupabaseEnvironment supabaseEnv;
     late TestObjectBoxEnvironment objectBoxEnvironment;
@@ -586,9 +582,10 @@ void main() {
         },
       ]);
 
-      final result = await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
-      expect(result, isA<Success<void>>());
       expect(placeBox.get(1)?.name, equals('Campobasso'));
       verify(
         () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
@@ -600,8 +597,8 @@ void main() {
         _createPlace(
           remoteId: 1,
           name: 'Campobasso',
-          createdAt: DateTime(2024, 1, 1),
-          modifiedAt: DateTime(2024, 1, 1),
+          createdAt: DateTime(2024),
+          modifiedAt: DateTime(2024),
         ),
       );
 
@@ -617,9 +614,10 @@ void main() {
         },
       ]);
 
-      final result = await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
-      expect(result, isA<Success<void>>());
       expect(placeBox.get(1)?.name, equals('Campobasso'));
       verifyNever(
         () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
@@ -634,7 +632,7 @@ void main() {
         _createPlace(
           remoteId: 1,
           name: 'Campobasso',
-          modifiedAt: DateTime(2024, 1, 1),
+          modifiedAt: DateTime(2024),
         ),
       );
 
@@ -650,9 +648,10 @@ void main() {
         },
       ]);
 
-      final result = await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
-      expect(result, isA<Success<void>>());
       expect(placeBox.get(1)?.name, equals('Campobasso Aggiornato'));
       verify(
         () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
@@ -676,7 +675,9 @@ void main() {
           'modified_at': '2024-01-01T00:00:00.000',
         },
       ]);
-      await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
       // A subsequent getAll() must reflect the new place, not the stale cache.
       final result = await repository.getAll();
@@ -686,16 +687,16 @@ void main() {
       expect(names, contains('New Place'));
     });
 
-    test('returns Error when Supabase query fails', () async {
+    test('prepareSync returns Error when Supabase query fails', () async {
       supabaseEnv.stubSelectError(
         const PostgrestException(
           message: 'relation "places_v2" does not exist',
         ),
       );
 
-      final result = await repository.synchronize();
+      final result = await repository.prepareSync();
 
-      expect(result, isA<Error<void>>());
+      expect(result, isA<Error<List<SyncDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('place'),
@@ -727,7 +728,7 @@ PlaceEntity _createPlace({
   DateTime? createdAt,
   DateTime? modifiedAt,
 }) {
-  final now = DateTime(2026, 1, 1);
+  final now = DateTime(2026);
   return PlaceEntity(
     remoteId: remoteId,
     name: name,

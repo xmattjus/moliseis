@@ -1,9 +1,8 @@
-// ignore_for_file: avoid_redundant_argument_values
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -156,7 +155,11 @@ class _FakeEventRepository extends EventRepository {
       const Result.success(null);
 
   @override
-  Future<Result<void>> synchronize() async => const Result.success(null);
+  Future<Result<List<SyncDto>>> prepareSync() async =>
+      const Result.success(<SyncDto>[]);
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
 }
 
 class _FakePlaceRepository extends PlaceRepository {
@@ -202,14 +205,18 @@ class _FakePlaceRepository extends PlaceRepository {
       const Result.success(null);
 
   @override
-  Future<Result<void>> synchronize() async => const Result.success(null);
+  Future<Result<List<SyncDto>>> prepareSync() async =>
+      const Result.success(<SyncDto>[]);
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
 }
 
 City _testCity() => City(
   remoteId: 0,
   name: 'Molise',
-  createdAt: DateTime(2026, 1, 1),
-  modifiedAt: DateTime(2026, 1, 1),
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
 );
 
 Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
@@ -217,10 +224,10 @@ Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
     category: ContentCategory.experience,
     city: _testCity(),
     coordinates: const LatLng(0, 0),
-    createdAt: DateTime(2026, 1, 1),
+    createdAt: DateTime(2026),
     description: 'Test event',
     media: const [],
-    modifiedAt: DateTime(2026, 1, 1),
+    modifiedAt: DateTime(2026),
     name: 'Event',
     remoteId: 1,
     isSaved: false,

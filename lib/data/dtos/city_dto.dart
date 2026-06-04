@@ -1,5 +1,5 @@
 import 'package:dart_mappable/dart_mappable.dart';
-import 'package:moliseis/data/core/sync_dto.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 
 part 'generated/city_dto.mapper.dart';
 

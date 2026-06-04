@@ -1,6 +1,5 @@
-// Tests seed multiple entities of the same type consecutively; the explicit
-// multi-statement form is preferred for readability over cascade notation.
-// ignore_for_file: avoid_redundant_argument_values, cascade_invocations
+// Test readability benefits from separate statements over cascades.
+// ignore_for_file: cascade_invocations
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -11,6 +10,7 @@ import 'package:moliseis/data/data-sources/media_supabase_table.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/services/objectbox.dart' as app_objectbox;
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
@@ -196,10 +196,10 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // synchronize — error path
+  // prepareSync — error path
   // ---------------------------------------------------------------------------
 
-  group('MediaRepositoryImpl - synchronize error handling', () {
+  group('MediaRepositoryImpl - prepareSync error handling', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late MediaRepositoryImpl repository;
     late MockLogger mockLogger;
@@ -222,12 +222,9 @@ void main() {
     });
 
     test('returns Error when Supabase throws an exception', () async {
-      final result = await repository.synchronize();
+      final result = await repository.prepareSync();
 
-      expect(result, isA<Error<void>>());
-      verify(
-        () => mockLogger.log(const RepositorySyncStarted('media')),
-      ).called(1);
+      expect(result, isA<Error<List<SyncDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('media'),
@@ -239,10 +236,10 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // synchronize — success path
+  // commitSync — success path
   // ---------------------------------------------------------------------------
 
-  group('MediaRepositoryImpl - synchronize success path', () {
+  group('MediaRepositoryImpl - commitSync', () {
     late MockLogger mockLogger;
     late MockSupabaseEnvironment supabaseEnv;
     late TestObjectBoxEnvironment objectBoxEnvironment;
@@ -280,9 +277,10 @@ void main() {
           },
         ]);
 
-        final result = await repository.synchronize();
+        final prepareResult = await repository.prepareSync();
+        final dtos = (prepareResult as Success<List<SyncDto>>).value;
+        repository.commitSync(dtos);
 
-        expect(result, isA<Success<void>>());
         expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
         verify(
           () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
@@ -304,7 +302,9 @@ void main() {
         },
       ]);
 
-      await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
       final entity = mediaBox.get(10)!;
       expect(entity.place.targetId, equals(5));
@@ -330,9 +330,10 @@ void main() {
         },
       ]);
 
-      final result = await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
-      expect(result, isA<Success<void>>());
       expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
       verifyNever(
         () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
@@ -361,25 +362,26 @@ void main() {
         },
       ]);
 
-      final result = await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
-      expect(result, isA<Success<void>>());
       expect(mediaBox.get(10)?.url, equals('https://example.com/new.jpg'));
       verify(
         () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
       ).called(1);
     });
 
-    test('returns Error when Supabase query fails', () async {
+    test('prepareSync returns Error when Supabase query fails', () async {
       supabaseEnv.stubSelectError(
         const PostgrestException(
           message: 'relation "media" does not exist',
         ),
       );
 
-      final result = await repository.synchronize();
+      final result = await repository.prepareSync();
 
-      expect(result, isA<Error<void>>());
+      expect(result, isA<Error<List<SyncDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('media'),
@@ -446,7 +448,7 @@ void main() {
 // ---------------------------------------------------------------------------
 
 EventEntity _createEvent({required int remoteId}) {
-  final now = DateTime(2026, 1, 1);
+  final now = DateTime(2026);
   return EventEntity(
     remoteId: remoteId,
     startDate: now,
@@ -458,7 +460,7 @@ EventEntity _createEvent({required int remoteId}) {
 }
 
 PlaceEntity _createPlace({required int remoteId}) {
-  final now = DateTime(2026, 1, 1);
+  final now = DateTime(2026);
   return PlaceEntity(
     remoteId: remoteId,
     name: 'Place $remoteId',
@@ -479,7 +481,7 @@ MediaEntity _createMedia({
   int? placeId,
   String url = 'https://example.com/1.jpg',
 }) {
-  final now = DateTime(2026, 1, 1);
+  final now = DateTime(2026);
   final entity = MediaEntity(
     remoteId: remoteId,
     url: url,

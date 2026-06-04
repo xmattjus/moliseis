@@ -3,6 +3,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/city_supabase_table.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/result.dart';
@@ -19,10 +20,10 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // synchronize — error path
+  // prepareSync — error path
   // ---------------------------------------------------------------------------
 
-  group('CityRepositoryImpl - synchronize error handling', () {
+  group('CityRepositoryImpl - prepareSync error handling', () {
     late MockLogger mockLogger;
     late MockSupabaseEnvironment supabaseEnv;
     late TestObjectBoxEnvironment objectBoxEnvironment;
@@ -45,16 +46,9 @@ void main() {
     });
 
     test('returns Error when Supabase throws an exception', () async {
-      final result = await repository.synchronize();
+      final result = await repository.prepareSync();
 
-      expect(result, isA<Error<void>>());
-      verify(
-        () {
-          mockLogger.log(
-            const RepositorySyncStarted('city'),
-          );
-        },
-      ).called(1);
+      expect(result, isA<Error<List<SyncDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('city'),
@@ -66,10 +60,10 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // synchronize — success path
+  // commitSync — success path
   // ---------------------------------------------------------------------------
 
-  group('CityRepositoryImpl - synchronize success path', () {
+  group('CityRepositoryImpl - commitSync', () {
     late MockLogger mockLogger;
     late MockSupabaseEnvironment supabaseEnv;
     late TestObjectBoxEnvironment objectBoxEnvironment;
@@ -103,9 +97,10 @@ void main() {
         },
       ]);
 
-      final result = await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
-      expect(result, isA<Success<void>>());
       expect(cityBox.get(1)?.name, equals('Campobasso'));
       verify(
         () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
@@ -135,9 +130,10 @@ void main() {
         },
       ]);
 
-      final result = await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
-      expect(result, isA<Success<void>>());
       expect(cityBox.get(1)?.name, equals('Campobasso Aggiornato'));
       verify(
         () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
@@ -165,23 +161,24 @@ void main() {
         },
       ]);
 
-      final result = await repository.synchronize();
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      repository.commitSync(dtos);
 
-      expect(result, isA<Success<void>>());
       // Box must be unchanged — city is identical to remote, no write occurs.
       expect(cityBox.get(1)?.name, equals('Campobasso'));
       verifyNever(() => mockLogger.log(any(that: isA<EntityInsertSuccess>())));
       verifyNever(() => mockLogger.log(any(that: isA<EntityUpdateSuccess>())));
     });
 
-    test('returns Error when Supabase query fails', () async {
+    test('prepareSync returns Error when Supabase query fails', () async {
       supabaseEnv.stubSelectError(
         const PostgrestException(message: 'relation "cities" does not exist'),
       );
 
-      final result = await repository.synchronize();
+      final result = await repository.prepareSync();
 
-      expect(result, isA<Error<void>>());
+      expect(result, isA<Error<List<SyncDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('city'),

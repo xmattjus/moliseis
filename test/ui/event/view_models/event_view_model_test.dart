@@ -1,7 +1,6 @@
-// ignore_for_file: avoid_redundant_argument_values
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -199,7 +198,11 @@ final class _FakeEventRepository extends EventRepository {
       const Result.success(null);
 
   @override
-  Future<Result<void>> synchronize() async => const Result.success(null);
+  Future<Result<List<SyncDto>>> prepareSync() async =>
+      const Result.success(<SyncDto>[]);
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +234,7 @@ Event _event({required int remoteId, required String name}) {
 }
 
 Event _eventContent({required DateTime startDate, DateTime? endDate}) {
-  final now = DateTime(2026, 4, 1);
+  final now = DateTime(2026, 4);
   return Event(
     remoteId: 1,
     name: 'Event',

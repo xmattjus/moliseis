@@ -1,5 +1,3 @@
-// ignore_for_file: avoid_redundant_argument_values
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +11,7 @@ import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_we
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -245,9 +244,11 @@ final class _FakeEventRepository implements EventRepository {
   }
 
   @override
-  Future<Result<void>> synchronize() async {
-    return const Result.success(null);
-  }
+  Future<Result<List<SyncDto>>> prepareSync() async =>
+      const Result.success(<SyncDto>[]);
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
 }
 
 final class _FakePlaceRepository implements PlaceRepository {
@@ -306,16 +307,18 @@ final class _FakePlaceRepository implements PlaceRepository {
   }
 
   @override
-  Future<Result<void>> synchronize() async {
-    return const Result.success(null);
-  }
+  Future<Result<List<SyncDto>>> prepareSync() async =>
+      const Result.success(<SyncDto>[]);
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
 }
 
 City _buildCity() => City(
   remoteId: 10,
   name: 'Campobasso',
-  createdAt: DateTime(2026, 1, 1),
-  modifiedAt: DateTime(2026, 1, 1),
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
 );
 
 Event _buildEvent() => Event(
@@ -323,11 +326,11 @@ Event _buildEvent() => Event(
   name: 'Evento demo',
   description: 'Descrizione evento',
   startDate: DateTime(2026, 4, 10, 10, 30),
-  endDate: DateTime(2026, 4, 10, 12, 0),
+  endDate: DateTime(2026, 4, 10, 12),
   coordinates: const LatLng(41.56, 14.66),
   category: ContentCategory.experience,
-  createdAt: DateTime(2026, 1, 1),
-  modifiedAt: DateTime(2026, 1, 1),
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
   city: _buildCity(),
   media: const [],
   isSaved: false,
@@ -339,8 +342,8 @@ Place _buildPlace() => Place(
   description: 'Descrizione luogo',
   coordinates: const LatLng(41.57, 14.67),
   category: ContentCategory.nature,
-  createdAt: DateTime(2026, 1, 1),
-  modifiedAt: DateTime(2026, 1, 1),
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
   city: _buildCity(),
   media: const [],
   isSaved: false,

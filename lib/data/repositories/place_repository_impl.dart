@@ -22,21 +22,15 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
        _table = supabaseTable,
-       _objectBox = objectBoxI,
        _box = objectBoxI.store.box<PlaceEntity>(),
        super(logger);
 
   final Supabase _supabase;
   final PlaceSupabaseTable _table;
-  final ObjectBox _objectBox;
   final Box<PlaceEntity> _box;
 
   @override
   String get entityName => 'place';
-
-  @override
-  void runInWriteTransaction(void Function() fn) =>
-      _objectBox.store.runInTransaction(TxMode.write, fn);
 
   @override
   Future<List<PlaceDto>> fetchRemote() async {
@@ -162,7 +156,7 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
 
       query = _box.query(condition).build();
 
-      // Duplication of receiver favors code readability.
+      // Code readability benefits from separate statements over cascades.
       // ignore: cascade_invocations
       query.limit = 3;
 

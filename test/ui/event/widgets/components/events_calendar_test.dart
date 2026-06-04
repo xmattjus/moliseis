@@ -1,8 +1,7 @@
-// ignore_for_file: avoid_redundant_argument_values
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -35,7 +34,7 @@ void main() {
     });
 
     test('treats null end date as a single-day event', () {
-      final event = _buildEventContent(startDate: DateTime(2026, 3, 15, 18, 0));
+      final event = _buildEventContent(startDate: DateTime(2026, 3, 15, 18));
 
       expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 14)), isFalse);
       expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 15)), isTrue);
@@ -67,7 +66,6 @@ void main() {
 
         final repository = _FakeEventRepository(
           currentYearEvents: [event],
-          byDateEvents: const [],
         );
         final viewModel = EventViewModel(repository: repository);
 
@@ -84,7 +82,7 @@ void main() {
     test('returns cached events on same day without repository call', () async {
       final event = _buildEvent(
         remoteId: 7,
-        startDate: DateTime(2026, 3, 11, 8, 0),
+        startDate: DateTime(2026, 3, 11, 8),
       );
       final repository = _FakeEventRepository(currentYearEvents: [event]);
       final viewModel = EventViewModel(repository: repository);
@@ -106,9 +104,9 @@ void main() {
     test('returns events sorted by start date and remote id', () async {
       final repository = _FakeEventRepository(
         currentYearEvents: [
-          _buildEvent(remoteId: 2, startDate: DateTime(2026, 3, 11, 10, 0)),
-          _buildEvent(remoteId: 1, startDate: DateTime(2026, 3, 11, 10, 0)),
-          _buildEvent(remoteId: 3, startDate: DateTime(2026, 3, 11, 9, 0)),
+          _buildEvent(remoteId: 2, startDate: DateTime(2026, 3, 11, 10)),
+          _buildEvent(remoteId: 1, startDate: DateTime(2026, 3, 11, 10)),
+          _buildEvent(remoteId: 3, startDate: DateTime(2026, 3, 11, 9)),
         ],
       );
       final viewModel = EventViewModel(repository: repository);
@@ -138,11 +136,11 @@ void main() {
               events: [
                 _buildEventContent(
                   remoteId: 5,
-                  startDate: DateTime(2026, 3, 11, 8, 0),
+                  startDate: DateTime(2026, 3, 11, 8),
                 ),
                 _buildEventContent(
                   remoteId: 13,
-                  startDate: DateTime(2026, 3, 11, 9, 0),
+                  startDate: DateTime(2026, 3, 11, 9),
                 ),
               ],
             ),
@@ -234,9 +232,11 @@ final class _FakeEventRepository implements EventRepository {
   }
 
   @override
-  Future<Result<void>> synchronize() async {
-    return const Result.success(null);
-  }
+  Future<Result<List<SyncDto>>> prepareSync() async =>
+      const Result.success(<SyncDto>[]);
+
+  @override
+  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
 }
 
 Future<void> _waitForCommand(Command<void> command) async {
@@ -248,8 +248,8 @@ Future<void> _waitForCommand(Command<void> command) async {
 City _testCity() => City(
   remoteId: 0,
   name: 'Molise',
-  createdAt: DateTime(2026, 1, 1),
-  modifiedAt: DateTime(2026, 1, 1),
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
 );
 
 Event _buildEvent({
@@ -264,8 +264,8 @@ Event _buildEvent({
     startDate: startDate,
     endDate: endDate,
     category: ContentCategory.unknown,
-    createdAt: DateTime(2026, 1, 1),
-    modifiedAt: DateTime(2026, 1, 1),
+    createdAt: DateTime(2026),
+    modifiedAt: DateTime(2026),
     city: _testCity(),
     coordinates: const LatLng(0, 0),
     media: const [],
@@ -282,10 +282,10 @@ Event _buildEventContent({
     category: ContentCategory.experience,
     city: _testCity(),
     coordinates: const LatLng(0, 0),
-    createdAt: DateTime(2026, 1, 1),
+    createdAt: DateTime(2026),
     description: 'Test event',
     media: const [],
-    modifiedAt: DateTime(2026, 1, 1),
+    modifiedAt: DateTime(2026),
     name: 'Event',
     remoteId: remoteId,
     isSaved: false,

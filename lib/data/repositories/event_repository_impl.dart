@@ -24,21 +24,15 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
        _table = supabaseTable,
-       _objectBox = objectBoxI,
        _box = objectBoxI.store.box<EventEntity>(),
        super(logger);
 
   final Supabase _supabase;
   final EventSupabaseTable _table;
-  final ObjectBox _objectBox;
   final Box<EventEntity> _box;
 
   @override
   String get entityName => 'event';
-
-  @override
-  void runInWriteTransaction(void Function() fn) =>
-      _objectBox.store.runInTransaction(TxMode.write, fn);
 
   @override
   Future<List<EventDto>> fetchRemote() async {

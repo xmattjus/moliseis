@@ -1,6 +1,6 @@
-import 'package:moliseis/data/core/sync_entity.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
+import 'package:moliseis/domain/core/sync_entity.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:objectbox/objectbox.dart';
 

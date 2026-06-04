@@ -18,21 +18,15 @@ class CityRepositoryImpl extends BaseSyncRepository<CityDto, CityEntity>
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
        _table = supabaseTable,
-       _objectBox = objectBoxI,
        _box = objectBoxI.store.box<CityEntity>(),
        super(logger);
 
   final Supabase _supabase;
   final CitySupabaseTable _table;
-  final ObjectBox _objectBox;
   final Box<CityEntity> _box;
 
   @override
   String get entityName => 'city';
-
-  @override
-  void runInWriteTransaction(void Function() fn) =>
-      _objectBox.store.runInTransaction(TxMode.write, fn);
 
   @override
   Future<List<CityDto>> fetchRemote() async {
