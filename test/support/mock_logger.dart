@@ -1,81 +1,60 @@
-import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 
-class MockLogger extends Mock implements Logger {}
+/// Test double for [Logger] that records every call in [calls] for direct
+/// inspection, replacing the need for mocktail's `verify`/`any` matchers.
+///
+/// Use it as a drop-in for [Logger]:
+///
+/// ```dart
+/// final mockLogger = MockLogger();
+/// repository.somethingThatLogs(mockLogger);
+///
+/// expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
+/// ```
+class MockLogger implements Logger {
+  final List<
+    ({
+      LogEvent event,
+      Object? error,
+      StackTrace? stackTrace,
+      Map<String, Object?>? extra,
+    })
+  >
+  calls = [];
 
-/// Registers fallback values for [MockLogger] verification with mocktail.
-/// Call once per test suite in `setUpAll`.
-void setUpMockLogger() {
-  registerFallbackValue(
-    CacheEntryAdded(
-      cache: 'weather',
-      key: '0, 0',
-      addedAt: DateTime.now(),
-    ),
-  );
-  registerFallbackValue(
-    const CacheEntryFetched(
-      cache: 'weather',
-      key: '0, 0',
-    ),
-  );
-  registerFallbackValue(
-    CacheEntryEvicted(
-      cache: 'weather',
-      key: '0, 0',
-      fetchedAt: DateTime.now(),
-    ),
-  );
-  registerFallbackValue(const CloudinaryRequestFailed(detail: ''));
-  registerFallbackValue(const CloudinaryRequestStarted());
-  registerFallbackValue(const EntityInsertFailed(''));
-  registerFallbackValue(const EntityInsertSuccess(''));
-  registerFallbackValue(const EntityLoadFailed('', method: ''));
-  registerFallbackValue(const EntityLoadStarted('', method: ''));
-  registerFallbackValue(const EntityRemoveFailed(''));
-  registerFallbackValue(const EntityUpdateFailed('', 0));
-  registerFallbackValue(const EntityUpdateSuccess(''));
-  registerFallbackValue(const ImageLoadFailed());
-  registerFallbackValue(const ImageSharingFailed());
-  registerFallbackValue(const LocalPersistenceInitFailed());
-  registerFallbackValue(const LocalPersistenceSettingsInitFailed());
-  registerFallbackValue(const NetworkRequestTimeout());
-  registerFallbackValue(const PostRouteContentIdParseFailed(reason: ''));
-  registerFallbackValue(const RepositorySyncFailed(''));
-  registerFallbackValue(const RepositorySyncStarted(''));
-  registerFallbackValue(
-    const ReverseGeocodingFetchFailed(
-      latitude: 0,
-      longitude: 0,
-    ),
-  );
-  registerFallbackValue(
-    const ReverseGeocodingFetchStarted(
-      latitude: 0,
-      longitude: 0,
-    ),
-  );
-  registerFallbackValue(const SentryLoggingDisabled());
-  registerFallbackValue(const SentryLoggingEnabled());
-  registerFallbackValue(const SnackBarShowFailed());
-  registerFallbackValue(const UrlLaunchFailed(''));
-  registerFallbackValue(const UrlLaunchStarted(''));
-  registerFallbackValue(const UserContributionMediaAddFailed());
-  registerFallbackValue(const UserContributionMediaRemovalFailed());
-  registerFallbackValue(const UserContributionMediaRetrievalFailed());
-  registerFallbackValue(const UserContributionMediaRetrievalStarted());
-  registerFallbackValue(const UserContributionUploadFailed());
-  registerFallbackValue(const UserContributionUploadStarted());
-  registerFallbackValue(
-    const WeatherForecastFetchFailed(
-      latitude: 0,
-      longitude: 0,
-    ),
-  );
-  registerFallbackValue(
-    const WeatherForecastFetchStarted(
-      latitude: 0,
-      longitude: 0,
-    ),
-  );
+  @override
+  void log(
+    LogEvent event, {
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, Object?>? extra,
+  }) {
+    calls.add((
+      event: event,
+      error: error,
+      stackTrace: stackTrace,
+      extra: extra,
+    ));
+  }
+
+  /// Returns every [LogEvent] of type [T] that was logged, in call order.
+  List<T> eventsOfType<T extends LogEvent>() =>
+      calls.where((c) => c.event is T).map((c) => c.event as T).toList();
+
+  /// Whether at least one [LogEvent] of type [T] was logged.
+  bool containsEvent<T extends LogEvent>() => calls.any((c) => c.event is T);
+
+  /// Returns the recorded call for the first [LogEvent] of type [T], or
+  /// `null` if none was logged.
+  ({
+    LogEvent event,
+    Object? error,
+    StackTrace? stackTrace,
+    Map<String, Object?>? extra,
+  })?
+  firstCallOfType<T extends LogEvent>() =>
+      calls.where((c) => c.event is T).firstOrNull;
+
+  /// Clears the call order list.
+  void reset() => calls.clear();
 }

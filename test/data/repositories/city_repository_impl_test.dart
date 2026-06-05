@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/city_supabase_table.dart';
 import 'package:moliseis/data/dtos/city_dto.dart';
@@ -14,10 +13,7 @@ import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
-  setUpAll(() {
-    setUpMockLogger();
-    setUpMockSupabase();
-  });
+  setUpAll(setUpMockSupabase);
 
   // ---------------------------------------------------------------------------
   // prepareSync — error path
@@ -49,13 +45,12 @@ void main() {
       final result = await repository.prepareSync();
 
       expect(result, isA<Error<List<CityDto>>>());
-      verify(
-        () => mockLogger.log(
-          const RepositorySyncFailed('city'),
-          error: any(named: 'error'),
-          stackTrace: any(named: 'stackTrace'),
-        ),
-      ).called(1);
+      final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+      expect(failedCall, isNotNull);
+      final event = failedCall!.event as RepositorySyncFailed;
+      expect(event.repositoryName, 'city');
+      expect(failedCall.error, isNotNull);
+      expect(failedCall.stackTrace, isNotNull);
     });
   });
 
@@ -102,9 +97,7 @@ void main() {
       repository.commitSync(dtos);
 
       expect(cityBox.get(1)?.name, equals('Campobasso'));
-      verify(
-        () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
-      ).called(1);
+      expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
     });
 
     test('updates an existing city when remote data differs', () async {
@@ -135,9 +128,7 @@ void main() {
       repository.commitSync(dtos);
 
       expect(cityBox.get(1)?.name, equals('Campobasso Aggiornato'));
-      verify(
-        () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
-      ).called(1);
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
     });
 
     test('skips a city that already matches the local copy', () async {
@@ -167,8 +158,8 @@ void main() {
 
       // Box must be unchanged — city is identical to remote, no write occurs.
       expect(cityBox.get(1)?.name, equals('Campobasso'));
-      verifyNever(() => mockLogger.log(any(that: isA<EntityInsertSuccess>())));
-      verifyNever(() => mockLogger.log(any(that: isA<EntityUpdateSuccess>())));
+      expect(mockLogger.containsEvent<EntityInsertSuccess>(), isFalse);
+      expect(mockLogger.containsEvent<EntityUpdateSuccess>(), isFalse);
     });
 
     test('prepareSync returns Error when Supabase query fails', () async {
@@ -179,13 +170,12 @@ void main() {
       final result = await repository.prepareSync();
 
       expect(result, isA<Error<List<CityDto>>>());
-      verify(
-        () => mockLogger.log(
-          const RepositorySyncFailed('city'),
-          error: any(named: 'error'),
-          stackTrace: any(named: 'stackTrace'),
-        ),
-      ).called(1);
+      final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+      expect(failedCall, isNotNull);
+      final event = failedCall!.event as RepositorySyncFailed;
+      expect(event.repositoryName, 'city');
+      expect(failedCall.error, isNotNull);
+      expect(failedCall.stackTrace, isNotNull);
     });
   });
 }

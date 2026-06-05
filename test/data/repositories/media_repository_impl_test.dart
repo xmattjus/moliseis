@@ -24,10 +24,7 @@ import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
-  setUpAll(() {
-    setUpMockLogger();
-    setUpMockSupabase();
-  });
+  setUpAll(setUpMockSupabase);
 
   // ---------------------------------------------------------------------------
   // getByEventId
@@ -225,13 +222,12 @@ void main() {
       final result = await repository.prepareSync();
 
       expect(result, isA<Error<List<MediaDto>>>());
-      verify(
-        () => mockLogger.log(
-          const RepositorySyncFailed('media'),
-          error: any(named: 'error'),
-          stackTrace: any(named: 'stackTrace'),
-        ),
-      ).called(1);
+      final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+      expect(failedCall, isNotNull);
+      final event = failedCall!.event as RepositorySyncFailed;
+      expect(event.repositoryName, 'media');
+      expect(failedCall.error, isNotNull);
+      expect(failedCall.stackTrace, isNotNull);
     });
   });
 
@@ -282,9 +278,7 @@ void main() {
         repository.commitSync(dtos);
 
         expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
-        verify(
-          () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
-        ).called(1);
+        expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
       },
     );
 
@@ -335,12 +329,8 @@ void main() {
       repository.commitSync(dtos);
 
       expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
-      verifyNever(
-        () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
-      );
-      verifyNever(
-        () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
-      );
+      expect(mockLogger.containsEvent<EntityInsertSuccess>(), isFalse);
+      expect(mockLogger.containsEvent<EntityUpdateSuccess>(), isFalse);
     });
 
     test('updates existing media when remote data differs', () async {
@@ -367,9 +357,7 @@ void main() {
       repository.commitSync(dtos);
 
       expect(mediaBox.get(10)?.url, equals('https://example.com/new.jpg'));
-      verify(
-        () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
-      ).called(1);
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
     });
 
     test('prepareSync returns Error when Supabase query fails', () async {
@@ -382,13 +370,12 @@ void main() {
       final result = await repository.prepareSync();
 
       expect(result, isA<Error<List<MediaDto>>>());
-      verify(
-        () => mockLogger.log(
-          const RepositorySyncFailed('media'),
-          error: any(named: 'error'),
-          stackTrace: any(named: 'stackTrace'),
-        ),
-      ).called(1);
+      final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+      expect(failedCall, isNotNull);
+      final event = failedCall!.event as RepositorySyncFailed;
+      expect(event.repositoryName, 'media');
+      expect(failedCall.error, isNotNull);
+      expect(failedCall.stackTrace, isNotNull);
     });
   });
 
@@ -419,26 +406,28 @@ void main() {
       final result = await repository.getByEventId(1);
 
       expect(result, isA<Error<List<Media>>>());
-      verify(
-        () => mockLogger.log(
-          const EntityLoadFailed('media', method: 'getByEventId'),
-          error: any(named: 'error'),
-          stackTrace: any(named: 'stackTrace'),
-        ),
-      ).called(1);
+      final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>();
+      expect(failedCall, isNotNull);
+      expect(
+        failedCall!.event,
+        const EntityLoadFailed('media', method: 'getByEventId'),
+      );
+      expect(failedCall.error, isNotNull);
+      expect(failedCall.stackTrace, isNotNull);
     });
 
     test('getByPlaceId returns Error when query throws', () async {
       final result = await repository.getByPlaceId(1);
 
       expect(result, isA<Error<List<Media>>>());
-      verify(
-        () => mockLogger.log(
-          const EntityLoadFailed('media', method: 'getByPlaceId'),
-          error: any(named: 'error'),
-          stackTrace: any(named: 'stackTrace'),
-        ),
-      ).called(1);
+      final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>();
+      expect(failedCall, isNotNull);
+      expect(
+        failedCall!.event,
+        const EntityLoadFailed('media', method: 'getByPlaceId'),
+      );
+      expect(failedCall.error, isNotNull);
+      expect(failedCall.stackTrace, isNotNull);
     });
   });
 }

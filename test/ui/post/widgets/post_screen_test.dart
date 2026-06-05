@@ -38,7 +38,6 @@ import '../../../support/mock_logger.dart';
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('it');
-    setUpMockLogger();
   });
 
   group('PostScreen', () {

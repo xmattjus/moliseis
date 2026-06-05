@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/core/base_sync_repository.dart';
 import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/core/sync_entity.dart';
@@ -124,8 +123,6 @@ class StubSyncRepository
 // ---------------------------------------------------------------------------
 
 void main() {
-  setUpAll(setUpMockLogger);
-
   group('BaseSyncRepository.prepareSync', () {
     late MockLogger mockLogger;
     late StubSyncRepository repository;
@@ -156,13 +153,11 @@ void main() {
         final result = await throwingRepository.prepareSync();
 
         expect(result, isA<Error<List<FakeSyncDto>>>());
-        verify(
-          () => mockLogger.log(
-            any(that: isA<RepositorySyncFailed>()),
-            error: any(named: 'error'),
-            stackTrace: any(named: 'stackTrace'),
-          ),
-        ).called(1);
+        expect(mockLogger.eventsOfType<RepositorySyncFailed>(), hasLength(1));
+        final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+        expect(failedCall, isNotNull);
+        expect(failedCall!.error, isNotNull);
+        expect(failedCall.stackTrace, isNotNull);
       },
     );
   });
@@ -183,9 +178,7 @@ void main() {
 
       expect(repository.createdEntities, hasLength(1));
       expect(repository.storedEntities[1]?.remoteId, equals(1));
-      verify(
-        () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
-      ).called(1);
+      expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
     });
 
     test('does not call putMany when remote returns empty', () {
@@ -211,9 +204,7 @@ void main() {
           repository.storedEntities[1]?.modifiedAt,
           equals(DateTime(2026)),
         );
-        verify(
-          () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
-        ).called(1);
+        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
       },
     );
 
@@ -231,12 +222,8 @@ void main() {
 
         expect(repository.mergedEntities, isEmpty);
         expect(repository.putManyCallCount, equals(0));
-        verifyNever(
-          () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
-        );
-        verifyNever(
-          () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
-        );
+        expect(mockLogger.containsEvent<EntityInsertSuccess>(), isFalse);
+        expect(mockLogger.containsEvent<EntityUpdateSuccess>(), isFalse);
       },
     );
 
@@ -258,9 +245,7 @@ void main() {
 
         expect(repository.deletedEntities, hasLength(1));
         expect(repository.storedEntities[1]?.isDeleted, isTrue);
-        verify(
-          () => mockLogger.log(any(that: isA<EntityDeleteSuccess>())),
-        ).called(1);
+        expect(mockLogger.eventsOfType<EntityDeleteSuccess>(), hasLength(1));
       },
     );
 
@@ -310,15 +295,9 @@ void main() {
 
         expect(repository.putManyCallCount, equals(1));
         expect(repository.putManyCalls[0], hasLength(3));
-        verify(
-          () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
-        ).called(1);
-        verify(
-          () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
-        ).called(1);
-        verify(
-          () => mockLogger.log(any(that: isA<EntityDeleteSuccess>())),
-        ).called(1);
+        expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
+        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
+        expect(mockLogger.eventsOfType<EntityDeleteSuccess>(), hasLength(1));
       },
     );
 
@@ -352,9 +331,7 @@ void main() {
         expect(repository.mergedEntities, hasLength(1));
         expect(repository.deletedEntities, isEmpty);
         expect(repository.storedEntities[1]?.isDeleted, isFalse);
-        verify(
-          () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
-        ).called(1);
+        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
       },
     );
 
@@ -374,12 +351,8 @@ void main() {
           repository.storedEntities[1]?.modifiedAt,
           equals(DateTime(2026, 6)),
         );
-        verify(
-          () => mockLogger.log(any(that: isA<EntityInsertSuccess>())),
-        ).called(1);
-        verify(
-          () => mockLogger.log(any(that: isA<EntityUpdateSuccess>())),
-        ).called(1);
+        expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
+        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
       },
     );
 
@@ -416,13 +389,11 @@ void main() {
         ]);
 
         expect(result.isError, isTrue);
-        verify(
-          () => mockLogger.log(
-            any(that: isA<RepositorySyncFailed>()),
-            error: any(named: 'error'),
-            stackTrace: any(named: 'stackTrace'),
-          ),
-        ).called(1);
+        expect(mockLogger.eventsOfType<RepositorySyncFailed>(), hasLength(1));
+        final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+        expect(failedCall, isNotNull);
+        expect(failedCall!.error, isNotNull);
+        expect(failedCall.stackTrace, isNotNull);
       },
     );
   });

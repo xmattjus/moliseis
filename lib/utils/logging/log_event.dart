@@ -1,4 +1,3 @@
-import 'package:meta/meta.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 
 part 'events/core_events.dart';

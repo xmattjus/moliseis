@@ -1,39 +1,28 @@
 part of 'package:moliseis/utils/logging/log_event.dart';
 
-/// Fired when a repository begins a sync with the remote data source.
-class RepositorySyncStarted extends LogEvent {
-  /// Creates an event for a sync started on [repositoryName].
-  const RepositorySyncStarted(this.repositoryName);
+/// Fired after an entity has been successfully deleted.
+class EntityDeleteSuccess extends LogEvent {
+  /// Creates an event for a successful deletion of [entityType]
+  /// with an optional [remoteId].
+  const EntityDeleteSuccess(this.entityType, [this.remoteId]);
 
-  /// Name of the repository that started syncing.
-  final String repositoryName;
+  /// Type label identifying the entity class (e.g. `"Event"`, `"Place"`).
+  final String entityType;
+
+  /// Remote (Supabase) id of the entity, if available at deletion time.
+  final int? remoteId;
 
   @override
-  Map<String, Object?> get data => {'repositoryName': repositoryName};
+  Map<String, Object?> get data => {
+    'entityType': entityType,
+    'remoteId': remoteId,
+  };
 
   @override
   AppLogLevel get level => AppLogLevel.info;
 
   @override
-  String get name => 'repository_sync_started';
-}
-
-/// Fired when a repository sync fails.
-class RepositorySyncFailed extends LogEvent {
-  /// Creates an event for a sync failure on [repositoryName].
-  const RepositorySyncFailed(this.repositoryName);
-
-  /// Name of the repository that failed to sync.
-  final String repositoryName;
-
-  @override
-  Map<String, Object?> get data => {'repositoryName': repositoryName};
-
-  @override
-  AppLogLevel get level => AppLogLevel.error;
-
-  @override
-  String get name => 'repository_sync_failed';
+  String get name => 'entity_delete_success';
 }
 
 /// Fired after an entity insert fails.
@@ -216,4 +205,58 @@ class EntityLoadStarted extends LogEvent {
 
   @override
   String get name => 'entity_load_started';
+}
+
+/// Fired when a repository sync fails.
+class RepositorySyncFailed extends LogEvent {
+  /// Creates an event for a sync failure on [repositoryName].
+  const RepositorySyncFailed(this.repositoryName);
+
+  /// Name of the repository that failed to sync.
+  final String repositoryName;
+
+  @override
+  Map<String, Object?> get data => {'repositoryName': repositoryName};
+
+  @override
+  AppLogLevel get level => AppLogLevel.error;
+
+  @override
+  String get name => 'repository_sync_failed';
+}
+
+/// Fired when a repository sync is completed successfully.
+class RepositorySyncFinished extends LogEvent {
+  /// Creates an event for a sync success on [repositoryName].
+  const RepositorySyncFinished(this.repositoryName);
+
+  /// Name of the repository that completed the sync.
+  final String repositoryName;
+
+  @override
+  Map<String, Object?> get data => {'repositoryName': repositoryName};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'repository_sync_finished';
+}
+
+/// Fired when a repository begins a sync with the remote data source.
+class RepositorySyncStarted extends LogEvent {
+  /// Creates an event for a sync started on [repositoryName].
+  const RepositorySyncStarted(this.repositoryName);
+
+  /// Name of the repository that started syncing.
+  final String repositoryName;
+
+  @override
+  Map<String, Object?> get data => {'repositoryName': repositoryName};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'repository_sync_started';
 }

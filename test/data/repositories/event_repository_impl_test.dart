@@ -22,23 +22,20 @@ import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
-  setUpAll(() {
-    setUpMockLogger();
-    setUpMockSupabase();
-  });
+  setUpAll(setUpMockSupabase);
 
   group('EventRepositoryImpl - DateTime Overlap Logic', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late Box<EventEntity> eventBox;
-    late Logger fakeLogger;
+    late MockLogger mockLogger;
     late EventRepositoryImpl repository;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
       eventBox = objectBoxEnvironment.store.box<EventEntity>();
-      fakeLogger = MockLogger();
+      mockLogger = MockLogger();
       repository = EventRepositoryImpl(
-        logger: fakeLogger,
+        logger: mockLogger,
         supabaseI: MockSupabase(),
         supabaseTable: EventSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
@@ -390,13 +387,14 @@ void main() {
           final result = await mockRepository.getByDate(DateTime(2026, 3, 15));
 
           expect(result, isA<Error<List<Event>>>());
-          verify(
-            () => mockLogger.log(
-              const EntityLoadFailed('event', method: 'getByDate'),
-              error: any(named: 'error'),
-              stackTrace: any(named: 'stackTrace'),
-            ),
-          ).called(1);
+          final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>();
+          expect(failedCall, isNotNull);
+          expect(
+            failedCall!.event,
+            const EntityLoadFailed('event', method: 'getByDate'),
+          );
+          expect(failedCall.error, isNotNull);
+          expect(failedCall.stackTrace, isNotNull);
         },
       );
 
@@ -409,13 +407,14 @@ void main() {
           );
 
           expect(result, isA<Error<List<Event>>>());
-          verify(
-            () => mockLogger.log(
-              const EntityLoadFailed('event', method: 'getByDateRange'),
-              error: any(named: 'error'),
-              stackTrace: any(named: 'stackTrace'),
-            ),
-          ).called(1);
+          final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>();
+          expect(failedCall, isNotNull);
+          expect(
+            failedCall!.event,
+            const EntityLoadFailed('event', method: 'getByDateRange'),
+          );
+          expect(failedCall.error, isNotNull);
+          expect(failedCall.stackTrace, isNotNull);
         },
       );
     });
