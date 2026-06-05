@@ -1,4 +1,7 @@
-import 'package:moliseis/domain/core/sync_dto.dart';
+import 'package:moliseis/data/dtos/city_dto.dart';
+import 'package:moliseis/data/dtos/event_dto.dart';
+import 'package:moliseis/data/dtos/media_dto.dart';
+import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
@@ -58,31 +61,48 @@ class SyncUseCase {
 
     try {
       // Phase 1: fetch all remote data concurrently
-      final cityResult = _cityRepository.prepareSync();
-      final placeResult = _placeRepository.prepareSync();
-      final eventResult = _eventRepository.prepareSync();
-      final mediaResult = _mediaRepository.prepareSync();
+      final (cityResult, placeResult, eventResult, mediaResult) = await (
+        _cityRepository.prepareSync(),
+        _placeRepository.prepareSync(),
+        _eventRepository.prepareSync(),
+        _mediaRepository.prepareSync(),
+      ).wait;
 
-      final results = await Future.wait([
-        cityResult,
-        placeResult,
-        eventResult,
-        mediaResult,
-      ]);
-
-      for (final result in results) {
-        switch (result) {
-          case Error<List<SyncDto>>():
-            spanStatus = const SpanStatus.internalError();
-            return Result.error(result.error);
-          case Success<List<SyncDto>>():
-        }
+      final List<CityDto> cityDtos;
+      switch (cityResult) {
+        case Success(:final value):
+          cityDtos = value;
+        case Error(:final error):
+          spanStatus = const SpanStatus.internalError();
+          return Result.error(error);
       }
 
-      final cityDtos = (results[0] as Success<List<SyncDto>>).value;
-      final placeDtos = (results[1] as Success<List<SyncDto>>).value;
-      final eventDtos = (results[2] as Success<List<SyncDto>>).value;
-      final mediaDtos = (results[3] as Success<List<SyncDto>>).value;
+      final List<PlaceDto> placeDtos;
+      switch (placeResult) {
+        case Success(:final value):
+          placeDtos = value;
+        case Error(:final error):
+          spanStatus = const SpanStatus.internalError();
+          return Result.error(error);
+      }
+
+      final List<EventDto> eventDtos;
+      switch (eventResult) {
+        case Success(:final value):
+          eventDtos = value;
+        case Error(:final error):
+          spanStatus = const SpanStatus.internalError();
+          return Result.error(error);
+      }
+
+      final List<MediaDto> mediaDtos;
+      switch (mediaResult) {
+        case Success(:final value):
+          mediaDtos = value;
+        case Error(:final error):
+          spanStatus = const SpanStatus.internalError();
+          return Result.error(error);
+      }
 
       // Phase 2: commit all repos in a single write transaction,
       // short-circuiting on the first commit error

@@ -7,8 +7,8 @@ import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/data-sources/place_supabase_table.dart';
+import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
-import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/place.dart';
@@ -530,7 +530,7 @@ void main() {
     test('returns Error when Supabase throws an exception', () async {
       final result = await repository.prepareSync();
 
-      expect(result, isA<Error<List<SyncDto>>>());
+      expect(result, isA<Error<List<PlaceDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('place'),
@@ -583,7 +583,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<PlaceDto>>).value;
       repository.commitSync(dtos);
 
       expect(placeBox.get(1)?.name, equals('Campobasso'));
@@ -615,7 +615,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<PlaceDto>>).value;
       repository.commitSync(dtos);
 
       expect(placeBox.get(1)?.name, equals('Campobasso'));
@@ -649,7 +649,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<PlaceDto>>).value;
       repository.commitSync(dtos);
 
       expect(placeBox.get(1)?.name, equals('Campobasso Aggiornato'));
@@ -676,7 +676,7 @@ void main() {
         },
       ]);
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<PlaceDto>>).value;
       repository.commitSync(dtos);
 
       // A subsequent getAll() must reflect the new place, not the stale cache.
@@ -696,7 +696,7 @@ void main() {
 
       final result = await repository.prepareSync();
 
-      expect(result, isA<Error<List<SyncDto>>>());
+      expect(result, isA<Error<List<PlaceDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('place'),

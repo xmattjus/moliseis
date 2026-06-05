@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/core/sync_dto.dart';
+import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -232,11 +232,11 @@ final class _FakeEventRepository implements EventRepository {
   }
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async =>
-      const Result.success(<SyncDto>[]);
+  Future<Result<List<EventDto>>> prepareSync() async =>
+      const Result.success(<EventDto>[]);
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
+  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
 }
 
 Future<void> _waitForCommand(Command<void> command) async {

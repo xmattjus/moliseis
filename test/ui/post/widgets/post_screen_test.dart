@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:moliseis/data/dtos/event_dto.dart';
+import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
@@ -11,7 +13,6 @@ import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_we
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
-import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -244,11 +245,11 @@ final class _FakeEventRepository implements EventRepository {
   }
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async =>
-      const Result.success(<SyncDto>[]);
+  Future<Result<List<EventDto>>> prepareSync() async =>
+      const Result.success(<EventDto>[]);
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
+  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
 }
 
 final class _FakePlaceRepository implements PlaceRepository {
@@ -307,11 +308,11 @@ final class _FakePlaceRepository implements PlaceRepository {
   }
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async =>
-      const Result.success(<SyncDto>[]);
+  Future<Result<List<PlaceDto>>> prepareSync() async =>
+      const Result.success(<PlaceDto>[]);
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
+  Result<void> commitSync(List<PlaceDto> dtos) => const Result.success(null);
 }
 
 City _buildCity() => City(

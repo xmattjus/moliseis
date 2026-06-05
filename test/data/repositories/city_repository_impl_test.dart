@@ -2,8 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/city_supabase_table.dart';
+import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
-import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/result.dart';
@@ -48,7 +48,7 @@ void main() {
     test('returns Error when Supabase throws an exception', () async {
       final result = await repository.prepareSync();
 
-      expect(result, isA<Error<List<SyncDto>>>());
+      expect(result, isA<Error<List<CityDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('city'),
@@ -98,7 +98,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<CityDto>>).value;
       repository.commitSync(dtos);
 
       expect(cityBox.get(1)?.name, equals('Campobasso'));
@@ -131,7 +131,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<CityDto>>).value;
       repository.commitSync(dtos);
 
       expect(cityBox.get(1)?.name, equals('Campobasso Aggiornato'));
@@ -162,7 +162,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<CityDto>>).value;
       repository.commitSync(dtos);
 
       // Box must be unchanged — city is identical to remote, no write occurs.
@@ -178,7 +178,7 @@ void main() {
 
       final result = await repository.prepareSync();
 
-      expect(result, isA<Error<List<SyncDto>>>());
+      expect(result, isA<Error<List<CityDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('city'),

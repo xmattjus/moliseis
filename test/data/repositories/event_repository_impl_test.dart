@@ -6,9 +6,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/event_supabase_table.dart';
+import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/data/services/objectbox.dart' as app_objectbox;
-import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -817,7 +817,7 @@ void main() {
           },
         ]);
         final prepareResult = await repository.prepareSync();
-        final dtos = (prepareResult as Success<List<SyncDto>>).value;
+        final dtos = (prepareResult as Success<List<EventDto>>).value;
         repository.commitSync(dtos);
 
         // Cache was invalidated; getByCurrentYear() must reflect the new event.

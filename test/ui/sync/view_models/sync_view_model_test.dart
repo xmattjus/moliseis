@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/domain/core/sync_dto.dart';
+import 'package:moliseis/data/dtos/city_dto.dart';
+import 'package:moliseis/data/dtos/event_dto.dart';
+import 'package:moliseis/data/dtos/media_dto.dart';
+import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -21,10 +24,10 @@ void main() {
   // Builds a SyncUseCase with configurable prepareSync() results and settings.
   SyncUseCase buildUseCase({
     required _FakeSettingsRepository settings,
-    Result<List<SyncDto>> cityResult = const Result.success([]),
-    Result<List<SyncDto>> eventResult = const Result.success([]),
-    Result<List<SyncDto>> mediaResult = const Result.success([]),
-    Result<List<SyncDto>> placeResult = const Result.success([]),
+    Result<List<CityDto>> cityResult = const Result.success([]),
+    Result<List<EventDto>> eventResult = const Result.success([]),
+    Result<List<MediaDto>> mediaResult = const Result.success([]),
+    Result<List<PlaceDto>> placeResult = const Result.success([]),
   }) {
     return SyncUseCase(
       cityRepository: _FakeCityRepository(prepareResult: cityResult),
@@ -179,15 +182,15 @@ final class _FakeCityRepository extends CityRepository {
     this.prepareResult = const Result.success([]),
   });
 
-  final Result<List<SyncDto>> prepareResult;
+  final Result<List<CityDto>> prepareResult;
   bool commitCalled = false;
-  List<SyncDto>? committedDtos;
+  List<CityDto>? committedDtos;
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<CityDto>>> prepareSync() async => prepareResult;
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) {
+  Result<void> commitSync(List<CityDto> dtos) {
     commitCalled = true;
     committedDtos = dtos;
     return const Result.success(null);
@@ -199,15 +202,15 @@ final class _FakeEventRepository extends EventRepository {
     this.prepareResult = const Result.success([]),
   });
 
-  final Result<List<SyncDto>> prepareResult;
+  final Result<List<EventDto>> prepareResult;
   bool commitCalled = false;
-  List<SyncDto>? committedDtos;
+  List<EventDto>? committedDtos;
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<EventDto>>> prepareSync() async => prepareResult;
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) {
+  Result<void> commitSync(List<EventDto> dtos) {
     commitCalled = true;
     committedDtos = dtos;
     return const Result.success(null);
@@ -260,15 +263,15 @@ final class _FakeMediaRepository extends MediaRepository {
     this.prepareResult = const Result.success([]),
   });
 
-  final Result<List<SyncDto>> prepareResult;
+  final Result<List<MediaDto>> prepareResult;
   bool commitCalled = false;
-  List<SyncDto>? committedDtos;
+  List<MediaDto>? committedDtos;
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<MediaDto>>> prepareSync() async => prepareResult;
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) {
+  Result<void> commitSync(List<MediaDto> dtos) {
     commitCalled = true;
     committedDtos = dtos;
     return const Result.success(null);
@@ -288,15 +291,15 @@ final class _FakePlaceRepository extends PlaceRepository {
     this.prepareResult = const Result.success([]),
   });
 
-  final Result<List<SyncDto>> prepareResult;
+  final Result<List<PlaceDto>> prepareResult;
   bool commitCalled = false;
-  List<SyncDto>? committedDtos;
+  List<PlaceDto>? committedDtos;
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<PlaceDto>>> prepareSync() async => prepareResult;
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) {
+  Result<void> commitSync(List<PlaceDto> dtos) {
     commitCalled = true;
     committedDtos = dtos;
     return const Result.success(null);

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/core/sync_dto.dart';
+import 'package:moliseis/data/dtos/event_dto.dart';
+import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -155,11 +156,11 @@ class _FakeEventRepository extends EventRepository {
       const Result.success(null);
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async =>
-      const Result.success(<SyncDto>[]);
+  Future<Result<List<EventDto>>> prepareSync() async =>
+      const Result.success(<EventDto>[]);
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
+  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
 }
 
 class _FakePlaceRepository extends PlaceRepository {
@@ -205,11 +206,11 @@ class _FakePlaceRepository extends PlaceRepository {
       const Result.success(null);
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async =>
-      const Result.success(<SyncDto>[]);
+  Future<Result<List<PlaceDto>>> prepareSync() async =>
+      const Result.success(<PlaceDto>[]);
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) => const Result.success(null);
+  Result<void> commitSync(List<PlaceDto> dtos) => const Result.success(null);
 }
 
 City _testCity() => City(

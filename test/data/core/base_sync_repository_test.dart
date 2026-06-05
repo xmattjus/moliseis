@@ -13,21 +13,6 @@ import '../../support/mock_logger.dart';
 // Test doubles
 // ---------------------------------------------------------------------------
 
-class _WrongSyncDto implements SyncDto {
-  const _WrongSyncDto({
-    required this.id,
-    required this.modifiedAt,
-    this.deletedAt,
-  });
-
-  @override
-  final int id;
-  @override
-  final DateTime modifiedAt;
-  @override
-  final DateTime? deletedAt;
-}
-
 class FakeSyncDto implements SyncDto {
   const FakeSyncDto({
     required this.id,
@@ -157,8 +142,8 @@ void main() {
 
       final result = await repository.prepareSync();
 
-      expect(result, isA<Success<List<SyncDto>>>());
-      final dtos = (result as Success<List<SyncDto>>).value;
+      expect(result, isA<Success<List<FakeSyncDto>>>());
+      final dtos = (result as Success<List<FakeSyncDto>>).value;
       expect(dtos, hasLength(1));
       expect(dtos[0].id, equals(1));
     });
@@ -170,7 +155,7 @@ void main() {
 
         final result = await throwingRepository.prepareSync();
 
-        expect(result, isA<Error<List<SyncDto>>>());
+        expect(result, isA<Error<List<FakeSyncDto>>>());
         verify(
           () => mockLogger.log(
             any(that: isA<RepositorySyncFailed>()),
@@ -190,18 +175,6 @@ void main() {
       mockLogger = MockLogger();
       repository = StubSyncRepository(mockLogger);
     });
-
-    test(
-      'returns Result.error when commitSync receives DTOs of the wrong type',
-      () {
-        final wrongDtos = <SyncDto>[
-          _WrongSyncDto(id: 1, modifiedAt: DateTime(2026)),
-        ];
-
-        final result = repository.commitSync(wrongDtos);
-        expect(result.isError, isTrue);
-      },
-    );
 
     test('inserts a new entity absent from the local store', () {
       repository.commitSync([

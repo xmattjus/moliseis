@@ -1,3 +1,4 @@
+import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/place.dart';
@@ -5,7 +6,14 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/synchronizable.dart';
 
 /// Domain interface for place data access.
-abstract class PlaceRepository with Synchronizable {
+///
+/// [Synchronizable] is parameterized with [PlaceDto] from the data layer so
+/// the concrete DTO type flows through `prepareSync`/`commitSync` at
+/// compile time. The `data/dtos` import is a deliberate outward
+/// dependency: the `SyncDto` base contract is in the domain, but the
+/// concrete subtypes stay in the data layer to keep serialization and
+/// ObjectBox annotations out of domain code.
+abstract class PlaceRepository with Synchronizable<PlaceDto> {
   /// Returns all places.
   Future<Result<List<Place>>> getAll({ContentSort sort = ContentSort.byName});
 

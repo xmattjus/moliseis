@@ -8,9 +8,9 @@ import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/media_supabase_table.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
+import 'package:moliseis/data/dtos/media_dto.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/services/objectbox.dart' as app_objectbox;
-import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
@@ -224,7 +224,7 @@ void main() {
     test('returns Error when Supabase throws an exception', () async {
       final result = await repository.prepareSync();
 
-      expect(result, isA<Error<List<SyncDto>>>());
+      expect(result, isA<Error<List<MediaDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('media'),
@@ -278,7 +278,7 @@ void main() {
         ]);
 
         final prepareResult = await repository.prepareSync();
-        final dtos = (prepareResult as Success<List<SyncDto>>).value;
+        final dtos = (prepareResult as Success<List<MediaDto>>).value;
         repository.commitSync(dtos);
 
         expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
@@ -303,7 +303,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<MediaDto>>).value;
       repository.commitSync(dtos);
 
       final entity = mediaBox.get(10)!;
@@ -331,7 +331,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<MediaDto>>).value;
       repository.commitSync(dtos);
 
       expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
@@ -363,7 +363,7 @@ void main() {
       ]);
 
       final prepareResult = await repository.prepareSync();
-      final dtos = (prepareResult as Success<List<SyncDto>>).value;
+      final dtos = (prepareResult as Success<List<MediaDto>>).value;
       repository.commitSync(dtos);
 
       expect(mediaBox.get(10)?.url, equals('https://example.com/new.jpg'));
@@ -381,7 +381,7 @@ void main() {
 
       final result = await repository.prepareSync();
 
-      expect(result, isA<Error<List<SyncDto>>>());
+      expect(result, isA<Error<List<MediaDto>>>());
       verify(
         () => mockLogger.log(
           const RepositorySyncFailed('media'),

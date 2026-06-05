@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/domain/core/sync_dto.dart';
+import 'package:moliseis/data/dtos/city_dto.dart';
+import 'package:moliseis/data/dtos/event_dto.dart';
+import 'package:moliseis/data/dtos/media_dto.dart';
+import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -19,10 +22,10 @@ import 'package:moliseis/utils/result.dart';
 void main() {
   _SyncUseCaseDeps buildUseCase({
     required _FakeSettingsRepository settings,
-    Result<List<SyncDto>> cityResult = const Result.success([]),
-    Result<List<SyncDto>> eventResult = const Result.success([]),
-    Result<List<SyncDto>> mediaResult = const Result.success([]),
-    Result<List<SyncDto>> placeResult = const Result.success([]),
+    Result<List<CityDto>> cityResult = const Result.success([]),
+    Result<List<EventDto>> eventResult = const Result.success([]),
+    Result<List<MediaDto>> mediaResult = const Result.success([]),
+    Result<List<PlaceDto>> placeResult = const Result.success([]),
     SyncTransactionCoordinator? transactionCoordinator,
   }) {
     final cityRepo = _FakeCityRepository(prepareResult: cityResult);
@@ -54,10 +57,10 @@ void main() {
     test(
       'calls commitSync on all repos when all prepareSync calls succeed',
       () async {
-        final cityDtos = [_FakeSyncDto(1)];
-        final placeDtos = [_FakeSyncDto(2)];
-        final eventDtos = [_FakeSyncDto(3)];
-        final mediaDtos = [_FakeSyncDto(4)];
+        final cityDtos = [_cityDto(1)];
+        final placeDtos = [_placeDto(2)];
+        final eventDtos = [_eventDto(3)];
+        final mediaDtos = [_mediaDto(4)];
 
         final settings = _FakeSettingsRepository(modifiedAt: null);
         final deps = buildUseCase(
@@ -190,10 +193,10 @@ void main() {
     test(
       'wraps all commitSync calls inside runInWriteTransaction',
       () async {
-        final cityDtos = [_FakeSyncDto(1)];
-        final placeDtos = [_FakeSyncDto(2)];
-        final eventDtos = [_FakeSyncDto(3)];
-        final mediaDtos = [_FakeSyncDto(4)];
+        final cityDtos = [_cityDto(1)];
+        final placeDtos = [_placeDto(2)];
+        final eventDtos = [_eventDto(3)];
+        final mediaDtos = [_mediaDto(4)];
 
         final settings = _FakeSettingsRepository(modifiedAt: null);
         final wrappedCalls = <VoidCall>[];
@@ -302,21 +305,49 @@ void main() {
 }
 
 // ---------------------------------------------------------------------------
-// Test helpers
+// DTO factories
 // ---------------------------------------------------------------------------
 
-final class _FakeSyncDto implements SyncDto {
-  _FakeSyncDto(this.id);
+CityDto _cityDto(int id) => CityDto(
+  id: id,
+  name: 'Test City $id',
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
+);
 
-  @override
-  final int id;
+PlaceDto _placeDto(int id) => PlaceDto(
+  id: id,
+  name: 'Test Place $id',
+  description: '',
+  coordinates: const [0, 0],
+  category: ContentCategory.nature,
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
+);
 
-  @override
-  DateTime get modifiedAt => DateTime(2025);
+EventDto _eventDto(int id) => EventDto(
+  id: id,
+  name: 'Test Event $id',
+  description: '',
+  startDate: DateTime(2026),
+  coordinates: const [0, 0],
+  category: ContentCategory.nature,
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
+);
 
-  @override
-  DateTime? get deletedAt => null;
-}
+MediaDto _mediaDto(int id) => MediaDto(
+  id: id,
+  url: 'https://example.com/$id.jpg',
+  width: 800,
+  height: 600,
+  createdAt: DateTime(2026),
+  modifiedAt: DateTime(2026),
+);
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
 
 final class _SyncUseCaseDeps {
   _SyncUseCaseDeps({
@@ -375,15 +406,15 @@ final class _FakeCityRepository extends CityRepository {
     this.prepareResult = const Result.success([]),
   });
 
-  final Result<List<SyncDto>> prepareResult;
+  final Result<List<CityDto>> prepareResult;
   bool commitCalled = false;
-  List<SyncDto>? committedDtos;
+  List<CityDto>? committedDtos;
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<CityDto>>> prepareSync() async => prepareResult;
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) {
+  Result<void> commitSync(List<CityDto> dtos) {
     commitCalled = true;
     committedDtos = dtos;
     return const Result.success(null);
@@ -395,15 +426,15 @@ final class _FakeEventRepository extends EventRepository {
     this.prepareResult = const Result.success([]),
   });
 
-  final Result<List<SyncDto>> prepareResult;
+  final Result<List<EventDto>> prepareResult;
   bool commitCalled = false;
-  List<SyncDto>? committedDtos;
+  List<EventDto>? committedDtos;
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<EventDto>>> prepareSync() async => prepareResult;
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) {
+  Result<void> commitSync(List<EventDto> dtos) {
     commitCalled = true;
     committedDtos = dtos;
     return const Result.success(null);
@@ -456,15 +487,15 @@ final class _FakeMediaRepository extends MediaRepository {
     this.prepareResult = const Result.success([]),
   });
 
-  final Result<List<SyncDto>> prepareResult;
+  final Result<List<MediaDto>> prepareResult;
   bool commitCalled = false;
-  List<SyncDto>? committedDtos;
+  List<MediaDto>? committedDtos;
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<MediaDto>>> prepareSync() async => prepareResult;
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) {
+  Result<void> commitSync(List<MediaDto> dtos) {
     commitCalled = true;
     committedDtos = dtos;
     return const Result.success(null);
@@ -484,15 +515,15 @@ final class _FakePlaceRepository extends PlaceRepository {
     this.prepareResult = const Result.success([]),
   });
 
-  final Result<List<SyncDto>> prepareResult;
+  final Result<List<PlaceDto>> prepareResult;
   bool commitCalled = false;
-  List<SyncDto>? committedDtos;
+  List<PlaceDto>? committedDtos;
 
   @override
-  Future<Result<List<SyncDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<PlaceDto>>> prepareSync() async => prepareResult;
 
   @override
-  Result<void> commitSync(List<SyncDto> dtos) {
+  Result<void> commitSync(List<PlaceDto> dtos) {
     commitCalled = true;
     committedDtos = dtos;
     return const Result.success(null);
