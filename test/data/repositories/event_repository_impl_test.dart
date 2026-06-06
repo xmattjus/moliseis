@@ -848,7 +848,7 @@ EventEntity _createEvent({
     name: name ?? 'Test Event $remoteId',
     startDate: startDate,
     endDate: endDate,
-    category: category,
+    contentCategoryIndex: category.index,
     createdAt: now,
     modifiedAt: modifiedAt ?? now,
     city: ToOne<CityEntity>(),

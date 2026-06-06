@@ -28,7 +28,7 @@ void main() {
     name: 'Castello Monforte',
     description: description,
     coordinates: [41.5633, 14.6564],
-    category: ContentCategory.history,
+    contentCategoryIndex: ContentCategory.history.index,
     createdAt: now,
     modifiedAt: now,
     city: ToOne<CityEntity>(target: city ?? cityEntity()),
@@ -70,6 +70,7 @@ void main() {
       final noCity = PlaceEntity(
         remoteId: 1,
         name: 'Place',
+        contentCategoryIndex: 0,
         createdAt: now,
         modifiedAt: now,
         city: ToOne<CityEntity>(),

@@ -441,6 +441,7 @@ EventEntity _createEvent({required int remoteId}) {
   return EventEntity(
     remoteId: remoteId,
     startDate: now,
+    contentCategoryIndex: 0,
     createdAt: now,
     modifiedAt: now,
     city: ToOne<CityEntity>(),
@@ -453,6 +454,7 @@ PlaceEntity _createPlace({required int remoteId}) {
   return PlaceEntity(
     remoteId: remoteId,
     name: 'Place $remoteId',
+    contentCategoryIndex: 0,
     createdAt: now,
     modifiedAt: now,
     city: ToOne<CityEntity>(),

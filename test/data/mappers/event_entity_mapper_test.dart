@@ -35,7 +35,7 @@ void main() {
     startDate: startDate ?? start,
     endDate: endDate,
     coordinates: [41.5, 14.2],
-    category: category,
+    contentCategoryIndex: category.index,
     createdAt: now,
     modifiedAt: now,
     city: withCity
@@ -80,6 +80,7 @@ void main() {
       final entityWithNullStart = EventEntity(
         remoteId: 3,
         name: 'Test',
+        contentCategoryIndex: 0,
         createdAt: now,
         modifiedAt: now,
         city: ToOne<CityEntity>(target: cityEntity()),

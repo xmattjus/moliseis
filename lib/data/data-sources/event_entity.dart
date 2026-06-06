@@ -13,7 +13,7 @@ class EventEntity implements SyncEntity {
     this.startDate,
     this.endDate,
     this.coordinates = const [0, 0],
-    this.category = ContentCategory.unknown,
+    required this.contentCategoryIndex,
     this.cityToOneId,
     required this.createdAt,
     required this.modifiedAt,
@@ -21,7 +21,9 @@ class EventEntity implements SyncEntity {
     required this.media,
     this.isSaved = false,
     this.isDeleted = false,
-  });
+  }) {
+    assertValidContentCategoryIndex(contentCategoryIndex);
+  }
 
   @override
   @Id(assignable: true)
@@ -43,9 +45,9 @@ class EventEntity implements SyncEntity {
   @Property(type: PropertyType.floatVector)
   final List<double> coordinates;
 
-  // TODO(xmattjus): remove field, add final int contentCategoryIndex.
-  @Transient()
-  ContentCategory category;
+  /// Index into [ContentCategory.values]. Must satisfy
+  /// `0 <= contentCategoryIndex < ContentCategory.values.length`.
+  final int contentCategoryIndex;
 
   final int? cityToOneId;
 
@@ -58,22 +60,6 @@ class EventEntity implements SyncEntity {
 
   @override
   final bool isDeleted;
-
-  int? get dbType {
-    assertStableContentCategoryEnumIndexes();
-    return category.index;
-  }
-
-  set dbType(int? value) {
-    assertStableContentCategoryEnumIndexes();
-    if (value == null) {
-      category = ContentCategory.unknown;
-    } else {
-      category = value >= 0 && value < ContentCategory.values.length
-          ? ContentCategory.values[value]
-          : ContentCategory.unknown;
-    }
-  }
 
   final ToOne<CityEntity> city;
 
@@ -88,7 +74,7 @@ class EventEntity implements SyncEntity {
     DateTime? startDate,
     DateTime? endDate,
     List<double>? coordinates,
-    ContentCategory? category,
+    int? contentCategoryIndex,
     DateTime? createdAt,
     DateTime? modifiedAt,
     bool? isDeleted,
@@ -100,7 +86,7 @@ class EventEntity implements SyncEntity {
     startDate: startDate ?? this.startDate,
     endDate: endDate ?? this.endDate,
     coordinates: coordinates ?? this.coordinates,
-    category: category ?? this.category,
+    contentCategoryIndex: contentCategoryIndex ?? this.contentCategoryIndex,
     createdAt: createdAt ?? this.createdAt,
     modifiedAt: modifiedAt ?? this.modifiedAt,
     city: city,
@@ -117,7 +103,7 @@ class EventEntity implements SyncEntity {
     startDate: startDate,
     endDate: endDate,
     coordinates: coordinates,
-    category: category,
+    contentCategoryIndex: contentCategoryIndex,
     cityToOneId: cityId,
     createdAt: createdAt,
     modifiedAt: modifiedAt,

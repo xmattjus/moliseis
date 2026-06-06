@@ -109,7 +109,7 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
     Query<PlaceEntity>? query;
 
     try {
-      final condition = PlaceEntity_.dbType
+      final condition = PlaceEntity_.contentCategoryIndex
           .oneOf(categories.map((e) => e.index).toList())
           .and(_isNotDeleted);
 

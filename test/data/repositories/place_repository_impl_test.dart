@@ -719,7 +719,7 @@ PlaceEntity _createPlace({
     remoteId: remoteId,
     name: name,
     description: 'Franco',
-    category: category,
+    contentCategoryIndex: category.index,
     isSaved: isSaved,
     createdAt: createdAt ?? now,
     modifiedAt: modifiedAt ?? now,

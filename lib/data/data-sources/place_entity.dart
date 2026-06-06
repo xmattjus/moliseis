@@ -11,7 +11,7 @@ class PlaceEntity implements SyncEntity {
     required this.name,
     this.description,
     this.coordinates = const [0, 0],
-    this.category = ContentCategory.unknown,
+    required this.contentCategoryIndex,
     this.cityToOneId,
     required this.createdAt,
     required this.modifiedAt,
@@ -19,7 +19,9 @@ class PlaceEntity implements SyncEntity {
     required this.media,
     this.isSaved = false,
     this.isDeleted = false,
-  });
+  }) {
+    assertValidContentCategoryIndex(contentCategoryIndex);
+  }
 
   @override
   @Id(assignable: true)
@@ -35,8 +37,9 @@ class PlaceEntity implements SyncEntity {
   @Property(type: PropertyType.floatVector)
   final List<double> coordinates;
 
-  @Transient()
-  ContentCategory category;
+  /// Index into [ContentCategory.values]. Must satisfy
+  /// `0 <= contentCategoryIndex < ContentCategory.values.length`.
+  final int contentCategoryIndex;
 
   final int? cityToOneId;
 
@@ -50,22 +53,6 @@ class PlaceEntity implements SyncEntity {
   @override
   final bool isDeleted;
 
-  int? get dbType {
-    assertStableContentCategoryEnumIndexes();
-    return category.index;
-  }
-
-  set dbType(int? value) {
-    assertStableContentCategoryEnumIndexes();
-    if (value == null) {
-      category = ContentCategory.unknown;
-    } else {
-      category = value >= 0 && value < ContentCategory.values.length
-          ? ContentCategory.values[value]
-          : ContentCategory.unknown;
-    }
-  }
-
   final ToOne<CityEntity> city;
 
   @Backlink('place')
@@ -77,7 +64,7 @@ class PlaceEntity implements SyncEntity {
     String? name,
     String? description,
     List<double>? coordinates,
-    ContentCategory? category,
+    int? contentCategoryIndex,
     DateTime? createdAt,
     DateTime? modifiedAt,
     bool? isDeleted,
@@ -87,7 +74,7 @@ class PlaceEntity implements SyncEntity {
     name: name ?? this.name,
     description: description ?? this.description,
     coordinates: coordinates ?? this.coordinates,
-    category: category ?? this.category,
+    contentCategoryIndex: contentCategoryIndex ?? this.contentCategoryIndex,
     createdAt: createdAt ?? this.createdAt,
     modifiedAt: modifiedAt ?? this.modifiedAt,
     city: city,
@@ -102,7 +89,7 @@ class PlaceEntity implements SyncEntity {
     name: name,
     description: description,
     coordinates: coordinates,
-    category: category,
+    contentCategoryIndex: contentCategoryIndex,
     cityToOneId: cityId,
     createdAt: createdAt,
     modifiedAt: modifiedAt,

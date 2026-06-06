@@ -110,7 +110,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     Query<EventEntity>? query;
 
     try {
-      final condition = EventEntity_.dbType
+      final condition = EventEntity_.contentCategoryIndex
           .oneOf(categories.map((e) => e.index).toList())
           .andAll([
             ObjectBoxConditions.eventStartsEndsCurrentYear,

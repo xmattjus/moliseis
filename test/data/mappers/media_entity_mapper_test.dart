@@ -23,6 +23,7 @@ void main() {
       PlaceEntity(
         remoteId: 10,
         name: name,
+        contentCategoryIndex: 0,
         createdAt: now,
         modifiedAt: now,
         city: ToOne<CityEntity>(target: city(cityName)),
@@ -33,6 +34,7 @@ void main() {
       EventEntity(
         remoteId: 20,
         name: name,
+        contentCategoryIndex: 0,
         startDate: now,
         createdAt: now,
         modifiedAt: now,

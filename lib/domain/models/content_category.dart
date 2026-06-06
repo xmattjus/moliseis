@@ -8,6 +8,29 @@ enum ContentCategory {
   experience,
 }
 
+/// Converts a persisted category index back into a [ContentCategory].
+///
+/// Falls back to [ContentCategory.unknown] when [index] is out of range,
+/// which can happen if the stored data predates an enum reorder or removal.
+/// Calls [assertValidContentCategoryIndex] in debug builds to flag stale
+/// index values early.
+ContentCategory contentCategoryFromIndex(int index) {
+  assertStableContentCategoryEnumIndexes();
+  assertValidContentCategoryIndex(index);
+
+  return index >= 0 && index < ContentCategory.values.length
+      ? ContentCategory.values[index]
+      : ContentCategory.unknown;
+}
+
+/// Verifies that [index] is a valid [ContentCategory] index.
+void assertValidContentCategoryIndex(int index) {
+  assert(
+    index >= 0 && index < ContentCategory.values.length,
+    '$index is not a valid ContentCategory index',
+  );
+}
+
 /// Verifies the index of each [ContentCategory] enum has not changed.
 void assertStableContentCategoryEnumIndexes() {
   assert(

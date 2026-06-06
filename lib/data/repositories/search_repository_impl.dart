@@ -47,7 +47,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
     _placeCategoryQuery = _objectBox.store
         .box<PlaceEntity>()
-        .query(PlaceEntity_.dbType.oneOf(<int>[]))
+        .query(PlaceEntity_.contentCategoryIndex.oneOf(<int>[]))
         .build();
   }
 
@@ -96,7 +96,7 @@ class SearchRepositoryImpl implements SearchRepository {
     final eventCategoryQuery = _objectBox.store
         .box<EventEntity>()
         .query(
-          EventEntity_.dbType
+          EventEntity_.contentCategoryIndex
               .oneOf(_getCategoryIndexes(text))
               .and(ObjectBoxConditions.eventStartsEndsCurrentYear),
         )
@@ -164,7 +164,7 @@ class SearchRepositoryImpl implements SearchRepository {
 
       _placeQuery.param(PlaceEntity_.name).value = text;
 
-      _placeCategoryQuery.param(PlaceEntity_.dbType).values =
+      _placeCategoryQuery.param(PlaceEntity_.contentCategoryIndex).values =
           _getCategoryIndexes(text);
 
       // Generates a record.
@@ -296,7 +296,8 @@ class SearchRepositoryImpl implements SearchRepository {
       map,
       element,
     ) {
-      map[element.category] = (map[element.category] ?? 0) + 1;
+      final category = contentCategoryFromIndex(element.contentCategoryIndex);
+      map[category] = (map[category] ?? 0) + 1;
       return map;
     });
 
@@ -307,7 +308,7 @@ class SearchRepositoryImpl implements SearchRepository {
     if (sorted.isEmpty) return const [];
 
     // Finds all places having the most appeared type.
-    _placeCategoryQuery.param(PlaceEntity_.dbType).values = [
+    _placeCategoryQuery.param(PlaceEntity_.contentCategoryIndex).values = [
       sorted.first.index,
     ];
 

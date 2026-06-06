@@ -19,7 +19,7 @@ class ObjectBox {
     final macOSAppGroup = Platform.isMacOS ? 'group.XIPB6vBUQJblN' : null;
     final docsDir = await getApplicationDocumentsDirectory();
     final store = await openStore(
-      directory: p.join(docsDir.path, 'db_v2-3'),
+      directory: p.join(docsDir.path, 'db_v2-3-0'),
       macosApplicationGroup: macOSAppGroup,
     );
     return ObjectBox._create(store);
