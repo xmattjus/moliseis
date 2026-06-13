@@ -108,6 +108,193 @@ void main() {
       expect(find.byType(PostScreen), findsOneWidget);
       expect(find.byType(EventFormattedDateTime), findsNothing);
     });
+
+    testWidgets('PopScope allows back navigation by default', (tester) async {
+      final event = _buildEvent();
+      final place = _buildPlace();
+      final viewModel = _buildPostViewModel(event: event, place: place);
+      final weatherViewModel = _buildWeatherViewModel(mockLogger);
+      final favouriteViewModel = _buildFavouriteViewModel(
+        event: event,
+        place: place,
+      );
+
+      await viewModel.loadEvent.execute(event.remoteId);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          PostScreen(
+            isEvent: true,
+            viewModel: viewModel,
+            weatherViewModel: weatherViewModel,
+          ),
+          favouriteViewModel,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byType(PostScreen),
+          matching: find.byKey(const ValueKey('galleryPopScopeVlb')),
+        ),
+        findsOneWidget,
+      );
+
+      final popScope = find.byKey(const ValueKey('galleryPopScope'));
+      expect(popScope, findsOneWidget);
+      expect(tester.widget<PopScope>(popScope).canPop, isTrue);
+    });
+
+    testWidgets('canPop changes when gallery open/close state changes', (
+      tester,
+    ) async {
+      final event = _buildEvent();
+      final place = _buildPlace();
+      final viewModel = _buildPostViewModel(event: event, place: place);
+      final weatherViewModel = _buildWeatherViewModel(mockLogger);
+      final favouriteViewModel = _buildFavouriteViewModel(
+        event: event,
+        place: place,
+      );
+
+      await viewModel.loadEvent.execute(event.remoteId);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          PostScreen(
+            isEvent: true,
+            viewModel: viewModel,
+            weatherViewModel: weatherViewModel,
+          ),
+          favouriteViewModel,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Access the notifier through the public ValueListenableBuilder API.
+      // The isGalleryOpenNotifier field controls PopScope reactivity.
+      final vlb = tester.widget<ValueListenableBuilder<bool>>(
+        find.byKey(const ValueKey('galleryPopScopeVlb')),
+      );
+      final notifier = vlb.valueListenable as ValueNotifier<bool>;
+
+      expect(notifier.value, isFalse);
+
+      final popScope = find.byKey(const ValueKey('galleryPopScope'));
+      expect(tester.widget<PopScope>(popScope).canPop, isTrue);
+
+      notifier.value = true;
+      await tester.pump();
+      expect(tester.widget<PopScope>(popScope).canPop, isFalse);
+
+      notifier.value = false;
+      await tester.pump();
+      expect(tester.widget<PopScope>(popScope).canPop, isTrue);
+    });
+
+    testWidgets('deactivate handles open gallery without crashing', (
+      tester,
+    ) async {
+      final event = _buildEvent();
+      final place = _buildPlace();
+      final viewModel = _buildPostViewModel(event: event, place: place);
+      final weatherViewModel = _buildWeatherViewModel(mockLogger);
+      final favouriteViewModel = _buildFavouriteViewModel(
+        event: event,
+        place: place,
+      );
+
+      await viewModel.loadEvent.execute(event.remoteId);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          PostScreen(
+            isEvent: true,
+            viewModel: viewModel,
+            weatherViewModel: weatherViewModel,
+          ),
+          favouriteViewModel,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final vlb = tester.widget<ValueListenableBuilder<bool>>(
+        find.byKey(const ValueKey('galleryPopScopeVlb')),
+      );
+      final notifier = vlb.valueListenable as ValueNotifier<bool>;
+
+      notifier.value = true;
+      // pumpAndSettle() ensures the canPop:false rebuild completes fully
+      // before the widget tree is replaced. Without this, deactivate() fires
+      // while the rebuild pipeline is still active, causing a "setState called
+      // during rebuild" error in the test environment.
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        _buildTestApp(const SizedBox.shrink(), favouriteViewModel),
+      );
+      // pumpAndSettle() lets the maybePop() call from deactivate() complete.
+      await tester.pumpAndSettle();
+      // The notifier belongs to the now-deactivated State; its value (true)
+      // is irrelevant — deactivate() correctly called maybePop() and did not
+      // crash. Test passes if no exception is thrown.
+    });
+
+    testWidgets('PopScope blocks back navigation when gallery is open', (
+      tester,
+    ) async {
+      final event = _buildEvent();
+      final place = _buildPlace();
+      final viewModel = _buildPostViewModel(event: event, place: place);
+      final weatherViewModel = _buildWeatherViewModel(mockLogger);
+      final favouriteViewModel = _buildFavouriteViewModel(
+        event: event,
+        place: place,
+      );
+
+      await viewModel.loadEvent.execute(event.remoteId);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          PostScreen(
+            isEvent: true,
+            viewModel: viewModel,
+            weatherViewModel: weatherViewModel,
+          ),
+          favouriteViewModel,
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final vlb = tester.widget<ValueListenableBuilder<bool>>(
+        find.byKey(const ValueKey('galleryPopScopeVlb')),
+      );
+      final notifier = vlb.valueListenable as ValueNotifier<bool>;
+
+      // Verify default state: canPop is true, onPopInvokedWithResult is wired.
+      final popScope = find.byKey(const ValueKey('galleryPopScope'));
+      expect(tester.widget<PopScope>(popScope).canPop, isTrue);
+      expect(
+        tester.widget<PopScope>(popScope).onPopInvokedWithResult,
+        isNotNull,
+      );
+
+      // Simulate gallery opening: canPop should become false.
+      notifier.value = true;
+      await tester.pump();
+
+      expect(tester.widget<PopScope>(popScope).canPop, isFalse);
+
+      // PopScope and PostScreen are still in tree — back navigation is
+      // suppressed when the gallery is open.
+      expect(find.byKey(const ValueKey('galleryPopScope')), findsOneWidget);
+      expect(find.byType(PostScreen), findsOneWidget);
+    });
   });
 }
 
@@ -195,6 +382,10 @@ final class _FakeEventRepository implements EventRepository {
   final Event event;
 
   @override
+  Future<Result<Iterable<Event>>> getFavourites() async =>
+      const Result.success(<Event>[]);
+
+  @override
   Future<Result<Event>> getById(int id) async => Result.success(event);
 
   @override
@@ -255,6 +446,10 @@ final class _FakePlaceRepository implements PlaceRepository {
   _FakePlaceRepository({required this.place});
 
   final Place place;
+
+  @override
+  Future<Result<Iterable<Place>>> getFavourites() async =>
+      const Result.success(<Place>[]);
 
   @override
   Future<Result<Place>> getById(int id) async => Result.success(place);

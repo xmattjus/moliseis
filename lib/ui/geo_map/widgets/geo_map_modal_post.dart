@@ -69,6 +69,9 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
       child: CustomScrollView(
         controller: _scrollController,
         slivers: <Widget>[
+          // TODO(xmattjus): Back-gesture closing of the gallery from this context is
+          // not addressed — PostScreen's PopScope/canPop guard is specific to
+          // that widget and not reused here.
           if (widget.content.media.isNotEmpty)
             PostSectionSlideshow(
               height: _mediaSlideshowHeight,

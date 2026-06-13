@@ -16,6 +16,8 @@ class PostSectionSlideshow extends StatelessWidget {
     required this.visibilityNotifier,
     this.overlayBuilder,
     this.chromeColor,
+    this.onGalleryOpened,
+    this.onGalleryClosed,
   });
 
   final double height;
@@ -32,6 +34,12 @@ class PostSectionSlideshow extends StatelessWidget {
   /// The color the slideshow bottom chrome will have.
   final Color? chromeColor;
 
+  /// Called when the gallery preview modal is opened.
+  final VoidCallback? onGalleryOpened;
+
+  /// Called when the gallery preview modal is closed.
+  final VoidCallback? onGalleryClosed;
+
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
@@ -43,6 +51,8 @@ class PostSectionSlideshow extends StatelessWidget {
             media: media,
             visibilityNotifier: visibilityNotifier,
             chromeColor: chromeColor,
+            onGalleryOpened: onGalleryOpened,
+            onGalleryClosed: onGalleryClosed,
           );
 
           // If overlay is provided (e.g., for modal), stack it on top.

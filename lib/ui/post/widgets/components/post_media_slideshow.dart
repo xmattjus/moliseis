@@ -17,6 +17,8 @@ class PostMediaSlideshow extends StatefulWidget {
     required this.media,
     required this.visibilityNotifier,
     this.chromeColor,
+    this.onGalleryOpened,
+    this.onGalleryClosed,
   });
 
   final double height;
@@ -27,6 +29,12 @@ class PostMediaSlideshow extends StatefulWidget {
 
   /// The color the slideshow bottom chrome will have.
   final Color? chromeColor;
+
+  /// Called when the gallery preview modal is opened.
+  final VoidCallback? onGalleryOpened;
+
+  /// Called when the gallery preview modal is closed.
+  final VoidCallback? onGalleryClosed;
 
   @override
   State<PostMediaSlideshow> createState() => _PostMediaSlideshowState();
@@ -148,11 +156,22 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
       _stopAutoPlay();
     }
 
+    // Notify the parent that the gallery is opening so it can block
+    // back navigation via PopScope before the async gallery dialog
+    // is pushed. Firing before await is intentional -- the same-frame
+    // synchronous call makes the gap between the state change and the
+    // dialog appearance negligible.
+    widget.onGalleryOpened?.call();
+
     final isDismissed = await GalleryPreviewModal.show(
       context: context,
       media: widget.media,
       initialIndex: initialIndex,
     );
+
+    widget.onGalleryClosed?.call();
+
+    if (!mounted) return;
 
     if ((isDismissed ?? true) && _isAutoPlayEnabled) {
       _startAutoPlay();
