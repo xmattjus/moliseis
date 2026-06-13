@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -9,7 +8,6 @@ import 'package:moliseis/data/services/api/weather/model/current_forecast/curren
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
-import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/widgets/components/weather_forecast_days_list.dart';
@@ -18,6 +16,7 @@ import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../../../support/fake_repositories.dart';
 import '../../../../support/mock_logger.dart';
 
 void main() {
@@ -77,7 +76,7 @@ void main() {
   ) {
     return WeatherViewModel(
       weatherApiClient: CachedWeatherApiClient(
-        weatherApiClient: _FakeWeatherApiClient(result: result),
+        weatherApiClient: FakeWeatherApiClient(result: result),
         currentWeatherCache:
             LruCache<
               String,
@@ -158,18 +157,4 @@ void main() {
       expect(find.byType(ListView), findsNothing);
     });
   });
-}
-
-final class _FakeWeatherApiClient extends WeatherApiClient {
-  _FakeWeatherApiClient({required this.result})
-    : super(logger: MockLogger(), httpClient: http.Client());
-
-  final Result<CombinedWeatherForecastResponse> result;
-
-  @override
-  Future<Result<CombinedWeatherForecastResponse>> getCombinedWeatherForecast(
-    double latitude,
-    double longitude, {
-    String timezone = 'Europe/Rome',
-  }) async => result;
 }

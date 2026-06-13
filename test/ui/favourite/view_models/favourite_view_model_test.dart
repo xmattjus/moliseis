@@ -1,19 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/city.dart';
-import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../../support/fake_repositories.dart';
+import '../../../support/fixtures.dart';
+
 void main() {
   group('FavouriteViewModel', () {
     group('load', () {
       test('populates both lists on full success', () async {
-        final event1 = _makeEvent(1);
-        final place1 = _makePlace(10);
+        final event1 = makeEvent();
+        final place1 = makePlace(remoteId: 10);
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouriteEventIdsResult: const Result.success([1]),
@@ -38,11 +38,11 @@ void main() {
           final vm = await _buildLoaded(
             _FakeFavouriteGetIdsUseCase(
               favouritePlaceIdsResult: Result.error(
-                _TestException('places failed'),
+                TestException('places failed'),
               ),
               // Events are still fetched even when places fail.
               favouriteEventIdsResult: const Result.success([1]),
-              eventResults: {1: Result.success(_makeEvent(1))},
+              eventResults: {1: Result.success(makeEvent())},
             ),
           );
 
@@ -61,9 +61,9 @@ void main() {
           final vm = await _buildLoaded(
             _FakeFavouriteGetIdsUseCase(
               favouritePlaceIdsResult: const Result.success([10]),
-              placeResults: {10: Result.success(_makePlace(10))},
+              placeResults: {10: Result.success(makePlace(remoteId: 10))},
               favouriteEventIdsResult: Result.error(
-                _TestException('events failed'),
+                TestException('events failed'),
               ),
             ),
           );
@@ -81,10 +81,10 @@ void main() {
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouritePlaceIdsResult: Result.error(
-              _TestException('places failed'),
+              TestException('places failed'),
             ),
             favouriteEventIdsResult: Result.error(
-              _TestException('events failed'),
+              TestException('events failed'),
             ),
           ),
         );
@@ -102,7 +102,7 @@ void main() {
               favouriteEventIdsResult: const Result.success([1]),
               // getEventById fails → content not added, but ID is still in the
               // list.
-              eventResults: {1: Result.error(_TestException('not found'))},
+              eventResults: {1: Result.error(TestException('not found'))},
             ),
           );
 
@@ -115,7 +115,7 @@ void main() {
 
     group('addEvent', () {
       test('adds id optimistically then fetches content on success', () async {
-        final event1 = _makeEvent(1);
+        final event1 = makeEvent();
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             eventResults: {1: Result.success(event1)},
@@ -133,7 +133,7 @@ void main() {
       test('rolls back id when persist fails', () async {
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
-            setEventResult: Result.error(_TestException('write failed')),
+            setEventResult: Result.error(TestException('write failed')),
           ),
         );
 
@@ -147,7 +147,7 @@ void main() {
 
     group('addPlace', () {
       test('adds id optimistically then fetches content on success', () async {
-        final place1 = _makePlace(10);
+        final place1 = makePlace(remoteId: 10);
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             placeResults: {10: Result.success(place1)},
@@ -165,7 +165,7 @@ void main() {
       test('rolls back id when persist fails', () async {
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
-            setPlaceResult: Result.error(_TestException('write failed')),
+            setPlaceResult: Result.error(TestException('write failed')),
           ),
         );
 
@@ -182,7 +182,7 @@ void main() {
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouriteEventIdsResult: const Result.success([1]),
-            eventResults: {1: Result.success(_makeEvent(1))},
+            eventResults: {1: Result.success(makeEvent())},
           ),
         );
 
@@ -194,12 +194,12 @@ void main() {
       });
 
       test('restores id and content when persist fails', () async {
-        final event1 = _makeEvent(1);
+        final event1 = makeEvent();
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouriteEventIdsResult: const Result.success([1]),
             eventResults: {1: Result.success(event1)},
-            setEventResult: Result.error(_TestException('delete failed')),
+            setEventResult: Result.error(TestException('delete failed')),
           ),
         );
 
@@ -217,7 +217,7 @@ void main() {
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouritePlaceIdsResult: const Result.success([10]),
-            placeResults: {10: Result.success(_makePlace(10))},
+            placeResults: {10: Result.success(makePlace(remoteId: 10))},
           ),
         );
 
@@ -229,12 +229,12 @@ void main() {
       });
 
       test('restores id and content when persist fails', () async {
-        final place1 = _makePlace(10);
+        final place1 = makePlace(remoteId: 10);
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouritePlaceIdsResult: const Result.success([10]),
             placeResults: {10: Result.success(place1)},
-            setPlaceResult: Result.error(_TestException('delete failed')),
+            setPlaceResult: Result.error(TestException('delete failed')),
           ),
         );
 
@@ -249,7 +249,7 @@ void main() {
 
     group('isFavourite', () {
       test('returns true for a loaded event', () async {
-        final event1 = _makeEvent(1);
+        final event1 = makeEvent();
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouriteEventIdsResult: const Result.success([1]),
@@ -261,7 +261,7 @@ void main() {
       });
 
       test('returns true for a loaded place', () async {
-        final place1 = _makePlace(10);
+        final place1 = makePlace(remoteId: 10);
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouritePlaceIdsResult: const Result.success([10]),
@@ -273,8 +273,8 @@ void main() {
       });
 
       test('returns false for an event not in the list', () async {
-        final event1 = _makeEvent(1);
-        final event2 = _makeEvent(2);
+        final event1 = makeEvent();
+        final event2 = makeEvent(remoteId: 2);
         final vm = await _buildLoaded(
           _FakeFavouriteGetIdsUseCase(
             favouriteEventIdsResult: const Result.success([1]),
@@ -339,12 +339,12 @@ final class _FakeFavouriteGetIdsUseCase implements FavouriteGetIdsUseCase {
   @override
   Future<Result<Event>> getEventById(int id) async =>
       _eventResults[id] ??
-      Result.error(_TestException('event $id not configured'));
+      Result.error(TestException('event $id not configured'));
 
   @override
   Future<Result<Place>> getPlaceById(int id) async =>
       _placeResults[id] ??
-      Result.error(_TestException('place $id not configured'));
+      Result.error(TestException('place $id not configured'));
 
   @override
   Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
@@ -353,51 +353,4 @@ final class _FakeFavouriteGetIdsUseCase implements FavouriteGetIdsUseCase {
   @override
   Future<Result<void>> setFavouritePlace(int id, bool save) async =>
       _setPlaceResult;
-}
-
-// ---------------------------------------------------------------------------
-// Content fixtures
-// ---------------------------------------------------------------------------
-
-City _testCity() => City(
-  remoteId: 0,
-  name: 'Molise',
-  createdAt: DateTime(2025),
-  modifiedAt: DateTime(2025),
-);
-
-Event _makeEvent(int id) => Event(
-  remoteId: id,
-  name: 'Event $id',
-  description: '',
-  category: ContentCategory.unknown,
-  city: _testCity(),
-  coordinates: const LatLng(0, 0),
-  createdAt: DateTime(2025),
-  modifiedAt: DateTime(2025),
-  media: const [],
-  startDate: DateTime(2025),
-  isSaved: false,
-);
-
-Place _makePlace(int id) => Place(
-  remoteId: id,
-  name: 'Place $id',
-  description: '',
-  category: ContentCategory.unknown,
-  city: _testCity(),
-  coordinates: const LatLng(0, 0),
-  createdAt: DateTime(2025),
-  modifiedAt: DateTime(2025),
-  media: const [],
-  isSaved: false,
-);
-
-final class _TestException implements Exception {
-  _TestException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }

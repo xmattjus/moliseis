@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/dtos/event_dto.dart';
-import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
-import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day_markers.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
+
+import '../../../../support/fake_repositories.dart';
+import '../../../../support/fixtures.dart';
 
 void main() {
   group('EventViewModel.isEventOnDay', () {
     late EventViewModel viewModel;
 
     setUp(() {
-      viewModel = EventViewModel(repository: _FakeEventRepository());
+      viewModel = EventViewModel(repository: FakeEventRepository());
     });
 
     test('returns true for each day in an inclusive multi-day span', () {
@@ -64,8 +63,8 @@ void main() {
           endDate: DateTime(2026, 3, 12, 22, 45),
         );
 
-        final repository = _FakeEventRepository(
-          currentYearEvents: [event],
+        final repository = FakeEventRepository(
+          getByCurrentYearResult: Result.success([event]),
         );
         final viewModel = EventViewModel(repository: repository);
 
@@ -84,7 +83,9 @@ void main() {
         remoteId: 7,
         startDate: DateTime(2026, 3, 11, 8),
       );
-      final repository = _FakeEventRepository(currentYearEvents: [event]);
+      final repository = FakeEventRepository(
+        getByCurrentYearResult: Result.success([event]),
+      );
       final viewModel = EventViewModel(repository: repository);
 
       await _waitForCommand(viewModel.loadAll);
@@ -102,12 +103,12 @@ void main() {
 
   group('EventViewModel.getEventsOnDay', () {
     test('returns events sorted by start date and remote id', () async {
-      final repository = _FakeEventRepository(
-        currentYearEvents: [
+      final repository = FakeEventRepository(
+        getByCurrentYearResult: Result.success([
           _buildEvent(remoteId: 2, startDate: DateTime(2026, 3, 11, 10)),
           _buildEvent(remoteId: 1, startDate: DateTime(2026, 3, 11, 10)),
           _buildEvent(remoteId: 3, startDate: DateTime(2026, 3, 11, 9)),
-        ],
+        ]),
       );
       final viewModel = EventViewModel(repository: repository);
 
@@ -168,89 +169,11 @@ void main() {
   });
 }
 
-final class _FakeEventRepository implements EventRepository {
-  _FakeEventRepository({
-    List<Event> currentYearEvents = const [],
-    List<Event> byDateEvents = const [],
-  }) : _currentYearEvents = currentYearEvents,
-       _byDateEvents = byDateEvents;
-
-  final List<Event> _currentYearEvents;
-  final List<Event> _byDateEvents;
-  int getByDateCallCount = 0;
-
-  @override
-  Future<Result<List<Event>>> getByCurrentYear() async {
-    return Result.success(_currentYearEvents);
-  }
-
-  @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async {
-    getByDateCallCount++;
-    return Result.success(_byDateEvents);
-  }
-
-  @override
-  Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
-  ) async {
-    return const Result.success(<Event>[]);
-  }
-
-  @override
-  Future<Result<List<Event>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async {
-    return const Result.success(<Event>[]);
-  }
-
-  @override
-  Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) async {
-    return const Result.success(<Event>[]);
-  }
-
-  @override
-  Future<Result<Event>> getById(int id) async {
-    return Result.error(Exception('Not needed in this test.'));
-  }
-
-  @override
-  Future<Result<List<int>>> getNextEventIds() async {
-    return const Result.success(<int>[]);
-  }
-
-  @override
-  Future<Result<List<int>>> getFavouriteEventIds() async {
-    return const Result.success(<int>[]);
-  }
-
-  @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async {
-    return const Result.success(null);
-  }
-
-  @override
-  Future<Result<List<EventDto>>> prepareSync() async =>
-      const Result.success(<EventDto>[]);
-
-  @override
-  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
-}
-
 Future<void> _waitForCommand(Command<void> command) async {
   while (command.running) {
     await Future<void>.delayed(Duration.zero);
   }
 }
-
-City _testCity() => City(
-  remoteId: 0,
-  name: 'Molise',
-  createdAt: DateTime(2026),
-  modifiedAt: DateTime(2026),
-);
 
 Event _buildEvent({
   required int remoteId,
@@ -266,7 +189,7 @@ Event _buildEvent({
     category: ContentCategory.unknown,
     createdAt: DateTime(2026),
     modifiedAt: DateTime(2026),
-    city: _testCity(),
+    city: testCity(),
     coordinates: const LatLng(0, 0),
     media: const [],
     isSaved: false,
@@ -280,7 +203,7 @@ Event _buildEventContent({
 }) {
   return Event(
     category: ContentCategory.experience,
-    city: _testCity(),
+    city: testCity(),
     coordinates: const LatLng(0, 0),
     createdAt: DateTime(2026),
     description: 'Test event',

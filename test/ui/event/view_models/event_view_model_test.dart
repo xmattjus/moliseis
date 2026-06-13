@@ -1,21 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/dtos/event_dto.dart';
-import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
-import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+
+import '../../../support/fake_repositories.dart';
+import '../../../support/fixtures.dart';
 
 void main() {
   group('EventViewModel', () {
     group('loadAll', () {
       test('populates all events on success', () async {
-        final event1 = _event(remoteId: 1, name: 'Festival');
+        final event1 = makeEvent(remoteId: 1, name: 'Festival');
         final vm = await buildLoaded(
-          _FakeEventRepository(
+          FakeEventRepository(
             getByCurrentYearResult: Result.success([event1]),
           ),
         );
@@ -28,9 +27,9 @@ void main() {
 
       test('leaves all empty and surfaces error on failure', () async {
         final vm = await buildLoaded(
-          _FakeEventRepository(
+          FakeEventRepository(
             getByCurrentYearResult: Result.error(
-              _TestException('year fetch failed'),
+              TestException('year fetch failed'),
             ),
           ),
         );
@@ -43,9 +42,9 @@ void main() {
     group('loadNextIds', () {
       test('does not trigger loadNext when getNextEventIds fails', () async {
         final vm = await buildLoaded(
-          _FakeEventRepository(
+          FakeEventRepository(
             getNextEventIdsResult: Result.error(
-              _TestException('ids fetch failed'),
+              TestException('ids fetch failed'),
             ),
           ),
         );
@@ -60,7 +59,7 @@ void main() {
 
       test('triggers loadNext when getNextEventIds succeeds', () async {
         // Default repo has getNextEventIdsResult = Result.success([]).
-        final vm = await buildLoaded(_FakeEventRepository());
+        final vm = await buildLoaded(FakeEventRepository());
 
         await vm.loadNextIds.execute();
         await pumpEventQueue(times: 10);
@@ -75,7 +74,7 @@ void main() {
       late EventViewModel vm;
 
       setUp(() async {
-        vm = await buildLoaded(_FakeEventRepository());
+        vm = await buildLoaded(FakeEventRepository());
       });
 
       test('returns true for a single-day event on its start date', () {
@@ -134,7 +133,7 @@ void main() {
 
 /// Builds a fully-loaded [EventViewModel] and drains the constructor's
 /// auto-fired [EventViewModel.loadAll] command.
-Future<EventViewModel> buildLoaded(_FakeEventRepository repo) async {
+Future<EventViewModel> buildLoaded(FakeEventRepository repo) async {
   final vm = EventViewModel(repository: repo);
   await pumpEventQueue(times: 10);
   assert(
@@ -144,95 +143,6 @@ Future<EventViewModel> buildLoaded(_FakeEventRepository repo) async {
   return vm;
 }
 
-// ---------------------------------------------------------------------------
-// Fake repository
-// ---------------------------------------------------------------------------
-
-final class _FakeEventRepository extends EventRepository {
-  _FakeEventRepository({
-    this.getByCurrentYearResult = const Result.success(<Event>[]),
-    this.getNextEventIdsResult = const Result.success(<int>[]),
-  });
-
-  final Result<List<Event>> getByCurrentYearResult;
-  final Result<List<int>> getNextEventIdsResult;
-
-  @override
-  Future<Result<List<Event>>> getByCurrentYear() async =>
-      getByCurrentYearResult;
-
-  @override
-  Future<Result<List<int>>> getNextEventIds() async => getNextEventIdsResult;
-
-  @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async =>
-      const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
-  ) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<Event>> getById(int id) async =>
-      Result.error(_TestException('not configured'));
-
-  @override
-  Future<Result<List<int>>> getFavouriteEventIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<List<EventDto>>> prepareSync() async =>
-      const Result.success(<EventDto>[]);
-
-  @override
-  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
-}
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-City _testCity() => City(
-  remoteId: 0,
-  name: 'Molise',
-  createdAt: DateTime.utc(2026),
-  modifiedAt: DateTime.utc(2026),
-);
-
-Event _event({required int remoteId, required String name}) {
-  final now = DateTime.utc(2026, 4, 7);
-  return Event(
-    remoteId: remoteId,
-    name: name,
-    description: 'Description',
-    startDate: now,
-    coordinates: const LatLng(41.9, 14.7),
-    category: ContentCategory.history,
-    createdAt: now,
-    modifiedAt: now,
-    city: _testCity(),
-    media: const [],
-    isSaved: false,
-  );
-}
-
 Event _eventContent({required DateTime startDate, DateTime? endDate}) {
   final now = DateTime(2026, 4);
   return Event(
@@ -240,7 +150,7 @@ Event _eventContent({required DateTime startDate, DateTime? endDate}) {
     name: 'Event',
     description: '',
     category: ContentCategory.unknown,
-    city: _testCity(),
+    city: testCity(),
     coordinates: const LatLng(0, 0),
     createdAt: now,
     modifiedAt: now,
@@ -249,17 +159,4 @@ Event _eventContent({required DateTime startDate, DateTime? endDate}) {
     endDate: endDate,
     isSaved: false,
   );
-}
-
-// ---------------------------------------------------------------------------
-// Test exception
-// ---------------------------------------------------------------------------
-
-final class _TestException implements Exception {
-  _TestException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }

@@ -1,15 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/dtos/event_dto.dart';
-import 'package:moliseis/data/dtos/place_dto.dart';
-import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
-import 'package:moliseis/domain/repositories/event_repository.dart';
-import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/use-cases/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
@@ -17,16 +11,19 @@ import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../support/fake_repositories.dart';
+import '../../support/fixtures.dart';
+
 void main() {
   // Fakes below intentionally return safe defaults for methods outside each
   // focused assertion to keep tests deterministic and lightweight.
   group('ExploreUseCase', () {
     test('getAllEvents maps success values to EventContent', () async {
-      final event = _event(remoteId: 10, name: 'Event Name');
-      final eventRepository = _FakeEventRepository(
+      final event = makeEvent(remoteId: 10, name: 'Event Name');
+      final eventRepository = FakeEventRepository(
         getByCurrentYearResult: Result.success([event]),
       );
-      final placeRepository = _FakePlaceRepository();
+      final placeRepository = FakePlaceRepository();
       final useCase = ExploreUseCase(
         eventRepository: eventRepository,
         placeRepository: placeRepository,
@@ -43,11 +40,11 @@ void main() {
     });
 
     test('getAllEvents propagates repository errors', () async {
-      final error = _TestException('events failed');
-      final eventRepository = _FakeEventRepository(
+      final error = TestException('events failed');
+      final eventRepository = FakeEventRepository(
         getByCurrentYearResult: Result.error(error),
       );
-      final placeRepository = _FakePlaceRepository();
+      final placeRepository = FakePlaceRepository();
       final useCase = ExploreUseCase(
         eventRepository: eventRepository,
         placeRepository: placeRepository,
@@ -60,9 +57,9 @@ void main() {
     });
 
     test('getAllPlaces maps success values and forwards sort', () async {
-      final place = _place(remoteId: 20, name: 'Place Name');
-      final eventRepository = _FakeEventRepository();
-      final placeRepository = _FakePlaceRepository(
+      final place = makePlace(remoteId: 20, name: 'Place Name');
+      final eventRepository = FakeEventRepository();
+      final placeRepository = FakePlaceRepository(
         getAllResult: Result.success([place]),
       );
       final useCase = ExploreUseCase(
@@ -81,9 +78,9 @@ void main() {
     });
 
     test('getAllPlaces propagates repository errors', () async {
-      final error = _TestException('places failed');
-      final eventRepository = _FakeEventRepository();
-      final placeRepository = _FakePlaceRepository(
+      final error = TestException('places failed');
+      final eventRepository = FakeEventRepository();
+      final placeRepository = FakePlaceRepository(
         getAllResult: Result.error(error),
       );
       final useCase = ExploreUseCase(
@@ -99,9 +96,11 @@ void main() {
     });
 
     test('getById maps success values to PlaceContent', () async {
-      final eventRepository = _FakeEventRepository();
-      final placeRepository = _FakePlaceRepository(
-        getByIdResult: Result.success(_place(remoteId: 21, name: 'Place 21')),
+      final eventRepository = FakeEventRepository();
+      final placeRepository = FakePlaceRepository(
+        getByIdResults: {
+          21: Result.success(makePlace(remoteId: 21, name: 'Place 21')),
+        },
       );
       final useCase = ExploreUseCase(
         eventRepository: eventRepository,
@@ -116,10 +115,10 @@ void main() {
     });
 
     test('getById propagates repository errors', () async {
-      final error = _TestException('getById failed');
-      final eventRepository = _FakeEventRepository();
-      final placeRepository = _FakePlaceRepository(
-        getByIdResult: Result.error(error),
+      final error = TestException('getById failed');
+      final eventRepository = FakeEventRepository();
+      final placeRepository = FakePlaceRepository(
+        getByIdResults: {21: Result.error(error)},
       );
       final useCase = ExploreUseCase(
         eventRepository: eventRepository,
@@ -136,12 +135,12 @@ void main() {
   group('GeoMapUseCase', () {
     test('getAllEvents maps success values to EventContent', () async {
       final useCase = GeoMapUseCase(
-        eventRepository: _FakeEventRepository(
+        eventRepository: FakeEventRepository(
           getByCurrentYearResult: Result.success([
-            _event(remoteId: 11, name: 'Event 11'),
+            makeEvent(remoteId: 11, name: 'Event 11'),
           ]),
         ),
-        placeRepository: _FakePlaceRepository(),
+        placeRepository: FakePlaceRepository(),
       );
 
       final result = await useCase.getAllEvents();
@@ -152,12 +151,12 @@ void main() {
     });
 
     test('getAllEvents propagates repository errors', () async {
-      final error = _TestException('events failed');
+      final error = TestException('events failed');
       final useCase = GeoMapUseCase(
-        eventRepository: _FakeEventRepository(
+        eventRepository: FakeEventRepository(
           getByCurrentYearResult: Result.error(error),
         ),
-        placeRepository: _FakePlaceRepository(),
+        placeRepository: FakePlaceRepository(),
       );
 
       final result = await useCase.getAllEvents();
@@ -167,11 +166,13 @@ void main() {
     });
 
     test('getAllPlaces maps success values and forwards sort', () async {
-      final placeRepository = _FakePlaceRepository(
-        getAllResult: Result.success([_place(remoteId: 12, name: 'Place 12')]),
+      final placeRepository = FakePlaceRepository(
+        getAllResult: Result.success([
+          makePlace(remoteId: 12, name: 'Place 12'),
+        ]),
       );
       final useCase = GeoMapUseCase(
-        eventRepository: _FakeEventRepository(),
+        eventRepository: FakeEventRepository(),
         placeRepository: placeRepository,
       );
 
@@ -184,10 +185,10 @@ void main() {
     });
 
     test('getAllPlaces propagates repository errors', () async {
-      final error = _TestException('places failed');
+      final error = TestException('places failed');
       final useCase = GeoMapUseCase(
-        eventRepository: _FakeEventRepository(),
-        placeRepository: _FakePlaceRepository(
+        eventRepository: FakeEventRepository(),
+        placeRepository: FakePlaceRepository(
           getAllResult: Result.error(error),
         ),
       );
@@ -200,11 +201,15 @@ void main() {
 
     test('maps getById methods to content models', () async {
       final useCase = GeoMapUseCase(
-        eventRepository: _FakeEventRepository(
-          getByIdResult: Result.success(_event(remoteId: 1, name: 'Event 1')),
+        eventRepository: FakeEventRepository(
+          getByIdResults: {
+            1: Result.success(makeEvent(name: 'Event 1')),
+          },
         ),
-        placeRepository: _FakePlaceRepository(
-          getByIdResult: Result.success(_place(remoteId: 2, name: 'Place 2')),
+        placeRepository: FakePlaceRepository(
+          getByIdResults: {
+            2: Result.success(makePlace(remoteId: 2, name: 'Place 2')),
+          },
         ),
       );
 
@@ -216,14 +221,14 @@ void main() {
     });
 
     test('propagates getById errors', () async {
-      final eventError = _TestException('event id failed');
-      final placeError = _TestException('place id failed');
+      final eventError = TestException('event id failed');
+      final placeError = TestException('place id failed');
       final useCase = GeoMapUseCase(
-        eventRepository: _FakeEventRepository(
-          getByIdResult: Result.error(eventError),
+        eventRepository: FakeEventRepository(
+          getByIdResults: {1: Result.error(eventError)},
         ),
-        placeRepository: _FakePlaceRepository(
-          getByIdResult: Result.error(placeError),
+        placeRepository: FakePlaceRepository(
+          getByIdResults: {2: Result.error(placeError)},
         ),
       );
 
@@ -237,14 +242,14 @@ void main() {
     });
 
     test('nearby methods forward coordinates and map values', () async {
-      final eventRepository = _FakeEventRepository(
+      final eventRepository = FakeEventRepository(
         getByCoordinatesResult: Result.success([
-          _event(remoteId: 3, name: 'Near Event'),
+          makeEvent(remoteId: 3, name: 'Near Event'),
         ]),
       );
-      final placeRepository = _FakePlaceRepository(
+      final placeRepository = FakePlaceRepository(
         getByCoordinatesResult: Result.success([
-          _place(remoteId: 4, name: 'Near Place'),
+          makePlace(remoteId: 4, name: 'Near Place'),
         ]),
       );
       final useCase = GeoMapUseCase(
@@ -262,13 +267,13 @@ void main() {
     });
 
     test('nearby methods propagate repository errors', () async {
-      final eventError = _TestException('near events failed');
-      final placeError = _TestException('near places failed');
+      final eventError = TestException('near events failed');
+      final placeError = TestException('near places failed');
       final useCase = GeoMapUseCase(
-        eventRepository: _FakeEventRepository(
+        eventRepository: FakeEventRepository(
           getByCoordinatesResult: Result.error(eventError),
         ),
-        placeRepository: _FakePlaceRepository(
+        placeRepository: FakePlaceRepository(
           getByCoordinatesResult: Result.error(placeError),
         ),
       );
@@ -286,11 +291,15 @@ void main() {
   group('PostUseCase', () {
     test('getEventById and getPlaceById map success values', () async {
       final useCase = PostUseCase(
-        eventRepository: _FakeEventRepository(
-          getByIdResult: Result.success(_event(remoteId: 30, name: 'Event 30')),
+        eventRepository: FakeEventRepository(
+          getByIdResults: {
+            30: Result.success(makeEvent(remoteId: 30, name: 'Event 30')),
+          },
         ),
-        placeRepository: _FakePlaceRepository(
-          getByIdResult: Result.success(_place(remoteId: 31, name: 'Place 31')),
+        placeRepository: FakePlaceRepository(
+          getByIdResults: {
+            31: Result.success(makePlace(remoteId: 31, name: 'Place 31')),
+          },
         ),
       );
 
@@ -302,14 +311,14 @@ void main() {
     });
 
     test('getEventById and getPlaceById propagate repository errors', () async {
-      final eventError = _TestException('event failed');
-      final placeError = _TestException('place failed');
+      final eventError = TestException('event failed');
+      final placeError = TestException('place failed');
       final useCase = PostUseCase(
-        eventRepository: _FakeEventRepository(
-          getByIdResult: Result.error(eventError),
+        eventRepository: FakeEventRepository(
+          getByIdResults: {1: Result.error(eventError)},
         ),
-        placeRepository: _FakePlaceRepository(
-          getByIdResult: Result.error(placeError),
+        placeRepository: FakePlaceRepository(
+          getByIdResults: {2: Result.error(placeError)},
         ),
       );
 
@@ -323,14 +332,14 @@ void main() {
     });
 
     test('nearby methods map success values and forward coordinates', () async {
-      final eventRepository = _FakeEventRepository(
+      final eventRepository = FakeEventRepository(
         getByCoordinatesResult: Result.success([
-          _event(remoteId: 32, name: 'Near Event 32'),
+          makeEvent(remoteId: 32, name: 'Near Event 32'),
         ]),
       );
-      final placeRepository = _FakePlaceRepository(
+      final placeRepository = FakePlaceRepository(
         getByCoordinatesResult: Result.success([
-          _place(remoteId: 33, name: 'Near Place 33'),
+          makePlace(remoteId: 33, name: 'Near Place 33'),
         ]),
       );
       final useCase = PostUseCase(
@@ -348,13 +357,13 @@ void main() {
     });
 
     test('nearby methods propagate repository errors', () async {
-      final eventError = _TestException('near events failed');
-      final placeError = _TestException('near places failed');
+      final eventError = TestException('near events failed');
+      final placeError = TestException('near places failed');
       final useCase = PostUseCase(
-        eventRepository: _FakeEventRepository(
+        eventRepository: FakeEventRepository(
           getByCoordinatesResult: Result.error(eventError),
         ),
-        placeRepository: _FakePlaceRepository(
+        placeRepository: FakePlaceRepository(
           getByCoordinatesResult: Result.error(placeError),
         ),
       );
@@ -371,12 +380,12 @@ void main() {
 
   group('CategoryUseCase', () {
     test('getEventsByCategories maps success values to EventContent', () async {
-      final event = _event(remoteId: 40, name: 'Category Event');
+      final event = makeEvent(remoteId: 40, name: 'Category Event');
       final useCase = CategoryUseCase(
-        eventRepository: _FakeEventRepository(
+        eventRepository: FakeEventRepository(
           getByCategoriesResult: Result.success([event]),
         ),
-        placeRepository: _FakePlaceRepository(),
+        placeRepository: FakePlaceRepository(),
       );
 
       final result = await useCase.getEventsByCategories({
@@ -392,12 +401,12 @@ void main() {
     });
 
     test('getEventsByCategories propagates repository errors', () async {
-      final error = _TestException('events by category failed');
+      final error = TestException('events by category failed');
       final useCase = CategoryUseCase(
-        eventRepository: _FakeEventRepository(
+        eventRepository: FakeEventRepository(
           getByCategoriesResult: Result.error(error),
         ),
-        placeRepository: _FakePlaceRepository(),
+        placeRepository: FakePlaceRepository(),
       );
 
       final result = await useCase.getEventsByCategories({
@@ -409,10 +418,10 @@ void main() {
     });
 
     test('getPlacesByCategories maps success values to PlaceContent', () async {
-      final place = _place(remoteId: 41, name: 'Category Place');
+      final place = makePlace(remoteId: 41, name: 'Category Place');
       final useCase = CategoryUseCase(
-        eventRepository: _FakeEventRepository(),
-        placeRepository: _FakePlaceRepository(
+        eventRepository: FakeEventRepository(),
+        placeRepository: FakePlaceRepository(
           getByCategoriesResult: Result.success([place]),
         ),
       );
@@ -430,10 +439,10 @@ void main() {
     });
 
     test('getPlacesByCategories propagates repository errors', () async {
-      final error = _TestException('places by category failed');
+      final error = TestException('places by category failed');
       final useCase = CategoryUseCase(
-        eventRepository: _FakeEventRepository(),
-        placeRepository: _FakePlaceRepository(
+        eventRepository: FakeEventRepository(),
+        placeRepository: FakePlaceRepository(
           getByCategoriesResult: Result.error(error),
         ),
       );
@@ -449,12 +458,12 @@ void main() {
 
   group('FavouriteGetIdsUseCase', () {
     test('getEventById maps success value to EventContent', () async {
-      final event = _event(remoteId: 50, name: 'Favourite Event');
+      final event = makeEvent(remoteId: 50, name: 'Favourite Event');
       final useCase = FavouriteGetIdsUseCase(
-        eventRepository: _FakeEventRepository(
-          getByIdResult: Result.success(event),
+        eventRepository: FakeEventRepository(
+          getByIdResults: {50: Result.success(event)},
         ),
-        placeRepository: _FakePlaceRepository(),
+        placeRepository: FakePlaceRepository(),
       );
 
       final result = await useCase.getEventById(50);
@@ -467,12 +476,12 @@ void main() {
     });
 
     test('getEventById propagates repository error', () async {
-      final error = _TestException('event not found');
+      final error = TestException('event not found');
       final useCase = FavouriteGetIdsUseCase(
-        eventRepository: _FakeEventRepository(
-          getByIdResult: Result.error(error),
+        eventRepository: FakeEventRepository(
+          getByIdResults: {50: Result.error(error)},
         ),
-        placeRepository: _FakePlaceRepository(),
+        placeRepository: FakePlaceRepository(),
       );
 
       final result = await useCase.getEventById(50);
@@ -482,11 +491,11 @@ void main() {
     });
 
     test('getPlaceById maps success value to PlaceContent', () async {
-      final place = _place(remoteId: 51, name: 'Favourite Place');
+      final place = makePlace(remoteId: 51, name: 'Favourite Place');
       final useCase = FavouriteGetIdsUseCase(
-        eventRepository: _FakeEventRepository(),
-        placeRepository: _FakePlaceRepository(
-          getByIdResult: Result.success(place),
+        eventRepository: FakeEventRepository(),
+        placeRepository: FakePlaceRepository(
+          getByIdResults: {51: Result.success(place)},
         ),
       );
 
@@ -500,11 +509,11 @@ void main() {
     });
 
     test('getPlaceById propagates repository error', () async {
-      final error = _TestException('place not found');
+      final error = TestException('place not found');
       final useCase = FavouriteGetIdsUseCase(
-        eventRepository: _FakeEventRepository(),
-        placeRepository: _FakePlaceRepository(
-          getByIdResult: Result.error(error),
+        eventRepository: FakeEventRepository(),
+        placeRepository: FakePlaceRepository(
+          getByIdResults: {51: Result.error(error)},
         ),
       );
 
@@ -514,187 +523,4 @@ void main() {
       expect((result as Error<Place>).error, same(error));
     });
   });
-}
-
-final class _FakeEventRepository extends EventRepository {
-  _FakeEventRepository({
-    this.getByCurrentYearResult = const Result.success(<Event>[]),
-    this.getByCoordinatesResult = const Result.success(<Event>[]),
-    this.getByCategoriesResult = const Result.success(<Event>[]),
-    Result<Event>? getByIdResult,
-  }) : _getByIdResult =
-           getByIdResult ?? Result.error(_TestException('Not configured.'));
-
-  final Result<List<Event>> getByCurrentYearResult;
-  final Result<List<Event>> getByCoordinatesResult;
-  final Result<List<Event>> getByCategoriesResult;
-  final Result<Event> _getByIdResult;
-
-  List<double>? lastCoordinates;
-
-  @override
-  Future<Result<List<Event>>> getByCurrentYear() async =>
-      getByCurrentYearResult;
-
-  @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async =>
-      const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
-  ) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async => getByCategoriesResult;
-
-  @override
-  Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) async {
-    lastCoordinates = coordinates;
-    return getByCoordinatesResult;
-  }
-
-  @override
-  Future<Result<Event>> getById(int id) async => _getByIdResult;
-
-  @override
-  Future<Result<List<int>>> getNextEventIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getFavouriteEventIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<List<EventDto>>> prepareSync() async =>
-      const Result.success(<EventDto>[]);
-
-  @override
-  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
-}
-
-final class _FakePlaceRepository extends PlaceRepository {
-  _FakePlaceRepository({
-    this.getAllResult = const Result.success(<Place>[]),
-    this.getByCoordinatesResult = const Result.success(<Place>[]),
-    this.getByCategoriesResult = const Result.success(<Place>[]),
-    Result<Place>? getByIdResult,
-  }) : _getByIdResult =
-           getByIdResult ?? Result.error(_TestException('Not configured.'));
-
-  final Result<List<Place>> getAllResult;
-  final Result<List<Place>> getByCoordinatesResult;
-  final Result<List<Place>> getByCategoriesResult;
-  final Result<Place> _getByIdResult;
-
-  ContentSort? lastGetAllSort;
-  List<double>? lastCoordinates;
-
-  @override
-  Future<Result<List<Place>>> getAll({
-    ContentSort sort = ContentSort.byName,
-  }) async {
-    lastGetAllSort = sort;
-    return getAllResult;
-  }
-
-  @override
-  Future<Result<List<Place>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async => getByCategoriesResult;
-
-  @override
-  Future<Result<List<Place>>> getByCoordinates(List<double> coordinates) async {
-    lastCoordinates = coordinates;
-    return getByCoordinatesResult;
-  }
-
-  @override
-  Future<Result<Place>> getById(int id) async => _getByIdResult;
-
-  @override
-  Future<Result<List<int>>> getFavouritePlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getIdsByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getLatestPlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getSuggestedPlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<void>> setFavouritePlace(int id, bool save) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<List<PlaceDto>>> prepareSync() async =>
-      const Result.success(<PlaceDto>[]);
-
-  @override
-  Result<void> commitSync(List<PlaceDto> dtos) => const Result.success(null);
-}
-
-City _city() => City(
-  remoteId: 0,
-  name: 'Molise',
-  createdAt: DateTime.utc(2026),
-  modifiedAt: DateTime.utc(2026),
-);
-
-Event _event({required int remoteId, required String name}) {
-  final now = DateTime.utc(2026, 4, 2);
-  return Event(
-    remoteId: remoteId,
-    name: name,
-    description: 'Description',
-    startDate: now,
-    category: ContentCategory.history,
-    createdAt: now,
-    modifiedAt: now,
-    city: _city(),
-    coordinates: const LatLng(41.9, 14.7),
-    media: const [],
-    isSaved: false,
-  );
-}
-
-Place _place({required int remoteId, required String name}) {
-  final now = DateTime.utc(2026, 4, 2);
-  return Place(
-    remoteId: remoteId,
-    name: name,
-    description: 'Description',
-    category: ContentCategory.nature,
-    createdAt: now,
-    modifiedAt: now,
-    city: _city(),
-    coordinates: const LatLng(41.9, 14.7),
-    media: const [],
-    isSaved: false,
-  );
-}
-
-final class _TestException implements Exception {
-  _TestException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }

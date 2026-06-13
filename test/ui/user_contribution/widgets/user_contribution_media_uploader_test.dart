@@ -1,18 +1,16 @@
 import 'dart:async' show Completer, unawaited;
-import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
-import 'package:moliseis/data/data-sources/user_contribution.dart';
-import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
 import 'package:moliseis/ui/user_contribution/widgets/user_contribution_media_uploader.dart';
-import 'package:moliseis/utils/result.dart';
 
+import '../../../support/fake_image_picker.dart';
+import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
 
 void main() {
@@ -22,11 +20,11 @@ void main() {
     );
   }
 
-  UserContributionViewModel buildViewModel({_FakeImagePicker? imagePicker}) {
+  UserContributionViewModel buildViewModel({FakeImagePicker? imagePicker}) {
     return UserContributionViewModel(
       logger: MockLogger(),
-      userContributionRepository: _FakeUserContributionRepository(),
-      imagePicker: imagePicker ?? _FakeImagePicker(),
+      userContributionRepository: FakeUserContributionRepository(),
+      imagePicker: imagePicker ?? FakeImagePicker(),
     );
   }
 
@@ -45,7 +43,7 @@ void main() {
     testWidgets('shows spinner while addMedia is running', (tester) async {
       final completer = Completer<List<XFile>>();
       final vm = buildViewModel(
-        imagePicker: _FakeImagePicker(
+        imagePicker: FakeImagePicker(
           onPickMultipleMedia: () => completer.future,
         ),
       );
@@ -75,7 +73,7 @@ void main() {
       try {
         final completer = Completer<LostDataResponse>();
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onRetrieveLostData: () => completer.future,
           ),
         );
@@ -99,41 +97,4 @@ void main() {
       }
     });
   });
-}
-
-// ---------------------------------------------------------------------------
-// Test doubles
-// ---------------------------------------------------------------------------
-
-final class _FakeImagePicker extends ImagePicker {
-  _FakeImagePicker({this.onPickMultipleMedia, this.onRetrieveLostData});
-
-  final Future<List<XFile>> Function()? onPickMultipleMedia;
-  final Future<LostDataResponse> Function()? onRetrieveLostData;
-
-  @override
-  Future<List<XFile>> pickMultipleMedia({
-    double? maxWidth,
-    double? maxHeight,
-    int? imageQuality,
-    int? limit,
-    bool requestFullMetadata = true,
-  }) async => onPickMultipleMedia != null ? await onPickMultipleMedia!() : [];
-
-  @override
-  Future<LostDataResponse> retrieveLostData() async =>
-      onRetrieveLostData != null
-      ? await onRetrieveLostData!()
-      : LostDataResponse.empty();
-}
-
-final class _FakeUserContributionRepository
-    implements UserContributionRepository {
-  @override
-  Future<Result<dynamic>> upload(UserContribution userContribution) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<String>> uploadImage(File image) async =>
-      const Result.success('https://example.com/image.jpg');
 }

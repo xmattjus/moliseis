@@ -5,33 +5,24 @@ import 'package:moliseis/data/dtos/media_dto.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/content_sort.dart';
-import 'package:moliseis/domain/models/event.dart';
-import 'package:moliseis/domain/models/media.dart';
-import 'package:moliseis/domain/models/place.dart';
-import 'package:moliseis/domain/models/theme_brightness.dart';
-import 'package:moliseis/domain/models/theme_type.dart';
-import 'package:moliseis/domain/repositories/city_repository.dart';
-import 'package:moliseis/domain/repositories/event_repository.dart';
-import 'package:moliseis/domain/repositories/media_repository.dart';
-import 'package:moliseis/domain/repositories/place_repository.dart';
-import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../support/fake_repositories.dart';
+
 void main() {
   _SyncUseCaseDeps buildUseCase({
-    required _FakeSettingsRepository settings,
+    required FakeSettingsRepository settings,
     Result<List<CityDto>> cityResult = const Result.success([]),
     Result<List<EventDto>> eventResult = const Result.success([]),
     Result<List<MediaDto>> mediaResult = const Result.success([]),
     Result<List<PlaceDto>> placeResult = const Result.success([]),
     SyncTransactionCoordinator? transactionCoordinator,
   }) {
-    final cityRepo = _FakeCityRepository(prepareResult: cityResult);
-    final eventRepo = _FakeEventRepository(prepareResult: eventResult);
-    final mediaRepo = _FakeMediaRepository(prepareResult: mediaResult);
-    final placeRepo = _FakePlaceRepository(prepareResult: placeResult);
+    final cityRepo = FakeCityRepository(prepareResult: cityResult);
+    final eventRepo = FakeEventRepository(prepareResult: eventResult);
+    final mediaRepo = FakeMediaRepository(prepareResult: mediaResult);
+    final placeRepo = FakePlaceRepository(prepareResult: placeResult);
 
     final useCase = SyncUseCase(
       cityRepository: cityRepo,
@@ -40,7 +31,7 @@ void main() {
       placeRepository: placeRepo,
       settingsRepository: settings,
       transactionCoordinator:
-          transactionCoordinator ?? _FakeTransactionCoordinator(),
+          transactionCoordinator ?? FakeTransactionCoordinator(),
     );
 
     return _SyncUseCaseDeps(
@@ -62,7 +53,7 @@ void main() {
         final eventDtos = [_eventDto(3)];
         final mediaDtos = [_mediaDto(4)];
 
-        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final settings = FakeSettingsRepository();
         final deps = buildUseCase(
           settings: settings,
           cityResult: Result.success(cityDtos),
@@ -89,8 +80,8 @@ void main() {
     test(
       'does not call commitSync on any repo when city prepareSync fails',
       () async {
-        final error = _TestException('city sync failed');
-        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final error = TestException('city sync failed');
+        final settings = FakeSettingsRepository();
         final deps = buildUseCase(
           cityResult: Result.error(error),
           settings: settings,
@@ -115,8 +106,8 @@ void main() {
     test(
       'does not call commitSync on any repo when place prepareSync fails',
       () async {
-        final error = _TestException('place sync failed');
-        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final error = TestException('place sync failed');
+        final settings = FakeSettingsRepository();
         final deps = buildUseCase(
           placeResult: Result.error(error),
           settings: settings,
@@ -141,8 +132,8 @@ void main() {
     test(
       'does not call commitSync on any repo when event prepareSync fails',
       () async {
-        final error = _TestException('event sync failed');
-        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final error = TestException('event sync failed');
+        final settings = FakeSettingsRepository();
         final deps = buildUseCase(
           eventResult: Result.error(error),
           settings: settings,
@@ -167,8 +158,8 @@ void main() {
     test(
       'does not call commitSync on any repo when media prepareSync fails',
       () async {
-        final error = _TestException('media sync failed');
-        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final error = TestException('media sync failed');
+        final settings = FakeSettingsRepository();
         final deps = buildUseCase(
           mediaResult: Result.error(error),
           settings: settings,
@@ -198,7 +189,7 @@ void main() {
         final eventDtos = [_eventDto(3)];
         final mediaDtos = [_mediaDto(4)];
 
-        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final settings = FakeSettingsRepository();
         final wrappedCalls = <VoidCall>[];
         final coordinator = _WrappingTransactionCoordinator(wrappedCalls);
 
@@ -229,8 +220,8 @@ void main() {
     test(
       'does not call setModifiedAt when any prepareSync fails',
       () async {
-        final error = _TestException('sync failed');
-        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final error = TestException('sync failed');
+        final settings = FakeSettingsRepository();
         final deps = buildUseCase(
           cityResult: Result.error(error),
           settings: settings,
@@ -245,7 +236,7 @@ void main() {
     test(
       'does not call setModifiedAt when commitSync returns error',
       () async {
-        final settings = _FakeSettingsRepository(modifiedAt: null);
+        final settings = FakeSettingsRepository();
         final deps = buildUseCase(
           settings: settings,
           transactionCoordinator: _ThrowingTransactionCoordinator(),
@@ -261,15 +252,15 @@ void main() {
 
   group('SyncUseCase.isSyncRequired', () {
     test('returns true when modifiedAt is null (never synced)', () {
-      final settings = _FakeSettingsRepository(modifiedAt: null);
+      final settings = FakeSettingsRepository();
       final deps = buildUseCase(settings: settings);
 
       expect(deps.useCase.isSyncRequired, isTrue);
     });
 
     test('returns false when last sync was less than 3 days ago', () {
-      final settings = _FakeSettingsRepository(
-        modifiedAt: DateTime.now().subtract(const Duration(days: 1)),
+      final settings = FakeSettingsRepository(
+        lastSyncedAt: DateTime.now().subtract(const Duration(days: 1)),
       );
       final deps = buildUseCase(settings: settings);
 
@@ -277,8 +268,8 @@ void main() {
     });
 
     test('returns true when last sync was more than 3 days ago', () {
-      final settings = _FakeSettingsRepository(
-        modifiedAt: DateTime.now().subtract(const Duration(days: 4)),
+      final settings = FakeSettingsRepository(
+        lastSyncedAt: DateTime.now().subtract(const Duration(days: 4)),
       );
       final deps = buildUseCase(settings: settings);
 
@@ -288,7 +279,7 @@ void main() {
 
   group('SyncUseCase.lastSyncedAt', () {
     test('returns null when settings has no modifiedAt', () {
-      final settings = _FakeSettingsRepository(modifiedAt: null);
+      final settings = FakeSettingsRepository();
       final deps = buildUseCase(settings: settings);
 
       expect(deps.useCase.lastSyncedAt, isNull);
@@ -296,7 +287,7 @@ void main() {
 
     test('returns the modifiedAt value from settings repository', () {
       final date = DateTime.now().subtract(const Duration(days: 1));
-      final settings = _FakeSettingsRepository(modifiedAt: date);
+      final settings = FakeSettingsRepository(lastSyncedAt: date);
       final deps = buildUseCase(settings: settings);
 
       expect(deps.useCase.lastSyncedAt, equals(date));
@@ -360,27 +351,22 @@ final class _SyncUseCaseDeps {
   });
 
   final SyncUseCase useCase;
-  final _FakeCityRepository cityRepo;
-  final _FakeEventRepository eventRepo;
-  final _FakeMediaRepository mediaRepo;
-  final _FakePlaceRepository placeRepo;
-  final _FakeSettingsRepository settings;
+  final FakeCityRepository cityRepo;
+  final FakeEventRepository eventRepo;
+  final FakeMediaRepository mediaRepo;
+  final FakePlaceRepository placeRepo;
+  final FakeSettingsRepository settings;
 }
 
 final class VoidCall {
   VoidCall();
 }
 
-final class _FakeTransactionCoordinator implements SyncTransactionCoordinator {
-  @override
-  Result<void> runInWriteTransaction(Result<void> Function() fn) => fn();
-}
-
 final class _ThrowingTransactionCoordinator
     implements SyncTransactionCoordinator {
   @override
   Result<void> runInWriteTransaction(Result<void> Function() fn) {
-    return Result.error(_TestException('commit failed'));
+    return Result.error(TestException('commit failed'));
   }
 }
 
@@ -395,236 +381,4 @@ final class _WrappingTransactionCoordinator
     _calls.add(VoidCall());
     return fn();
   }
-}
-
-// ---------------------------------------------------------------------------
-// Fakes
-// ---------------------------------------------------------------------------
-
-final class _FakeCityRepository extends CityRepository {
-  _FakeCityRepository({
-    this.prepareResult = const Result.success([]),
-  });
-
-  final Result<List<CityDto>> prepareResult;
-  bool commitCalled = false;
-  List<CityDto>? committedDtos;
-
-  @override
-  Future<Result<List<CityDto>>> prepareSync() async => prepareResult;
-
-  @override
-  Result<void> commitSync(List<CityDto> dtos) {
-    commitCalled = true;
-    committedDtos = dtos;
-    return const Result.success(null);
-  }
-}
-
-final class _FakeEventRepository extends EventRepository {
-  _FakeEventRepository({
-    this.prepareResult = const Result.success([]),
-  });
-
-  final Result<List<EventDto>> prepareResult;
-  bool commitCalled = false;
-  List<EventDto>? committedDtos;
-
-  @override
-  Future<Result<List<EventDto>>> prepareSync() async => prepareResult;
-
-  @override
-  Result<void> commitSync(List<EventDto> dtos) {
-    commitCalled = true;
-    committedDtos = dtos;
-    return const Result.success(null);
-  }
-
-  @override
-  Future<Result<List<Event>>> getByCurrentYear() async =>
-      const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async =>
-      const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
-  ) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<Event>> getById(int id) async =>
-      Result.error(_TestException('not configured'));
-
-  @override
-  Future<Result<List<int>>> getNextEventIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getFavouriteEventIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
-      const Result.success(null);
-}
-
-final class _FakeMediaRepository extends MediaRepository {
-  _FakeMediaRepository({
-    this.prepareResult = const Result.success([]),
-  });
-
-  final Result<List<MediaDto>> prepareResult;
-  bool commitCalled = false;
-  List<MediaDto>? committedDtos;
-
-  @override
-  Future<Result<List<MediaDto>>> prepareSync() async => prepareResult;
-
-  @override
-  Result<void> commitSync(List<MediaDto> dtos) {
-    commitCalled = true;
-    committedDtos = dtos;
-    return const Result.success(null);
-  }
-
-  @override
-  Future<Result<List<Media>>> getByEventId(int id) async =>
-      const Result.success(<Media>[]);
-
-  @override
-  Future<Result<List<Media>>> getByPlaceId(int id) async =>
-      const Result.success(<Media>[]);
-}
-
-final class _FakePlaceRepository extends PlaceRepository {
-  _FakePlaceRepository({
-    this.prepareResult = const Result.success([]),
-  });
-
-  final Result<List<PlaceDto>> prepareResult;
-  bool commitCalled = false;
-  List<PlaceDto>? committedDtos;
-
-  @override
-  Future<Result<List<PlaceDto>>> prepareSync() async => prepareResult;
-
-  @override
-  Result<void> commitSync(List<PlaceDto> dtos) {
-    commitCalled = true;
-    committedDtos = dtos;
-    return const Result.success(null);
-  }
-
-  @override
-  Future<Result<List<Place>>> getAll({
-    ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Place>[]);
-
-  @override
-  Future<Result<List<Place>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Place>[]);
-
-  @override
-  Future<Result<List<Place>>> getByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success(<Place>[]);
-
-  @override
-  Future<Result<Place>> getById(int id) async =>
-      Result.error(_TestException('not configured'));
-
-  @override
-  Future<Result<List<int>>> getFavouritePlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getIdsByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getLatestPlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getSuggestedPlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<void>> setFavouritePlace(int id, bool save) async =>
-      const Result.success(null);
-}
-
-final class _FakeSettingsRepository implements SettingsRepository {
-  _FakeSettingsRepository({required DateTime? modifiedAt})
-    : _modifiedAt = modifiedAt;
-
-  DateTime? _modifiedAt;
-  bool setModifiedAtCalled = false;
-
-  @override
-  DateTime? get lastSyncedAt => _modifiedAt;
-
-  @override
-  bool get crashReporting => false;
-
-  @override
-  ContentSort get contentSort => ContentSort.byName;
-
-  @override
-  ThemeBrightness get themeBrightness => ThemeBrightness.system;
-
-  @override
-  ThemeType get themeType => ThemeType.system;
-
-  @override
-  Future<Result<void>> initialize() async => const Result.success(null);
-
-  @override
-  Future<Result<void>> setModifiedAt(DateTime dateTime) async {
-    _modifiedAt = dateTime;
-    setModifiedAtCalled = true;
-    return const Result.success(null);
-  }
-
-  @override
-  Future<Result<void>> setCrashReporting(bool enable) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<void>> setContentSort(ContentSort sort) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<void>> setThemeBrightness(ThemeBrightness brightness) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<void>> setThemeType(ThemeType type) async =>
-      const Result.success(null);
-}
-
-final class _TestException implements Exception {
-  _TestException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }

@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/content_category.dart'
-    show ContentCategory;
-import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/widgets/components/search_anchor_suggestion_list.dart';
+
+import '../../../../support/fixtures.dart';
 
 void main() {
   group('SearchAnchorSuggestionList', () {
@@ -30,7 +27,7 @@ void main() {
     testWidgets('renders one item without a divider for a single suggestion', (
       tester,
     ) async {
-      final place = _makePlace(1);
+      final place = makePlace(name: 'Place 1');
 
       await tester.pumpWidget(_buildTestApp([place]));
 
@@ -40,8 +37,8 @@ void main() {
     });
 
     testWidgets('renders two items with one divider', (tester) async {
-      final place1 = _makePlace(1);
-      final place2 = _makePlace(2);
+      final place1 = makePlace(name: 'Place 1');
+      final place2 = makePlace(remoteId: 2, name: 'Place 2');
 
       await tester.pumpWidget(_buildTestApp([place1, place2]));
 
@@ -58,7 +55,11 @@ void main() {
     });
 
     testWidgets('renders three items with two dividers', (tester) async {
-      final places = [_makePlace(1), _makePlace(2), _makePlace(3)];
+      final places = [
+        makePlace(name: 'Place 1'),
+        makePlace(remoteId: 2, name: 'Place 2'),
+        makePlace(remoteId: 3, name: 'Place 3'),
+      ];
 
       await tester.pumpWidget(_buildTestApp(places));
 
@@ -75,7 +76,7 @@ void main() {
     testWidgets('calls onSuggestionPressed when an item is tapped', (
       tester,
     ) async {
-      final place = _makePlace(1);
+      final place = makePlace(name: 'Place 1');
       ContentBase? pressed;
 
       await tester.pumpWidget(
@@ -91,7 +92,7 @@ void main() {
     testWidgets('does not fire onSuggestionPressed when callback is null', (
       tester,
     ) async {
-      final place = _makePlace(1);
+      final place = makePlace(name: 'Place 1');
 
       await tester.pumpWidget(_buildTestApp([place]));
 
@@ -121,27 +122,3 @@ Widget _buildTestApp(
     ),
   );
 }
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-City _testCity() => City(
-  remoteId: 0,
-  name: 'Molise',
-  createdAt: DateTime(2025),
-  modifiedAt: DateTime(2025),
-);
-
-Place _makePlace(int id) => Place(
-  remoteId: id,
-  name: 'Place $id',
-  description: '',
-  category: ContentCategory.unknown,
-  city: _testCity(),
-  coordinates: const LatLng(41.56, 14.66),
-  createdAt: DateTime(2025),
-  modifiedAt: DateTime(2025),
-  media: const [],
-  isSaved: false,
-);

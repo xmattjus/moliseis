@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../support/fake_repositories.dart';
+
 void main() {
   group('Result helpers', () {
     test('map transforms a successful value', () {
@@ -11,7 +13,7 @@ void main() {
     });
 
     test('map preserves the error branch', () {
-      final error = _TestException('failed');
+      final error = TestException('failed');
 
       final result = Result<int>.error(error).map((value) => value * 3);
 
@@ -29,7 +31,7 @@ void main() {
 
     test('fold returns the error branch value', () {
       final result = Result<int>.error(
-        _TestException('failed'),
+        TestException('failed'),
       ).fold((value) => value * 2, (error) => error.toString());
 
       expect(result, 'failed');
@@ -38,20 +40,20 @@ void main() {
     test('fold rethrows when success callback throws', () {
       expect(
         () => const Result.success(2).fold<int>(
-          (_) => throw _TestException('success callback failed'),
+          (_) => throw TestException('success callback failed'),
           (_) => 0,
         ),
-        throwsA(isA<_TestException>()),
+        throwsA(isA<TestException>()),
       );
     });
 
     test('fold rethrows when error callback throws', () {
       expect(
-        () => Result<int>.error(_TestException('failed')).fold<int>(
+        () => Result<int>.error(TestException('failed')).fold<int>(
           (_) => 0,
-          (_) => throw _TestException('error callback failed'),
+          (_) => throw TestException('error callback failed'),
         ),
-        throwsA(isA<_TestException>()),
+        throwsA(isA<TestException>()),
       );
     });
 
@@ -65,7 +67,7 @@ void main() {
     });
 
     test('flatMap preserves the first error', () {
-      final error = _TestException('failed');
+      final error = TestException('failed');
 
       final result = Result<int>.error(
         error,
@@ -76,7 +78,7 @@ void main() {
     });
 
     test('flatMap can transform a success into an error', () {
-      final error = _TestException('mapped failed');
+      final error = TestException('mapped failed');
 
       final result = const Result.success(
         2,
@@ -89,18 +91,18 @@ void main() {
     test('map rethrows when mapper throws', () {
       expect(
         () => const Result.success(2).map<int>((_) {
-          throw _TestException('mapper failed');
+          throw TestException('mapper failed');
         }),
-        throwsA(isA<_TestException>()),
+        throwsA(isA<TestException>()),
       );
     });
 
     test('flatMap rethrows when mapper throws', () {
       expect(
         () => const Result.success(2).flatMap<int>((_) {
-          throw _TestException('mapper failed');
+          throw TestException('mapper failed');
         }),
-        throwsA(isA<_TestException>()),
+        throwsA(isA<TestException>()),
       );
     });
 
@@ -110,7 +112,7 @@ void main() {
     });
 
     test('getOrNull returns null on error', () {
-      final result = Result<String>.error(_TestException('failed')).getOrNull();
+      final result = Result<String>.error(TestException('failed')).getOrNull();
       expect(result, isNull);
     });
 
@@ -133,7 +135,7 @@ void main() {
 
     test('getOrElse returns default on error', () {
       final result = Result<String>.error(
-        _TestException('failed'),
+        TestException('failed'),
       ).getOrElse(() => 'fallback');
       expect(result, 'fallback');
     });
@@ -141,7 +143,7 @@ void main() {
     test('getOrElse calls fallback exactly once on error', () {
       var calls = 0;
 
-      final result = Result<String>.error(_TestException('failed')).getOrElse(
+      final result = Result<String>.error(TestException('failed')).getOrElse(
         () {
           calls++;
           return 'fallback';
@@ -157,11 +159,11 @@ void main() {
     });
 
     test('isSuccess returns false on error', () {
-      expect(Result<int>.error(_TestException('failed')).isSuccess, isFalse);
+      expect(Result<int>.error(TestException('failed')).isSuccess, isFalse);
     });
 
     test('isError returns true on error', () {
-      expect(Result<int>.error(_TestException('failed')).isError, isTrue);
+      expect(Result<int>.error(TestException('failed')).isError, isTrue);
     });
 
     test('isError returns false on success', () {
@@ -172,7 +174,7 @@ void main() {
       test('leaves success unchanged', () {
         final result = const Result.success(
           42,
-        ).mapError((_) => _TestException('x'));
+        ).mapError((_) => TestException('x'));
 
         expect(result, isA<Success<int>>());
         expect((result as Success<int>).value, 42);
@@ -183,15 +185,15 @@ void main() {
 
         const Result.success(42).mapError((_) {
           calls++;
-          return _TestException('x');
+          return TestException('x');
         });
 
         expect(calls, 0);
       });
 
       test('transforms error with mapper', () {
-        final original = _TestException('original');
-        final mapped = _TestException('mapped');
+        final original = TestException('original');
+        final mapped = TestException('mapped');
 
         final result = Result<int>.error(original).mapError((_) => mapped);
 
@@ -200,12 +202,12 @@ void main() {
       });
 
       test('receives the original error in the mapper', () {
-        final original = _TestException('original');
+        final original = TestException('original');
         Exception? received;
 
         Result<int>.error(original).mapError((error) {
           received = error;
-          return _TestException('replacement');
+          return TestException('replacement');
         });
 
         expect(received, same(original));
@@ -213,10 +215,10 @@ void main() {
 
       test('rethrows when mapper throws', () {
         expect(
-          () => Result<int>.error(_TestException('original')).mapError((_) {
-            throw _TestException('mapper failed');
+          () => Result<int>.error(TestException('original')).mapError((_) {
+            throw TestException('mapper failed');
           }),
-          throwsA(isA<_TestException>()),
+          throwsA(isA<TestException>()),
         );
       });
     });
@@ -244,7 +246,7 @@ void main() {
 
       test('recovers error to success', () {
         final result = Result<int>.error(
-          _TestException('failed'),
+          TestException('failed'),
         ).flatMapError((_) => const Result.success(99));
 
         expect(result, isA<Success<int>>());
@@ -252,10 +254,10 @@ void main() {
       });
 
       test('maps error to another error', () {
-        final newError = _TestException('new error');
+        final newError = TestException('new error');
 
         final result = Result<int>.error(
-          _TestException('original'),
+          TestException('original'),
         ).flatMapError((_) => Result.error(newError));
 
         expect(result, isA<Error<int>>());
@@ -263,7 +265,7 @@ void main() {
       });
 
       test('receives the original error in the mapper', () {
-        final original = _TestException('original');
+        final original = TestException('original');
         Exception? received;
 
         Result<int>.error(original).flatMapError((error) {
@@ -277,9 +279,9 @@ void main() {
       test('rethrows when mapper throws', () {
         expect(
           () => Result<int>.error(
-            _TestException('original'),
-          ).flatMapError((_) => throw _TestException('mapper failed')),
-          throwsA(isA<_TestException>()),
+            TestException('original'),
+          ).flatMapError((_) => throw TestException('mapper failed')),
+          throwsA(isA<TestException>()),
         );
       });
     });
@@ -295,7 +297,7 @@ void main() {
       });
 
       test('returns error branch value', () async {
-        final result = await Result<int>.error(_TestException('failed'))
+        final result = await Result<int>.error(TestException('failed'))
             .asyncFold(
               (value) => Future.value(value * 2),
               (error) => Future.value(error.toString()),
@@ -324,7 +326,7 @@ void main() {
       });
 
       test('preserves the error branch', () async {
-        final error = _TestException('failed');
+        final error = TestException('failed');
 
         final result = await Result<int>.error(
           error,
@@ -337,7 +339,7 @@ void main() {
       test('does not call mapper on error', () async {
         var calls = 0;
 
-        await Result<int>.error(_TestException('failed')).asyncMap((value) {
+        await Result<int>.error(TestException('failed')).asyncMap((value) {
           calls++;
           return Future.value(value);
         });
@@ -363,7 +365,7 @@ void main() {
       });
 
       test('preserves the first error', () async {
-        final error = _TestException('failed');
+        final error = TestException('failed');
 
         final result = await Result<int>.error(
           error,
@@ -374,7 +376,7 @@ void main() {
       });
 
       test('can transform a success into an error', () async {
-        final error = _TestException('mapped failed');
+        final error = TestException('mapped failed');
 
         final result = await const Result.success(
           2,
@@ -387,7 +389,7 @@ void main() {
       test('does not call mapper on error', () async {
         var calls = 0;
 
-        await Result<int>.error(_TestException('failed')).asyncFlatMap((v) {
+        await Result<int>.error(TestException('failed')).asyncFlatMap((v) {
           calls++;
           return Future.value(Result.success(v));
         });
@@ -400,7 +402,7 @@ void main() {
       test('leaves success unchanged', () async {
         final result = await const Result.success(
           42,
-        ).asyncMapError((_) => Future.value(_TestException('x')));
+        ).asyncMapError((_) => Future.value(TestException('x')));
 
         expect(result, isA<Success<int>>());
         expect((result as Success<int>).value, 42);
@@ -411,17 +413,17 @@ void main() {
 
         await const Result.success(42).asyncMapError((_) {
           calls++;
-          return Future.value(_TestException('x'));
+          return Future.value(TestException('x'));
         });
 
         expect(calls, 0);
       });
 
       test('transforms error with async mapper', () async {
-        final mapped = _TestException('mapped');
+        final mapped = TestException('mapped');
 
         final result = await Result<int>.error(
-          _TestException('original'),
+          TestException('original'),
         ).asyncMapError((_) => Future.value(mapped));
 
         expect(result, isA<Error<int>>());
@@ -429,12 +431,12 @@ void main() {
       });
 
       test('receives the original error in the mapper', () async {
-        final original = _TestException('original');
+        final original = TestException('original');
         Exception? received;
 
         await Result<int>.error(original).asyncMapError((error) {
           received = error;
-          return Future.value(_TestException('replacement'));
+          return Future.value(TestException('replacement'));
         });
 
         expect(received, same(original));
@@ -464,7 +466,7 @@ void main() {
 
       test('recovers error to success asynchronously', () async {
         final result = await Result<int>.error(
-          _TestException('failed'),
+          TestException('failed'),
         ).asyncFlatMapError((_) => Future.value(const Result.success(99)));
 
         expect(result, isA<Success<int>>());
@@ -472,10 +474,10 @@ void main() {
       });
 
       test('maps error to another error asynchronously', () async {
-        final newError = _TestException('new error');
+        final newError = TestException('new error');
 
         final result = await Result<int>.error(
-          _TestException('original'),
+          TestException('original'),
         ).asyncFlatMapError((_) => Future.value(Result.error(newError)));
 
         expect(result, isA<Error<int>>());
@@ -483,7 +485,7 @@ void main() {
       });
 
       test('receives the original error in the mapper', () async {
-        final original = _TestException('original');
+        final original = TestException('original');
         Exception? received;
 
         await Result<int>.error(original).asyncFlatMapError((error) {
@@ -510,7 +512,7 @@ void main() {
 
       test('returns async default on error', () async {
         final result = await Result<String>.error(
-          _TestException('failed'),
+          TestException('failed'),
         ).asyncGetOrElse(() => Future.value('fallback'));
 
         expect(result, 'fallback');
@@ -519,7 +521,7 @@ void main() {
       test('calls fallback exactly once on error', () async {
         var calls = 0;
 
-        await Result<String>.error(_TestException('failed')).asyncGetOrElse(() {
+        await Result<String>.error(TestException('failed')).asyncGetOrElse(() {
           calls++;
           return Future.value('fallback');
         });
@@ -529,7 +531,7 @@ void main() {
 
       test('works with sync fallback', () async {
         final result = await Result<String>.error(
-          _TestException('failed'),
+          TestException('failed'),
         ).asyncGetOrElse(() => 'sync fallback');
 
         expect(result, 'sync fallback');
@@ -549,7 +551,7 @@ void main() {
       });
 
       test('short-circuits and propagates a error without calling b', () async {
-        final error = _TestException('a failed');
+        final error = TestException('a failed');
         var bCalled = false;
 
         final result = await Result.zip2(
@@ -567,7 +569,7 @@ void main() {
       });
 
       test('propagates b error without calling onSuccess', () async {
-        final error = _TestException('b failed');
+        final error = TestException('b failed');
         var onSuccessCalled = false;
 
         final result = await Result.zip2(
@@ -585,7 +587,7 @@ void main() {
       });
 
       test('propagates error returned from onSuccess', () async {
-        final error = _TestException('onSuccess failed');
+        final error = TestException('onSuccess failed');
 
         final result = await Result.zip2(
           () async => const Result.success(1),
@@ -602,9 +604,9 @@ void main() {
           () => Result.zip2<int, int, Exception>(
             () async => const Result.success(1),
             () async => const Result.success(2),
-            (a, b) => throw _TestException('onSuccess threw'),
+            (a, b) => throw TestException('onSuccess threw'),
           ),
-          throwsA(isA<_TestException>()),
+          throwsA(isA<TestException>()),
         );
       });
     });
@@ -623,7 +625,7 @@ void main() {
       });
 
       test('short-circuits when a fails, skipping b and c', () async {
-        final error = _TestException('a failed');
+        final error = TestException('a failed');
         var bCalled = false;
         var cCalled = false;
 
@@ -647,7 +649,7 @@ void main() {
       });
 
       test('short-circuits when b fails, skipping c', () async {
-        final error = _TestException('b failed');
+        final error = TestException('b failed');
         var cCalled = false;
 
         final result = await Result.zip3(
@@ -666,7 +668,7 @@ void main() {
       });
 
       test('propagates c error', () async {
-        final error = _TestException('c failed');
+        final error = TestException('c failed');
 
         final result = await Result.zip3(
           () async => const Result.success(1),
@@ -695,7 +697,7 @@ void main() {
       });
 
       test('short-circuits when a fails, skipping b, c and d', () async {
-        final error = _TestException('a failed');
+        final error = TestException('a failed');
         var bCalled = false;
 
         final result = await Result.zip4(
@@ -715,7 +717,7 @@ void main() {
       });
 
       test('short-circuits when b fails, skipping c and d', () async {
-        final error = _TestException('b failed');
+        final error = TestException('b failed');
         var cCalled = false;
 
         final result = await Result.zip4(
@@ -735,7 +737,7 @@ void main() {
       });
 
       test('short-circuits when c fails, skipping d', () async {
-        final error = _TestException('c failed');
+        final error = TestException('c failed');
         var dCalled = false;
 
         final result = await Result.zip4(
@@ -755,7 +757,7 @@ void main() {
       });
 
       test('propagates d error', () async {
-        final error = _TestException('d failed');
+        final error = TestException('d failed');
 
         final result = await Result.zip4(
           () async => const Result.success(1),
@@ -770,13 +772,4 @@ void main() {
       });
     });
   });
-}
-
-final class _TestException implements Exception {
-  _TestException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }

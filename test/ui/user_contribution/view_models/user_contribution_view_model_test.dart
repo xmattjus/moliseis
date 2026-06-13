@@ -1,22 +1,19 @@
-import 'dart:io' show File;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:moliseis/data/data-sources/user_contribution.dart';
-import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
-import 'package:moliseis/utils/result.dart';
 
+import '../../../support/fake_image_picker.dart';
+import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
 
 void main() {
-  UserContributionViewModel buildViewModel({_FakeImagePicker? imagePicker}) {
+  UserContributionViewModel buildViewModel({FakeImagePicker? imagePicker}) {
     return UserContributionViewModel(
       logger: MockLogger(),
-      userContributionRepository: _FakeUserContributionRepository(),
-      imagePicker: imagePicker ?? _FakeImagePicker(),
+      userContributionRepository: FakeUserContributionRepository(),
+      imagePicker: imagePicker ?? FakeImagePicker(),
     );
   }
 
@@ -28,7 +25,7 @@ void main() {
           name: 'a.jpg',
         );
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async => [file],
           ),
         );
@@ -44,7 +41,7 @@ void main() {
         () async {
           final bytes = Uint8List.fromList([1, 2, 3]);
           final vm = buildViewModel(
-            imagePicker: _FakeImagePicker(
+            imagePicker: FakeImagePicker(
               onPickMultipleMedia: () async => [
                 XFile.fromData(bytes, name: 'a.jpg'),
                 XFile.fromData(bytes, name: 'a_copy.jpg'),
@@ -61,7 +58,7 @@ void main() {
       test('does not add a file whose content was already added', () async {
         final bytes = Uint8List.fromList([1, 2, 3]);
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async => [
               XFile.fromData(bytes, name: 'a.jpg'),
             ],
@@ -77,7 +74,7 @@ void main() {
       test('adds two files with different content', () async {
         var callCount = 0;
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async {
               callCount++;
               return callCount == 1
@@ -108,7 +105,7 @@ void main() {
       test('removes the file at the specified index', () async {
         var callCount = 0;
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async {
               callCount++;
               return callCount == 1
@@ -142,7 +139,7 @@ void main() {
       test('allows a removed file to be added again', () async {
         final bytes = Uint8List.fromList([1, 2, 3]);
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async => [
               XFile.fromData(bytes, name: 'a.jpg'),
             ],
@@ -168,7 +165,7 @@ void main() {
 
         var retrieveLostDataCalled = false;
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onRetrieveLostData: () async {
               retrieveLostDataCalled = true;
               return LostDataResponse.empty();
@@ -189,7 +186,7 @@ void main() {
         addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onRetrieveLostData: () async => LostDataResponse.empty(),
           ),
         );
@@ -209,7 +206,7 @@ void main() {
           name: 'lost.jpg',
         );
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onRetrieveLostData: () async => LostDataResponse(file: file),
           ),
         );
@@ -233,7 +230,7 @@ void main() {
           name: 'b.jpg',
         );
         final vm = buildViewModel(
-          imagePicker: _FakeImagePicker(
+          imagePicker: FakeImagePicker(
             onRetrieveLostData: () async =>
                 LostDataResponse(file: fileA, files: [fileA, fileB]),
           ),
@@ -253,7 +250,7 @@ void main() {
 
           final bytes = Uint8List.fromList([1, 2, 3]);
           final vm = buildViewModel(
-            imagePicker: _FakeImagePicker(
+            imagePicker: FakeImagePicker(
               onPickMultipleMedia: () async => [
                 XFile.fromData(bytes, name: 'a.jpg'),
               ],
@@ -280,7 +277,7 @@ void main() {
           addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
           final vm = buildViewModel(
-            imagePicker: _FakeImagePicker(
+            imagePicker: FakeImagePicker(
               onRetrieveLostData: () async => LostDataResponse(
                 exception: PlatformException(
                   code: 'MEDIA_ERROR',
@@ -299,41 +296,4 @@ void main() {
       );
     });
   });
-}
-
-// ---------------------------------------------------------------------------
-// Test doubles
-// ---------------------------------------------------------------------------
-
-final class _FakeImagePicker extends ImagePicker {
-  _FakeImagePicker({this.onPickMultipleMedia, this.onRetrieveLostData});
-
-  final Future<List<XFile>> Function()? onPickMultipleMedia;
-  final Future<LostDataResponse> Function()? onRetrieveLostData;
-
-  @override
-  Future<List<XFile>> pickMultipleMedia({
-    double? maxWidth,
-    double? maxHeight,
-    int? imageQuality,
-    int? limit,
-    bool requestFullMetadata = true,
-  }) async => onPickMultipleMedia != null ? await onPickMultipleMedia!() : [];
-
-  @override
-  Future<LostDataResponse> retrieveLostData() async =>
-      onRetrieveLostData != null
-      ? await onRetrieveLostData!()
-      : LostDataResponse.empty();
-}
-
-final class _FakeUserContributionRepository
-    implements UserContributionRepository {
-  @override
-  Future<Result<dynamic>> upload(UserContribution userContribution) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<String>> uploadImage(File image) async =>
-      const Result.success('https://example.com/image.jpg');
 }

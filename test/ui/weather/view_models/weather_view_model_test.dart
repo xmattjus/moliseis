@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -8,13 +7,13 @@ import 'package:moliseis/data/services/api/weather/model/current_forecast/curren
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
-import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
 
 void main() {
@@ -69,7 +68,7 @@ void main() {
     );
   });
 
-  WeatherViewModel buildViewModel(_FakeWeatherApiClient fakeClient) {
+  WeatherViewModel buildViewModel(FakeWeatherApiClient fakeClient) {
     final apiClient = CachedWeatherApiClient(
       weatherApiClient: fakeClient,
       currentWeatherCache:
@@ -101,7 +100,7 @@ void main() {
     group('loadCurrentForecast', () {
       test('sets current conditions state on success', () async {
         final viewModel = buildViewModel(
-          _FakeWeatherApiClient(result: Result.success(testCombinedResponse)),
+          FakeWeatherApiClient(result: Result.success(testCombinedResponse)),
         );
 
         await viewModel.loadCurrentForecast.execute(testCoordinates);
@@ -123,8 +122,8 @@ void main() {
 
       test('leaves state at defaults and surfaces error on failure', () async {
         final viewModel = buildViewModel(
-          _FakeWeatherApiClient(
-            result: Result.error(_TestException('network error')),
+          FakeWeatherApiClient(
+            result: Result.error(TestException('network error')),
           ),
         );
 
@@ -145,7 +144,7 @@ void main() {
     group('loadHourlyForecast', () {
       test('populates getHourlyForecastData on success', () async {
         final viewModel = buildViewModel(
-          _FakeWeatherApiClient(result: Result.success(testCombinedResponse)),
+          FakeWeatherApiClient(result: Result.success(testCombinedResponse)),
         );
 
         await viewModel.loadHourlyForecast.execute(testCoordinates);
@@ -163,8 +162,8 @@ void main() {
         'leaves getHourlyForecastData null and surfaces error on failure',
         () async {
           final viewModel = buildViewModel(
-            _FakeWeatherApiClient(
-              result: Result.error(_TestException('network error')),
+            FakeWeatherApiClient(
+              result: Result.error(TestException('network error')),
             ),
           );
 
@@ -184,7 +183,7 @@ void main() {
     group('loadDailyForecast', () {
       test('populates getDailyForecastData on success', () async {
         final viewModel = buildViewModel(
-          _FakeWeatherApiClient(result: Result.success(testCombinedResponse)),
+          FakeWeatherApiClient(result: Result.success(testCombinedResponse)),
         );
 
         await viewModel.loadDailyForecast.execute(testCoordinates);
@@ -202,8 +201,8 @@ void main() {
         'leaves getDailyForecastData null and surfaces error on failure',
         () async {
           final viewModel = buildViewModel(
-            _FakeWeatherApiClient(
-              result: Result.error(_TestException('network error')),
+            FakeWeatherApiClient(
+              result: Result.error(TestException('network error')),
             ),
           );
 
@@ -220,27 +219,4 @@ void main() {
       );
     });
   });
-}
-
-final class _FakeWeatherApiClient extends WeatherApiClient {
-  _FakeWeatherApiClient({required this.result})
-    : super(logger: MockLogger(), httpClient: http.Client());
-
-  final Result<CombinedWeatherForecastResponse> result;
-
-  @override
-  Future<Result<CombinedWeatherForecastResponse>> getCombinedWeatherForecast(
-    double latitude,
-    double longitude, {
-    String timezone = 'Europe/Rome',
-  }) async => result;
-}
-
-final class _TestException implements Exception {
-  _TestException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
 }

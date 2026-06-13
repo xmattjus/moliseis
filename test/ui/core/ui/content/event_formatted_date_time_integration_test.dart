@@ -2,23 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/dtos/event_dto.dart';
-import 'package:moliseis/data/dtos/place_dto.dart';
-import 'package:moliseis/domain/models/city.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
-import 'package:moliseis/domain/models/place.dart';
-import 'package:moliseis/domain/repositories/event_repository.dart';
-import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/ui/core/ui/content/content_event_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/search_anchor_suggestion_list.dart';
-import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
+
+import '../../../../support/fake_repositories.dart';
+import '../../../../support/fixtures.dart';
 
 void main() {
   late FavouriteViewModel favouriteViewModel;
@@ -28,8 +23,8 @@ void main() {
 
     favouriteViewModel = FavouriteViewModel(
       favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
-        eventRepository: _FakeEventRepository(),
-        placeRepository: _FakePlaceRepository(),
+        eventRepository: FakeEventRepository(),
+        placeRepository: FakePlaceRepository(),
       ),
     );
   });
@@ -113,126 +108,12 @@ void main() {
   });
 }
 
-class _FakeEventRepository extends EventRepository {
-  @override
-  Future<Result<List<Event>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByCurrentYear() async =>
-      const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async =>
-      const Result.success(<Event>[]);
-
-  @override
-  Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
-  ) async => const Result.success(<Event>[]);
-
-  @override
-  Future<Result<Event>> getById(int id) async =>
-      Result.error(Exception('Not used in this test'));
-
-  @override
-  Future<Result<List<int>>> getFavouriteEventIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getNextEventIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<List<EventDto>>> prepareSync() async =>
-      const Result.success(<EventDto>[]);
-
-  @override
-  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
-}
-
-class _FakePlaceRepository extends PlaceRepository {
-  @override
-  Future<Result<List<Place>>> getAll({
-    ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Place>[]);
-
-  @override
-  Future<Result<List<Place>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async => const Result.success(<Place>[]);
-
-  @override
-  Future<Result<List<Place>>> getByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success(<Place>[]);
-
-  @override
-  Future<Result<Place>> getById(int id) async =>
-      Result.error(Exception('Not used in this test'));
-
-  @override
-  Future<Result<List<int>>> getFavouritePlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getIdsByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getLatestPlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getSuggestedPlaceIds() async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<void>> setFavouritePlace(int id, bool save) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<List<PlaceDto>>> prepareSync() async =>
-      const Result.success(<PlaceDto>[]);
-
-  @override
-  Result<void> commitSync(List<PlaceDto> dtos) => const Result.success(null);
-}
-
-City _testCity() => City(
-  remoteId: 0,
-  name: 'Molise',
-  createdAt: DateTime(2026),
-  modifiedAt: DateTime(2026),
-);
-
 Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
-  return Event(
-    category: ContentCategory.experience,
-    city: _testCity(),
-    coordinates: const LatLng(0, 0),
-    createdAt: DateTime(2026),
-    description: 'Test event',
-    media: const [],
-    modifiedAt: DateTime(2026),
-    name: 'Event',
-    remoteId: 1,
-    isSaved: false,
+  return makeEvent(
     startDate: startDate,
     endDate: endDate,
+    description: 'Test event',
+    category: ContentCategory.experience,
+    coordinates: const LatLng(0, 0),
   );
 }

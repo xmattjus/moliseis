@@ -1,16 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/dtos/event_dto.dart';
-import 'package:moliseis/domain/models/city.dart';
-import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
-import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_get_by_id_use_case.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+
+import '../../../support/fake_repositories.dart';
+import '../../../support/fixtures.dart';
 
 void main() {
   group('SearchViewModel', () {
@@ -31,7 +28,7 @@ void main() {
       test('surfaces error on failure', () async {
         final vm = _buildVm(
           searchRepository: _FakeSearchRepository(
-            pastSearchesResult: Result.error(_TestException('db error')),
+            pastSearchesResult: Result.error(TestException('db error')),
           ),
         );
 
@@ -114,7 +111,7 @@ void main() {
         final vm = await _buildLoaded(
           searchRepository: _FakeSearchRepository(
             pastSearchesResult: const Result.success([]),
-            addToHistoryResult: Result.error(_TestException('write failed')),
+            addToHistoryResult: Result.error(TestException('write failed')),
           ),
         );
 
@@ -145,7 +142,7 @@ void main() {
           searchRepository: _FakeSearchRepository(
             pastSearchesResult: const Result.success(['molise']),
             removeFromHistoryResult: Result.error(
-              _TestException('write failed'),
+              TestException('write failed'),
             ),
           ),
         );
@@ -175,8 +172,8 @@ void main() {
       test(
         'populates results from both place and event ids on success',
         () async {
-          final place = _makePlaceContent(1);
-          final event = _makeEvent(2);
+          final place = makePlace();
+          final event = makeEvent(remoteId: 2);
 
           final vm = await _buildLoaded(
             searchRepository: _FakeSearchRepository(
@@ -198,7 +195,7 @@ void main() {
         final vm = await _buildLoaded(
           searchRepository: _FakeSearchRepository(
             placeIdsByQueryResult: Result.error(
-              _TestException('place search failed'),
+              TestException('place search failed'),
             ),
             eventIdsByQueryResult: const Result.success([]),
           ),
@@ -215,7 +212,7 @@ void main() {
           searchRepository: _FakeSearchRepository(
             placeIdsByQueryResult: const Result.success([]),
             eventIdsByQueryResult: Result.error(
-              _TestException('event search failed'),
+              TestException('event search failed'),
             ),
           ),
         );
@@ -227,14 +224,14 @@ void main() {
       });
 
       test('silently skips place when its getById fails', () async {
-        final event = _makeEvent(2);
+        final event = makeEvent(remoteId: 2);
 
         final vm = await _buildLoaded(
           searchRepository: _FakeSearchRepository(
             placeIdsByQueryResult: const Result.success([1]),
             eventIdsByQueryResult: const Result.success([2]),
           ),
-          placeResults: {1: Result.error(_TestException('not found'))},
+          placeResults: {1: Result.error(TestException('not found'))},
           eventResults: {2: Result.success(event)},
         );
 
@@ -246,7 +243,7 @@ void main() {
       });
 
       test('silently skips event when its getById fails', () async {
-        final place = _makePlaceContent(1);
+        final place = makePlace();
 
         final vm = await _buildLoaded(
           searchRepository: _FakeSearchRepository(
@@ -254,7 +251,7 @@ void main() {
             eventIdsByQueryResult: const Result.success([2]),
           ),
           placeResults: {1: Result.success(place)},
-          eventResults: {2: Result.error(_TestException('not found'))},
+          eventResults: {2: Result.error(TestException('not found'))},
         );
 
         await vm.loadSuggestions.execute('campobasso');
@@ -271,7 +268,7 @@ void main() {
         );
         final vm = await _buildLoaded(
           searchRepository: repo,
-          placeResults: {1: Result.success(_makePlaceContent(1))},
+          placeResults: {1: Result.success(makePlace())},
         );
 
         await vm.loadSuggestions.execute('campobasso');
@@ -290,7 +287,7 @@ void main() {
         );
         final vm = await _buildLoaded(
           searchRepository: repo,
-          eventResults: {2: Result.success(_makeEvent(2))},
+          eventResults: {2: Result.success(makeEvent(remoteId: 2))},
         );
 
         await vm.loadSuggestions.execute('campobasso');
@@ -309,7 +306,7 @@ void main() {
           searchRepository: _FakeSearchRepository(
             relatedResultsResult: const Result.success([1]),
           ),
-          placeResults: {1: Result.success(_makePlaceContent(1))},
+          placeResults: {1: Result.success(makePlace())},
         );
 
         await vm.loadRelatedResultsIds.execute('mo');
@@ -320,7 +317,7 @@ void main() {
       });
 
       test('fetches results for queries of exactly 3 chars', () async {
-        final place = _makePlaceContent(1);
+        final place = makePlace();
 
         final vm = await _buildLoaded(
           searchRepository: _FakeSearchRepository(
@@ -355,8 +352,8 @@ void main() {
       test(
         'populates results from both place and event ids on success',
         () async {
-          final place = _makePlaceContent(1);
-          final event = _makeEvent(2);
+          final place = makePlace();
+          final event = makeEvent(remoteId: 2);
 
           final vm = await _buildLoaded(
             searchRepository: _FakeSearchRepository(
@@ -378,7 +375,7 @@ void main() {
         final vm = await _buildLoaded(
           searchRepository: _FakeSearchRepository(
             placeIdsByQueryResult: Result.error(
-              _TestException('place search failed'),
+              TestException('place search failed'),
             ),
             eventIdsByQueryResult: const Result.success([]),
           ),
@@ -395,7 +392,7 @@ void main() {
           searchRepository: _FakeSearchRepository(
             placeIdsByQueryResult: const Result.success([]),
             eventIdsByQueryResult: Result.error(
-              _TestException('event search failed'),
+              TestException('event search failed'),
             ),
           ),
         );
@@ -418,7 +415,7 @@ SearchViewModel _buildVm({
   Map<int, Result<Place>> placeResults = const {},
   Map<int, Result<Event>> eventResults = const {},
 }) {
-  final eventRepository = _FakeEventRepository(eventResults: eventResults);
+  final eventRepository = FakeEventRepository(getByIdResults: eventResults);
 
   return SearchViewModel(
     eventRepository: eventRepository,
@@ -511,106 +508,5 @@ final class _FakeExploreGetByIdUseCase implements ExploreGetByIdUseCase {
   @override
   Future<Result<Place>> getById(int id) async =>
       placeResults[id] ??
-      Result.error(_TestException('place $id not configured'));
-}
-
-final class _FakeEventRepository implements EventRepository {
-  _FakeEventRepository({this.eventResults = const {}});
-
-  final Map<int, Result<Event>> eventResults;
-
-  @override
-  Future<Result<Event>> getById(int id) async =>
-      eventResults[id] ??
-      Result.error(_TestException('event $id not configured'));
-
-  @override
-  Future<Result<List<Event>>> getByCurrentYear() async =>
-      const Result.success([]);
-
-  @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async =>
-      const Result.success([]);
-
-  @override
-  Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
-  ) async => const Result.success([]);
-
-  @override
-  Future<Result<List<Event>>> getByCategories(
-    Set<ContentCategory> categories, {
-    ContentSort sort = ContentSort.byName,
-  }) async => const Result.success([]);
-
-  @override
-  Future<Result<List<Event>>> getByCoordinates(
-    List<double> coordinates,
-  ) async => const Result.success([]);
-
-  @override
-  Future<Result<List<int>>> getNextEventIds() async => const Result.success([]);
-
-  @override
-  Future<Result<List<int>>> getFavouriteEventIds() async =>
-      const Result.success([]);
-
-  @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<List<EventDto>>> prepareSync() async =>
-      const Result.success(<EventDto>[]);
-
-  @override
-  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
-}
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
-City _testCity() => City(
-  remoteId: 0,
-  name: 'Molise',
-  createdAt: DateTime(2025),
-  modifiedAt: DateTime(2025),
-);
-
-Place _makePlaceContent(int id) => Place(
-  category: ContentCategory.nature,
-  city: _testCity(),
-  coordinates: const LatLng(41.56, 14.66),
-  createdAt: DateTime(2025),
-  description: '',
-  isSaved: false,
-  media: const [],
-  modifiedAt: DateTime(2025),
-  name: 'Place $id',
-  remoteId: id,
-);
-
-Event _makeEvent(int id) => Event(
-  remoteId: id,
-  name: 'Event $id',
-  description: '',
-  category: ContentCategory.unknown,
-  city: _testCity(),
-  coordinates: const LatLng(41.56, 14.66),
-  startDate: DateTime(2025),
-  createdAt: DateTime(2025),
-  modifiedAt: DateTime(2025),
-  media: const [],
-  isSaved: false,
-);
-
-final class _TestException implements Exception {
-  _TestException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
+      Result.error(TestException('place $id not configured'));
 }
