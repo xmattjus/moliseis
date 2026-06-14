@@ -2,10 +2,6 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';
-import 'package:moliseis/data/data-sources/city_supabase_table.dart';
-import 'package:moliseis/data/data-sources/event_supabase_table.dart';
-import 'package:moliseis/data/data-sources/media_supabase_table.dart';
-import 'package:moliseis/data/data-sources/place_supabase_table.dart';
 import 'package:moliseis/data/data-sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
@@ -98,7 +94,6 @@ List<SingleChildWidget> providers(
         PlaceRepositoryImpl(
               logger: context.read(),
               supabaseI: supabase,
-              supabaseTable: PlaceSupabaseTable(),
               objectBoxI: objectBox,
             )
             as PlaceRepository,
@@ -108,7 +103,6 @@ List<SingleChildWidget> providers(
         EventRepositoryImpl(
               logger: context.read(),
               supabaseI: supabase,
-              supabaseTable: EventSupabaseTable(),
               objectBoxI: objectBox,
             )
             as EventRepository,
@@ -118,7 +112,6 @@ List<SingleChildWidget> providers(
         MediaRepositoryImpl(
               logger: context.read(),
               supabaseI: supabase,
-              supabaseTable: MediaSupabaseTable(),
               objectBoxI: objectBox,
             )
             as MediaRepository,
@@ -128,7 +121,6 @@ List<SingleChildWidget> providers(
         CityRepositoryImpl(
               logger: context.read(),
               supabaseI: supabase,
-              supabaseTable: CitySupabaseTable(),
               objectBoxI: objectBox,
             )
             as CityRepository,

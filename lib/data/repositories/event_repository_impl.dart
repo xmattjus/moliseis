@@ -1,7 +1,6 @@
 import 'package:moliseis/data/core/base_sync_repository.dart';
 import 'package:moliseis/data/core/object_box_conditions.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
-import 'package:moliseis/data/data-sources/event_supabase_table.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/mappers/mappers.dart';
 import 'package:moliseis/data/services/objectbox.dart';
@@ -20,23 +19,23 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   EventRepositoryImpl({
     required Logger logger,
     required Supabase supabaseI,
-    required EventSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
-       _table = supabaseTable,
        _box = objectBoxI.store.box<EventEntity>(),
        super(logger);
 
   final Supabase _supabase;
-  final EventSupabaseTable _table;
   final Box<EventEntity> _box;
+
+  @override
+  String get tableName => 'events';
 
   @override
   String get entityName => 'event';
 
   @override
   Future<List<EventDto>> fetchRemote() async {
-    final response = await _supabase.client.from(_table.tableName).select();
+    final response = await _supabase.client.from(tableName).select();
 
     return response.map<EventDto>(EventDtoMapper.fromMap).toList();
   }

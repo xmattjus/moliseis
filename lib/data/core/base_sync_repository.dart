@@ -15,6 +15,10 @@ abstract class BaseSyncRepository<
 
   String get entityName;
 
+  /// The backend table name to use to fetch new data.
+  String get tableName;
+
+  /// Used to fetch new data from the [tableName] backend table.
   Future<List<TDto>> fetchRemote();
 
   TEntity? getLocalById(int id);

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
-import 'package:moliseis/data/data-sources/city_supabase_table.dart';
 import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
@@ -32,7 +31,6 @@ void main() {
       repository = CityRepositoryImpl(
         logger: mockLogger,
         supabaseI: supabaseEnv.mockSupabase,
-        supabaseTable: CitySupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -73,7 +71,6 @@ void main() {
       repository = CityRepositoryImpl(
         logger: mockLogger,
         supabaseI: supabaseEnv.mockSupabase,
-        supabaseTable: CitySupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });

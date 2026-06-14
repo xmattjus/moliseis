@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
-import 'package:moliseis/data/data-sources/place_supabase_table.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -514,7 +513,6 @@ void main() {
       repository = PlaceRepositoryImpl(
         logger: mockLogger,
         supabaseI: supabaseEnv.mockSupabase,
-        supabaseTable: PlaceSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -555,7 +553,6 @@ void main() {
       repository = PlaceRepositoryImpl(
         logger: mockLogger,
         supabaseI: supabaseEnv.mockSupabase,
-        supabaseTable: PlaceSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -702,7 +699,6 @@ PlaceRepositoryImpl _makeRepository(TestObjectBoxEnvironment env) =>
     PlaceRepositoryImpl(
       logger: MockLogger(),
       supabaseI: MockSupabase(),
-      supabaseTable: PlaceSupabaseTable(),
       objectBoxI: TestObjectBox(env.store),
     );
 

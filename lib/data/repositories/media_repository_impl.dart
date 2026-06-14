@@ -1,6 +1,5 @@
 import 'package:moliseis/data/core/base_sync_repository.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
-import 'package:moliseis/data/data-sources/media_supabase_table.dart';
 import 'package:moliseis/data/dtos/media_dto.dart';
 import 'package:moliseis/data/mappers/mappers.dart';
 import 'package:moliseis/data/services/objectbox.dart';
@@ -16,23 +15,23 @@ class MediaRepositoryImpl extends BaseSyncRepository<MediaDto, MediaEntity>
   MediaRepositoryImpl({
     required Logger logger,
     required Supabase supabaseI,
-    required MediaSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
-       _table = supabaseTable,
        _box = objectBoxI.store.box<MediaEntity>(),
        super(logger);
 
   final Supabase _supabase;
-  final MediaSupabaseTable _table;
   final Box<MediaEntity> _box;
+
+  @override
+  String get tableName => 'media';
 
   @override
   String get entityName => 'media';
 
   @override
   Future<List<MediaDto>> fetchRemote() async {
-    final response = await _supabase.client.from(_table.tableName).select();
+    final response = await _supabase.client.from(tableName).select();
 
     return response.map<MediaDto>(MediaDtoMapper.fromMap).toList();
   }

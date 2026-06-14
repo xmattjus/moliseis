@@ -1,6 +1,5 @@
 import 'package:moliseis/data/core/base_sync_repository.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
-import 'package:moliseis/data/data-sources/city_supabase_table.dart';
 import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/data/mappers/mappers.dart';
 import 'package:moliseis/data/services/objectbox.dart';
@@ -14,23 +13,23 @@ class CityRepositoryImpl extends BaseSyncRepository<CityDto, CityEntity>
   CityRepositoryImpl({
     required Logger logger,
     required Supabase supabaseI,
-    required CitySupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
-       _table = supabaseTable,
        _box = objectBoxI.store.box<CityEntity>(),
        super(logger);
 
   final Supabase _supabase;
-  final CitySupabaseTable _table;
   final Box<CityEntity> _box;
+
+  @override
+  String get tableName => 'cities';
 
   @override
   String get entityName => 'city';
 
   @override
   Future<List<CityDto>> fetchRemote() async {
-    final response = await _supabase.client.from(_table.tableName).select();
+    final response = await _supabase.client.from(tableName).select();
 
     return response.map<CityDto>(CityDtoMapper.fromMap).toList();
   }

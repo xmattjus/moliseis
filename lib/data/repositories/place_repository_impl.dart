@@ -1,6 +1,5 @@
 import 'package:moliseis/data/core/base_sync_repository.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
-import 'package:moliseis/data/data-sources/place_supabase_table.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/mappers/mappers.dart';
 import 'package:moliseis/data/services/objectbox.dart';
@@ -18,23 +17,23 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
   PlaceRepositoryImpl({
     required Logger logger,
     required Supabase supabaseI,
-    required PlaceSupabaseTable supabaseTable,
     required ObjectBox objectBoxI,
   }) : _supabase = supabaseI,
-       _table = supabaseTable,
        _box = objectBoxI.store.box<PlaceEntity>(),
        super(logger);
 
   final Supabase _supabase;
-  final PlaceSupabaseTable _table;
   final Box<PlaceEntity> _box;
+
+  @override
+  String get tableName => 'places';
 
   @override
   String get entityName => 'place';
 
   @override
   Future<List<PlaceDto>> fetchRemote() async {
-    final response = await _supabase.client.from(_table.tableName).select();
+    final response = await _supabase.client.from(tableName).select();
 
     return response.map<PlaceDto>(PlaceDtoMapper.fromMap).toList();
   }

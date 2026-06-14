@@ -6,7 +6,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
-import 'package:moliseis/data/data-sources/media_supabase_table.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/dtos/media_dto.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
@@ -43,7 +42,6 @@ void main() {
       repository = MediaRepositoryImpl(
         logger: MockLogger(),
         supabaseI: MockSupabase(),
-        supabaseTable: MediaSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -126,7 +124,6 @@ void main() {
       repository = MediaRepositoryImpl(
         logger: MockLogger(),
         supabaseI: MockSupabase(),
-        supabaseTable: MediaSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -209,7 +206,6 @@ void main() {
       repository = MediaRepositoryImpl(
         logger: mockLogger,
         supabaseI: supabaseEnv.mockSupabase,
-        supabaseTable: MediaSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -250,7 +246,6 @@ void main() {
       repository = MediaRepositoryImpl(
         logger: mockLogger,
         supabaseI: supabaseEnv.mockSupabase,
-        supabaseTable: MediaSupabaseTable(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
       );
     });
@@ -397,7 +392,6 @@ void main() {
       repository = MediaRepositoryImpl(
         logger: mockLogger,
         supabaseI: MockSupabase(),
-        supabaseTable: MediaSupabaseTable(),
         objectBoxI: _MockObjectBox(mockStore),
       );
     });

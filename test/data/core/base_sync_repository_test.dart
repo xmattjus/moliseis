@@ -62,6 +62,9 @@ class StubSyncRepository
   final deletedEntities = <FakeSyncEntity>[];
 
   @override
+  String get tableName => 'fakes';
+
+  @override
   String get entityName => 'fake';
 
   @override
