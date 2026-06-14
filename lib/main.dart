@@ -61,7 +61,22 @@ Future<void> _main() async {
       // Session Replay setup.
       ..replay.sessionSampleRate = 0.4
       ..replay.onErrorSampleRate = 1.0
-      ..httpClient = httpClient,
+      ..httpClient = httpClient
+      ..enableLogs = false
+      ..beforeBreadcrumb = (breadcrumb, hint) {
+        final message = breadcrumb?.message;
+
+        // Drops Talker console breadcrumbs.
+        if (message != null &&
+            (message.contains('┌') ||
+                message.contains('│ [') ||
+                message.contains('└') ||
+                message.contains('─['))) {
+          return null;
+        }
+
+        return breadcrumb;
+      },
     appRunner: () async {
       final supabase = await Supabase.initialize(
         url: Env.supabaseProdUrl,
