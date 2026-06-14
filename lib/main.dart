@@ -80,7 +80,7 @@ Future<void> _main() async {
     appRunner: () async {
       final supabase = await Supabase.initialize(
         url: Env.supabaseProdUrl,
-        anonKey: Env.supabaseProdApiKey,
+        publishableKey: Env.supabaseProdApiKey,
         httpClient: SentrySupabaseClient(client: httpClient),
       );
 
