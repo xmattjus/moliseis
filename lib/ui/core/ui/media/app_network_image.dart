@@ -59,7 +59,7 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
 
     final cacheImageProvider = CachedNetworkImageProvider(
       widget.url,
-      cacheManager: context.read(),
+      cacheManager: context.read<CacheManager>(),
     );
 
     if (widget._fullResolution) {

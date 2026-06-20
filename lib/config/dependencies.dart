@@ -1,4 +1,5 @@
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart'
+    show CacheManager;
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';

@@ -1,5 +1,6 @@
+import 'package:cached_network_image_ce/cached_network_image.dart'
+    show CacheManager;
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:material_symbols_icons/material_symbols_icons.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/media.dart';
@@ -13,6 +14,7 @@ import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/horizontal_button_list.dart';
 import 'package:moliseis/ui/core/ui/linear_gradient_background.dart';
 import 'package:moliseis/ui/core/ui/link_text_button.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -33,7 +35,7 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
 
   Future<void> _onSharePressed(BuildContext context) async {
     try {
-      final cache = DefaultCacheManager();
+      final cache = context.read<CacheManager>();
       final file = await cache.getSingleFile(media.url);
       final sharedImage = XFile(file.path, mimeType: 'image/*');
       await SharePlus.instance.share(ShareParams(files: [sharedImage]));

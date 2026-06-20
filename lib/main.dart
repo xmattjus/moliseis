@@ -1,6 +1,6 @@
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/dependencies.dart';
@@ -11,6 +11,7 @@ import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
+import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/http_client.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
@@ -106,12 +107,14 @@ Future<void> _main() async {
 
       _sentryLoggingFlag.enabled = settingsRepository.crashReporting;
 
-      final cacheManager = CacheManager(
-        Config(
-          'moliseIsCacheKey',
-          stalePeriod: const Duration(days: 7),
-          maxNrOfCacheObjects: 100,
-          fileService: HttpFileService(httpClient: httpClient),
+      final cacheManager = DefaultCacheManager(
+        connectionParameters: ConnectionParameters(
+          connectionTimeout: const Duration(
+            seconds: kDefaultNetworkTimeoutSeconds,
+          ),
+          requestTimeout: const Duration(
+            seconds: kDefaultNetworkTimeoutSeconds,
+          ),
         ),
       );
 
