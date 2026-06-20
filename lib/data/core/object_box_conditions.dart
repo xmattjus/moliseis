@@ -6,14 +6,16 @@ class ObjectBoxConditions {
   // Private constructor to prevent class instantiation.
   ObjectBoxConditions._();
 
-  /// A [Condition] representing whether an event starts and ends in the current
-  /// year or not.
+  /// A [Condition] for events that are visible and happen entirely within the
+  /// current year.
+  ///
+  /// The event must be visible — [EventEntity.isDeleted] equals `false`.
   ///
   /// Multi-day events (non-null [EventEntity_.endDate]) must both start on or
   /// after January 1st and end on or before December 31st 23:59:59.999.
   /// Single-day events (null [EventEntity_.endDate]) are matched when their
   /// [EventEntity_.startDate] falls within the same range.
-  static Condition<EventEntity> get eventStartsEndsCurrentYear {
+  static Condition<EventEntity> get visibleEventInCurrentYear {
     final now = DateTime.now();
     final startOfYear = DateTime(now.year);
     final endOfYear = DateTime(now.year, 12, 31).endOfDay;
@@ -27,6 +29,6 @@ class ObjectBoxConditions {
       EventEntity_.startDate.betweenDate(startOfYear, endOfYear),
     );
 
-    return multiDay.or(singleDay);
+    return multiDay.or(singleDay).and(EventEntity_.isDeleted.equals(false));
   }
 }

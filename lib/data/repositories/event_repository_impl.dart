@@ -71,9 +71,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     Query<EventEntity>? query;
 
     try {
-      final condition = ObjectBoxConditions.eventStartsEndsCurrentYear.and(
-        _isNotDeleted,
-      );
+      final condition = ObjectBoxConditions.visibleEventInCurrentYear;
 
       final builder = _box
           .query(condition)
@@ -111,10 +109,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     try {
       final condition = EventEntity_.contentCategoryIndex
           .oneOf(categories.map((e) => e.index).toList())
-          .andAll([
-            ObjectBoxConditions.eventStartsEndsCurrentYear,
-            _isNotDeleted,
-          ]);
+          .and(ObjectBoxConditions.visibleEventInCurrentYear);
 
       query = _box.query(condition).build();
 
@@ -154,10 +149,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     try {
       final condition = EventEntity_.coordinates
           .nearestNeighborsF32(coordinates, 200)
-          .andAll([
-            ObjectBoxConditions.eventStartsEndsCurrentYear,
-            _isNotDeleted,
-          ]);
+          .and(ObjectBoxConditions.visibleEventInCurrentYear);
 
       query = _box.query(condition).build()..limit = 2;
 
@@ -203,21 +195,19 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
         : DateTime(start.year, start.month, start.day).endOfDay;
 
     try {
-      // TODO(xmattjus): small modifications to ObjectBoxConditions.eventStartsEndCurrentYear could unlock usage in situations like below.
+      // Uses overlap semantics (event overlaps [startDate, endDate]),
+      // distinct from ObjectBoxConditions.visibleEventInCurrentYear which
+      // requires the event to be fully contained within the year.
       final multiDayCondition = EventEntity_.startDate
           .lessOrEqualDate(endDate)
-          .andAll([
-            EventEntity_.endDate.greaterOrEqualDate(startDate),
-            _isNotDeleted,
-          ]);
+          .and(EventEntity_.endDate.greaterOrEqualDate(startDate));
 
-      final singleDayCondition = EventEntity_.endDate.isNull().andAll([
+      final singleDayCondition = EventEntity_.endDate.isNull().and(
         EventEntity_.startDate.betweenDate(startDate, endDate),
-        _isNotDeleted,
-      ]);
+      );
 
       final builder = _box
-          .query(multiDayCondition.or(singleDayCondition))
+          .query(multiDayCondition.or(singleDayCondition).and(_isNotDeleted))
           .order(EventEntity_.startDate, flags: Order.unsigned);
 
       query = builder.build();
@@ -342,12 +332,10 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     final nextMonth = DateTime(now.year, now.month, now.day + 30).endOfDay;
 
     try {
-      final condition = EventEntity_.startDate.greaterOrEqualDate(today).andAll(
-        [
-          EventEntity_.startDate.lessOrEqualDate(nextMonth),
-          _isNotDeleted,
-        ],
-      );
+      final condition = EventEntity_.startDate
+          .greaterOrEqualDate(today)
+          .and(EventEntity_.startDate.lessOrEqualDate(nextMonth))
+          .and(_isNotDeleted);
 
       final builder = _box
           .query(condition)

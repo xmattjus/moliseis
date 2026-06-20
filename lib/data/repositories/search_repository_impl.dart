@@ -82,14 +82,14 @@ class SearchRepositoryImpl implements SearchRepository {
   @override
   Future<Result<List<int>>> getEventIdsByQuery(String text) async {
     // Queries are built fresh each call so that the year-boundary values in
-    // ObjectBoxConditions.eventStartsEndsCurrentYear always reflect the current
+    // ObjectBoxConditions.visibleEventInCurrentYear always reflect the current
     // date rather than the date at construction time.
     final eventQuery = _objectBox.store
         .box<EventEntity>()
         .query(
           EventEntity_.name
               .contains(text, caseSensitive: false)
-              .and(ObjectBoxConditions.eventStartsEndsCurrentYear),
+              .and(ObjectBoxConditions.visibleEventInCurrentYear),
         )
         .build();
 
@@ -98,7 +98,7 @@ class SearchRepositoryImpl implements SearchRepository {
         .query(
           EventEntity_.contentCategoryIndex
               .oneOf(_getCategoryIndexes(text))
-              .and(ObjectBoxConditions.eventStartsEndsCurrentYear),
+              .and(ObjectBoxConditions.visibleEventInCurrentYear),
         )
         .build();
 
@@ -119,20 +119,17 @@ class SearchRepositoryImpl implements SearchRepository {
       final currentYearStart = DateTime(now.year);
       final currentYearEnd = DateTime(now.year, 12, 31).endOfDay;
 
+      // Mirrors ObjectBoxConditions.visibleEventInCurrentYear so the in-memory
+      // city traversal stays consistent with the ObjectBox query paths above.
       for (final city in cities) {
-        if (city != null) {
-          for (final event in city.events) {
-            // Adds the event to results only if it starts and ends in the
-            // current year.
-            if (event.startDate.maybeGreaterOrEqualDate(currentYearStart)) {
-              final endDate = event.endDate;
-              // Single-day events (null endDate) are always included when
-              // their startDate is within the year.
-              if (endDate == null ||
-                  endDate.maybeLessOrEqualDate(currentYearEnd)) {
-                results.add(event.remoteId);
-              }
-            }
+        if (city == null) continue;
+        for (final event in city.events) {
+          if (_isVisibleEventInCurrentYear(
+            event,
+            currentYearStart,
+            currentYearEnd,
+          )) {
+            results.add(event.remoteId);
           }
         }
       }
@@ -328,5 +325,32 @@ class SearchRepositoryImpl implements SearchRepository {
   void _removeDuplicates(List<int> ids) {
     final uniqueIds = <int>{};
     ids.retainWhere(uniqueIds.add);
+  }
+
+  /// Whether [event] is visible ([EventEntity.isDeleted] is `false`) and
+  /// happens entirely within the year bounded by [startOfYear] and
+  /// [endOfYear].
+  ///
+  /// Multi-day events (non-null [EventEntity.endDate]) must both start on or
+  /// after [startOfYear] and end on or before [endOfYear]. Single-day events
+  /// (null [EventEntity.endDate]) are matched when their
+  /// [EventEntity.startDate] falls within the same range.
+  bool _isVisibleEventInCurrentYear(
+    EventEntity event,
+    DateTime startOfYear,
+    DateTime endOfYear,
+  ) {
+    if (event.isDeleted) return false;
+
+    final startDate = event.startDate;
+    final endDate = event.endDate;
+
+    if (endDate == null) {
+      return startDate.maybeGreaterOrEqualDate(startOfYear) &&
+          startDate.maybeLessOrEqualDate(endOfYear);
+    }
+
+    return startDate.maybeGreaterOrEqualDate(startOfYear) &&
+        endDate.maybeLessOrEqualDate(endOfYear);
   }
 }

@@ -169,6 +169,106 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
+    // Soft-delete exclusion
+    // -------------------------------------------------------------------------
+
+    group('soft-delete exclusion', () {
+      test(
+        'excludes soft-deleted current-year event whose name matches query',
+        () async {
+          final now = DateTime.now();
+          eventBox.put(
+            _createEvent(
+              remoteId: 200,
+              name: 'Sagra fantasma',
+              startDate: DateTime(now.year, 8),
+              endDate: DateTime(now.year, 8, 5),
+              isDeleted: true,
+            ),
+          );
+
+          final result = await repository.getEventIdsByQuery('fantasma');
+
+          expect(result, isA<Success<List<int>>>());
+          final ids = (result as Success<List<int>>).value;
+          expect(ids, isNot(contains(200)));
+        },
+      );
+
+      test(
+        'excludes soft-deleted current-year event whose category matches query',
+        () async {
+          final now = DateTime.now();
+          eventBox.put(
+            _createEvent(
+              remoteId: 201,
+              name: 'Escursione cancellata',
+              startDate: DateTime(now.year, 6),
+              endDate: DateTime(now.year, 6, 10),
+              contentCategoryIndex: 1, // ContentCategory.nature
+              isDeleted: true,
+            ),
+          );
+
+          final result = await repository.getEventIdsByQuery('natura');
+
+          expect(result, isA<Success<List<int>>>());
+          final ids = (result as Success<List<int>>).value;
+          expect(ids, isNot(contains(201)));
+        },
+      );
+
+      test(
+        'excludes soft-deleted current-year event linked to a matching city',
+        () async {
+          final now = DateTime.now();
+          final city = _createCity(remoteId: 30, name: 'Termoli');
+          cityBox.put(city);
+
+          final event = _createEvent(
+            remoteId: 202,
+            name: 'Evento fantasma',
+            startDate: DateTime(now.year, 9),
+            endDate: DateTime(now.year, 9, 5),
+            cityId: city.remoteId,
+            isDeleted: true,
+          );
+          eventBox.put(event);
+
+          final result = await repository.getEventIdsByQuery('Termoli');
+
+          expect(result, isA<Success<List<int>>>());
+          final ids = (result as Success<List<int>>).value;
+          expect(ids, isNot(contains(202)));
+        },
+      );
+
+      test(
+        'excludes single-day event from a future year linked to a matching '
+        'city',
+        () async {
+          final city = _createCity(remoteId: 31, name: 'Larino');
+          cityBox.put(city);
+
+          final event = _createEvent(
+            remoteId: 203,
+            name: 'Futura giornata',
+            startDate: DateTime(2099, 5, 15),
+            endDate: null,
+            cityId: city.remoteId,
+          );
+          eventBox.put(event);
+
+          final result = await repository.getEventIdsByQuery('Larino');
+
+          expect(result, isA<Success<List<int>>>());
+          final ids = (result as Success<List<int>>).value;
+          expect(ids, isNot(contains(203)));
+        },
+      );
+    });
+
+    // -------------------------------------------------------------------------
     // Deduplication
     // -------------------------------------------------------------------------
 
@@ -484,6 +584,7 @@ EventEntity _createEvent({
   required DateTime? endDate,
   int? cityId,
   int contentCategoryIndex = 0,
+  bool isDeleted = false,
 }) {
   final now = DateTime.now();
   final event = EventEntity(
@@ -496,6 +597,7 @@ EventEntity _createEvent({
     modifiedAt: now,
     city: ToOne<CityEntity>(),
     media: ToMany(),
+    isDeleted: isDeleted,
   );
 
   if (cityId != null) {

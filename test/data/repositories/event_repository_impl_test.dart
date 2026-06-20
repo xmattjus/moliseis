@@ -547,6 +547,25 @@ void main() {
       );
     });
 
+    test('excludes soft-deleted current-year event', () async {
+      final now = DateTime.now();
+      final event = _createEvent(
+        remoteId: 5,
+        startDate: DateTime(now.year, 4),
+        endDate: DateTime(now.year, 4, 10),
+        isDeleted: true,
+      );
+      eventBox.put(event);
+
+      final result = await repository.getByCurrentYear();
+
+      expect(result, isA<Success<List<Event>>>());
+      expect(
+        (result as Success<List<Event>>).value.map((e) => e.remoteId),
+        isNot(contains(5)),
+      );
+    });
+
     test('returns empty list when store is empty', () async {
       final result = await repository.getByCurrentYear();
 
@@ -835,6 +854,7 @@ EventEntity _createEvent({
   String? name,
   ContentCategory category = ContentCategory.unknown,
   DateTime? modifiedAt,
+  bool isDeleted = false,
 }) {
   final now = DateTime.now();
   return EventEntity(
@@ -847,6 +867,7 @@ EventEntity _createEvent({
     modifiedAt: modifiedAt ?? now,
     city: ToOne<CityEntity>(),
     media: ToMany(),
+    isDeleted: isDeleted,
   );
 }
 
