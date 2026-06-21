@@ -8,7 +8,7 @@ import 'package:objectbox/objectbox.dart';
 class EventEntity implements SyncEntity {
   EventEntity({
     required this.remoteId,
-    this.name,
+    required this.name,
     this.description,
     this.startDate,
     this.endDate,
@@ -30,7 +30,7 @@ class EventEntity implements SyncEntity {
   final int remoteId;
 
   @Index()
-  final String? name;
+  final String name;
 
   final String? description;
 

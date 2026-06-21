@@ -1017,9 +1017,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         }
       },
       objectToFB: (EventEntity object, fb.Builder fbb) {
-        final nameOffset = object.name == null
-            ? null
-            : fbb.writeString(object.name!);
+        final nameOffset = fbb.writeString(object.name);
         final descriptionOffset = object.description == null
             ? null
             : fbb.writeString(object.description!);
@@ -1072,7 +1070,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         );
         final nameParam = const fb.StringReader(
           asciiOptimization: true,
-        ).vTableGetNullable(buffer, rootOffset, 6);
+        ).vTableGet(buffer, rootOffset, 6, '');
         final descriptionParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGetNullable(buffer, rootOffset, 8);
