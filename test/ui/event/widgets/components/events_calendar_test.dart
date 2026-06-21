@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day_markers.dart';
 import 'package:moliseis/utils/command.dart';
@@ -20,7 +17,7 @@ void main() {
     });
 
     test('returns true for each day in an inclusive multi-day span', () {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 3, 10, 10, 30),
         endDate: DateTime(2026, 3, 12, 22, 45),
       );
@@ -33,7 +30,7 @@ void main() {
     });
 
     test('treats null end date as a single-day event', () {
-      final event = _buildEventContent(startDate: DateTime(2026, 3, 15, 18));
+      final event = makeEvent(startDate: DateTime(2026, 3, 15, 18));
 
       expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 14)), isFalse);
       expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 15)), isTrue);
@@ -41,7 +38,7 @@ void main() {
     });
 
     test('falls back to start day when end date is before start date', () {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 3, 20, 10),
         endDate: DateTime(2026, 3, 19, 10),
       );
@@ -57,7 +54,7 @@ void main() {
       'includes multi-day event on middle day when repository getByDate is '
       'empty',
       () async {
-        final event = _buildEvent(
+        final event = makeEvent(
           remoteId: 42,
           startDate: DateTime(2026, 3, 10, 10, 30),
           endDate: DateTime(2026, 3, 12, 22, 45),
@@ -79,7 +76,7 @@ void main() {
     );
 
     test('returns cached events on same day without repository call', () async {
-      final event = _buildEvent(
+      final event = makeEvent(
         remoteId: 7,
         startDate: DateTime(2026, 3, 11, 8),
       );
@@ -105,9 +102,11 @@ void main() {
     test('returns events sorted by start date and remote id', () async {
       final repository = FakeEventRepository(
         getByCurrentYearResult: Result.success([
-          _buildEvent(remoteId: 2, startDate: DateTime(2026, 3, 11, 10)),
-          _buildEvent(remoteId: 1, startDate: DateTime(2026, 3, 11, 10)),
-          _buildEvent(remoteId: 3, startDate: DateTime(2026, 3, 11, 9)),
+          makeEvent(remoteId: 2, startDate: DateTime(2026, 3, 11, 10)),
+          // Test readability benefits from redundant argument values.
+          // ignore: avoid_redundant_argument_values
+          makeEvent(remoteId: 1, startDate: DateTime(2026, 3, 11, 10)),
+          makeEvent(remoteId: 3, startDate: DateTime(2026, 3, 11, 9)),
         ]),
       );
       final viewModel = EventViewModel(repository: repository);
@@ -135,11 +134,11 @@ void main() {
           home: Scaffold(
             body: EventsVerticalCalendarDayMarkers(
               events: [
-                _buildEventContent(
+                makeEvent(
                   remoteId: 5,
                   startDate: DateTime(2026, 3, 11, 8),
                 ),
-                _buildEventContent(
+                makeEvent(
                   remoteId: 13,
                   startDate: DateTime(2026, 3, 11, 9),
                 ),
@@ -173,46 +172,4 @@ Future<void> _waitForCommand(Command<void> command) async {
   while (command.running) {
     await Future<void>.delayed(Duration.zero);
   }
-}
-
-Event _buildEvent({
-  required int remoteId,
-  required DateTime startDate,
-  DateTime? endDate,
-}) {
-  return Event(
-    remoteId: remoteId,
-    name: 'Event $remoteId',
-    description: '',
-    startDate: startDate,
-    endDate: endDate,
-    category: ContentCategory.unknown,
-    createdAt: DateTime(2026),
-    modifiedAt: DateTime(2026),
-    city: testCity(),
-    coordinates: const LatLng(0, 0),
-    media: const [],
-    isSaved: false,
-  );
-}
-
-Event _buildEventContent({
-  required DateTime startDate,
-  DateTime? endDate,
-  int remoteId = 1,
-}) {
-  return Event(
-    category: ContentCategory.experience,
-    city: testCity(),
-    coordinates: const LatLng(0, 0),
-    createdAt: DateTime(2026),
-    description: 'Test event',
-    media: const [],
-    modifiedAt: DateTime(2026),
-    name: 'Event',
-    remoteId: remoteId,
-    isSaved: false,
-    startDate: startDate,
-    endDate: endDate,
-  );
 }

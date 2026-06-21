@@ -8,7 +8,6 @@ import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/dtos/media_dto.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
-import 'package:moliseis/data/services/objectbox.dart' as app_objectbox;
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
@@ -19,6 +18,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
+import '../../support/mock_objectbox.dart';
 import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 
@@ -54,7 +54,7 @@ void main() {
       final event = makeEventEntity(remoteId: 1);
       eventBox.put(event);
 
-      final media = _createMedia(remoteId: 10, eventId: event.remoteId);
+      final media = makeMediaEntity(remoteId: 10, eventId: event.remoteId);
       mediaBox.put(media);
 
       final result = await repository.getByEventId(1);
@@ -71,7 +71,7 @@ void main() {
       eventBox.put(event1);
       eventBox.put(event2);
 
-      final media = _createMedia(remoteId: 10, eventId: event2.remoteId);
+      final media = makeMediaEntity(remoteId: 10, eventId: event2.remoteId);
       mediaBox.put(media);
 
       final result = await repository.getByEventId(1);
@@ -94,8 +94,8 @@ void main() {
       final event = makeEventEntity(remoteId: 1);
       eventBox.put(event);
 
-      final media1 = _createMedia(remoteId: 10, eventId: event.remoteId);
-      final media2 = _createMedia(remoteId: 11, eventId: event.remoteId);
+      final media1 = makeMediaEntity(remoteId: 10, eventId: event.remoteId);
+      final media2 = makeMediaEntity(remoteId: 11, eventId: event.remoteId);
       mediaBox.put(media1);
       mediaBox.put(media2);
 
@@ -136,7 +136,7 @@ void main() {
       final place = makePlaceEntity(remoteId: 1);
       placeBox.put(place);
 
-      final media = _createMedia(remoteId: 20, placeId: place.remoteId);
+      final media = makeMediaEntity(remoteId: 20, placeId: place.remoteId);
       mediaBox.put(media);
 
       final result = await repository.getByPlaceId(1);
@@ -153,7 +153,7 @@ void main() {
       placeBox.put(place1);
       placeBox.put(place2);
 
-      final media = _createMedia(remoteId: 20, placeId: place2.remoteId);
+      final media = makeMediaEntity(remoteId: 20, placeId: place2.remoteId);
       mediaBox.put(media);
 
       final result = await repository.getByPlaceId(1);
@@ -176,8 +176,8 @@ void main() {
       final place = makePlaceEntity(remoteId: 1);
       placeBox.put(place);
 
-      final media1 = _createMedia(remoteId: 20, placeId: place.remoteId);
-      final media2 = _createMedia(remoteId: 21, placeId: place.remoteId);
+      final media1 = makeMediaEntity(remoteId: 20, placeId: place.remoteId);
+      final media2 = makeMediaEntity(remoteId: 21, placeId: place.remoteId);
       mediaBox.put(media1);
       mediaBox.put(media2);
 
@@ -302,7 +302,7 @@ void main() {
 
     test('skips a media item that already matches the local copy', () async {
       mediaBox.put(
-        _createMedia(
+        makeMediaEntity(
           remoteId: 10,
           url: 'https://example.com/img.jpg',
         ),
@@ -330,7 +330,7 @@ void main() {
 
     test('updates existing media when remote data differs', () async {
       mediaBox.put(
-        _createMedia(
+        makeMediaEntity(
           remoteId: 10,
           url: 'https://example.com/old.jpg',
         ),
@@ -384,15 +384,15 @@ void main() {
 
     setUp(() {
       mockLogger = MockLogger();
-      final mockBox = _MockMediaEntityBox();
+      final mockBox = MockEntityBox<MediaEntity>();
       when(() => mockBox.query(any())).thenThrow(Exception('query failed'));
 
-      final mockStore = _MockStore(mockBox);
+      final mockStore = MockObjectBoxStore<MediaEntity>(mockBox);
 
       repository = MediaRepositoryImpl(
         logger: mockLogger,
         supabaseI: MockSupabase(),
-        objectBoxI: _MockObjectBox(mockStore),
+        objectBoxI: MockObjectBox(mockStore),
       );
     });
 
@@ -424,62 +424,4 @@ void main() {
       expect(failedCall.stackTrace, isNotNull);
     });
   });
-}
-
-// Sets both the JSON-serialization field (`eventToOneId`/`placeToOneId`) and
-// the ObjectBox relation ID (`event.targetId`/`place.targetId`). Both are
-// required: the former is the plain Dart field used in JSON; the latter is
-// what ObjectBox uses to build the in-store relation for `.link()` queries.
-MediaEntity _createMedia({
-  required int remoteId,
-  int? eventId,
-  int? placeId,
-  String url = 'https://example.com/1.jpg',
-}) {
-  final now = DateTime(2026);
-  final entity = MediaEntity(
-    remoteId: remoteId,
-    url: url,
-    width: 800,
-    height: 600,
-    eventToOneId: eventId,
-    placeToOneId: placeId,
-    createdAt: now,
-    modifiedAt: now,
-    place: ToOne<PlaceEntity>(),
-    event: ToOne<EventEntity>(),
-  );
-  if (eventId != null) entity.event.targetId = eventId;
-  if (placeId != null) entity.place.targetId = placeId;
-  return entity;
-}
-
-final class _MockStore extends Mock implements Store {
-  _MockStore(this._mockBox);
-
-  final Box<MediaEntity> _mockBox;
-
-  @override
-  Box<T> box<T>() {
-    if (T == MediaEntity) return _mockBox as Box<T>;
-    throw StateError(
-      '_MockStore only supports Box<MediaEntity>, got Box<$T>',
-    );
-  }
-}
-
-final class _MockMediaEntityBox extends Mock implements Box<MediaEntity> {}
-
-final class _MockObjectBox implements app_objectbox.ObjectBox {
-  _MockObjectBox(this._mockStore);
-
-  final Store _mockStore;
-
-  @override
-  Store get store => _mockStore;
-
-  @override
-  set store(Store value) {
-    throw UnsupportedError('_MockObjectBox store is immutable.');
-  }
 }

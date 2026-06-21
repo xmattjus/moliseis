@@ -6,7 +6,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
-import 'package:moliseis/data/services/objectbox.dart' as app_objectbox;
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -17,6 +16,7 @@ import 'package:objectbox/objectbox.dart';
 
 import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
+import '../../support/mock_objectbox.dart';
 import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 
@@ -359,15 +359,15 @@ void main() {
 
       setUp(() {
         mockLogger = MockLogger();
-        final mockBox = _MockEventEntityBox();
+        final mockBox = MockEntityBox<EventEntity>();
         when(() => mockBox.query(any())).thenThrow(Exception('query failed'));
 
-        final mockStore = _MockStore(mockBox);
+        final mockStore = MockObjectBoxStore<EventEntity>(mockBox);
 
         mockRepository = EventRepositoryImpl(
           logger: mockLogger,
           supabaseI: MockSupabase(),
-          objectBoxI: _MockObjectBox(mockStore),
+          objectBoxI: MockObjectBox(mockStore),
         );
       });
 
@@ -830,33 +830,3 @@ void main() {
 
 Matcher containsEventId(int remoteId) =>
     contains(predicate<Event>((e) => e.remoteId == remoteId));
-
-final class _MockStore extends Mock implements Store {
-  _MockStore(this._mockBox);
-
-  final Box<EventEntity> _mockBox;
-
-  @override
-  Box<T> box<T>() {
-    if (T == EventEntity) return _mockBox as Box<T>;
-    throw StateError(
-      '_MockStore only supports Box<EventEntity>, got Box<$T>',
-    );
-  }
-}
-
-final class _MockEventEntityBox extends Mock implements Box<EventEntity> {}
-
-final class _MockObjectBox implements app_objectbox.ObjectBox {
-  _MockObjectBox(this._mockStore);
-
-  final Store _mockStore;
-
-  @override
-  Store get store => _mockStore;
-
-  @override
-  set store(Store value) {
-    throw UnsupportedError('_MockObjectBox store is immutable.');
-  }
-}

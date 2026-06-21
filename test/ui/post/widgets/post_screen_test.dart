@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
-import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
@@ -220,6 +218,8 @@ void main() {
       );
       final notifier = vlb.valueListenable as ValueNotifier<bool>;
 
+      // Test readability benefits from separate statements over cascades.
+      // ignore: cascade_invocations
       notifier.value = true;
       // pumpAndSettle() ensures the canPop:false rebuild completes fully
       // before the widget tree is replaced. Without this, deactivate() fires
@@ -363,30 +363,9 @@ WeatherViewModel _buildWeatherViewModel(MockLogger mockLogger) {
   );
 }
 
-Event _buildEvent() => Event(
-  remoteId: 1,
-  name: 'Evento demo',
-  description: 'Descrizione evento',
+Event _buildEvent() => makeEvent(
   startDate: DateTime(2026, 4, 10, 10, 30),
   endDate: DateTime(2026, 4, 10, 12),
-  coordinates: const LatLng(41.56, 14.66),
-  category: ContentCategory.experience,
-  createdAt: DateTime(2026),
-  modifiedAt: DateTime(2026),
-  city: testCity(),
-  media: const [],
-  isSaved: false,
 );
 
-Place _buildPlace() => Place(
-  remoteId: 2,
-  name: 'Luogo demo',
-  description: 'Descrizione luogo',
-  coordinates: const LatLng(41.57, 14.67),
-  category: ContentCategory.nature,
-  createdAt: DateTime(2026),
-  modifiedAt: DateTime(2026),
-  city: testCity(),
-  media: const [],
-  isSaved: false,
-);
+Place _buildPlace() => makePlace(remoteId: 2);

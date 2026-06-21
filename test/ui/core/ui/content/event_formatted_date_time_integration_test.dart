@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/ui/core/ui/content/content_event_card_grid_item.dart';
@@ -33,7 +31,7 @@ void main() {
     testWidgets('is used by compact ContentSliverGrid for EventContent', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
       );
 
@@ -62,7 +60,7 @@ void main() {
     testWidgets('is used by ContentEventCardGridItem trailing content', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
       );
 
@@ -84,7 +82,7 @@ void main() {
     testWidgets('is used by SearchAnchorSuggestionList for EventContent', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
       );
 
@@ -106,14 +104,4 @@ void main() {
       expect(find.byType(EventFormattedDateTime), findsOneWidget);
     });
   });
-}
-
-Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
-  return makeEvent(
-    startDate: startDate,
-    endDate: endDate,
-    description: 'Test event',
-    category: ContentCategory.experience,
-    coordinates: const LatLng(0, 0),
-  );
 }

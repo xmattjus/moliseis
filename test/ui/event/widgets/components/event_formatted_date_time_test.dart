@@ -1,3 +1,4 @@
+// Test readability benefits from redundant argument values.
 // ignore_for_file: avoid_redundant_argument_values
 
 import 'package:flutter/material.dart';
@@ -5,11 +6,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart' as intl;
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/city.dart';
-import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
+
+import '../../../../support/fixtures.dart';
 
 void main() {
   setUpAll(() async {
@@ -45,7 +45,7 @@ void main() {
     testWidgets('renders single-day event with one date and one time', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
       );
 
@@ -61,7 +61,7 @@ void main() {
     testWidgets('renders same-day event range with end time', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
         endDate: DateTime(2026, 4, 10, 12, 45),
       );
@@ -79,7 +79,7 @@ void main() {
     testWidgets('renders time range when minutes differ in same hour', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
         endDate: DateTime(2026, 4, 10, 10, 45),
       );
@@ -95,7 +95,7 @@ void main() {
     testWidgets('uses 24-hour time format when requested by MediaQuery', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 13, 5),
         endDate: DateTime(2026, 4, 10, 14, 10),
       );
@@ -122,7 +122,7 @@ void main() {
       const iconColor = Color(0xFF123456);
       const textColor = Color(0xFF654321);
 
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
       );
 
@@ -163,7 +163,7 @@ void main() {
     testWidgets('updates month labels when the locale changes', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
       );
 
@@ -181,7 +181,7 @@ void main() {
     testWidgets('renders multi-day event in same month', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
         endDate: DateTime(2026, 4, 12, 12, 45),
       );
@@ -202,7 +202,7 @@ void main() {
     testWidgets('renders multi-month and multi-year date ranges', (
       tester,
     ) async {
-      final multiMonth = _buildEventContent(
+      final multiMonth = makeEvent(
         startDate: DateTime(2026, 4, 30, 10, 15),
         endDate: DateTime(2026, 5, 2, 12, 45),
       );
@@ -222,7 +222,7 @@ void main() {
         findsOneWidget,
       );
 
-      final multiYear = _buildEventContent(
+      final multiYear = makeEvent(
         startDate: DateTime(2026, 12, 31, 23, 0),
         endDate: DateTime(2027, 1, 2, 8, 30),
       );
@@ -248,7 +248,7 @@ void main() {
     testWidgets('normalizes inverted start and end dates', (
       tester,
     ) async {
-      final event = _buildEventContent(
+      final event = makeEvent(
         startDate: DateTime(2026, 4, 12, 18, 0),
         endDate: DateTime(2026, 4, 10, 9, 30),
       );
@@ -280,29 +280,5 @@ String _formatTimeOfDay(
   return localizations.formatTimeOfDay(
     TimeOfDay.fromDateTime(time),
     alwaysUse24HourFormat: alwaysUse24HourFormat,
-  );
-}
-
-City _testCity() => City(
-  remoteId: 0,
-  name: 'Molise',
-  createdAt: DateTime(2026, 1, 1),
-  modifiedAt: DateTime(2026, 1, 1),
-);
-
-Event _buildEventContent({required DateTime startDate, DateTime? endDate}) {
-  return Event(
-    category: ContentCategory.experience,
-    city: _testCity(),
-    coordinates: const LatLng(0, 0),
-    createdAt: DateTime(2026, 1, 1),
-    description: 'Test event',
-    media: const [],
-    modifiedAt: DateTime(2026, 1, 1),
-    name: 'Event',
-    remoteId: 1,
-    isSaved: false,
-    startDate: startDate,
-    endDate: endDate,
   );
 }
