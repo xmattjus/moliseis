@@ -1,3 +1,7 @@
+import 'dart:ui' show Locale;
+
+import 'package:intl/intl.dart' as intl;
+
 extension DateTimeExtensions on DateTime {
   /// Returns a new [DateTime] instance with the same date but the time set to
   /// 23:59:59.999999.
@@ -14,6 +18,26 @@ extension DateTimeExtensions on DateTime {
   /// Whether this [DateTime] instance is after the current date and time
   /// or not.
   bool get isAfterNow => isAfter(DateTime.now());
+
+  /// Returns a [String] of the date formatted to [locale].
+  String formatDate(Locale locale) =>
+      intl.DateFormat.yMd(locale.toLanguageTag()).format(this);
+
+  /// Returns a [String] of the time formatted to [locale].
+  /// Set [alwaysUse24HourFormat] to true to always return 24H time format.
+  String formatTime(Locale locale, {bool alwaysUse24HourFormat = false}) {
+    // intl.DateFormat.jm localizes the time format based on the locale
+    // (e.g., 5:08 PM or 17:08).
+    final timeFormat = alwaysUse24HourFormat
+        ? intl.DateFormat.Hm(locale.toLanguageTag())
+        : intl.DateFormat.jm(locale.toLanguageTag());
+
+    return timeFormat.format(this);
+  }
+
+  /// Returns a [String] of the month formatted to [locale].
+  String localizeMonth(Locale locale) =>
+      intl.DateFormat.MMMM(locale.toLanguageTag()).format(this);
 }
 
 // TODO(xmattjus): convert to non-nullable after backend table schema rewrite.

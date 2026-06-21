@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart' as intl;
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
@@ -41,20 +40,6 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
     _currentLocale = Localizations.localeOf(context);
   }
 
-  String _localizeMonth(DateTime date) {
-    final dateSymbols = intl.DateFormat.MMMM(_currentLocale.toLanguageTag());
-    return dateSymbols.format(date);
-  }
-
-  String _localizeTimeOfDay(DateTime date, bool alwaysUse24HourFormat) {
-    // intl.DateFormat.jm localizes the time format based on the locale
-    // (e.g., 5:08 PM or 17:08).
-    final timeFormat = alwaysUse24HourFormat
-        ? intl.DateFormat.Hm(_currentLocale.toLanguageTag())
-        : intl.DateFormat.jm(_currentLocale.toLanguageTag());
-    return timeFormat.format(date);
-  }
-
   @override
   Widget build(BuildContext context) {
     var startDate = widget.event.startDate;
@@ -89,11 +74,11 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
         endDate.hour != startDate.hour ||
         endDate.minute != startDate.minute;
 
-    var startMonth = _localizeMonth(startDate);
+    var startMonth = startDate.localizeMonth(_currentLocale);
     String? endMonth;
 
     if (isMultipleMonths) {
-      endMonth = _localizeMonth(endDate);
+      endMonth = endDate.localizeMonth(_currentLocale);
     }
 
     if (isMultipleYears) {
@@ -113,13 +98,20 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
       date = '${startDate.day} $startMonth';
     }
 
-    final alwaysUse24HourFormat =
+    final force24HourFormat =
         MediaQuery.maybeAlwaysUse24HourFormatOf(context) ?? false;
 
-    var time = _localizeTimeOfDay(startDate, alwaysUse24HourFormat);
+    var time = startDate.formatTime(
+      _currentLocale,
+      alwaysUse24HourFormat: force24HourFormat,
+    );
 
     if (isMultipleHours) {
-      time += ' - ${_localizeTimeOfDay(endDate, alwaysUse24HourFormat)}';
+      time +=
+          ' - ${endDate.formatTime(
+            _currentLocale,
+            alwaysUse24HourFormat: force24HourFormat,
+          )}';
     }
 
     return Flex(

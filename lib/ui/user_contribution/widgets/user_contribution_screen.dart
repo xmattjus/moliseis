@@ -172,7 +172,9 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                                 initialDate: startDate,
                                 label: Text(
                                   startDate != null
-                                      ? 'Inizia il ${widget.viewModel.formatDate(currentLocale, startDate)}'
+                                      ? 'Inizia il ${startDate.formatDate(
+                                          currentLocale,
+                                        )}'
                                       : 'Seleziona data di inizio',
                                 ),
                                 onDatePicked: (date) {
@@ -183,7 +185,9 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                                 UserContributionDateChip(
                                   initialDate: startDate,
                                   label: Text(
-                                    'Inizia alle ${widget.viewModel.formatTime(currentLocale, startDate)}',
+                                    'Inizia alle ${startDate.formatTime(
+                                      currentLocale,
+                                    )}',
                                   ),
                                   mode: UserContributionDateChipMode.time,
                                   onDatePicked: (date) {
@@ -195,7 +199,9 @@ class _UserContributionScreenState extends State<UserContributionScreen> {
                                 initialDate: endDate ?? startDate,
                                 label: Text(
                                   endDate != null
-                                      ? 'Finisce il ${widget.viewModel.formatDate(currentLocale, endDate)}'
+                                      ? 'Finisce il ${endDate.formatDate(
+                                          currentLocale,
+                                        )}'
                                       : 'Seleziona data di fine',
                                 ),
                                 onDatePicked: (date) {

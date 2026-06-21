@@ -5,7 +5,6 @@ import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart' as intl;
 import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
@@ -223,12 +222,6 @@ class UserContributionViewModel extends ChangeNotifier {
     // block the flow with no actionable recovery step for the user.
     return const Result.success(null);
   }
-
-  String formatDate(Locale locale, DateTime date) =>
-      intl.DateFormat.yMd(locale.languageCode).format(date);
-
-  String formatTime(Locale locale, DateTime date) =>
-      intl.DateFormat.jm(locale.languageCode).format(date);
 
   bool validateEmail(String? text) => StringValidator.isValidEmail(text);
 }
