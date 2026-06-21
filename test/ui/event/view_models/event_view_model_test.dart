@@ -1,7 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -12,7 +9,7 @@ void main() {
   group('EventViewModel', () {
     group('loadAll', () {
       test('populates all events on success', () async {
-        final event1 = makeEvent(remoteId: 1, name: 'Festival');
+        final event1 = makeEvent(name: 'Festival');
         final vm = await buildLoaded(
           FakeEventRepository(
             getByCurrentYearResult: Result.success([event1]),
@@ -78,17 +75,17 @@ void main() {
       });
 
       test('returns true for a single-day event on its start date', () {
-        final event = _eventContent(startDate: DateTime(2026, 4, 7));
+        final event = makeEvent(startDate: DateTime(2026, 4, 7));
         expect(vm.isEventOnDay(event, DateTime(2026, 4, 7, 12)), isTrue);
       });
 
       test('returns false for a single-day event on a different date', () {
-        final event = _eventContent(startDate: DateTime(2026, 4, 7));
+        final event = makeEvent(startDate: DateTime(2026, 4, 7));
         expect(vm.isEventOnDay(event, DateTime(2026, 4, 8)), isFalse);
       });
 
       test('returns true on the first day of a multi-day event', () {
-        final event = _eventContent(
+        final event = makeEvent(
           startDate: DateTime(2026, 4, 7),
           endDate: DateTime(2026, 4, 9),
         );
@@ -96,7 +93,7 @@ void main() {
       });
 
       test('returns true on the last day of a multi-day event', () {
-        final event = _eventContent(
+        final event = makeEvent(
           startDate: DateTime(2026, 4, 7),
           endDate: DateTime(2026, 4, 9),
         );
@@ -104,7 +101,7 @@ void main() {
       });
 
       test('returns false on the day after a multi-day event ends', () {
-        final event = _eventContent(
+        final event = makeEvent(
           startDate: DateTime(2026, 4, 7),
           endDate: DateTime(2026, 4, 9),
         );
@@ -114,7 +111,7 @@ void main() {
       test(
         'treats malformed event (end before start) as single-day on startDate',
         () {
-          final event = _eventContent(
+          final event = makeEvent(
             startDate: DateTime(2026, 4, 9),
             endDate: DateTime(2026, 4, 7),
           );
@@ -141,22 +138,4 @@ Future<EventViewModel> buildLoaded(FakeEventRepository repo) async {
     'buildLoaded returned before loadAll finished',
   );
   return vm;
-}
-
-Event _eventContent({required DateTime startDate, DateTime? endDate}) {
-  final now = DateTime(2026, 4);
-  return Event(
-    remoteId: 1,
-    name: 'Event',
-    description: '',
-    category: ContentCategory.unknown,
-    city: testCity(),
-    coordinates: const LatLng(0, 0),
-    createdAt: now,
-    modifiedAt: now,
-    media: const [],
-    startDate: startDate,
-    endDate: endDate,
-    isSaved: false,
-  );
 }

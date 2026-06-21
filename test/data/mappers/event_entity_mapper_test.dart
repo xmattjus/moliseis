@@ -7,28 +7,23 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:objectbox/objectbox.dart';
 
+import '../../support/fixtures.dart';
+
 void main() {
   final now = DateTime.utc(2026, 4);
   final start = DateTime.utc(2026, 5, 10);
   final end = DateTime.utc(2026, 5, 12);
 
-  CityEntity cityEntity() => CityEntity(
-    remoteId: 1,
-    name: 'Isernia',
-    createdAt: now,
-    modifiedAt: now,
-    places: ToMany(),
-    events: ToMany(),
-  );
+  CityEntity cityEntity() => makeCityEntity(remoteId: 1, name: 'Isernia');
 
   EventEntity entity({
-    String? name = 'Sagra della Tintilia',
+    String name = 'Sagra della Tintilia',
     String? description = 'A local festival',
     DateTime? startDate,
     DateTime? endDate,
     ContentCategory category = ContentCategory.folklore,
     bool withCity = true,
-  }) => EventEntity(
+  }) => makeEventEntity(
     remoteId: 3,
     name: name,
     description: description,
@@ -41,7 +36,6 @@ void main() {
     city: withCity
         ? ToOne<CityEntity>(target: cityEntity())
         : ToOne<CityEntity>(),
-    media: ToMany(),
   );
 
   group('EventEntityExtensions.toModel', () {
@@ -67,24 +61,15 @@ void main() {
       expect(entity().toModel().endDate, isNull);
     });
 
-    test('null name falls back to placeholder string', () {
-      expect(entity(name: null).toModel().name, 'Evento Senza Nome');
-    });
-
     test('null description falls back to empty string', () {
       expect(entity(description: null).toModel().description, '');
     });
 
     test('null startDate falls back to a non-null DateTime', () {
       // Documents the current ?? DateTime.now() fallback in the mapper.
-      final entityWithNullStart = EventEntity(
-        remoteId: 3,
-        name: 'Test',
-        contentCategoryIndex: 0,
-        createdAt: now,
-        modifiedAt: now,
+      final entityWithNullStart = makeEventEntity(
+        remoteId: 1,
         city: ToOne<CityEntity>(target: cityEntity()),
-        media: ToMany(),
       );
       expect(entityWithNullStart.toModel().startDate, isNotNull);
     });

@@ -7,6 +7,7 @@ import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
 import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
@@ -100,13 +101,11 @@ void main() {
     test('updates an existing city when remote data differs', () async {
       // Seed the local store with an older version.
       cityBox.put(
-        CityEntity(
+        makeCityEntity(
           remoteId: 1,
           name: 'Campobasso',
           createdAt: DateTime(2024),
           modifiedAt: DateTime(2024),
-          places: ToMany(),
-          events: ToMany(),
         ),
       );
 
@@ -130,13 +129,11 @@ void main() {
 
     test('skips a city that already matches the local copy', () async {
       cityBox.put(
-        CityEntity(
+        makeCityEntity(
           remoteId: 1,
           name: 'Campobasso',
           createdAt: DateTime(2024),
           modifiedAt: DateTime(2024),
-          places: ToMany(),
-          events: ToMany(),
         ),
       );
 

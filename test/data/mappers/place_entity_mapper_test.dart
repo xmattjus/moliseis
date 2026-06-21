@@ -7,38 +7,32 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:objectbox/objectbox.dart';
 
+import '../../support/fixtures.dart';
+
 void main() {
   final now = DateTime.utc(2026);
 
-  CityEntity cityEntity({String name = 'Campobasso'}) => CityEntity(
-    remoteId: 1,
-    name: name,
-    createdAt: now,
-    modifiedAt: now,
-    places: ToMany(),
-    events: ToMany(),
-  );
-
-  PlaceEntity entity({
+  PlaceEntity placeEntity({
     String? description = 'A scenic location',
     bool isSaved = false,
     CityEntity? city,
-  }) => PlaceEntity(
+  }) => makePlaceEntity(
     remoteId: 5,
     name: 'Castello Monforte',
     description: description,
-    coordinates: [41.5633, 14.6564],
     contentCategoryIndex: ContentCategory.history.index,
+    coordinates: [41.5633, 14.6564],
     createdAt: now,
     modifiedAt: now,
-    city: ToOne<CityEntity>(target: city ?? cityEntity()),
-    media: ToMany(),
+    city: ToOne<CityEntity>(
+      target: city ?? makeCityEntity(remoteId: 1, name: 'Campobasso'),
+    ),
     isSaved: isSaved,
   );
 
   group('PlaceEntityExtensions.toModel', () {
     test('maps all populated fields correctly', () {
-      final model = entity().toModel();
+      final model = placeEntity().toModel();
 
       expect(model, isA<Place>());
       expect(model.remoteId, 5);
@@ -54,28 +48,20 @@ void main() {
     });
 
     test('null description falls back to empty string', () {
-      final model = entity(description: null).toModel();
+      final model = placeEntity(description: null).toModel();
       expect(model.description, '');
     });
 
     test('isSaved propagates true', () {
-      expect(entity(isSaved: true).toModel().isSaved, isTrue);
+      expect(placeEntity(isSaved: true).toModel().isSaved, isTrue);
     });
 
     test('isSaved propagates false', () {
-      expect(entity().toModel().isSaved, isFalse);
+      expect(placeEntity().toModel().isSaved, isFalse);
     });
 
     test('unresolved city relation produces null city', () {
-      final noCity = PlaceEntity(
-        remoteId: 1,
-        name: 'Place',
-        contentCategoryIndex: 0,
-        createdAt: now,
-        modifiedAt: now,
-        city: ToOne<CityEntity>(),
-        media: ToMany(),
-      );
+      final noCity = makePlaceEntity(remoteId: 1);
 
       expect(noCity.toModel().city, isNull);
     });

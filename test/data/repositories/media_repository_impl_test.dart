@@ -3,7 +3,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
@@ -18,6 +17,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:objectbox/objectbox.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
 import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
@@ -51,7 +51,7 @@ void main() {
     });
 
     test('returns media linked to the given event ID', () async {
-      final event = _createEvent(remoteId: 1);
+      final event = makeEventEntity(remoteId: 1);
       eventBox.put(event);
 
       final media = _createMedia(remoteId: 10, eventId: event.remoteId);
@@ -66,8 +66,8 @@ void main() {
     });
 
     test('excludes media linked to a different event', () async {
-      final event1 = _createEvent(remoteId: 1);
-      final event2 = _createEvent(remoteId: 2);
+      final event1 = makeEventEntity(remoteId: 1);
+      final event2 = makeEventEntity(remoteId: 2);
       eventBox.put(event1);
       eventBox.put(event2);
 
@@ -91,7 +91,7 @@ void main() {
     );
 
     test('returns all media linked to the same event', () async {
-      final event = _createEvent(remoteId: 1);
+      final event = makeEventEntity(remoteId: 1);
       eventBox.put(event);
 
       final media1 = _createMedia(remoteId: 10, eventId: event.remoteId);
@@ -133,7 +133,7 @@ void main() {
     });
 
     test('returns media linked to the given place ID', () async {
-      final place = _createPlace(remoteId: 1);
+      final place = makePlaceEntity(remoteId: 1);
       placeBox.put(place);
 
       final media = _createMedia(remoteId: 20, placeId: place.remoteId);
@@ -148,8 +148,8 @@ void main() {
     });
 
     test('excludes media linked to a different place', () async {
-      final place1 = _createPlace(remoteId: 1);
-      final place2 = _createPlace(remoteId: 2);
+      final place1 = makePlaceEntity(remoteId: 1);
+      final place2 = makePlaceEntity(remoteId: 2);
       placeBox.put(place1);
       placeBox.put(place2);
 
@@ -173,7 +173,7 @@ void main() {
     );
 
     test('returns all media linked to the same place', () async {
-      final place = _createPlace(remoteId: 1);
+      final place = makePlaceEntity(remoteId: 1);
       placeBox.put(place);
 
       final media1 = _createMedia(remoteId: 20, placeId: place.remoteId);
@@ -424,36 +424,6 @@ void main() {
       expect(failedCall.stackTrace, isNotNull);
     });
   });
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-EventEntity _createEvent({required int remoteId}) {
-  final now = DateTime(2026);
-  return EventEntity(
-    remoteId: remoteId,
-    startDate: now,
-    contentCategoryIndex: 0,
-    createdAt: now,
-    modifiedAt: now,
-    city: ToOne<CityEntity>(),
-    media: ToMany(),
-  );
-}
-
-PlaceEntity _createPlace({required int remoteId}) {
-  final now = DateTime(2026);
-  return PlaceEntity(
-    remoteId: remoteId,
-    name: 'Place $remoteId',
-    contentCategoryIndex: 0,
-    createdAt: now,
-    modifiedAt: now,
-    city: ToOne<CityEntity>(),
-    media: ToMany(),
-  );
 }
 
 // Sets both the JSON-serialization field (`eventToOneId`/`placeToOneId`) and

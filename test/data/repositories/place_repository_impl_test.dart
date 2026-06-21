@@ -2,8 +2,6 @@
 // ignore_for_file: cascade_invocations
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/data-sources/city_entity.dart';
-import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
@@ -16,6 +14,7 @@ import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
 import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
@@ -50,8 +49,8 @@ void main() {
     });
 
     test('returns all places from the store', () async {
-      placeBox.put(_createPlace(remoteId: 1, name: 'A'));
-      placeBox.put(_createPlace(remoteId: 2, name: 'B'));
+      placeBox.put(makePlaceEntity(remoteId: 1, name: 'A'));
+      placeBox.put(makePlaceEntity(remoteId: 2, name: 'B'));
 
       final result = await repository.getAll();
 
@@ -60,8 +59,8 @@ void main() {
     });
 
     test('sorts by name ascending when sort is byName', () async {
-      placeBox.put(_createPlace(remoteId: 1, name: 'Zeta'));
-      placeBox.put(_createPlace(remoteId: 2, name: 'Alpha'));
+      placeBox.put(makePlaceEntity(remoteId: 1, name: 'Zeta'));
+      placeBox.put(makePlaceEntity(remoteId: 2, name: 'Alpha'));
 
       final result = await repository.getAll();
 
@@ -74,14 +73,14 @@ void main() {
 
     test('sorts by modifiedAt descending when sort is byDate', () async {
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 1,
           name: 'Older',
           modifiedAt: DateTime(2025),
         ),
       );
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 2,
           name: 'Newer',
           modifiedAt: DateTime(2026, 6),
@@ -103,14 +102,14 @@ void main() {
       () async {
         // Zeta is newer; Alpha is older.
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 1,
             name: 'Zeta',
             modifiedAt: DateTime(2026, 6),
           ),
         );
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 2,
             name: 'Alpha',
             modifiedAt: DateTime(2025),
@@ -155,7 +154,7 @@ void main() {
     });
 
     test('returns the place when it exists in the store', () async {
-      placeBox.put(_createPlace(remoteId: 42, name: 'Campobasso'));
+      placeBox.put(makePlaceEntity(remoteId: 42, name: 'Campobasso'));
 
       final result = await repository.getById(42);
 
@@ -190,41 +189,60 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test('returns places matching the requested category', () async {
-      placeBox.put(
-        _createPlace(remoteId: 1, name: 'A', category: ContentCategory.nature),
-      );
-      placeBox.put(
-        _createPlace(remoteId: 2, name: 'B', category: ContentCategory.history),
-      );
+    test(
+      'returns places matching the requested ContentCategory',
+      () async {
+        placeBox.put(
+          makePlaceEntity(
+            remoteId: 1,
+            name: 'A',
+            contentCategoryIndex: ContentCategory.nature.index,
+          ),
+        );
+        placeBox.put(
+          makePlaceEntity(
+            remoteId: 2,
+            name: 'B',
+            contentCategoryIndex: ContentCategory.history.index,
+          ),
+        );
 
-      final result = await repository.getByCategories({ContentCategory.nature});
+        final result = await repository.getByCategories({
+          ContentCategory.nature,
+        });
 
-      expect(result, isA<Success<List<Place>>>());
-      final ids = (result as Success<List<Place>>).value.map((p) => p.remoteId);
-      expect(ids, contains(1));
-      expect(ids, isNot(contains(2)));
-    });
+        expect(result, isA<Success<List<Place>>>());
+        final ids = (result as Success<List<Place>>).value.map(
+          (p) => p.remoteId,
+        );
+        expect(ids, contains(1));
+        expect(ids, isNot(contains(2)));
+      },
+    );
 
     test(
       'returns places matching any of multiple requested categories',
       () async {
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 1,
             name: 'A',
-            category: ContentCategory.nature,
+            contentCategoryIndex: ContentCategory.nature.index,
           ),
         );
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 2,
             name: 'B',
-            category: ContentCategory.history,
+            contentCategoryIndex: ContentCategory.history.index,
           ),
         );
         placeBox.put(
-          _createPlace(remoteId: 3, name: 'C', category: ContentCategory.food),
+          makePlaceEntity(
+            remoteId: 3,
+            name: 'C',
+            contentCategoryIndex: ContentCategory.food.index,
+          ),
         );
 
         final result = await repository.getByCategories({
@@ -242,13 +260,13 @@ void main() {
     );
 
     test(
-      'returns empty list when no places match the requested category',
+      'returns empty list when no places match the requested ContentCategory',
       () async {
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 1,
             name: 'A',
-            category: ContentCategory.nature,
+            contentCategoryIndex: ContentCategory.nature.index,
           ),
         );
 
@@ -261,24 +279,24 @@ void main() {
 
     test('sorts by name ascending when sort is byName', () async {
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 1,
           name: 'Zeta',
-          category: ContentCategory.nature,
+          contentCategoryIndex: ContentCategory.nature.index,
         ),
       );
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 2,
           name: 'Alpha',
-          category: ContentCategory.nature,
+          contentCategoryIndex: ContentCategory.nature.index,
         ),
       );
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 3,
           name: 'Middle',
-          category: ContentCategory.nature,
+          contentCategoryIndex: ContentCategory.nature.index,
         ),
       );
 
@@ -295,26 +313,26 @@ void main() {
 
     test('sorts by modifiedAt descending when sort is byDate', () async {
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 1,
           name: 'Older',
-          category: ContentCategory.nature,
+          contentCategoryIndex: ContentCategory.nature.index,
           modifiedAt: DateTime(2025),
         ),
       );
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 2,
           name: 'Newer',
-          category: ContentCategory.nature,
+          contentCategoryIndex: ContentCategory.nature.index,
           modifiedAt: DateTime(2026, 6),
         ),
       );
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 3,
           name: 'Middle',
-          category: ContentCategory.nature,
+          contentCategoryIndex: ContentCategory.nature.index,
           modifiedAt: DateTime(2025, 12),
         ),
       );
@@ -352,8 +370,8 @@ void main() {
     });
 
     test('getFavouritePlaceIds returns only saved place IDs', () async {
-      placeBox.put(_createPlace(remoteId: 1, isSaved: true));
-      placeBox.put(_createPlace(remoteId: 2));
+      placeBox.put(makePlaceEntity(remoteId: 1, isSaved: true));
+      placeBox.put(makePlaceEntity(remoteId: 2));
 
       final result = await repository.getFavouritePlaceIds();
 
@@ -366,7 +384,7 @@ void main() {
     test(
       'getFavouritePlaceIds returns empty list when no places are saved',
       () async {
-        placeBox.put(_createPlace(remoteId: 1));
+        placeBox.put(makePlaceEntity(remoteId: 1));
 
         final result = await repository.getFavouritePlaceIds();
 
@@ -376,7 +394,7 @@ void main() {
     );
 
     test('setFavouritePlace saves a place', () async {
-      placeBox.put(_createPlace(remoteId: 1));
+      placeBox.put(makePlaceEntity(remoteId: 1));
 
       final result = await repository.setFavouritePlace(1, true);
 
@@ -385,7 +403,7 @@ void main() {
     });
 
     test('setFavouritePlace unsaves a place', () async {
-      placeBox.put(_createPlace(remoteId: 1, isSaved: true));
+      placeBox.put(makePlaceEntity(remoteId: 1, isSaved: true));
 
       final result = await repository.setFavouritePlace(1, false);
 
@@ -425,7 +443,7 @@ void main() {
     test('returns at most 6 IDs ordered by most recently created', () async {
       for (var i = 1; i <= 10; i++) {
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: i,
             name: 'Place $i',
             createdAt: DateTime(2026, 1, i),
@@ -476,7 +494,7 @@ void main() {
 
     test('returns at most 5 place IDs from the store', () async {
       for (var i = 1; i <= 8; i++) {
-        placeBox.put(_createPlace(remoteId: i, name: 'Place $i'));
+        placeBox.put(makePlaceEntity(remoteId: i, name: 'Place $i'));
       }
 
       final result = await repository.getSuggestedPlaceIds();
@@ -584,7 +602,7 @@ void main() {
 
     test('skips a place that already matches the local copy', () async {
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 1,
           name: 'Campobasso',
           createdAt: DateTime(2024),
@@ -615,7 +633,7 @@ void main() {
 
     test('updates an existing place when remote data differs', () async {
       placeBox.put(
-        _createPlace(
+        makePlaceEntity(
           remoteId: 1,
           name: 'Campobasso',
           modifiedAt: DateTime(2024),
@@ -644,7 +662,7 @@ void main() {
 
     test('invalidates the in-memory cache after a successful sync', () async {
       // Populate the cache via getAll().
-      placeBox.put(_createPlace(remoteId: 1, name: 'Old'));
+      placeBox.put(makePlaceEntity(remoteId: 1, name: 'Old'));
       await repository.getAll();
 
       // Sync adds a new place from remote.
@@ -701,25 +719,3 @@ PlaceRepositoryImpl _makeRepository(TestObjectBoxEnvironment env) =>
       supabaseI: MockSupabase(),
       objectBoxI: TestObjectBox(env.store),
     );
-
-PlaceEntity _createPlace({
-  required int remoteId,
-  String name = 'Test Place',
-  ContentCategory category = ContentCategory.unknown,
-  bool isSaved = false,
-  DateTime? createdAt,
-  DateTime? modifiedAt,
-}) {
-  final now = DateTime(2026);
-  return PlaceEntity(
-    remoteId: remoteId,
-    name: name,
-    description: 'Franco',
-    contentCategoryIndex: category.index,
-    isSaved: isSaved,
-    createdAt: createdAt ?? now,
-    modifiedAt: modifiedAt ?? now,
-    city: ToOne<CityEntity>(),
-    media: ToMany<MediaEntity>(),
-  );
-}

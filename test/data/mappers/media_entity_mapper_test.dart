@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
@@ -7,40 +6,10 @@ import 'package:moliseis/data/mappers/media_entity_mapper.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:objectbox/objectbox.dart';
 
+import '../../support/fixtures.dart';
+
 void main() {
   final now = DateTime.utc(2026);
-
-  CityEntity city(String name) => CityEntity(
-    remoteId: 1,
-    name: name,
-    createdAt: now,
-    modifiedAt: now,
-    places: ToMany(),
-    events: ToMany(),
-  );
-
-  PlaceEntity placeEntity({required String name, required String cityName}) =>
-      PlaceEntity(
-        remoteId: 10,
-        name: name,
-        contentCategoryIndex: 0,
-        createdAt: now,
-        modifiedAt: now,
-        city: ToOne<CityEntity>(target: city(cityName)),
-        media: ToMany(),
-      );
-
-  EventEntity eventEntity({required String name, required String cityName}) =>
-      EventEntity(
-        remoteId: 20,
-        name: name,
-        contentCategoryIndex: 0,
-        startDate: now,
-        createdAt: now,
-        modifiedAt: now,
-        city: ToOne<CityEntity>(target: city(cityName)),
-        media: ToMany(),
-      );
 
   MediaEntity mediaEntity({
     PlaceEntity? placeTarget,
@@ -75,9 +44,10 @@ void main() {
 
     test('place-linked media derives areaName and cityName from the place', () {
       final model = mediaEntity(
-        placeTarget: placeEntity(
+        placeTarget: makePlaceEntity(
+          remoteId: 10,
           name: 'Castello Monforte',
-          cityName: 'Campobasso',
+          city: newCityRelation(name: 'Campobasso'),
         ),
       ).toModel();
 
@@ -87,9 +57,10 @@ void main() {
 
     test('event-linked media derives areaName and cityName from the event', () {
       final model = mediaEntity(
-        eventTarget: eventEntity(
+        eventTarget: makeEventEntity(
+          remoteId: 1,
           name: 'Sagra della Tintilia',
-          cityName: 'Isernia',
+          city: newCityRelation(name: 'Isernia'),
         ),
       ).toModel();
 
@@ -108,8 +79,14 @@ void main() {
       // The mapper checks place first: if(place.hasValue && !event.hasValue).
       // When both are set neither branch matches, so both fields remain empty.
       final model = mediaEntity(
-        placeTarget: placeEntity(name: 'Place', cityName: 'CityA'),
-        eventTarget: eventEntity(name: 'Event', cityName: 'CityB'),
+        placeTarget: makePlaceEntity(
+          remoteId: 1,
+          city: newCityRelation(name: 'CityA'),
+        ),
+        eventTarget: makeEventEntity(
+          remoteId: 1,
+          city: newCityRelation(name: 'CityB'),
+        ),
       ).toModel();
 
       expect(model.areaName, '');

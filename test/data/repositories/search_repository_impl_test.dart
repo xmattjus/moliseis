@@ -1,3 +1,6 @@
+// Test readability benefits from separate statements over cascades.
+// ignore_for_file: cascade_invocations
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
@@ -6,6 +9,7 @@ import 'package:moliseis/data/repositories/search_repository_impl.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
 import '../../support/objectbox_test_store.dart';
 
@@ -38,7 +42,7 @@ void main() {
       test('includes current-year event whose name matches query', () async {
         final now = DateTime.now();
         eventBox.put(
-          _createEvent(
+          makeEventEntity(
             remoteId: 1,
             name: 'Sagra del tartufo',
             startDate: DateTime(now.year, 8),
@@ -55,7 +59,7 @@ void main() {
 
       test('excludes event from a past year even when name matches', () async {
         eventBox.put(
-          _createEvent(
+          makeEventEntity(
             remoteId: 2,
             name: 'Sagra storica',
             startDate: DateTime(2020, 6),
@@ -74,7 +78,7 @@ void main() {
         'excludes event from a future year even when name matches',
         () async {
           eventBox.put(
-            _createEvent(
+            makeEventEntity(
               remoteId: 3,
               name: 'Festival futuro',
               startDate: DateTime(2099, 6),
@@ -100,10 +104,10 @@ void main() {
         'includes current-year multi-day event linked to a matching city',
         () async {
           final now = DateTime.now();
-          final city = _createCity(remoteId: 10, name: 'Campobasso');
+          final city = makeCityEntity(remoteId: 10, name: 'Campobasso');
           cityBox.put(city);
 
-          final event = _createEvent(
+          final event = makeEventEntity(
             remoteId: 4,
             name: 'Non matching name',
             startDate: DateTime(now.year, 9),
@@ -123,10 +127,10 @@ void main() {
       test(
         'excludes multi-day event from past year linked to a matching city',
         () async {
-          final city = _createCity(remoteId: 11, name: 'Isernia');
+          final city = makeCityEntity(remoteId: 11, name: 'Isernia');
           cityBox.put(city);
 
-          final event = _createEvent(
+          final event = makeEventEntity(
             remoteId: 5,
             name: 'Old festival',
             startDate: DateTime(2020, 7),
@@ -147,14 +151,13 @@ void main() {
         'includes single-day event (null endDate) linked to a matching city',
         () async {
           final now = DateTime.now();
-          final city = _createCity(remoteId: 12, name: 'Bojano');
+          final city = makeCityEntity(remoteId: 12, name: 'Bojano');
           cityBox.put(city);
 
-          final event = _createEvent(
+          final event = makeEventEntity(
             remoteId: 6,
             name: 'Giornata speciale',
             startDate: DateTime(now.year, 5, 15),
-            endDate: null,
             cityId: city.remoteId,
           );
           eventBox.put(event);
@@ -178,7 +181,7 @@ void main() {
         () async {
           final now = DateTime.now();
           eventBox.put(
-            _createEvent(
+            makeEventEntity(
               remoteId: 200,
               name: 'Sagra fantasma',
               startDate: DateTime(now.year, 8),
@@ -200,7 +203,7 @@ void main() {
         () async {
           final now = DateTime.now();
           eventBox.put(
-            _createEvent(
+            makeEventEntity(
               remoteId: 201,
               name: 'Escursione cancellata',
               startDate: DateTime(now.year, 6),
@@ -222,10 +225,10 @@ void main() {
         'excludes soft-deleted current-year event linked to a matching city',
         () async {
           final now = DateTime.now();
-          final city = _createCity(remoteId: 30, name: 'Termoli');
+          final city = makeCityEntity(remoteId: 30, name: 'Termoli');
           cityBox.put(city);
 
-          final event = _createEvent(
+          final event = makeEventEntity(
             remoteId: 202,
             name: 'Evento fantasma',
             startDate: DateTime(now.year, 9),
@@ -247,14 +250,13 @@ void main() {
         'excludes single-day event from a future year linked to a matching '
         'city',
         () async {
-          final city = _createCity(remoteId: 31, name: 'Larino');
+          final city = makeCityEntity(remoteId: 31, name: 'Larino');
           cityBox.put(city);
 
-          final event = _createEvent(
+          final event = makeEventEntity(
             remoteId: 203,
             name: 'Futura giornata',
             startDate: DateTime(2099, 5, 15),
-            endDate: null,
             cityId: city.remoteId,
           );
           eventBox.put(event);
@@ -277,12 +279,12 @@ void main() {
         'returns each event ID only once when it matches both name and city',
         () async {
           final now = DateTime.now();
-          final city = _createCity(remoteId: 20, name: 'Venafro');
+          final city = makeCityEntity(remoteId: 20, name: 'Venafro');
           cityBox.put(city);
 
           // The event name also contains "venafro" so it would be picked up by
           // both the name query and the city query.
-          final event = _createEvent(
+          final event = makeEventEntity(
             remoteId: 7,
             name: 'Festa di Venafro',
             startDate: DateTime(now.year, 10),
@@ -321,7 +323,7 @@ void main() {
         () async {
           final now = DateTime.now();
           eventBox.put(
-            _createEvent(
+            makeEventEntity(
               remoteId: 100,
               name: 'Escursione guidata',
               startDate: DateTime(now.year, 6),
@@ -344,7 +346,7 @@ void main() {
         () async {
           final now = DateTime.now();
           eventBox.put(
-            _createEvent(
+            makeEventEntity(
               remoteId: 101,
               name: 'Mostra storica',
               startDate: DateTime(now.year, 6),
@@ -367,7 +369,7 @@ void main() {
         () async {
           final now = DateTime.now();
           eventBox.put(
-            _createEvent(
+            makeEventEntity(
               remoteId: 102,
               name: 'Degustazione vini',
               startDate: DateTime(now.year, 9),
@@ -414,7 +416,7 @@ void main() {
       'includes place whose category label matches query (non-zero index)',
       () async {
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 200,
             name: 'Parco nazionale',
             contentCategoryIndex: 1, // ContentCategory.nature
@@ -433,10 +435,9 @@ void main() {
       'includes place whose name matches query',
       () async {
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 201,
             name: 'Castello di Campobasso',
-            contentCategoryIndex: 0,
           ),
         );
 
@@ -452,7 +453,7 @@ void main() {
       'deduplicates place when both name and category match',
       () async {
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 202,
             name: 'Cibo di strada',
             contentCategoryIndex: 4, // ContentCategory.food
@@ -503,14 +504,15 @@ void main() {
       () async {
         // Two places share the same category (nature).
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 300,
             name: 'Unique name alpha',
             contentCategoryIndex: 1, // ContentCategory.nature
           ),
         );
+
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 301,
             name: 'Natura viva',
             contentCategoryIndex: 1, // ContentCategory.nature
@@ -519,7 +521,7 @@ void main() {
 
         // A third place with a different category.
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 302,
             name: 'Museo storico',
             contentCategoryIndex: 2, // ContentCategory.history
@@ -554,7 +556,7 @@ void main() {
       'returns empty list when the previous search was category-based',
       () async {
         placeBox.put(
-          _createPlace(
+          makePlaceEntity(
             remoteId: 310,
             name: 'Some place',
             contentCategoryIndex: 1,
@@ -571,67 +573,4 @@ void main() {
       },
     );
   });
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-EventEntity _createEvent({
-  required int remoteId,
-  required String name,
-  required DateTime startDate,
-  required DateTime? endDate,
-  int? cityId,
-  int contentCategoryIndex = 0,
-  bool isDeleted = false,
-}) {
-  final now = DateTime.now();
-  final event = EventEntity(
-    remoteId: remoteId,
-    name: name,
-    contentCategoryIndex: contentCategoryIndex,
-    startDate: startDate,
-    endDate: endDate,
-    createdAt: now,
-    modifiedAt: now,
-    city: ToOne<CityEntity>(),
-    media: ToMany(),
-    isDeleted: isDeleted,
-  );
-
-  if (cityId != null) {
-    event.city.targetId = cityId;
-  }
-
-  return event;
-}
-
-CityEntity _createCity({required int remoteId, required String name}) {
-  final now = DateTime.now();
-  return CityEntity(
-    remoteId: remoteId,
-    name: name,
-    createdAt: now,
-    modifiedAt: now,
-    places: ToMany(),
-    events: ToMany(),
-  );
-}
-
-PlaceEntity _createPlace({
-  required int remoteId,
-  required String name,
-  int contentCategoryIndex = 0,
-}) {
-  final now = DateTime.now();
-  return PlaceEntity(
-    remoteId: remoteId,
-    name: name,
-    contentCategoryIndex: contentCategoryIndex,
-    createdAt: now,
-    modifiedAt: now,
-    city: ToOne<CityEntity>(),
-    media: ToMany(),
-  );
 }

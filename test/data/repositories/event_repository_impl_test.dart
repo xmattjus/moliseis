@@ -3,7 +3,6 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
@@ -16,6 +15,7 @@ import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:objectbox/objectbox.dart';
 
+import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
 import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
@@ -56,10 +56,9 @@ void main() {
           final rangeStart = DateTime(2026, 3, 10);
           final rangeEnd = DateTime(2026, 3, 20);
 
-          final event = _createEvent(
+          final event = makeEventEntity(
             remoteId: 1,
             startDate: now,
-            endDate: null,
           );
 
           seedEvents([event]);
@@ -76,10 +75,9 @@ void main() {
         'excludes single-day event when start date is before range',
         () async {
           seedEvents([
-            _createEvent(
+            makeEventEntity(
               remoteId: 1,
               startDate: DateTime(2026, 3, 5), // before rangeStart
-              endDate: null,
             ),
           ]);
 
@@ -98,10 +96,9 @@ void main() {
         'excludes single-day event when start date is after range',
         () async {
           seedEvents([
-            _createEvent(
+            makeEventEntity(
               remoteId: 1,
               startDate: DateTime(2026, 3, 25), // after rangeEnd
-              endDate: null,
             ),
           ]);
 
@@ -120,10 +117,9 @@ void main() {
         'prevents old single-day events from leaking into range queries',
         () async {
           seedEvents([
-            _createEvent(
+            makeEventEntity(
               remoteId: 1,
               startDate: DateTime(2020), // years before the range
-              endDate: null,
             ),
           ]);
 
@@ -139,10 +135,9 @@ void main() {
       );
 
       test('includes single-day event at range start boundary', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 10),
-          endDate: null,
         );
 
         seedEvents([event]);
@@ -158,10 +153,9 @@ void main() {
       });
 
       test('includes single-day event at range end boundary', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 20),
-          endDate: null,
         );
 
         seedEvents([event]);
@@ -179,7 +173,7 @@ void main() {
 
     group('_getByDateRange with multi-day events (endDate != null)', () {
       test('includes event fully contained within range', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 5),
           endDate: DateTime(2026, 3, 25),
@@ -198,7 +192,7 @@ void main() {
       });
 
       test('includes event overlapping range start', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 5),
           endDate: DateTime(2026, 3, 15),
@@ -217,7 +211,7 @@ void main() {
       });
 
       test('includes event overlapping range end', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 15),
           endDate: DateTime(2026, 3, 25),
@@ -236,7 +230,7 @@ void main() {
       });
 
       test('includes event fully containing range', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3),
           endDate: DateTime(2026, 3, 31),
@@ -256,7 +250,7 @@ void main() {
 
       test('excludes event before range', () async {
         seedEvents([
-          _createEvent(
+          makeEventEntity(
             remoteId: 1,
             startDate: DateTime(2026, 3),
             endDate: DateTime(2026, 3, 8), // ends before rangeStart
@@ -275,7 +269,7 @@ void main() {
 
       test('excludes event after range', () async {
         seedEvents([
-          _createEvent(
+          makeEventEntity(
             remoteId: 1,
             startDate: DateTime(2026, 3, 22), // starts after rangeEnd
             endDate: DateTime(2026, 3, 28),
@@ -293,7 +287,7 @@ void main() {
       });
 
       test('includes event at range start boundary', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 10),
           endDate: DateTime(2026, 3, 15),
@@ -312,7 +306,7 @@ void main() {
       });
 
       test('includes event at range end boundary', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 15),
           endDate: DateTime(2026, 3, 20),
@@ -333,13 +327,12 @@ void main() {
 
     group('_getByDateRange with mixed event types', () {
       test('correctly filters single-day and multi-day events', () async {
-        final singleDay = _createEvent(
+        final singleDay = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 15),
-          endDate: null,
         );
 
-        final multiDay = _createEvent(
+        final multiDay = makeEventEntity(
           remoteId: 2,
           startDate: DateTime(2026, 3, 5),
           endDate: DateTime(2026, 3, 25),
@@ -418,10 +411,9 @@ void main() {
 
     group('getByDate - single day normalization', () {
       test('normalizes date to full day range', () async {
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(2026, 3, 15, 14, 30),
-          endDate: null,
         );
 
         seedEvents([event]);
@@ -435,10 +427,9 @@ void main() {
 
       test('excludes event that starts on the following day', () async {
         seedEvents([
-          _createEvent(
+          makeEventEntity(
             remoteId: 2,
             startDate: DateTime(2026, 3, 16), // midnight of next day
-            endDate: null,
           ),
         ]);
 
@@ -474,7 +465,7 @@ void main() {
       'includes multi-day event that starts and ends within current year',
       () async {
         final now = DateTime.now();
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(now.year, 6),
           endDate: DateTime(now.year, 6, 10),
@@ -496,10 +487,9 @@ void main() {
       'year',
       () async {
         final now = DateTime.now();
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 2,
           startDate: DateTime(now.year, 5, 15),
-          endDate: null,
         );
         eventBox.put(event);
 
@@ -514,7 +504,7 @@ void main() {
     );
 
     test('excludes multi-day event from a past year', () async {
-      final event = _createEvent(
+      final event = makeEventEntity(
         remoteId: 3,
         startDate: DateTime(2020, 8),
         endDate: DateTime(2020, 8, 10),
@@ -531,10 +521,9 @@ void main() {
     });
 
     test('excludes single-day event from a past year', () async {
-      final event = _createEvent(
+      final event = makeEventEntity(
         remoteId: 4,
         startDate: DateTime(2020, 3, 20),
-        endDate: null,
       );
       eventBox.put(event);
 
@@ -549,7 +538,7 @@ void main() {
 
     test('excludes soft-deleted current-year event', () async {
       final now = DateTime.now();
-      final event = _createEvent(
+      final event = makeEventEntity(
         remoteId: 5,
         startDate: DateTime(now.year, 4),
         endDate: DateTime(now.year, 4, 10),
@@ -597,11 +586,11 @@ void main() {
       'includes current-year multi-day event matching the requested category',
       () async {
         final now = DateTime.now();
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 1,
           startDate: DateTime(now.year, 7),
           endDate: DateTime(now.year, 7, 5),
-          category: ContentCategory.food,
+          contentCategoryIndex: ContentCategory.food.index,
         );
         eventBox.put(event);
 
@@ -620,11 +609,10 @@ void main() {
       'requested category',
       () async {
         final now = DateTime.now();
-        final event = _createEvent(
+        final event = makeEventEntity(
           remoteId: 2,
           startDate: DateTime(now.year, 9, 10),
-          endDate: null,
-          category: ContentCategory.folklore,
+          contentCategoryIndex: ContentCategory.folklore.index,
         );
         eventBox.put(event);
 
@@ -641,11 +629,11 @@ void main() {
     );
 
     test('excludes past-year event even when category matches', () async {
-      final event = _createEvent(
+      final event = makeEventEntity(
         remoteId: 3,
         startDate: DateTime(2020, 4),
         endDate: DateTime(2020, 4, 5),
-        category: ContentCategory.nature,
+        contentCategoryIndex: ContentCategory.nature.index,
       );
       eventBox.put(event);
 
@@ -660,11 +648,11 @@ void main() {
 
     test('excludes current-year event whose category does not match', () async {
       final now = DateTime.now();
-      final event = _createEvent(
+      final event = makeEventEntity(
         remoteId: 4,
         startDate: DateTime(now.year, 6),
         endDate: DateTime(now.year, 6, 5),
-        category: ContentCategory.history,
+        contentCategoryIndex: ContentCategory.history.index,
       );
       eventBox.put(event);
 
@@ -680,30 +668,29 @@ void main() {
     test('sorts by name ascending when sort is byName', () async {
       final now = DateTime.now();
       eventBox.put(
-        _createEvent(
+        makeEventEntity(
           remoteId: 1,
           name: 'Zeta Festival',
           startDate: DateTime(now.year, 7),
           endDate: DateTime(now.year, 7, 5),
-          category: ContentCategory.folklore,
+          contentCategoryIndex: ContentCategory.folklore.index,
         ),
       );
       eventBox.put(
-        _createEvent(
+        makeEventEntity(
           remoteId: 2,
           name: 'Alpha Fair',
           startDate: DateTime(now.year, 8),
           endDate: DateTime(now.year, 8, 5),
-          category: ContentCategory.folklore,
+          contentCategoryIndex: ContentCategory.folklore.index,
         ),
       );
       eventBox.put(
-        _createEvent(
+        makeEventEntity(
           remoteId: 3,
           name: 'Middle Market',
           startDate: DateTime(now.year, 9),
-          endDate: null,
-          category: ContentCategory.folklore,
+          contentCategoryIndex: ContentCategory.folklore.index,
         ),
       );
 
@@ -721,32 +708,29 @@ void main() {
     test('sorts by modifiedAt descending when sort is byDate', () async {
       final now = DateTime.now();
       eventBox.put(
-        _createEvent(
+        makeEventEntity(
           remoteId: 1,
           name: 'Older',
           startDate: DateTime(now.year, 7),
-          endDate: null,
-          category: ContentCategory.food,
+          contentCategoryIndex: ContentCategory.food.index,
           modifiedAt: DateTime(2025),
         ),
       );
       eventBox.put(
-        _createEvent(
+        makeEventEntity(
           remoteId: 2,
           name: 'Newer',
           startDate: DateTime(now.year, 8),
-          endDate: null,
-          category: ContentCategory.food,
+          contentCategoryIndex: ContentCategory.food.index,
           modifiedAt: DateTime(2026, 6),
         ),
       );
       eventBox.put(
-        _createEvent(
+        makeEventEntity(
           remoteId: 3,
           name: 'Middle',
           startDate: DateTime(now.year, 9),
-          endDate: null,
-          category: ContentCategory.food,
+          contentCategoryIndex: ContentCategory.food.index,
           modifiedAt: DateTime(2025, 12),
         ),
       );
@@ -798,7 +782,7 @@ void main() {
 
         // Seed a current-year event in the local store.
         eventBox.put(
-          _createEvent(
+          makeEventEntity(
             remoteId: 1,
             name: 'Existing Event',
             startDate: DateTime(now.year, 6),
@@ -846,30 +830,6 @@ void main() {
 
 Matcher containsEventId(int remoteId) =>
     contains(predicate<Event>((e) => e.remoteId == remoteId));
-
-EventEntity _createEvent({
-  required int remoteId,
-  required DateTime startDate,
-  required DateTime? endDate,
-  String? name,
-  ContentCategory category = ContentCategory.unknown,
-  DateTime? modifiedAt,
-  bool isDeleted = false,
-}) {
-  final now = DateTime.now();
-  return EventEntity(
-    remoteId: remoteId,
-    name: name ?? 'Test Event $remoteId',
-    startDate: startDate,
-    endDate: endDate,
-    contentCategoryIndex: category.index,
-    createdAt: now,
-    modifiedAt: modifiedAt ?? now,
-    city: ToOne<CityEntity>(),
-    media: ToMany(),
-    isDeleted: isDeleted,
-  );
-}
 
 final class _MockStore extends Mock implements Store {
   _MockStore(this._mockBox);
