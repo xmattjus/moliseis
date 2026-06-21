@@ -17,7 +17,7 @@ extension PlaceDtoExtensions on PlaceDto {
       remoteId: id,
       name: name,
       description: description,
-      coordinates: coordinates,
+      coordinates: [latitude, longitude],
       contentCategoryIndex: category.index,
       cityToOneId: cityRelationId,
       createdAt: createdAt,
@@ -43,7 +43,7 @@ extension PlaceDtoExtensions on PlaceDto {
         .copyWith(
           name: name,
           description: description,
-          coordinates: coordinates,
+          coordinates: [latitude, longitude],
           contentCategoryIndex: category.index,
           createdAt: createdAt,
           modifiedAt: modifiedAt,

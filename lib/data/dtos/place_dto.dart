@@ -22,7 +22,8 @@ class PlaceDto with PlaceDtoMappable implements SyncDto {
     required this.id,
     required this.name,
     required this.description,
-    required this.coordinates,
+    required this.latitude,
+    required this.longitude,
     required this.category,
     this.cityId = const Keep<int>(),
     required this.createdAt,
@@ -34,7 +35,8 @@ class PlaceDto with PlaceDtoMappable implements SyncDto {
   final int id;
   final String name;
   final String description;
-  final List<double> coordinates;
+  final double latitude;
+  final double longitude;
   final ContentCategory category;
   @MappableField(
     hook: RelationUpdateHook<int>(

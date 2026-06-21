@@ -27,7 +27,7 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
   static const Field<EventDto, int> _f$id = Field('id', _$id);
   static String _$name(EventDto v) => v.name;
   static const Field<EventDto, String> _f$name = Field('name', _$name);
-  static String _$description(EventDto v) => v.description;
+  static String? _$description(EventDto v) => v.description;
   static const Field<EventDto, String> _f$description = Field(
     'description',
     _$description,
@@ -38,10 +38,15 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     _$startDate,
     key: r'start_date',
   );
-  static List<double> _$coordinates(EventDto v) => v.coordinates;
-  static const Field<EventDto, List<double>> _f$coordinates = Field(
-    'coordinates',
-    _$coordinates,
+  static double _$latitude(EventDto v) => v.latitude;
+  static const Field<EventDto, double> _f$latitude = Field(
+    'latitude',
+    _$latitude,
+  );
+  static double _$longitude(EventDto v) => v.longitude;
+  static const Field<EventDto, double> _f$longitude = Field(
+    'longitude',
+    _$longitude,
   );
   static ContentCategory _$category(EventDto v) => v.category;
   static const Field<EventDto, ContentCategory> _f$category = Field(
@@ -90,7 +95,8 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     #name: _f$name,
     #description: _f$description,
     #startDate: _f$startDate,
-    #coordinates: _f$coordinates,
+    #latitude: _f$latitude,
+    #longitude: _f$longitude,
     #category: _f$category,
     #createdAt: _f$createdAt,
     #modifiedAt: _f$modifiedAt,
@@ -107,7 +113,8 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
       name: data.dec(_f$name),
       description: data.dec(_f$description),
       startDate: data.dec(_f$startDate),
-      coordinates: data.dec(_f$coordinates),
+      latitude: data.dec(_f$latitude),
+      longitude: data.dec(_f$longitude),
       category: data.dec(_f$category),
       createdAt: data.dec(_f$createdAt),
       modifiedAt: data.dec(_f$modifiedAt),

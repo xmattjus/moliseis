@@ -23,7 +23,8 @@ class EventDto with EventDtoMappable implements SyncDto {
     required this.name,
     required this.description,
     required this.startDate,
-    required this.coordinates,
+    required this.latitude,
+    required this.longitude,
     required this.category,
     required this.createdAt,
     required this.modifiedAt,
@@ -38,7 +39,8 @@ class EventDto with EventDtoMappable implements SyncDto {
   final String description;
   final DateTime startDate;
   final DateTime? endDate;
-  final List<double> coordinates;
+  final double latitude;
+  final double longitude;
   final ContentCategory category;
   @MappableField(
     hook: RelationUpdateHook<int>(

@@ -27,15 +27,20 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
   static const Field<PlaceDto, int> _f$id = Field('id', _$id);
   static String _$name(PlaceDto v) => v.name;
   static const Field<PlaceDto, String> _f$name = Field('name', _$name);
-  static String _$description(PlaceDto v) => v.description;
+  static String? _$description(PlaceDto v) => v.description;
   static const Field<PlaceDto, String> _f$description = Field(
     'description',
     _$description,
   );
-  static List<double> _$coordinates(PlaceDto v) => v.coordinates;
-  static const Field<PlaceDto, List<double>> _f$coordinates = Field(
-    'coordinates',
-    _$coordinates,
+  static double _$latitude(PlaceDto v) => v.latitude;
+  static const Field<PlaceDto, double> _f$latitude = Field(
+    'latitude',
+    _$latitude,
+  );
+  static double _$longitude(PlaceDto v) => v.longitude;
+  static const Field<PlaceDto, double> _f$longitude = Field(
+    'longitude',
+    _$longitude,
   );
   static ContentCategory _$category(PlaceDto v) => v.category;
   static const Field<PlaceDto, ContentCategory> _f$category = Field(
@@ -76,7 +81,8 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
     #id: _f$id,
     #name: _f$name,
     #description: _f$description,
-    #coordinates: _f$coordinates,
+    #latitude: _f$latitude,
+    #longitude: _f$longitude,
     #category: _f$category,
     #cityId: _f$cityId,
     #createdAt: _f$createdAt,
@@ -91,7 +97,8 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
       id: data.dec(_f$id),
       name: data.dec(_f$name),
       description: data.dec(_f$description),
-      coordinates: data.dec(_f$coordinates),
+      latitude: data.dec(_f$latitude),
+      longitude: data.dec(_f$longitude),
       category: data.dec(_f$category),
       cityId: data.dec(_f$cityId),
       createdAt: data.dec(_f$createdAt),

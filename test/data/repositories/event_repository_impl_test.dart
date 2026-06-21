@@ -808,7 +808,8 @@ void main() {
             'created_at': '2026-01-01T00:00:00.000',
             'modified_at': '2026-01-01T00:00:00.000',
             'description': '',
-            'coordinates': [0, 0],
+            'latitude': 0,
+            'longitude': 0,
             'category': 'unknown',
           },
         ]);
