@@ -3,6 +3,7 @@ library;
 
 export 'app_color_schemes_theme_extension_extensions.dart';
 export 'build_context_extensions.dart';
+export 'cache_manager_extensions.dart';
 export 'color_extensions.dart';
 export 'content_category_extensions.dart';
 export 'date_time_extensions.dart';
