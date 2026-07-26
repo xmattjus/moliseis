@@ -5,22 +5,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
+import 'package:moliseis/data/repositories/content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
-import 'package:moliseis/data/repositories/user_contribution_repository_impl.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/geo_map_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
-import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
@@ -121,8 +121,8 @@ void main() {
                 resolved[SearchRepository] = context.read<SearchRepository>();
                 resolved[SettingsRepository] = context
                     .read<SettingsRepository>();
-                resolved[UserContributionRepository] = context
-                    .read<UserContributionRepository>();
+                resolved[ContentSubmissionRepository] = context
+                    .read<ContentSubmissionRepository>();
                 resolved[GeoMapRepository] = context.read<GeoMapRepository>();
                 resolved[ThemeViewModel] = context.read<ThemeViewModel>();
                 resolved[SyncViewModel] = context.read<SyncViewModel>();
@@ -155,8 +155,8 @@ void main() {
       expect(resolved[CityRepository], isA<CityRepositoryImpl>());
       expect(resolved[SearchRepository], isA<SearchRepositoryImpl>());
       expect(
-        resolved[UserContributionRepository],
-        isA<UserContributionRepositoryImpl>(),
+        resolved[ContentSubmissionRepository],
+        isA<ContentSubmissionRepositoryImpl>(),
       );
       expect(resolved[GeoMapRepository], isA<GeoMapRepositoryImpl>());
 

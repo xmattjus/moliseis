@@ -16,6 +16,7 @@ import 'package:objectbox_flutter_libs/objectbox_flutter_libs.dart';
 
 import '../data/data-sources/app_settings.dart';
 import '../data/data-sources/city_entity.dart';
+import '../data/data-sources/content_submission_draft_entry.dart';
 import '../data/data-sources/event_entity.dart';
 import '../data/data-sources/media_entity.dart';
 import '../data/data-sources/place_entity.dart';
@@ -437,6 +438,76 @@ final _entities = <obx_int.ModelEntity>[
       ),
     ],
   ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(20, 8436787422671765122),
+    name: 'ContentSubmissionDraftEntity',
+    lastPropertyId: const obx_int.IdUid(14, 3484431749528952426),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 1208002047882703222),
+        name: 'id',
+        type: 6,
+        flags: 129,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 6506260487384241458),
+        name: 'city',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 4130767201911942907),
+        name: 'name',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 1782482440836601473),
+        name: 'description',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 5115398000572587196),
+        name: 'categoryIndex',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 5344761860883717598),
+        name: 'startDate',
+        type: 12,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 6490402400871800405),
+        name: 'endDate',
+        type: 12,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(10, 6781673835166488566),
+        name: 'acceptedTerms',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(13, 5395657878380578421),
+        name: 'authorEmail',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(14, 3484431749528952426),
+        name: 'authorName',
+        type: 9,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
 ];
 
 /// Shortcut for [obx.Store.new] that passes [getObjectBoxModel] and for Flutter
@@ -482,7 +553,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
     // Typically, this is done with `dart run build_runner build`.
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(18, 7465876784755698809),
+    lastEntityId: const obx_int.IdUid(20, 8436787422671765122),
     lastIndexId: const obx_int.IdUid(51, 4917123769674284820),
     lastRelationId: const obx_int.IdUid(2, 6027552760664793313),
     lastSequenceId: const obx_int.IdUid(0, 0),
@@ -499,6 +570,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
       771336569779381012,
       3865124494693155681,
       8311290654804837212,
+      358009706007483606,
     ],
     retiredIndexUids: const [
       3416954265858690250,
@@ -657,6 +729,20 @@ obx_int.ModelDefinition getObjectBoxModel() {
       2793615948796076140,
       4937572240779558281,
       3637763644055067335,
+      393314283497020140,
+      8887338682661855412,
+      4615355261266545459,
+      2095536647475228193,
+      3660949941741769505,
+      9127183198870165650,
+      1629617897071379024,
+      7014653895980883567,
+      2797092085087905632,
+      1742153811676212819,
+      1517645468836491504,
+      6397925763748579508,
+      4299766296453028595,
+      7286222595985040632,
     ],
     retiredRelationUids: const [2557435973112971372, 6027552760664793313],
     modelVersion: 5,
@@ -1276,6 +1362,118 @@ obx_int.ModelDefinition getObjectBoxModel() {
         return object;
       },
     ),
+    ContentSubmissionDraftEntity:
+        obx_int.EntityDefinition<ContentSubmissionDraftEntity>(
+          model: _entities[6],
+          toOneRelations: (ContentSubmissionDraftEntity object) => [],
+          toManyRelations: (ContentSubmissionDraftEntity object) => {},
+          getId: (ContentSubmissionDraftEntity object) => object.id,
+          setId: (ContentSubmissionDraftEntity object, int id) {
+            object.id = id;
+          },
+          objectToFB: (ContentSubmissionDraftEntity object, fb.Builder fbb) {
+            final cityOffset = object.city == null
+                ? null
+                : fbb.writeString(object.city!);
+            final nameOffset = object.name == null
+                ? null
+                : fbb.writeString(object.name!);
+            final descriptionOffset = object.description == null
+                ? null
+                : fbb.writeString(object.description!);
+            final authorEmailOffset = object.authorEmail == null
+                ? null
+                : fbb.writeString(object.authorEmail!);
+            final authorNameOffset = object.authorName == null
+                ? null
+                : fbb.writeString(object.authorName!);
+            fbb.startTable(15);
+            fbb.addInt64(0, object.id);
+            fbb.addOffset(1, cityOffset);
+            fbb.addOffset(2, nameOffset);
+            fbb.addOffset(3, descriptionOffset);
+            fbb.addInt64(4, object.categoryIndex);
+            fbb.addInt64(
+              5,
+              object.startDate == null
+                  ? null
+                  : object.startDate!.microsecondsSinceEpoch * 1000,
+            );
+            fbb.addInt64(
+              6,
+              object.endDate == null
+                  ? null
+                  : object.endDate!.microsecondsSinceEpoch * 1000,
+            );
+            fbb.addBool(9, object.acceptedTerms);
+            fbb.addOffset(12, authorEmailOffset);
+            fbb.addOffset(13, authorNameOffset);
+            fbb.finish(fbb.endTable());
+            return object.id;
+          },
+          objectFromFB: (obx.Store store, ByteData fbData) {
+            final buffer = fb.BufferContext(fbData);
+            final rootOffset = buffer.derefObject(0);
+            final startDateValue = const fb.Int64Reader().vTableGetNullable(
+              buffer,
+              rootOffset,
+              14,
+            );
+            final endDateValue = const fb.Int64Reader().vTableGetNullable(
+              buffer,
+              rootOffset,
+              16,
+            );
+            final categoryIndexParam = const fb.Int64Reader().vTableGetNullable(
+              buffer,
+              rootOffset,
+              12,
+            );
+            final cityParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 6);
+            final nameParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 8);
+            final descriptionParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 10);
+            final startDateParam = startDateValue == null
+                ? null
+                : DateTime.fromMicrosecondsSinceEpoch(
+                    (startDateValue / 1000).round(),
+                  );
+            final endDateParam = endDateValue == null
+                ? null
+                : DateTime.fromMicrosecondsSinceEpoch(
+                    (endDateValue / 1000).round(),
+                  );
+            final authorEmailParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 28);
+            final authorNameParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 30);
+            final acceptedTermsParam = const fb.BoolReader().vTableGetNullable(
+              buffer,
+              rootOffset,
+              22,
+            );
+            final object = ContentSubmissionDraftEntity(
+              categoryIndex: categoryIndexParam,
+              city: cityParam,
+              name: nameParam,
+              description: descriptionParam,
+              startDate: startDateParam,
+              endDate: endDateParam,
+              authorEmail: authorEmailParam,
+              authorName: authorNameParam,
+              acceptedTerms: acceptedTermsParam,
+            )..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0);
+
+            return object;
+          },
+        ),
   };
 
   return obx_int.ModelDefinition(model, bindings);
@@ -1577,4 +1775,64 @@ class PlaceEntity_ {
   static final media = obx.QueryBacklinkToMany<MediaEntity, PlaceEntity>(
     MediaEntity_.place,
   );
+}
+
+/// [ContentSubmissionDraftEntity] entity fields to define ObjectBox queries.
+class ContentSubmissionDraftEntity_ {
+  /// See [ContentSubmissionDraftEntity.id].
+  static final id = obx.QueryIntegerProperty<ContentSubmissionDraftEntity>(
+    _entities[6].properties[0],
+  );
+
+  /// See [ContentSubmissionDraftEntity.city].
+  static final city = obx.QueryStringProperty<ContentSubmissionDraftEntity>(
+    _entities[6].properties[1],
+  );
+
+  /// See [ContentSubmissionDraftEntity.name].
+  static final name = obx.QueryStringProperty<ContentSubmissionDraftEntity>(
+    _entities[6].properties[2],
+  );
+
+  /// See [ContentSubmissionDraftEntity.description].
+  static final description =
+      obx.QueryStringProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[3],
+      );
+
+  /// See [ContentSubmissionDraftEntity.categoryIndex].
+  static final categoryIndex =
+      obx.QueryIntegerProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[4],
+      );
+
+  /// See [ContentSubmissionDraftEntity.startDate].
+  static final startDate =
+      obx.QueryDateNanoProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[5],
+      );
+
+  /// See [ContentSubmissionDraftEntity.endDate].
+  static final endDate =
+      obx.QueryDateNanoProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[6],
+      );
+
+  /// See [ContentSubmissionDraftEntity.acceptedTerms].
+  static final acceptedTerms =
+      obx.QueryBooleanProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[7],
+      );
+
+  /// See [ContentSubmissionDraftEntity.authorEmail].
+  static final authorEmail =
+      obx.QueryStringProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[8],
+      );
+
+  /// See [ContentSubmissionDraftEntity.authorName].
+  static final authorName =
+      obx.QueryStringProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[9],
+      );
 }

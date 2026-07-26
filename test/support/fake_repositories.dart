@@ -1,7 +1,7 @@
+import 'dart:async' show Completer;
 import 'dart:io' show File;
 
 import 'package:http/http.dart' as http;
-import 'package:moliseis/data/data-sources/user_contribution.dart';
 import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/dtos/media_dto.dart';
@@ -11,17 +11,23 @@ import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/content_submission.dart';
+import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/image_upload_task.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/domain/models/place.dart';
+import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
-import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
+import 'package:moliseis/utils/command.dart' show Command;
 import 'package:moliseis/utils/result.dart';
 
 import 'mock_logger.dart';
@@ -415,32 +421,162 @@ final class FakeSettingsRepository implements SettingsRepository {
 }
 
 // ---------------------------------------------------------------------------
-// FakeUserContributionRepository
+// FakeContentSubmissionRepository
 // ---------------------------------------------------------------------------
 
-final class FakeUserContributionRepository
-    implements UserContributionRepository {
-  FakeUserContributionRepository({
+final class FakeContentSubmissionRepository
+    implements ContentSubmissionRepository {
+  FakeContentSubmissionRepository({
     this.uploadResult = const Result.success(null),
-    this.uploadImageResult = const Result.success(''),
-  });
+    ImageUploadTask? uploadImageTaskResult,
+  }) : uploadImageTaskResult =
+           uploadImageTaskResult ??
+           _FakeUploadTask.success(
+             const Result.success(
+               SubmissionAsset(
+                 secureUrl: '',
+                 width: 2048,
+                 height: 2048,
+               ),
+             ),
+           );
 
   Result<void> uploadResult;
-  Result<String> uploadImageResult;
+  ImageUploadTask uploadImageTaskResult;
 
   bool uploadCalled = false;
-  bool uploadImageCalled = false;
 
   @override
-  Future<Result<void>> upload(UserContribution userContribution) async {
+  Future<Result<void>> upload(
+    ContentSubmission contentSubmission,
+    List<SubmissionAsset> submissionAssets,
+  ) async {
     uploadCalled = true;
     return uploadResult;
   }
 
   @override
-  Future<Result<String>> uploadImage(File image) async {
-    uploadImageCalled = true;
-    return uploadImageResult;
+  ImageUploadTask uploadImageTask(File image) => uploadImageTaskResult;
+
+  @override
+  void dispose() {}
+}
+
+/// A stub [ImageUploadTask] for tests that do not exercise the upload pipeline.
+final class _FakeUploadTask implements ImageUploadTask {
+  _FakeUploadTask.success(Result<SubmissionAsset> result)
+    : _result = Future.value(result);
+
+  final Future<Result<SubmissionAsset>> _result;
+
+  @override
+  Future<Result<SubmissionAsset>> get result => _result;
+
+  @override
+  Stream<double> get progress => Stream<double>.value(1);
+
+  @override
+  void cancel() {}
+}
+
+// ---------------------------------------------------------------------------
+// ControllableSubmissionRepository
+// ---------------------------------------------------------------------------
+
+/// A [ContentSubmissionRepository] fake whose [upload] result is gated by a
+/// fresh [Completer] per call. Used by widget tests that need to hold the
+/// submit [Command] in the running state until the test resolves it to
+/// success or error.
+///
+/// [uploadImageTask] throws by default: the widget tests that consume this
+/// fake run the submit pipeline with no assets, so any call to it indicates a
+/// logic error. Pass a non-throwing [ImageUploadTask] via [uploadImageTaskResult]
+/// when a test actually needs the upload-image branch.
+final class ControllableSubmissionRepository
+    implements ContentSubmissionRepository {
+  ControllableSubmissionRepository({
+    this.uploadImageTaskResult,
+    this.uploadImageTaskThrowMessage =
+        'controllable repository tests run with no assets',
+  });
+
+  /// Optional task returned from [uploadImageTask]. When null, calling
+  /// [uploadImageTask] throws with [uploadImageTaskThrowMessage].
+  final ImageUploadTask? uploadImageTaskResult;
+
+  /// Message used when [uploadImageTask] throws (i.e. when
+  /// [uploadImageTaskResult] is null).
+  final String uploadImageTaskThrowMessage;
+
+  Completer<Result<void>>? _pending;
+  int uploadCallCount = 0;
+
+  @override
+  Future<Result<void>> upload(
+    ContentSubmission contentSubmission,
+    List<SubmissionAsset> submissionAssets,
+  ) async {
+    uploadCallCount++;
+    _pending = Completer<Result<void>>();
+    return _pending!.future;
+  }
+
+  /// Resolves the in-flight [upload] call (if any) with [result]. Safe to
+  /// call when no upload is pending: it is a no-op in that case.
+  void completeUpload(Result<void> result) {
+    final pending = _pending;
+    _pending = null;
+    pending?.complete(result);
+  }
+
+  @override
+  ImageUploadTask uploadImageTask(File image) {
+    final task = uploadImageTaskResult;
+    if (task == null) {
+      throw StateError(uploadImageTaskThrowMessage);
+    }
+    return task;
+  }
+
+  @override
+  void dispose() {}
+}
+
+// ---------------------------------------------------------------------------
+// FakeContentSubmissionDraftRepository
+// ---------------------------------------------------------------------------
+
+/// Create a fresh instance per test to avoid state bleed between tests.
+final class FakeContentSubmissionDraftRepository
+    implements ContentSubmissionDraftRepository {
+  FakeContentSubmissionDraftRepository({
+    this.loadDraftResult = const Result.success(null),
+    this.saveDraftResult = const Result.success(null),
+    this.clearDraftResult = const Result.success(null),
+  });
+
+  Result<ContentSubmissionDraft?> loadDraftResult;
+  Result<void> saveDraftResult;
+  Result<void> clearDraftResult;
+
+  bool saveDraftCalled = false;
+  bool clearDraftCalled = false;
+  ContentSubmissionDraft? lastSavedState;
+
+  @override
+  Future<Result<ContentSubmissionDraft?>> loadDraft() async => loadDraftResult;
+
+  @override
+  Future<Result<void>> saveDraft(ContentSubmissionDraft state) async {
+    saveDraftCalled = true;
+    lastSavedState = state;
+    return saveDraftResult;
+  }
+
+  @override
+  Future<Result<void>> clearDraft() async {
+    clearDraftCalled = true;
+    return clearDraftResult;
   }
 }
 

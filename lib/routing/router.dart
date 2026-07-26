@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
 import 'package:moliseis/ui/core/ui/logging_screen.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
@@ -26,12 +28,9 @@ import 'package:moliseis/ui/search/widgets/search_result_screen.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
-import 'package:moliseis/ui/user_contribution/view_models/user_contribution_view_model.dart';
-import 'package:moliseis/ui/user_contribution/widgets/user_contribution_screen.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
-import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -52,7 +51,7 @@ final appRouter = GoRouter(
 
     if ((syncViewModel.sync.completed ||
             syncViewModel.sync.error && !syncViewModel.fatalError) &&
-        state.uri.toString().contains(RoutePaths.sync)) {
+        state.matchedLocation == RoutePaths.sync) {
       return RoutePaths.home;
     }
 
@@ -72,16 +71,22 @@ final appRouter = GoRouter(
       builder: (_, _) => const SettingsScreen(),
     ),
     GoRoute(
-      path: RoutePaths.userContribution,
-      name: RouteNames.userContribution,
+      path: RoutePaths.contentSubmission,
+      name: RouteNames.contentSubmission,
       builder: (context, _) {
-        final viewModel = UserContributionViewModel(
-          logger: context.read<Logger>(),
-          userContributionRepository: context
-              .read<UserContributionRepository>(),
-        );
-        return UserContributionScreen(viewModel: viewModel);
+        final viewModel = context.read<ContentSubmissionViewModel>();
+        return ContentSubmissionScreen(viewModel: viewModel);
       },
+      routes: <RouteBase>[
+        GoRoute(
+          path: RoutePaths.contentSubmissionUploadProgress,
+          name: RouteNames.contentSubmissionUploadProgress,
+          builder: (context, _) {
+            final viewModel = context.read<ContentSubmissionViewModel>();
+            return ContentSubmissionProgressScreen(viewModel: viewModel);
+          },
+        ),
+      ],
     ),
     GoRoute(
       path: RoutePaths.logging,
@@ -241,7 +246,14 @@ final appRouter = GoRouter(
               path: RoutePaths.geoMap,
               name: RouteNames.geoMap,
               builder: (context, state) {
-                final contentExtra = state.extra as ContentBase?;
+                final contentExtra = state.extra is ContentBase
+                    ? state.extra! as ContentBase
+                    : null;
+                assert(
+                  state.extra == null || contentExtra != null,
+                  'geoMap route received an unexpected extra payload of type '
+                  '${state.extra.runtimeType}. Expected ContentBase or null.',
+                );
 
                 final viewModel = GeoMapViewModel(
                   geoMapUseCase: GeoMapUseCase(

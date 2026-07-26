@@ -328,6 +328,20 @@ class WeatherForecastFetchFailed extends LogEvent {
   String get name => 'weather_forecast_fetch_failed';
 }
 
+/// Fired when the user id fetch failed.
+class UserIdFetchFailed extends LogEvent {
+  const UserIdFetchFailed();
+
+  @override
+  Map<String, Object?> get data => {};
+
+  @override
+  AppLogLevel get level => AppLogLevel.error;
+
+  @override
+  String get name => 'user_id_fetch_failed';
+}
+
 /// Fired when a weather forecast fetch started.
 class WeatherForecastFetchStarted extends LogEvent {
   /// Creates an event for a weather forecast request started

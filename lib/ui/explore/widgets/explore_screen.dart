@@ -7,6 +7,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/category/widgets/category_button.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_cta_button.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
@@ -18,7 +19,6 @@ import 'package:moliseis/ui/explore/widgets/components/suggested_carousel_view.d
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
-import 'package:moliseis/ui/user_contribution/widgets/user_contribution_cta_button.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:provider/provider.dart';
 
@@ -142,7 +142,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
               const SliverPadding(
                 padding: EdgeInsets.all(16),
-                sliver: SliverToBoxAdapter(child: UserContributionCTAButton()),
+                sliver: SliverToBoxAdapter(child: ContentSubmissionCTAButton()),
               ),
               const SliverToBoxAdapter(
                 child: TextSectionDivider(

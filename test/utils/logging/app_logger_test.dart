@@ -522,8 +522,8 @@ void main() {
           sentryFlag: sentryFlag,
         );
 
-        // 'user_contribution_media_removal_failed' has 5 segments.
-        logger.log(const UserContributionMediaRemovalFailed());
+        // 'content_submission_asset_removal_failed' has 5 segments.
+        logger.log(const ContentSubmissionAssetRemovalFailed());
       });
     });
   });

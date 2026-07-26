@@ -9,6 +9,7 @@ abstract class RoutePaths {
   static const settings = '/settings';
   static const sync = '/sync';
   static const post = 'posts/:id';
-  static const userContribution = '/userContribution';
+  static const contentSubmission = '/contentSubmission';
+  static const contentSubmissionUploadProgress = 'uploadProgress';
   static const logging = '/logging';
 }

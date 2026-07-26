@@ -339,47 +339,47 @@ void main() {
       });
     });
 
-    group('User contribution events', () {
-      test('UserContributionMediaRemovalFailed has correct contract', () {
-        const event = UserContributionMediaRemovalFailed();
+    group('Content submission events', () {
+      test('ContentSubmissionAssetRemovalFailed has correct contract', () {
+        const event = ContentSubmissionAssetRemovalFailed();
 
-        expect(event.name, 'user_contribution_media_removal_failed');
+        expect(event.name, 'content_submission_asset_removal_failed');
         expect(event.level, AppLogLevel.error);
         expect(event.data, isEmpty);
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
-      test('UserContributionMediaRetrievalFailed has correct contract', () {
-        const event = UserContributionMediaRetrievalFailed();
+      test('ContentSubmissionAssetRetrievalFailed has correct contract', () {
+        const event = ContentSubmissionAssetRetrievalFailed();
 
-        expect(event.name, 'user_contribution_media_retrieval_failed');
+        expect(event.name, 'content_submission_asset_retrieval_failed');
         expect(event.level, AppLogLevel.warning);
         expect(event.data, isEmpty);
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
-      test('UserContributionMediaRetrievalStarted has correct contract', () {
-        const event = UserContributionMediaRetrievalStarted();
+      test('ContentSubmissionAssetRetrievalStarted has correct contract', () {
+        const event = ContentSubmissionAssetRetrievalStarted();
 
-        expect(event.name, 'user_contribution_media_retrieval_started');
+        expect(event.name, 'content_submission_asset_retrieval_started');
         expect(event.level, AppLogLevel.info);
         expect(event.data, isEmpty);
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
-      test('UserContributionUploadFailed has correct contract', () {
-        const event = UserContributionUploadFailed();
+      test('ContentSubmissionUploadFailed has correct contract', () {
+        const event = ContentSubmissionUploadFailed();
 
-        expect(event.name, 'user_contribution_upload_failed');
+        expect(event.name, 'content_submission_upload_failed');
         expect(event.level, AppLogLevel.error);
         expect(event.data, isEmpty);
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
-      test('UserContributionUploadStarted has correct contract', () {
-        const event = UserContributionUploadStarted();
+      test('ContentSubmissionUploadStarted has correct contract', () {
+        const event = ContentSubmissionUploadStarted();
 
-        expect(event.name, 'user_contribution_upload_started');
+        expect(event.name, 'content_submission_upload_started');
         expect(event.level, AppLogLevel.info);
         expect(event.data, isEmpty);
         expect(eventNamePattern.hasMatch(event.name), isTrue);

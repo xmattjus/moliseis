@@ -15,6 +15,8 @@ abstract class RouteNames {
   static const homeSearchResult = 'homeSearchResult';
   static const homeSearchResultPost = 'homeSearchResultPost';
   static const settings = 'settings';
-  static const userContribution = 'userContribution';
+  static const contentSubmission = 'contentSubmission';
+  static const contentSubmissionUploadProgress =
+      'contentSubmissionUploadProgress';
   static const logging = 'logging';
 }

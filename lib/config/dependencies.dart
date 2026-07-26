@@ -1,17 +1,19 @@
+import 'dart:async';
+
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';
-import 'package:moliseis/data/data-sources/user_contribution_supabase_table.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
+import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
+import 'package:moliseis/data/repositories/content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
-import 'package:moliseis/data/repositories/user_contribution_repository_impl.dart';
-import 'package:moliseis/data/services/api/cloudinary_client.dart';
+import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client_impl.dart';
 import 'package:moliseis/data/services/api/openstreetmap/openstreetmap_client.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
@@ -21,15 +23,17 @@ import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/geo_map_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
-import 'package:moliseis/domain/repositories/user_contribution_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
+import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
@@ -132,23 +136,29 @@ List<SingleChildWidget> providers(
             as SearchRepository,
   ),
   Provider<SettingsRepository>.value(value: settingsRepository),
-  Provider<UserContributionRepository>(
+  Provider<ContentSubmissionRepository>(
     create: (context) {
-      final cloudinaryClient = CloudinaryClient(
+      final cloudinaryUploadClient = CloudinaryUploadClientImpl(
         logger: context.read(),
         cloudName: Env.cloudinaryProdCloudName,
         apiKey: Env.cloudinaryProdApiKey,
         apiSecret: Env.cloudinaryProdApiSecret,
       );
 
-      return UserContributionRepositoryImpl(
+      return ContentSubmissionRepositoryImpl(
             logger: context.read(),
             supabase: supabase,
-            supabaseTable: UserContributionSupabaseTable(),
-            cloudinaryClient: cloudinaryClient,
+            cloudinaryUploadClient: cloudinaryUploadClient,
           )
-          as UserContributionRepository;
+          as ContentSubmissionRepository;
     },
+    dispose: (_, repository) => repository.dispose(),
+  ),
+  Provider<ContentSubmissionDraftRepository>(
+    create: (context) => ContentSubmissionDraftRepositoryImpl(
+      logger: context.read(),
+      objectBoxI: objectBox,
+    ),
   ),
   Provider<GeoMapRepository>(
     create: (context) {
@@ -201,6 +211,18 @@ List<SingleChildWidget> providers(
           placeRepository: context.read(),
         ),
       );
+    },
+  ),
+  ChangeNotifierProvider(
+    create: (context) {
+      final viewModel = ContentSubmissionViewModel(
+        logger: context.read<Logger>(),
+        contentSubmissionRepository: context
+            .read<ContentSubmissionRepository>(),
+        draftRepository: context.read<ContentSubmissionDraftRepository>(),
+      );
+      unawaited(viewModel.initialize());
+      return viewModel;
     },
   ),
   //#endregion

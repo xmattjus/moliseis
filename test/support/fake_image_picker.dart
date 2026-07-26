@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 ///
 /// Uses callbacks rather than pre-configured result values to support
 /// [Completer]-based in-flight tests (see
-/// `user_contribution_media_uploader_test.dart`).
+/// `content_submission_add_asset_form_test.dart`).
 ///
 /// When callbacks are `null`, returns empty/default responses.
 final class FakeImagePicker extends ImagePicker {
