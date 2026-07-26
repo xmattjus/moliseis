@@ -202,6 +202,37 @@ void main() {
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
+      test('CloudinaryUploadCompleted has correct contract', () {
+        const event = CloudinaryUploadCompleted(
+          publicId: 'content_submissions/abc',
+        );
+
+        expect(event.name, 'cloudinary_upload_completed');
+        expect(event.level, AppLogLevel.info);
+        expect(event.data, {'publicId': 'content_submissions/abc'});
+        expect(eventNamePattern.hasMatch(event.name), isTrue);
+      });
+
+      test('CloudinaryUploadCancelled has correct contract', () {
+        const event = CloudinaryUploadCancelled();
+
+        expect(event.name, 'cloudinary_upload_cancelled');
+        expect(event.level, AppLogLevel.info);
+        expect(event.data, isEmpty);
+        expect(eventNamePattern.hasMatch(event.name), isTrue);
+      });
+
+      test('CloudinaryDuplicateDetected has correct contract', () {
+        const event = CloudinaryDuplicateDetected(
+          publicId: 'content_submissions/abc',
+        );
+
+        expect(event.name, 'cloudinary_duplicate_detected');
+        expect(event.level, AppLogLevel.info);
+        expect(event.data, {'publicId': 'content_submissions/abc'});
+        expect(eventNamePattern.hasMatch(event.name), isTrue);
+      });
+
       test('ImageSharingFailed has correct contract', () {
         const event = ImageSharingFailed();
 

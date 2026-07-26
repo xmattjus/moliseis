@@ -108,6 +108,57 @@ class CloudinaryRequestStarted extends LogEvent {
   String get name => 'cloudinary_request_started';
 }
 
+/// Fired when a Cloudinary upload completes successfully.
+class CloudinaryUploadCompleted extends LogEvent {
+  /// Creates an event for a completed Cloudinary upload of [publicId].
+  const CloudinaryUploadCompleted({required this.publicId});
+
+  /// Public ID of the uploaded asset.
+  final String publicId;
+
+  @override
+  Map<String, Object?> get data => {'publicId': publicId};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'cloudinary_upload_completed';
+}
+
+/// Fired when a Cloudinary upload is cancelled by the caller.
+class CloudinaryUploadCancelled extends LogEvent {
+  /// Creates an event for a cancelled Cloudinary upload.
+  const CloudinaryUploadCancelled();
+
+  @override
+  Map<String, Object?> get data => const {};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'cloudinary_upload_cancelled';
+}
+
+/// Fired when a duplicate Cloudinary upload is detected and skipped.
+class CloudinaryDuplicateDetected extends LogEvent {
+  /// Creates an event for a duplicate Cloudinary upload of [publicId].
+  const CloudinaryDuplicateDetected({required this.publicId});
+
+  /// Public ID of the existing asset.
+  final String publicId;
+
+  @override
+  Map<String, Object?> get data => {'publicId': publicId};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'cloudinary_duplicate_detected';
+}
+
 /// Fired when an image sharing attempt fails.
 class ImageSharingFailed extends LogEvent {
   /// Creates an event for a failed image sharing attempt.
