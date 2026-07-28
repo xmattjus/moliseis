@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:moliseis/domain/models/media.dart';
@@ -180,6 +182,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
 
   void _onImageLoadingChanged(bool isLoading) {
     SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _isMediaLoadingNotifier.value = isLoading;
     });
 
@@ -202,7 +205,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
         controller: _pageController,
         onPageChanged: (_) {
           if (_isAutoPlayEnabled) {
-            _animationController.forward(from: 0);
+            unawaited(_animationController.forward(from: 0));
           }
         },
         itemBuilder: (_, index) {
@@ -288,8 +291,8 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     // and the ticker is not already active.
     if (_initTicker && !_ticker.isActive) {
       _delta = Duration.zero;
-      _ticker.start();
-      _animationController.forward();
+      unawaited(_ticker.start());
+      unawaited(_animationController.forward());
     }
   }
 
@@ -308,10 +311,12 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
           ? currentPage + 1
           : 0;
 
-      _pageController.animateToPage(
-        nextPage,
-        duration: Durations.extralong4,
-        curve: Curves.easeInOutCubicEmphasized,
+      unawaited(
+        _pageController.animateToPage(
+          nextPage,
+          duration: Durations.extralong4,
+          curve: Curves.easeInOutCubicEmphasized,
+        ),
       );
 
       _lastPage = nextPage;

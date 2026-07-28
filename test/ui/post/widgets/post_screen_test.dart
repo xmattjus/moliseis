@@ -1,3 +1,4 @@
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -8,12 +9,14 @@ import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_we
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/post/view_models/post_view_model.dart';
+import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
@@ -22,6 +25,7 @@ import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
 
+import '../../../support/fake_cache_manager.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
 import '../../../support/mock_logger.dart';
@@ -288,17 +292,74 @@ void main() {
       expect(find.byKey(const ValueKey('galleryPopScope')), findsOneWidget);
       expect(find.byType(PostScreen), findsOneWidget);
     });
+
+    testWidgets('gallery callbacks are safe after PostScreen is disposed', (
+      tester,
+    ) async {
+      final event = _buildEvent(media: [_buildMedia()]);
+      final place = _buildPlace();
+      final viewModel = _buildPostViewModel(event: event, place: place);
+      final weatherViewModel = _buildWeatherViewModel(mockLogger);
+      final favouriteViewModel = _buildFavouriteViewModel(
+        event: event,
+        place: place,
+      );
+      final cacheManager = FakeCacheManager();
+      addTearDown(cacheManager.dispose);
+
+      await viewModel.loadEvent.execute(event.remoteId);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          PostScreen(
+            isEvent: true,
+            viewModel: viewModel,
+            weatherViewModel: weatherViewModel,
+          ),
+          favouriteViewModel,
+          cacheManager: cacheManager,
+        ),
+      );
+      await tester.pump();
+
+      final slideshow = tester.widget<PostMediaSlideshow>(
+        find.byType(PostMediaSlideshow),
+      );
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          const SizedBox.shrink(),
+          favouriteViewModel,
+          cacheManager: cacheManager,
+        ),
+      );
+
+      slideshow.onGalleryOpened!();
+      slideshow.onGalleryClosed!();
+
+      expect(tester.takeException(), isNull);
+    });
   });
 }
 
-Widget _buildTestApp(Widget child, FavouriteViewModel favouriteViewModel) {
+Widget _buildTestApp(
+  Widget child,
+  FavouriteViewModel favouriteViewModel, {
+  CacheManager? cacheManager,
+}) {
   final router = GoRouter(
     initialLocation: '/',
     routes: <RouteBase>[GoRoute(path: '/', builder: (_, _) => child)],
   );
 
-  return ChangeNotifierProvider<FavouriteViewModel>.value(
-    value: favouriteViewModel,
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<FavouriteViewModel>.value(
+        value: favouriteViewModel,
+      ),
+      if (cacheManager != null)
+        Provider<CacheManager>.value(value: cacheManager),
+    ],
     child: MaterialApp.router(routerConfig: router),
   );
 }
@@ -363,9 +424,37 @@ WeatherViewModel _buildWeatherViewModel(MockLogger mockLogger) {
   );
 }
 
-Event _buildEvent() => makeEvent(
-  startDate: DateTime(2026, 4, 10, 10, 30),
-  endDate: DateTime(2026, 4, 10, 12),
+Event _buildEvent({List<Media> media = const []}) {
+  final event = makeEvent(
+    startDate: DateTime(2026, 4, 10, 10, 30),
+    endDate: DateTime(2026, 4, 10, 12),
+  );
+
+  return Event(
+    category: event.category,
+    city: event.city,
+    coordinates: event.coordinates,
+    createdAt: event.createdAt,
+    description: event.description,
+    media: media,
+    modifiedAt: event.modifiedAt,
+    name: event.name,
+    remoteId: event.remoteId,
+    isSaved: event.isSaved,
+    startDate: event.startDate,
+    endDate: event.endDate,
+  );
+}
+
+Media _buildMedia() => Media(
+  remoteId: 1,
+  url: 'https://example.com/image.jpg',
+  width: 800,
+  height: 600,
+  createdAt: DateTime.utc(2026),
+  modifiedAt: DateTime.utc(2026),
+  areaName: 'Event',
+  cityName: 'Molise',
 );
 
 Place _buildPlace() => makePlace(remoteId: 2);

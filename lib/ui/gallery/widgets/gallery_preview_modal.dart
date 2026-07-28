@@ -12,8 +12,11 @@ class GalleryPreviewModal {
     required List<Media> media,
     required int initialIndex,
   }) async {
-    if (context.mounted) {
-      final streamController = StreamController<Widget>();
+    if (!context.mounted) return null;
+
+    final streamController = StreamController<Widget>();
+
+    try {
       await SwipeImageGallery<void>(
         context: context,
         itemBuilder: (context, index) {
@@ -47,8 +50,8 @@ class GalleryPreviewModal {
 
       /// Resolves to true when the SwipeImageGallery dialog has been dismissed.
       return true;
+    } finally {
+      await streamController.close();
     }
-
-    return null;
   }
 }

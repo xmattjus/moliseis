@@ -58,9 +58,15 @@ class _PostScreenState extends State<PostScreen> {
     super.dispose();
   }
 
-  void _onGalleryOpened() => isGalleryOpenNotifier.value = true;
+  void _onGalleryOpened() {
+    if (!mounted) return;
+    isGalleryOpenNotifier.value = true;
+  }
 
-  void _onGalleryClosed() => isGalleryOpenNotifier.value = false;
+  void _onGalleryClosed() {
+    if (!mounted) return;
+    isGalleryOpenNotifier.value = false;
+  }
 
   bool _onScrollNotification(ScrollNotification notification) {
     _slideshowVisibilityNotifier.updateVisibilityFromNotification(notification);
@@ -242,10 +248,12 @@ class _PostScreenState extends State<PostScreen> {
         map['index'] = (content.category.index - 1).toString();
       }
 
-      GoRouter.of(context).pushReplacementNamed(
-        nextRoute,
-        pathParameters: map,
-        queryParameters: {'isEvent': (content is Event ? 'true' : 'false')},
+      unawaited(
+        GoRouter.of(context).pushReplacementNamed(
+          nextRoute,
+          pathParameters: map,
+          queryParameters: {'isEvent': (content is Event ? 'true' : 'false')},
+        ),
       );
     }
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
@@ -179,9 +180,9 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       onPressed: (_, _) {
         /// Shows the bottom sheet if it's currently not visible.
         if (_sheetController.size <= 0.01) {
-          _animateBottomSheetTo(0.5);
+          unawaited(_animateBottomSheetTo(0.5));
         } else {
-          _animateBottomSheetTo(0.3);
+          unawaited(_animateBottomSheetTo(0.3));
         }
       },
       onPositionChangeStart: (_) => _animateBottomSheetTo(0.3),
@@ -215,7 +216,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
                 _searchController.text = '';
               });
 
-              _animateBottomSheetTo(0.3);
+              unawaited(_animateBottomSheetTo(0.3));
             },
             onContentPressed: (content) {
               _searchQuery = '';
@@ -280,7 +281,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
           _searchQuery = '';
         });
 
-        _animateBottomSheetTo(0.3);
+        unawaited(_animateBottomSheetTo(0.3));
       },
       child: Scaffold(
         appBar: const CustomAppBar.hidden(),
@@ -294,9 +295,9 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
             AnimatedGeoMapSearchBar(
               searchController: _searchController,
               animation: _showSearchBar,
-              onSubmitted: (text) => _onSearchSubmitted(text),
+              onSubmitted: _onSearchSubmitted,
               onBackPressed: _onSeachBackPressed,
-              onSuggestionPressed: (ContentBase content) =>
+              onSuggestionPressed: (content) =>
                   _onSearchSubmitted(content.name),
               viewModel: widget.searchViewModel,
               trailing: <Widget>[
@@ -321,13 +322,14 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       _searchController.closeView(text);
     }
 
-    widget.searchViewModel.loadResults.execute(text);
+    unawaited(widget.searchViewModel.loadResults.execute(text));
 
     setState(() {
+      _selectedContent = null;
       _searchQuery = text;
     });
 
-    _animateBottomSheetTo(1);
+    unawaited(_animateBottomSheetTo(1));
   }
 
   void _onSeachBackPressed() {
@@ -372,17 +374,20 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     // screen.
     final offset = (bottomChromeHeight - topViewPadding) / -2;
 
-    // TODO(xmattjus): find out why the map does not load without a fake delay, https://github.com/fleaflet/flutter_map/issues/1813.
+    // TODO(xmattjus): find out why the map does not load without a fake delay,
+    //  https://github.com/fleaflet/flutter_map/issues/1813.
     Future.delayed(Duration.zero, () {
       _mapController.move(_currentCenter, 16, offset: Offset(0, offset + 16.0));
     });
 
-    _animateBottomSheetTo(0.5);
+    unawaited(_animateBottomSheetTo(0.5));
   }
 
   /// Animates the attached sheet from its current size to the given [size], a
   /// fractional value of the parent container's height.
   Future<void> _animateBottomSheetTo(double size) {
+    if (!_sheetController.isAttached) return Future<void>.value();
+
     final currentSize = _sheetController.size;
     final isMinimizing = size < currentSize;
     return _sheetController.animateTo(

@@ -219,7 +219,7 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
           );
         }
 
-        if (id > 0 && widget.searchQuery.isEmpty) {
+        if (id > 0) {
           return AppBottomSheetSurface(child: child);
         }
 
