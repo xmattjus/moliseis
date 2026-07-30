@@ -34,7 +34,7 @@ class PlaceDto with PlaceDtoMappable implements SyncDto {
   @override
   final int id;
   final String name;
-  final String description;
+  final String? description;
   final double latitude;
   final double longitude;
   final ContentCategory category;

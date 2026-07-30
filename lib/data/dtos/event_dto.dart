@@ -36,7 +36,7 @@ class EventDto with EventDtoMappable implements SyncDto {
   @override
   final int id;
   final String name;
-  final String description;
+  final String? description;
   final DateTime startDate;
   final DateTime? endDate;
   final double latitude;

@@ -20,7 +20,7 @@ extension EventEntityExtensions on EventEntity {
         .map<Media>((entity) => entity.toModel())
         .toList(growable: false),
     modifiedAt: modifiedAt,
-    name: name ?? 'Evento Senza Nome',
+    name: name,
     remoteId: remoteId,
     // A null startDate is a data integrity error; use epoch as a sentinel so
     // the record is visibly wrong in the UI rather than silently showing today.
