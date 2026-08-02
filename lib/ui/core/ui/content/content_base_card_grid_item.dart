@@ -86,7 +86,8 @@ class ContentBaseCardGridItem extends StatelessWidget {
           Positioned(
             top: 8,
             right: 8,
-            child: SizedBox(width: width, child: trailing),
+            width: width,
+            child: trailing!,
           ),
       ],
     );

@@ -50,7 +50,7 @@ class ContentSliverGrid extends StatelessWidget {
       if (isCompact) {
         return ContentBaseListItem(
           content,
-          key: ValueKey<String>('list-item:${content.name}-$index'),
+          key: ValueKey<String>('list-item:${content.remoteId}-$index'),
           onPressed: onPressed,
           horizontalTrailing: FavouriteButton(content: content),
           verticalTrailing: content is Event
@@ -60,12 +60,16 @@ class ContentSliverGrid extends StatelessWidget {
       }
 
       if (content is Event) {
-        return ContentEventCardGridItem(event: content, onPressed: onPressed);
+        return ContentEventCardGridItem(
+          event: content,
+          key: ValueKey<String>('grid-item:${content.remoteId}-$index'),
+          onPressed: onPressed,
+        );
       }
 
       return ContentBaseCardGridItem(
         content,
-        key: ValueKey<String>('grid-item:${content.name}-$index'),
+        key: ValueKey<String>('grid-item:${content.remoteId}-$index'),
         onPressed: onPressed,
         trailing: FavouriteButton(
           color: Colors.white,
