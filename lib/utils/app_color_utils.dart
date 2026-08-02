@@ -13,9 +13,9 @@ class AppColorUtils {
     double saturation = 1.0,
     double lightness = 0.0,
   ]) {
-    int hash = 0;
+    var hash = 0;
 
-    for (int i = 0; i < string.length; i++) {
+    for (var i = 0; i < string.length; i++) {
       hash = string.codeUnitAt(i) + ((hash << 5) - hash);
       hash = hash & hash;
     }
@@ -33,11 +33,11 @@ class AppColorUtils {
     assert(rgb.length == 3);
 
     // Based on APCA™ 0.98G middle contrast background color.
-    const double flipYs = 0.342;
+    const flipYs = 0.342;
 
-    const double trc = 2.4;
+    const trc = 2.4;
 
-    const List<double> rgbCo = [0.2126729, 0.7151522, 0.0721750];
+    const rgbCo = <double>[0.2126729, 0.7151522, 0.0721750];
 
     var ys = 0.0;
 

@@ -11,7 +11,7 @@ class EmptyBox extends LeafRenderObjectWidget {
 
   @override
   String toStringShort() {
-    String type = 'EmptyBox';
+    var type = 'EmptyBox';
     assert(() {
       type = runtimeType.toString();
       return true;

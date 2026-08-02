@@ -27,7 +27,7 @@ class SearchAnchorSuggestionList extends StatelessWidget {
       children: <Widget>[
         const TextSectionDivider('Risultati rapidi'),
         ...List.generate(length, (index) {
-          final int itemIndex = index ~/ 2;
+          final itemIndex = index ~/ 2;
           final content = suggestions[itemIndex];
           if (index.isEven) {
             return ContentBaseListItem(

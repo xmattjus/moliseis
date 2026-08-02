@@ -131,7 +131,7 @@ class FavouriteViewModel extends ChangeNotifier {
     final placeIds = placesResult.getOrNull();
     if (placeIds != null) {
       _favouritePlaceIds = List<int>.of(placeIds);
-      for (final int id in _favouritePlaceIds) {
+      for (final id in _favouritePlaceIds) {
         await _getPlaceFromRepository(id);
       }
       notifyListeners();
@@ -142,7 +142,7 @@ class FavouriteViewModel extends ChangeNotifier {
     final eventIds = eventsResult.getOrNull();
     if (eventIds != null) {
       _favouriteEventIds = List<int>.of(eventIds);
-      for (final int id in _favouriteEventIds) {
+      for (final id in _favouriteEventIds) {
         await _getEventFromRepository(id);
       }
       notifyListeners();

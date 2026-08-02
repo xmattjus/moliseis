@@ -119,8 +119,7 @@ class SuggestedCarouselView extends StatelessWidget {
   List<Widget> _buildCarouselItems(double height) =>
       UnmodifiableListView<Widget>(
         exploreViewModel.suggested.map<Widget>(
-          (Place content) =>
-              _CarouselViewItem(content: content, height: height),
+          (content) => _CarouselViewItem(content: content, height: height),
         ),
       );
 }

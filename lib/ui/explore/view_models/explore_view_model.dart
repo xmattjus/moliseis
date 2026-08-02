@@ -69,7 +69,7 @@ class ExploreViewModel extends ChangeNotifier {
   Future<Result<void>> _loadLatest() async {
     _latest = [];
 
-    for (final int id in _latestIds) {
+    for (final id in _latestIds) {
       final place = (await _byIdUseCase.getById(id)).getOrNull();
       if (place != null) _latest.add(place);
     }
@@ -99,7 +99,7 @@ class ExploreViewModel extends ChangeNotifier {
   Future<Result<void>> _loadSuggested() async {
     _suggested = [];
 
-    for (final int id in _suggestedIds) {
+    for (final id in _suggestedIds) {
       final place = (await _byIdUseCase.getById(id)).getOrNull();
       if (place != null) _suggested.add(place);
     }
