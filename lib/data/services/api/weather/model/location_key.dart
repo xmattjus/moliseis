@@ -17,6 +17,6 @@ class LocationKey {
   static String from(double latitude, double longitude) {
     final lat = latitude.toStringAsFixed(2);
     final lon = longitude.toStringAsFixed(2);
-    return '$lat,$lon';
+    return '$lat, $lon';
   }
 }
