@@ -16,7 +16,3 @@ linter:
     prefer_const_literals_to_create_immutables: true
     prefer_constructors_over_static_methods: true
     public_member_api_docs: false
-
-plugins:
-  app_lints:
-    path: packages/app_lints
