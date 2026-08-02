@@ -58,7 +58,7 @@ void main() {
       expect(find.text(time), findsOneWidget);
     });
 
-    testWidgets('renders same-day event range with end time', (
+    testWidgets('renders same-day event range with start time', (
       tester,
     ) async {
       final event = makeEvent(
@@ -70,10 +70,9 @@ void main() {
 
       final month = intl.DateFormat.MMMM('en').format(event.startDate);
       final startTime = _formatTimeOfDay(tester, event.startDate);
-      final endTime = _formatTimeOfDay(tester, event.endDate!);
 
       expect(find.text('${event.startDate.day} $month'), findsOneWidget);
-      expect(find.text('$startTime - $endTime'), findsOneWidget);
+      expect(find.text(startTime), findsOneWidget);
     });
 
     testWidgets('renders time range when minutes differ in same hour', (
@@ -87,9 +86,8 @@ void main() {
       await pumpDateTime(tester, event);
 
       final startTime = _formatTimeOfDay(tester, event.startDate);
-      final endTime = _formatTimeOfDay(tester, event.endDate!);
 
-      expect(find.text('$startTime - $endTime'), findsOneWidget);
+      expect(find.text(startTime), findsOneWidget);
     });
 
     testWidgets('uses 24-hour time format when requested by MediaQuery', (
@@ -107,13 +105,8 @@ void main() {
         event.startDate,
         alwaysUse24HourFormat: true,
       );
-      final endTime = _formatTimeOfDay(
-        tester,
-        event.endDate!,
-        alwaysUse24HourFormat: true,
-      );
 
-      expect(find.text('$startTime - $endTime'), findsOneWidget);
+      expect(find.text(startTime), findsOneWidget);
     });
 
     testWidgets('applies custom icon and text colors', (
@@ -189,14 +182,11 @@ void main() {
       await pumpDateTime(tester, event);
 
       final month = intl.DateFormat.MMMM('en').format(event.startDate);
-      final startTime = _formatTimeOfDay(tester, event.startDate);
-      final endTime = _formatTimeOfDay(tester, event.endDate!);
 
       expect(
         find.text('${event.startDate.day} - ${event.endDate!.day} $month'),
         findsOneWidget,
       );
-      expect(find.text('$startTime - $endTime'), findsOneWidget);
     });
 
     testWidgets('renders multi-month and multi-year date ranges', (
@@ -258,14 +248,11 @@ void main() {
       final normalizedStart = event.endDate!;
       final normalizedEnd = event.startDate;
       final month = intl.DateFormat.MMMM('en').format(normalizedStart);
-      final startTime = _formatTimeOfDay(tester, normalizedStart);
-      final endTime = _formatTimeOfDay(tester, normalizedEnd);
 
       expect(
         find.text('${normalizedStart.day} - ${normalizedEnd.day} $month'),
         findsOneWidget,
       );
-      expect(find.text('$startTime - $endTime'), findsOneWidget);
     });
   });
 }

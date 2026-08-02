@@ -68,12 +68,6 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
     // Whether the event spans multiple days or not.
     final isMultipleDays = isMultipleMonths || endDate.day != startDate.day;
 
-    // Whether the event start and end times are the same instant or not.
-    final isMultipleHours =
-        isMultipleDays ||
-        endDate.hour != startDate.hour ||
-        endDate.minute != startDate.minute;
-
     var startMonth = startDate.localizeMonth(_currentLocale);
     String? endMonth;
 
@@ -101,45 +95,35 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
     final force24HourFormat =
         MediaQuery.maybeAlwaysUse24HourFormatOf(context) ?? false;
 
-    var time = startDate.formatTime(
-      _currentLocale,
-      alwaysUse24HourFormat: force24HourFormat,
-    );
-
-    if (isMultipleHours) {
-      time +=
-          ' - ${endDate.formatTime(
+    final startTime = isMultipleDays
+        ? null
+        : startDate.formatTime(
             _currentLocale,
             alwaysUse24HourFormat: force24HourFormat,
-          )}';
-    }
+          );
 
-    return Flex(
-      direction: Axis.horizontal,
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
+      alignment: WrapAlignment.end,
       spacing: 4,
-      children: <Widget>[
+      runAlignment: WrapAlignment.end,
+      runSpacing: 4,
+      children: [
         Icon(Symbols.calendar_month, size: 18, color: color),
-        Flexible(
-          flex: 2,
-          child: Text(
-            date,
+        Text(
+          date,
+          style: textStyle,
+          softWrap: false,
+          overflow: TextOverflow.fade,
+        ),
+        if (startTime != null) const SizedBox(width: 4),
+        if (startTime != null) Icon(Symbols.schedule, size: 18, color: color),
+        if (startTime != null)
+          Text(
+            startTime,
             style: textStyle,
             softWrap: false,
             overflow: TextOverflow.fade,
           ),
-        ),
-        const SizedBox(width: 4),
-        Icon(Symbols.schedule, size: 18, color: color),
-        Flexible(
-          flex: 2,
-          child: Text(
-            time,
-            style: textStyle,
-            softWrap: false,
-            overflow: TextOverflow.fade,
-          ),
-        ),
       ],
     );
   }
