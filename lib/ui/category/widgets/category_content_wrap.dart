@@ -17,7 +17,7 @@ class CategoryContentWrap extends StatelessWidget {
   final void Function(ContentCategory) onCategorySelected;
   final Color? chipBackgroundColor;
   final ContentCategory? selectedCategory;
-  final void Function(ContentCategory)? onCategoryDeleted;
+  final void Function()? onCategoryDeleted;
 
   @override
   Widget build(BuildContext context) {
@@ -31,11 +31,7 @@ class CategoryContentWrap extends StatelessWidget {
             category,
             backgroundColor: chipBackgroundColor,
             isSelected: isSelected,
-            onDeleted: onCategoryDeleted != null && isSelected
-                ? () {
-                    onCategoryDeleted!(category);
-                  }
-                : null,
+            onDeleted: isSelected ? onCategoryDeleted : null,
             onPressed: () => onCategorySelected(category),
           );
         }),
