@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
@@ -40,7 +41,7 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
             const Align(child: AppBottomSheetDragHandle()),
             AppBottomSheetTitle(
               title: 'Previsioni meteo per ${widget.content.city?.name}',
-              onClose: () => Navigator.of(context).pop(),
+              onClose: () => context.pop(),
             ),
             const SizedBox(height: 32),
             Text(
