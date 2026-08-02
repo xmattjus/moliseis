@@ -1,6 +1,7 @@
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
@@ -174,7 +175,7 @@ class _CategoryContentAndTypeSelectionState
           ),
           actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => context.pop(),
               child: const Text('Salva'),
             ),
           ],
@@ -200,7 +201,7 @@ class _CategoryContentAndTypeSelectionState
               title: title,
               tooltipMessage: 'Salva',
               icon: Symbols.check,
-              onClose: () => Navigator.of(context).pop(),
+              onClose: () => context.pop(),
             ),
             const SizedBox(height: 16),
             ...children,
