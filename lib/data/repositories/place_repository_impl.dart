@@ -192,11 +192,6 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
   Future<Result<Place>> getById(int id) async {
     Query<PlaceEntity>? query;
 
-    logger.log(
-      const EntityLoadStarted('place', method: 'getById'),
-      extra: {'id': id},
-    );
-
     try {
       final condition = PlaceEntity_.remoteId.equals(id).and(_isNotDeleted);
 
@@ -213,7 +208,11 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
       }
     } on Exception catch (exception, stackTrace) {
       logger.log(
-        const EntityLoadFailed('place', method: 'getById'),
+        EntityLoadFailed(
+          'place',
+          method: 'getById',
+          extra: {'id': id},
+        ),
         error: exception,
         stackTrace: stackTrace,
       );

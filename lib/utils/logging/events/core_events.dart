@@ -3,10 +3,13 @@ part of 'package:moliseis/utils/logging/log_event.dart';
 /// Fired when an image failed to load.
 class ImageLoadFailed extends LogEvent {
   /// Creates an event for a failed image load.
-  const ImageLoadFailed();
+  const ImageLoadFailed({required this.url});
+
+  /// The url of the requested image to load.
+  final String url;
 
   @override
-  Map<String, Object?> get data => const {};
+  Map<String, Object?> get data => {'url': url};
 
   @override
   AppLogLevel get level => AppLogLevel.error;

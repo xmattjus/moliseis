@@ -1,17 +1,12 @@
 import 'package:moliseis/data/services/external_url_service.dart';
-import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Service responsible for handling map-related external URL launches,
 /// including attribution pages and location searches.
 class MapUrlService {
   MapUrlService({
-    required Logger logger,
     required ExternalUrlService externalUrlService,
-  }) : _logger = logger,
-       _externalUrlService = externalUrlService;
-
-  final Logger _logger;
+  }) : _externalUrlService = externalUrlService;
 
   final ExternalUrlService _externalUrlService;
 
@@ -23,26 +18,15 @@ class MapUrlService {
   /// Opens the MapTiler copyright web page with the default web browser app.
   ///
   /// Returns a [Result] containing success or failure information.
-  Future<Result<void>> openMapTilerAttribution() {
-    _logger.log(
-      const UrlLaunchStarted(_mapTilerUrl, method: 'openMapTilerAttribution'),
-    );
-    return _externalUrlService.launchGenericUrl(_mapTilerUrl);
-  }
+  Future<Result<void>> openMapTilerAttribution() =>
+      _externalUrlService.launchGenericUrl(_mapTilerUrl);
 
   /// Opens the OpenStreetMap copyright web page with the default web browser
   /// app.
   ///
   /// Returns a [Result] containing success or failure information.
-  Future<Result<void>> openOpenStreetMapAttribution() {
-    _logger.log(
-      const UrlLaunchStarted(
-        _openStreetMapUrl,
-        method: 'openOpenStreetMapAttribution',
-      ),
-    );
-    return _externalUrlService.launchGenericUrl(_openStreetMapUrl);
-  }
+  Future<Result<void>> openOpenStreetMapAttribution() =>
+      _externalUrlService.launchGenericUrl(_openStreetMapUrl);
 
   /// Opens the requested content in a Google Maps window.
   ///
@@ -60,7 +44,6 @@ class MapUrlService {
 
     final searchUrl = '$_googleMapsBaseUrl&query=$query';
 
-    _logger.log(UrlLaunchStarted(searchUrl, method: 'searchInGoogleMaps'));
     return _externalUrlService.launchGenericUrl(searchUrl);
   }
 }

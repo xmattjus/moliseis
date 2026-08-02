@@ -26,13 +26,11 @@ class UrlLaunchService {
       appInfoService:
           appInfoService ??
           AppInfoService(
-            logger: logger,
             externalUrlService: resolvedExternalUrlService,
           ),
       mapUrlService:
           mapUrlService ??
           MapUrlService(
-            logger: logger,
             externalUrlService: resolvedExternalUrlService,
           ),
     );

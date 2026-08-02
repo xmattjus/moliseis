@@ -102,7 +102,7 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
       },
       errorBuilder: (context, error, stackTrace) {
         context.read<Logger?>()?.log(
-          const ImageLoadFailed(),
+          ImageLoadFailed(url: widget.url),
           error: error,
           stackTrace: stackTrace,
         );

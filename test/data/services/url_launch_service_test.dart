@@ -102,11 +102,9 @@ void main() {
 
     test('uses injected app and map service overrides when provided', () async {
       final appInfoService = _FakeAppInfoService(
-        logger: logger,
         externalUrlService: externalUrlService,
       );
       final mapUrlService = _FakeMapUrlService(
-        logger: logger,
         externalUrlService: externalUrlService,
       );
       final service = UrlLaunchService(
@@ -144,7 +142,6 @@ final class _FakeExternalUrlService extends ExternalUrlService {
 
 final class _FakeAppInfoService extends AppInfoService {
   _FakeAppInfoService({
-    required super.logger,
     required super.externalUrlService,
   });
 
@@ -164,7 +161,6 @@ final class _FakeAppInfoService extends AppInfoService {
 
 final class _FakeMapUrlService extends MapUrlService {
   _FakeMapUrlService({
-    required super.logger,
     required super.externalUrlService,
   });
 

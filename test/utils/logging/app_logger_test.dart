@@ -133,7 +133,7 @@ void main() {
           minLevel: AppLogLevel.warning,
         );
 
-        logger.log(const ImageLoadFailed());
+        logger.log(const ImageLoadFailed(url: 'test'));
 
         verify(
           () => mockTalker.log(
@@ -171,7 +171,7 @@ void main() {
           sentryFlag: sentryFlag,
         );
 
-        logger.log(const ImageLoadFailed());
+        logger.log(const ImageLoadFailed(url: ''));
 
         verify(
           () => mockTalker.log(
@@ -192,7 +192,7 @@ void main() {
         final stackTrace = StackTrace.current;
 
         logger.log(
-          const ImageLoadFailed(),
+          const ImageLoadFailed(url: ''),
           error: error,
           stackTrace: stackTrace,
         );
@@ -314,7 +314,7 @@ void main() {
           sentryFlag: sentryFlag,
         );
 
-        logger.log(const ImageLoadFailed());
+        logger.log(const ImageLoadFailed(url: ''));
 
         // Allow microtask queue to flush.
         await Future<void>.delayed(Duration.zero);
@@ -333,7 +333,7 @@ void main() {
           );
 
           logger.log(
-            const ImageLoadFailed(),
+            const ImageLoadFailed(url: ''),
             error: Exception('should not be captured'),
           );
 
@@ -410,7 +410,7 @@ void main() {
           );
 
           logger.log(
-            const ImageLoadFailed(),
+            const ImageLoadFailed(url: ''),
             error: Exception('captured'),
           );
 
@@ -451,7 +451,7 @@ void main() {
             sentryFlag: sentryFlag,
           );
 
-          logger.log(const ImageLoadFailed());
+          logger.log(const ImageLoadFailed(url: ''));
 
           // Allow microtask queue to flush.
           await Future<void>.delayed(Duration.zero);
@@ -513,7 +513,7 @@ void main() {
         );
 
         // Should not throw.
-        logger.log(const ImageLoadFailed());
+        logger.log(const ImageLoadFailed(url: ''));
       });
 
       test('valid multi-segment name passes assertion', () {

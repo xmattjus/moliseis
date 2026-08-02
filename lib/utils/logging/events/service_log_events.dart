@@ -260,26 +260,19 @@ class SentryLoggingEnabled extends LogEvent {
   String get name => 'sentry_crash_reporting_enabled';
 }
 
-/// Fired before attempting to open a URL via the system launcher.
-class UrlLaunchStarted extends LogEvent {
-  /// Creates an event for launching [url] using the given [method].
-  const UrlLaunchStarted(this.url, {this.method = 'unknown'});
-
-  /// The URL that will be opened by the system launcher.
-  final String url;
-
-  /// Calling method or context (e.g. `openPrivacyPolicy'`,
-  /// `'searchInGoogleMaps'`).
-  final String method;
+/// Fired when Supabase Auth anonymous login fails.
+class SupabaseAuthAnonymousLoginFailed extends LogEvent {
+  /// Creates an event when a Supabase Auth anonymous login is failed.
+  const SupabaseAuthAnonymousLoginFailed();
 
   @override
-  Map<String, Object?> get data => {'url': url, 'method': method};
+  Map<String, Object?> get data => const {};
 
   @override
-  AppLogLevel get level => AppLogLevel.info;
+  AppLogLevel get level => AppLogLevel.error;
 
   @override
-  String get name => 'url_launch_started';
+  String get name => 'supabase_auth_anonymous_login_failed';
 }
 
 /// Fired when opening a URL via the system launcher fails.
@@ -340,32 +333,4 @@ class UserIdFetchFailed extends LogEvent {
 
   @override
   String get name => 'user_id_fetch_failed';
-}
-
-/// Fired when a weather forecast fetch started.
-class WeatherForecastFetchStarted extends LogEvent {
-  /// Creates an event for a weather forecast request started
-  /// at [latitude], [longitude].
-  const WeatherForecastFetchStarted({
-    required this.latitude,
-    required this.longitude,
-  });
-
-  /// Latitude coordinate of the forecast request.
-  final double latitude;
-
-  /// Longitude coordinate of the forecast request.
-  final double longitude;
-
-  @override
-  Map<String, Object?> get data => {
-    'latitude': latitude,
-    'longitude': longitude,
-  };
-
-  @override
-  AppLogLevel get level => AppLogLevel.info;
-
-  @override
-  String get name => 'weather_forecast_fetch_started';
 }

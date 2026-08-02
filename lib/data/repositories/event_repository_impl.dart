@@ -181,7 +181,8 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     }
   }
 
-  // TODO(xmattjus): remove the try / catch block here since callers also wrap this function in a try / catch block.
+  // TODO(xmattjus): remove the try / catch block here since callers also wrap
+  //  this function in a try / catch block.
   Future<Result<List<Event>>> _getByDateRange({
     required DateTime start,
     DateTime? end,
@@ -233,20 +234,16 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   @override
   Future<Result<List<Event>>> getByDate(DateTime date) async {
     try {
+      return await _getByDateRange(start: date);
+    } on Exception catch (exception, stackTrace) {
       logger.log(
-        EntityLoadStarted(
+        EntityLoadFailed(
           'event',
           method: 'getByDate',
           extra: {
             'startDate': date.toIso8601String(),
           },
         ),
-      );
-
-      return await _getByDateRange(start: date);
-    } on Exception catch (exception, stackTrace) {
-      logger.log(
-        const EntityLoadFailed('event', method: 'getByDate'),
         error: exception,
         stackTrace: stackTrace,
       );
@@ -262,8 +259,10 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     DateTime end,
   ) async {
     try {
+      return await _getByDateRange(start: start, end: end);
+    } on Exception catch (exception, stackTrace) {
       logger.log(
-        EntityLoadStarted(
+        EntityLoadFailed(
           'event',
           method: 'getByDateRange',
           extra: {
@@ -271,12 +270,6 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
             'endDate': end.toIso8601String(),
           },
         ),
-      );
-
-      return await _getByDateRange(start: start, end: end);
-    } on Exception catch (exception, stackTrace) {
-      logger.log(
-        const EntityLoadFailed('event', method: 'getByDateRange'),
         error: exception,
         stackTrace: stackTrace,
       );
@@ -288,11 +281,6 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   @override
   Future<Result<Event>> getById(int id) async {
     Query<EventEntity>? query;
-
-    logger.log(
-      const EntityLoadStarted('event', method: 'getById'),
-      extra: {'id': id},
-    );
 
     try {
       final condition = EventEntity_.remoteId.equals(id).and(_isNotDeleted);
@@ -312,7 +300,11 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
       }
     } on Exception catch (exception, stackTrace) {
       logger.log(
-        const EntityLoadFailed('event', method: 'getById'),
+        EntityLoadFailed(
+          'event',
+          method: 'getById',
+          extra: {'id': id},
+        ),
         error: exception,
         stackTrace: stackTrace,
       );

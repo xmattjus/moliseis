@@ -55,10 +55,6 @@ class WeatherApiClient {
     double longitude, {
     String timezone = 'Europe/Rome',
   }) async {
-    _logger.log(
-      WeatherForecastFetchStarted(latitude: latitude, longitude: longitude),
-    );
-
     try {
       final uri = _buildApiUri(latitude, longitude, timezone: timezone);
 

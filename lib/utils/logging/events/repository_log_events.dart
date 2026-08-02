@@ -159,39 +159,17 @@ class EntityUpdateFailed extends LogEvent {
 /// Fired when loading an entity from the local database fails.
 class EntityLoadFailed extends LogEvent {
   /// Creates an event for a failed load of [entityType] via [method].
-  const EntityLoadFailed(this.entityType, {required this.method});
+  const EntityLoadFailed(this.entityType, {required this.method, this.extra});
 
   /// Type label identifying the entity class (e.g. `"Event"`, `"Place"`).
   final String entityType;
 
   /// Repository method that triggered the load (e.g. `"getById"`, `"getAll"`).
   final String method;
-
-  @override
-  Map<String, Object?> get data => {'entityType': entityType, 'method': method};
-
-  @override
-  AppLogLevel get level => AppLogLevel.error;
-
-  @override
-  String get name => 'entity_load_failed';
-}
-
-/// Fired when loading an entity from the local database starts.
-class EntityLoadStarted extends LogEvent {
-  /// Creates an event for a load of [entityType] via [method]
-  /// with optional [extra] context.
-  const EntityLoadStarted(this.entityType, {required this.method, this.extra});
-
-  /// Type label identifying the entity class (e.g. `"Event"`, `"Place"`).
-  final String entityType;
 
   /// Optional structured context carried alongside the request
   /// (e.g. filter parameters).
   final Map<String, Object?>? extra;
-
-  /// Repository method that triggered the load (e.g. `"getById"`, `"getAll"`).
-  final String method;
 
   @override
   Map<String, Object?> get data => {
@@ -201,10 +179,10 @@ class EntityLoadStarted extends LogEvent {
   };
 
   @override
-  AppLogLevel get level => AppLogLevel.info;
+  AppLogLevel get level => AppLogLevel.error;
 
   @override
-  String get name => 'entity_load_started';
+  String get name => 'entity_load_failed';
 }
 
 /// Fired when a repository sync fails.
