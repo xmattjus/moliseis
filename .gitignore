@@ -131,7 +131,6 @@ app.*.symbols
 lib/libobjectbox.dylib
 
 # AI
-**/.agents/
 **/.claude/
 **/.github/
 .code-review-graphignore
@@ -140,6 +139,5 @@ CLAUDE.md
 **/.opencode/
 **/docs/
 **/plans/
-skills-lock.json
 # Added by code-review-graph
 .code-review-graph/
