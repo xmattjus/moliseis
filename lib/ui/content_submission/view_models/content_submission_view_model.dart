@@ -62,9 +62,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     submit = Command0(_submit);
     clear = Command0(_clear);
     retrieveLostAssets = Command0(_retrieveLostAssets);
-    _debounced = CancellableDebouncer(
+    _debounced = debounce<Result<void>, void>(
       duration: const Duration(seconds: 3),
-      function: () => _draftRepository.saveDraft(state),
+      function: ([_]) => _draftRepository.saveDraft(state),
     );
   }
 
@@ -115,7 +115,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// recoverable alternative path for the user to take.
   late Command0<void> retrieveLostAssets;
 
-  late final CancellableDebouncer<Result<void>> _debounced;
+  late final Debounced<Result<void>, void> _debounced;
 
   /// Loads the last [ContentSubmissionDraft] saved to local persistance
   /// if any.

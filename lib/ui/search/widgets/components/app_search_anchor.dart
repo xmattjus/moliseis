@@ -88,7 +88,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
     _debouncedSearch = debounce<Iterable<ContentBase>?, String>(
       duration: const Duration(milliseconds: 500),
       function: _search,
-    );
+    ).call;
   }
 
   @override
@@ -310,9 +310,9 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
 
   // Calls the "remote" API to search with the given query. Returns null when
   // the call has been made obsolete.
-  Future<Iterable<ContentBase>?> _search(String query) async {
+  Future<Iterable<ContentBase>?> _search([String? query]) async {
     // If the query is too short, do not search.
-    if (!SearchViewModel.isSearchQueryValid(query)) {
+    if (query == null || !SearchViewModel.isSearchQueryValid(query)) {
       // Resets the last shown options.
       _lastOptions = <Widget>[];
 

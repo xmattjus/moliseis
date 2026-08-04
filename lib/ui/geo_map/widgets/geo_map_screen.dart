@@ -47,7 +47,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   /// Initially set to somewhere near Campobasso.
   LatLng _currentCenter = const LatLng(41.5575078, 14.6485406);
 
-  late final Debounceable1<bool> _debouncedUpdate;
+  late final Debounceable<bool, void> _debouncedUpdate;
 
   final _mapController = MapController();
 
@@ -82,10 +82,10 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       _currentCenter = widget.contentExtra!.coordinates;
     }
 
-    _debouncedUpdate = debounce1<bool>(
+    _debouncedUpdate = debounce<bool, void>(
       duration: const Duration(milliseconds: 1500),
-      function: () => Future.value(true),
-    );
+      function: ([_]) => Future.value(true),
+    ).call;
   }
 
   @override
