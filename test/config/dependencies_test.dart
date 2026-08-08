@@ -7,7 +7,6 @@ import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
-import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
@@ -16,7 +15,6 @@ import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
-import 'package:moliseis/domain/repositories/geo_map_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
@@ -123,7 +121,6 @@ void main() {
                     .read<SettingsRepository>();
                 resolved[ContentSubmissionRepository] = context
                     .read<ContentSubmissionRepository>();
-                resolved[GeoMapRepository] = context.read<GeoMapRepository>();
                 resolved[ThemeViewModel] = context.read<ThemeViewModel>();
                 resolved[SyncViewModel] = context.read<SyncViewModel>();
                 resolved[SettingsViewModel] = context.read<SettingsViewModel>();
@@ -158,7 +155,6 @@ void main() {
         resolved[ContentSubmissionRepository],
         isA<ContentSubmissionRepositoryImpl>(),
       );
-      expect(resolved[GeoMapRepository], isA<GeoMapRepositoryImpl>());
 
       // View models are constructed and wired with their repositories.
       expect(resolved[ThemeViewModel], isA<ThemeViewModel>());

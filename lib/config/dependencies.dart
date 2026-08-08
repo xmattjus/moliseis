@@ -9,12 +9,10 @@ import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
-import 'package:moliseis/data/repositories/geo_map_repository_impl.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client_impl.dart';
-import 'package:moliseis/data/services/api/openstreetmap/openstreetmap_client.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
@@ -26,7 +24,6 @@ import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
-import 'package:moliseis/domain/repositories/geo_map_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
@@ -159,17 +156,6 @@ List<SingleChildWidget> providers(
       logger: context.read(),
       objectBoxI: objectBox,
     ),
-  ),
-  Provider<GeoMapRepository>(
-    create: (context) {
-      return GeoMapRepositoryImpl(
-            openStreetMapClient: OpenStreetMapClient(
-              logger: context.read(),
-              httpClient: httpClient,
-            ),
-          )
-          as GeoMapRepository;
-    },
   ),
   //#endregion
 
