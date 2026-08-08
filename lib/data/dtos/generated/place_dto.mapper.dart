@@ -32,6 +32,15 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
     'description',
     _$description,
   );
+  static List<Map<String, dynamic>>? _$descriptionDelta(PlaceDto v) =>
+      v.descriptionDelta;
+  static const Field<PlaceDto, List<Map<String, dynamic>>> _f$descriptionDelta =
+      Field(
+        'descriptionDelta',
+        _$descriptionDelta,
+        key: r'description_delta',
+        opt: true,
+      );
   static double _$latitude(PlaceDto v) => v.latitude;
   static const Field<PlaceDto, double> _f$latitude = Field(
     'latitude',
@@ -81,6 +90,7 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
     #id: _f$id,
     #name: _f$name,
     #description: _f$description,
+    #descriptionDelta: _f$descriptionDelta,
     #latitude: _f$latitude,
     #longitude: _f$longitude,
     #category: _f$category,
@@ -97,6 +107,7 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
       id: data.dec(_f$id),
       name: data.dec(_f$name),
       description: data.dec(_f$description),
+      descriptionDelta: data.dec(_f$descriptionDelta),
       latitude: data.dec(_f$latitude),
       longitude: data.dec(_f$longitude),
       category: data.dec(_f$category),

@@ -28,6 +28,7 @@ class MediaDtoMapper extends ClassMapperBase<MediaDto> {
   static const Field<MediaDto, String> _f$title = Field(
     'title',
     _$title,
+    key: r'description',
     opt: true,
   );
   static String? _$author(MediaDto v) => v.author;

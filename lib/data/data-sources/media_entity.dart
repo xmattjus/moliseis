@@ -23,6 +23,8 @@ class MediaEntity implements SyncEntity {
     this.isDeleted = false,
   });
 
+  static const _unset = Object();
+
   @override
   @Id(assignable: true)
   final int remoteId;
@@ -67,6 +69,8 @@ class MediaEntity implements SyncEntity {
     String? url,
     int? width,
     int? height,
+    Object? eventToOneId = _unset,
+    Object? placeToOneId = _unset,
     DateTime? createdAt,
     DateTime? modifiedAt,
     bool? isDeleted,
@@ -79,29 +83,15 @@ class MediaEntity implements SyncEntity {
     url: url ?? this.url,
     width: width ?? this.width,
     height: height ?? this.height,
+    eventToOneId: identical(eventToOneId, _unset)
+        ? this.eventToOneId
+        : eventToOneId as int?,
+    placeToOneId: identical(placeToOneId, _unset)
+        ? this.placeToOneId
+        : placeToOneId as int?,
     createdAt: createdAt ?? this.createdAt,
     modifiedAt: modifiedAt ?? this.modifiedAt,
     isDeleted: isDeleted ?? this.isDeleted,
-    place: place,
-    event: event,
-  );
-
-  /// Creates a copy of this [MediaEntity] with [eventToOneId] set to [eventId]
-  /// and [placeToOneId] set to [placeId].
-  MediaEntity updateRelationIds(int? eventId, int? placeId) => MediaEntity(
-    remoteId: remoteId,
-    title: title,
-    author: author,
-    license: license,
-    licenseUrl: licenseUrl,
-    url: url,
-    width: width,
-    height: height,
-    eventToOneId: eventId,
-    placeToOneId: placeId,
-    createdAt: createdAt,
-    modifiedAt: modifiedAt,
-    isDeleted: isDeleted,
     place: place,
     event: event,
   );

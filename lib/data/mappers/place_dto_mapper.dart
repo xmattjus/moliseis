@@ -3,6 +3,7 @@ import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
+import 'package:moliseis/data/mappers/description_delta_copy.dart';
 import 'package:objectbox/objectbox.dart';
 
 /// Conversion extensions from [PlaceDto] to [PlaceEntity].
@@ -17,6 +18,7 @@ extension PlaceDtoExtensions on PlaceDto {
       remoteId: id,
       name: name,
       description: description,
+      descriptionDelta: copyDescriptionDelta(descriptionDelta),
       coordinates: [latitude, longitude],
       contentCategoryIndex: category.index,
       cityToOneId: cityRelationId,
@@ -39,18 +41,19 @@ extension PlaceDtoExtensions on PlaceDto {
       Assign<int>(value: final id) => id,
     };
 
-    final copy = existing
-        .copyWith(
-          name: name,
-          description: description,
-          coordinates: [latitude, longitude],
-          contentCategoryIndex: category.index,
-          createdAt: createdAt,
-          modifiedAt: modifiedAt,
-          isDeleted: deletedAt != null,
-        )
-        .updateRelationId(cityRelationId);
+    final copy = existing.copyWith(
+      name: name,
+      description: description,
+      descriptionDelta: copyDescriptionDelta(descriptionDelta),
+      coordinates: [latitude, longitude],
+      contentCategoryIndex: category.index,
+      cityToOneId: cityRelationId,
+      createdAt: createdAt,
+      modifiedAt: modifiedAt,
+      isDeleted: deletedAt != null,
+    );
 
+    // The shared ToOne needs its target updated independently of the scalar.
     copy.city.targetId = cityRelationId;
 
     return copy;

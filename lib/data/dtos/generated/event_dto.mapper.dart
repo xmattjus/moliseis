@@ -32,6 +32,15 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     'description',
     _$description,
   );
+  static List<Map<String, dynamic>>? _$descriptionDelta(EventDto v) =>
+      v.descriptionDelta;
+  static const Field<EventDto, List<Map<String, dynamic>>> _f$descriptionDelta =
+      Field(
+        'descriptionDelta',
+        _$descriptionDelta,
+        key: r'description_delta',
+        opt: true,
+      );
   static DateTime _$startDate(EventDto v) => v.startDate;
   static const Field<EventDto, DateTime> _f$startDate = Field(
     'startDate',
@@ -94,6 +103,7 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     #id: _f$id,
     #name: _f$name,
     #description: _f$description,
+    #descriptionDelta: _f$descriptionDelta,
     #startDate: _f$startDate,
     #latitude: _f$latitude,
     #longitude: _f$longitude,
@@ -112,6 +122,7 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
       id: data.dec(_f$id),
       name: data.dec(_f$name),
       description: data.dec(_f$description),
+      descriptionDelta: data.dec(_f$descriptionDelta),
       startDate: data.dec(_f$startDate),
       latitude: data.dec(_f$latitude),
       longitude: data.dec(_f$longitude),

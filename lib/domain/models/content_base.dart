@@ -56,13 +56,14 @@ LatLng _round(LatLng coordinates) =>
 abstract class ContentBase {
   /// Creates a [ContentBase] with the given [category], [city], [coordinates],
   /// [createdAt], [description], [modifiedAt], [media], [name], [remoteId] and
-  /// optionally [isSaved].
+  /// optionally [descriptionDelta] and [isSaved].
   const ContentBase({
     required this.category,
     required this.city,
     required this.coordinates,
     required this.createdAt,
     required this.description,
+    this.descriptionDelta,
     required this.modifiedAt,
     required this.media,
     required this.name,
@@ -75,6 +76,7 @@ abstract class ContentBase {
   final LatLng coordinates;
   final DateTime createdAt;
   final String description;
+  final List<Map<String, dynamic>>? descriptionDelta;
   final DateTime modifiedAt;
   final List<Media> media;
   final String name;
@@ -91,6 +93,10 @@ abstract class ContentBase {
         _round(other.coordinates) == _round(coordinates) &&
         other.createdAt.isAtSameMomentAs(createdAt) &&
         other.description == description &&
+        const DeepCollectionEquality().equals(
+          other.descriptionDelta,
+          descriptionDelta,
+        ) &&
         other.modifiedAt.isAtSameMomentAs(modifiedAt) &&
         const ListEquality<Media>().equals(other.media, media) &&
         other.name == name &&
@@ -105,6 +111,7 @@ abstract class ContentBase {
     _round(coordinates),
     createdAt.millisecondsSinceEpoch,
     description,
+    const DeepCollectionEquality().hash(descriptionDelta),
     modifiedAt.millisecondsSinceEpoch,
     Object.hashAll(media),
     name,

@@ -97,8 +97,8 @@ import 'package:moliseis/data/dtos/media_dto.dart';
 /// ```
 ///
 /// [eventId] and [placeId] are mutually exclusive: when one is [Assign], the
-/// other must be [Clear]. The backend rejects simultaneous assignment of both
-/// relations.
+/// other must be [Clear]. Clearing both is also rejected because it always
+/// violates the backend's `media_exactly_one_parent` constraint.
 ///
 /// See also:
 ///
@@ -116,16 +116,17 @@ extension MediaDtoPatchEncoding on MediaDto {
   ///
   /// Fields represented by [Assign] are encoded using their contained value.
   ///
-  /// Throws [ArgumentError] if [eventId] and [placeId] would result in both
-  /// relations being set simultaneously, which the backend rejects. When one
-  /// field is [Assign], the other must be [Clear] to avoid a conflict.
+  /// Throws [ArgumentError] for conflicting parent assignments or clearing both
+  /// parents, which violates `media_exactly_one_parent`. When one field is
+  /// [Assign], the other must be [Clear] to avoid a conflict.
   Map<String, dynamic> toPatchJson() {
     if ((eventId is Assign<int> && placeId is! Clear<int>) ||
-        (placeId is Assign<int> && eventId is! Clear<int>)) {
+        (placeId is Assign<int> && eventId is! Clear<int>) ||
+        (eventId is Clear<int> && placeId is Clear<int>)) {
       throw ArgumentError(
         'MediaDto.eventId and MediaDto.placeId are mutually exclusive: '
-        'assigning both is rejected by the backend. '
-        'When one is assigned, the other must be Clear().',
+        'conflicting assignments and clearing both parents are rejected by '
+        'the backend. When one is assigned, the other must be Clear().',
       );
     }
 

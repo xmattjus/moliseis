@@ -253,7 +253,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(17, 7285695363865824884),
     name: 'EventEntity',
-    lastPropertyId: const obx_int.IdUid(14, 518889750085749809),
+    lastPropertyId: const obx_int.IdUid(15, 3781919031562521160),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -340,6 +340,12 @@ final _entities = <obx_int.ModelEntity>[
         type: 6,
         flags: 0,
       ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(15, 3781919031562521160),
+        name: 'descriptionDelta',
+        type: 13,
+        flags: 0,
+      ),
     ],
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[
@@ -353,7 +359,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(18, 7465876784755698809),
     name: 'PlaceEntity',
-    lastPropertyId: const obx_int.IdUid(12, 3931452297098446623),
+    lastPropertyId: const obx_int.IdUid(13, 7959729577756223052),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -426,6 +432,12 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(12, 3931452297098446623),
         name: 'contentCategoryIndex',
         type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(13, 7959729577756223052),
+        name: 'descriptionDelta',
+        type: 13,
         flags: 0,
       ),
     ],
@@ -1108,7 +1120,10 @@ obx_int.ModelDefinition getObjectBoxModel() {
             ? null
             : fbb.writeString(object.description!);
         final coordinatesOffset = fbb.writeListFloat32(object.coordinates);
-        fbb.startTable(15);
+        final descriptionDeltaOffset = object.descriptionDelta == null
+            ? null
+            : fbb.writeListInt8(obx_int.toFlexBuffer(object.descriptionDelta!));
+        fbb.startTable(16);
         fbb.addInt64(0, object.remoteId);
         fbb.addOffset(1, nameOffset);
         fbb.addOffset(2, descriptionOffset);
@@ -1132,6 +1147,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addBool(11, object.isSaved);
         fbb.addBool(12, object.isDeleted);
         fbb.addInt64(13, object.contentCategoryIndex);
+        fbb.addOffset(14, descriptionDeltaOffset);
         fbb.finish(fbb.endTable());
         return object.remoteId;
       },
@@ -1160,6 +1176,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final descriptionParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGetNullable(buffer, rootOffset, 8);
+        final descriptionDeltaParam = obx_int.flexBufferToListOfMaps(
+          buffer,
+          rootOffset,
+          32,
+        );
         final startDateParam = startDateValue == null
             ? null
             : DateTime.fromMicrosecondsSinceEpoch(
@@ -1213,6 +1234,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           remoteId: remoteIdParam,
           name: nameParam,
           description: descriptionParam,
+          descriptionDelta: descriptionDeltaParam,
           startDate: startDateParam,
           endDate: endDateParam,
           coordinates: coordinatesParam,
@@ -1266,7 +1288,10 @@ obx_int.ModelDefinition getObjectBoxModel() {
             ? null
             : fbb.writeString(object.description!);
         final coordinatesOffset = fbb.writeListFloat32(object.coordinates);
-        fbb.startTable(13);
+        final descriptionDeltaOffset = object.descriptionDelta == null
+            ? null
+            : fbb.writeListInt8(obx_int.toFlexBuffer(object.descriptionDelta!));
+        fbb.startTable(14);
         fbb.addInt64(0, object.remoteId);
         fbb.addOffset(1, nameOffset);
         fbb.addOffset(2, descriptionOffset);
@@ -1278,6 +1303,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addBool(9, object.isSaved);
         fbb.addBool(10, object.isDeleted);
         fbb.addInt64(11, object.contentCategoryIndex);
+        fbb.addOffset(12, descriptionDeltaOffset);
         fbb.finish(fbb.endTable());
         return object.remoteId;
       },
@@ -1296,6 +1322,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final descriptionParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGetNullable(buffer, rootOffset, 8);
+        final descriptionDeltaParam = obx_int.flexBufferToListOfMaps(
+          buffer,
+          rootOffset,
+          28,
+        );
         final coordinatesParam = const fb.ListReader<double>(
           fb.Float32Reader(),
           lazy: false,
@@ -1339,6 +1370,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           remoteId: remoteIdParam,
           name: nameParam,
           description: descriptionParam,
+          descriptionDelta: descriptionDeltaParam,
           coordinates: coordinatesParam,
           contentCategoryIndex: contentCategoryIndexParam,
           cityToOneId: cityToOneIdParam,

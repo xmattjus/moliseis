@@ -1,6 +1,7 @@
 import 'package:latlong2/latlong.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/mappers/city_entity_mapper.dart';
+import 'package:moliseis/data/mappers/description_delta_copy.dart';
 import 'package:moliseis/data/mappers/media_entity_mapper.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/media.dart';
@@ -15,6 +16,7 @@ extension PlaceEntityExtensions on PlaceEntity {
     coordinates: LatLng(coordinates[0], coordinates[1]),
     createdAt: createdAt,
     description: description ?? '',
+    descriptionDelta: copyDescriptionDelta(descriptionDelta),
     media: media
         .where((entity) => !entity.isDeleted)
         .map<Media>((entity) => entity.toModel())

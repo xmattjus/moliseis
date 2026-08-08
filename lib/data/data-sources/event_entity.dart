@@ -10,6 +10,7 @@ class EventEntity implements SyncEntity {
     required this.remoteId,
     required this.name,
     this.description,
+    this.descriptionDelta,
     this.startDate,
     this.endDate,
     this.coordinates = const [0, 0],
@@ -25,6 +26,8 @@ class EventEntity implements SyncEntity {
     assertValidContentCategoryIndex(contentCategoryIndex);
   }
 
+  static const _unset = Object();
+
   @override
   @Id(assignable: true)
   final int remoteId;
@@ -33,6 +36,7 @@ class EventEntity implements SyncEntity {
   final String name;
 
   final String? description;
+  final List<Map<String, dynamic>>? descriptionDelta;
 
   @Property(type: PropertyType.dateNano)
   final DateTime? startDate;
@@ -71,10 +75,12 @@ class EventEntity implements SyncEntity {
   EventEntity copyWith({
     String? name,
     String? description,
+    Object? descriptionDelta = _unset,
     DateTime? startDate,
     DateTime? endDate,
     List<double>? coordinates,
     int? contentCategoryIndex,
+    Object? cityToOneId = _unset,
     DateTime? createdAt,
     DateTime? modifiedAt,
     bool? isDeleted,
@@ -83,33 +89,21 @@ class EventEntity implements SyncEntity {
     remoteId: remoteId,
     name: name ?? this.name,
     description: description ?? this.description,
+    descriptionDelta: identical(descriptionDelta, _unset)
+        ? this.descriptionDelta
+        : descriptionDelta as List<Map<String, dynamic>>?,
     startDate: startDate ?? this.startDate,
     endDate: endDate ?? this.endDate,
     coordinates: coordinates ?? this.coordinates,
     contentCategoryIndex: contentCategoryIndex ?? this.contentCategoryIndex,
+    cityToOneId: identical(cityToOneId, _unset)
+        ? this.cityToOneId
+        : cityToOneId as int?,
     createdAt: createdAt ?? this.createdAt,
     modifiedAt: modifiedAt ?? this.modifiedAt,
     city: city,
     media: media,
     isSaved: isSaved ?? this.isSaved,
     isDeleted: isDeleted ?? this.isDeleted,
-  );
-
-  /// Creates a copy of this [EventEntity] with [cityToOneId] set to [cityId].
-  EventEntity updateRelationId(int? cityId) => EventEntity(
-    remoteId: remoteId,
-    name: name,
-    description: description,
-    startDate: startDate,
-    endDate: endDate,
-    coordinates: coordinates,
-    contentCategoryIndex: contentCategoryIndex,
-    cityToOneId: cityId,
-    createdAt: createdAt,
-    modifiedAt: modifiedAt,
-    city: city,
-    media: media,
-    isSaved: isSaved,
-    isDeleted: isDeleted,
   );
 }

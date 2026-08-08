@@ -187,7 +187,7 @@
     },
     {
       "id": "17:7285695363865824884",
-      "lastPropertyId": "14:518889750085749809",
+      "lastPropertyId": "15:3781919031562521160",
       "name": "EventEntity",
       "properties": [
         {
@@ -262,13 +262,18 @@
           "id": "14:518889750085749809",
           "name": "contentCategoryIndex",
           "type": 6
+        },
+        {
+          "id": "15:3781919031562521160",
+          "name": "descriptionDelta",
+          "type": 13
         }
       ],
       "relations": []
     },
     {
       "id": "18:7465876784755698809",
-      "lastPropertyId": "12:3931452297098446623",
+      "lastPropertyId": "13:7959729577756223052",
       "name": "PlaceEntity",
       "properties": [
         {
@@ -333,6 +338,11 @@
           "id": "12:3931452297098446623",
           "name": "contentCategoryIndex",
           "type": 6
+        },
+        {
+          "id": "13:7959729577756223052",
+          "name": "descriptionDelta",
+          "type": 13
         }
       ],
       "relations": []

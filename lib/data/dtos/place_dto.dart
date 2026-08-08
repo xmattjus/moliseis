@@ -22,6 +22,7 @@ class PlaceDto with PlaceDtoMappable implements SyncDto {
     required this.id,
     required this.name,
     required this.description,
+    this.descriptionDelta,
     required this.latitude,
     required this.longitude,
     required this.category,
@@ -35,6 +36,7 @@ class PlaceDto with PlaceDtoMappable implements SyncDto {
   final int id;
   final String name;
   final String? description;
+  final List<Map<String, dynamic>>? descriptionDelta;
   final double latitude;
   final double longitude;
   final ContentCategory category;

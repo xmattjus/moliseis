@@ -22,6 +22,7 @@ class EventDto with EventDtoMappable implements SyncDto {
     required this.id,
     required this.name,
     required this.description,
+    this.descriptionDelta,
     required this.startDate,
     required this.latitude,
     required this.longitude,
@@ -37,6 +38,7 @@ class EventDto with EventDtoMappable implements SyncDto {
   final int id;
   final String name;
   final String? description;
+  final List<Map<String, dynamic>>? descriptionDelta;
   final DateTime startDate;
   final DateTime? endDate;
   final double latitude;

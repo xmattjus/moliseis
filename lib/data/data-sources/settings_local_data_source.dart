@@ -13,15 +13,14 @@ abstract interface class ISettingsLocalDataSource {
 
 /// ObjectBox-backed implementation for app settings persistence.
 class SettingsLocalDataSource implements ISettingsLocalDataSource {
-  SettingsLocalDataSource(Store store)
-    : _settingsBox = _ObjectBoxSettingsBox(store.box<AppSettings>());
+  SettingsLocalDataSource(Store store) : _box = store.box<AppSettings>();
 
-  final ISettingsBox _settingsBox;
+  final Box<AppSettings> _box;
 
   @override
   Future<Result<AppSettings>> load() async {
     try {
-      final entity = _settingsBox.get(AppSettings.singletonId);
+      final entity = _box.get(AppSettings.singletonId);
       if (entity == null) return Result.success(AppSettings());
       return Result.success(entity);
     } on Exception catch (exception, stackTrace) {
@@ -34,7 +33,7 @@ class SettingsLocalDataSource implements ISettingsLocalDataSource {
   @override
   Future<Result<void>> save(AppSettings settings) async {
     try {
-      _settingsBox.put(settings);
+      _box.put(settings);
       return const Result.success(null);
     } on Exception catch (exception, stackTrace) {
       return Result.error(
@@ -42,25 +41,4 @@ class SettingsLocalDataSource implements ISettingsLocalDataSource {
       );
     }
   }
-}
-
-/// Minimal storage API used by [SettingsLocalDataSource].
-abstract interface class ISettingsBox {
-  /// Returns settings entity by id.
-  AppSettings? get(int id);
-
-  /// Stores the provided settings entity.
-  void put(AppSettings settings);
-}
-
-final class _ObjectBoxSettingsBox implements ISettingsBox {
-  _ObjectBoxSettingsBox(this._box);
-
-  final Box<AppSettings> _box;
-
-  @override
-  AppSettings? get(int id) => _box.get(id);
-
-  @override
-  void put(AppSettings settings) => _box.put(settings);
 }

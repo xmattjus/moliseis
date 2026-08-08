@@ -34,6 +34,7 @@ class MediaDto with MediaDtoMappable implements SyncDto {
   @override
   final int id;
 
+  @MappableField(key: 'description')
   final String? title;
   final String? author;
   final String? license;

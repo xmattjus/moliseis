@@ -18,6 +18,11 @@ extension MediaDtoExtensions on MediaDto {
       _ => null,
     };
 
+    _validateExactlyOneParent(
+      eventRelationId: eventRelationId,
+      placeRelationId: placeRelationId,
+    );
+
     final entity = MediaEntity(
       remoteId: id,
       title: title,
@@ -55,29 +60,42 @@ extension MediaDtoExtensions on MediaDto {
       Assign<int>(value: final id) => id,
     };
 
-    if ((eventRelationId != null && placeRelationId == null) ||
-        (eventRelationId == null && placeRelationId != null)) {
-      throw Exception('Only one between eventId and placeId must be set.');
-    }
+    _validateExactlyOneParent(
+      eventRelationId: eventRelationId,
+      placeRelationId: placeRelationId,
+    );
 
-    final copy = existing
-        .copyWith(
-          title: title,
-          author: author,
-          license: license,
-          licenseUrl: licenseUrl,
-          url: url,
-          width: width,
-          height: height,
-          createdAt: createdAt,
-          modifiedAt: modifiedAt,
-          isDeleted: deletedAt != null,
-        )
-        .updateRelationIds(eventRelationId, placeRelationId);
+    final copy = existing.copyWith(
+      title: title,
+      author: author,
+      license: license,
+      licenseUrl: licenseUrl,
+      url: url,
+      width: width,
+      height: height,
+      eventToOneId: eventRelationId,
+      placeToOneId: placeRelationId,
+      createdAt: createdAt,
+      modifiedAt: modifiedAt,
+      isDeleted: deletedAt != null,
+    );
 
+    // The shared ToOne targets need updating independently of the scalars.
     copy.event.targetId = eventRelationId;
     copy.place.targetId = placeRelationId;
 
     return copy;
+  }
+}
+
+void _validateExactlyOneParent({
+  required int? eventRelationId,
+  required int? placeRelationId,
+}) {
+  if ((eventRelationId == null) == (placeRelationId == null)) {
+    throw const FormatException(
+      'Media must be linked to exactly one of event or place, matching '
+      'media_exactly_one_parent.',
+    );
   }
 }

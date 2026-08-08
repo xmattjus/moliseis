@@ -10,6 +10,7 @@ class PlaceEntity implements SyncEntity {
     required this.remoteId,
     required this.name,
     this.description,
+    this.descriptionDelta,
     this.coordinates = const [0, 0],
     required this.contentCategoryIndex,
     this.cityToOneId,
@@ -23,6 +24,8 @@ class PlaceEntity implements SyncEntity {
     assertValidContentCategoryIndex(contentCategoryIndex);
   }
 
+  static const _unset = Object();
+
   @override
   @Id(assignable: true)
   final int remoteId;
@@ -31,6 +34,7 @@ class PlaceEntity implements SyncEntity {
   final String name;
 
   final String? description;
+  final List<Map<String, dynamic>>? descriptionDelta;
 
   /// Latitude x Longitude
   @HnswIndex(dimensions: 2, distanceType: VectorDistanceType.geo)
@@ -63,8 +67,10 @@ class PlaceEntity implements SyncEntity {
   PlaceEntity copyWith({
     String? name,
     String? description,
+    Object? descriptionDelta = _unset,
     List<double>? coordinates,
     int? contentCategoryIndex,
+    Object? cityToOneId = _unset,
     DateTime? createdAt,
     DateTime? modifiedAt,
     bool? isDeleted,
@@ -73,29 +79,19 @@ class PlaceEntity implements SyncEntity {
     remoteId: remoteId,
     name: name ?? this.name,
     description: description ?? this.description,
+    descriptionDelta: identical(descriptionDelta, _unset)
+        ? this.descriptionDelta
+        : descriptionDelta as List<Map<String, dynamic>>?,
     coordinates: coordinates ?? this.coordinates,
     contentCategoryIndex: contentCategoryIndex ?? this.contentCategoryIndex,
+    cityToOneId: identical(cityToOneId, _unset)
+        ? this.cityToOneId
+        : cityToOneId as int?,
     createdAt: createdAt ?? this.createdAt,
     modifiedAt: modifiedAt ?? this.modifiedAt,
     city: city,
     media: media,
     isDeleted: isDeleted ?? this.isDeleted,
     isSaved: isSaved ?? this.isSaved,
-  );
-
-  /// Creates a copy of this [PlaceEntity] with [cityToOneId] set to [cityId].
-  PlaceEntity updateRelationId(int? cityId) => PlaceEntity(
-    remoteId: remoteId,
-    name: name,
-    description: description,
-    coordinates: coordinates,
-    contentCategoryIndex: contentCategoryIndex,
-    cityToOneId: cityId,
-    createdAt: createdAt,
-    modifiedAt: modifiedAt,
-    city: city,
-    media: media,
-    isSaved: isSaved,
-    isDeleted: isDeleted,
   );
 }
