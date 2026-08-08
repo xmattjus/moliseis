@@ -15,7 +15,6 @@ import 'package:moliseis/utils/synchronizable.dart';
 /// ObjectBox annotations out of domain code.
 abstract class EventRepository with Synchronizable<EventDto> {
   /// Returns all events occurring in the current calendar year.
-  // TODO(xmattjus): remove getByCurrentYear and use getByDateRange.
   Future<Result<List<Event>>> getByCurrentYear();
 
   /// Returns all events that overlap the provided [date].
@@ -45,7 +44,6 @@ abstract class EventRepository with Synchronizable<EventDto> {
   Future<Result<Event>> getById(int id);
 
   /// Returns the IDs of the upcoming events.
-  // TODO(xmattjus): remove getNextEventIds and use getByDateRange.
   Future<Result<List<int>>> getNextEventIds();
 
   /// Returns the IDs of all events marked as favourites.
