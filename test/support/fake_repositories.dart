@@ -199,9 +199,6 @@ final class FakeEventRepository extends EventRepository {
       getFavouriteEventIdsResult;
 
   @override
-  Future<Result<Iterable<Event>>> getFavourites() async => getFavouritesResult;
-
-  @override
   Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
       setFavouriteEventResult;
 }
@@ -320,9 +317,6 @@ final class FakePlaceRepository extends PlaceRepository {
   @override
   Future<Result<List<int>>> getFavouritePlaceIds() async =>
       getFavouritePlaceIdsResult;
-
-  @override
-  Future<Result<Iterable<Place>>> getFavourites() async => getFavouritesResult;
 
   @override
   Future<Result<List<int>>> getIdsByCoordinates(
