@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class _BorderRadiusTokens {
-  const _BorderRadiusTokens({
+class BorderRadiusTokens {
+  const BorderRadiusTokens({
     required this.cornerNone,
     required this.cornerExtraSmall,
     required this.cornerSmall,
@@ -31,7 +31,7 @@ class AppShapesThemeExtension extends ThemeExtension<AppShapesThemeExtension> {
   /// tokens.
   factory AppShapesThemeExtension() {
     return const AppShapesThemeExtension._(
-      circular: _BorderRadiusTokens(
+      circular: BorderRadiusTokens(
         cornerNone: BorderRadius.zero,
         cornerExtraSmall: BorderRadius.all(Radius.circular(4)),
         cornerSmall: BorderRadius.all(Radius.circular(8)),
@@ -47,7 +47,7 @@ class AppShapesThemeExtension extends ThemeExtension<AppShapesThemeExtension> {
   }
 
   const AppShapesThemeExtension._({required this.circular});
-  final _BorderRadiusTokens circular;
+  final BorderRadiusTokens circular;
 
   @override
   ThemeExtension<AppShapesThemeExtension> copyWith({
@@ -61,7 +61,7 @@ class AppShapesThemeExtension extends ThemeExtension<AppShapesThemeExtension> {
     BorderRadius? cornerExtraLargeIncreased,
     BorderRadius? cornerExtraExtraLarge,
     BorderRadius? cornerFull,
-    _BorderRadiusTokens? circular,
+    BorderRadiusTokens? circular,
   }) {
     return AppShapesThemeExtension._(circular: circular ?? this.circular);
   }
@@ -75,7 +75,7 @@ class AppShapesThemeExtension extends ThemeExtension<AppShapesThemeExtension> {
       return this;
     }
     return AppShapesThemeExtension._(
-      circular: _BorderRadiusTokens(
+      circular: BorderRadiusTokens(
         cornerNone: BorderRadius.lerp(
           circular.cornerNone.resolve(TextDirection.ltr),
           other.circular.cornerNone.resolve(TextDirection.ltr),

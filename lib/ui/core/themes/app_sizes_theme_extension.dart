@@ -2,8 +2,8 @@ import 'dart:ui' as ui show lerpDouble;
 
 import 'package:flutter/material.dart';
 
-class _BorderSideTokens {
-  const _BorderSideTokens({
+class BorderSideTokens {
+  const BorderSideTokens({
     this.none = 0,
     this.small = 0.6,
     this.medium = 1.2,
@@ -30,7 +30,7 @@ class _BorderSideTokens {
 class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
   factory AppSizesThemeExtension() {
     return const AppSizesThemeExtension._(
-      borderSide: _BorderSideTokens(),
+      borderSide: BorderSideTokens(),
       bottomSheetMinSnapSize: 0.20,
       bottomSheetInitialSnapSize: 0.35,
       bottomSheetSnapSizes: [0.20, 0.35, 0.50],
@@ -50,7 +50,7 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
     required this.searchBarMaxWidth,
   });
 
-  final _BorderSideTokens borderSide;
+  final BorderSideTokens borderSide;
 
   /// The minimum snap size all bottom sheets should have.
   final double bottomSheetMinSnapSize;
@@ -70,7 +70,7 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
 
   @override
   ThemeExtension<AppSizesThemeExtension> copyWith({
-    _BorderSideTokens? borderSide,
+    BorderSideTokens? borderSide,
     double? bottomSheetMinSnapSize,
     double? bottomSheetInitialSnapSize,
     List<double>? bottomSheetSnapSizes,
@@ -100,7 +100,7 @@ class AppSizesThemeExtension extends ThemeExtension<AppSizesThemeExtension> {
       return this;
     }
     return AppSizesThemeExtension._(
-      borderSide: _BorderSideTokens(
+      borderSide: BorderSideTokens(
         none: ui.lerpDouble(borderSide.none, other.borderSide.none, t)!,
         small: ui.lerpDouble(borderSide.small, other.borderSide.small, t)!,
         medium: ui.lerpDouble(borderSide.medium, other.borderSide.medium, t)!,
