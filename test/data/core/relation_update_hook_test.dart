@@ -158,20 +158,17 @@ void main() {
     );
 
     test(
-      'encodes MediaDto eventId and placeId as null when relation should be '
-      'cleared',
+      'rejects clearing both MediaDto parent relations',
       () {
         final dto = _mediaDto(
           eventId: const Clear<int>(),
           placeId: const Clear<int>(),
         );
 
-        final json = dto.toPatchJson();
+        var json = const <String, Object?>{};
 
-        expect(json, {
-          'event_id': null,
-          'place_id': null,
-        });
+        expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
+        expect(json, isEmpty);
       },
     );
 
@@ -264,11 +261,6 @@ void main() {
           placeId: const Keep<int>(),
         );
 
-        final clearDto = _mediaDto(
-          eventId: const Clear<int>(),
-          placeId: const Clear<int>(),
-        );
-
         final assignDto1 = _mediaDto(
           eventId: const Assign<int>(99),
           placeId: const Clear<int>(),
@@ -282,14 +274,6 @@ void main() {
         expect(
           keepDto.toPatchJson(),
           isEmpty,
-        );
-
-        expect(
-          clearDto.toPatchJson(),
-          {
-            'event_id': null,
-            'place_id': null,
-          },
         );
 
         expect(

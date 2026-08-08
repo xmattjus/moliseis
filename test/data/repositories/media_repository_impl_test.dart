@@ -3,6 +3,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:moliseis/data/core/relation_update.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
@@ -263,41 +264,80 @@ void main() {
             'url': 'https://example.com/img.jpg',
             'width': 800,
             'height': 600,
-            'created_at': '2024-01-01T00:00:00.000',
-            'modified_at': '2024-01-01T00:00:00.000',
+            'description': 'Backend description',
+            'event_id': 7,
+            'place_id': null,
+            'created_at': '2024-01-01T00:00:00.000Z',
+            'modified_at': '2024-01-01T00:00:00.000Z',
           },
         ]);
 
         final prepareResult = await repository.prepareSync();
         final dtos = (prepareResult as Success<List<MediaDto>>).value;
-        repository.commitSync(dtos);
+        final commitResult = repository.commitSync(dtos);
 
-        expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
+        final entity = mediaBox.get(10)!;
+        expect(commitResult, isA<Success<void>>());
+        expect(entity.url, equals('https://example.com/img.jpg'));
+        expect(entity.title, 'Backend description');
+        expect(entity.eventToOneId, 7);
+        expect(entity.placeToOneId, isNull);
+        expect(entity.event.targetId, 7);
+        expect(entity.place.targetId, 0);
         expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
       },
     );
 
-    test('wires place and event relations when inserting new media', () async {
+    test('wires an event relation when inserting new media', () async {
       supabaseEnv.stubSelectResponse([
         {
           'id': 10,
           'url': 'https://example.com/img.jpg',
           'width': 800,
           'height': 600,
-          'place_id': 5,
           'event_id': 7,
-          'created_at': '2024-01-01T00:00:00.000',
-          'modified_at': '2024-01-01T00:00:00.000',
+          'place_id': null,
+          'created_at': '2024-01-01T00:00:00.000Z',
+          'modified_at': '2024-01-01T00:00:00.000Z',
         },
       ]);
 
       final prepareResult = await repository.prepareSync();
       final dtos = (prepareResult as Success<List<MediaDto>>).value;
-      repository.commitSync(dtos);
+      final commitResult = repository.commitSync(dtos);
 
       final entity = mediaBox.get(10)!;
-      expect(entity.place.targetId, equals(5));
+      expect(commitResult, isA<Success<void>>());
+      expect(entity.eventToOneId, 7);
+      expect(entity.placeToOneId, isNull);
       expect(entity.event.targetId, equals(7));
+      expect(entity.place.targetId, 0);
+    });
+
+    test('wires a place relation when inserting new media', () async {
+      supabaseEnv.stubSelectResponse([
+        {
+          'id': 10,
+          'url': 'https://example.com/img.jpg',
+          'width': 800,
+          'height': 600,
+          'event_id': null,
+          'place_id': 5,
+          'created_at': '2024-01-01T00:00:00.000Z',
+          'modified_at': '2024-01-01T00:00:00.000Z',
+        },
+      ]);
+
+      final prepareResult = await repository.prepareSync();
+      final dtos = (prepareResult as Success<List<MediaDto>>).value;
+      final commitResult = repository.commitSync(dtos);
+
+      final entity = mediaBox.get(10)!;
+      expect(commitResult, isA<Success<void>>());
+      expect(entity.eventToOneId, isNull);
+      expect(entity.placeToOneId, 5);
+      expect(entity.event.targetId, 0);
+      expect(entity.place.targetId, 5);
     });
 
     test('skips a media item that already matches the local copy', () async {
@@ -305,6 +345,8 @@ void main() {
         makeMediaEntity(
           remoteId: 10,
           url: 'https://example.com/img.jpg',
+          eventId: 7,
+          modifiedAt: DateTime.utc(2026),
         ),
       );
 
@@ -314,16 +356,24 @@ void main() {
           'url': 'https://example.com/img.jpg',
           'width': 800,
           'height': 600,
-          'created_at': '2026-01-01T00:00:00.000',
-          'modified_at': '2026-01-01T00:00:00.000',
+          'event_id': 7,
+          'place_id': null,
+          'created_at': '2026-01-01T00:00:00.000Z',
+          'modified_at': '2026-01-01T00:00:00.000Z',
         },
       ]);
 
       final prepareResult = await repository.prepareSync();
       final dtos = (prepareResult as Success<List<MediaDto>>).value;
-      repository.commitSync(dtos);
+      final commitResult = repository.commitSync(dtos);
 
-      expect(mediaBox.get(10)?.url, equals('https://example.com/img.jpg'));
+      final entity = mediaBox.get(10)!;
+      expect(commitResult, isA<Success<void>>());
+      expect(entity.url, equals('https://example.com/img.jpg'));
+      expect(entity.eventToOneId, 7);
+      expect(entity.placeToOneId, isNull);
+      expect(entity.event.targetId, 7);
+      expect(entity.place.targetId, 0);
       expect(mockLogger.containsEvent<EntityInsertSuccess>(), isFalse);
       expect(mockLogger.containsEvent<EntityUpdateSuccess>(), isFalse);
     });
@@ -333,6 +383,8 @@ void main() {
         makeMediaEntity(
           remoteId: 10,
           url: 'https://example.com/old.jpg',
+          eventId: 1,
+          modifiedAt: DateTime.utc(2024),
         ),
       );
 
@@ -342,16 +394,24 @@ void main() {
           'url': 'https://example.com/new.jpg',
           'width': 1920,
           'height': 1080,
-          'created_at': '2024-01-01T00:00:00.000',
-          'modified_at': '2027-06-01T00:00:00.000',
+          'event_id': 1,
+          'place_id': null,
+          'created_at': '2024-01-01T00:00:00.000Z',
+          'modified_at': '2027-06-01T00:00:00.000Z',
         },
       ]);
 
       final prepareResult = await repository.prepareSync();
       final dtos = (prepareResult as Success<List<MediaDto>>).value;
-      repository.commitSync(dtos);
+      final commitResult = repository.commitSync(dtos);
 
-      expect(mediaBox.get(10)?.url, equals('https://example.com/new.jpg'));
+      final entity = mediaBox.get(10)!;
+      expect(commitResult, isA<Success<void>>());
+      expect(entity.url, equals('https://example.com/new.jpg'));
+      expect(entity.eventToOneId, 1);
+      expect(entity.placeToOneId, isNull);
+      expect(entity.event.targetId, 1);
+      expect(entity.place.targetId, 0);
       expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
     });
 
@@ -372,6 +432,59 @@ void main() {
       expect(failedCall.error, isNotNull);
       expect(failedCall.stackTrace, isNotNull);
     });
+  });
+
+  group('MediaRepositoryImpl - relation scalar preservation', () {
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<MediaEntity> mediaBox;
+    late MediaRepositoryImpl repository;
+
+    setUp(() async {
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      mediaBox = objectBoxEnvironment.store.box<MediaEntity>();
+      repository = MediaRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+      );
+    });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    test(
+      'preserves parent relations through soft deletion and a Keep merge',
+      () {
+        mediaBox.put(
+          makeMediaEntity(eventId: 7, modifiedAt: DateTime.utc(2024)),
+        );
+
+        final deleteResult = repository.commitSync([
+          _relationTestMediaDto(
+            modifiedAt: DateTime.utc(2025),
+            deletedAt: DateTime.utc(2025),
+          ),
+        ]);
+
+        expect(deleteResult, isA<Success<void>>());
+        expect(mediaBox.get(1)?.eventToOneId, 7);
+        expect(mediaBox.get(1)?.placeToOneId, isNull);
+        expect(mediaBox.get(1)?.event.targetId, 7);
+        expect(mediaBox.get(1)?.place.targetId, 0);
+
+        final restoreResult = repository.commitSync([
+          _relationTestMediaDto(modifiedAt: DateTime.utc(2027)),
+        ]);
+
+        expect(restoreResult, isA<Success<void>>());
+        expect(mediaBox.get(1)?.isDeleted, isFalse);
+        expect(mediaBox.get(1)?.eventToOneId, 7);
+        expect(mediaBox.get(1)?.placeToOneId, isNull);
+        expect(mediaBox.get(1)?.event.targetId, 7);
+        expect(mediaBox.get(1)?.place.targetId, 0);
+      },
+    );
   });
 
   // ---------------------------------------------------------------------------
@@ -425,3 +538,20 @@ void main() {
     });
   });
 }
+
+MediaDto _relationTestMediaDto({
+  RelationUpdate<int> eventId = const Keep<int>(),
+  RelationUpdate<int> placeId = const Keep<int>(),
+  required DateTime modifiedAt,
+  DateTime? deletedAt,
+}) => MediaDto(
+  id: 1,
+  url: 'https://example.com/media.jpg',
+  width: 800,
+  height: 600,
+  eventId: eventId,
+  placeId: placeId,
+  createdAt: DateTime.utc(2024),
+  modifiedAt: modifiedAt,
+  deletedAt: deletedAt,
+);

@@ -3,6 +3,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:moliseis/data/core/relation_update.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
@@ -827,7 +828,231 @@ void main() {
       },
     );
   });
+
+  group('EventRepositoryImpl - commitSync description Delta', () {
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<EventEntity> eventBox;
+    late MockSupabaseEnvironment supabaseEnv;
+    late EventRepositoryImpl repository;
+
+    setUp(() async {
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      eventBox = objectBoxEnvironment.store.box<EventEntity>();
+      supabaseEnv = MockSupabaseEnvironment();
+      repository = EventRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: supabaseEnv.mockSupabase,
+        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+      );
+    });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    test(
+      'persists and clears description Delta from newer remote data',
+      () async {
+        final descriptionDelta = <Map<String, dynamic>>[
+          {'insert': 'Rich event description\n'},
+        ];
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 1,
+            'name': 'Campobasso festival',
+            'description': 'Rich event description',
+            'description_delta': descriptionDelta,
+            'start_date': '2026-07-01T00:00:00.000',
+            'latitude': 0,
+            'longitude': 0,
+            'category': 'unknown',
+            'created_at': '2024-01-01T00:00:00.000',
+            'modified_at': '2024-01-02T00:00:00.000',
+          },
+        ]);
+
+        final initialResult = await repository.prepareSync();
+        repository.commitSync((initialResult as Success<List<EventDto>>).value);
+
+        expect(eventBox.get(1)?.descriptionDelta, descriptionDelta);
+
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 1,
+            'name': 'Campobasso festival',
+            'description': 'Legacy event description',
+            'start_date': '2026-07-01T00:00:00.000',
+            'latitude': 0,
+            'longitude': 0,
+            'category': 'unknown',
+            'created_at': '2024-01-01T00:00:00.000',
+            'modified_at': '2024-01-03T00:00:00.000',
+          },
+        ]);
+
+        final clearingResult = await repository.prepareSync();
+        repository.commitSync(
+          (clearingResult as Success<List<EventDto>>).value,
+        );
+
+        expect(eventBox.get(1)?.descriptionDelta, isNull);
+      },
+    );
+
+    test(
+      'persists assigned and cleared city relations from complete rows',
+      () async {
+        eventBox.put(
+          makeEventEntity(
+            remoteId: 1,
+            cityId: 7,
+            modifiedAt: DateTime.utc(2024),
+          ),
+        );
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 1,
+            'name': 'Campobasso festival',
+            'description': '',
+            'start_date': '2024-01-01T00:00:00.000Z',
+            'latitude': 0,
+            'longitude': 0,
+            'category': 'unknown',
+            'city_id': 99,
+            'created_at': '2024-01-01T00:00:00.000Z',
+            'modified_at': '2025-01-01T00:00:00.000Z',
+          },
+        ]);
+
+        final assignedDtos =
+            ((await repository.prepareSync()) as Success<List<EventDto>>).value;
+        final assignedResult = repository.commitSync(assignedDtos);
+
+        expect(assignedResult, isA<Success<void>>());
+        expect(eventBox.get(1)?.cityToOneId, 99);
+        expect(eventBox.get(1)?.city.targetId, 99);
+
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 1,
+            'name': 'Campobasso festival',
+            'description': '',
+            'start_date': '2024-01-01T00:00:00.000Z',
+            'latitude': 0,
+            'longitude': 0,
+            'category': 'unknown',
+            'city_id': null,
+            'created_at': '2024-01-01T00:00:00.000Z',
+            'modified_at': '2026-01-01T00:00:00.000Z',
+          },
+        ]);
+
+        final clearedDtos =
+            ((await repository.prepareSync()) as Success<List<EventDto>>).value;
+        final clearedResult = repository.commitSync(clearedDtos);
+
+        expect(clearedResult, isA<Success<void>>());
+        expect(eventBox.get(1)?.cityToOneId, isNull);
+        expect(eventBox.get(1)?.city.targetId, 0);
+      },
+    );
+  });
+
+  group('EventRepositoryImpl - relation scalar preservation', () {
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<EventEntity> eventBox;
+    late EventRepositoryImpl repository;
+
+    setUp(() async {
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      eventBox = objectBoxEnvironment.store.box<EventEntity>();
+      repository = EventRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+      );
+    });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    test(
+      'preserves city relations through favourite copies and Keep merges',
+      () async {
+        eventBox.put(
+          makeEventEntity(
+            remoteId: 1,
+            cityId: 7,
+            modifiedAt: DateTime.utc(2024),
+          ),
+        );
+
+        final favouriteResult = await repository.setFavouriteEvent(1, true);
+
+        expect(favouriteResult, isA<Success<void>>());
+        expect(eventBox.get(1)?.cityToOneId, 7);
+        expect(eventBox.get(1)?.city.targetId, 7);
+
+        final mergeResult = repository.commitSync([
+          _relationTestEventDto(modifiedAt: DateTime.utc(2027)),
+        ]);
+
+        expect(mergeResult, isA<Success<void>>());
+        expect(eventBox.get(1)?.cityToOneId, 7);
+        expect(eventBox.get(1)?.city.targetId, 7);
+      },
+    );
+
+    test('preserves city relations through soft deletion and a Keep merge', () {
+      eventBox.put(
+        makeEventEntity(
+          remoteId: 1,
+          cityId: 7,
+          modifiedAt: DateTime.utc(2024),
+        ),
+      );
+
+      final deleteResult = repository.commitSync([
+        _relationTestEventDto(
+          modifiedAt: DateTime.utc(2025),
+          deletedAt: DateTime.utc(2025),
+        ),
+      ]);
+
+      expect(deleteResult, isA<Success<void>>());
+      expect(eventBox.get(1)?.cityToOneId, 7);
+      expect(eventBox.get(1)?.city.targetId, 7);
+
+      final restoreResult = repository.commitSync([
+        _relationTestEventDto(modifiedAt: DateTime.utc(2027)),
+      ]);
+
+      expect(restoreResult, isA<Success<void>>());
+      expect(eventBox.get(1)?.isDeleted, isFalse);
+      expect(eventBox.get(1)?.cityToOneId, 7);
+      expect(eventBox.get(1)?.city.targetId, 7);
+    });
+  });
 }
 
 Matcher containsEventId(int remoteId) =>
     contains(predicate<Event>((e) => e.remoteId == remoteId));
+
+EventDto _relationTestEventDto({
+  RelationUpdate<int> cityId = const Keep<int>(),
+  required DateTime modifiedAt,
+  DateTime? deletedAt,
+}) => EventDto(
+  id: 1,
+  name: 'Event',
+  description: '',
+  startDate: DateTime.utc(2024),
+  latitude: 0,
+  longitude: 0,
+  category: ContentCategory.unknown,
+  cityId: cityId,
+  createdAt: DateTime.utc(2024),
+  modifiedAt: modifiedAt,
+  deletedAt: deletedAt,
+);

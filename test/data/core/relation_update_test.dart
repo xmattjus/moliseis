@@ -120,7 +120,7 @@ void main() {
     test(
       'Keep should represent omitted backend field',
       () {
-        const update = Keep<int>();
+        const RelationUpdate<int> update = Keep();
 
         final result = switch (update) {
           Keep<int>() => 'unchanged',
@@ -135,7 +135,7 @@ void main() {
     test(
       'Clear should represent explicit backend null',
       () {
-        const update = Clear<int>();
+        const RelationUpdate<int> update = Clear();
 
         final result = switch (update) {
           Keep<int>() => 'unchanged',
@@ -150,7 +150,7 @@ void main() {
     test(
       'Assign should represent explicit backend value',
       () {
-        const update = Assign<int>(123);
+        const RelationUpdate<int> update = Assign(123);
 
         final result = switch (update) {
           Keep<int>() => 'unchanged',

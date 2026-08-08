@@ -2,6 +2,7 @@
 // ignore_for_file: cascade_invocations
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/data/core/relation_update.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
@@ -663,6 +664,53 @@ void main() {
       expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
     });
 
+    test(
+      'persists and clears description Delta from newer remote data',
+      () async {
+        final descriptionDelta = <Map<String, dynamic>>[
+          {'insert': 'Rich place description\n'},
+        ];
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 1,
+            'name': 'Campobasso',
+            'description': 'Rich place description',
+            'description_delta': descriptionDelta,
+            'latitude': 0,
+            'longitude': 0,
+            'category': 'unknown',
+            'created_at': '2024-01-01T00:00:00.000',
+            'modified_at': '2024-01-02T00:00:00.000',
+          },
+        ]);
+
+        final initialResult = await repository.prepareSync();
+        repository.commitSync((initialResult as Success<List<PlaceDto>>).value);
+
+        expect(placeBox.get(1)?.descriptionDelta, descriptionDelta);
+
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 1,
+            'name': 'Campobasso',
+            'description': 'Legacy place description',
+            'latitude': 0,
+            'longitude': 0,
+            'category': 'unknown',
+            'created_at': '2024-01-01T00:00:00.000',
+            'modified_at': '2024-01-03T00:00:00.000',
+          },
+        ]);
+
+        final clearingResult = await repository.prepareSync();
+        repository.commitSync(
+          (clearingResult as Success<List<PlaceDto>>).value,
+        );
+
+        expect(placeBox.get(1)?.descriptionDelta, isNull);
+      },
+    );
+
     test('invalidates the in-memory cache after a successful sync', () async {
       // Populate the cache via getAll().
       placeBox.put(makePlaceEntity(remoteId: 1, name: 'Old'));
@@ -693,10 +741,66 @@ void main() {
       expect(names, contains('New Place'));
     });
 
+    test(
+      'persists assigned and cleared city relations from complete rows',
+      () async {
+        placeBox.put(
+          makePlaceEntity(
+            remoteId: 1,
+            cityId: 7,
+            modifiedAt: DateTime.utc(2024),
+          ),
+        );
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 1,
+            'name': 'Campobasso',
+            'description': '',
+            'latitude': 0,
+            'longitude': 0,
+            'category': 'unknown',
+            'city_id': 99,
+            'created_at': '2024-01-01T00:00:00.000Z',
+            'modified_at': '2025-01-01T00:00:00.000Z',
+          },
+        ]);
+
+        final assignedDtos =
+            ((await repository.prepareSync()) as Success<List<PlaceDto>>).value;
+        final assignedResult = repository.commitSync(assignedDtos);
+
+        expect(assignedResult, isA<Success<void>>());
+        expect(placeBox.get(1)?.cityToOneId, 99);
+        expect(placeBox.get(1)?.city.targetId, 99);
+
+        supabaseEnv.stubSelectResponse([
+          {
+            'id': 1,
+            'name': 'Campobasso',
+            'description': '',
+            'latitude': 0,
+            'longitude': 0,
+            'category': 'unknown',
+            'city_id': null,
+            'created_at': '2024-01-01T00:00:00.000Z',
+            'modified_at': '2026-01-01T00:00:00.000Z',
+          },
+        ]);
+
+        final clearedDtos =
+            ((await repository.prepareSync()) as Success<List<PlaceDto>>).value;
+        final clearedResult = repository.commitSync(clearedDtos);
+
+        expect(clearedResult, isA<Success<void>>());
+        expect(placeBox.get(1)?.cityToOneId, isNull);
+        expect(placeBox.get(1)?.city.targetId, 0);
+      },
+    );
+
     test('prepareSync returns Error when Supabase query fails', () async {
       supabaseEnv.stubSelectError(
         const PostgrestException(
-          message: 'relation "places_v2" does not exist',
+          message: 'relation places does not exist',
         ),
       );
 
@@ -711,6 +815,83 @@ void main() {
       expect(failedCall.stackTrace, isNotNull);
     });
   });
+
+  group('PlaceRepositoryImpl - relation scalar preservation', () {
+    late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<PlaceEntity> placeBox;
+    late PlaceRepositoryImpl repository;
+
+    setUp(() async {
+      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      placeBox = objectBoxEnvironment.store.box<PlaceEntity>();
+      repository = PlaceRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+      );
+    });
+
+    tearDown(() async {
+      await objectBoxEnvironment.dispose();
+    });
+
+    test(
+      'preserves city relations through favourite copies and Keep merges',
+      () async {
+        placeBox.put(
+          makePlaceEntity(
+            remoteId: 1,
+            cityId: 7,
+            modifiedAt: DateTime.utc(2024),
+          ),
+        );
+
+        final favouriteResult = await repository.setFavouritePlace(1, true);
+
+        expect(favouriteResult, isA<Success<void>>());
+        expect(placeBox.get(1)?.cityToOneId, 7);
+        expect(placeBox.get(1)?.city.targetId, 7);
+
+        final mergeResult = repository.commitSync([
+          _relationTestPlaceDto(modifiedAt: DateTime.utc(2027)),
+        ]);
+
+        expect(mergeResult, isA<Success<void>>());
+        expect(placeBox.get(1)?.cityToOneId, 7);
+        expect(placeBox.get(1)?.city.targetId, 7);
+      },
+    );
+
+    test('preserves city relations through soft deletion and a Keep merge', () {
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 1,
+          cityId: 7,
+          modifiedAt: DateTime.utc(2024),
+        ),
+      );
+
+      final deleteResult = repository.commitSync([
+        _relationTestPlaceDto(
+          modifiedAt: DateTime.utc(2025),
+          deletedAt: DateTime.utc(2025),
+        ),
+      ]);
+
+      expect(deleteResult, isA<Success<void>>());
+      expect(placeBox.get(1)?.cityToOneId, 7);
+      expect(placeBox.get(1)?.city.targetId, 7);
+
+      final restoreResult = repository.commitSync([
+        _relationTestPlaceDto(modifiedAt: DateTime.utc(2027)),
+      ]);
+
+      expect(restoreResult, isA<Success<void>>());
+      expect(placeBox.get(1)?.isDeleted, isFalse);
+      expect(placeBox.get(1)?.cityToOneId, 7);
+      expect(placeBox.get(1)?.city.targetId, 7);
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -723,3 +904,20 @@ PlaceRepositoryImpl _makeRepository(TestObjectBoxEnvironment env) =>
       supabaseI: MockSupabase(),
       objectBoxI: TestObjectBox(env.store),
     );
+
+PlaceDto _relationTestPlaceDto({
+  RelationUpdate<int> cityId = const Keep<int>(),
+  required DateTime modifiedAt,
+  DateTime? deletedAt,
+}) => PlaceDto(
+  id: 1,
+  name: 'Place',
+  description: '',
+  latitude: 0,
+  longitude: 0,
+  category: ContentCategory.unknown,
+  cityId: cityId,
+  createdAt: DateTime.utc(2024),
+  modifiedAt: modifiedAt,
+  deletedAt: deletedAt,
+);

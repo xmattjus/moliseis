@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';
+import 'package:moliseis/data/data-sources/app_settings.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -31,11 +32,14 @@ void main() {
 
     test('returns Result.error when the callback returns an error', () {
       final error = Exception('test error');
+      final settingsBox = env.store.box<AppSettings>();
       final result = coordinator.runInWriteTransaction(() {
+        settingsBox.put(AppSettings());
         return Result.error(error);
       });
       expect(result.isError, isTrue);
       expect((result as Error<void>).error, same(error));
+      expect(settingsBox.get(AppSettings.singletonId), isNull);
     });
   });
 }
