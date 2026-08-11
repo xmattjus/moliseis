@@ -6,11 +6,11 @@ void main() {
   group('LogEvent subclasses', () {
     group('Core events', () {
       test('ImageLoadFailed has correct contract', () {
-        const event = ImageLoadFailed();
+        const event = ImageLoadFailed(url: 'https://picsum.photos/200');
 
         expect(event.name, 'image_load_failed');
         expect(event.level, AppLogLevel.error);
-        expect(event.data, isEmpty);
+        expect(event.data, {'url': 'https://picsum.photos/200'});
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
@@ -171,25 +171,8 @@ void main() {
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
-      test('EntityLoadStarted has correct contract', () {
-        const event = EntityLoadStarted(
-          'Place',
-          method: 'getById',
-          extra: {'id': 42},
-        );
-
-        expect(event.name, 'entity_load_started');
-        expect(event.level, AppLogLevel.info);
-        expect(event.data, {
-          'entityType': 'Place',
-          'method': 'getById',
-          'id': 42,
-        });
-        expect(eventNamePattern.hasMatch(event.name), isTrue);
-      });
-
-      test('EntityLoadStarted works with null extra', () {
-        const event = EntityLoadStarted('Place', method: 'getAll');
+      test('EntityLoadFailed works with null extra', () {
+        const event = EntityLoadFailed('Place', method: 'getAll');
 
         expect(event.data, {'entityType': 'Place', 'method': 'getAll'});
       });
@@ -296,27 +279,6 @@ void main() {
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
-      test('UrlLaunchStarted has correct contract', () {
-        const event = UrlLaunchStarted(
-          'https://example.com',
-          method: 'openInBrowser',
-        );
-
-        expect(event.name, 'url_launch_started');
-        expect(event.level, AppLogLevel.info);
-        expect(event.data, {
-          'url': 'https://example.com',
-          'method': 'openInBrowser',
-        });
-        expect(eventNamePattern.hasMatch(event.name), isTrue);
-      });
-
-      test('UrlLaunchStarted defaults method to unknown', () {
-        const event = UrlLaunchStarted('https://example.com');
-
-        expect(event.data['method'], 'unknown');
-      });
-
       test('UrlLaunchFailed has correct contract', () {
         const event = UrlLaunchFailed('https://example.com');
 
@@ -334,18 +296,6 @@ void main() {
 
         expect(event.name, 'weather_forecast_fetch_failed');
         expect(event.level, AppLogLevel.error);
-        expect(event.data, {'latitude': 41.56, 'longitude': 14.66});
-        expect(eventNamePattern.hasMatch(event.name), isTrue);
-      });
-
-      test('WeatherForecastFetchStarted has correct contract', () {
-        const event = WeatherForecastFetchStarted(
-          latitude: 41.56,
-          longitude: 14.66,
-        );
-
-        expect(event.name, 'weather_forecast_fetch_started');
-        expect(event.level, AppLogLevel.info);
         expect(event.data, {'latitude': 41.56, 'longitude': 14.66});
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
