@@ -65,7 +65,7 @@ class _AnimatedMapAttributionState extends State<AnimatedMapAttribution> {
     // bounds when the bottom sheet is completely closed.
     if (_controller.isAttached) {
       Future.delayed(Duration.zero, () {
-        if (context.mounted) {
+        if (mounted && _controller.isAttached) {
           _positionAnimation.value = clampDouble(_controller.size, 0, 1);
         }
       });
