@@ -47,7 +47,6 @@ GoRouter buildAppRouter({required SyncViewModel syncViewModel}) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: RoutePaths.home,
-    overridePlatformDefaultLocation: false,
     restorationScopeId: 'router',
     refreshListenable: syncViewModel.sync,
     redirect: (context, state) =>
