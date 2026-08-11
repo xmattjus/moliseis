@@ -5,9 +5,35 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 
+/// The severity of a snack bar, which drives its background and foreground
+/// colors as well as the leading icon shown by [showSnackBar].
+///
+/// - [info]: neutral informational feedback.
+/// - [warning]: alerts the user that an action needs attention.
+/// - [error]: signals a failed operation.
 enum SnackBarType { info, warning, error }
 
-/// Shows a floating style Material3 snack bar.
+/// Shows the standard generic error snack bar, reusing the same localized
+/// message across the app.
+///
+/// Convenience wrapper around [showSnackBar] for failures whose specific
+/// cause should not be shown to the user; the message is a fixed Italian
+/// string ("Si è verificato un errore, riprova più tardi").
+void showSnackBarGenericError({required BuildContext context}) => showSnackBar(
+  context: context,
+  textContent: 'Si è verificato un errore, riprova più tardi',
+  type: SnackBarType.error,
+);
+
+/// Shows a floating Material 3 snack bar through the app-wide scaffold
+/// messenger, so it works from any context without a `Scaffold` ancestor
+/// (e.g. after an async gap) and never clashes with per-screen messengers.
+///
+/// The snack bar text is [textContent] and its severity is [type], which
+/// drives the background, foreground, and leading icon. Has no return
+/// value; if the global messenger is unavailable or showing fails, the
+/// event is logged through the injected [Logger] instead of surfacing an
+/// error to the caller.
 void showSnackBar({
   required BuildContext context,
   required String textContent,
