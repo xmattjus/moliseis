@@ -46,7 +46,11 @@ extension ColorExtensions on Color? {
   Color? _changeLightness(double amount) {
     if (this == null) return null;
 
-    assert(amount.abs() <= 1);
+    assert(
+      amount.abs() <= 1,
+      'amount must be between -1.0 and 1.0 inclusive; '
+      'lightness changes beyond that range are undefined.',
+    );
 
     final hsl = HSLColor.fromColor(this!);
     final hslNew = hsl.withLightness((hsl.lightness + amount).clamp(0.0, 1.0));
