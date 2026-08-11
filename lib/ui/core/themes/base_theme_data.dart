@@ -3,6 +3,7 @@ import 'package:moliseis/ui/core/themes/app_effects_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_shapes_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/text_theme.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class BaseThemeData {
   // Private constructor to prevent class instantiation.
@@ -78,9 +79,8 @@ class BaseThemeData {
       ),
       dropdownMenuTheme: DropdownMenuThemeData(
         inputDecorationTheme: InputDecorationTheme(
-          filled: true,
           border: OutlineInputBorder(
-            borderRadius: appShapes.circular.cornerMedium,
+            borderRadius: appShapes.circular.cornerExtraSmall,
           ),
         ),
       ),
@@ -91,19 +91,25 @@ class BaseThemeData {
         style: ButtonStyle(shape: _expressiveButtonShape),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        filled: true,
+        hintStyle: TextStyle(
+          color: colorScheme?.onSurfaceVariant.lighten(0.125),
+        ),
+        floatingLabelBehavior: FloatingLabelBehavior.always,
         border: OutlineInputBorder(
-          borderRadius: appShapes.circular.cornerMedium,
-          gapPadding: 4.0 + 2.0,
+          borderRadius: appShapes.circular.cornerExtraSmall,
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: ButtonStyle(shape: _expressiveButtonShape),
       ),
-      progressIndicatorTheme: const ProgressIndicatorThemeData(
-        strokeWidth: 3,
-        // ignore: deprecated_member_use
-        year2023: false,
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        linearTrackColor: colorScheme?.secondaryContainer,
+        linearMinHeight: 4,
+        circularTrackColor: colorScheme?.secondaryContainer,
+        stopIndicatorColor: colorScheme?.primary,
+        strokeWidth: 4,
+        strokeCap: StrokeCap.round,
+        trackGap: 4,
       ),
       searchBarTheme: const SearchBarThemeData(
         constraints: BoxConstraints(minHeight: 56),
