@@ -94,15 +94,17 @@ void main() {
     );
   }
 
-  Widget buildTestWidget(WeatherViewModel viewModel) {
+  Widget buildTestWidget(
+    WeatherViewModel viewModel, {
+    int currentHourOverride = 0,
+  }) {
     return MaterialApp(
       home: Scaffold(
         body: WeatherForecastHourlyList(
           borderColor: Colors.grey,
           backgroundColor: Colors.white,
           viewModel: viewModel,
-          // Pin to hour 0 so scroll target is always 0 — no animation needed.
-          currentHourOverride: 0,
+          currentHourOverride: currentHourOverride,
         ),
       ),
     );
@@ -153,5 +155,31 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.byType(SuperListView), findsNothing);
     });
+
+    testWidgets(
+      'does not leak a ticker when disposed after scheduling the current hour '
+      'scroll',
+      (tester) async {
+        final viewModel = buildViewModel(
+          mockLogger,
+          Result.success(successResponse),
+        );
+        await viewModel.loadHourlyForecast.execute(testCoordinates);
+
+        await tester.pumpWidget(
+          buildTestWidget(viewModel, currentHourOverride: 12),
+        );
+
+        // Ensure the post-frame callback has fired and the buggy implementation
+        // would have started its animation before the list is disposed.
+        await tester.pump();
+        await tester.pumpWidget(
+          const MaterialApp(home: Scaffold(body: SizedBox.shrink())),
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }

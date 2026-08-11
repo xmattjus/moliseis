@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -32,6 +33,7 @@ class WeatherForecastHourlyList extends StatefulWidget {
 class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
   final _listController = ListController();
   final _scrollController = ScrollController();
+  HourlyWeatherForecastData? _scrolledForHourlyData;
 
   @override
   void dispose() {
@@ -40,22 +42,19 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
     super.dispose();
   }
 
-  // Scrolls the hourly forecast list to the current hour.
+  // Scrolls the hourly forecast list to the current hour without creating an
+  // animation ticker that could outlive the list's ScrollableState.
   // Guard against the case where the ListView is not visible yet (e.g. still
-  // loading), which means no scroll view is attached to the controller.
-  void _animateToItem(int index) {
-    if (!_scrollController.hasClients) {
+  // loading), which means either controller may not be attached.
+  void _scrollToItem(int index) {
+    if (!_listController.isAttached || !_scrollController.hasClients) {
       return;
     }
 
-    _listController.animateToItem(
+    _listController.jumpToItem(
       index: index,
       scrollController: _scrollController,
       alignment: 0,
-      // You can provide duration and curve depending on the estimated
-      // distance between currentPosition and the target item position.
-      duration: (estimatedDistance) => Durations.medium3,
-      curve: (estimatedDistance) => Curves.easeInOut,
     );
   }
 
@@ -104,11 +103,18 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                   // Shows at most 24 hours of the hourly weather forecast data.
                   final itemCount = hourlyData.time.take(24).length;
 
-                  // Schedules the hourly forecast list scroll to the current
-                  // hour after the first frame has been rendered.
-                  SchedulerBinding.instance.addPostFrameCallback((_) {
-                    _animateToItem(currentHour);
-                  });
+                  // Schedule the scroll once for each loaded data instance.
+                  // Re-scheduling on every rebuild previously accumulated
+                  // animation tickers in super_sliver_list.
+                  if (!identical(_scrolledForHourlyData, hourlyData)) {
+                    _scrolledForHourlyData = hourlyData;
+                    SchedulerBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) {
+                        return;
+                      }
+                      _scrollToItem(currentHour);
+                    });
+                  }
 
                   return ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 160),
