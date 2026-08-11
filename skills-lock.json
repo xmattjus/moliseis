@@ -11,7 +11,7 @@
       "source": "dart-lang/skills",
       "sourceType": "github",
       "skillPath": "skills/dart-add-unit-test/SKILL.md",
-      "computedHash": "326a2b6cb57bcb4f40203e063a1060e9549a8cea0ece1a5c9a0d39a2f2b85bc8"
+      "computedHash": "55dabb37175bc8091a02b7d78d405f7e33173698c48a649ea29748f1186ac9c0"
     },
     "dart-build-cli-app": {
       "source": "dart-lang/skills",
@@ -144,6 +144,90 @@
       "sourceType": "github",
       "skillPath": "skills/flutter-use-http-package/SKILL.md",
       "computedHash": "17efcf4da9933afaf9c1d41940bd6b92f1ae73dcae4bf6c59cfe24f7e487ee9f"
+    },
+    "sentry-android-sdk": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "skills-legacy/sentry-android-sdk/SKILL.md",
+      "computedHash": "6c8e7dee5327bf86b06a38c402f436dd1162abcca034fb26d1f19428a9cffdd4"
+    },
+    "sentry-cocoa-sdk": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "skills-legacy/sentry-cocoa-sdk/SKILL.md",
+      "computedHash": "d184d414ba63299176f9c58d6b916d7b9714d0adafc380ad2b4c462cf402c8e4"
+    },
+    "sentry-create-alert": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "src/skills/sentry-create-alert/SKILL.md",
+      "computedHash": "c94c836eb7ad92225e64bcbdaa5610a7ed1a6115653584464ef46a1c12707e34"
+    },
+    "sentry-debug-issue": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "src/skills/sentry-debug-issue/SKILL.md",
+      "computedHash": "448787a0630fc135bfa0888116a1ac27d14e64d67f5f2e9da2016ab39d529b35"
+    },
+    "sentry-fix-issues": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "skills-legacy/sentry-fix-issues/SKILL.md",
+      "computedHash": "0ef2103f20d698acc56d856a07a372a0a68cb02bad654d0dacb4e2ffe87e98b5"
+    },
+    "sentry-fix-stack-traces": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "src/skills/sentry-fix-stack-traces/SKILL.md",
+      "computedHash": "a74e5a7f57b6b56c1349ed75d5afb9fe586e512a1f6134a7040443a41e93d16e"
+    },
+    "sentry-flutter-sdk": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "skills-legacy/sentry-flutter-sdk/SKILL.md",
+      "computedHash": "fa43808a64ede439bd075b46f1985f81a85a39efb2bdaf089edb05941ec32102"
+    },
+    "sentry-get-started": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "src/skills/sentry-get-started/SKILL.md",
+      "computedHash": "5f6057ca2ceff60c2d99ec740d872a0d311436424975ff42dd2b4eda6d6b9c66"
+    },
+    "sentry-instrument": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "src/skills/sentry-instrument/SKILL.md",
+      "computedHash": "673fba74f95f66dc9ecba6fbd1967b5589b998609735422087ebc5b7b3c82697"
+    },
+    "sentry-instrument-logging": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "skills-legacy/sentry-instrument-logging/SKILL.md",
+      "computedHash": "1ab5e50902b1c6f8a3c0cd57d82809c6c42900da27bd50a3caab90acdce830d1"
+    },
+    "sentry-instrumentation-guide": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "skills-legacy/sentry-instrumentation-guide/SKILL.md",
+      "computedHash": "757bf2bf8453182517125a882b9b66b49e246e006170949a5a4310cd5a931efa"
+    },
+    "sentry-setup-ai-monitoring": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "skills-legacy/sentry-setup-ai-monitoring/SKILL.md",
+      "computedHash": "fd763e7d5cada2ed0ea56a27dbe54c9faacb2c361cb525a06bf7c214072fb4a7"
+    },
+    "sentry-setup-releases": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "src/skills/sentry-setup-releases/SKILL.md",
+      "computedHash": "6e0f3d08baec1642429aa6625480b57575036ba05d6bd875ccd2a42058e751ef"
+    },
+    "sentry-snapshots-cocoa": {
+      "source": "getsentry/sentry-for-ai",
+      "sourceType": "github",
+      "skillPath": "src/skills/sentry-snapshots-cocoa/SKILL.md",
+      "computedHash": "f4258d31d8eccbad531fe2bc4cdfcd3a8253d1d8e566f712372e93027c05654d"
     }
   }
 }
