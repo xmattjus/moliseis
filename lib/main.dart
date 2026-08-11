@@ -55,17 +55,15 @@ Future<void> _main() async {
     (options) => options
       ..dsn = Env.sentryUrl
       ..environment = kDebugMode ? 'debug' : 'production'
-      // Set tracesSampleRate to 1.0 to capture 100% of transactions for
-      // tracing.
-      ..tracesSampleRate = kDebugMode ? 1.0 : 0.4
-      // The sampling rate for profiling is relative to tracesSampleRate
-      // Setting to 1.0 will profile 100% of sampled transactions:
-      ..profilesSampleRate = 1.0
-      // Session Replay setup.
-      ..replay.sessionSampleRate = 0.4
-      ..replay.onErrorSampleRate = 1.0
+      ..tracesSampleRate = kDebugMode ? 0 : 0.4
+      ..profilesSampleRate = kDebugMode ? 0 : 0.7
+      ..replay.sessionSampleRate = kDebugMode ? 0 : 0.4
+      ..replay.onErrorSampleRate = kDebugMode ? 0 : 1.0
+      ..sendDefaultPii = false
       ..httpClient = httpClient
       ..enableLogs = false
+      ..privacy.maskAllText = false
+      ..privacy.maskAllImages = false
       ..beforeBreadcrumb = (breadcrumb, hint) {
         final message = breadcrumb?.message;
 

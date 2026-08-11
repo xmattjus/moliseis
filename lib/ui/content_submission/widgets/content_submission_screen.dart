@@ -290,50 +290,56 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              TextFormField(
-                                autovalidateMode: AutovalidateMode.onUnfocus,
-                                initialValue: widget.viewModel.state.userEmail,
-                                decoration: const InputDecoration(
-                                  labelText: 'E-mail',
-                                  hintText: 'mario.rossi@gmail.com',
-                                ),
-                                onChanged: (value) =>
-                                    widget.viewModel.setUserEmail(value),
-                                validator: (value) {
-                                  if (value != null) {
-                                    if (!widget.viewModel.validateEmail(
-                                      value,
-                                    )) {
-                                      return 'Inserisci un indirizzo e-mail '
-                                          'valido';
-                                    } else if (value.length > 320) {
-                                      return "L'indirizzo e-mail inserito è "
-                                          'troppo lungo';
+                              SentryMask(
+                                TextFormField(
+                                  autovalidateMode: AutovalidateMode.onUnfocus,
+                                  initialValue:
+                                      widget.viewModel.state.userEmail,
+                                  decoration: const InputDecoration(
+                                    labelText: 'E-mail',
+                                    hintText: 'mario.rossi@gmail.com',
+                                  ),
+                                  onChanged: (value) =>
+                                      widget.viewModel.setUserEmail(value),
+                                  validator: (value) {
+                                    if (value != null) {
+                                      if (!widget.viewModel.validateEmail(
+                                        value,
+                                      )) {
+                                        return 'Inserisci un indirizzo e-mail '
+                                            'valido';
+                                      } else if (value.length > 320) {
+                                        return "L'indirizzo e-mail inserito è "
+                                            'troppo lungo';
+                                      }
                                     }
-                                  }
-                                  return null;
-                                },
+                                    return null;
+                                  },
+                                ),
                               ),
                               const SizedBox(height: 12),
-                              TextFormField(
-                                initialValue: widget.viewModel.state.userName,
-                                decoration: const InputDecoration(
-                                  labelText: 'Autore',
-                                  hintText: 'Mario Rossi',
-                                ),
-                                onChanged: (value) =>
-                                    widget.viewModel.setUserName(value),
-                                validator: (value) {
-                                  if (value != null) {
-                                    if (value.isEmpty) {
-                                      return 'Inserisci il tuo nome';
-                                    } else if (value.length > 100) {
-                                      return 'Il nome inserito è troppo lungo.';
+                              SentryMask(
+                                TextFormField(
+                                  initialValue: widget.viewModel.state.userName,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Autore',
+                                    hintText: 'Mario Rossi',
+                                  ),
+                                  onChanged: (value) =>
+                                      widget.viewModel.setUserName(value),
+                                  validator: (value) {
+                                    if (value != null) {
+                                      if (value.isEmpty) {
+                                        return 'Inserisci il tuo nome';
+                                      } else if (value.length > 100) {
+                                        return 'Il nome inserito è troppo '
+                                            'lungo.';
+                                      }
                                     }
-                                  }
-                                  return null;
-                                },
-                                autovalidateMode: AutovalidateMode.onUnfocus,
+                                    return null;
+                                  },
+                                  autovalidateMode: AutovalidateMode.onUnfocus,
+                                ),
                               ),
                               const SizedBox(height: 16),
                               CheckboxFormField(
