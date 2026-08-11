@@ -15,9 +15,11 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.backButtonBgColor,
   }) : _type = CustomAppBarType.standard,
        assert(
-         showBackButton == true && leading == null ||
-             showBackButton == false && leading != null ||
-             showBackButton == false && leading == null,
+         showBackButton && leading == null ||
+             !showBackButton && leading != null ||
+             !showBackButton && leading == null,
+         '`leading` must be null when `showBackButton` is true: '
+         'the two options are mutually exclusive.',
        );
 
   /// Creates an app bar whose height is equal to 0.
