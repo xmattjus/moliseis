@@ -30,30 +30,32 @@ class ContentSubmissionProgressScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: viewModel.submit,
       builder: (context, child) {
-        final color = _buildColor(colorScheme, viewModel.submit);
+        final submit = viewModel.submit;
+        final color = _buildColor(colorScheme, submit);
 
-        final submitIdle = viewModel.submit.idle;
-        final submitRunning = viewModel.submit.running;
+        final canPop = !submit.running;
 
         return PopScope(
-          // `canPop: false` keeps the OS back gesture and the AppBar chevron
-          // on the same code path: with `canPop: true` on completed/error the
-          // OS gesture would pop without ever invoking
-          // `onPopInvokedWithResult`, bypassing `_clearState` (the original
-          // P6 bug). The `maybePop` inside `_handleBack` is a no-op if the
-          // route was already popped by the explicit chevron tap path.
-          canPop: false,
-          onPopInvokedWithResult: (didPop, _) async {
-            if (didPop) return;
-            await _handleBack(context);
+          // Only an active upload blocks navigation. A recreated view model is
+          // idle after process restoration; that state cannot resume the lost
+          // operation and must let the user return to the form.
+          canPop: canPop,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) return;
+            // A completed submission triggers state cleanup after the pop: the
+            // form screen below reacts to `viewModel.clear` and resets its
+            // fields. The viewModel outlives this route, so the popped
+            // `BuildContext` is never used here. Idle and error pops preserve
+            // the editable form state.
+            if (submit.completed) {
+              unawaited(viewModel.clear.execute());
+            }
           },
           child: Scaffold(
             appBar: AppBar(
-              leading: (submitRunning || submitIdle)
-                  ? null
-                  : BackButton(
-                      onPressed: () => _handleBack(context),
-                    ),
+              leading: canPop
+                  ? BackButton(onPressed: () => context.pop())
+                  : null,
             ),
             body: Center(
               child: DefaultTextStyle.merge(
@@ -70,13 +72,19 @@ class ContentSubmissionProgressScreen extends StatelessWidget {
                     text: Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
-                        _buildTextDescription(viewModel.submit),
+                        _buildTextDescription(submit),
                         textAlign: TextAlign.center,
                       ),
                     ),
-                    icon: _buildIcon(viewModel.submit),
-                    action: (submitRunning || submitIdle)
+                    icon: _buildIcon(submit),
+                    action: submit.running
                         ? null
+                        : submit.idle
+                        ? _primaryActionButton(
+                            colorScheme: colorScheme,
+                            onPressed: () => context.pop(),
+                            child: const Text('Torna al modulo'),
+                          )
                         : Wrap(
                             spacing: 4,
                             runSpacing: 4,
@@ -90,20 +98,17 @@ class ContentSubmissionProgressScreen extends StatelessWidget {
                                 },
                                 child: const Text('Torna alla home'),
                               ),
-                              if (viewModel.submit.completed)
+                              if (submit.completed)
                                 _primaryActionButton(
                                   colorScheme: colorScheme,
-                                  onPressed: () async => _clearState(
-                                    context,
-                                    () => _replaceWithFreshForm(context),
-                                  ),
+                                  onPressed: () => context.pop(),
                                   child: const Text('Nuovo suggerimento'),
                                 )
                               else
                                 _primaryActionButton(
                                   colorScheme: colorScheme,
                                   onPressed: () {
-                                    unawaited(viewModel.submit.execute());
+                                    unawaited(submit.execute());
                                   },
                                   child: const Text('Riprova'),
                                 ),
@@ -120,22 +125,26 @@ class ContentSubmissionProgressScreen extends StatelessWidget {
   }
 
   Color _buildColor(ColorScheme colorScheme, Command<void> command) =>
-      (command.idle || command.running)
-      ? colorScheme.onSurfaceVariant
-      : command.error
+      command.error
       ? colorScheme.error
-      : colorScheme.primary;
+      : command.completed
+      ? colorScheme.primary
+      : colorScheme.onSurfaceVariant;
 
-  String _buildTextDescription(Command<void> command) =>
-      (command.idle || command.running)
+  String _buildTextDescription(Command<void> command) => command.running
       ? 'Invio in corso...'
+      : command.idle
+      ? "L'invio è stato interrotto. Torna al modulo per controllare i dati "
+            'prima di riprovare.'
       : command.error
       ? "Si è verificato un problema durante l'invio"
       : 'Grazie, il suggerimento è stato inviato con successo e verrà '
             'pubblicato a breve';
 
-  Widget _buildIcon(Command<void> command) => (command.idle || command.running)
+  Widget _buildIcon(Command<void> command) => command.running
       ? const CircularProgressIndicator()
+      : command.idle
+      ? const Icon(Symbols.upload)
       : command.error
       ? const Icon(Symbols.error_circle_rounded_rounded)
       : const Icon(Symbols.check_circle);
@@ -166,45 +175,5 @@ class ContentSubmissionProgressScreen extends StatelessWidget {
     if (context.mounted) {
       fn?.call();
     }
-  }
-
-  /// Single entry point for both the AppBar back chevron and the OS back
-  /// gesture. Re-resolves `viewModel.submit` at call time so a state
-  /// transition arriving between the build that mounted the button and the
-  /// tap is honored.
-  ///
-  /// - `idle` / `running` → no-op (stay blocked, matches P6 in-flight).
-  /// - `completed` → `_clearState` then recreate the form fresh (pop the
-  ///   progress route, pop the stale form, push a new form). Avoids the
-  ///   P1/P4 trap where the preserved form `State` still holds the old
-  ///   `TextFormField` text after the in-memory `_state` was wiped.
-  /// - `error` → pop once without clearing (P2 intent: let the user modify
-  ///   the submission before retrying).
-  Future<void> _handleBack(BuildContext context) async {
-    final submit = viewModel.submit;
-    if (submit.idle || submit.running) {
-      return;
-    }
-    if (submit.completed) {
-      await _clearState(context, () => _replaceWithFreshForm(context));
-    } else {
-      context.pop();
-    }
-  }
-
-  /// Pops the progress route and the stale form route, then pushes a fresh
-  /// `contentSubmission` route on top of explore. The two pops and the push
-  /// run synchronously with no pump between them, so no intermediate frame
-  /// showing the stale form is ever rendered.
-  void _replaceWithFreshForm(BuildContext context) {
-    // Cache the router once: the progress screen's `context` becomes
-    // unmounted after the second pop, so a second `context.pop()` would
-    // resolve the element tree lookup against a stale subtree.
-    // `GoRouter.of(context)` captures the single router instance attached to
-    // the root navigator key, which survives the progress route's disposal.
-    final router = GoRouter.of(context);
-    router.pop(); // pop /contentSubmission/uploadProgress
-    router.pop(); // pop the stale /contentSubmission form
-    unawaited(router.pushNamed(RouteNames.contentSubmission)); // fresh form
   }
 }

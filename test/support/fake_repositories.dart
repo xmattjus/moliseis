@@ -204,6 +204,86 @@ final class FakeEventRepository extends EventRepository {
 }
 
 // ---------------------------------------------------------------------------
+// ControllableEventRepository
+// ---------------------------------------------------------------------------
+
+/// An [EventRepository] fake whose [getById] result is gated by a fresh
+/// [Completer] per call. Used by widget tests that need to hold the
+/// resolution [Command] in the running state and complete the repository
+/// calls in a controlled order (e.g. rapid-navigation races).
+///
+/// Every non-`getById` method mirrors the successful no-op defaults of
+/// [FakeEventRepository].
+final class ControllableEventRepository extends EventRepository {
+  final Map<int, Completer<Result<Event>>> _pendingGetById = {};
+
+  /// Number of times [getById] has been invoked.
+  int getByIdCallCount = 0;
+
+  /// Returns the completers still awaiting completion, keyed by id.
+  ///
+  /// Exposed for assertions that a specific request is in flight.
+  Map<int, Completer<Result<Event>>> get pendingGetById => _pendingGetById;
+
+  @override
+  Future<Result<Event>> getById(int id) {
+    getByIdCallCount++;
+    final completer = Completer<Result<Event>>();
+    _pendingGetById[id] = completer;
+    return completer.future;
+  }
+
+  /// Resolves the in-flight [getById] call for [id] with [result]. Safe to
+  /// call when no call for [id] is pending: it is a no-op in that case.
+  void completeGetById(int id, Result<Event> result) {
+    _pendingGetById.remove(id)?.complete(result);
+  }
+
+  @override
+  Future<Result<List<EventDto>>> prepareSync() async =>
+      const Result.success([]);
+
+  @override
+  Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
+
+  @override
+  Future<Result<List<Event>>> getByCurrentYear() async =>
+      const Result.success([]);
+
+  @override
+  Future<Result<List<Event>>> getByDate(DateTime date) async =>
+      const Result.success([]);
+
+  @override
+  Future<Result<List<Event>>> getByDateRange(
+    DateTime start,
+    DateTime end,
+  ) async => const Result.success([]);
+
+  @override
+  Future<Result<List<Event>>> getByCategories(
+    Set<ContentCategory> categories, {
+    ContentSort sort = ContentSort.byName,
+  }) async => const Result.success([]);
+
+  @override
+  Future<Result<List<Event>>> getByCoordinates(
+    List<double> coordinates,
+  ) async => const Result.success([]);
+
+  @override
+  Future<Result<List<int>>> getNextEventIds() async => const Result.success([]);
+
+  @override
+  Future<Result<List<int>>> getFavouriteEventIds() async =>
+      const Result.success([]);
+
+  @override
+  Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
+      const Result.success(null);
+}
+
+// ---------------------------------------------------------------------------
 // FakeMediaRepository
 // ---------------------------------------------------------------------------
 
@@ -440,12 +520,16 @@ final class FakeContentSubmissionRepository
 
   bool uploadCalled = false;
 
+  /// Content submission received by the latest [upload] call.
+  ContentSubmission? lastUploadedSubmission;
+
   @override
   Future<Result<void>> upload(
     ContentSubmission contentSubmission,
     List<SubmissionAsset> submissionAssets,
   ) async {
     uploadCalled = true;
+    lastUploadedSubmission = contentSubmission;
     return uploadResult;
   }
 
@@ -484,7 +568,8 @@ final class _FakeUploadTask implements ImageUploadTask {
 ///
 /// [uploadImageTask] throws by default: the widget tests that consume this
 /// fake run the submit pipeline with no assets, so any call to it indicates a
-/// logic error. Pass a non-throwing [ImageUploadTask] via [uploadImageTaskResult]
+/// logic error. Pass a non-throwing [ImageUploadTask] via
+/// [uploadImageTaskResult]
 /// when a test actually needs the upload-image branch.
 final class ControllableSubmissionRepository
     implements ContentSubmissionRepository {
@@ -554,6 +639,7 @@ final class FakeContentSubmissionDraftRepository
   Result<void> clearDraftResult;
 
   bool saveDraftCalled = false;
+  int saveDraftCallCount = 0;
   bool clearDraftCalled = false;
   ContentSubmissionDraft? lastSavedState;
 
@@ -563,6 +649,7 @@ final class FakeContentSubmissionDraftRepository
   @override
   Future<Result<void>> saveDraft(ContentSubmissionDraft state) async {
     saveDraftCalled = true;
+    saveDraftCallCount++;
     lastSavedState = state;
     return saveDraftResult;
   }

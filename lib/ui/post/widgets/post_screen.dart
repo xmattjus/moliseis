@@ -1,13 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/utils/slideshow_visibility_notifier.dart';
@@ -40,32 +39,15 @@ class PostScreen extends StatefulWidget {
 }
 
 class _PostScreenState extends State<PostScreen> {
-  String _currentUri = '';
-
-  /// Controls [PopScope.canPop]. Exposed for test access via
-  /// [ValueListenableBuilder.valueListenable].
-  final ValueNotifier<bool> isGalleryOpenNotifier = ValueNotifier(false);
-
   final ScrollController _scrollController = ScrollController();
   late final SlideshowVisibilityNotifier _slideshowVisibilityNotifier =
       SlideshowVisibilityNotifier(threshold: _mediaSlideshowHeight * 0.6);
 
   @override
   void dispose() {
-    isGalleryOpenNotifier.dispose();
     _slideshowVisibilityNotifier.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onGalleryOpened() {
-    if (!mounted) return;
-    isGalleryOpenNotifier.value = true;
-  }
-
-  void _onGalleryClosed() {
-    if (!mounted) return;
-    isGalleryOpenNotifier.value = false;
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
@@ -78,182 +60,149 @@ class _PostScreenState extends State<PostScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _currentUri = GoRouterState.of(context).fullPath.toString();
+    return Scaffold(
+      appBar: const CustomAppBar(
+        showBackButton: true,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+      ),
+      body: SafeArea(
+        top: false,
+        child: ListenableBuilder(
+          listenable: Listenable.merge([
+            widget.viewModel.loadEvent,
+            widget.viewModel.loadPlace,
+          ]),
+          builder: (context, child) {
+            if (widget.viewModel.loadEvent.completed ||
+                widget.viewModel.loadPlace.completed) {
+              final content = widget.viewModel.content;
 
-    return ValueListenableBuilder<bool>(
-      key: const ValueKey('galleryPopScopeVlb'),
-      valueListenable: isGalleryOpenNotifier,
-      builder: (_, isGalleryOpen, child) {
-        return PopScope(
-          key: const ValueKey('galleryPopScope'),
-          canPop: !isGalleryOpen,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) {
-              unawaited(Navigator.of(context, rootNavigator: true).maybePop());
-            }
-          },
-          child: child!,
-        );
-      },
-      child: Scaffold(
-        appBar: const CustomAppBar(
-          showBackButton: true,
-          systemOverlayStyle: SystemUiOverlayStyle.light,
-        ),
-        body: SafeArea(
-          top: false,
-          child: ListenableBuilder(
-            listenable: Listenable.merge([
-              widget.viewModel.loadEvent,
-              widget.viewModel.loadPlace,
-            ]),
-            builder: (context, child) {
-              if (widget.viewModel.loadEvent.completed ||
-                  widget.viewModel.loadPlace.completed) {
-                final content = widget.viewModel.content;
-
-                return NotificationListener<ScrollNotification>(
-                  onNotification: _onScrollNotification,
-                  child: CustomScrollView(
-                    controller: _scrollController,
-                    slivers: <Widget>[
-                      if (content.media.isNotEmpty)
-                        PostSectionSlideshow(
-                          height: _mediaSlideshowHeight,
-                          media: content.media,
-                          visibilityNotifier:
-                              _slideshowVisibilityNotifier.notifier,
-                          onGalleryOpened: _onGalleryOpened,
-                          onGalleryClosed: _onGalleryClosed,
-                        ),
-                      PostSectionHeader(
-                        content: content,
-                        weatherViewModel: widget.weatherViewModel,
+              return NotificationListener<ScrollNotification>(
+                onNotification: _onScrollNotification,
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: <Widget>[
+                    if (content.media.isNotEmpty)
+                      PostSectionSlideshow(
+                        height: _mediaSlideshowHeight,
+                        media: content.media,
+                        visibilityNotifier:
+                            _slideshowVisibilityNotifier.notifier,
                       ),
-                      PostSectionActionButtons(
-                        content: content,
-                        onCategoryPressed: () =>
-                            _buildCategoriesRoute(content.category),
+                    PostSectionHeader(
+                      content: content,
+                      weatherViewModel: widget.weatherViewModel,
+                    ),
+                    PostSectionActionButtons(
+                      content: content,
+                      onCategoryPressed: () =>
+                          _buildCategoriesRoute(content.category),
+                    ),
+                    PostSectionDescription(content: content),
+                    PostSectionMapPreview(
+                      content: content,
+                      onMapPressed: () {
+                        // The initial map selection is identified by the
+                        // canonical content id and type query parameters, so
+                        // the location is deep-linkable and restorable without
+                        // a random navigation key or a ContentBase extra.
+                        context.goNamed(
+                          RouteNames.geoMap,
+                          queryParameters: {
+                            'contentId': content.remoteId.toString(),
+                            'type': RouteParameters.contentTypeSlug(
+                              content is Event
+                                  ? ContentType.event
+                                  : ContentType.place,
+                            ),
+                          },
+                        );
+                      },
+                    ),
+                    PostSectionNearbyContent(
+                      coordinates: content.coordinates,
+                      onContentPressed: _buildPostRoute,
+                      loadNearContentCommand: widget.viewModel.loadNearContent,
+                      nearContent: widget.viewModel.nearContent,
+                    ),
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                        bottom: context.bottomPadding,
                       ),
-                      PostSectionDescription(content: content),
-                      PostSectionMapPreview(
-                        content: content,
-                        onMapPressed: () {
-                          // A unique query parameter forces go_router to
-                          // treat this as a fresh navigation update even
-                          // when the destination route is already in stack.
-                          context.goNamed(
-                            RouteNames.geoMap,
-                            queryParameters: {
-                              'key': UniqueKey().toString(),
-                            },
-                            extra: content,
-                          );
-                        },
-                      ),
-                      PostSectionNearbyContent(
-                        coordinates: content.coordinates,
-                        onContentPressed: _buildPostRoute,
-                        loadNearContentCommand:
-                            widget.viewModel.loadNearContent,
-                        nearContent: widget.viewModel.nearContent,
-                      ),
-                      SliverPadding(
-                        padding: EdgeInsets.only(
-                          bottom: context.bottomPadding,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return const Center(
-                child: EmptyView.loading(
-                  text: Text('Caricamento in corso...'),
+                    ),
+                  ],
                 ),
               );
-            },
-          ),
+            }
+
+            return const Center(
+              child: EmptyView.loading(
+                text: Text('Caricamento in corso...'),
+              ),
+            );
+          },
         ),
-        extendBodyBehindAppBar: true,
       ),
+      extendBodyBehindAppBar: true,
     );
   }
 
-  @override
-  void deactivate() {
-    // Dismiss any orphaned gallery dialog on the root navigator when this
-    // screen is deactivated (e.g., GoRouter removes the branch route while
-    // the gallery is open, or the user switches shell tabs). The gallery uses
-    // barrierDismissible: false and has no PopScope of its own, so without
-    // this call the dialog would be permanently orphaned with no
-    // user-accessible dismiss path.
-    //
-    // A push-behind regression (deactivate firing when another route is pushed
-    // on top) is not a concern here: the gallery dialog is a fullscreen overlay
-    // that physically blocks all PostScreen UI — no tap target can trigger a
-    // push while the gallery is visible, so isGalleryOpenNotifier.value is
-    // always false when a push-behind deactivation occurs in practice.
-    // Tab-switch deactivations are similarly safe: the gallery overlay blocks
-    // the tab bar, so the user cannot switch tabs while the gallery is open.
-    if (isGalleryOpenNotifier.value) {
-      unawaited(Navigator.of(context, rootNavigator: true).maybePop());
-    }
-    super.deactivate();
-  }
-
   void _buildCategoriesRoute(ContentCategory category) {
-    String? nextRouteName;
-
-    if (_currentUri.startsWith(RoutePaths.favourites)) {
-      nextRouteName = RouteNames.favouritesCategory;
-    } else if (_currentUri.startsWith(RoutePaths.events)) {
-      nextRouteName = RouteNames.eventsCategory;
-    } else {
-      nextRouteName = RouteNames.homeCategory;
-    }
+    final nextRouteName = switch (GoRouterState.of(context).name) {
+      RouteNames.favouritesPost ||
+      RouteNames.favouritesCategoryPost => RouteNames.favouritesCategory,
+      RouteNames.eventsPost ||
+      RouteNames.eventsCategoryPost => RouteNames.eventsCategory,
+      _ => RouteNames.homeCategory,
+    };
 
     GoRouter.of(context).goNamed(
       nextRouteName,
-      pathParameters: {'index': (category.index - 1).toString()},
+      pathParameters: {
+        'categorySlug': RouteParameters.categorySlug(category),
+      },
     );
   }
 
   void _buildPostRoute(ContentBase content) {
-    String? nextRoute;
-    var indexNecessary = false;
+    final currentRouteName = GoRouterState.of(context).name;
+    final indexNecessary =
+        currentRouteName == RouteNames.eventsCategoryPost ||
+        currentRouteName == RouteNames.favouritesCategoryPost ||
+        currentRouteName == RouteNames.homeCategoryPost;
 
-    if (_currentUri.startsWith('${RoutePaths.events}/category')) {
-      nextRoute = RouteNames.eventsCategoryPost;
-      indexNecessary = true;
-    } else if (_currentUri.startsWith('${RoutePaths.favourites}/category')) {
-      nextRoute = RouteNames.favouritesCategoryPost;
-      indexNecessary = true;
-    } else if (_currentUri.startsWith('${RoutePaths.home}/category')) {
-      nextRoute = RouteNames.homeCategoryPost;
-      indexNecessary = true;
-    } else if (_currentUri.startsWith(RoutePaths.events)) {
-      nextRoute = RouteNames.eventsPost;
-    } else if (_currentUri.startsWith(RoutePaths.favourites)) {
-      nextRoute = RouteNames.favouritesPost;
-    } else if (_currentUri.startsWith(RoutePaths.home)) {
-      nextRoute = RouteNames.homePost;
-    }
+    final nextRoute = switch (currentRouteName) {
+      RouteNames.eventsCategoryPost => RouteNames.eventsCategoryPost,
+      RouteNames.favouritesCategoryPost => RouteNames.favouritesCategoryPost,
+      RouteNames.homeCategoryPost => RouteNames.homeCategoryPost,
+      RouteNames.eventsPost => RouteNames.eventsPost,
+      RouteNames.favouritesPost => RouteNames.favouritesPost,
+      RouteNames.homeSearchResultPost => RouteNames.homeSearchResultPost,
+      RouteNames.homePost => RouteNames.homePost,
+      _ => null,
+    };
 
     if (nextRoute != null) {
       final map = {'id': content.remoteId.toString()};
 
       if (indexNecessary) {
-        map['index'] = (content.category.index - 1).toString();
+        map['categorySlug'] = RouteParameters.categorySlug(content.category);
       }
 
-      unawaited(
-        GoRouter.of(context).pushReplacementNamed(
-          nextRoute,
-          pathParameters: map,
-          queryParameters: {'isEvent': (content is Event ? 'true' : 'false')},
+      final queryParameters = <String, String>{
+        'type': RouteParameters.contentTypeSlug(
+          content is Event ? ContentType.event : ContentType.place,
         ),
+      };
+      if (currentRouteName == RouteNames.homeSearchResultPost) {
+        final query = GoRouterState.of(context).uri.queryParameters['q'];
+        if (query != null) queryParameters['q'] = query;
+      }
+
+      GoRouter.of(context).goNamed(
+        nextRoute,
+        pathParameters: map,
+        queryParameters: queryParameters,
       );
     }
   }

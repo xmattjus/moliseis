@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:go_router/go_router.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
@@ -18,6 +19,36 @@ class _SyncScreenState extends State<SyncScreen> {
   // Whether to schedule a callback on next frame build or not.
   bool _scheduleCallbackOnNextFrame = true;
 
+  late final SyncViewModel _syncViewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncViewModel = context.read<SyncViewModel>();
+    _syncViewModel.sync.addListener(_onSyncChanged);
+  }
+
+  @override
+  void dispose() {
+    _syncViewModel.sync.removeListener(_onSyncChanged);
+    super.dispose();
+  }
+
+  void _onSyncChanged() {
+    if (_syncViewModel.sync.error && !_syncViewModel.fatalError) {
+      _scheduleCallback(() {
+        if (!mounted) return;
+        showSnackBar(
+          context: context,
+          textContent:
+              "Si è verificato un errore durante l'aggiornamento dei "
+              'contenuti',
+          type: SnackBarType.error,
+        );
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion(
@@ -34,54 +65,40 @@ class _SyncScreenState extends State<SyncScreen> {
             return ListenableBuilder(
               listenable: viewModel.sync,
               builder: (context, child) {
-                if (viewModel.sync.completed) {
-                  _scheduleCallback(() {
-                    GoRouter.of(context).refresh();
-                  });
+                if (viewModel.sync.error && viewModel.fatalError) {
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    spacing: 8,
+                    children: <Widget>[
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Molise Is necessita di una connessione ad internet '
+                          "per l'aggiornamento dei contenuti. Controlla le "
+                          'impostazioni di rete.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          _scheduleCallbackOnNextFrame = true;
+                          unawaited(viewModel.sync.execute(true));
+                        },
+                        child: const Text('Riprova'),
+                      ),
+                    ],
+                  );
                 }
 
-                if (viewModel.sync.error) {
-                  if (viewModel.fatalError) {
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      spacing: 8,
-                      children: <Widget>[
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'Molise Is necessita di una connessione ad '
-                            'internet '
-                            "per l'aggiornamento dei contenuti. Controlla le "
-                            'impostazioni di rete.',
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            _scheduleCallbackOnNextFrame = true;
-                            viewModel.sync.execute(true);
-                          },
-                          child: const Text('Riprova'),
-                        ),
-                      ],
-                    );
-                  } else {
-                    _scheduleCallback(() {
-                      GoRouter.of(context).refresh();
-
-                      showSnackBar(
-                        context: context,
-                        textContent:
-                            "Si è verificato un errore durante l'aggiornamento "
-                            'dei contenuti.',
-                      );
-                    });
-                  }
+                if (viewModel.sync.running) {
+                  return const EmptyView.loading(
+                    text: Text('Aggiornamento dei contenuti in corso...'),
+                  );
                 }
 
-                return const EmptyView.loading(
-                  text: Text('Aggiornamento dei contenuti in corso...'),
-                );
+                // The router leaves /sync for every non-running, non-fatal
+                // state. Avoid showing a misleading spinner during that frame.
+                return const SizedBox.shrink();
               },
             );
           },

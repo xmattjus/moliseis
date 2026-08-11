@@ -1,7 +1,11 @@
+import 'dart:async' show Completer;
+
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
+import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
@@ -16,11 +20,13 @@ import '../../../support/mock_logger.dart';
 void main() {
   ContentSubmissionViewModel buildViewModel({
     required ControllableSubmissionRepository submissionRepository,
+    ContentSubmissionDraftRepository? draftRepository,
   }) {
     return ContentSubmissionViewModel(
       logger: MockLogger(),
       contentSubmissionRepository: submissionRepository,
-      draftRepository: FakeContentSubmissionDraftRepository(),
+      draftRepository:
+          draftRepository ?? FakeContentSubmissionDraftRepository(),
       imagePicker: FakeImagePicker(),
     );
   }
@@ -91,7 +97,15 @@ void main() {
         ),
       ],
     );
-    return MaterialApp.router(routerConfig: router);
+    return MaterialApp.router(
+      routerConfig: router,
+      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        GlobalCupertinoLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en'), Locale('it')],
+    );
   }
 
   /// Enters text into all required form fields and accepts the terms checkbox
@@ -128,7 +142,8 @@ void main() {
       expect(repo.uploadCallCount, 0);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
       expect(find.byType(ContentSubmissionScreen), findsOneWidget);
-      expect(vm.submit.idle, isTrue);
+      expect(vm.submit.running, isFalse);
+      expect(vm.submit.result, isNull);
     });
 
     testWidgets('with valid form fires submit and navigates to progress', (
@@ -208,6 +223,194 @@ void main() {
     });
   });
 
+  group('ContentSubmissionScreen back navigation', () {
+    testWidgets(
+      'completed back pops once and leaves a clean form',
+      (tester) async {
+        final repo = ControllableSubmissionRepository();
+        final vm = buildViewModel(submissionRepository: repo);
+        await vm.initialize();
+
+        await tester.pumpWidget(buildApp(vm));
+        await fillValidForm(tester);
+        await flushDebounce(tester);
+
+        // Enable the event path so the local `_isEvent` state is true before
+        // submitting; the completed back must reset it.
+        final eventCheckbox = find.descendant(
+          of: find
+              .ancestor(
+                of: find.text('È un evento?'),
+                matching: find.byType(Row),
+              )
+              .first,
+          matching: find.byType(Checkbox),
+        );
+        await tester.scrollUntilVisible(
+          find.text('È un evento?'),
+          200,
+          scrollable: mainScrollable,
+        );
+        await tester.ensureVisible(eventCheckbox);
+        await tester.pump();
+        await tester.tap(eventCheckbox);
+        await tester.pump();
+        expect(tester.widget<Checkbox>(eventCheckbox).value, isTrue);
+
+        await tester.scrollUntilVisible(
+          find.widgetWithText(OutlinedButton, 'Invia'),
+          200,
+          scrollable: mainScrollable,
+        );
+        await tester.ensureVisible(
+          find.widgetWithText(OutlinedButton, 'Invia'),
+        );
+        await tester.pump();
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Invia'));
+        await tester.pump();
+
+        repo.completeUpload(const Result.success(null));
+        await tester.pumpAndSettle();
+        expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+
+        final handled = await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+
+        expect(handled, isTrue);
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+
+        // The completed pop cleared the in-memory state; the form fields reset
+        // to empty and re-sync the draft with empty values.
+        expect(vm.state.city, isEmpty);
+        expect(vm.state.name, isEmpty);
+        expect(find.widgetWithText(TextFormField, 'Campobasso'), findsNothing);
+        expect(find.widgetWithText(TextFormField, 'Test Event'), findsNothing);
+
+        // The local `_isEvent` state is reset and the event checkbox cleared.
+        await tester.scrollUntilVisible(
+          find.text('È un evento?'),
+          -200,
+          scrollable: mainScrollable,
+        );
+        expect(tester.widget<Checkbox>(eventCheckbox).value, isFalse);
+
+        await tester.scrollUntilVisible(
+          find.widgetWithText(TextFormField, 'E-mail'),
+          200,
+          scrollable: mainScrollable,
+        );
+        expect(
+          find.widgetWithText(TextFormField, 'test@example.com'),
+          findsNothing,
+        );
+
+        await tester.scrollUntilVisible(
+          find.byType(CheckboxFormField),
+          200,
+          scrollable: mainScrollable,
+        );
+        final termsCheckbox = tester.widget<Checkbox>(
+          find.descendant(
+            of: find.byType(CheckboxFormField),
+            matching: find.byType(Checkbox),
+          ),
+        );
+        expect(termsCheckbox.value, isFalse);
+        // The reset re-synced the draft through the field onChanged callbacks,
+        // scheduling the 3s draft-save debounce again; drain it.
+        await flushDebounce(tester);
+      },
+    );
+
+    testWidgets(
+      'completed pop hides stale form while persisted clear is pending',
+      (tester) async {
+        final repo = ControllableSubmissionRepository();
+        final draftRepo = _GatedDraftRepository();
+        final vm = buildViewModel(
+          submissionRepository: repo,
+          draftRepository: draftRepo,
+        );
+        await vm.initialize();
+
+        await tester.pumpWidget(buildApp(vm));
+        await fillValidForm(tester);
+        await flushDebounce(tester);
+        await scrollToAndTap(
+          tester,
+          find.widgetWithText(OutlinedButton, 'Invia'),
+        );
+        await tester.pump();
+
+        repo.completeUpload(const Result.success(null));
+        await tester.pumpAndSettle();
+        expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+
+        expect(await tester.binding.handlePopRoute(), isTrue);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+
+        expect(vm.clear.running, isTrue);
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.text('Caricamento in corso...'), findsOneWidget);
+        expect(find.text('Campobasso'), findsNothing);
+
+        draftRepo.releaseClear();
+        await tester.pumpAndSettle();
+
+        expect(vm.clear.completed, isTrue);
+        expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+        expect(vm.state.city, isEmpty);
+        expect(find.text('Campobasso'), findsNothing);
+        await flushDebounce(tester);
+      },
+    );
+
+    testWidgets('error back pops once and preserves the form data', (
+      tester,
+    ) async {
+      final repo = ControllableSubmissionRepository();
+      final vm = buildViewModel(submissionRepository: repo);
+      await vm.initialize();
+
+      await tester.pumpWidget(buildApp(vm));
+      await fillValidForm(tester);
+      await flushDebounce(tester);
+
+      await scrollToAndTap(
+        tester,
+        find.widgetWithText(OutlinedButton, 'Invia'),
+      );
+      await tester.pump();
+
+      repo.completeUpload(Result.error(Exception('boom')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+
+      final handled = await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(handled, isTrue);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+      expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+
+      // No clear ran, so the editable draft retains the submitted values.
+      expect(vm.state.city, 'Campobasso');
+      expect(vm.state.name, 'Test Event');
+      expect(vm.state.userEmail, 'test@example.com');
+      expect(vm.state.userName, 'Test User');
+
+      // The preserved form still shows the entered text on screen.
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextFormField, 'Città'),
+        -200,
+        scrollable: mainScrollable,
+      );
+      expect(find.widgetWithText(TextFormField, 'Campobasso'), findsOneWidget);
+    });
+  });
+
   group('ContentSubmissionScreen persisted draft binding', () {
     testWidgets(
       'binds the loaded draft values to the form fields on first build',
@@ -239,9 +442,9 @@ void main() {
         await tester.pumpWidget(buildApp(vm));
         await flushDebounce(tester);
 
-        // Each TextFormField now carries `initialValue` bound to the loaded
-        // draft state — the belt-and-suspenders path that fixes the
-        // resume-through-CTA visible-text drift.
+        // The standard form fields retain their initial values while the
+        // description field reconstructs its owned Quill document from the
+        // loaded legacy draft text.
         expect(
           tester
               .widget<TextFormField>(
@@ -350,4 +553,24 @@ void main() {
       },
     );
   });
+}
+
+final class _GatedDraftRepository implements ContentSubmissionDraftRepository {
+  final _clearGate = Completer<void>();
+
+  void releaseClear() => _clearGate.complete();
+
+  @override
+  Future<Result<void>> clearDraft() async {
+    await _clearGate.future;
+    return const Result.success(null);
+  }
+
+  @override
+  Future<Result<ContentSubmissionDraft?>> loadDraft() async =>
+      const Result.success(null);
+
+  @override
+  Future<Result<void>> saveDraft(ContentSubmissionDraft state) async =>
+      const Result.success(null);
 }

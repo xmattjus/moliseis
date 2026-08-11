@@ -3,9 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/ui/category/view_models/category_view_model.dart';
 import 'package:moliseis/ui/category/widgets/category_content_and_type_selection.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
@@ -22,12 +23,8 @@ class CategoryScreen extends StatefulWidget {
 }
 
 class _CategoryScreenState extends State<CategoryScreen> {
-  String _currentUri = '';
-
   @override
   Widget build(BuildContext context) {
-    _currentUri = GoRouterState.of(context).fullPath.toString();
-
     return Scaffold(
       body: SafeArea(
         child: NestedScrollView(
@@ -136,26 +133,25 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   void _buildStoryRoute(ContentBase content) {
-    String? nextRoute;
-
-    if (_currentUri.startsWith('${RoutePaths.events}/category')) {
-      nextRoute = RouteNames.eventsCategoryPost;
-    } else if (_currentUri.startsWith('${RoutePaths.favourites}/category')) {
-      nextRoute = RouteNames.favouritesCategoryPost;
-    } else if (_currentUri.startsWith('${RoutePaths.home}/category')) {
-      nextRoute = RouteNames.homeCategoryPost;
-    }
+    final nextRoute = switch (GoRouterState.of(context).name) {
+      RouteNames.eventsCategory => RouteNames.eventsCategoryPost,
+      RouteNames.favouritesCategory => RouteNames.favouritesCategoryPost,
+      RouteNames.homeCategory => RouteNames.homeCategoryPost,
+      _ => null,
+    };
 
     if (nextRoute != null) {
-      final map = {
-        'id': content.remoteId.toString(),
-        'index': (content.category.index - 1).toString(),
-      };
-
       GoRouter.of(context).goNamed(
         nextRoute,
-        pathParameters: map,
-        queryParameters: {'isEvent': (content is Event ? 'true' : 'false')},
+        pathParameters: {
+          'id': content.remoteId.toString(),
+          'categorySlug': RouteParameters.categorySlug(content.category),
+        },
+        queryParameters: {
+          'type': RouteParameters.contentTypeSlug(
+            content is Event ? ContentType.event : ContentType.place,
+          ),
+        },
       );
     }
   }

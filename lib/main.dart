@@ -2,6 +2,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/config/env/env.dart';
@@ -11,6 +12,7 @@ import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
+import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/http_client.dart';
 import 'package:moliseis/utils/logging/logging.dart';
@@ -150,16 +152,38 @@ Future<void> _main() async {
   );
 }
 
-class MoliseIsApp extends StatelessWidget {
+class MoliseIsApp extends StatefulWidget {
   const MoliseIsApp({super.key});
 
   @override
+  State<MoliseIsApp> createState() => _MoliseIsAppState();
+}
+
+class _MoliseIsAppState extends State<MoliseIsApp> {
+  GoRouter? _router;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _router ??= buildAppRouter(
+      syncViewModel: context.read<SyncViewModel>(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _router?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final router = _router!;
     return Consumer<ThemeViewModel>(
       builder: (_, viewModel, _) {
         return MaterialApp.router(
           restorationScopeId: 'app',
-          routerConfig: appRouter,
+          routerConfig: router,
           builder: (_, child) => child!,
           title: 'Molise Is',
           localizationsDelegates: const <LocalizationsDelegate<dynamic>>[

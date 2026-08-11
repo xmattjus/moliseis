@@ -37,22 +37,23 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
     try {
       final cache = context.read<CacheManager>();
       final file = await cache.getSingleFile(media.url);
+      if (!context.mounted) return;
       final sharedImage = XFile(file.path, mimeType: 'image/*');
       await SharePlus.instance.share(ShareParams(files: [sharedImage]));
     } on Exception catch (exception, stackTrace) {
-      if (context.mounted) {
-        context.read<Logger?>()?.log(
-          const ImageSharingFailed(),
-          error: exception,
-          stackTrace: stackTrace,
-        );
+      if (!context.mounted) return;
 
-        showSnackBar(
-          context: context,
-          textContent:
-              'Si è verificato un errore durante la condivisione, riprova.',
-        );
-      }
+      context.read<Logger?>()?.log(
+        const ImageSharingFailed(),
+        error: exception,
+        stackTrace: stackTrace,
+      );
+
+      showSnackBar(
+        context: context,
+        textContent:
+            'Si è verificato un errore durante la condivisione, riprova.',
+      );
     }
   }
 

@@ -48,7 +48,12 @@ class AppSearchAnchor extends StatefulWidget {
   /// field.
   final void Function(String text)? onSubmitted;
 
-  /// Called when the user indicates that they want to close the [SearchAnchor].
+  /// Called when the search view closes, regardless of how it was dismissed:
+  /// system back, barrier tap, the leading close button, or a programmatic
+  /// [SearchController.closeView].
+  ///
+  /// The popup route is already popped when this runs, so the callback must
+  /// only perform close-state cleanup and must not close the view again.
   final VoidCallback? onBackPressed;
 
   final double? elevation;
@@ -120,109 +125,108 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
         /// Prevents the [SearchBar] from automatically obtaining focus.
         canRequestFocus: false,
 
-        /// Handles the [SearchAnchor] back gesture/button.
-        child: BackButtonListener(
-          child: SearchAnchor(
-            isFullScreen: _isFullScreen,
-            searchController: _searchController,
-            viewBuilder: _buildViewBuilder,
-            builder: (context, controller) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SearchBar(
-                  controller: controller,
-                  hintText: widget.hintText,
-                  leading: widget.leading,
-                  trailing: <Widget>[
-                    Icon(
-                      Symbols.search,
-                      size: 24,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ],
-                  onTap: controller.openView,
-                  elevation: WidgetStatePropertyAll<double>(
-                    widget.elevation ?? 0,
+        child: SearchAnchor(
+          isFullScreen: _isFullScreen,
+          searchController: _searchController,
+          viewBuilder: _buildViewBuilder,
+          builder: (context, controller) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SearchBar(
+                controller: controller,
+                hintText: widget.hintText,
+                leading: widget.leading,
+                trailing: <Widget>[
+                  Icon(
+                    Symbols.search,
+                    size: 24,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  padding: WidgetStatePropertyAll<EdgeInsets>(
-                    widget.leading == null
-                        ? const EdgeInsets.symmetric(horizontal: 16)
-                        : const EdgeInsets.only(left: 4, right: 16),
-                  ),
+                ],
+                onTap: controller.openView,
+                elevation: WidgetStatePropertyAll<double>(
+                  widget.elevation ?? 0,
                 ),
-              );
-            },
-            viewLeading: BackButton(onPressed: _handleOnBackPressed),
-            viewHintText: widget.hintText,
-            viewOnSubmitted: (query) {
-              widget.viewModel.addToPastSearches.execute(query);
-
-              _searchController.closeView(query);
-
-              widget.onSubmitted?.call(query);
-            },
-            suggestionsBuilder: (context, controller) async {
-              if (controller.text.isEmpty) {
-                final history = widget.viewModel.pastSearches;
-
-                return _lastHistory = _buildChips(
-                  texts: history,
-                  showDeleteIcon: true,
-                );
-              }
-
-              final options = (await _debouncedSearch(
-                controller.text,
-              ))?.toList();
-
-              if (options == null) {
-                return _lastOptions;
-              }
-
-              return _lastOptions = <Widget>[
-                ListenableBuilder(
-                  listenable: widget.viewModel.loadSuggestions,
-                  builder: (context, _) {
-                    if (widget.viewModel.loadSuggestions.completed) {
-                      if (widget.viewModel.suggestions.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: EmptyView(
-                            text: Text('Non è stato trovato alcun risultato.'),
-                          ),
-                        );
-                      }
-
-                      return SearchAnchorSuggestionList(
-                        suggestions: widget.viewModel.suggestions,
-                        onSuggestionPressed: (content) {
-                          widget.viewModel.addToPastSearches.execute(
-                            content.name,
-                          );
-
-                          widget.onSuggestionPressed(content);
-                        },
-                      );
-                    }
-
-                    if (widget.viewModel.loadSuggestions.error) {
-                      return const ListTile(
-                        title: Text('Si è verificato un problema, riprova.'),
-                      );
-                    }
-
-                    return const SearchAnchorSkeletonList();
-                  },
+                padding: WidgetStatePropertyAll<EdgeInsets>(
+                  widget.leading == null
+                      ? const EdgeInsets.symmetric(horizontal: 16)
+                      : const EdgeInsets.only(left: 4, right: 16),
                 ),
-              ];
-            },
+              ),
+            );
+          },
+          // The leading close button pops the popup route through the
+          // controller; the resulting popup `didPop` fires [viewOnClose],
+          // which runs the host's close-state cleanup.
+          viewLeading: BackButton(
+            onPressed: () => _searchController.closeView(null),
           ),
-          onBackButtonPressed: () async {
-            if (_searchController.isOpen) {
-              _handleOnBackPressed();
-              return true;
+          // Fires on every dismissal of the search view, including system
+          // back, barrier dismissal, the leading close button, and
+          // programmatic `closeView`.
+          viewOnClose: widget.onBackPressed != null ? _handleOnClose : null,
+          viewHintText: widget.hintText,
+          viewOnSubmitted: (query) {
+            widget.viewModel.addToPastSearches.execute(query);
+
+            _searchController.closeView(query);
+
+            widget.onSubmitted?.call(query);
+          },
+          suggestionsBuilder: (context, controller) async {
+            if (controller.text.isEmpty) {
+              final history = widget.viewModel.pastSearches;
+
+              return _lastHistory = _buildChips(
+                texts: history,
+                showDeleteIcon: true,
+              );
             }
-            return false;
+
+            final options = (await _debouncedSearch(
+              controller.text,
+            ))?.toList();
+
+            if (options == null) {
+              return _lastOptions;
+            }
+
+            return _lastOptions = <Widget>[
+              ListenableBuilder(
+                listenable: widget.viewModel.loadSuggestions,
+                builder: (context, _) {
+                  if (widget.viewModel.loadSuggestions.completed) {
+                    if (widget.viewModel.suggestions.isEmpty) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: EmptyView(
+                          text: Text('Non è stato trovato alcun risultato.'),
+                        ),
+                      );
+                    }
+
+                    return SearchAnchorSuggestionList(
+                      suggestions: widget.viewModel.suggestions,
+                      onSuggestionPressed: (content) {
+                        widget.viewModel.addToPastSearches.execute(
+                          content.name,
+                        );
+
+                        widget.onSuggestionPressed(content);
+                      },
+                    );
+                  }
+
+                  if (widget.viewModel.loadSuggestions.error) {
+                    return const ListTile(
+                      title: Text('Si è verificato un problema, riprova.'),
+                    );
+                  }
+
+                  return const SearchAnchorSkeletonList();
+                },
+              ),
+            ];
           },
         ),
       ),
@@ -304,9 +308,10 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
     );
   }
 
-  void _handleOnBackPressed() => widget.onBackPressed != null
-      ? widget.onBackPressed!()
-      : _searchController.closeView(null);
+  /// Runs the host's close-state cleanup once the search view has been
+  /// dismissed. The popup route is already popped by the time this runs, so
+  /// no additional close is needed here.
+  void _handleOnClose() => widget.onBackPressed?.call();
 
   // Calls the "remote" API to search with the given query. Returns null when
   // the call has been made obsolete.

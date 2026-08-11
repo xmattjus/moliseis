@@ -1,5 +1,7 @@
 import 'dart:async' show unawaited;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +15,7 @@ import 'package:moliseis/utils/result.dart';
 import '../../../support/fake_image_picker.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
+import '../../../support/predictive_back.dart';
 
 void main() {
   ContentSubmissionViewModel buildViewModel({
@@ -97,34 +100,35 @@ void main() {
   /// Pushes the form route (`/contentSubmission`) and then the progress
   /// route on top of it, mirroring the production stack
   /// `[explore → contentSubmission → contentSubmission/uploadProgress]`,
-  /// and pumps a single frame so the progress screen is mounted.
+  /// waiting for the form route to mount before pushing its child.
   ///
   /// Returns synchronously without awaiting `pushNamed`: its returned
   /// `Future<String?>` only completes when the pushed route is *popped*
   /// (carrying a result), so awaiting it would hang the test forever.
   ///
-  /// Pumps once (not `pumpAndSettle`) because at push time `submit` is
-  /// `idle` and the progress screen renders an indefinite
-  /// `CircularProgressIndicator` — `pumpAndSettle` would never settle on
-  /// that infinite animation. Callers that need a settled tree should drive
-  /// `submit` to `completed`/`error` (which swaps the spinner for a static
-  /// icon) and then `pumpAndSettle`.
+  /// This harness deliberately leaves `submit` idle so tests can exercise the
+  /// process-restoration recovery state. Callers that need an in-flight upload
+  /// start `submit` after this helper returns.
   Future<void> pushProgress(WidgetTester tester, GoRouter router) async {
     unawaited(router.pushNamed(RouteNames.contentSubmission));
+    await tester.pumpAndSettle();
     unawaited(router.pushNamed(RouteNames.contentSubmissionUploadProgress));
-    await tester.pump();
+    await tester.pumpAndSettle();
   }
 
   group('ContentSubmissionProgressScreen state rendering', () {
-    testWidgets('idle: shows spinner and no action buttons', (tester) async {
+    testWidgets('idle: shows recovery UI and no retry action', (tester) async {
       final repo = ControllableSubmissionRepository();
       final vm = buildViewModel(submissionRepository: repo);
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
       await flushDebounce(tester);
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.text('Invio in corso...'), findsOneWidget);
+      expect(find.byIcon(Symbols.upload), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.textContaining("L'invio è stato interrotto"), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.text('Torna al modulo'), findsOneWidget);
       expect(find.text('Torna alla home'), findsNothing);
       expect(find.text('Nuovo suggerimento'), findsNothing);
       expect(find.text('Riprova'), findsNothing);
@@ -201,7 +205,7 @@ void main() {
 
   group('ContentSubmissionProgressScreen clear command call sites', () {
     testWidgets(
-      'BackButton when completed calls clear then recreates the form fresh',
+      'BackButton when completed pops once, clears, and reveals the form',
       (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
@@ -223,8 +227,9 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(draftRepo.clearDraftCalled, isTrue);
-        // P1 fix: completed exits recreate the form (pop-twice-then-push),
-        // so they land on a fresh `/contentSubmission` route, not home.
+        // The completed exit pops the progress route once and lands on the
+        // form route below; the form screen owns the reset of its fields when
+        // `viewModel.clear` completes.
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
         expect(
@@ -267,7 +272,7 @@ void main() {
     );
 
     testWidgets(
-      'Nuovo suggerimento when completed calls clear then recreates the form',
+      'Nuovo suggerimento when completed clears then pops to the form',
       (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
@@ -289,7 +294,8 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(draftRepo.clearDraftCalled, isTrue);
-        // P4 fix: same pop-twice-then-push as the AppBar chevron on success.
+        // The completed exit pops the progress route once and lands on the
+        // form route below, which resets its own fields on clear.
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
         expect(
@@ -299,40 +305,43 @@ void main() {
       },
     );
 
-    testWidgets('OS back when completed clears and recreates the form', (
-      tester,
-    ) async {
-      final repo = ControllableSubmissionRepository();
-      final draftRepo = FakeContentSubmissionDraftRepository();
-      final vm = buildViewModel(
-        submissionRepository: repo,
-        draftRepository: draftRepo,
-      );
+    testWidgets(
+      'OS back when completed pops once, clears, and reveals the form',
+      (
+        tester,
+      ) async {
+        final repo = ControllableSubmissionRepository();
+        final draftRepo = FakeContentSubmissionDraftRepository();
+        final vm = buildViewModel(
+          submissionRepository: repo,
+          draftRepository: draftRepo,
+        );
 
-      final (router, app) = buildHomeFirstApp(vm);
-      await tester.pumpWidget(app);
-      await flushDebounce(tester);
-      await pushProgress(tester, router);
-      unawaited(vm.submit.execute());
-      await tester.pump();
-      repo.completeUpload(const Result.success(null));
-      await tester.pumpAndSettle();
+        final (router, app) = buildHomeFirstApp(vm);
+        await tester.pumpWidget(app);
+        await flushDebounce(tester);
+        await pushProgress(tester, router);
+        unawaited(vm.submit.execute());
+        await tester.pump();
+        repo.completeUpload(const Result.success(null));
+        await tester.pumpAndSettle();
 
-      // Simulate the OS back gesture by dispatching it at the binding level,
-      // which routes through `PopScope.onPopInvokedWithResult` rather than
-      // the explicit AppBar chevron tap path.
-      final handled = await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+        // Simulate the OS back gesture by dispatching it at the binding level,
+        // which routes through `PopScope.onPopInvokedWithResult` rather than
+        // the explicit AppBar chevron tap path.
+        final handled = await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
 
-      expect(handled, isTrue);
-      expect(draftRepo.clearDraftCalled, isTrue);
-      expect(find.byType(_FormMarker), findsOneWidget);
-      expect(find.byType(_HomeMarker), findsNothing);
-      expect(
-        find.byType(ContentSubmissionProgressScreen),
-        findsNothing,
-      );
-    });
+        expect(handled, isTrue);
+        expect(draftRepo.clearDraftCalled, isTrue);
+        expect(find.byType(_FormMarker), findsOneWidget);
+        expect(find.byType(_HomeMarker), findsNothing);
+        expect(
+          find.byType(ContentSubmissionProgressScreen),
+          findsNothing,
+        );
+      },
+    );
 
     testWidgets('OS back when error does not clear and pops to the form', (
       tester,
@@ -361,6 +370,178 @@ void main() {
       expect(find.byType(_FormMarker), findsOneWidget);
       expect(find.byType(_HomeMarker), findsNothing);
     });
+
+    testWidgets(
+      'BackButton while idle pops to form without clearing or retrying',
+      (tester) async {
+        final repo = ControllableSubmissionRepository();
+        final draftRepo = FakeContentSubmissionDraftRepository();
+        final vm = buildViewModel(
+          submissionRepository: repo,
+          draftRepository: draftRepo,
+        );
+
+        final (router, app) = buildHomeFirstApp(vm);
+        await tester.pumpWidget(app);
+        await flushDebounce(tester);
+        await pushProgress(tester, router);
+
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        expect(draftRepo.clearDraftCalled, isFalse);
+        expect(repo.uploadCallCount, 0);
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.byType(_FormMarker), findsOneWidget);
+        expect(find.byType(_HomeMarker), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'Torna al modulo while idle pops to form without clearing or retrying',
+      (tester) async {
+        final repo = ControllableSubmissionRepository();
+        final draftRepo = FakeContentSubmissionDraftRepository();
+        final vm = buildViewModel(
+          submissionRepository: repo,
+          draftRepository: draftRepo,
+        );
+
+        final (router, app) = buildHomeFirstApp(vm);
+        await tester.pumpWidget(app);
+        await flushDebounce(tester);
+        await pushProgress(tester, router);
+
+        await tester.tap(find.text('Torna al modulo'));
+        await tester.pumpAndSettle();
+
+        expect(draftRepo.clearDraftCalled, isFalse);
+        expect(repo.uploadCallCount, 0);
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.byType(_FormMarker), findsOneWidget);
+        expect(find.byType(_HomeMarker), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'OS back while idle pops to form without clearing or retrying',
+      (
+        tester,
+      ) async {
+        final repo = ControllableSubmissionRepository();
+        final draftRepo = FakeContentSubmissionDraftRepository();
+        final vm = buildViewModel(
+          submissionRepository: repo,
+          draftRepository: draftRepo,
+        );
+
+        final (router, app) = buildHomeFirstApp(vm);
+        await tester.pumpWidget(app);
+        await flushDebounce(tester);
+        await pushProgress(tester, router);
+
+        final handled = await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+
+        expect(handled, isTrue);
+        expect(draftRepo.clearDraftCalled, isFalse);
+        expect(repo.uploadCallCount, 0);
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.byType(_FormMarker), findsOneWidget);
+        expect(find.byType(_HomeMarker), findsNothing);
+      },
+    );
+
+    testWidgets('OS back while running is blocked and does not pop', (
+      tester,
+    ) async {
+      final repo = ControllableSubmissionRepository();
+      final vm = buildViewModel(submissionRepository: repo);
+
+      final (router, app) = buildHomeFirstApp(vm);
+      await tester.pumpWidget(app);
+      await flushDebounce(tester);
+      await pushProgress(tester, router);
+      unawaited(vm.submit.execute());
+      await tester.pump();
+
+      final handled = await tester.binding.handlePopRoute();
+      // The spinner keeps animating, so a single pump is enough here.
+      await tester.pump();
+
+      expect(handled, isTrue);
+      expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+      expect(find.byType(_FormMarker), findsNothing);
+      expect(vm.submit.running, isTrue);
+
+      addTearDown(() => repo.completeUpload(const Result.success(null)));
+    });
+
+    testWidgets(
+      'predictive back while idle pops to form without clearing or retrying',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        try {
+          final repo = ControllableSubmissionRepository();
+          final draftRepo = FakeContentSubmissionDraftRepository();
+          final vm = buildViewModel(
+            submissionRepository: repo,
+            draftRepository: draftRepo,
+          );
+
+          final (router, app) = buildHomeFirstApp(vm);
+          await tester.pumpWidget(app);
+          await flushDebounce(tester);
+          await pushProgress(tester, router);
+
+          await startPredictiveBack(tester);
+          expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+
+          await commitPredictiveBack(tester);
+
+          expect(draftRepo.clearDraftCalled, isFalse);
+          expect(repo.uploadCallCount, 0);
+          expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+          expect(find.byType(_FormMarker), findsOneWidget);
+          expect(find.byType(_HomeMarker), findsNothing);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+
+    testWidgets(
+      'predictive back while running does not pop the progress route',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        try {
+          final repo = ControllableSubmissionRepository();
+          final vm = buildViewModel(submissionRepository: repo);
+
+          final (router, app) = buildHomeFirstApp(vm);
+          await tester.pumpWidget(app);
+          await flushDebounce(tester);
+          await pushProgress(tester, router);
+          unawaited(vm.submit.execute());
+          await tester.pump();
+
+          await startPredictiveBack(tester);
+          expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+
+          // Commit the gesture without settling: the running spinner is an
+          // infinite animation, so `pumpAndSettle` would never settle.
+          await commitPredictiveBack(tester, settle: false);
+
+          expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+          expect(find.byType(_FormMarker), findsNothing);
+          expect(vm.submit.running, isTrue);
+
+          addTearDown(() => repo.completeUpload(const Result.success(null)));
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
 
     testWidgets('Riprova when error does not call clear and retries submit', (
       tester,

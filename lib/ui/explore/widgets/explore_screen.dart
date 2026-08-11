@@ -4,8 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/ui/category/widgets/category_button.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_cta_button.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
@@ -125,7 +127,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         return GoRouter.of(context).goNamed(
                           RouteNames.homeCategory,
                           pathParameters: {
-                            'index': (type.index - 1).toString(),
+                            'categorySlug': RouteParameters.categorySlug(type),
                           },
                         );
                       },
@@ -163,7 +165,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             RouteNames.homePost,
                             pathParameters: {'id': content.remoteId.toString()},
                             queryParameters: {
-                              'isEvent': (content is Event ? 'true' : 'false'),
+                              'type': RouteParameters.contentTypeSlug(
+                                content is Event
+                                    ? ContentType.event
+                                    : ContentType.place,
+                              ),
                             },
                           );
                         },
@@ -210,7 +216,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         onPressed: () => GoRouter.of(context).goNamed(
                           RouteNames.homeCategory,
                           pathParameters: {
-                            'index': kcategoryScreenNoIndex.toString(),
+                            'categorySlug': RouteParameters.allCategorySlug,
                           },
                         ),
                         style: const ButtonStyle(
@@ -235,7 +241,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           RouteNames.homePost,
                           pathParameters: {'id': content.remoteId.toString()},
                           queryParameters: {
-                            'isEvent': (content is Event ? 'true' : 'false'),
+                            'type': RouteParameters.contentTypeSlug(
+                              content is Event
+                                  ? ContentType.event
+                                  : ContentType.place,
+                            ),
                           },
                         );
                       },
@@ -276,16 +286,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void _startSync() {
     final syncViewModel = context.read<SyncViewModel>();
     unawaited(syncViewModel.sync.execute(true));
-
-    // Redirects to the local app repositories synchronization screen.
-    GoRouter.of(context).refresh();
   }
 
   void _showSearchResults(String text) {
     if (text.isNotEmpty) {
       context.goNamed(
         RouteNames.homeSearchResult,
-        pathParameters: {'query': text},
+        queryParameters: {'q': text},
       );
     }
 

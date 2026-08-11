@@ -1,19 +1,19 @@
 import 'dart:async' show unawaited;
 
-import 'package:animated_stateful_shell_route/animated_stateful_shell_route.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/config/dependencies.dart';
-import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
 import 'package:moliseis/ui/core/ui/logging_screen.dart';
+import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/events_screen.dart';
@@ -21,6 +21,8 @@ import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_screen.dart';
+import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
+import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_screen.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
@@ -41,266 +43,355 @@ final _favouritesShellNavigatorKey = GlobalKey<NavigatorState>();
 final _mapShellNavigatorKey = GlobalKey<NavigatorState>();
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-final appRouter = GoRouter(
-  redirect: (context, state) {
-    final syncViewModel = context.read<SyncViewModel>();
-
-    if (syncViewModel.sync.running) {
-      return RoutePaths.sync;
-    }
-
-    if ((syncViewModel.sync.completed ||
-            syncViewModel.sync.error && !syncViewModel.fatalError) &&
-        state.matchedLocation == RoutePaths.sync) {
-      return RoutePaths.home;
-    }
-
-    // https://stackoverflow.com/a/78203240
-    if (state.fullPath?.isEmpty ?? true) return RoutePaths.home;
-
-    return null;
-  },
-  routes: <RouteBase>[
-    GoRoute(
-      path: RoutePaths.sync,
-      pageBuilder: (_, _) => const NoTransitionPage(child: SyncScreen()),
+GoRouter buildAppRouter({required SyncViewModel syncViewModel}) {
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: RoutePaths.home,
+    overridePlatformDefaultLocation: false,
+    restorationScopeId: 'router',
+    refreshListenable: syncViewModel.sync,
+    redirect: (context, state) =>
+        _redirectForSync(context, syncViewModel, state),
+    errorBuilder: (_, state) => RouteErrorScreen(
+      uri: state.uri,
+      error: state.error,
     ),
-    GoRoute(
-      path: RoutePaths.settings,
-      name: RouteNames.settings,
-      builder: (_, _) => const SettingsScreen(),
-    ),
-    GoRoute(
-      path: RoutePaths.contentSubmission,
-      name: RouteNames.contentSubmission,
-      builder: (context, _) {
-        final viewModel = context.read<ContentSubmissionViewModel>();
-        return ContentSubmissionScreen(viewModel: viewModel);
-      },
-      routes: <RouteBase>[
-        GoRoute(
-          path: RoutePaths.contentSubmissionUploadProgress,
-          name: RouteNames.contentSubmissionUploadProgress,
-          builder: (context, _) {
-            final viewModel = context.read<ContentSubmissionViewModel>();
-            return ContentSubmissionProgressScreen(viewModel: viewModel);
-          },
-        ),
-      ],
-    ),
-    GoRoute(
-      path: RoutePaths.logging,
-      name: RouteNames.logging,
-      builder: (_, _) {
-        return LoggingScreen(talker: $talker);
-      },
-    ),
-    AnimatedStatefulShellRoute(
-      restorationScopeId: 'appShell',
-      branches: <StatefulShellBranch>[
-        StatefulShellBranch(
-          restorationScopeId: 'exploreBranch',
-          navigatorKey: _exploreShellNavigatorKey,
-          routes: <RouteBase>[
-            GoRoute(
-              path: RoutePaths.home,
-              name: RouteNames.home,
-              builder: (_, _) {
-                return MultiProvider(
-                  providers: <SingleChildWidget>[
-                    ChangeNotifierProvider<EventViewModel>(
-                      create: (context) {
-                        final viewModel = EventViewModel(
-                          repository: context.read(),
-                        );
-                        unawaited(viewModel.loadNextIds.execute());
-                        return viewModel;
-                      },
-                    ),
-                    ChangeNotifierProvider<ExploreViewModel>(
-                      create: (context) => ExploreViewModel(
-                        byIdUseCase: ExploreUseCase(
-                          eventRepository: context.read(),
+    routes: <RouteBase>[
+      GoRoute(
+        path: RoutePaths.sync,
+        pageBuilder: (_, _) => const NoTransitionPage(child: SyncScreen()),
+      ),
+      GoRoute(
+        path: RoutePaths.settings,
+        name: RouteNames.settings,
+        builder: (_, _) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.contentSubmission,
+        name: RouteNames.contentSubmission,
+        builder: (context, _) {
+          final viewModel = context.read<ContentSubmissionViewModel>();
+          return ContentSubmissionScreen(viewModel: viewModel);
+        },
+        routes: <RouteBase>[
+          GoRoute(
+            path: RoutePaths.contentSubmissionUploadProgress,
+            name: RouteNames.contentSubmissionUploadProgress,
+            builder: (context, _) {
+              final viewModel = context.read<ContentSubmissionViewModel>();
+              return ContentSubmissionProgressScreen(viewModel: viewModel);
+            },
+          ),
+        ],
+      ),
+      GoRoute(
+        path: RoutePaths.logging,
+        name: RouteNames.logging,
+        builder: (_, _) {
+          return LoggingScreen(talker: $talker);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.gallery,
+        name: RouteNames.gallery,
+        builder: (_, state) {
+          final data = GalleryPreviewRouteData.tryParse(state.extra);
+          return data == null
+              ? const GalleryUnavailableScreen()
+              : GalleryPreviewScreen(data: data);
+        },
+      ),
+      StatefulShellRoute.indexedStack(
+        restorationScopeId: 'appShell',
+        branches: <StatefulShellBranch>[
+          StatefulShellBranch(
+            restorationScopeId: 'exploreBranch',
+            navigatorKey: _exploreShellNavigatorKey,
+            routes: <RouteBase>[
+              GoRoute(
+                path: RoutePaths.home,
+                name: RouteNames.home,
+                builder: (_, _) {
+                  return MultiProvider(
+                    providers: <SingleChildWidget>[
+                      ChangeNotifierProvider<EventViewModel>(
+                        create: (context) {
+                          final viewModel = EventViewModel(
+                            repository: context.read(),
+                          );
+                          unawaited(viewModel.loadNextIds.execute());
+                          return viewModel;
+                        },
+                      ),
+                      ChangeNotifierProvider<ExploreViewModel>(
+                        create: (context) => ExploreViewModel(
+                          byIdUseCase: ExploreUseCase(
+                            eventRepository: context.read(),
+                            placeRepository: context.read(),
+                          ),
                           placeRepository: context.read(),
                         ),
-                        placeRepository: context.read(),
                       ),
-                    ),
-                    ChangeNotifierProvider<SearchViewModel>(
-                      create: (context) => SearchViewModel(
-                        eventRepository: context.read(),
-                        exploreGetByIdUseCase: ExploreUseCase(
-                          eventRepository: context.read(),
-                          placeRepository: context.read(),
-                        ),
-                        searchRepository: context.read(),
-                      ),
-                    ),
-                  ],
-                  builder: (context, _) {
-                    return ExploreScreen(
-                      eventViewModel: context.read(),
-                      exploreViewModel: context.read(),
-                      searchViewModel: context.read(),
-                    );
-                  },
-                );
-              },
-              routes: <RouteBase>[
-                GoRoute(
-                  path: RoutePaths.homeSearchResults,
-                  name: RouteNames.homeSearchResult,
-                  builder: (_, state) {
-                    final query = state.pathParameters['query'] ?? '';
-
-                    return ChangeNotifierProvider(
-                      create: (context) {
-                        final viewModel = SearchViewModel(
+                      ChangeNotifierProvider<SearchViewModel>(
+                        create: (context) => SearchViewModel(
                           eventRepository: context.read(),
                           exploreGetByIdUseCase: ExploreUseCase(
                             eventRepository: context.read(),
                             placeRepository: context.read(),
                           ),
                           searchRepository: context.read(),
-                        );
-
-                        unawaited(viewModel.loadResults.execute(query));
-
-                        return viewModel;
-                      },
-                      builder: (context, _) => SearchResultScreen(
-                        query: query,
-                        viewModel: context.read(),
+                        ),
                       ),
-                    );
-                  },
-                  routes: <RouteBase>[
-                    postRoute(name: RouteNames.homeSearchResultPost),
-                  ],
-                ),
-                postRoute(name: RouteNames.homePost),
-                categoryRoute(
-                  name: RouteNames.homeCategory,
-                  childName: RouteNames.homeCategoryPost,
-                ),
-              ],
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          restorationScopeId: 'favouritesBranch',
-          navigatorKey: _favouritesShellNavigatorKey,
-          routes: [
-            GoRoute(
-              path: RoutePaths.favourites,
-              name: RouteNames.favourites,
-              builder: (context, _) {
-                return FavouriteScreen(
-                  viewModel: context.read<FavouriteViewModel>(),
-                );
-              },
-              routes: <RouteBase>[
-                postRoute(name: RouteNames.favouritesPost),
-                categoryRoute(
-                  name: RouteNames.favouritesCategory,
-                  childName: RouteNames.favouritesCategoryPost,
-                ),
-              ],
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          restorationScopeId: 'eventsBranch',
-          navigatorKey: _eventsShellNavigatorKey,
-          routes: <RouteBase>[
-            GoRoute(
-              path: RoutePaths.events,
-              name: RouteNames.events,
-              builder: (context, _) {
-                return ChangeNotifierProvider<EventViewModel>(
-                  create: (context) {
-                    return EventViewModel(repository: context.read());
-                  },
-                  child: Consumer<EventViewModel>(
-                    builder: (_, viewModel, _) {
-                      return EventsScreen(viewModel: viewModel);
+                    ],
+                    builder: (context, _) {
+                      return ExploreScreen(
+                        eventViewModel: context.read(),
+                        exploreViewModel: context.read(),
+                        searchViewModel: context.read(),
+                      );
                     },
-                  ),
-                );
-              },
-              routes: <RouteBase>[
-                postRoute(name: RouteNames.eventsPost),
-                categoryRoute(
-                  name: RouteNames.eventsCategory,
-                  childName: RouteNames.eventsCategoryPost,
-                ),
-              ],
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          restorationScopeId: 'mapBranch',
-          navigatorKey: _mapShellNavigatorKey,
-          routes: <RouteBase>[
-            GoRoute(
-              path: RoutePaths.geoMap,
-              name: RouteNames.geoMap,
-              builder: (context, state) {
-                final contentExtra = state.extra is ContentBase
-                    ? state.extra! as ContentBase
-                    : null;
-                assert(
-                  state.extra == null || contentExtra != null,
-                  'geoMap route received an unexpected extra payload of type '
-                  '${state.extra.runtimeType}. Expected ContentBase or null.',
-                );
+                  );
+                },
+                routes: <RouteBase>[
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: RoutePaths.homeSearchResults,
+                    name: RouteNames.homeSearchResult,
+                    builder: (_, state) {
+                      final query = state.uri.queryParameters['q'] ?? '';
 
-                final viewModel = GeoMapViewModel(
-                  geoMapUseCase: GeoMapUseCase(
+                      return ChangeNotifierProvider(
+                        key: ValueKey(query),
+                        create: (context) {
+                          final viewModel = SearchViewModel(
+                            eventRepository: context.read(),
+                            exploreGetByIdUseCase: ExploreUseCase(
+                              eventRepository: context.read(),
+                              placeRepository: context.read(),
+                            ),
+                            searchRepository: context.read(),
+                          );
+
+                          unawaited(viewModel.loadResults.execute(query));
+
+                          return viewModel;
+                        },
+                        builder: (context, _) => SearchResultScreen(
+                          query: query,
+                          viewModel: context.read(),
+                        ),
+                      );
+                    },
+                    routes: <RouteBase>[
+                      postRoute(
+                        name: RouteNames.homeSearchResultPost,
+                        parentNavigatorKey: _rootNavigatorKey,
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: RoutePaths.homeSearchResultsLegacy,
+                    redirect: redirectLegacySearchResults,
+                  ),
+                  GoRoute(
+                    parentNavigatorKey: _rootNavigatorKey,
+                    path: RoutePaths.homeSearchResultsLegacyPost,
+                    redirect: redirectLegacySearchResults,
+                  ),
+                  postRoute(
+                    name: RouteNames.homePost,
+                    parentNavigatorKey: _rootNavigatorKey,
+                  ),
+                  categoryRoute(
+                    name: RouteNames.homeCategory,
+                    childName: RouteNames.homeCategoryPost,
+                    parentNavigatorKey: _rootNavigatorKey,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            restorationScopeId: 'favouritesBranch',
+            navigatorKey: _favouritesShellNavigatorKey,
+            routes: [
+              GoRoute(
+                path: RoutePaths.favourites,
+                name: RouteNames.favourites,
+                builder: (context, _) {
+                  return FavouriteScreen(
+                    viewModel: context.read<FavouriteViewModel>(),
+                  );
+                },
+                routes: <RouteBase>[
+                  postRoute(
+                    name: RouteNames.favouritesPost,
+                    parentNavigatorKey: _rootNavigatorKey,
+                  ),
+                  categoryRoute(
+                    name: RouteNames.favouritesCategory,
+                    childName: RouteNames.favouritesCategoryPost,
+                    parentNavigatorKey: _rootNavigatorKey,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            restorationScopeId: 'eventsBranch',
+            navigatorKey: _eventsShellNavigatorKey,
+            routes: <RouteBase>[
+              GoRoute(
+                path: RoutePaths.events,
+                name: RouteNames.events,
+                builder: (context, _) {
+                  return ChangeNotifierProvider<EventViewModel>(
+                    create: (context) {
+                      return EventViewModel(repository: context.read());
+                    },
+                    child: Consumer<EventViewModel>(
+                      builder: (_, viewModel, _) {
+                        return EventsScreen(viewModel: viewModel);
+                      },
+                    ),
+                  );
+                },
+                routes: <RouteBase>[
+                  postRoute(
+                    name: RouteNames.eventsPost,
+                    parentNavigatorKey: _rootNavigatorKey,
+                  ),
+                  categoryRoute(
+                    name: RouteNames.eventsCategory,
+                    childName: RouteNames.eventsCategoryPost,
+                    parentNavigatorKey: _rootNavigatorKey,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            restorationScopeId: 'mapBranch',
+            navigatorKey: _mapShellNavigatorKey,
+            routes: <RouteBase>[
+              GoRoute(
+                path: RoutePaths.geoMap,
+                name: RouteNames.geoMap,
+                redirect: _redirectLegacyMapKey,
+                builder: (context, state) {
+                  final contentId = RouteParameters.contentId(
+                    state.uri.queryParameters['contentId'],
+                  );
+                  final contentType = RouteParameters.contentType(
+                    state.uri.queryParameters['type'],
+                  );
+
+                  final viewModel = GeoMapViewModel(
+                    geoMapUseCase: GeoMapUseCase(
+                      eventRepository: context.read(),
+                      placeRepository: context.read(),
+                    ),
+                  );
+
+                  final searchViewModel = SearchViewModel(
                     eventRepository: context.read(),
-                    placeRepository: context.read(),
-                  ),
-                );
+                    exploreGetByIdUseCase: ExploreUseCase(
+                      eventRepository: context.read(),
+                      placeRepository: context.read(),
+                    ),
+                    searchRepository: context.read(),
+                  );
 
-                final searchViewModel = SearchViewModel(
-                  eventRepository: context.read(),
-                  exploreGetByIdUseCase: ExploreUseCase(
-                    eventRepository: context.read(),
-                    placeRepository: context.read(),
-                  ),
-                  searchRepository: context.read(),
-                );
+                  final weatherViewModel = WeatherViewModel(
+                    weatherApiClient: context.read(),
+                    weatherDescriptionMapper:
+                        const WmoWeatherDescriptionMapper(),
+                    weatherCodeIconMapper: const WmoWeatherIconMapper(),
+                  );
 
-                final weatherViewModel = WeatherViewModel(
-                  weatherApiClient: context.read(),
-                  weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
-                  weatherCodeIconMapper: const WmoWeatherIconMapper(),
-                );
+                  return GeoMapScreen(
+                    initialContentId: contentId,
+                    initialContentType: contentType,
+                    viewModel: viewModel,
+                    searchViewModel: searchViewModel,
+                    weatherViewModel: weatherViewModel,
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
+        pageBuilder: (_, _, navigationShell) {
+          return MaterialPage<void>(
+            restorationId: 'appShellPage',
+            child: ScaffoldShell(navigationShell: navigationShell),
+          );
+        },
+      ),
+    ],
+    observers: [
+      TalkerRouteObserver($talker),
+    ],
+  );
+}
 
-                return GeoMapScreen(
-                  // mapState: mapState,
-                  contentExtra: contentExtra,
-                  viewModel: viewModel,
-                  searchViewModel: searchViewModel,
-                  weatherViewModel: weatherViewModel,
-                );
-              },
-            ),
-          ],
-        ),
-      ],
-      pageBuilder: (_, _, navigationShell) {
-        return MaterialPage<void>(
-          restorationId: 'appShellPage',
-          child: ScaffoldShell(navigationShell: navigationShell),
-        );
-      },
-      transitionBuilder: ShellRouteTransitions.fade,
-    ),
-  ],
-  observers: [
-    TalkerRouteObserver($talker),
-  ],
-  navigatorKey: _rootNavigatorKey,
-  restorationScopeId: 'router',
-);
+/// Side-effect-free sync redirect that preserves a requested internal URI.
+///
+/// Mirrors the Sync Redirect Contract:
+/// - sync starts outside `/sync` -> `/sync?from=<encoded current URI>`
+/// - sync running on `/sync` -> no redirect
+/// - fatal first-sync error on `/sync` -> remain for retry
+/// - any other non-running state on `/sync` (completed, non-fatal error, or
+///   idle) -> validated `from` URI, otherwise `/home`
+String? _redirectForSync(
+  BuildContext context,
+  SyncViewModel syncViewModel,
+  GoRouterState state,
+) {
+  final sync = syncViewModel.sync;
+  final onSync = state.matchedLocation == RoutePaths.sync;
+
+  if (sync.running) {
+    return onSync ? null : RoutePaths.syncFor(state.uri);
+  }
+
+  if (!onSync || (sync.error && syncViewModel.fatalError)) return null;
+
+  return _validatedFrom(
+        context,
+        state.uri.queryParameters['from'],
+      ) ??
+      RoutePaths.home;
+}
+
+/// Returns the [from] query value only when it is a safe internal URI.
+///
+/// Rejects external URLs, network-path references, non-leading-slash values,
+/// recursive `/sync` targets, and locations not accepted by the router.
+String? _validatedFrom(BuildContext context, String? from) {
+  if (from == null || from.isEmpty) return null;
+
+  final uri = Uri.tryParse(from);
+  if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
+
+  if (!uri.path.startsWith('/')) return null;
+
+  if (uri.path == RoutePaths.sync) return null;
+
+  if (GoRouter.of(context).configuration.findMatch(uri).isError) return null;
+
+  return from;
+}
+
+/// Canonicalizes restored map locations that carried the old random key.
+///
+/// Compatibility marker: the `key` query parameter is supported only for
+/// restored pre-2.3.0 locations and can be removed in the next major release.
+String? _redirectLegacyMapKey(BuildContext _, GoRouterState state) {
+  final query = state.uri.queryParameters;
+  if (!query.containsKey('key')) return null;
+
+  final canonicalQuery = <String, String>{...query}..remove('key');
+  return state.uri.replace(queryParameters: canonicalQuery).toString();
+}

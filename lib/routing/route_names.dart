@@ -7,6 +7,7 @@ abstract class RouteNames {
   static const favouritesCategory = 'favouritesCategory';
   static const favouritesCategoryPost = 'favouritesCategoryPost';
   static const favouritesPost = 'favouritesPost';
+  static const gallery = 'gallery';
   static const geoMap = 'map';
   static const home = 'home';
   static const homeCategory = 'homeCategory';

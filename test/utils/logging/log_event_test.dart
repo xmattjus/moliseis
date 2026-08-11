@@ -14,13 +14,25 @@ void main() {
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
-      test('PostRouteContentIdParseFailed has correct contract', () {
-        const event = PostRouteContentIdParseFailed(reason: 'invalid id');
+      test('RouteErrorScreenShown has correct contract', () {
+        const event = RouteErrorScreenShown(uri: '/bogus');
 
-        expect(event.name, 'post_route_content_id_parse_failed');
+        expect(event.name, 'route_error_screen_shown');
         expect(event.level, AppLogLevel.error);
-        expect(event.data, {'reason': 'invalid id'});
+        expect(event.data, {'uri': '/bogus'});
         expect(eventNamePattern.hasMatch(event.name), isTrue);
+      });
+
+      test('RouteErrorScreenShown includes the reason when provided', () {
+        const event = RouteErrorScreenShown(
+          uri: '/bogus',
+          reason: 'GoException: no routes for location: /bogus',
+        );
+
+        expect(event.data, {
+          'uri': '/bogus',
+          'reason': 'GoException: no routes for location: /bogus',
+        });
       });
 
       test('SnackBarShowFailed has correct contract with reason', () {

@@ -3,9 +3,11 @@ import 'dart:collection' show UnmodifiableListView;
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
@@ -165,7 +167,11 @@ class _CarouselViewItem extends StatelessWidget {
                     RouteNames.homePost,
                     pathParameters: {'id': content.remoteId.toString()},
                     queryParameters: {
-                      'isEvent': (content is Event ? 'true' : 'false'),
+                      'type': RouteParameters.contentTypeSlug(
+                        content is Event
+                            ? ContentType.event
+                            : ContentType.place,
+                      ),
                     },
                   ),
                 ),

@@ -18,22 +18,28 @@ class ImageLoadFailed extends LogEvent {
   String get name => 'image_load_failed';
 }
 
-/// Fired when the content id could not be parsed while loading a Post route.
-class PostRouteContentIdParseFailed extends LogEvent {
-  /// Creates an event with a [reason] describing the parse failure.
-  const PostRouteContentIdParseFailed({required this.reason});
+/// Fired when the router error screen is shown for an unmatched or invalid
+/// route location.
+class RouteErrorScreenShown extends LogEvent {
+  /// Creates an event for the displayed [uri], optionally carrying the
+  /// [reason] that prevented the location from being rendered.
+  const RouteErrorScreenShown({required this.uri, this.reason});
 
-  /// Human-readable description of why content id parsing failed.
-  final String reason;
+  /// The location that could not be matched or parsed.
+  final String uri;
+
+  /// Human-readable description of the failure, when available.
+  final String? reason;
 
   @override
-  Map<String, Object?> get data => {'reason': reason};
+  Map<String, Object?> get data =>
+      reason == null ? {'uri': uri} : {'uri': uri, 'reason': reason};
 
   @override
   AppLogLevel get level => AppLogLevel.error;
 
   @override
-  String get name => 'post_route_content_id_parse_failed';
+  String get name => 'route_error_screen_shown';
 }
 
 /// Fired when a SnackBar could not be shown.

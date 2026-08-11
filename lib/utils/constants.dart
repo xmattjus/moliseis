@@ -8,8 +8,6 @@ const double kListViewCardHeight = 96;
 
 const double kButtonHeight = 40;
 
-const int kcategoryScreenNoIndex = -1;
-
 const String kAssetMapTilerIconPath =
     'assets/icons/maptiler-icon-dark_64x69_optimized.png';
 

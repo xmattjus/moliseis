@@ -3,8 +3,10 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
@@ -34,7 +36,20 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   void initState() {
     super.initState();
 
-    _controller = SearchController();
+    _controller = SearchController()..text = widget.query;
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchResultScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.query == widget.query) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _controller.text != widget.query) {
+        _controller.text = widget.query;
+      }
+    });
   }
 
   @override
@@ -45,10 +60,6 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.query.isNotEmpty) {
-      _controller.text = widget.query;
-    }
-
     return Scaffold(
       appBar: const CustomAppBar.hidden(),
       body: SafeArea(
@@ -71,7 +82,9 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                   onResultPressed: (content) =>
                       _onSearchResultPressed(context, content),
                   onRetrySearchPressed: () {
-                    widget.viewModel.loadResults.execute(widget.query);
+                    unawaited(
+                      widget.viewModel.loadResults.execute(widget.query),
+                    );
                   },
                   viewModel: widget.viewModel,
                 ),
@@ -96,17 +109,10 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                       padding: EdgeInsetsDirectional.zero,
                       backgroundColor: Colors.transparent,
                     ),
-                    onSubmitted: (text) {
-                      unawaited(widget.viewModel.loadResults.execute(text));
-                      // widget.viewModel.loadRelatedResultsIds.execute(text);
-                    },
-                    onSuggestionPressed: (_) {
-                      _controller.closeView(_controller.text);
-                      unawaited(
-                        widget.viewModel.loadResults.execute(
-                          _controller.text,
-                        ),
-                      );
+                    onSubmitted: _showSearchResults,
+                    onSuggestionPressed: (content) {
+                      _controller.closeView(content.name);
+                      _showSearchResults(content.name);
                       // widget.viewModel.loadRelatedResultsIds.execute(
                       //   _controller.text,
                       // );
@@ -122,6 +128,15 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     );
   }
 
+  void _showSearchResults(String query) {
+    if (query.isEmpty) return;
+
+    context.goNamed(
+      RouteNames.homeSearchResult,
+      queryParameters: {'q': query},
+    );
+  }
+
   void _onSearchResultPressed(BuildContext context, ContentBase content) {
     if (_controller.isOpen) {
       _controller.closeView(_controller.text);
@@ -130,10 +145,14 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     GoRouter.of(context).goNamed(
       RouteNames.homeSearchResultPost,
       pathParameters: {
-        'query': widget.query,
         'id': content.remoteId.toString(),
       },
-      queryParameters: {'isEvent': (content is Event ? 'true' : 'false')},
+      queryParameters: {
+        'q': widget.query,
+        'type': RouteParameters.contentTypeSlug(
+          content is Event ? ContentType.event : ContentType.place,
+        ),
+      },
     );
   }
 }

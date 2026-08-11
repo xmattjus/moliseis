@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_title.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
@@ -76,7 +77,7 @@ class EventsModal extends StatelessWidget {
                   GoRouter.of(context).goNamed(
                     RouteNames.eventsPost,
                     pathParameters: {'id': content.remoteId.toString()},
-                    queryParameters: {'isEvent': 'true'},
+                    queryParameters: {'type': RouteParameters.eventType},
                   );
                 },
               );

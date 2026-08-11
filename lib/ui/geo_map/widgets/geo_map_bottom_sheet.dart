@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event.dart';
-import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
@@ -21,8 +18,8 @@ import 'package:skeletonizer/skeletonizer.dart';
 class GeoMapBottomSheet extends StatefulWidget {
   const GeoMapBottomSheet({
     super.key,
-    // required this.contentId,
     required this.content,
+    required this.isResolvingRequestedSelection,
     required this.controller,
     required this.currentCenter,
     required this.onCloseButtonPressed,
@@ -34,16 +31,21 @@ class GeoMapBottomSheet extends StatefulWidget {
     required this.weatherViewModel,
   });
 
-  // final int contentId;
+  /// Fully resolved content to display, or null when the sheet should show
+  /// search results or nearby content.
   final ContentBase? content;
+
+  /// True while the screen resolves a requested deep-link selection.
+  ///
+  /// A resolving selection takes precedence over previously displayed content
+  /// so a stale post is never rendered for a newly requested identity.
+  final bool isResolvingRequestedSelection;
 
   final DraggableScrollableController controller;
 
   /// The current map center.
   ///
-  /// When both the [contentId] and [currentCenter] are defined, the first
-  /// will take priority, e.g. the post of that [PlaceEntity] will be shown in
-  /// the bottom sheet.
+  /// Used by the nearby-content view when [content] is null.
   final LatLng currentCenter;
   final VoidCallback onCloseButtonPressed;
   final void Function(ContentBase content) onContentPressed;
@@ -69,10 +71,6 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
   void initState() {
     super.initState();
     _controller.addListener(_onVerticalDragUpdate);
-
-    if (widget.content != null) {
-      _showContent();
-    }
   }
 
   @override
@@ -93,19 +91,6 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
         _snapSizes.insert(0, 0.2);
       }
     }
-
-    if (widget.content != null &&
-        widget.content!.remoteId != oldWidget.content?.remoteId) {
-      _showContent();
-    }
-  }
-
-  void _showContent() {
-    if (widget.content! is Event) {
-      widget.viewModel.showEvent.execute(widget.content!.remoteId);
-    } else if (widget.content! is Place) {
-      widget.viewModel.showPlace.execute(widget.content!.remoteId);
-    }
   }
 
   @override
@@ -123,86 +108,48 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
       snapSizes: _snapSizes,
       controller: _controller,
       builder: (context, scrollController) {
-        Widget? child;
+        final content = widget.content;
+        final isResolving = widget.isResolvingRequestedSelection;
+        final showPost = !isResolving && content != null;
+        late final Widget child;
 
-        final id = widget.content?.remoteId ?? 0;
-
-        if (id > 0) {
-          child = ListenableBuilder(
-            listenable: Listenable.merge([
-              widget.viewModel.showEvent,
-              widget.viewModel.showPlace,
-            ]),
-            builder: (_, _) {
-              if (widget.content! is Event &&
-                      widget.viewModel.showEvent.completed ||
-                  widget.content! is Place &&
-                      widget.viewModel.showPlace.completed) {
-                return GeoMapModalPost(
-                  content: widget.viewModel.selectedContent!,
-                  onContentPressed: widget.onContentPressed,
-                  onCloseButtonPressed: widget.onCloseButtonPressed,
-                  viewModel: widget.viewModel,
-                  weatherViewModel: widget.weatherViewModel,
-                  scrollController: scrollController,
-                );
-              }
-
-              if (id > 0) {
-                return Skeletonizer(
-                  effect: AppPulseEffect(
-                    from: colorScheme.surfaceContainerHigh,
-                    to: colorScheme.surfaceContainerLow,
+        if (isResolving) {
+          child = SliverSkeletonizer(
+            effect: AppPulseEffect(
+              from: colorScheme.surfaceContainerHigh,
+              to: colorScheme.surfaceContainerLow,
+            ),
+            child: SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                vertical: 18,
+                horizontal: 16,
+              ),
+              sliver: SliverList.list(
+                children: <Widget>[
+                  Text(
+                    'Esplora Placeholder: nome di un luogo',
+                    style: AppTextStyles.title(context),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 18,
-                      horizontal: 16,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          'Esplora Placeholder: nome di un luogo',
-                          style: AppTextStyles.title(context),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Placeholder: nome di un paese',
-                          style: AppTextStyles.subtitle(context),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Placeholder: nome di un paese',
+                    style: AppTextStyles.subtitle(context),
                   ),
-                );
-              }
-
-              return SliverSkeletonizer(
-                effect: AppPulseEffect(
-                  from: colorScheme.surfaceContainerHigh,
-                  to: colorScheme.surfaceContainerLow,
-                ),
-                child: SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 18,
-                    horizontal: 16,
-                  ),
-                  sliver: SliverList.list(
-                    children: <Widget>[
-                      Text(
-                        'Esplora Placeholder: nome di un luogo',
-                        style: AppTextStyles.title(context),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Placeholder: nome di un paese',
-                        style: AppTextStyles.subtitle(context),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+                ],
+              ),
+            ),
+          );
+        } else if (content != null) {
+          // The screen already resolved this selection; re-executing its
+          // command would clear the successful result and reintroduce loading.
+          child = GeoMapModalPost(
+            key: ValueKey((content.runtimeType, content.remoteId)),
+            content: content,
+            onContentPressed: widget.onContentPressed,
+            onCloseButtonPressed: widget.onCloseButtonPressed,
+            viewModel: widget.viewModel,
+            weatherViewModel: widget.weatherViewModel,
+            scrollController: scrollController,
           );
         } else if (widget.searchQuery.isNotEmpty) {
           child = GeoMapModalSearchResults(
@@ -219,7 +166,7 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
           );
         }
 
-        if (id > 0) {
+        if (showPost) {
           return AppBottomSheetSurface(child: child);
         }
 
