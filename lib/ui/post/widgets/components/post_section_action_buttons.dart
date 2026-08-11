@@ -44,13 +44,12 @@ class PostSectionActionButtons extends StatelessWidget {
                 content.name,
                 content.city?.name,
               )) {
-                if (context.mounted) {
-                  showSnackBar(
-                    context: context,
-                    textContent:
-                        'Si è verificato un errore, riprova più tardi.',
-                  );
-                }
+                if (!context.mounted) return;
+                showSnackBar(
+                  context: context,
+                  textContent: 'Si è verificato un errore, riprova più tardi',
+                  type: SnackBarType.error,
+                );
               }
             },
             icon: const Icon(Symbols.directions),

@@ -52,7 +52,9 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
       showSnackBar(
         context: context,
         textContent:
-            'Si è verificato un errore durante la condivisione, riprova.',
+            'Si è verificato un errore durante la condivisione, riprova più '
+            'tardi',
+        type: SnackBarType.error,
       );
     }
   }

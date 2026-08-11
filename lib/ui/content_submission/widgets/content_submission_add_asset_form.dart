@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
@@ -30,9 +31,6 @@ class _ContentSubmissionAddAssetFormState
   ]);
 
   void _showTooLargeSnackBar(List<String> rejectedNames) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
-
     final count = rejectedNames.length;
     final names = rejectedNames.take(3).join(', ');
     final suffix = count > 3 ? ' (+${count - 3})' : '';
@@ -40,9 +38,11 @@ class _ContentSubmissionAddAssetFormState
         '$count file${count == 1 ? '' : 's'} '
         'oltre il limite di 10 MB: $names$suffix';
 
-    messenger
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showSnackBar(
+      context: context,
+      textContent: message,
+      type: SnackBarType.warning,
+    );
   }
 
   @override

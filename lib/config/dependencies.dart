@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';
@@ -46,9 +47,24 @@ import 'package:talker_flutter/talker_flutter.dart';
 ///
 /// The Dependency Injection pattern is intentionally not used here because
 /// go_router route observers do not have access to the build context.
+///
 /// The `$` character in the name is used to clearly indicate that this
 /// instance is intentionally global/static.
 final Talker $talker = TalkerFlutter.init();
+
+/// The global [ScaffoldMessengerState] instance.
+///
+/// The Dependency Injection pattern is intentionally not used here because
+/// this key must be eagerly available at the application root during the
+/// initialization of MaterialApp, and its lifecycle is tied permanently
+/// to the single global widget tree, making DI an unnecessary abstraction
+/// layer that introduces boilerplate without providing flexibility or
+/// mockability.
+///
+/// The `$` character in the name is used to clearly indicate that this
+/// instance is intentionally global/static.
+final GlobalKey<ScaffoldMessengerState> $scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
 
 /// Builds the root provider list using fully initialized dependencies.
 ///

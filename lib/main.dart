@@ -182,6 +182,7 @@ class _MoliseIsAppState extends State<MoliseIsApp> {
     return Consumer<ThemeViewModel>(
       builder: (_, viewModel, _) {
         return MaterialApp.router(
+          scaffoldMessengerKey: $scaffoldMessengerKey,
           restorationScopeId: 'app',
           routerConfig: router,
           builder: (_, child) => child!,

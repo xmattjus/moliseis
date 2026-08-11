@@ -1,6 +1,7 @@
 part of 'gallery_preview_modal_overlay.dart';
 
-// TODO(xmattjus): merge this widget with the main gallery preview overlay widget.
+// TODO(xmattjus): merge this widget with the main gallery preview overlay
+//  widget.
 class _GalleryPreviewModalOverlayContent extends StatelessWidget {
   const _GalleryPreviewModalOverlayContent({
     required this.eventOrPlaceName,
@@ -48,7 +49,8 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
 
     final licenseText = TextSpan(text: ' $license');
 
-    // TODO(xmattjus): handle license with no URL (e.g. public domain) and license with URL (e.g. CC BY-SA).
+    // TODO(xmattjus): handle license with no URL (e.g. public domain) and
+    //  license with URL (e.g. CC BY-SA).
     final licenseButton = Padding(
       padding: const EdgeInsetsDirectional.only(top: 8),
       child: LinkTextButton.icon(
@@ -59,13 +61,13 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
                 if (!await context.read<UrlLaunchService>().launchGenericUrl(
                   licenseUrl,
                 )) {
-                  if (context.mounted) {
-                    showSnackBar(
-                      context: context,
-                      textContent:
-                          'Si è verificato un errore, riprova più tardi.',
-                    );
-                  }
+                  if (!context.mounted) return;
+
+                  showSnackBar(
+                    context: context,
+                    textContent: 'Si è verificato un errore, riprova più tardi',
+                    type: SnackBarType.error,
+                  );
                 }
               }
             : null,

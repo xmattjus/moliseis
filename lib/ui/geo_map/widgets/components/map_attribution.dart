@@ -26,11 +26,7 @@ class MapAttribution extends StatelessWidget {
                     .read<UrlLaunchService>()
                     .openMapTilerWebsite()) {
                   if (context.mounted) {
-                    showSnackBar(
-                      context: context,
-                      textContent:
-                          'Si è verificato un errore, riprova più tardi.',
-                    );
+                    _showSnackBar(context);
                   }
                 }
               },
@@ -44,11 +40,7 @@ class MapAttribution extends StatelessWidget {
                     .read<UrlLaunchService>()
                     .openOpenStreetMapWebsite()) {
                   if (context.mounted) {
-                    showSnackBar(
-                      context: context,
-                      textContent:
-                          'Si è verificato un errore, riprova più tardi.',
-                    );
+                    _showSnackBar(context);
                   }
                 }
               },
@@ -59,4 +51,10 @@ class MapAttribution extends StatelessWidget {
       ),
     );
   }
+
+  void _showSnackBar(BuildContext context) => showSnackBar(
+    context: context,
+    textContent: 'Si è verificato un errore, riprova più tardi',
+    type: SnackBarType.error,
+  );
 }
