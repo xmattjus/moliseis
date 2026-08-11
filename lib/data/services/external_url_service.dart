@@ -14,13 +14,20 @@ class ExternalUrlService {
     try {
       final uri = Uri.parse(url);
 
+      // The generic exception Result.error returns on canLaunchUrl == false or
+      // launchUrl == false.
+      final message = 'Could not handle URL: $url';
+      final exception = Exception(message);
+
       if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-        return const Result.success(null);
+        final launched = await launchUrl(uri);
+        return switch (launched) {
+          false => Result.error(exception),
+          true => const Result.success(null),
+        };
       } else {
-        final message = 'Could not handle URL: $url';
         _logger.log(UrlLaunchFailed(url));
-        return Result.error(Exception(message));
+        return Result.error(exception);
       }
     } on Exception catch (exception, stackTrace) {
       _logger.log(
