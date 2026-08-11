@@ -395,13 +395,11 @@ void main() {
   group('SearchRepositoryImpl - getPlaceIdsByQuery', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late Box<PlaceEntity> placeBox;
-    late Box<CityEntity> cityBox;
     late SearchRepositoryImpl repository;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
       placeBox = objectBoxEnvironment.store.box<PlaceEntity>();
-      cityBox = objectBoxEnvironment.store.box<CityEntity>();
       repository = SearchRepositoryImpl(
         logger: MockLogger(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
