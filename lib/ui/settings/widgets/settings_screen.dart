@@ -23,7 +23,7 @@ class SettingsScreen extends StatelessWidget {
   ///
   Widget _buildSectionText(BuildContext context, String s) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(s, style: AppTextStyles.section(context)),
     );
   }
