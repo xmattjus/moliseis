@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -41,10 +43,35 @@ void handleSettingsRepositoryInitialization(Result<void> result) {
   }
 }
 
+/// Ensures that Supabase has an anonymous session without making startup fatal.
+///
+/// A session restored during Supabase initialization is reused as-is. When no
+/// session exists, anonymous sign-in is attempted once; expected Supabase Auth
+/// failures are logged and startup continues without an authenticated user.
+@visibleForTesting
+Future<void> ensureAnonymousSupabaseSession({
+  required GoTrueClient authClient,
+  required Logger logger,
+}) async {
+  if (authClient.currentUser != null) return;
+
+  try {
+    await authClient.signInAnonymously();
+  } on AuthException catch (error, stackTrace) {
+    logger.log(
+      const SupabaseAuthAnonymousLoginFailed(),
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
 void main() async => await http.runWithClient(_main, httpClientFactory);
 
 Future<void> _main() async {
   // Ensures the disk can be accessed before continuing app start-up.
+  WidgetsFlutterBinding.ensureInitialized();
+
   SentryWidgetsFlutterBinding.ensureInitialized();
 
   // Retrieves an HTTP client instance initialized with the `runWithClient`
@@ -83,6 +110,11 @@ Future<void> _main() async {
         url: Env.supabaseProdUrl,
         publishableKey: Env.supabaseProdApiKey,
         httpClient: SentrySupabaseClient(client: httpClient),
+      );
+
+      await ensureAnonymousSupabaseSession(
+        authClient: supabase.client.auth,
+        logger: _logger,
       );
 
       late final ObjectBox objectBox;
