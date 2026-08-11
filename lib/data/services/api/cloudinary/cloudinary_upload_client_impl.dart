@@ -346,11 +346,13 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
         if (!isRetryable || attempt == _kMaxUploadAttempts) {
           break;
         }
+        final exception = error is TimeoutException
+            ? 'timeout'
+            : 'http_${(error as _UploadHttpException).statusCode}';
+
         _logger.log(
           CloudinaryRequestFailed(
-            detail: error is TimeoutException
-                ? 'timeout_attempt_$attempt'
-                : 'http_${(error as _UploadHttpException).statusCode}_attempt_$attempt',
+            detail: '${exception}_attempt_$attempt',
           ),
         );
       }
@@ -537,13 +539,14 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
           );
         } else {
           // Catch-all for terminal errors that don't have a dedicated branch
-          // above (e.g. a final [TimeoutException] after all retry attempts are
-          // exhausted, or an unexpected [SocketException]/`HttpException` from
-          // the connect phase). A terminal timeout is logged here as the generic
-          // `upload_exception` rather than a dedicated `timeout` detail because
-          // the per-attempt breadcrumbs already emitted `timeout_attempt_<N>`
-          // for each failed attempt in [_uploadWithRetries], so the timeout
-          // detail is preserved in the log trail — nothing is lost.
+          // above (e.g. a final [TimeoutException] after all retry attempts
+          // are exhausted, or an unexpected [SocketException]/`HttpException`
+          // from the connect phase). A terminal timeout is logged here as the
+          // generic `upload_exception` rather than a dedicated `timeout`
+          // detail because the per-attempt breadcrumbs already emitted
+          // `timeout_attempt_<N>` for each failed attempt in
+          // [_uploadWithRetries], so the timeout detail is preserved in the
+          // log trail — nothing is lost.
           _logger.log(
             const CloudinaryRequestFailed(detail: 'upload_exception'),
             error: error,
