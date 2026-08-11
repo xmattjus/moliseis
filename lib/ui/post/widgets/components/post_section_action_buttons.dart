@@ -40,11 +40,10 @@ class PostSectionActionButtons extends StatelessWidget {
           FavouriteButton.wide(content: content),
           OutlinedButton.icon(
             onPressed: () async {
-              if (!await context.read<UrlLaunchService>().openGoogleMaps(
-                content.name,
-                content.city?.name,
-              )) {
-                if (!context.mounted) return;
+              final launched = await context
+                  .read<UrlLaunchService>()
+                  .openGoogleMaps(content.name, content.city?.name);
+              if (context.mounted && !launched) {
                 showSnackBar(
                   context: context,
                   textContent: 'Si è verificato un errore, riprova più tardi',

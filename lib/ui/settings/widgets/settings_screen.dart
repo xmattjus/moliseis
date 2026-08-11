@@ -114,12 +114,12 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: (value) async {
                     await viewModel.setCrashReporting.execute(value);
 
-                    if (value && context.mounted) {
+                    if (context.mounted && value) {
                       showSnackBar(
                         context: context,
                         textContent:
                             'Gli errori verranno inviati al prossimo avvio '
-                            "dell'app.",
+                            "dell'app",
                       );
                     }
                   },
@@ -172,15 +172,23 @@ class SettingsScreen extends StatelessWidget {
             ListTile(
               title: const Text('Termini di Servizio'),
               onTap: () async {
-                final urlLauncher = context.read<UrlLaunchService>();
-                await urlLauncher.openTermsOfService();
+                final launched = await context
+                    .read<UrlLaunchService>()
+                    .openTermsOfService();
+                if (context.mounted && !launched) {
+                  _showLaunchFailedSnackBar(context);
+                }
               },
             ),
             ListTile(
               title: const Text('Informativa sulla privacy'),
               onTap: () async {
-                final urlLauncher = context.read<UrlLaunchService>();
-                await urlLauncher.openPrivacyPolicy();
+                final launched = await context
+                    .read<UrlLaunchService>()
+                    .openPrivacyPolicy();
+                if (context.mounted && !launched) {
+                  _showLaunchFailedSnackBar(context);
+                }
               },
             ),
           ],
@@ -188,4 +196,10 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  void _showLaunchFailedSnackBar(BuildContext context) => showSnackBar(
+    context: context,
+    textContent: 'Si è verificato un errore, riprova più tardi',
+    type: SnackBarType.error,
+  );
 }

@@ -22,12 +22,11 @@ class MapAttribution extends StatelessWidget {
           children: <Widget>[
             LinkTextButton.icon(
               onPressed: () async {
-                if (!await context
+                final launched = await context
                     .read<UrlLaunchService>()
-                    .openMapTilerWebsite()) {
-                  if (context.mounted) {
-                    _showSnackBar(context);
-                  }
+                    .openMapTilerWebsite();
+                if (context.mounted && !launched) {
+                  _showLaunchFailedSnackBar(context);
                 }
               },
               icon: const ImageIcon(AssetImage(kAssetMapTilerIconPath)),
@@ -36,12 +35,11 @@ class MapAttribution extends StatelessWidget {
             ),
             LinkTextButton(
               onPressed: () async {
-                if (!await context
+                final launched = await context
                     .read<UrlLaunchService>()
-                    .openOpenStreetMapWebsite()) {
-                  if (context.mounted) {
-                    _showSnackBar(context);
-                  }
+                    .openOpenStreetMapWebsite();
+                if (context.mounted && !launched) {
+                  _showLaunchFailedSnackBar(context);
                 }
               },
               label: const Text('© OpenStreetMap contributors'),
@@ -52,7 +50,7 @@ class MapAttribution extends StatelessWidget {
     );
   }
 
-  void _showSnackBar(BuildContext context) => showSnackBar(
+  void _showLaunchFailedSnackBar(BuildContext context) => showSnackBar(
     context: context,
     textContent: 'Si è verificato un errore, riprova più tardi',
     type: SnackBarType.error,
