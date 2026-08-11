@@ -126,8 +126,8 @@ class _ContentSubmissionDateChipState extends State<ContentSubmissionDateChip> {
 
   // This function displays a CupertinoModalPopup with a reasonable fixed height
   // which hosts CupertinoDatePicker.
-  void _showDialog(BuildContext context, Widget child) {
-    showCupertinoModalPopup<void>(
+  Future<void> _showDialog(BuildContext context, Widget child) async {
+    await showCupertinoModalPopup<void>(
       context: context,
       builder: (context) => Container(
         constraints: const BoxConstraints.expand(height: 216),
