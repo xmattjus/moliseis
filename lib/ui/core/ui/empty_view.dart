@@ -43,7 +43,7 @@ class EmptyView extends StatelessWidget {
                 textAlign: TextAlign.center,
                 child: text!,
               ),
-            if (action != null) action!,
+            ?action,
           ],
         ),
       ),
