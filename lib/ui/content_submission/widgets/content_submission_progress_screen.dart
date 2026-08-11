@@ -1,6 +1,3 @@
-// Code readability benefits from separate statements over cascades.
-// ignore_for_file: cascade_invocations
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
