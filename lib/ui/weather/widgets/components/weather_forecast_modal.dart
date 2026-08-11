@@ -4,6 +4,7 @@ import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_title.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/link_text_button.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/widgets/components/weather_forecast_days_list.dart';
@@ -76,9 +77,14 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
             const SizedBox(height: 16),
             LinkTextButton(
               label: const Text('Dati meteo forniti da Open-Meteo.com'),
-              onPressed: () => context
-                  .read<UrlLaunchService>()
-                  .launchGenericUrl('https://open-meteo.com/'),
+              onPressed: () async {
+                final launched = await context
+                    .read<UrlLaunchService>()
+                    .launchGenericUrl('https://open-meteo.com/');
+                if (context.mounted && !launched) {
+                  showSnackBarGenericError(context: context);
+                }
+              },
             ),
             SizedBox(height: context.bottomPadding),
           ],

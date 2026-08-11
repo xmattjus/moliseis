@@ -58,16 +58,11 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
         iconSize: 18,
         onPressed: licenseUrl.isNotEmpty
             ? () async {
-                if (!await context.read<UrlLaunchService>().launchGenericUrl(
-                  licenseUrl,
-                )) {
-                  if (!context.mounted) return;
-
-                  showSnackBar(
-                    context: context,
-                    textContent: 'Si è verificato un errore, riprova più tardi',
-                    type: SnackBarType.error,
-                  );
+                final launched = await context
+                    .read<UrlLaunchService>()
+                    .launchGenericUrl(licenseUrl);
+                if (context.mounted && !launched) {
+                  showSnackBarGenericError(context: context);
                 }
               }
             : null,

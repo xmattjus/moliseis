@@ -176,7 +176,7 @@ class SettingsScreen extends StatelessWidget {
                     .read<UrlLaunchService>()
                     .openTermsOfService();
                 if (context.mounted && !launched) {
-                  _showLaunchFailedSnackBar(context);
+                  showSnackBarGenericError(context: context);
                 }
               },
             ),
@@ -187,7 +187,7 @@ class SettingsScreen extends StatelessWidget {
                     .read<UrlLaunchService>()
                     .openPrivacyPolicy();
                 if (context.mounted && !launched) {
-                  _showLaunchFailedSnackBar(context);
+                  showSnackBarGenericError(context: context);
                 }
               },
             ),
@@ -196,10 +196,4 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
-
-  void _showLaunchFailedSnackBar(BuildContext context) => showSnackBar(
-    context: context,
-    textContent: 'Si è verificato un errore, riprova più tardi',
-    type: SnackBarType.error,
-  );
 }

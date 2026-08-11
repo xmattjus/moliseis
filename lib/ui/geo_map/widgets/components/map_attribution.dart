@@ -26,7 +26,7 @@ class MapAttribution extends StatelessWidget {
                     .read<UrlLaunchService>()
                     .openMapTilerWebsite();
                 if (context.mounted && !launched) {
-                  _showLaunchFailedSnackBar(context);
+                  showSnackBarGenericError(context: context);
                 }
               },
               icon: const ImageIcon(AssetImage(kAssetMapTilerIconPath)),
@@ -39,7 +39,7 @@ class MapAttribution extends StatelessWidget {
                     .read<UrlLaunchService>()
                     .openOpenStreetMapWebsite();
                 if (context.mounted && !launched) {
-                  _showLaunchFailedSnackBar(context);
+                  showSnackBarGenericError(context: context);
                 }
               },
               label: const Text('© OpenStreetMap contributors'),
@@ -49,10 +49,4 @@ class MapAttribution extends StatelessWidget {
       ),
     );
   }
-
-  void _showLaunchFailedSnackBar(BuildContext context) => showSnackBar(
-    context: context,
-    textContent: 'Si è verificato un errore, riprova più tardi',
-    type: SnackBarType.error,
-  );
 }
