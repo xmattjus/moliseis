@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_classes_with_only_static_members
+import 'package:flutter/material.dart';
 
 /// Maps logical pixel dimensions to discrete physical-pixel "buckets",
 /// preventing image reloads on every window-resize tick while still avoiding
@@ -112,6 +112,7 @@ abstract final class ImageSizeBucket {
 /// Bucketed physical-pixel dimensions for a single image slot.
 ///
 /// A null value on either axis means "no constraint on that axis" (full res).
+@immutable
 final class ImageBucketSize {
   const ImageBucketSize({this.width, this.height});
 
