@@ -375,14 +375,26 @@ void main() {
       test(
         'getByDate returns Result.error when _getByDateRange rethrows',
         () async {
-          final result = await mockRepository.getByDate(DateTime(2026, 3, 15));
+          final date = DateTime(2026, 3, 15);
+
+          final result = await mockRepository.getByDate(date);
 
           expect(result, isA<Error<List<Event>>>());
           final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>();
           expect(failedCall, isNotNull);
+          final failedEvent = failedCall!.event as EntityLoadFailed;
           expect(
-            failedCall!.event,
-            const EntityLoadFailed('event', method: 'getByDate'),
+            failedEvent.entityType,
+            'event',
+          );
+          expect(failedEvent.method, 'getByDate');
+          expect(
+            failedEvent.data,
+            {
+              'entityType': 'event',
+              'method': 'getByDate',
+              'startDate': date.toIso8601String(),
+            },
           );
           expect(failedCall.error, isNotNull);
           expect(failedCall.stackTrace, isNotNull);
@@ -392,17 +404,28 @@ void main() {
       test(
         'getByDateRange returns Result.error when _getByDateRange rethrows',
         () async {
-          final result = await mockRepository.getByDateRange(
-            DateTime(2026, 3, 10),
-            DateTime(2026, 3, 20),
-          );
+          final start = DateTime(2026, 3, 10);
+          final end = DateTime(2026, 3, 20);
+
+          final result = await mockRepository.getByDateRange(start, end);
 
           expect(result, isA<Error<List<Event>>>());
           final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>();
           expect(failedCall, isNotNull);
+          final failedEvent = failedCall!.event as EntityLoadFailed;
           expect(
-            failedCall!.event,
-            const EntityLoadFailed('event', method: 'getByDateRange'),
+            failedEvent.entityType,
+            'event',
+          );
+          expect(failedEvent.method, 'getByDateRange');
+          expect(
+            failedEvent.data,
+            {
+              'entityType': 'event',
+              'method': 'getByDateRange',
+              'startDate': start.toIso8601String(),
+              'endDate': end.toIso8601String(),
+            },
           );
           expect(failedCall.error, isNotNull);
           expect(failedCall.stackTrace, isNotNull);
