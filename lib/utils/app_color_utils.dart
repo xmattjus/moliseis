@@ -30,7 +30,11 @@ class AppColorUtils {
   /// https://stackoverflow.com/a/77124714,
   /// https://github.com/Myndex/max-contrast.
   static Brightness maxContrast([List<double> rgb = const [0xa4, 0xa4, 0xa4]]) {
-    assert(rgb.length == 3);
+    assert(
+      rgb.length == 3,
+      'rgb must contain exactly 3 channel values (red, green, blue), '
+      'matching the APCA contrast computation.',
+    );
 
     // Based on APCA™ 0.98G middle contrast background color.
     const flipYs = 0.342;
