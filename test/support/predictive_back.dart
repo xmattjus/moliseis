@@ -39,9 +39,9 @@ Future<void> updatePredictiveBack(
   final messenger = tester.binding.defaultBinaryMessenger;
   await messenger.handlePlatformMessage(
     'flutter/backgesture',
-    StandardMethodCodec().encodeMethodCall(
+    const StandardMethodCodec().encodeMethodCall(
       MethodCall('updateBackGestureProgress', <String, Object?>{
-        'touchOffset': <double>[5, 300],
+        'touchOffset': const <double>[5, 300],
         'progress': progress,
         'swipeEdge': 0,
       }),
