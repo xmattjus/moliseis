@@ -14,7 +14,11 @@ class ContentNameAndCity extends StatelessWidget {
     this.cityNameStyle,
     this.color,
     this.overflow,
-  }) : assert(color == null || nameStyle == null && cityNameStyle == null);
+  }) : assert(
+         color == null || nameStyle == null && cityNameStyle == null,
+         'Either specify `color` or `nameStyle`/`cityNameStyle`, not both: '
+         'a style takes precedence and silently ignores `color`.',
+       );
 
   final String name;
   final String? cityName;
