@@ -15,7 +15,8 @@ void main() {
   group('restoration behavior', () {
     group('single-page gallery', () {
       testWidgets(
-        'restoration restores branch state and the serializable gallery payload',
+        'restoration restores branch state and the serializable gallery '
+        'payload',
         (
           tester,
         ) async {
@@ -45,11 +46,11 @@ void main() {
           await tester.restartAndRestore();
           await tester.pumpAndSettle();
 
-          // The harness rebuilt a fresh router from the saved restoration bucket.
-          // The declarative stack, the shell branch state, and the serializable
-          // gallery extra all survive: the pushed gallery route is restored with
-          // its media payload intact (go_router's route-match codec JSON-encodes
-          // serializable extras), with no exceptions.
+          // The harness rebuilt a fresh router from the saved restoration
+          // bucket. The declarative stack, the shell branch state, and the
+          // serializable gallery extra all survive: the pushed gallery route
+          // is restored with its media payload intact (go_router's route-match
+          // codec JSON-encodes serializable extras), with no exceptions.
           final after = holder.fixture!;
           expect(after, isNot(same(before)));
           expect(after.uri.path, '/home/detail');
@@ -88,8 +89,8 @@ void main() {
           expect(find.text('Map root'), findsOneWidget);
           expect(after.uri.path, '/map');
 
-          // The restored router stays fully functional: pop the restored gallery
-          // and open it again from a fresh navigation.
+          // The restored router stays fully functional: pop the restored
+          // gallery and open it again from a fresh navigation.
           after.router.go('/home/detail');
           await tester.pumpAndSettle();
           expect(find.text('Detail page'), findsOneWidget);
