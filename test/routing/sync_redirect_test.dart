@@ -51,7 +51,7 @@ void main() {
     testWidgets('unknown route renders the route error screen', (
       tester,
     ) async {
-      final harness = _SyncHarness(autoSync: false);
+      final harness = _SyncHarness();
       final router = _buildTestRouterApp(harness);
 
       await tester.pumpWidget(router.app);
@@ -70,7 +70,7 @@ void main() {
     testWidgets('cold start without a due sync stays on /home', (
       tester,
     ) async {
-      final harness = _SyncHarness(autoSync: false);
+      final harness = _SyncHarness();
       final router = _buildTestRouterApp(harness);
 
       await tester.pumpWidget(router.app);
@@ -106,7 +106,7 @@ void main() {
     testWidgets('manual sync from /home preserves /home and returns', (
       tester,
     ) async {
-      final harness = _SyncHarness(autoSync: false);
+      final harness = _SyncHarness();
       final router = _buildTestRouterApp(harness);
 
       await tester.pumpWidget(router.app);
@@ -136,7 +136,7 @@ void main() {
       final eventRepository = FakeEventRepository(
         getByIdResults: <int, Result<Event>>{1: Result.success(event)},
       );
-      final harness = _SyncHarness(autoSync: false);
+      final harness = _SyncHarness();
       final router = _buildTestRouterApp(
         harness,
         eventRepository: eventRepository,
@@ -175,7 +175,6 @@ void main() {
       tester,
     ) async {
       final harness = _SyncHarness(
-        autoSync: false,
         cityResult: Result.error(TestException('sync failed')),
       );
       final router = _buildTestRouterApp(harness);
@@ -237,7 +236,7 @@ void main() {
         (
           tester,
         ) async {
-          final harness = _SyncHarness(autoSync: false);
+          final harness = _SyncHarness();
           final router = _buildTestRouterApp(harness);
 
           await tester.pumpWidget(router.app);
@@ -327,7 +326,7 @@ void main() {
         final holder = _SyncRestorationHolder(
           // Each fixture needs its own settings so completing the old gated
           // sync cannot make the fresh view model think it is up to date.
-          settingsFactory: () => FakeSettingsRepository(),
+          settingsFactory: FakeSettingsRepository.new,
         );
 
         await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
@@ -383,7 +382,7 @@ void main() {
 
   group('MoliseIsApp router lifecycle', () {
     testWidgets('theme rebuild keeps the same router and URI', (tester) async {
-      final harness = _SyncHarness(autoSync: false);
+      final harness = _SyncHarness();
       await tester.pumpWidget(_buildRealApp(harness));
       await tester.pumpAndSettle();
 
