@@ -53,7 +53,7 @@ class _AppNetworkImageState extends State<AppNetworkImage> {
   Widget build(BuildContext context) {
     assert(
       widget.width.isFinite && widget.height.isFinite,
-      'Invalid image dimensions: $widget.width x $widget.height',
+      'Invalid image dimensions: ${widget.width} x ${widget.height}',
     );
     // debugInvertOversizedImages = true;
 
