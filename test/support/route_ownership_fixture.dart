@@ -43,16 +43,14 @@ final class RouteOwnershipFixture {
   RouteOwnershipFixture() {
     eventRepository = FakeEventRepository(
       getByIdResults: <int, Result<Event>>{
-        1: Result.success(makeEvent(remoteId: 1)),
+        1: Result.success(makeEvent()),
         2: Result.success(makeEvent(remoteId: 2)),
       },
-      getByCoordinatesResult: const Result.success(<Event>[]),
     );
     placeRepository = FakePlaceRepository(
       getByIdResults: <int, Result<Place>>{
         2: Result.success(makePlace(remoteId: 2)),
       },
-      getByCoordinatesResult: const Result.success(<Place>[]),
     );
     cacheManager = FakeCacheManager();
     weatherApiClient = CachedWeatherApiClient(
