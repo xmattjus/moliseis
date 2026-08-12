@@ -27,8 +27,16 @@ Future<T?> appShowModalBottomSheet<T>({
   AnimationStyle? sheetAnimationStyle,
   bool? requestFocus,
 }) {
-  assert(debugCheckHasMediaQuery(context));
-  assert(debugCheckHasMaterialLocalizations(context));
+  assert(
+    debugCheckHasMediaQuery(context),
+    'Context must have a MediaQuery ancestor to compute the bottom '
+    "sheet's maximum width and size.",
+  );
+  assert(
+    debugCheckHasMaterialLocalizations(context),
+    'Context must provide MaterialLocalizations for the barrier label '
+    'and its on-tap hint.',
+  );
 
   final navigator = Navigator.of(
     context,
