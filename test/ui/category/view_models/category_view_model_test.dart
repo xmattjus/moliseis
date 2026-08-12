@@ -15,7 +15,7 @@ void main() {
   group('CategoryViewModel', () {
     group('_load via filtered path (CategoryUseCase)', () {
       test('populates content when both places and events succeed', () async {
-        final place1 = makePlace(remoteId: 1, name: 'Castle');
+        final place1 = makePlace(name: 'Castle');
         final event1 = makeEvent(remoteId: 2, name: 'Festival');
         final vm = buildViewModel(
           placesByCategoryResult: Result.success([place1]),
@@ -130,7 +130,7 @@ void main() {
 
 /// Builds a [CategoryViewModel] wired to fakes.
 ///
-/// By default [selectedCategories] is empty, routing [_load] through
+/// By default `selectedCategories` is empty, routing `_load` through
 /// [CategoryUseCase] (filtered path) rather than [ExploreUseCase] (all path).
 CategoryViewModel buildViewModel({
   Result<List<Event>>? eventsByCategoryResult,
