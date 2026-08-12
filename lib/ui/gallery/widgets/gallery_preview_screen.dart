@@ -121,7 +121,7 @@ class _GalleryPreviewScreenState extends State<GalleryPreviewScreen>
             behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _showOverlay = !_showOverlay),
             child: Gallery(
-              controller: _pageController!,
+              controller: _pageController,
               initialIndex: _index.value,
               itemCount: widget.data.media.length,
               itemBuilder: (_, index) {
