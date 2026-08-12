@@ -85,9 +85,7 @@ class _PostMediaSlideshowPauseButtonState
     final textPainter = TextPainter(
       text: textSpan,
       textDirection: Directionality.of(context),
-    );
-
-    textPainter.layout();
+    )..layout();
 
     return textPainter.width;
   }
@@ -117,8 +115,8 @@ class _PostMediaSlideshowPauseButtonState
     if (widget.expanded != oldWidget.expanded) {
       /// Animates the button to its expanded or shrunk state.
       widget.expanded
-          ? _animationController.forward()
-          : _animationController.reverse();
+          ? unawaited(_animationController.forward())
+          : unawaited(_animationController.reverse());
     }
   }
 
