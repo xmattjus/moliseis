@@ -1,3 +1,6 @@
+// Separate response and delay setup keeps each timeout scenario clear.
+// ignore_for_file: cascade_invocations
+
 import 'dart:async' show TimeoutException, unawaited;
 import 'dart:io' show Directory, File;
 

@@ -127,8 +127,9 @@ void main() {
           doneFuture: doneCompleter.future,
         );
 
-        token.attach(request);
-        token.cancel();
+        token
+          ..attach(request)
+          ..cancel();
 
         doneCompleter.completeError(
           Exception('abort-induced connection closed'),
@@ -168,6 +169,9 @@ void main() {
 
         expect(() {
           token.abortCurrentRequest();
+          // The repeated receiver makes the idempotence action under test
+          // explicit.
+          // ignore: cascade_invocations
           token.abortCurrentRequest();
         }, returnsNormally);
         expect(token.isCancelled, isFalse);
@@ -184,8 +188,9 @@ void main() {
             doneFuture: doneCompleter.future,
           );
 
-          token.attach(request);
-          token.abortCurrentRequest();
+          token
+            ..attach(request)
+            ..abortCurrentRequest();
 
           // The abort-induced `request.done` error lands on the passive
           // listener while `_abortedForRetry` is true — it must NOT be
@@ -210,8 +215,9 @@ void main() {
             doneFuture: firstDone.future,
           );
 
-          token.attach(firstRequest);
-          token.abortCurrentRequest();
+          token
+            ..attach(firstRequest)
+            ..abortCurrentRequest();
           firstDone.completeError(
             Exception('timeout-induced connection abort'),
           );
