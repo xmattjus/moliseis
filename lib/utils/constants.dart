@@ -17,3 +17,11 @@ const String kAssetMapTilerIconPath =
 const int kDefaultNetworkTimeoutSeconds = 10;
 
 const String kUserAgent = 'it.benitomatteobercini.moliseis/2.1';
+
+/// Maximum size, in bytes, of a single asset uploaded to Cloudinary.
+///
+/// Mirrors Cloudinary's free-tier upload limit (10 MiB). Files larger than
+/// this are rejected client-side before any network bytes are transferred, so
+/// the user gets immediate feedback instead of a `http_400
+/// "File size too large"` failure after the upload has already streamed.
+const int kCloudinaryMaxUploadBytes = 10 * 1024 * 1024;
