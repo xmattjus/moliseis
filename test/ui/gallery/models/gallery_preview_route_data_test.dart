@@ -136,7 +136,10 @@ void main() {
       ],
     };
 
-    badValuesByKey.forEach((key, badValues) {
+    for (final entry in badValuesByKey.entries) {
+      final key = entry.key;
+      final badValues = entry.value;
+
       for (final badValue in badValues) {
         test('rejects $key = $badValue', () {
           final encoded = _encodedMedia()..[key] = badValue;
@@ -147,7 +150,7 @@ void main() {
           );
         });
       }
-    });
+    }
 
     test('accepts boundary timestamps', () {
       for (final timestamp in const <int>[
