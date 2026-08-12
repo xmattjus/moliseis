@@ -411,7 +411,8 @@ class FakeCloudinaryRecordedRequest {
   final List<int> body;
 }
 
-/// Per-request override popped from [FakeCloudinaryServer.queueUploadResponses].
+/// Per-request override popped from
+/// [FakeCloudinaryServer.queueUploadResponses].
 class _FakeUploadOverride {
   const _FakeUploadOverride({required this.status, required this.body});
 
