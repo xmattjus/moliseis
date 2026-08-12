@@ -3,6 +3,8 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/core/relation_update.dart';
+import 'package:moliseis/data/data-sources/city_entity.dart';
+import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
@@ -475,16 +477,20 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // getSuggestedPlaceIds
+  // getSuggestions
   // ---------------------------------------------------------------------------
 
-  group('PlaceRepositoryImpl - getSuggestedPlaceIds', () {
+  group('PlaceRepositoryImpl - getSuggestions', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
+    late Box<CityEntity> cityBox;
+    late Box<MediaEntity> mediaBox;
     late Box<PlaceEntity> placeBox;
     late PlaceRepositoryImpl repository;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+      cityBox = objectBoxEnvironment.store.box<CityEntity>();
+      mediaBox = objectBoxEnvironment.store.box<MediaEntity>();
       placeBox = objectBoxEnvironment.store.box<PlaceEntity>();
       repository = _makeRepository(objectBoxEnvironment);
     });
@@ -493,25 +499,137 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test('returns at most 5 place IDs from the store', () async {
-      for (var i = 1; i <= 8; i++) {
-        placeBox.put(makePlaceEntity(remoteId: i, name: 'Place $i'));
-      }
+    test(
+      'returns a unique capped subset of non-deleted places',
+      () async {
+        final eligibleIds = <int>{};
 
-      final result = await repository.getSuggestedPlaceIds();
+        for (var i = 1; i <= 8; i++) {
+          eligibleIds.add(i);
+          placeBox.put(makePlaceEntity(remoteId: i, name: 'Place $i'));
+        }
 
-      expect(result, isA<Success<List<int>>>());
-      final ids = (result as Success<List<int>>).value;
-      expect(ids.length, lessThanOrEqualTo(5));
-      // All returned IDs belong to the seeded set.
-      expect(ids, everyElement(inInclusiveRange(1, 8)));
+        placeBox.put(
+          makePlaceEntity(
+            remoteId: 99,
+            name: 'Deleted place',
+            isDeleted: true,
+          ),
+        );
+
+        final result = await repository.getSuggestions();
+
+        expect(result, isA<Success<List<Place>>>());
+        final places = (result as Success<List<Place>>).value;
+        final ids = places.map((place) => place.remoteId).toList();
+
+        // Suggestions are intentionally shuffled, so assert their contract
+        // rather than a particular order or membership of the five-item sample.
+        expect(places, hasLength(5));
+        expect(ids.toSet(), hasLength(ids.length));
+        expect(ids, everyElement(isIn(eligibleIds)));
+        expect(ids, isNot(contains(99)));
+      },
+    );
+
+    test(
+      'returns every eligible place when fewer than five are available',
+      () async {
+        placeBox.put(makePlaceEntity(remoteId: 1, name: 'First'));
+        placeBox.put(makePlaceEntity(remoteId: 2, name: 'Second'));
+        placeBox.put(makePlaceEntity(remoteId: 3, name: 'Third'));
+
+        final result = await repository.getSuggestions();
+
+        expect(result, isA<Success<List<Place>>>());
+        final ids = (result as Success<List<Place>>).value
+            .map((place) => place.remoteId)
+            .toSet();
+        expect(ids, equals(<int>{1, 2, 3}));
+      },
+    );
+
+    test('excludes soft-deleted places', () async {
+      placeBox.put(makePlaceEntity(remoteId: 1, name: 'Visible'));
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 2,
+          name: 'Deleted',
+          isDeleted: true,
+        ),
+      );
+
+      final result = await repository.getSuggestions();
+
+      expect(result, isA<Success<List<Place>>>());
+      final places = (result as Success<List<Place>>).value;
+      expect(places.map((place) => place.remoteId), equals(<int>[1]));
     });
 
     test('returns empty list when store is empty', () async {
-      final result = await repository.getSuggestedPlaceIds();
+      final result = await repository.getSuggestions();
 
-      expect(result, isA<Success<List<int>>>());
-      expect((result as Success<List<int>>).value, isEmpty);
+      expect(result, isA<Success<List<Place>>>());
+      expect((result as Success<List<Place>>).value, isEmpty);
+    });
+
+    test('maps persisted place, city, and non-deleted media fields', () async {
+      final city = makeCityEntity(remoteId: 10, name: 'Termoli');
+      cityBox.put(city);
+
+      final place = makePlaceEntity(
+        remoteId: 1,
+        name: 'Castello Svevo',
+        description: 'A historic castle.',
+        coordinates: const <double>[41.999, 14.993],
+        cityId: city.remoteId,
+        contentCategoryIndex: ContentCategory.history.index,
+        isSaved: true,
+      );
+      placeBox.put(place);
+
+      mediaBox.put(
+        makeMediaEntity(
+          remoteId: 100,
+          url: 'https://cdn.example.com/castello.jpg',
+          width: 1280,
+          height: 720,
+          placeId: place.remoteId,
+        ),
+      );
+      mediaBox.put(
+        makeMediaEntity(
+          remoteId: 101,
+          url: 'https://cdn.example.com/deleted.jpg',
+          width: 1280,
+          height: 720,
+          placeId: place.remoteId,
+          isDeleted: true,
+        ),
+      );
+
+      final result = await repository.getSuggestions();
+
+      expect(result, isA<Success<List<Place>>>());
+      final mappedPlace = (result as Success<List<Place>>).value.single;
+      expect(mappedPlace.remoteId, place.remoteId);
+      expect(mappedPlace.name, place.name);
+      expect(mappedPlace.description, place.description);
+      expect(mappedPlace.category, ContentCategory.history);
+      // ObjectBox persists vector coordinates as float32 values.
+      expect(mappedPlace.coordinates.latitude, closeTo(41.999, 0.000001));
+      expect(mappedPlace.coordinates.longitude, closeTo(14.993, 0.000001));
+      expect(mappedPlace.isSaved, isTrue);
+      expect(mappedPlace.city?.remoteId, city.remoteId);
+      expect(mappedPlace.city?.name, city.name);
+      expect(mappedPlace.media, hasLength(1));
+      expect(mappedPlace.media.single.remoteId, 100);
+      expect(
+        mappedPlace.media.single.url,
+        'https://cdn.example.com/castello.jpg',
+      );
+      expect(mappedPlace.media.single.areaName, place.name);
+      expect(mappedPlace.media.single.cityName, city.name);
     });
   });
 

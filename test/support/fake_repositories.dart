@@ -335,6 +335,8 @@ final class FakePlaceRepository extends PlaceRepository {
     this.getLatestPlaceIdsResult = const Result.success([]),
     this.getSuggestedPlaceIdsResult = const Result.success([]),
     this.setFavouritePlaceResult = const Result.success(null),
+    this.getSuggestedPlacesResult = const Result.success([]),
+    this.getSuggestionsHandler,
     Map<int, Result<Place>>? getByIdResults,
   }) : getByIdResults = getByIdResults ?? {};
 
@@ -347,6 +349,8 @@ final class FakePlaceRepository extends PlaceRepository {
   Result<List<int>> getIdsByCoordinatesResult;
   Result<List<int>> getLatestPlaceIdsResult;
   Result<List<int>> getSuggestedPlaceIdsResult;
+  Result<List<Place>> getSuggestedPlacesResult;
+  Future<Result<List<Place>>> Function()? getSuggestionsHandler;
   Result<void> setFavouritePlaceResult;
   Map<int, Result<Place>> getByIdResults;
 
@@ -356,6 +360,8 @@ final class FakePlaceRepository extends PlaceRepository {
   // Argument captures (only where existing tests inspect them)
   ContentSort? lastGetAllSort;
   List<double>? lastCoordinates;
+
+  int getSuggestionsCallCount = 0;
 
   @override
   Future<Result<List<PlaceDto>>> prepareSync() async => prepareResult;
@@ -408,8 +414,11 @@ final class FakePlaceRepository extends PlaceRepository {
       getLatestPlaceIdsResult;
 
   @override
-  Future<Result<List<int>>> getSuggestedPlaceIds() async =>
-      getSuggestedPlaceIdsResult;
+  Future<Result<List<Place>>> getSuggestions() {
+    getSuggestionsCallCount++;
+    return getSuggestionsHandler?.call() ??
+        Future.value(getSuggestedPlacesResult);
+  }
 
   @override
   Future<Result<void>> setFavouritePlace(int id, bool save) async =>

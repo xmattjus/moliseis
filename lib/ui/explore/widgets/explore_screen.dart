@@ -16,8 +16,9 @@ import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart'
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
-import 'package:moliseis/ui/explore/widgets/components/responsive_overflow_menu.dart';
-import 'package:moliseis/ui/explore/widgets/components/suggested_carousel_view.dart';
+import 'package:moliseis/ui/explore/view_models/suggestion_view_model.dart';
+import 'package:moliseis/ui/explore/widgets/responsive_overflow_menu.dart';
+import 'package:moliseis/ui/explore/widgets/suggestion_horizontal_list_view.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
@@ -29,12 +30,14 @@ class ExploreScreen extends StatefulWidget {
     required this.eventViewModel,
     required this.exploreViewModel,
     required this.searchViewModel,
+    required this.suggestedViewModel,
     super.key,
   });
 
   final EventViewModel eventViewModel;
   final ExploreViewModel exploreViewModel;
   final SearchViewModel searchViewModel;
+  final SuggestionViewModel suggestedViewModel;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -113,7 +116,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 pinned: true,
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              SuggestedCarouselView(exploreViewModel: widget.exploreViewModel),
+              SuggestiondHorizontalListView(
+                viewModel: widget.suggestedViewModel,
+              ),
               const SliverToBoxAdapter(child: TextSectionDivider('Categorie')),
               SliverPadding(
                 padding: const EdgeInsetsDirectional.symmetric(

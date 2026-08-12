@@ -18,6 +18,7 @@ import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/events_screen.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
+import 'package:moliseis/ui/explore/view_models/suggestion_view_model.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_screen.dart';
@@ -131,6 +132,11 @@ GoRouter buildAppRouter({required SyncViewModel syncViewModel}) {
                           placeRepository: context.read(),
                         ),
                       ),
+                      ChangeNotifierProvider<SuggestionViewModel>(
+                        create: (context) => SuggestionViewModel(
+                          placeRepository: context.read(),
+                        ),
+                      ),
                       ChangeNotifierProvider<SearchViewModel>(
                         create: (context) => SearchViewModel(
                           eventRepository: context.read(),
@@ -147,6 +153,7 @@ GoRouter buildAppRouter({required SyncViewModel syncViewModel}) {
                         eventViewModel: context.read(),
                         exploreViewModel: context.read(),
                         searchViewModel: context.read(),
+                        suggestedViewModel: context.read(),
                       );
                     },
                   );

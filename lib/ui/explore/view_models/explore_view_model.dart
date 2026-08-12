@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
@@ -16,10 +17,10 @@ class ExploreViewModel extends ChangeNotifier {
     required PlaceRepository placeRepository,
   }) : _byIdUseCase = byIdUseCase,
        _placeRepository = placeRepository {
-    load = Command0(_load)..execute();
+    load = Command0(_load);
+    unawaited(load.execute());
     loadLatest = Command0(_loadLatest);
     loadNear = Command1(_loadNear);
-    loadSuggested = Command0(_loadSuggested);
   }
 
   final ExploreUseCase _byIdUseCase;
@@ -28,42 +29,29 @@ class ExploreViewModel extends ChangeNotifier {
   late Command0<void> load;
   late Command0<void> loadLatest;
   late Command1<void, List<double>> loadNear;
-  late Command0<void> loadSuggested;
 
   var _latest = <Place>[];
   final _near = <ContentBase>[];
-  var _suggested = <Place>[];
 
   var _latestIds = <int>[];
-  var _suggestedIds = <int>[];
 
   UnmodifiableListView<Place> get latest => UnmodifiableListView(_latest);
   UnmodifiableListView<ContentBase> get near => UnmodifiableListView(_near);
-  UnmodifiableListView<Place> get suggested => UnmodifiableListView(_suggested);
 
   UnmodifiableListView<int> get latestIds => UnmodifiableListView(_latestIds);
-  UnmodifiableListView<int> get suggestedIds =>
-      UnmodifiableListView(_suggestedIds);
 
   UnmodifiableListView<ContentCategory> get types =>
       UnmodifiableListView(ContentCategory.values.minusUnknown);
 
   Future<Result<void>> _load() async {
     final latestResult = await _placeRepository.getLatestPlaceIds();
-    final latestIds = latestResult.getOrNull();
-    if (latestIds != null) _latestIds = latestIds;
-
-    final suggestedResult = await _placeRepository.getSuggestedPlaceIds();
-    final suggestedIds = suggestedResult.getOrNull();
-    if (suggestedIds != null) _suggestedIds = suggestedIds;
+    _latestIds = latestResult.getOrNull() ?? [];
 
     notifyListeners();
 
-    loadLatest.execute();
-    loadSuggested.execute();
+    unawaited(loadLatest.execute());
 
-    if (latestResult.isError) return latestResult;
-    return suggestedResult;
+    return latestResult;
   }
 
   Future<Result<void>> _loadLatest() async {
@@ -94,18 +82,5 @@ class ExploreViewModel extends ChangeNotifier {
 
       return const Result.success(null);
     });
-  }
-
-  Future<Result<void>> _loadSuggested() async {
-    _suggested = [];
-
-    for (final id in _suggestedIds) {
-      final place = (await _byIdUseCase.getById(id)).getOrNull();
-      if (place != null) _suggested.add(place);
-    }
-
-    notifyListeners();
-
-    return const Result.success(null);
   }
 }

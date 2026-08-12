@@ -339,27 +339,32 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
   }
 
   @override
-  Future<Result<List<int>>> getSuggestedPlaceIds() async {
+  Future<Result<List<Place>>> getSuggestions() async {
+    Query<PlaceEntity>? query;
     try {
-      final query = _box.query(_isNotDeleted);
+      final builder = _box.query(_isNotDeleted);
 
-      final builder = query.build();
+      query = builder.build();
 
-      final places = builder.findIds()..shuffle();
+      final results = await query.findAsync()
+        ..shuffle();
 
-      final result = places.take(5).toList();
+      final mappedResults = results
+          .take(5)
+          .map<Place>((entity) => entity.toModel())
+          .toList();
 
-      builder.close();
-
-      return Result.success(result);
+      return Result.success(mappedResults);
     } on Exception catch (exception, stackTrace) {
       logger.log(
-        const EntityLoadFailed('place', method: 'getSuggestedPlaceIds'),
+        const EntityLoadFailed('place', method: 'getSuggestedPlaces'),
         error: exception,
         stackTrace: stackTrace,
       );
 
       return Result.error(exception);
+    } finally {
+      query?.close();
     }
   }
 }

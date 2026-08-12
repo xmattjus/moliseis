@@ -38,8 +38,8 @@ abstract class PlaceRepository with Synchronizable<PlaceDto> {
   /// Returns the IDs of the most recently added places.
   Future<Result<List<int>>> getLatestPlaceIds();
 
-  /// Returns the IDs of places suggested for the user.
-  Future<Result<List<int>>> getSuggestedPlaceIds();
+  /// Returns place suggestions.
+  Future<Result<List<Place>>> getSuggestions();
 
   /// Marks or unmarks the place identified by [id] as a favourite.
   ///
