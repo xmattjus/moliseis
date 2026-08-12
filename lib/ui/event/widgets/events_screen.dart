@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show clampDouble;
 
 import 'package:flutter/material.dart';
@@ -30,7 +31,7 @@ class _EventsScreenState extends State<EventsScreen> {
   void initState() {
     super.initState();
 
-    widget.viewModel.loadByDate.execute(DateTime.now());
+    unawaited(widget.viewModel.loadByDate.execute(DateTime.now()));
 
     _draggableScrollableController = DraggableScrollableController();
     _draggableScrollableController.addListener(_draggableScrollableListener);
@@ -58,8 +59,9 @@ class _EventsScreenState extends State<EventsScreen> {
 
   @override
   void dispose() {
-    _draggableScrollableController.removeListener(_draggableScrollableListener);
-    _draggableScrollableController.dispose();
+    _draggableScrollableController
+      ..removeListener(_draggableScrollableListener)
+      ..dispose();
     super.dispose();
   }
 
