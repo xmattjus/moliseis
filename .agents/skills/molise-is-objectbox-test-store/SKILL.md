@@ -1,6 +1,6 @@
 ---
 name: molise-is-objectbox-test-store
-description: Use a real temporary ObjectBox store in tests instead of fakes. Prefer this when rewriting repository or data-source tests that currently mock Box, Store, QueryBuilder, or ObjectBox behavior.
+description: Use when writing or modifying ObjectBox repository, local data-source, or data-layer tests. Uses a real temporary ObjectBox store instead of Box, Store, QueryBuilder, or ObjectBox fakes and keeps persistence fixtures independent from UI codecs such as Flutter Quill.
 ---
 
 # ObjectBox Test Store
@@ -29,11 +29,30 @@ Use a helper like `TestObjectBoxEnvironment`:
 If production code expects the app `ObjectBox` wrapper, add a thin test wrapper
 that exposes the real `Store`.
 
+## Keep persistence fixtures layer-local
+
+ObjectBox repository and data-source tests should construct fixtures directly
+in the serialized shape owned by the data layer. Do not depend on a UI codec or
+widget library merely to produce values for persistence tests.
+
+For rich-text Delta fields, use raw canonical Delta fixtures such as
+`List<Map<String, dynamic>>` instead of constructing them through a UI codec or
+Flutter Quill. This keeps the test focused on the ObjectBox persistence
+contract, reduces dependencies, and prevents UI changes from breaking
+unrelated data-layer tests.
+
+Test codec-to-Delta conversion separately in the codec's own UI or utility test
+suite. An end-to-end test may intentionally cover both layers, but it should be
+classified and located as an integration test rather than as an ObjectBox
+repository unit test.
+
 ## What to avoid
 
 - Do not fake `Box`, `QueryBuilder`, `Query`, or `Store` unless the test is only
   about a pure unit boundary and ObjectBox behavior is irrelevant.
 - Do not keep custom in-memory maps that pretend to be ObjectBox.
+- Do not import UI codecs or widget libraries only to construct persistence
+  fixtures; use raw data-layer values instead.
 - Do not use `catch (Object)` or `catch (Error)` to simulate closed-store
   behavior.
 - Do not hide programming errors by broadly swallowing non-Exception failures.
@@ -55,6 +74,8 @@ If you need to verify error handling for a closed store:
 - Rewriting a local data-source test that currently uses a fake storage map.
 - Verifying date-range, relationship, or id-based ObjectBox behavior against the
   real database engine.
+- Writing or modifying an ObjectBox repository test that persists structured
+  JSON or rich-text Delta data.
 
 ## Repository-specific notes
 
