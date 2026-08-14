@@ -1,0 +1,307 @@
+import { assert, assertEquals } from "jsr:@std/assert@1";
+
+import {
+  MAX_REQUEST_BODY_BYTES,
+  parseContentSubmission,
+  readJsonBodyWithLimit,
+  RequestBodyTooLargeError,
+  type ValidatedQuillOperation,
+} from "./submission_validation.ts";
+
+const validSubmission = () => ({
+  city: " Campobasso ",
+  name: " Teatro ",
+  user_email: " author@example.com ",
+  user_name: " Autore ",
+});
+
+const validDelta = () => [
+  { insert: "Visita " },
+  { insert: "guidata", attributes: { bold: true } },
+  { insert: "\n" },
+];
+
+function expectInvalid(value: unknown, message: string): void {
+  const result = parseContentSubmission(value);
+  assert(!result.ok);
+  assertEquals(result.message, message);
+}
+
+Deno.test("accepts absent and null legacy Delta projections", () => {
+  for (const description_delta of [undefined, null]) {
+    const result = parseContentSubmission({
+      ...validSubmission(),
+      description: "Legacy text",
+      description_delta,
+    });
+
+    assert(result.ok);
+    assertEquals(result.value.description, "Legacy text");
+    assertEquals(result.value.description_delta, null);
+  }
+});
+
+Deno.test("accepts an empty Quill document as null projections", () => {
+  const result = parseContentSubmission({
+    ...validSubmission(),
+    description: null,
+    description_delta: null,
+  });
+
+  assert(result.ok);
+  assertEquals(result.value.description, null);
+  assertEquals(result.value.description_delta, null);
+});
+
+Deno.test("rejects the non-null representation of an empty Quill document", () => {
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "",
+      description_delta: [{ insert: "\n" }],
+    },
+    "empty Quill documents require null description and description_delta",
+  );
+});
+
+Deno.test("preserves canonical rich projections and supported formats", () => {
+  const delta: ValidatedQuillOperation[] = [
+    { insert: "  Visita", attributes: { bold: true, italic: true } },
+    { insert: " il sito", attributes: { underline: true } },
+    { insert: " ufficiale", attributes: { link: "https://example.com/info" } },
+    { insert: "\n" },
+    { insert: "\n", attributes: { list: "ordered" } },
+    { insert: "Seconda voce" },
+    { insert: "\n", attributes: { list: "bullet" } },
+    { insert: "\n" },
+  ];
+  const result = parseContentSubmission({
+    ...validSubmission(),
+    description: "  Visita il sito ufficiale\n\nSeconda voce\n",
+    description_delta: delta,
+  });
+
+  assert(result.ok);
+  assertEquals(
+    result.value.description,
+    "  Visita il sito ufficiale\n\nSeconda voce\n",
+  );
+  assertEquals(result.value.description_delta, delta);
+  assertEquals(result.value.city, "Campobasso");
+});
+
+Deno.test("accepts exactly 5,000 authored characters and rejects longer text", () => {
+  const withinLimit = "a".repeat(5000);
+  const accepted = parseContentSubmission({
+    ...validSubmission(),
+    description: withinLimit,
+    description_delta: [{ insert: `${withinLimit}\n` }],
+  });
+  assert(accepted.ok);
+
+  const tooLong = "a".repeat(5001);
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: tooLong,
+      description_delta: [{ insert: `${tooLong}\n` }],
+    },
+    "description exceeds maximum length of 5000",
+  );
+});
+
+Deno.test("counts legacy description whitespace toward the maximum length", () => {
+  const whitespacePaddedDescription = `${" ".repeat(2501)}text${
+    " ".repeat(2500)
+  }`;
+
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: whitespacePaddedDescription,
+      description_delta: null,
+    },
+    "description exceeds maximum length of 5000",
+  );
+});
+
+Deno.test("rejects malformed Delta shapes, operations, and attributes", () => {
+  expectInvalid(
+    { ...validSubmission(), description: "x", description_delta: {} },
+    "description_delta must be a non-empty array when present",
+  );
+  expectInvalid(
+    { ...validSubmission(), description: "x", description_delta: [{}] },
+    "description_delta operations may contain only insert and attributes",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "" }],
+    },
+    "description_delta insert must be a non-empty string",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "x\n", attributes: { bold: false } }],
+    },
+    "description_delta bold must be true",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "x\n", attributes: null }],
+    },
+    "description_delta attributes must be a non-empty object",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "x\n", attributes: { italic: "true" } }],
+    },
+    "description_delta italic must be true",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "x\n", attributes: { link: null } }],
+    },
+    "description_delta link must be an absolute HTTP/HTTPS URL",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "x\n", attributes: { color: "red" } }],
+    },
+    "description_delta attribute color is not supported",
+  );
+});
+
+Deno.test("rejects unsupported operations, unsafe links, and invalid list placement", () => {
+  for (
+    const unsupportedOperation of [{ retain: 1 }, { delete: 1 }, {
+      insert: { image: "https://example.test/image.png" },
+    }]
+  ) {
+    expectInvalid(
+      {
+        ...validSubmission(),
+        description: "x",
+        description_delta: [unsupportedOperation, { insert: "x\n" }],
+      },
+      "insert" in unsupportedOperation
+        ? "description_delta insert must be a non-empty string"
+        : "description_delta operations may contain only insert and attributes",
+    );
+  }
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{
+        insert: "x\n",
+        attributes: { link: "javascript:alert(1)" },
+      }],
+    },
+    "description_delta link must be an absolute HTTP/HTTPS URL",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{
+        insert: "x\n",
+        attributes: { link: "https://" },
+      }],
+    },
+    "description_delta link must be an absolute HTTP/HTTPS URL",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "x", attributes: { list: "ordered" } }],
+    },
+    "description_delta list must be ordered or bullet on an exact newline insert",
+  );
+});
+
+Deno.test("rejects non-canonical and mismatched Delta projections", () => {
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "x" }, { insert: "\n" }],
+    },
+    "description_delta contains adjacent operations Quill would normalize",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      description_delta: [{ insert: "x" }],
+    },
+    "description_delta must end with a terminal newline",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "different",
+      description_delta: validDelta(),
+    },
+    "description does not match description_delta plain text",
+  );
+});
+
+Deno.test("rejects non-string submission and asset fields before normalization", () => {
+  expectInvalid({ city: 1 }, "city is required");
+  expectInvalid(
+    { ...validSubmission(), description: "x", latitude: "1" },
+    "latitude is not valid",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      description: "x",
+      assets: [{
+        url: "https://res.cloudinary.com/demo/image",
+        width: "1",
+        height: 1,
+      }],
+    },
+    "asset is not valid",
+  );
+});
+
+Deno.test("enforces the streaming request-body limit", async () => {
+  const oversizedBody = "x".repeat(MAX_REQUEST_BODY_BYTES + 1);
+  const request = new Request("https://example.test", {
+    method: "POST",
+    body: oversizedBody,
+  });
+
+  await assertRejects(
+    () => readJsonBodyWithLimit(request),
+    RequestBodyTooLargeError,
+  );
+});
+
+async function assertRejects(
+  action: () => Promise<unknown>,
+  expected: new (...args: never[]) => Error,
+): Promise<void> {
+  try {
+    await action();
+  } catch (error) {
+    assert(error instanceof expected);
+    return;
+  }
+  throw new Error("Expected promise to reject");
+}

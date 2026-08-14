@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict nJViDWieTrzhLaJL1J1amyVa3OBcQU9WpIBDV1KAco0oP8JSbXGgYnNzC0VY2Yt
+\restrict KUwlAC8Ae1zu9tlJU8T8OCKfdfi2qScgvku43k8sZ4IeRNjak7RSY5Vjb2Tq20K
 
 -- Dumped from database version 17.6
--- Dumped by pg_dump version 18.4
+-- Dumped by pg_dump version 18.6
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -48,10 +48,31 @@ CREATE SCHEMA graphql_public;
 
 
 --
+-- Name: pg_net; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+
+
+--
+-- Name: EXTENSION pg_net; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pg_net IS 'Async HTTP';
+
+
+--
 -- Name: pgbouncer; Type: SCHEMA; Schema: -; Owner: -
 --
 
 CREATE SCHEMA pgbouncer;
+
+
+--
+-- Name: private; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA private;
 
 
 --
@@ -66,6 +87,13 @@ CREATE SCHEMA realtime;
 --
 
 CREATE SCHEMA storage;
+
+
+--
+-- Name: supabase_functions; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA supabase_functions;
 
 
 --
@@ -537,48 +565,39 @@ COMMENT ON FUNCTION extensions.grant_pg_graphql_access() IS 'Grants access to pg
 CREATE FUNCTION extensions.grant_pg_net_access() RETURNS event_trigger
     LANGUAGE plpgsql
     AS $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM pg_event_trigger_ddl_commands() AS ev
-    JOIN pg_extension AS ext
-    ON ev.objid = ext.oid
-    WHERE ext.extname = 'pg_net'
-  )
-  THEN
-    IF NOT EXISTS (
+  BEGIN
+    IF EXISTS (
       SELECT 1
-      FROM pg_roles
-      WHERE rolname = 'supabase_functions_admin'
+      FROM pg_event_trigger_ddl_commands() AS ev
+      JOIN pg_extension AS ext
+      ON ev.objid = ext.oid
+      WHERE ext.extname = 'pg_net'
     )
     THEN
-      CREATE USER supabase_functions_admin NOINHERIT CREATEROLE LOGIN NOREPLICATION;
+      GRANT USAGE ON SCHEMA net TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+
+      IF EXISTS (
+        SELECT FROM pg_extension
+        WHERE extname = 'pg_net'
+        -- all versions in use on existing projects as of 2025-02-20
+        -- version 0.12.0 onwards don't need these applied
+        AND extversion IN ('0.2', '0.6', '0.7', '0.7.1', '0.8', '0.10.0', '0.11.0')
+      ) THEN
+        ALTER function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) SECURITY DEFINER;
+        ALTER function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) SECURITY DEFINER;
+
+        ALTER function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) SET search_path = net;
+        ALTER function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) SET search_path = net;
+
+        REVOKE ALL ON FUNCTION net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) FROM PUBLIC;
+        REVOKE ALL ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) FROM PUBLIC;
+
+        GRANT EXECUTE ON FUNCTION net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+        GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
+      END IF;
     END IF;
-
-    GRANT USAGE ON SCHEMA net TO supabase_functions_admin, postgres, anon, authenticated, service_role;
-
-    IF EXISTS (
-      SELECT FROM pg_extension
-      WHERE extname = 'pg_net'
-      -- all versions in use on existing projects as of 2025-02-20
-      -- version 0.12.0 onwards don't need these applied
-      AND extversion IN ('0.2', '0.6', '0.7', '0.7.1', '0.8', '0.10.0', '0.11.0')
-    ) THEN
-      ALTER function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) SECURITY DEFINER;
-      ALTER function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) SECURITY DEFINER;
-
-      ALTER function net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) SET search_path = net;
-      ALTER function net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) SET search_path = net;
-
-      REVOKE ALL ON FUNCTION net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) FROM PUBLIC;
-      REVOKE ALL ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) FROM PUBLIC;
-
-      GRANT EXECUTE ON FUNCTION net.http_get(url text, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
-      GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
-    END IF;
-  END IF;
-END;
-$$;
+  END;
+  $$;
 
 
 --
@@ -771,6 +790,72 @@ CREATE FUNCTION pgbouncer.get_auth(p_usename text) RETURNS TABLE(username text, 
       WHERE rolname=$1 and rolcanlogin;
   END;
   $_$;
+
+
+--
+-- Name: notify_submission_status_webhook(); Type: FUNCTION; Schema: private; Owner: -
+--
+
+CREATE FUNCTION private.notify_submission_status_webhook() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+  function_url text;
+  webhook_secret text;
+BEGIN
+  BEGIN
+    SELECT decrypted_secret
+    INTO function_url
+    FROM vault.decrypted_secrets
+    WHERE name = 'notify_submission_status_url'
+    LIMIT 1;
+
+    SELECT decrypted_secret
+    INTO webhook_secret
+    FROM vault.decrypted_secrets
+    WHERE name = 'notify_submission_status_webhook_secret'
+    LIMIT 1;
+
+    IF function_url IS NULL OR webhook_secret IS NULL THEN
+      RAISE WARNING
+        'notify-submission-status Vault configuration is missing';
+
+      RETURN NEW;
+    END IF;
+
+    PERFORM net.http_post(
+      url := function_url,
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'x-webhook-secret', webhook_secret
+      ),
+      body := jsonb_build_object(
+        'type', TG_OP,
+        'schema', TG_TABLE_SCHEMA,
+        'table', TG_TABLE_NAME,
+        'record', jsonb_build_object(
+          'id', NEW.id,
+          'status', NEW.status
+        ),
+        'old_record', jsonb_build_object(
+          'id', OLD.id,
+          'status', OLD.status
+        )
+      ),
+      timeout_milliseconds := 10000
+    );
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- Notification failures must not roll back moderation updates.
+      RAISE WARNING
+        'Could not enqueue notify-submission-status: %',
+        SQLERRM;
+  END;
+
+  RETURN NEW;
+END;
+$$;
 
 
 --
@@ -1821,13 +1906,13 @@ $$;
 --
 
 CREATE FUNCTION storage.filename(name text) RETURNS text
-    LANGUAGE plpgsql
+    LANGUAGE plpgsql IMMUTABLE
     AS $$
 DECLARE
-_parts text[];
+    _parts text[];
 BEGIN
-	select string_to_array(name, '/') into _parts;
-	return _parts[array_length(_parts,1)];
+    SELECT string_to_array(name, '/') INTO _parts;
+    RETURN _parts[array_length(_parts, 1)];
 END
 $$;
 
@@ -2609,6 +2694,87 @@ END;
 $$;
 
 
+--
+-- Name: http_request(); Type: FUNCTION; Schema: supabase_functions; Owner: -
+--
+
+CREATE FUNCTION supabase_functions.http_request() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'supabase_functions'
+    AS $$
+    DECLARE
+      request_id bigint;
+      payload jsonb;
+      url text := TG_ARGV[0]::text;
+      method text := TG_ARGV[1]::text;
+      headers jsonb DEFAULT '{}'::jsonb;
+      params jsonb DEFAULT '{}'::jsonb;
+      timeout_ms integer DEFAULT 1000;
+    BEGIN
+      IF url IS NULL OR url = 'null' THEN
+        RAISE EXCEPTION 'url argument is missing';
+      END IF;
+
+      IF method IS NULL OR method = 'null' THEN
+        RAISE EXCEPTION 'method argument is missing';
+      END IF;
+
+      IF TG_ARGV[2] IS NULL OR TG_ARGV[2] = 'null' THEN
+        headers = '{"Content-Type": "application/json"}'::jsonb;
+      ELSE
+        headers = TG_ARGV[2]::jsonb;
+      END IF;
+
+      IF TG_ARGV[3] IS NULL OR TG_ARGV[3] = 'null' THEN
+        params = '{}'::jsonb;
+      ELSE
+        params = TG_ARGV[3]::jsonb;
+      END IF;
+
+      IF TG_ARGV[4] IS NULL OR TG_ARGV[4] = 'null' THEN
+        timeout_ms = 1000;
+      ELSE
+        timeout_ms = TG_ARGV[4]::integer;
+      END IF;
+
+      CASE
+        WHEN method = 'GET' THEN
+          SELECT http_get INTO request_id FROM net.http_get(
+            url,
+            params,
+            headers,
+            timeout_ms
+          );
+        WHEN method = 'POST' THEN
+          payload = jsonb_build_object(
+            'old_record', OLD,
+            'record', NEW,
+            'type', TG_OP,
+            'table', TG_TABLE_NAME,
+            'schema', TG_TABLE_SCHEMA
+          );
+
+          SELECT http_post INTO request_id FROM net.http_post(
+            url,
+            payload,
+            params,
+            headers,
+            timeout_ms
+          );
+        ELSE
+          RAISE EXCEPTION 'method argument % is invalid', method;
+      END CASE;
+
+      INSERT INTO supabase_functions.hooks
+        (hook_table_id, hook_name, request_id)
+      VALUES
+        (TG_RELID, TG_NAME, request_id);
+
+      RETURN NEW;
+    END
+  $$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -3313,13 +3479,65 @@ CREATE TABLE public.content_submissions (
     handled_by uuid,
     rejection_reason text,
     internal_notes text,
+    description_delta jsonb,
+    status_email_state text,
+    status_email_key text,
+    status_email_attempted_at timestamp with time zone,
+    status_email_sent_at timestamp with time zone,
+    status_email_message_id text,
+    status_email_last_error text,
     CONSTRAINT content_submissions_address_length_check CHECK ((char_length(address) <= 250)),
     CONSTRAINT content_submissions_city_length_check CHECK ((char_length(city) <= 100)),
+    CONSTRAINT content_submissions_description_delta_requires_description_chec CHECK (((description_delta IS NULL) OR (description IS NOT NULL))),
+    CONSTRAINT content_submissions_description_delta_type_check CHECK (((description_delta IS NULL) OR (jsonb_typeof(description_delta) = 'array'::text))),
     CONSTRAINT content_submissions_description_length_check CHECK ((char_length(description) <= 5000)),
     CONSTRAINT content_submissions_name_length_check CHECK ((char_length(name) <= 150)),
+    CONSTRAINT content_submissions_status_email_state_check CHECK (((status_email_state IS NULL) OR (status_email_state = ANY (ARRAY['sending'::text, 'sent'::text, 'failed'::text])))),
     CONSTRAINT content_submissions_user_email_length_check CHECK ((char_length(user_email) <= 320)),
     CONSTRAINT content_submissions_user_name_length_check CHECK ((char_length(user_name) <= 100))
 );
+
+
+--
+-- Name: COLUMN content_submissions.status_email_state; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.content_submissions.status_email_state IS 'Stato dell’ultimo tentativo di notifica relativo alla transizione identificata da status_email_key.';
+
+
+--
+-- Name: COLUMN content_submissions.status_email_key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.content_submissions.status_email_key IS 'SHA-256 di submission id, status finale e handled_at; usato per evitare duplicati concorrenti.';
+
+
+--
+-- Name: COLUMN content_submissions.status_email_attempted_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.content_submissions.status_email_attempted_at IS 'Istante in cui la Edge Function ha acquisito il tentativo di invio.';
+
+
+--
+-- Name: COLUMN content_submissions.status_email_sent_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.content_submissions.status_email_sent_at IS 'Istante in cui Brevo ha accettato la richiesta di invio.';
+
+
+--
+-- Name: COLUMN content_submissions.status_email_message_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.content_submissions.status_email_message_id IS 'messageId restituito dall’API transazionale Brevo.';
+
+
+--
+-- Name: COLUMN content_submissions.status_email_last_error; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.content_submissions.status_email_last_error IS 'Ultimo errore registrato durante la preparazione o l’invio della notifica.';
 
 
 --
@@ -3692,10 +3910,66 @@ CREATE TABLE storage.vector_indexes (
 
 
 --
+-- Name: hooks; Type: TABLE; Schema: supabase_functions; Owner: -
+--
+
+CREATE TABLE supabase_functions.hooks (
+    id bigint NOT NULL,
+    hook_table_id integer NOT NULL,
+    hook_name text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    request_id bigint
+);
+
+
+--
+-- Name: TABLE hooks; Type: COMMENT; Schema: supabase_functions; Owner: -
+--
+
+COMMENT ON TABLE supabase_functions.hooks IS 'Supabase Functions Hooks: Audit trail for triggered hooks.';
+
+
+--
+-- Name: hooks_id_seq; Type: SEQUENCE; Schema: supabase_functions; Owner: -
+--
+
+CREATE SEQUENCE supabase_functions.hooks_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: hooks_id_seq; Type: SEQUENCE OWNED BY; Schema: supabase_functions; Owner: -
+--
+
+ALTER SEQUENCE supabase_functions.hooks_id_seq OWNED BY supabase_functions.hooks.id;
+
+
+--
+-- Name: migrations; Type: TABLE; Schema: supabase_functions; Owner: -
+--
+
+CREATE TABLE supabase_functions.migrations (
+    version text NOT NULL,
+    inserted_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: refresh_tokens id; Type: DEFAULT; Schema: auth; Owner: -
 --
 
 ALTER TABLE ONLY auth.refresh_tokens ALTER COLUMN id SET DEFAULT nextval('auth.refresh_tokens_id_seq'::regclass);
+
+
+--
+-- Name: hooks id; Type: DEFAULT; Schema: supabase_functions; Owner: -
+--
+
+ALTER TABLE ONLY supabase_functions.hooks ALTER COLUMN id SET DEFAULT nextval('supabase_functions.hooks_id_seq'::regclass);
 
 
 --
@@ -4128,6 +4402,22 @@ ALTER TABLE ONLY storage.s3_multipart_uploads
 
 ALTER TABLE ONLY storage.vector_indexes
     ADD CONSTRAINT vector_indexes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: hooks hooks_pkey; Type: CONSTRAINT; Schema: supabase_functions; Owner: -
+--
+
+ALTER TABLE ONLY supabase_functions.hooks
+    ADD CONSTRAINT hooks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: migrations migrations_pkey; Type: CONSTRAINT; Schema: supabase_functions; Owner: -
+--
+
+ALTER TABLE ONLY supabase_functions.migrations
+    ADD CONSTRAINT migrations_pkey PRIMARY KEY (version);
 
 
 --
@@ -4684,6 +4974,27 @@ CREATE UNIQUE INDEX vector_indexes_name_bucket_id_idx ON storage.vector_indexes 
 
 
 --
+-- Name: supabase_functions_hooks_h_table_id_h_name_idx; Type: INDEX; Schema: supabase_functions; Owner: -
+--
+
+CREATE INDEX supabase_functions_hooks_h_table_id_h_name_idx ON supabase_functions.hooks USING btree (hook_table_id, hook_name);
+
+
+--
+-- Name: supabase_functions_hooks_request_id_idx; Type: INDEX; Schema: supabase_functions; Owner: -
+--
+
+CREATE INDEX supabase_functions_hooks_request_id_idx ON supabase_functions.hooks USING btree (request_id);
+
+
+--
+-- Name: content_submissions handle_handled_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER handle_handled_at BEFORE UPDATE ON public.content_submissions FOR EACH ROW WHEN ((new.status IS DISTINCT FROM old.status)) EXECUTE FUNCTION extensions.moddatetime('handled_at');
+
+
+--
 -- Name: cities handle_modified_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -4709,6 +5020,13 @@ CREATE TRIGGER handle_modified_at BEFORE UPDATE ON public.media FOR EACH ROW WHE
 --
 
 CREATE TRIGGER handle_modified_at BEFORE UPDATE ON public.places FOR EACH ROW WHEN ((NOT (new.deleted_at IS DISTINCT FROM old.deleted_at))) EXECUTE FUNCTION extensions.moddatetime('modified_at');
+
+
+--
+-- Name: content_submissions notify-submission-status; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER "notify-submission-status" AFTER UPDATE OF status ON public.content_submissions FOR EACH ROW WHEN (((old.status = 'pending'::public.submission_status) AND ((new.status = 'accepted'::public.submission_status) OR (new.status = 'rejected'::public.submission_status)))) EXECUTE FUNCTION private.notify_submission_status_webhook();
 
 
 --
@@ -5446,5 +5764,5 @@ CREATE EVENT TRIGGER pgrst_drop_watch ON sql_drop
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nJViDWieTrzhLaJL1J1amyVa3OBcQU9WpIBDV1KAco0oP8JSbXGgYnNzC0VY2Yt
+\unrestrict KUwlAC8Ae1zu9tlJU8T8OCKfdfi2qScgvku43k8sZ4IeRNjak7RSY5Vjb2Tq20K
 
