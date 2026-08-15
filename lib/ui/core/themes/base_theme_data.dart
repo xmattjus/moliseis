@@ -3,7 +3,6 @@ import 'package:moliseis/ui/core/themes/app_effects_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_shapes_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/text_theme.dart';
-import 'package:moliseis/utils/extensions/extensions.dart';
 
 class BaseThemeData {
   // Private constructor to prevent class instantiation.
@@ -92,7 +91,7 @@ class BaseThemeData {
       ),
       inputDecorationTheme: InputDecorationTheme(
         hintStyle: TextStyle(
-          color: colorScheme?.onSurfaceVariant.lighten(0.125),
+          color: colorScheme?.onSurfaceVariant.withValues(alpha: 0.6),
         ),
         floatingLabelBehavior: FloatingLabelBehavior.always,
         border: OutlineInputBorder(
