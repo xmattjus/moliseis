@@ -1,8 +1,9 @@
-/// Creates an immutable deep copy of Delta operations at mapper boundaries.
+/// Returns a deeply copied, recursively unmodifiable snapshot of
+/// [descriptionDelta].
 ///
-/// This prevents callers that retain decoded JSON collections from mutating
-/// data held by a domain model or ObjectBox entity.
-List<Map<String, dynamic>>? copyDescriptionDelta(
+/// It freezes ownership only and does not validate, normalize, or otherwise
+/// interpret Delta operations.
+List<Map<String, dynamic>>? freezeDescriptionDelta(
   List<Map<String, dynamic>>? descriptionDelta,
 ) {
   if (descriptionDelta == null) return null;
@@ -11,23 +12,23 @@ List<Map<String, dynamic>>? copyDescriptionDelta(
     descriptionDelta.map(
       (operation) => Map<String, dynamic>.unmodifiable({
         for (final entry in operation.entries)
-          entry.key: _copyDescriptionDeltaValue(entry.value),
+          entry.key: _freezeDescriptionDeltaValue(entry.value),
       }),
     ),
   );
 }
 
-Object? _copyDescriptionDeltaValue(Object? value) {
+Object? _freezeDescriptionDeltaValue(Object? value) {
   if (value is Map<String, dynamic>) {
     return Map<String, dynamic>.unmodifiable({
       for (final entry in value.entries)
-        entry.key: _copyDescriptionDeltaValue(entry.value),
+        entry.key: _freezeDescriptionDeltaValue(entry.value),
     });
   }
 
   if (value is List<dynamic>) {
     return List<Object?>.unmodifiable(
-      value.map(_copyDescriptionDeltaValue),
+      value.map(_freezeDescriptionDeltaValue),
     );
   }
 

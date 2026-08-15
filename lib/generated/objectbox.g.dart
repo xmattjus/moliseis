@@ -453,7 +453,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(20, 8436787422671765122),
     name: 'ContentSubmissionDraftEntity',
-    lastPropertyId: const obx_int.IdUid(14, 3484431749528952426),
+    lastPropertyId: const obx_int.IdUid(15, 8592803869694869745),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -514,6 +514,12 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(14, 3484431749528952426),
         name: 'authorName',
         type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(15, 8592803869694869745),
+        name: 'descriptionDelta',
+        type: 13,
         flags: 0,
       ),
     ],
@@ -1419,7 +1425,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
             final authorNameOffset = object.authorName == null
                 ? null
                 : fbb.writeString(object.authorName!);
-            fbb.startTable(15);
+            final descriptionDeltaOffset = object.descriptionDelta == null
+                ? null
+                : fbb.writeListInt8(
+                    obx_int.toFlexBuffer(object.descriptionDelta!),
+                  );
+            fbb.startTable(16);
             fbb.addInt64(0, object.id);
             fbb.addOffset(1, cityOffset);
             fbb.addOffset(2, nameOffset);
@@ -1440,6 +1451,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
             fbb.addBool(9, object.acceptedTerms);
             fbb.addOffset(12, authorEmailOffset);
             fbb.addOffset(13, authorNameOffset);
+            fbb.addOffset(14, descriptionDeltaOffset);
             fbb.finish(fbb.endTable());
             return object.id;
           },
@@ -1470,6 +1482,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
             final descriptionParam = const fb.StringReader(
               asciiOptimization: true,
             ).vTableGetNullable(buffer, rootOffset, 10);
+            final descriptionDeltaParam = obx_int.flexBufferToListOfMaps(
+              buffer,
+              rootOffset,
+              32,
+            );
             final startDateParam = startDateValue == null
                 ? null
                 : DateTime.fromMicrosecondsSinceEpoch(
@@ -1496,6 +1513,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
               city: cityParam,
               name: nameParam,
               description: descriptionParam,
+              descriptionDelta: descriptionDeltaParam,
               startDate: startDateParam,
               endDate: endDateParam,
               authorEmail: authorEmailParam,

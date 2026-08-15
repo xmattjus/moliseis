@@ -39,6 +39,16 @@ class ContentSubmissionDtoMapper extends ClassMapperBase<ContentSubmissionDto> {
     _$description,
     opt: true,
   );
+  static List<Map<String, dynamic>>? _$descriptionDelta(
+    ContentSubmissionDto v,
+  ) => v.descriptionDelta;
+  static const Field<ContentSubmissionDto, List<Map<String, dynamic>>>
+  _f$descriptionDelta = Field(
+    'descriptionDelta',
+    _$descriptionDelta,
+    key: r'description_delta',
+    opt: true,
+  );
   static double? _$latitude(ContentSubmissionDto v) => v.latitude;
   static const Field<ContentSubmissionDto, double> _f$latitude = Field(
     'latitude',
@@ -115,6 +125,7 @@ class ContentSubmissionDtoMapper extends ClassMapperBase<ContentSubmissionDto> {
     #city: _f$city,
     #name: _f$name,
     #description: _f$description,
+    #descriptionDelta: _f$descriptionDelta,
     #latitude: _f$latitude,
     #longitude: _f$longitude,
     #address: _f$address,
@@ -133,6 +144,7 @@ class ContentSubmissionDtoMapper extends ClassMapperBase<ContentSubmissionDto> {
       city: data.dec(_f$city),
       name: data.dec(_f$name),
       description: data.dec(_f$description),
+      descriptionDelta: data.dec(_f$descriptionDelta),
       latitude: data.dec(_f$latitude),
       longitude: data.dec(_f$longitude),
       address: data.dec(_f$address),

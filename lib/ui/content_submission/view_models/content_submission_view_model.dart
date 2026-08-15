@@ -81,7 +81,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   final ContentSubmissionRepository _contentSubmissionRepository;
   final ContentSubmissionDraftRepository _draftRepository;
   final ImagePicker _imagePicker;
-  ContentSubmissionDraft _state = const ContentSubmissionDraft();
+  ContentSubmissionDraft _state = ContentSubmissionDraft();
   ContentSubmissionDraftLoadState _loadState =
       ContentSubmissionDraftLoadState.loading;
   final _assets = <Asset>[];

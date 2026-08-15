@@ -1,12 +1,17 @@
+import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
+import 'package:moliseis/domain/core/description_delta.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
 @immutable
 class ContentSubmission {
-  const ContentSubmission({
+  /// Creates a submission that retains a deeply copied, recursively
+  /// unmodifiable snapshot of [descriptionDelta].
+  ContentSubmission({
     required this.city,
     required this.name,
     this.description,
+    List<Map<String, dynamic>>? descriptionDelta,
     this.latitude,
     this.longitude,
     this.address,
@@ -17,13 +22,15 @@ class ContentSubmission {
     required this.userName,
     this.createdAt,
     this.modifiedAt,
-  });
+  }) : descriptionDelta = freezeDescriptionDelta(descriptionDelta);
 
   final String city;
 
   final String name;
 
   final String? description;
+
+  final List<Map<String, dynamic>>? descriptionDelta;
 
   final double? latitude;
 
@@ -51,6 +58,10 @@ class ContentSubmission {
         other.city == city &&
         other.name == name &&
         other.description == description &&
+        const DeepCollectionEquality().equals(
+          other.descriptionDelta,
+          descriptionDelta,
+        ) &&
         other.latitude == latitude &&
         other.longitude == longitude &&
         other.address == address &&
@@ -68,6 +79,7 @@ class ContentSubmission {
     city,
     name,
     description,
+    const DeepCollectionEquality().hash(descriptionDelta),
     latitude,
     longitude,
     address,

@@ -10,6 +10,7 @@ class ContentSubmissionDraftEntity {
     this.city,
     this.name,
     this.description,
+    this.descriptionDelta,
     this.startDate,
     this.endDate,
     this.authorEmail,
@@ -25,6 +26,7 @@ class ContentSubmissionDraftEntity {
   final String? city;
   final String? name;
   final String? description;
+  final List<Map<String, dynamic>>? descriptionDelta;
 
   @Property(type: PropertyType.dateNano)
   final DateTime? startDate;

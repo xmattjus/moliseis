@@ -17,6 +17,7 @@ class ContentSubmissionDto with ContentSubmissionDtoMappable {
     required this.city,
     required this.name,
     this.description,
+    this.descriptionDelta,
     this.latitude,
     this.longitude,
     this.address,
@@ -35,6 +36,8 @@ class ContentSubmissionDto with ContentSubmissionDtoMappable {
   final String name;
 
   final String? description;
+
+  final List<Map<String, dynamic>>? descriptionDelta;
 
   final double? latitude;
 

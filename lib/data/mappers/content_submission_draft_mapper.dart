@@ -1,4 +1,5 @@
 import 'package:moliseis/data/data-sources/content_submission_draft_entry.dart';
+import 'package:moliseis/domain/core/description_delta.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 
@@ -10,6 +11,7 @@ extension ContentSubmissionDraftEntityMapper on ContentSubmissionDraftEntity {
     city: city,
     name: name,
     description: description,
+    descriptionDelta: freezeDescriptionDelta(descriptionDelta),
     startDate: startDate,
     endDate: endDate,
     userEmail: authorEmail,
@@ -24,6 +26,7 @@ extension ContentSubmissionDraftMapper on ContentSubmissionDraft {
     city: city,
     name: name,
     description: description,
+    descriptionDelta: freezeDescriptionDelta(descriptionDelta),
     startDate: startDate,
     endDate: endDate,
     authorEmail: userEmail,

@@ -349,7 +349,7 @@
     },
     {
       "id": "20:8436787422671765122",
-      "lastPropertyId": "14:3484431749528952426",
+      "lastPropertyId": "15:8592803869694869745",
       "name": "ContentSubmissionDraftEntity",
       "properties": [
         {
@@ -402,6 +402,11 @@
           "id": "14:3484431749528952426",
           "name": "authorName",
           "type": 9
+        },
+        {
+          "id": "15:8592803869694869745",
+          "name": "descriptionDelta",
+          "type": 13
         }
       ],
       "relations": []

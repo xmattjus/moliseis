@@ -1,7 +1,7 @@
 part of 'package:moliseis/utils/logging/log_event.dart';
 
 /// Fired when one or more selected assets are skipped because they exceed
-/// [kCloudinaryMaxUploadBytes].
+/// `kCloudinaryMaxUploadBytes`.
 ///
 /// This is a soft warning, not a hard failure: under-limit files in the
 /// same selection session are still added.

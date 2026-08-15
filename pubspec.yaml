@@ -121,6 +121,15 @@ dev_dependencies:
   # Z
 
 dependency_overrides:
+  # Temporary workaround for google/flatbuffers#8935.
+  # ObjectBox 5.3.2 pins affected flat_buffers 25.9.23; remove once
+  # ObjectBox depends on a published flat_buffers release containing the fix.
+  flat_buffers:
+    git:
+      url: https://github.com/google/flatbuffers.git
+      ref: e7c6874192a643c50b10cb90f81c0ed84fd7f53a
+      path: dart
+
   # Temporary workaround for flutter_map 8.3.0/8.3.1 zero-displacement
   # flings poisoning the camera with a NaN center.
   # TODO(xmattjus): remove when a pub.dev release includes

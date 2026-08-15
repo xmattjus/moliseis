@@ -1,26 +1,26 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/mappers/description_delta_copy.dart';
+import 'package:moliseis/domain/core/description_delta.dart';
 
 void main() {
-  group('copyDescriptionDelta', () {
+  group('freezeDescriptionDelta', () {
     test('returns null for null input', () {
-      expect(copyDescriptionDelta(null), isNull);
+      expect(freezeDescriptionDelta(null), isNull);
     });
 
     test('returns an unmodifiable empty list for empty input', () {
-      final copy = switch (copyDescriptionDelta(<Map<String, dynamic>>[])) {
-        final copy? => copy,
-        null => throw StateError('Expected a non-null Delta copy.'),
+      final frozen = switch (freezeDescriptionDelta(<Map<String, dynamic>>[])) {
+        final frozen? => frozen,
+        null => throw StateError('Expected a non-null frozen Delta.'),
       };
 
-      expect(copy, isEmpty);
+      expect(frozen, isEmpty);
       expect(
-        () => copy.add(<String, dynamic>{}),
+        () => frozen.add(<String, dynamic>{}),
         throwsUnsupportedError,
       );
     });
 
-    test('deeply copies Delta values and makes every collection immutable', () {
+    test('deeply freezes Delta values and every collection level', () {
       final sourceTags = <String>['featured'];
       final sourceMetadata = <String, dynamic>{'tags': sourceTags};
       final sourceAttributes = <String, dynamic>{
@@ -34,13 +34,14 @@ void main() {
         {
           'insert': 'Original\n',
           'retain': 3,
+          'nullable': null,
           'attributes': sourceAttributes,
           'embeds': sourceEmbeds,
         },
       ];
-      final copy = switch (copyDescriptionDelta(source)) {
-        final copy? => copy,
-        null => throw StateError('Expected a non-null Delta copy.'),
+      final frozen = switch (freezeDescriptionDelta(source)) {
+        final frozen? => frozen,
+        null => throw StateError('Expected a non-null frozen Delta.'),
       };
 
       source.single['insert'] = 'Mutated\n';
@@ -50,11 +51,13 @@ void main() {
       sourceTags.add('mutated');
       sourceEmbed['type'] = 'video';
       sourceNestedList.add('mutated');
+      source.add(<String, dynamic>{'insert': 'Added\n'});
 
-      expect(copy, [
+      expect(frozen, [
         {
           'insert': 'Original\n',
           'retain': 3,
+          'nullable': null,
           'attributes': {
             'bold': true,
             'metadata': {
@@ -68,7 +71,7 @@ void main() {
         },
       ]);
 
-      final [operation] = copy;
+      final [operation] = frozen;
       final (attributes, embeds) = switch (operation) {
         {
           'attributes': Map<String, dynamic> attributes,
@@ -93,7 +96,7 @@ void main() {
         _ => throw StateError('Expected the Delta embeds to have two values.'),
       };
 
-      expect(() => copy.add(<String, dynamic>{}), throwsUnsupportedError);
+      expect(() => frozen.add(<String, dynamic>{}), throwsUnsupportedError);
       expect(() => operation['insert'] = 'Changed\n', throwsUnsupportedError);
       expect(() => attributes['bold'] = false, throwsUnsupportedError);
       expect(() => metadata['source'] = 'local', throwsUnsupportedError);

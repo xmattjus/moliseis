@@ -3,7 +3,7 @@ import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
-import 'package:moliseis/data/mappers/description_delta_copy.dart';
+import 'package:moliseis/domain/core/description_delta.dart';
 import 'package:objectbox/objectbox.dart';
 
 /// Conversion extensions from [PlaceDto] to [PlaceEntity].
@@ -18,7 +18,7 @@ extension PlaceDtoExtensions on PlaceDto {
       remoteId: id,
       name: name,
       description: description,
-      descriptionDelta: copyDescriptionDelta(descriptionDelta),
+      descriptionDelta: freezeDescriptionDelta(descriptionDelta),
       coordinates: [latitude, longitude],
       contentCategoryIndex: category.index,
       cityToOneId: cityRelationId,
@@ -44,7 +44,7 @@ extension PlaceDtoExtensions on PlaceDto {
     final copy = existing.copyWith(
       name: name,
       description: description,
-      descriptionDelta: copyDescriptionDelta(descriptionDelta),
+      descriptionDelta: freezeDescriptionDelta(descriptionDelta),
       coordinates: [latitude, longitude],
       contentCategoryIndex: category.index,
       cityToOneId: cityRelationId,

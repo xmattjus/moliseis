@@ -12,11 +12,18 @@ void main() {
     test(
       'preserves every populated field through entity -> model -> entity',
       () {
-        const draft = ContentSubmissionDraft(
+        final draft = ContentSubmissionDraft(
           category: ContentCategory.history,
           city: 'Rome',
           name: 'Colosseum',
           description: 'Ancient arena',
+          descriptionDelta: const [
+            {
+              'insert': 'Ancient ',
+              'attributes': {'bold': true},
+            },
+            {'insert': 'arena\n'},
+          ],
           userEmail: 'jane@example.com',
           userName: 'Jane',
           acceptedTerms: true,
@@ -66,7 +73,7 @@ void main() {
     );
 
     test('round-trips an empty draft without data loss', () {
-      const draft = ContentSubmissionDraft();
+      final draft = ContentSubmissionDraft();
 
       final restored = draft.toEntity().toModel();
 
@@ -75,6 +82,7 @@ void main() {
       expect(restored.city, isNull);
       expect(restored.name, isNull);
       expect(restored.description, isNull);
+      expect(restored.descriptionDelta, isNull);
       expect(restored.startDate, isNull);
       expect(restored.endDate, isNull);
       expect(restored.userEmail, isNull);
@@ -87,7 +95,7 @@ void main() {
 
       expect(entity.toModel().category, isNull);
       // And the reverse: a model with null category writes a null index.
-      expect(const ContentSubmissionDraft().toEntity().categoryIndex, isNull);
+      expect(ContentSubmissionDraft().toEntity().categoryIndex, isNull);
     });
 
     test('writes the enum index for each category', () {
@@ -114,6 +122,39 @@ void main() {
           reason: '${category.index} should deserialise back to $category',
         );
       }
+    });
+
+    test('makes defensive copies of Delta operations at mapper boundaries', () {
+      final source = <Map<String, dynamic>>[
+        {
+          'insert': 'Original\n',
+          'attributes': <String, dynamic>{'bold': true},
+        },
+      ];
+      final entity = ContentSubmissionDraft(
+        descriptionDelta: source,
+      ).toEntity();
+
+      source[0]['insert'] = 'Mutated\n';
+      (source[0]['attributes']! as Map<String, dynamic>)['bold'] = false;
+
+      expect(entity.descriptionDelta, [
+        {
+          'insert': 'Original\n',
+          'attributes': {'bold': true},
+        },
+      ]);
+
+      final model = entity.toModel();
+
+      expect(
+        identical(model.descriptionDelta, entity.descriptionDelta),
+        isFalse,
+      );
+      expect(
+        identical(model.descriptionDelta![0], entity.descriptionDelta![0]),
+        isFalse,
+      );
     });
   });
 }

@@ -1,25 +1,31 @@
+import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
+import 'package:moliseis/domain/core/description_delta.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
 @immutable
 class ContentSubmissionDraft {
-  const ContentSubmissionDraft({
+  /// Creates a draft that retains a deeply copied, recursively unmodifiable
+  /// snapshot of [descriptionDelta].
+  ContentSubmissionDraft({
     this.category,
     this.city,
     this.name,
     this.description,
+    List<Map<String, dynamic>>? descriptionDelta,
     this.startDate,
     this.endDate,
     this.userEmail,
     this.userName,
     this.acceptedTerms,
-  });
+  }) : descriptionDelta = freezeDescriptionDelta(descriptionDelta);
 
   final ContentCategory? category;
 
   final String? city;
   final String? name;
   final String? description;
+  final List<Map<String, dynamic>>? descriptionDelta;
 
   final DateTime? startDate;
   final DateTime? endDate;
@@ -36,6 +42,10 @@ class ContentSubmissionDraft {
         other.city == city &&
         other.name == name &&
         other.description == description &&
+        const DeepCollectionEquality().equals(
+          other.descriptionDelta,
+          descriptionDelta,
+        ) &&
         other.startDate == startDate &&
         other.endDate == endDate &&
         other.userEmail == userEmail &&
@@ -49,6 +59,7 @@ class ContentSubmissionDraft {
     city,
     name,
     description,
+    const DeepCollectionEquality().hash(descriptionDelta),
     startDate,
     endDate,
     userEmail,
@@ -60,6 +71,7 @@ class ContentSubmissionDraft {
   String toString() =>
       'ContentSubmissionDraft: category: $category, city: $city, '
       'name: $name, description (length): ${description?.length}, '
+      'descriptionDelta (operation count): ${descriptionDelta?.length}, '
       'startDate: $startDate, endDate: $endDate, '
       'userEmail (length): ${userEmail?.length}, '
       'userName (length): ${userName?.length}, acceptedTerms: $acceptedTerms,';
@@ -71,6 +83,7 @@ class ContentSubmissionDraft {
     Object? city = _unset,
     Object? name = _unset,
     Object? description = _unset,
+    Object? descriptionDelta = _unset,
     Object? startDate = _unset,
     Object? endDate = _unset,
     Object? userEmail = _unset,
@@ -85,6 +98,9 @@ class ContentSubmissionDraft {
     description: identical(description, _unset)
         ? this.description
         : description as String?,
+    descriptionDelta: identical(descriptionDelta, _unset)
+        ? this.descriptionDelta
+        : descriptionDelta as List<Map<String, dynamic>>?,
     startDate: identical(startDate, _unset)
         ? this.startDate
         : startDate as DateTime?,

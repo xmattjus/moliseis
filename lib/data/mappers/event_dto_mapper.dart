@@ -3,7 +3,7 @@ import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
-import 'package:moliseis/data/mappers/description_delta_copy.dart';
+import 'package:moliseis/domain/core/description_delta.dart';
 import 'package:objectbox/objectbox.dart';
 
 /// Conversion extensions from [EventDto] to [EventEntity].
@@ -18,7 +18,7 @@ extension EventDtoExtensions on EventDto {
       remoteId: id,
       name: name,
       description: description,
-      descriptionDelta: copyDescriptionDelta(descriptionDelta),
+      descriptionDelta: freezeDescriptionDelta(descriptionDelta),
       startDate: startDate,
       endDate: endDate,
       contentCategoryIndex: category.index,
@@ -46,7 +46,7 @@ extension EventDtoExtensions on EventDto {
     final copy = existing.copyWith(
       name: name,
       description: description,
-      descriptionDelta: copyDescriptionDelta(descriptionDelta),
+      descriptionDelta: freezeDescriptionDelta(descriptionDelta),
       startDate: startDate,
       endDate: endDate,
       coordinates: [latitude, longitude],

@@ -650,6 +650,7 @@ final class FakeContentSubmissionDraftRepository
   bool saveDraftCalled = false;
   int saveDraftCallCount = 0;
   bool clearDraftCalled = false;
+  int clearDraftCallCount = 0;
   ContentSubmissionDraft? lastSavedState;
 
   @override
@@ -666,6 +667,7 @@ final class FakeContentSubmissionDraftRepository
   @override
   Future<Result<void>> clearDraft() async {
     clearDraftCalled = true;
+    clearDraftCallCount++;
     return clearDraftResult;
   }
 }
