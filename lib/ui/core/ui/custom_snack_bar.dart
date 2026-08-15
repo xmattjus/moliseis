@@ -5,13 +5,22 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 
-/// The severity of a snack bar, which drives its background and foreground
-/// colors as well as the leading icon shown by [showSnackBar].
+/// The severity of a snack bar, which drives its background, foreground and
+/// action foreground (if not provided in the call site) colors as well as the
+/// leading icon shown by [showSnackBar].
 ///
 /// - [info]: neutral informational feedback.
 /// - [warning]: alerts the user that an action needs attention.
 /// - [error]: signals a failed operation.
 enum SnackBarType { info, warning, error }
+
+/// The duration of a snack bar.
+///
+/// * [extrashort] - 1000ms.
+/// * [short] - 1500ms.
+/// * [medium] - 3000ms, matches current SnackBar standard duration.
+/// * [long] - 5000ms.
+enum SnackBarDuration { extrashort, short, medium, long }
 
 /// Shows the standard generic error snack bar, reusing the same localized
 /// message across the app.
@@ -38,6 +47,8 @@ void showSnackBar({
   required BuildContext context,
   required String textContent,
   SnackBarType type = SnackBarType.info,
+  SnackBarAction? action,
+  SnackBarDuration duration = SnackBarDuration.medium,
 }) {
   final globalMessenger = $scaffoldMessengerKey.currentState;
 
@@ -51,7 +62,13 @@ void showSnackBar({
 
   try {
     globalMessenger.showSnackBar(
-      _buildSnackBar(context, textContent, type),
+      _buildSnackBar(
+        context,
+        textContent,
+        type,
+        action,
+        _snackBarDurationEnumToDuration(duration),
+      ),
     );
   } on Exception catch (exception, stackTrace) {
     context.read<Logger?>()?.log(
@@ -64,21 +81,39 @@ void showSnackBar({
   return;
 }
 
+Duration _snackBarDurationEnumToDuration(SnackBarDuration duration) =>
+    switch (duration) {
+      SnackBarDuration.extrashort => const Duration(milliseconds: 1000),
+      SnackBarDuration.short => const Duration(milliseconds: 1500),
+      SnackBarDuration.medium => const Duration(milliseconds: 3000),
+      SnackBarDuration.long => const Duration(milliseconds: 5000),
+    };
+
 SnackBar _buildSnackBar(
   BuildContext context,
   String textContent,
   SnackBarType type,
+  SnackBarAction? action,
+  Duration duration,
 ) {
+  final appColors = context.appColors;
+
   final background = switch (type) {
-    SnackBarType.info => Colors.lightBlueAccent,
-    SnackBarType.warning => Colors.yellowAccent,
-    SnackBarType.error => context.colorScheme.errorContainer,
+    SnackBarType.info => appColors.infoSnackBar.background,
+    SnackBarType.warning => appColors.warningSnackBar.background,
+    SnackBarType.error => appColors.errorSnackBar.background,
   };
 
   final foreground = switch (type) {
-    SnackBarType.info => Colors.lightBlue.darken(0.3),
-    SnackBarType.warning => Colors.yellow.darken(0.5),
-    SnackBarType.error => context.colorScheme.onErrorContainer,
+    SnackBarType.info => appColors.infoSnackBar.foreground,
+    SnackBarType.warning => appColors.warningSnackBar.foreground,
+    SnackBarType.error => appColors.errorSnackBar.foreground,
+  };
+
+  final actionForeground = switch (type) {
+    SnackBarType.info => appColors.infoSnackBar.actionForeground,
+    SnackBarType.warning => appColors.warningSnackBar.actionForeground,
+    SnackBarType.error => appColors.errorSnackBar.actionForeground,
   };
 
   final icon = switch (type) {
@@ -86,6 +121,38 @@ SnackBar _buildSnackBar(
     SnackBarType.warning => Symbols.warning,
     SnackBarType.error => Symbols.error,
   };
+
+  /// Rebuilds the call-site action with a per-type `textColor` so its label
+  /// reads as a tappable text button on this snack bar's container background.
+  ///
+  /// Call sites pass only `label` and `onPressed`, leaving
+  /// [SnackBarAction.textColor] null. The null resolves to the M3 default —
+  /// [ColorScheme.inversePrimary] (see `_SnackbarDefaultsM3`) — which is
+  /// tuned for the dark default background; this app's info, warning, and
+  /// error backgrounds are light containers, so the default label washes out.
+  ///
+  /// A single [SnackBarThemeData.actionTextColor] cannot fix this, because the
+  /// three backgrounds differ in hue. Instead `actionForeground` holds an
+  /// intermediate tone of the *same* per-type seed palette (tone 40 in light,
+  /// tone 80 in dark), mirroring how [ColorScheme.inversePrimary] relates to
+  /// [ColorScheme.inverseSurface]. It is deliberately distinct from the body
+  /// `foreground`, giving the label a tinted-button affordance rather than
+  /// looking like plain text.
+  ///
+  /// `disabledTextColor` receives the same per-type treatment, since the M3
+  /// default does not visually distinguish the disabled action.
+  /// `backgroundColor` and `disabledBackgroundColor` pass through untouched
+  /// so the action stays a transparent text button.
+  final recoloredAction = action == null
+      ? null
+      : SnackBarAction(
+          textColor: action.textColor ?? actionForeground,
+          disabledTextColor: action.disabledTextColor ?? actionForeground,
+          backgroundColor: action.backgroundColor,
+          disabledBackgroundColor: action.disabledBackgroundColor,
+          label: action.label,
+          onPressed: action.onPressed,
+        );
 
   return SnackBar(
     content: Row(
@@ -109,9 +176,12 @@ SnackBar _buildSnackBar(
     backgroundColor: background,
     elevation: 3,
     margin: const EdgeInsetsDirectional.fromSTEB(24, 0, 24, 16),
-    behavior: SnackBarBehavior.floating,
     shape: RoundedRectangleBorder(
       borderRadius: context.appShapes.circular.cornerMedium,
     ),
+    behavior: SnackBarBehavior.floating,
+    action: recoloredAction,
+    duration: duration,
+    persist: false,
   );
 }
