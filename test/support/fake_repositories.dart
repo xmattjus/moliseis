@@ -116,6 +116,7 @@ final class FakeEventRepository extends EventRepository {
     this.getFavouriteEventIdsResult = const Result.success([]),
     this.getFavouritesResult = const Result.success([]),
     this.setFavouriteEventResult = const Result.success(null),
+    this.setFavouriteEventHandler,
     Map<int, Result<Event>>? getByIdResults,
   }) : getByIdResults = getByIdResults ?? {};
 
@@ -130,6 +131,7 @@ final class FakeEventRepository extends EventRepository {
   Result<List<int>> getFavouriteEventIdsResult;
   Result<Iterable<Event>> getFavouritesResult;
   Result<void> setFavouriteEventResult;
+  Future<Result<void>> Function(int id, bool save)? setFavouriteEventHandler;
   Map<int, Result<Event>> getByIdResults;
 
   // Sync tracking
@@ -142,6 +144,7 @@ final class FakeEventRepository extends EventRepository {
 
   // Argument captures (only where existing tests inspect them)
   List<double>? lastCoordinates;
+  final setFavouriteEventCalls = <({int id, bool save})>[];
 
   @override
   Future<Result<List<EventDto>>> prepareSync() async => prepareResult;
@@ -199,8 +202,10 @@ final class FakeEventRepository extends EventRepository {
       getFavouriteEventIdsResult;
 
   @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
-      setFavouriteEventResult;
+  Future<Result<void>> setFavouriteEvent(int id, bool save) async {
+    setFavouriteEventCalls.add((id: id, save: save));
+    return setFavouriteEventHandler?.call(id, save) ?? setFavouriteEventResult;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -330,11 +335,13 @@ final class FakePlaceRepository extends PlaceRepository {
     this.getByCategoriesResult = const Result.success([]),
     this.getByCoordinatesResult = const Result.success([]),
     this.getFavouritePlaceIdsResult = const Result.success([]),
+    this.getFavouritePlaceIdsHandler,
     this.getFavouritesResult = const Result.success([]),
     this.getIdsByCoordinatesResult = const Result.success([]),
     this.getLatestPlaceIdsResult = const Result.success([]),
     this.getSuggestedPlaceIdsResult = const Result.success([]),
     this.setFavouritePlaceResult = const Result.success(null),
+    this.setFavouritePlaceHandler,
     this.getSuggestedPlacesResult = const Result.success([]),
     this.getSuggestionsHandler,
     Map<int, Result<Place>>? getByIdResults,
@@ -345,6 +352,7 @@ final class FakePlaceRepository extends PlaceRepository {
   Result<List<Place>> getByCategoriesResult;
   Result<List<Place>> getByCoordinatesResult;
   Result<List<int>> getFavouritePlaceIdsResult;
+  Future<Result<List<int>>> Function()? getFavouritePlaceIdsHandler;
   Result<Iterable<Place>> getFavouritesResult;
   Result<List<int>> getIdsByCoordinatesResult;
   Result<List<int>> getLatestPlaceIdsResult;
@@ -352,6 +360,7 @@ final class FakePlaceRepository extends PlaceRepository {
   Result<List<Place>> getSuggestedPlacesResult;
   Future<Result<List<Place>>> Function()? getSuggestionsHandler;
   Result<void> setFavouritePlaceResult;
+  Future<Result<void>> Function(int id, bool save)? setFavouritePlaceHandler;
   Map<int, Result<Place>> getByIdResults;
 
   bool commitCalled = false;
@@ -360,6 +369,7 @@ final class FakePlaceRepository extends PlaceRepository {
   // Argument captures (only where existing tests inspect them)
   ContentSort? lastGetAllSort;
   List<double>? lastCoordinates;
+  final setFavouritePlaceCalls = <({int id, bool save})>[];
 
   int getSuggestionsCallCount = 0;
 
@@ -402,7 +412,7 @@ final class FakePlaceRepository extends PlaceRepository {
 
   @override
   Future<Result<List<int>>> getFavouritePlaceIds() async =>
-      getFavouritePlaceIdsResult;
+      getFavouritePlaceIdsHandler?.call() ?? getFavouritePlaceIdsResult;
 
   @override
   Future<Result<List<int>>> getIdsByCoordinates(
@@ -421,8 +431,10 @@ final class FakePlaceRepository extends PlaceRepository {
   }
 
   @override
-  Future<Result<void>> setFavouritePlace(int id, bool save) async =>
-      setFavouritePlaceResult;
+  Future<Result<void>> setFavouritePlace(int id, bool save) async {
+    setFavouritePlaceCalls.add((id: id, save: save));
+    return setFavouritePlaceHandler?.call(id, save) ?? setFavouritePlaceResult;
+  }
 }
 
 // ---------------------------------------------------------------------------

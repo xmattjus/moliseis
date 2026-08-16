@@ -11,7 +11,110 @@ import 'package:provider/provider.dart';
 import '../../../support/mock_logger.dart';
 
 void main() {
-  testWidgets('showSnackBar does not throw when providers are present', (
+  testWidgets('logs a no-op when the global messenger is absent', (
+    tester,
+  ) async {
+    final logger = MockLogger();
+    late BuildContext context;
+
+    await tester.pumpWidget(
+      Provider<Logger>.value(
+        value: logger,
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Builder(
+            builder: (innerContext) {
+              context = innerContext;
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+
+    showSnackBar(context: context, textContent: 'Message');
+
+    expect(logger.eventsOfType<SnackBarShowFailed>(), hasLength(1));
+  });
+
+  testWidgets('showSnackBar action invokes its callback', (tester) async {
+    late BuildContext context;
+    var actionPressed = false;
+
+    await tester.pumpWidget(
+      Provider<Logger>.value(
+        value: MockLogger(),
+        child: Builder(
+          builder: (outerContext) => MaterialApp(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            theme: AppThemeData.light(context: outerContext),
+            home: Builder(
+              builder: (innerContext) {
+                context = innerContext;
+                return const Scaffold(body: SizedBox.shrink());
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    showSnackBar(
+      context: context,
+      textContent: 'Message',
+      action: SnackBarAction(
+        label: 'Annulla',
+        onPressed: () => actionPressed = true,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.tap(find.text('Annulla'));
+
+    expect(actionPressed, isTrue);
+  });
+
+  testWidgets('queues feedback by default', (tester) async {
+    late BuildContext context;
+
+    await tester.pumpWidget(
+      Provider<Logger>.value(
+        value: MockLogger(),
+        child: Builder(
+          builder: (outerContext) => MaterialApp(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            theme: AppThemeData.light(context: outerContext),
+            home: Builder(
+              builder: (innerContext) {
+                context = innerContext;
+                return const Scaffold(body: SizedBox.shrink());
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    showSnackBar(
+      context: context,
+      textContent: 'First',
+      duration: SnackBarDuration.long,
+    );
+    showSnackBar(
+      context: context,
+      textContent: 'Queued',
+      duration: SnackBarDuration.long,
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('First'), findsOneWidget);
+    expect(find.text('Queued'), findsNothing);
+  });
+
+  testWidgets('replacement removes current and queued feedback', (
     tester,
   ) async {
     late BuildContext context;
@@ -19,57 +122,52 @@ void main() {
     await tester.pumpWidget(
       Provider<Logger>.value(
         value: MockLogger(),
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Builder(
-            builder: (innerContext) {
-              context = innerContext;
-              return const SizedBox.shrink();
-            },
+        child: Builder(
+          builder: (outerContext) => MaterialApp(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            theme: AppThemeData.light(context: outerContext),
+            home: Builder(
+              builder: (innerContext) {
+                context = innerContext;
+                return const Scaffold(body: SizedBox.shrink());
+              },
+            ),
           ),
         ),
       ),
     );
+    await tester.pump();
 
-    expect(
-      () => showSnackBar(context: context, textContent: 'Message'),
-      returnsNormally,
+    showSnackBar(
+      context: context,
+      textContent: 'First',
+      duration: SnackBarDuration.long,
     );
-  });
-
-  testWidgets('showSnackBar does not throw when providers are NOT present', (
-    tester,
-  ) async {
-    late BuildContext context;
-
-    await tester.pumpWidget(
-      Provider<Logger?>.value(
-        value: null,
-        child: Directionality(
-          textDirection: TextDirection.ltr,
-          child: Builder(
-            builder: (innerContext) {
-              context = innerContext;
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      ),
+    showSnackBar(
+      context: context,
+      textContent: 'Queued',
+      duration: SnackBarDuration.long,
     );
+    await tester.pump(const Duration(milliseconds: 250));
 
-    expect(
-      () => showSnackBar(context: context, textContent: 'Message'),
-      returnsNormally,
+    showSnackBar(
+      context: context,
+      textContent: 'Replacement',
+      replaceCurrent: true,
     );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('First'), findsNothing);
+    expect(find.text('Queued'), findsNothing);
+    expect(find.text('Replacement'), findsOneWidget);
   });
 
   group('showSnackBar action color', () {
     for (final type in SnackBarType.values) {
       testWidgets(
         '$type action label resolves to the per-type actionForeground',
-        (
-          tester,
-        ) async {
+        (tester) async {
           late BuildContext context;
           late AppColorsThemeExtension appColors;
 
@@ -95,7 +193,7 @@ void main() {
 
           showSnackBar(
             context: context,
-            textContent: 'msg',
+            textContent: 'Message',
             type: type,
             action: SnackBarAction(label: 'Annulla', onPressed: () {}),
           );
@@ -106,18 +204,15 @@ void main() {
             SnackBarType.warning => appColors.warningSnackBar.actionForeground,
             SnackBarType.error => appColors.errorSnackBar.actionForeground,
           };
-
-          expect(find.text('Annulla'), findsOneWidget);
           final button = tester.widget<TextButton>(
             find.ancestor(
               of: find.text('Annulla'),
               matching: find.byType(TextButton),
             ),
           );
-          final actual = button.style?.foregroundColor?.resolve({});
 
-          expect(actual, isNotNull);
-          expect(actual, equals(expected));
+          expect(find.text('Annulla'), findsOneWidget);
+          expect(button.style?.foregroundColor?.resolve({}), equals(expected));
         },
       );
     }

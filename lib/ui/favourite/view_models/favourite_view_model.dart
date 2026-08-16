@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
@@ -10,39 +11,29 @@ import 'package:moliseis/utils/result.dart';
 
 /// Manages the user's favourited places and events.
 ///
-/// Exposes commands for loading, adding, and removing favourites. Add and
-/// remove operations are applied optimistically and rolled back on failure.
+/// Loading remains command-based for the screen's loading and error UI. A
+/// single short local persistence mutation is accepted at a time so optimistic
+/// updates and their rollbacks always have one clear predecessor state.
 class FavouriteViewModel extends ChangeNotifier {
   FavouriteViewModel({required FavouriteGetIdsUseCase favouriteGetIdsUseCase})
     : _favouriteGetIdsUseCase = favouriteGetIdsUseCase {
-    load = Command0(_load)..execute();
-    addEvent = Command1(_addEvent);
-    addPlace = Command1(_addPlace);
-    removeEvent = Command1(_removeEvent);
-    removePlace = Command1(_removePlace);
+    load = Command0(_load);
+    load.addListener(_forwardLoadChanges);
+
+    unawaited(load.execute());
   }
 
   final FavouriteGetIdsUseCase _favouriteGetIdsUseCase;
 
-  /// Command for marking an event as a favourite by its ID.
-  late Command1<void, int> addEvent;
-
-  /// Command for marking a place as a favourite by its ID.
-  late Command1<void, int> addPlace;
-
   /// Command for loading all favourited places and events from the repository.
-  late Command0<void> load;
+  late final Command0<void> load;
 
-  /// Command for unmarking an event as a favourite by its ID.
-  late Command1<void, int> removeEvent;
-
-  /// Command for unmarking a place as a favourite by its ID.
-  late Command1<void, int> removePlace;
-
-  final _favouriteEvents = <ContentBase>[];
-  final _favouritePlaces = <ContentBase>[];
+  var _favouriteEvents = <ContentBase>[];
+  var _favouritePlaces = <ContentBase>[];
   var _favouriteEventIds = <int>[];
   var _favouritePlaceIds = <int>[];
+  var _mutationRunning = false;
+  var _disposed = false;
 
   /// The full content objects for all favourited events.
   UnmodifiableListView<ContentBase> get favouriteEvents =>
@@ -60,92 +51,183 @@ class FavouriteViewModel extends ChangeNotifier {
   UnmodifiableListView<int> get favouritePlaceIds =>
       UnmodifiableListView(_favouritePlaceIds);
 
-  Future<Result<void>> _addEvent(int id) {
-    return _addFavourite(
-      ids: _favouriteEventIds,
-      persist: (favId) =>
-          _favouriteGetIdsUseCase.setFavouriteEvent(favId, true),
-      fetchContent: _getEventFromRepository,
-      id: id,
-    );
-  }
+  /// Whether favourite controls should temporarily reject a new mutation.
+  bool get isUpdating => load.running || _mutationRunning;
 
-  Future<Result<void>> _addPlace(int id) {
-    return _addFavourite(
-      ids: _favouritePlaceIds,
-      persist: (favId) =>
-          _favouriteGetIdsUseCase.setFavouritePlace(favId, true),
-      fetchContent: _getPlaceFromRepository,
-      id: id,
-    );
-  }
-
-  /// Optimistically adds [id] to [ids], persists via [persist], then fetches
-  /// the full content object via [fetchContent]. Rolls back [ids] on failure.
-  Future<Result<void>> _addFavourite({
-    required List<int> ids,
-    required Future<Result<void>> Function(int) persist,
-    required Future<void> Function(int) fetchContent,
-    required int id,
-  }) async {
-    ids.add(id);
-    notifyListeners();
-
-    final result = await persist(id);
-
-    if (result.isError) {
-      // Roll back the optimistically added ID if the repository rejected it.
-      ids.remove(id);
-    } else {
-      await fetchContent(id);
+  /// Optimistically sets [content]'s favourite state to [save] and persists it.
+  ///
+  /// Calls made during the initial load or another favourite write are
+  /// rejected.
+  /// Expected persistence failures restore the exact pre-call local state.
+  Future<Result<void>> setFavourite(ContentBase content, bool save) async {
+    if (isUpdating) return Result.error(_updateUnavailableException());
+    if (content is! Event && content is! Place) {
+      return Result.error(_unsupportedContentException(content));
     }
-    notifyListeners();
 
-    return result;
-  }
-
-  Future<void> _getEventFromRepository(int id) async {
-    final event = (await _favouriteGetIdsUseCase.getEventById(id)).getOrNull();
-    if (event != null) _favouriteEvents.add(event);
-  }
-
-  Future<void> _getPlaceFromRepository(int id) async {
-    final place = (await _favouriteGetIdsUseCase.getPlaceById(id)).getOrNull();
-    if (place != null) _favouritePlaces.add(place);
+    _mutationRunning = true;
+    try {
+      return switch (content) {
+        Event() => await _setEventFavourite(content, save),
+        Place() => await _setPlaceFavourite(content, save),
+        _ => Result.error(_unsupportedContentException(content)),
+      };
+    } finally {
+      _mutationRunning = false;
+      _notifyListeners();
+    }
   }
 
   /// Returns whether [content] is currently marked as a favourite.
   bool isFavourite(ContentBase content) {
-    if (content is Event) {
-      return _favouriteEventIds.contains(content.remoteId);
-    } else if (content is Place) {
-      return _favouritePlaceIds.contains(content.remoteId);
+    return switch (content) {
+      Event(:final remoteId) => _favouriteEventIds.contains(remoteId),
+      Place(:final remoteId) => _favouritePlaceIds.contains(remoteId),
+      _ => false,
+    };
+  }
+
+  Future<Result<void>> _setEventFavourite(Event event, bool save) async {
+    final id = event.remoteId;
+
+    if (save) {
+      final idAdded = !_favouriteEventIds.contains(id);
+      final contentAdded = !_favouriteEvents.any(
+        (content) => content.remoteId == id,
+      );
+      if (idAdded) _favouriteEventIds.add(id);
+      if (contentAdded) _favouriteEvents.add(event);
+      _notifyListeners();
+
+      final result = await _persistFavourite(event, true);
+      return result.mapError((error) {
+        if (idAdded) _favouriteEventIds.remove(id);
+        if (contentAdded) {
+          _favouriteEvents.removeWhere((content) => content.remoteId == id);
+        }
+        _notifyListeners();
+        return error;
+      });
     }
-    // Unknown ContentBase subtype — not tracked as a favourite.
-    return false;
+
+    final idIndex = _favouriteEventIds.indexOf(id);
+    final contentIndex = _favouriteEvents.indexWhere(
+      (content) => content.remoteId == id,
+    );
+    final removedContent = contentIndex < 0
+        ? null
+        : _favouriteEvents.removeAt(contentIndex);
+    if (idIndex >= 0) _favouriteEventIds.removeAt(idIndex);
+    _notifyListeners();
+
+    final result = await _persistFavourite(event, false);
+    return result.mapError((error) {
+      if (idIndex >= 0) _favouriteEventIds.insert(idIndex, id);
+      if (removedContent != null) {
+        _favouriteEvents.insert(contentIndex, removedContent);
+      }
+      _notifyListeners();
+      return error;
+    });
+  }
+
+  Future<Result<void>> _setPlaceFavourite(Place place, bool save) async {
+    final id = place.remoteId;
+
+    if (save) {
+      final idAdded = !_favouritePlaceIds.contains(id);
+      final contentAdded = !_favouritePlaces.any(
+        (content) => content.remoteId == id,
+      );
+      if (idAdded) _favouritePlaceIds.add(id);
+      if (contentAdded) _favouritePlaces.add(place);
+      _notifyListeners();
+
+      final result = await _persistFavourite(place, true);
+      return result.mapError((error) {
+        if (idAdded) _favouritePlaceIds.remove(id);
+        if (contentAdded) {
+          _favouritePlaces.removeWhere((content) => content.remoteId == id);
+        }
+        _notifyListeners();
+        return error;
+      });
+    }
+
+    final idIndex = _favouritePlaceIds.indexOf(id);
+    final contentIndex = _favouritePlaces.indexWhere(
+      (content) => content.remoteId == id,
+    );
+    final removedContent = contentIndex < 0
+        ? null
+        : _favouritePlaces.removeAt(contentIndex);
+    if (idIndex >= 0) _favouritePlaceIds.removeAt(idIndex);
+    _notifyListeners();
+
+    final result = await _persistFavourite(place, false);
+    return result.mapError((error) {
+      if (idIndex >= 0) _favouritePlaceIds.insert(idIndex, id);
+      if (removedContent != null) {
+        _favouritePlaces.insert(contentIndex, removedContent);
+      }
+      _notifyListeners();
+      return error;
+    });
+  }
+
+  Future<Result<void>> _persistFavourite(
+    ContentBase content,
+    bool save,
+  ) async {
+    try {
+      final result = switch (content) {
+        Event(:final remoteId) => _favouriteGetIdsUseCase.setFavouriteEvent(
+          remoteId,
+          save,
+        ),
+        Place(:final remoteId) => _favouriteGetIdsUseCase.setFavouritePlace(
+          remoteId,
+          save,
+        ),
+        _ => Future.value(
+          Result<void>.error(_unsupportedContentException(content)),
+        ),
+      };
+      return await result;
+    } on Exception catch (exception) {
+      return Result.error(exception);
+    }
   }
 
   Future<Result<void>> _load() async {
-    final placesResult = await _favouriteGetIdsUseCase.getFavouritePlaceIds();
+    if (_mutationRunning) return Result.error(_updateUnavailableException());
 
+    final placesResult = await _favouriteGetIdsUseCase.getFavouritePlaceIds();
     final placeIds = placesResult.getOrNull();
     if (placeIds != null) {
-      _favouritePlaceIds = List<int>.of(placeIds);
-      for (final id in _favouritePlaceIds) {
-        await _getPlaceFromRepository(id);
+      final freshPlaceIds = _deduplicateIds(placeIds);
+      final freshPlaces = <ContentBase>[];
+      for (final id in freshPlaceIds) {
+        final place = await _getPlaceFromRepository(id);
+        if (place != null) freshPlaces.add(place);
       }
-      notifyListeners();
+      _favouritePlaceIds = freshPlaceIds;
+      _favouritePlaces = freshPlaces;
+      _notifyListeners();
     }
 
     final eventsResult = await _favouriteGetIdsUseCase.getFavouriteEventIds();
-
     final eventIds = eventsResult.getOrNull();
     if (eventIds != null) {
-      _favouriteEventIds = List<int>.of(eventIds);
-      for (final id in _favouriteEventIds) {
-        await _getEventFromRepository(id);
+      final freshEventIds = _deduplicateIds(eventIds);
+      final freshEvents = <ContentBase>[];
+      for (final id in freshEventIds) {
+        final event = await _getEventFromRepository(id);
+        if (event != null) freshEvents.add(event);
       }
-      notifyListeners();
+      _favouriteEventIds = freshEventIds;
+      _favouriteEvents = freshEvents;
+      _notifyListeners();
     }
 
     if (placesResult.isError) return placesResult.map((_) {});
@@ -153,51 +235,33 @@ class FavouriteViewModel extends ChangeNotifier {
     return const Result.success(null);
   }
 
-  Future<Result<void>> _removeEvent(int id) {
-    return _removeFavourite(
-      ids: _favouriteEventIds,
-      contents: _favouriteEvents,
-      persist: (favId) =>
-          _favouriteGetIdsUseCase.setFavouriteEvent(favId, false),
-      fetchContent: _getEventFromRepository,
-      id: id,
-    );
+  List<int> _deduplicateIds(List<int> ids) => ids.toSet().toList();
+
+  Future<Event?> _getEventFromRepository(int id) async =>
+      (await _favouriteGetIdsUseCase.getEventById(id)).getOrNull();
+
+  Future<Place?> _getPlaceFromRepository(int id) async =>
+      (await _favouriteGetIdsUseCase.getPlaceById(id)).getOrNull();
+
+  Exception _unsupportedContentException(ContentBase content) => Exception(
+    'Unsupported favourite content type: ${content.runtimeType}.',
+  );
+
+  Exception _updateUnavailableException() => Exception(
+    'Cannot update favourites while another update is in progress.',
+  );
+
+  void _forwardLoadChanges() => _notifyListeners();
+
+  void _notifyListeners() {
+    if (!_disposed) notifyListeners();
   }
 
-  Future<Result<void>> _removePlace(int id) {
-    return _removeFavourite(
-      ids: _favouritePlaceIds,
-      contents: _favouritePlaces,
-      persist: (favId) =>
-          _favouriteGetIdsUseCase.setFavouritePlace(favId, false),
-      fetchContent: _getPlaceFromRepository,
-      id: id,
-    );
-  }
-
-  /// Optimistically removes [id] from [ids] and its content from [contents],
-  /// persists via [persist]. Restores both on failure.
-  Future<Result<void>> _removeFavourite({
-    required List<int> ids,
-    required List<ContentBase> contents,
-    required Future<Result<void>> Function(int) persist,
-    required Future<void> Function(int) fetchContent,
-    required int id,
-  }) async {
-    ids.remove(id);
-    contents.removeWhere((item) => item.remoteId == id);
-    notifyListeners();
-
-    final result = await persist(id);
-
-    if (result.isError) {
-      // Restore the optimistically removed item if the repository rejected it.
-      ids.add(id);
-      notifyListeners();
-      await fetchContent(id);
-      notifyListeners();
-    }
-
-    return result;
+  @override
+  void dispose() {
+    _disposed = true;
+    load.removeListener(_forwardLoadChanges);
+    if (!load.running) load.dispose();
+    super.dispose();
   }
 }

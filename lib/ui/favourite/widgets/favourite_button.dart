@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/ui/blurred_box.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
@@ -44,6 +46,7 @@ class FavouriteButton extends StatelessWidget {
     return Consumer<FavouriteViewModel>(
       builder: (_, viewModel, _) {
         final isSaved = viewModel.isFavourite(content);
+        final isUpdating = viewModel.isUpdating;
 
         final shape = RoundedRectangleBorder(
           borderRadius:
@@ -75,7 +78,15 @@ class FavouriteButton extends StatelessWidget {
                   borderRadius: shape.borderRadius as BorderRadius?,
                   child: IconButton(
                     key: ValueKey<bool>(isSaved),
-                    onPressed: onPressed(content, isSaved, viewModel),
+                    onPressed: isUpdating
+                        ? null
+                        : () => unawaited(
+                            _handlePressed(
+                              context,
+                              content,
+                              viewModel,
+                            ),
+                          ),
                     focusColor: feedbackColor.withValues(alpha: 0.08),
                     hoverColor: feedbackColor.withValues(alpha: 0.08),
                     splashColor: splashColor.withValues(alpha: 0.1),
@@ -95,7 +106,15 @@ class FavouriteButton extends StatelessWidget {
             );
           case FavouriteButtonType.wide:
             return OutlinedButton.icon(
-              onPressed: onPressed(content, isSaved, viewModel),
+              onPressed: isUpdating
+                  ? null
+                  : () => unawaited(
+                      _handlePressed(
+                        context,
+                        content,
+                        viewModel,
+                      ),
+                    ),
               style: ButtonStyle(
                 side: WidgetStateProperty.resolveWith((states) {
                   if (isSaved && !states.contains(WidgetState.pressed)) {
@@ -135,27 +154,50 @@ class FavouriteButton extends StatelessWidget {
     );
   }
 
-  void Function() onPressed(
+  Future<void> _handlePressed(
+    BuildContext context,
     ContentBase content,
-    bool isSaved,
     FavouriteViewModel viewModel,
-  ) {
-    return () {
-      HapticFeedback.lightImpact();
+  ) async {
+    // An enabled callback can be invoked again before Provider rebuilds the
+    // button. Revalidate against current state before producing any feedback.
+    if (viewModel.isUpdating) return;
 
-      if (content is Event) {
-        if (isSaved) {
-          viewModel.removeEvent.execute(content.remoteId);
-        } else {
-          viewModel.addEvent.execute(content.remoteId);
-        }
-      } else {
-        if (isSaved) {
-          viewModel.removePlace.execute(content.remoteId);
-        } else {
-          viewModel.addPlace.execute(content.remoteId);
-        }
-      }
-    };
+    clearAppSnackBars();
+    unawaited(HapticFeedback.lightImpact());
+
+    final wasFavourite = viewModel.isFavourite(content);
+    final result = await viewModel.setFavourite(content, !wasFavourite);
+    if (!context.mounted) return;
+    if (result.isError) {
+      showSnackBarGenericError(context: context);
+      return;
+    }
+
+    if (!wasFavourite) {
+      showSnackBar(
+        context: context,
+        textContent: 'Aggiunto ai preferiti',
+        action: SnackBarAction(
+          label: 'Annulla',
+          onPressed: () => unawaited(
+            _handleUndo(context, content, wasFavourite, viewModel),
+          ),
+        ),
+        replaceCurrent: true,
+      );
+    }
+  }
+
+  Future<void> _handleUndo(
+    BuildContext context,
+    ContentBase content,
+    bool previousState,
+    FavouriteViewModel viewModel,
+  ) async {
+    final result = await viewModel.setFavourite(content, previousState);
+    if (result.isError && context.mounted) {
+      showSnackBarGenericError(context: context);
+    }
   }
 }

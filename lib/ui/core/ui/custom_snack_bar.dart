@@ -28,27 +28,44 @@ enum SnackBarDuration { extrashort, short, medium, long }
 /// Convenience wrapper around [showSnackBar] for failures whose specific
 /// cause should not be shown to the user; the message is a fixed Italian
 /// string ("Si è verificato un errore, riprova più tardi").
-void showSnackBarGenericError({required BuildContext context}) => showSnackBar(
+void showSnackBarGenericError({
+  required BuildContext context,
+}) => showSnackBar(
   context: context,
   textContent: 'Si è verificato un errore, riprova più tardi',
   type: SnackBarType.error,
 );
+
+/// Removes the current and queued snack bars from the app-wide messenger.
+///
+/// This intentionally applies a global latest-feedback policy. Call it only
+/// when newer feedback must revoke a previously actionable message.
+void clearAppSnackBars() {
+  final globalMessenger = $scaffoldMessengerKey.currentState;
+  if (globalMessenger == null) return;
+
+  globalMessenger
+    ..clearSnackBars()
+    ..removeCurrentSnackBar();
+}
 
 /// Shows a floating Material 3 snack bar through the app-wide scaffold
 /// messenger, so it works from any context without a `Scaffold` ancestor
 /// (e.g. after an async gap) and never clashes with per-screen messengers.
 ///
 /// The snack bar text is [textContent] and its severity is [type], which
-/// drives the background, foreground, and leading icon. Has no return
-/// value; if the global messenger is unavailable or showing fails, the
-/// event is logged through the injected [Logger] instead of surfacing an
-/// error to the caller.
+/// drives the background, foreground, and leading icon. When [replaceCurrent]
+/// is true, the global messenger removes all current and queued feedback
+/// before presenting this one. If the global messenger is unavailable, or an
+/// ordinary exception prevents display, the failure is logged through the
+/// injected [Logger]. Flutter contract errors and assertions remain visible.
 void showSnackBar({
   required BuildContext context,
   required String textContent,
   SnackBarType type = SnackBarType.info,
   SnackBarAction? action,
   SnackBarDuration duration = SnackBarDuration.medium,
+  bool replaceCurrent = false,
 }) {
   final globalMessenger = $scaffoldMessengerKey.currentState;
 
@@ -61,6 +78,10 @@ void showSnackBar({
   }
 
   try {
+    if (replaceCurrent) {
+      clearAppSnackBars();
+    }
+
     globalMessenger.showSnackBar(
       _buildSnackBar(
         context,
@@ -77,8 +98,6 @@ void showSnackBar({
       stackTrace: stackTrace,
     );
   }
-
-  return;
 }
 
 Duration _snackBarDurationEnumToDuration(SnackBarDuration duration) =>
