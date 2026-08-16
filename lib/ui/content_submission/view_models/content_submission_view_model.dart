@@ -377,7 +377,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     _logger.log(const ContentSubmissionStateClearStarted());
     _assets.clear();
 
-    _state = const ContentSubmissionDraft();
+    _state = ContentSubmissionDraft();
     notifyListeners();
     _logger.log(const ContentSubmissionStateClearSuccess());
 
