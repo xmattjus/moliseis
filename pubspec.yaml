@@ -132,15 +132,14 @@ dependency_overrides:
 
   # Temporary workaround for flutter_map 8.3.0/8.3.1 zero-displacement
   # flings poisoning the camera with a NaN center.
-  # TODO(xmattjus): remove when a pub.dev release includes
-  # fleaflet/flutter_map#2220.
+  # TODO(xmattjus): remove when a pub.dev release includes fleaflet/flutter_map#2220.
   flutter_map:
     git:
       url: https://github.com/fleaflet/flutter_map.git
       ref: f779faed3afe37e70dd1e57aea0dc0a14f7a8fca
 
-  # Workaround to fix iOS and macOS runtime exceptions with higher 
-  # dependency versions on Flutter 3.41
+  # Temporary workaround to fix iOS and macOS runtime exceptions with higher 
+  # objective_c versions on Flutter 3.41.
   # TODO(xmattjus): remove this on sdk update to >= Flutter 3.44.
   objective_c: 9.1.0
 
