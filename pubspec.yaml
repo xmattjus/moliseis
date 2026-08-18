@@ -2,7 +2,7 @@ name: moliseis
 description: "La prima app multipiattaforma per il turismo in Molise."
 publish_to: none
 
-version: 2.3.0+102
+version: 2.4.0+104
 
 environment:
   sdk: ^3.11.5
@@ -49,7 +49,7 @@ dependencies:
   # M
   markdown_widget: ^2.3.2+8
   material_color_utilities: ^0.13.0
-  material_symbols_icons: ^4.2928.1
+  material_symbols_icons: 4.2906.0
   meta: ^1.17.0
   # N
   # O
