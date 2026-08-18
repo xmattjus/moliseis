@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:provider/provider.dart';
@@ -98,7 +99,7 @@ class _SyncScreenState extends State<SyncScreen> {
 
                 // The router leaves /sync for every non-running, non-fatal
                 // state. Avoid showing a misleading spinner during that frame.
-                return const SizedBox.shrink();
+                return const EmptyBox();
               },
             );
           },
