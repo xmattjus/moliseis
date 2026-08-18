@@ -20,7 +20,7 @@ extension ContentCategoryExtensions on ContentCategory {
     ContentCategory.history => 'Storia',
     ContentCategory.folklore => 'Folklore',
     ContentCategory.food => 'Cibo',
-    ContentCategory.allure => 'Attrazioni',
+    ContentCategory.allure => 'Divertimento',
     ContentCategory.experience => 'Esperienze',
   };
 }
