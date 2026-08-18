@@ -55,8 +55,9 @@ void main() {
         crashReporting: true,
       );
 
-      settingsBox.put(nonSingletonSettings);
-      settingsBox.put(singletonSettings);
+      settingsBox
+        ..put(nonSingletonSettings)
+        ..put(singletonSettings);
 
       final result = await dataSource.load();
 
