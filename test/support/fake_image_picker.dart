@@ -15,6 +15,9 @@ final class FakeImagePicker extends ImagePicker {
   final Future<List<XFile>> Function()? onPickMultipleMedia;
   final Future<LostDataResponse> Function()? onRetrieveLostData;
 
+  /// Picker limits supplied by callers, in invocation order.
+  final pickMultipleMediaLimits = <int?>[];
+
   @override
   Future<List<XFile>> pickMultipleMedia({
     double? maxWidth,
@@ -22,7 +25,10 @@ final class FakeImagePicker extends ImagePicker {
     int? imageQuality,
     int? limit,
     bool requestFullMetadata = true,
-  }) async => onPickMultipleMedia != null ? await onPickMultipleMedia!() : [];
+  }) async {
+    pickMultipleMediaLimits.add(limit);
+    return onPickMultipleMedia != null ? await onPickMultipleMedia!() : [];
+  }
 
   @override
   Future<LostDataResponse> retrieveLostData() async =>

@@ -5,17 +5,31 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-class ContentSubmissionProgressScreen extends StatelessWidget {
+class ContentSubmissionProgressScreen extends StatefulWidget {
   const ContentSubmissionProgressScreen({
     super.key,
     required this.viewModel,
   });
 
   final ContentSubmissionViewModel viewModel;
+
+  @override
+  State<ContentSubmissionProgressScreen> createState() =>
+      _ContentSubmissionProgressScreenState();
+}
+
+class _ContentSubmissionProgressScreenState
+    extends State<ContentSubmissionProgressScreen> {
+  Future<void>? _clearFuture;
+
+  ContentSubmissionViewModel get _viewModel => widget.viewModel;
+
+  Future<void> _clearOnce() => _clearFuture ??= _viewModel.clear.execute();
 
   @override
   Widget build(BuildContext context) {
@@ -25,11 +39,10 @@ class ContentSubmissionProgressScreen extends StatelessWidget {
     final colorScheme = context.theme.colorScheme;
 
     return ListenableBuilder(
-      listenable: viewModel.submit,
+      listenable: _viewModel.submit,
       builder: (context, child) {
-        final submit = viewModel.submit;
+        final submit = _viewModel.submit;
         final color = _buildColor(colorScheme, submit);
-
         final canPop = !submit.running;
 
         return PopScope(
@@ -45,14 +58,16 @@ class ContentSubmissionProgressScreen extends StatelessWidget {
             // `BuildContext` is never used here. Idle and error pops preserve
             // the editable form state.
             if (submit.completed) {
-              unawaited(viewModel.clear.execute());
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                unawaited(_clearOnce());
+              });
             }
           },
           child: Scaffold(
             appBar: AppBar(
               leading: canPop
                   ? BackButton(onPressed: () => context.pop())
-                  : null,
+                  : const EmptyBox(),
             ),
             body: Center(
               child: DefaultTextStyle.merge(
@@ -168,7 +183,7 @@ class ContentSubmissionProgressScreen extends StatelessWidget {
     // going back to the main screen to block
     // user from interacting with stale/sent
     // data.
-    await viewModel.clear.execute();
+    await _clearOnce();
     if (context.mounted) {
       fn?.call();
     }

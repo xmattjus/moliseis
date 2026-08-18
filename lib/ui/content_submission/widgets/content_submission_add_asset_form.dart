@@ -6,6 +6,7 @@ import 'package:moliseis/ui/content_submission/view_models/content_submission_vi
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
@@ -30,13 +31,24 @@ class _ContentSubmissionAddAssetFormState
     widget.viewModel.retrieveLostAssets,
   ]);
 
-  void _showTooLargeSnackBar(List<String> rejectedNames) {
-    final count = rejectedNames.length;
-    final names = rejectedNames.take(3).join(', ');
-    final suffix = count > 3 ? ' (+${count - 3})' : '';
-    final message =
-        '$count file${count == 1 ? '' : 's'} '
-        'oltre il limite di 10 MB: $names$suffix';
+  void _showAssetSelectionWarning(AssetSelectionOutcome outcome) {
+    final message = switch ((
+      outcome.hasOversizedRejections,
+      outcome.hasAssetLimitRejections,
+    )) {
+      (false, false) => null,
+      (true, false) => 'Le foto oltre i 10 MB sono state escluse',
+      (false, true) =>
+        'Le foto oltre il limite di '
+            '${ContentSubmissionViewModel.maximumAssetCount} sono state '
+            'escluse',
+      (true, true) =>
+        'Le foto oltre i 10 MB o il limite di '
+            '${ContentSubmissionViewModel.maximumAssetCount} sono state '
+            'escluse',
+    };
+
+    if (message == null) return;
 
     showSnackBar(
       context: context,
@@ -66,9 +78,9 @@ class _ContentSubmissionAddAssetFormState
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemBuilder: (context, index) {
-                  // The last widget of the list is a button to append new
-                  // assets to the content submission.
                   if (widget.viewModel.assets.length == index) {
+                    // Snows a CircularProgressIndicator when the selected
+                    // assets are being addeded to the content submission.
                     if (widget.viewModel.addAsset.running ||
                         widget.viewModel.retrieveLostAssets.running) {
                       return const Padding(
@@ -77,6 +89,15 @@ class _ContentSubmissionAddAssetFormState
                       );
                     }
 
+                    // Hides the button when the limit of assets to add has
+                    // been reached.
+                    if (widget.viewModel.assets.length >=
+                        ContentSubmissionViewModel.maximumAssetCount) {
+                      return const EmptyBox();
+                    }
+
+                    // Shows a button to append new assets to the content
+                    // submission.
                     return CardBase(
                       width: 72,
                       height: 72,
@@ -86,15 +107,15 @@ class _ContentSubmissionAddAssetFormState
                       ),
                       onPressed: () async {
                         final viewModel = widget.viewModel;
-                        await viewModel.addAsset.execute().then((_) {
-                          final result = viewModel.addAsset.result;
-                          if (result case Success<AssetSelectionOutcome>(
-                            :final value,
-                          ) when value.hasRejections) {
-                            if (!mounted) return;
-                            _showTooLargeSnackBar(value.rejectedNames);
-                          }
-                        });
+                        await viewModel.addAsset.execute();
+                        if (!mounted) return;
+
+                        final result = viewModel.addAsset.result;
+                        if (result case Success<AssetSelectionOutcome>(
+                          :final value,
+                        ) when value.hasRejections) {
+                          _showAssetSelectionWarning(value);
+                        }
                       },
                     );
                   }
@@ -138,6 +159,24 @@ class _ContentSubmissionAddAssetFormState
                 },
                 itemCount: widget.viewModel.assets.length + 1,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
+              );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+            32,
+            2,
+            32,
+            0,
+          ),
+          child: Builder(
+            builder: (context) {
+              return Text(
+                'È possibile inserire al massimo '
+                '${ContentSubmissionViewModel.maximumAssetCount} foto e ogni '
+                'foto può essere grande al massimo 10 megabyte (MB)',
+                style: Theme.of(context).textTheme.bodySmall,
               );
             },
           ),

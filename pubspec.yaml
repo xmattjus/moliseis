@@ -34,6 +34,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   flutter_map: ^8.3.0
+  flutter_quill: ^11.5.0
   # G
   go_router: ^17.3.0
   # H

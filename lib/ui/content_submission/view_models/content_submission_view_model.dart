@@ -26,20 +26,38 @@ typedef Asset = ({XFile file, String digest});
 /// Outcome of an `addAsset` selection session.
 ///
 /// [rejectedNames] lists file names that were skipped because they exceeded
-/// [kCloudinaryMaxUploadBytes]. Under-limit files in the same session are
-/// still added; the UI surfaces a soft warning when [rejectedNames] is
-/// non-empty.
+/// [kCloudinaryMaxUploadBytes]. It is retained for logging and diagnostics;
+/// UI messages must not expose those names. Under-limit files in the same
+/// session are still added, while [rejectedForLimitCount] records files that
+/// exceeded the total submission capacity.
 final class AssetSelectionOutcome {
   /// Creates an outcome.
   const AssetSelectionOutcome({
     this.rejectedNames = const <String>[],
-  });
+    this.rejectedForLimitCount = 0,
+  }) : assert(
+         rejectedForLimitCount >= 0,
+         'rejectedForLimitCount cannot be negative',
+       );
 
-  /// Names of the files skipped for being too large, in selection order.
+  /// Names of files skipped for being too large, in selection order.
+  ///
+  /// This diagnostic information must not be displayed in user-facing
+  /// messages.
   final List<String> rejectedNames;
 
+  /// Number of files skipped because the total asset limit was reached.
+  final int rejectedForLimitCount;
+
   /// Whether any file in this session was rejected for being too large.
-  bool get hasRejections => rejectedNames.isNotEmpty;
+  bool get hasOversizedRejections => rejectedNames.isNotEmpty;
+
+  /// Whether any file in this session was rejected for exceeding the asset
+  /// limit.
+  bool get hasAssetLimitRejections => rejectedForLimitCount > 0;
+
+  /// Whether the selection had any soft rejection.
+  bool get hasRejections => hasOversizedRejections || hasAssetLimitRejections;
 }
 
 enum ContentSubmissionDraftLoadState {
@@ -68,6 +86,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     );
   }
 
+  /// Maximum number of assets that a content submission can include.
+  static const int maximumAssetCount = 5;
+
   bool _disposed = false;
 
   @override
@@ -92,12 +113,17 @@ class ContentSubmissionViewModel extends ChangeNotifier {
 
   ContentSubmissionDraftLoadState get loadState => _loadState;
 
+  int get _remainingAssetCapacity {
+    final capacity = maximumAssetCount - _assets.length;
+    return capacity > 0 ? capacity : 0;
+  }
+
   /// Starts an `image-picker` session to let user select relevant assets.
   ///
-  /// The [AssetSelectionOutcome] result exposes any file names that were
-  /// skipped for exceeding [kCloudinaryMaxUploadBytes]; the command succeeds
-  /// even when some files were skipped, so the UI can render a soft warning
-  /// rather than an error.
+  /// The [AssetSelectionOutcome] result exposes soft rejections for oversized
+  /// files and the total submission limit. The command succeeds even when
+  /// some files were skipped, so the UI can render a warning rather than an
+  /// error.
   late Command0<AssetSelectionOutcome> addAsset;
 
   late Command1<void, int> removeAssetAt;
@@ -140,17 +166,30 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     final digest = await sha1.bind(asset.openRead()).first;
     final digestString = digest.toString();
 
-    if (!_assets.any((e) => e.digest == digestString)) {
+    if (_assets.length < maximumAssetCount &&
+        !_assets.any((e) => e.digest == digestString)) {
       _assets.add((file: asset, digest: digestString));
     }
   }
 
   Future<Result<AssetSelectionOutcome>> _addAsset() async {
     try {
-      final selectedAssets = await _imagePicker.pickMultipleMedia(limit: 5);
+      final capacityBeforePicking = _remainingAssetCapacity;
+      if (capacityBeforePicking == 0) {
+        return const Result.success(AssetSelectionOutcome());
+      }
+
+      final selectedAssets = await _imagePicker.pickMultipleMedia(
+        limit: capacityBeforePicking,
+      );
+
+      final capacityAfterPicking = _remainingAssetCapacity;
+      final rejectedForLimitCount = selectedAssets.length > capacityAfterPicking
+          ? selectedAssets.length - capacityAfterPicking
+          : 0;
 
       final rejectedNames = <String>[];
-      for (final asset in selectedAssets) {
+      for (final asset in selectedAssets.take(capacityAfterPicking)) {
         final length = await asset.length();
         if (length > kCloudinaryMaxUploadBytes) {
           rejectedNames.add(asset.name);
@@ -168,7 +207,10 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       notifyListeners();
 
       return Result.success(
-        AssetSelectionOutcome(rejectedNames: rejectedNames),
+        AssetSelectionOutcome(
+          rejectedNames: rejectedNames,
+          rejectedForLimitCount: rejectedForLimitCount,
+        ),
       );
     } on Exception catch (exception, stackTrace) {
       _logger.log(
@@ -221,8 +263,19 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     _emit();
   }
 
-  void setDescription(String? description) {
-    _state = _state.copyWith(description: description);
+  /// Stores matching plain-text and Delta description projections in one
+  /// update.
+  ///
+  /// A single state emission keeps the draft debounce from persisting a
+  /// transient representation where only one projection has changed.
+  void setDescription({
+    required String? description,
+    required List<Map<String, dynamic>>? descriptionDelta,
+  }) {
+    _state = _state.copyWith(
+      description: description,
+      descriptionDelta: descriptionDelta,
+    );
     _emit();
   }
 
@@ -350,6 +403,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
         city: c,
         name: n,
         description: _state.description,
+        descriptionDelta: _state.descriptionDelta,
         startDate: _state.startDate,
         endDate: _state.endDate,
         userEmail: ue,
@@ -420,7 +474,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
         // to the first item. Fall back to file for single-result responses.
         final files = response.files ?? [response.file!];
         final rejectedNames = <String>[];
-        for (final file in files) {
+        for (final file in files.take(_remainingAssetCapacity)) {
           final length = await file.length();
           if (length > kCloudinaryMaxUploadBytes) {
             // Lost-data recovery is best-effort and silent: oversized

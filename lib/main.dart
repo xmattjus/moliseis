@@ -4,6 +4,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/dependencies.dart';
@@ -218,6 +219,7 @@ class _MoliseIsAppState extends State<MoliseIsApp> {
           builder: (_, child) => child!,
           title: 'Molise Is',
           localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+            FlutterQuillLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,

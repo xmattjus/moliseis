@@ -51,6 +51,253 @@ void main() {
         expect(vm.addAsset.completed, isTrue);
       });
 
+      test('accepts exactly the maximum number of assets', () async {
+        final picker = FakeImagePicker(
+          onPickMultipleMedia: () async => List<XFile>.generate(
+            ContentSubmissionViewModel.maximumAssetCount,
+            (index) => XFile.fromData(
+              Uint8List.fromList([index]),
+              path: '/tmp/exact-$index.jpg',
+            ),
+          ),
+        );
+        final vm = buildViewModel(imagePicker: picker);
+
+        await vm.addAsset.execute();
+
+        final result = vm.addAsset.result! as Success<AssetSelectionOutcome>;
+        expect(
+          vm.assets,
+          hasLength(ContentSubmissionViewModel.maximumAssetCount),
+        );
+        expect(
+          vm.assets.map((asset) => asset.file.name).toList(),
+          List<String>.generate(
+            ContentSubmissionViewModel.maximumAssetCount,
+            (index) => 'exact-$index.jpg',
+          ),
+        );
+        expect(
+          picker.pickMultipleMediaLimits,
+          [ContentSubmissionViewModel.maximumAssetCount],
+        );
+        expect(result.value.rejectedForLimitCount, 0);
+        expect(result.value.hasOversizedRejections, isFalse);
+        expect(result.value.hasAssetLimitRejections, isFalse);
+        expect(result.value.hasRejections, isFalse);
+      });
+
+      test('caps picker results and reports selection overflow', () async {
+        final picker = FakeImagePicker(
+          onPickMultipleMedia: () async => List<XFile>.generate(
+            ContentSubmissionViewModel.maximumAssetCount + 1,
+            (index) => XFile.fromData(
+              Uint8List.fromList([index]),
+              path: '/tmp/overflow-$index.jpg',
+            ),
+          ),
+        );
+        final logger = MockLogger();
+        final vm = buildViewModel(imagePicker: picker, logger: logger);
+
+        await vm.addAsset.execute();
+
+        final result = vm.addAsset.result! as Success<AssetSelectionOutcome>;
+        expect(
+          vm.assets,
+          hasLength(ContentSubmissionViewModel.maximumAssetCount),
+        );
+        expect(
+          vm.assets.map((asset) => asset.file.name).toList(),
+          List<String>.generate(
+            ContentSubmissionViewModel.maximumAssetCount,
+            (index) => 'overflow-$index.jpg',
+          ),
+        );
+        expect(
+          picker.pickMultipleMediaLimits,
+          [ContentSubmissionViewModel.maximumAssetCount],
+        );
+        expect(result.value.rejectedForLimitCount, 1);
+        expect(result.value.hasOversizedRejections, isFalse);
+        expect(result.value.hasAssetLimitRejections, isTrue);
+        expect(result.value.hasRejections, isTrue);
+        expect(vm.addAsset.completed, isTrue);
+        expect(vm.addAsset.error, isFalse);
+        expect(logger.eventsOfType<ContentSubmissionAssetAddFailed>(), isEmpty);
+      });
+
+      test(
+        'uses remaining capacity and reports later selection overflow',
+        () async {
+          var pickRound = 0;
+          final picker = FakeImagePicker(
+            onPickMultipleMedia: () async {
+              pickRound++;
+              return pickRound == 1
+                  ? List<XFile>.generate(
+                      3,
+                      (index) => XFile.fromData(
+                        Uint8List.fromList([index]),
+                        path: '/tmp/first-round-$index.jpg',
+                      ),
+                    )
+                  : List<XFile>.generate(
+                      3,
+                      (index) => XFile.fromData(
+                        Uint8List.fromList([index + 3]),
+                        path: '/tmp/second-round-$index.jpg',
+                      ),
+                    );
+            },
+          );
+          final vm = buildViewModel(imagePicker: picker);
+
+          await vm.addAsset.execute();
+          await vm.addAsset.execute();
+
+          final result = vm.addAsset.result! as Success<AssetSelectionOutcome>;
+          expect(
+            vm.assets,
+            hasLength(ContentSubmissionViewModel.maximumAssetCount),
+          );
+          expect(
+            vm.assets.map((asset) => asset.file.name).toList(),
+            [
+              'first-round-0.jpg',
+              'first-round-1.jpg',
+              'first-round-2.jpg',
+              'second-round-0.jpg',
+              'second-round-1.jpg',
+            ],
+          );
+          expect(
+            picker.pickMultipleMediaLimits,
+            [ContentSubmissionViewModel.maximumAssetCount, 2],
+          );
+          expect(result.value.rejectedForLimitCount, 1);
+          expect(result.value.hasOversizedRejections, isFalse);
+          expect(result.value.hasAssetLimitRejections, isTrue);
+        },
+      );
+
+      test(
+        'does not open the picker when assets already reach the limit',
+        () async {
+          final picker = FakeImagePicker(
+            onPickMultipleMedia: () async => List<XFile>.generate(
+              ContentSubmissionViewModel.maximumAssetCount,
+              (index) => XFile.fromData(
+                Uint8List.fromList([index]),
+                path: '/tmp/full-$index.jpg',
+              ),
+            ),
+          );
+          final vm = buildViewModel(imagePicker: picker);
+
+          await vm.addAsset.execute();
+          await vm.addAsset.execute();
+
+          final result = vm.addAsset.result! as Success<AssetSelectionOutcome>;
+          expect(
+            vm.assets,
+            hasLength(ContentSubmissionViewModel.maximumAssetCount),
+          );
+          expect(
+            picker.pickMultipleMediaLimits,
+            [ContentSubmissionViewModel.maximumAssetCount],
+          );
+          expect(result.value.hasRejections, isFalse);
+          expect(vm.addAsset.completed, isTrue);
+          expect(vm.addAsset.error, isFalse);
+        },
+      );
+
+      test('does not backfill overflow after a retained duplicate', () async {
+        var pickRound = 0;
+        final picker = FakeImagePicker(
+          onPickMultipleMedia: () async {
+            pickRound++;
+            return pickRound == 1
+                ? List<XFile>.generate(
+                    4,
+                    (index) => XFile.fromData(
+                      Uint8List.fromList([index + 1]),
+                      path: '/tmp/original-$index.jpg',
+                    ),
+                  )
+                : [
+                    XFile.fromData(
+                      Uint8List.fromList([1]),
+                      path: '/tmp/duplicate.jpg',
+                    ),
+                    XFile.fromData(
+                      Uint8List.fromList([99]),
+                      path: '/tmp/overflow.jpg',
+                    ),
+                  ];
+          },
+        );
+        final vm = buildViewModel(imagePicker: picker);
+
+        await vm.addAsset.execute();
+        await vm.addAsset.execute();
+
+        final result = vm.addAsset.result! as Success<AssetSelectionOutcome>;
+        expect(vm.assets, hasLength(4));
+        expect(
+          vm.assets.map((asset) => asset.file.name).toList(),
+          [
+            'original-0.jpg',
+            'original-1.jpg',
+            'original-2.jpg',
+            'original-3.jpg',
+          ],
+        );
+        expect(
+          picker.pickMultipleMediaLimits,
+          [ContentSubmissionViewModel.maximumAssetCount, 1],
+        );
+        expect(result.value.rejectedForLimitCount, 1);
+        expect(result.value.hasOversizedRejections, isFalse);
+        expect(result.value.hasAssetLimitRejections, isTrue);
+      });
+
+      test('reports oversized and asset-limit rejections together', () async {
+        final picker = FakeImagePicker(
+          onPickMultipleMedia: () async => [
+            XFile.fromData(
+              Uint8List.fromList([1]),
+              path: '/tmp/oversized.jpg',
+              length: kCloudinaryMaxUploadBytes + 1,
+            ),
+            ...List<XFile>.generate(
+              ContentSubmissionViewModel.maximumAssetCount,
+              (index) => XFile.fromData(
+                Uint8List.fromList([index + 2]),
+                path: '/tmp/combined-$index.jpg',
+              ),
+            ),
+          ],
+        );
+        final vm = buildViewModel(imagePicker: picker);
+
+        await vm.addAsset.execute();
+
+        final result = vm.addAsset.result! as Success<AssetSelectionOutcome>;
+        expect(
+          vm.assets,
+          hasLength(ContentSubmissionViewModel.maximumAssetCount - 1),
+        );
+        expect(result.value.rejectedNames, ['oversized.jpg']);
+        expect(result.value.rejectedForLimitCount, 1);
+        expect(result.value.hasOversizedRejections, isTrue);
+        expect(result.value.hasAssetLimitRejections, isTrue);
+        expect(result.value.hasRejections, isTrue);
+        expect(vm.addAsset.completed, isTrue);
+        expect(vm.addAsset.error, isFalse);
+      });
+
       test(
         'deduplicates files with the same content in a single pick',
         () async {
@@ -130,7 +377,9 @@ void main() {
             path: '/tmp/big.jpg',
             length: kCloudinaryMaxUploadBytes + 1,
           );
+          final logger = MockLogger();
           final vm = buildViewModel(
+            logger: logger,
             imagePicker: FakeImagePicker(
               onPickMultipleMedia: () async => [small, oversized],
             ),
@@ -145,7 +394,21 @@ void main() {
 
           final result = vm.addAsset.result! as Success<AssetSelectionOutcome>;
           expect(result.value.rejectedNames, ['big.jpg']);
+          expect(result.value.rejectedForLimitCount, 0);
+          expect(result.value.hasOversizedRejections, isTrue);
+          expect(result.value.hasAssetLimitRejections, isFalse);
           expect(result.value.hasRejections, isTrue);
+          expect(
+            logger.eventsOfType<ContentSubmissionAssetSkippedTooLarge>(),
+            hasLength(1),
+          );
+          expect(
+            logger
+                .eventsOfType<ContentSubmissionAssetSkippedTooLarge>()
+                .single
+                .rejectedNames,
+            ['big.jpg'],
+          );
         },
       );
 
@@ -166,6 +429,9 @@ void main() {
           await vm.addAsset.execute();
 
           final result = vm.addAsset.result! as Success<AssetSelectionOutcome>;
+          expect(result.value.rejectedForLimitCount, 0);
+          expect(result.value.hasOversizedRejections, isFalse);
+          expect(result.value.hasAssetLimitRejections, isFalse);
           expect(result.value.hasRejections, isFalse);
           expect(result.value.rejectedNames, isEmpty);
         },
@@ -313,6 +579,53 @@ void main() {
         expect(vm.retrieveLostAssets.completed, isTrue);
       });
 
+      test('caps recovered Android files at the total asset limit', () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+        final recoveredFiles = List<XFile>.generate(
+          ContentSubmissionViewModel.maximumAssetCount + 1,
+          (index) => XFile.fromData(
+            Uint8List.fromList([index]),
+            path: '/tmp/recovered-$index.jpg',
+          ),
+        );
+        final logger = MockLogger();
+        final vm = buildViewModel(
+          logger: logger,
+          imagePicker: FakeImagePicker(
+            onRetrieveLostData: () async => LostDataResponse(
+              file: recoveredFiles.first,
+              files: recoveredFiles,
+            ),
+          ),
+        );
+
+        await vm.retrieveLostAssets.execute();
+
+        expect(
+          vm.assets,
+          hasLength(ContentSubmissionViewModel.maximumAssetCount),
+        );
+        expect(
+          vm.assets.map((asset) => asset.file.name).toList(),
+          List<String>.generate(
+            ContentSubmissionViewModel.maximumAssetCount,
+            (index) => 'recovered-$index.jpg',
+          ),
+        );
+        expect(vm.retrieveLostAssets.completed, isTrue);
+        expect(vm.retrieveLostAssets.error, isFalse);
+        expect(
+          logger.eventsOfType<ContentSubmissionAssetSkippedTooLarge>(),
+          isEmpty,
+        );
+        expect(
+          logger.eventsOfType<ContentSubmissionAssetRetrievalFailed>(),
+          isEmpty,
+        );
+      });
+
       test(
         'silently drops oversized recovered files without erroring',
         () async {
@@ -403,21 +716,46 @@ void main() {
 
     group('form state field isolation', () {
       test('setting one field preserves all previously set fields', () {
-        final vm = buildViewModel();
-
-        vm.setCategory(ContentCategory.history);
-        vm.setCity('Rome');
-        vm.setName('Colosseum');
-        vm.setDescription('Ancient arena');
-        vm.setUserEmail('jane@example.com');
-        vm.setUserName('Jane');
+        final vm = buildViewModel()
+          ..setCategory(ContentCategory.history)
+          ..setCity('Rome')
+          ..setName('Colosseum');
+        const descriptionDelta = <Map<String, dynamic>>[
+          <String, dynamic>{'insert': 'Ancient arena\n'},
+        ];
+        vm
+          ..setDescription(
+            description: 'Ancient arena',
+            descriptionDelta: descriptionDelta,
+          )
+          ..setUserEmail('jane@example.com')
+          ..setUserName('Jane');
 
         expect(vm.state.category, ContentCategory.history);
         expect(vm.state.city, 'Rome');
         expect(vm.state.name, 'Colosseum');
         expect(vm.state.description, 'Ancient arena');
+        expect(vm.state.descriptionDelta, descriptionDelta);
         expect(vm.state.userEmail, 'jane@example.com');
         expect(vm.state.userName, 'Jane');
+      });
+
+      test('sets description projections atomically', () {
+        final vm = buildViewModel();
+        const descriptionDelta = <Map<String, dynamic>>[
+          <String, dynamic>{'insert': 'Descrizione\n'},
+        ];
+
+        vm
+          ..setCity('Isernia')
+          ..setDescription(
+            description: 'Descrizione',
+            descriptionDelta: descriptionDelta,
+          );
+
+        expect(vm.state.city, 'Isernia');
+        expect(vm.state.description, 'Descrizione');
+        expect(vm.state.descriptionDelta, descriptionDelta);
       });
 
       test('setting a field does not clear previously set date fields', () {
@@ -426,9 +764,10 @@ void main() {
         final start = DateTime.utc(2026, 7, 25);
         final end = DateTime.utc(2026, 7, 26);
 
-        vm.setStartDate(start);
-        vm.setEndDate(end);
-        vm.setCity('Campobasso');
+        vm
+          ..setStartDate(start)
+          ..setEndDate(end)
+          ..setCity('Campobasso');
 
         expect(vm.state.startDate, start);
         expect(vm.state.endDate, end);
@@ -438,19 +777,24 @@ void main() {
       test(
         'setting date fields does not clear previously set text fields',
         () {
-          final vm = buildViewModel();
-
-          vm.setCity('Rome');
-          vm.setName('Colosseum');
-          vm.setDescription('Ancient arena');
-          vm.setUserEmail('jane@example.com');
-          vm.setUserName('Jane');
+          final vm = buildViewModel()
+            ..setCity('Rome')
+            ..setName('Colosseum')
+            ..setDescription(
+              description: 'Ancient arena',
+              descriptionDelta: const <Map<String, dynamic>>[
+                <String, dynamic>{'insert': 'Ancient arena\n'},
+              ],
+            )
+            ..setUserEmail('jane@example.com')
+            ..setUserName('Jane');
 
           final start = DateTime.utc(2026, 7, 25);
           final end = DateTime.utc(2026, 7, 26);
 
-          vm.setStartDate(start);
-          vm.setEndDate(end);
+          vm
+            ..setStartDate(start)
+            ..setEndDate(end);
 
           expect(vm.state.startDate, start);
           expect(vm.state.endDate, end);
@@ -463,13 +807,11 @@ void main() {
       );
 
       test('clearing one field to null preserves other fields', () {
-        final vm = buildViewModel();
-
-        vm.setCategory(ContentCategory.history);
-        vm.setCity('Rome');
-        vm.setName('Colosseum');
-
-        vm.setCategory(null);
+        final vm = buildViewModel()
+          ..setCategory(ContentCategory.history)
+          ..setCity('Rome')
+          ..setName('Colosseum')
+          ..setCategory(null);
 
         expect(vm.state.category, isNull);
         expect(vm.state.city, 'Rome');
@@ -496,8 +838,9 @@ void main() {
 
           expect(draftRepo.saveDraftCalled, isFalse);
 
-          vm.setCity('Campobasso');
-          vm.setName('Test event');
+          vm
+            ..setCity('Campobasso')
+            ..setName('Test event');
           await tester.pump();
 
           // While the debounce window is open, the call has not landed yet.
@@ -511,6 +854,52 @@ void main() {
           expect(draftRepo.lastSavedState, vm.state);
         },
       );
+
+      testWidgets(
+        'schedules one debounced save carrying both description projections',
+        (tester) async {
+          final draftRepo = FakeContentSubmissionDraftRepository();
+          final vm = buildViewModel(draftRepository: draftRepo);
+          addTearDown(vm.dispose);
+          const descriptionDelta = <Map<String, dynamic>>[
+            <String, dynamic>{'insert': 'Descrizione\n'},
+          ];
+
+          await tester.pumpWidget(
+            const Directionality(
+              textDirection: TextDirection.ltr,
+              child: SizedBox.shrink(),
+            ),
+          );
+
+          vm.setDescription(
+            description: 'Descrizione',
+            descriptionDelta: descriptionDelta,
+          );
+          await tester.pump();
+          expect(draftRepo.saveDraftCallCount, 0);
+
+          await tester.pump(const Duration(seconds: 3, milliseconds: 100));
+
+          expect(draftRepo.saveDraftCallCount, 1);
+          expect(draftRepo.lastSavedState?.description, 'Descrizione');
+          expect(draftRepo.lastSavedState?.descriptionDelta, descriptionDelta);
+        },
+      );
+
+      test('clearing description clears both projections', () {
+        final vm = buildViewModel()
+          ..setDescription(
+            description: 'Descrizione',
+            descriptionDelta: const <Map<String, dynamic>>[
+              <String, dynamic>{'insert': 'Descrizione\n'},
+            ],
+          )
+          ..setDescription(description: null, descriptionDelta: null);
+
+        expect(vm.state.description, isNull);
+        expect(vm.state.descriptionDelta, isNull);
+      });
     });
 
     group('submit', () {
@@ -542,13 +931,13 @@ void main() {
         'reports only the specific missing field when one is left null',
         () async {
           final submissionRepository = FakeContentSubmissionRepository();
-          final vm = buildViewModel(
-            contentSubmissionRepository: submissionRepository,
-          );
-
-          vm.setCity('Rome');
-          vm.setName('Colosseum');
-          vm.setUserEmail('jane@example.com');
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: submissionRepository,
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com');
           // userName intentionally left null
 
           await vm.submit.execute();
@@ -566,29 +955,75 @@ void main() {
 
       test('calls upload when all required fields are present', () async {
         final submissionRepository = FakeContentSubmissionRepository();
-        final vm = buildViewModel(
-          contentSubmissionRepository: submissionRepository,
-        );
-
-        vm.setCity('Rome');
-        vm.setName('Colosseum');
-        vm.setUserEmail('jane@example.com');
-        vm.setUserName('Jane');
+        final vm =
+            buildViewModel(
+                contentSubmissionRepository: submissionRepository,
+              )
+              ..setCity('Rome')
+              ..setName('Colosseum');
+        const descriptionDelta = <Map<String, dynamic>>[
+          <String, dynamic>{'insert': 'Ancient arena\n'},
+        ];
+        vm
+          ..setDescription(
+            description: 'Ancient arena',
+            descriptionDelta: descriptionDelta,
+          )
+          ..setUserEmail('jane@example.com')
+          ..setUserName('Jane');
 
         await vm.submit.execute();
 
         expect(vm.submit.completed, isTrue);
         expect(vm.submit.error, isFalse);
         expect(submissionRepository.uploadCalled, isTrue);
+        expect(
+          submissionRepository.lastUploadedSubmission?.description,
+          'Ancient arena',
+        );
+        expect(
+          submissionRepository.lastUploadedSubmission?.descriptionDelta,
+          descriptionDelta,
+        );
       });
+
+      test(
+        'retains description projections after a failed submission',
+        () async {
+          final submissionRepository = FakeContentSubmissionRepository(
+            uploadResult: Result.error(Exception('upload failed')),
+          );
+          final vm = buildViewModel(
+            contentSubmissionRepository: submissionRepository,
+          );
+          const descriptionDelta = <Map<String, dynamic>>[
+            <String, dynamic>{'insert': 'Da ritentare\n'},
+          ];
+
+          vm
+            ..setCity('Rome')
+            ..setName('Colosseum')
+            ..setDescription(
+              description: 'Da ritentare',
+              descriptionDelta: descriptionDelta,
+            )
+            ..setUserEmail('jane@example.com')
+            ..setUserName('Jane');
+
+          await vm.submit.execute();
+
+          expect(vm.submit.error, isTrue);
+          expect(vm.state.description, 'Da ritentare');
+          expect(vm.state.descriptionDelta, descriptionDelta);
+        },
+      );
     });
 
     group('setAcceptedTerms', () {
       test('stores the value on the state and emits it to listeners', () {
         final draftRepo = FakeContentSubmissionDraftRepository();
-        final vm = buildViewModel(draftRepository: draftRepo);
-
-        vm.setAcceptedTerms(true);
+        final vm = buildViewModel(draftRepository: draftRepo)
+          ..setAcceptedTerms(true);
 
         expect(vm.state.acceptedTerms, isTrue);
       });
@@ -616,9 +1051,7 @@ void main() {
       });
 
       test('passing null resets the field to null', () {
-        final vm = buildViewModel();
-
-        vm.setAcceptedTerms(true);
+        final vm = buildViewModel()..setAcceptedTerms(true);
         expect(vm.state.acceptedTerms, isTrue);
 
         vm.setAcceptedTerms(null);
@@ -643,7 +1076,7 @@ void main() {
         await vm.clear.execute();
 
         expect(vm.assets, isEmpty);
-        expect(vm.state, const ContentSubmissionDraft());
+        expect(vm.state, ContentSubmissionDraft());
         expect(vm.clear.completed, isTrue);
         expect(vm.clear.error, isFalse);
       });
@@ -668,7 +1101,7 @@ void main() {
         await vm.clear.execute();
 
         expect(vm.assets, isEmpty);
-        expect(vm.state, const ContentSubmissionDraft());
+        expect(vm.state, ContentSubmissionDraft());
         expect(draftRepository.clearDraftCalled, isTrue);
         expect(vm.clear.completed, isTrue);
         expect(vm.clear.error, isFalse);

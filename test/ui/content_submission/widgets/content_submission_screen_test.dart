@@ -2,6 +2,7 @@ import 'dart:async' show Completer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
@@ -9,6 +10,7 @@ import 'package:moliseis/domain/repositories/content_submission_draft_repository
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_description_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
 import 'package:moliseis/utils/result.dart';
@@ -100,6 +102,7 @@ void main() {
     return MaterialApp.router(
       routerConfig: router,
       localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        FlutterQuillLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -136,7 +139,7 @@ void main() {
 
       await scrollToAndTap(
         tester,
-        find.widgetWithText(OutlinedButton, 'Invia'),
+        find.widgetWithText(FilledButton, 'Invia'),
       );
 
       expect(repo.uploadCallCount, 0);
@@ -159,7 +162,7 @@ void main() {
 
       await scrollToAndTap(
         tester,
-        find.widgetWithText(OutlinedButton, 'Invia'),
+        find.widgetWithText(FilledButton, 'Invia'),
       );
       await tester.pump();
 
@@ -187,7 +190,7 @@ void main() {
 
       await scrollToAndTap(
         tester,
-        find.widgetWithText(OutlinedButton, 'Invia'),
+        find.widgetWithText(FilledButton, 'Invia'),
       );
       await tester.pump();
 
@@ -210,7 +213,7 @@ void main() {
 
       await scrollToAndTap(
         tester,
-        find.widgetWithText(OutlinedButton, 'Invia'),
+        find.widgetWithText(FilledButton, 'Invia'),
       );
       await tester.pump();
 
@@ -258,15 +261,15 @@ void main() {
         expect(tester.widget<Checkbox>(eventCheckbox).value, isTrue);
 
         await tester.scrollUntilVisible(
-          find.widgetWithText(OutlinedButton, 'Invia'),
+          find.widgetWithText(FilledButton, 'Invia'),
           200,
           scrollable: mainScrollable,
         );
         await tester.ensureVisible(
-          find.widgetWithText(OutlinedButton, 'Invia'),
+          find.widgetWithText(FilledButton, 'Invia'),
         );
         await tester.pump();
-        await tester.tap(find.widgetWithText(OutlinedButton, 'Invia'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Invia'));
         await tester.pump();
 
         repo.completeUpload(const Result.success(null));
@@ -339,7 +342,7 @@ void main() {
         await flushDebounce(tester);
         await scrollToAndTap(
           tester,
-          find.widgetWithText(OutlinedButton, 'Invia'),
+          find.widgetWithText(FilledButton, 'Invia'),
         );
         await tester.pump();
 
@@ -380,7 +383,7 @@ void main() {
 
       await scrollToAndTap(
         tester,
-        find.widgetWithText(OutlinedButton, 'Invia'),
+        find.widgetWithText(FilledButton, 'Invia'),
       );
       await tester.pump();
 
@@ -416,7 +419,7 @@ void main() {
       'binds the loaded draft values to the form fields on first build',
       (tester) async {
         final draftRepo = FakeContentSubmissionDraftRepository(
-          loadDraftResult: const Result.success(
+          loadDraftResult: Result.success(
             ContentSubmissionDraft(
               city: 'Isernia',
               name: 'Test',
@@ -461,13 +464,17 @@ void main() {
               .initialValue,
           'Test',
         );
+        final descriptionEditor = find.descendant(
+          of: find.byType(ContentDescriptionFormField),
+          matching: find.byType(QuillEditor),
+        );
         expect(
           tester
-              .widget<TextFormField>(
-                find.widgetWithText(TextFormField, 'Descrizione'),
-              )
-              .initialValue,
-          'Descrizione di test',
+              .widget<QuillEditor>(descriptionEditor)
+              .controller
+              .document
+              .toPlainText(),
+          'Descrizione di test\n',
         );
         // E-mail, Autore, and the terms checkbox live in the second
         // SliverList — scroll them into view so sliver children are built.
@@ -513,7 +520,7 @@ void main() {
       'tapping the terms checkbox propagates the new value to the draft',
       (tester) async {
         final draftRepo = FakeContentSubmissionDraftRepository(
-          loadDraftResult: const Result.success(
+          loadDraftResult: Result.success(
             ContentSubmissionDraft(acceptedTerms: true),
           ),
         );

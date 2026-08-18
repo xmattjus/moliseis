@@ -11,6 +11,7 @@ import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:provider/provider.dart';
 
 import '../../../support/fake_image_picker.dart';
 import '../../../support/fake_repositories.dart';
@@ -22,20 +23,18 @@ void main() {
     required ControllableSubmissionRepository submissionRepository,
     ContentSubmissionDraftRepository? draftRepository,
   }) {
-    final vm = ContentSubmissionViewModel(
-      logger: MockLogger(),
-      contentSubmissionRepository: submissionRepository,
-      draftRepository:
-          draftRepository ?? FakeContentSubmissionDraftRepository(),
-      imagePicker: FakeImagePicker(),
-    );
     // _submit null-checks these fields; populate them so the Command can run.
-    vm
+    return ContentSubmissionViewModel(
+        logger: MockLogger(),
+        contentSubmissionRepository: submissionRepository,
+        draftRepository:
+            draftRepository ?? FakeContentSubmissionDraftRepository(),
+        imagePicker: FakeImagePicker(),
+      )
       ..setCity('Campobasso')
       ..setName('Test event')
       ..setUserEmail('test@example.com')
       ..setUserName('Test User');
-    return vm;
   }
 
   /// Flushes the 3s debounce timer scheduled by the setters in
@@ -57,12 +56,16 @@ void main() {
         ),
         GoRoute(
           path: '/progress',
-          builder: (_, _) =>
-              ContentSubmissionProgressScreen(viewModel: viewModel),
+          builder: (context, _) => ContentSubmissionProgressScreen(
+            viewModel: context.read<ContentSubmissionViewModel>(),
+          ),
         ),
       ],
     );
-    return MaterialApp.router(routerConfig: router);
+    return ChangeNotifierProvider<ContentSubmissionViewModel>.value(
+      value: viewModel,
+      child: MaterialApp.router(routerConfig: router),
+    );
   }
 
   /// Harness mounting the home route as the initial route and mirroring the
@@ -87,14 +90,21 @@ void main() {
             GoRoute(
               path: 'uploadProgress',
               name: RouteNames.contentSubmissionUploadProgress,
-              builder: (_, _) =>
-                  ContentSubmissionProgressScreen(viewModel: viewModel),
+              builder: (context, _) => ContentSubmissionProgressScreen(
+                viewModel: context.read<ContentSubmissionViewModel>(),
+              ),
             ),
           ],
         ),
       ],
     );
-    return (router, MaterialApp.router(routerConfig: router));
+    return (
+      router,
+      ChangeNotifierProvider<ContentSubmissionViewModel>.value(
+        value: viewModel,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
   }
 
   /// Pushes the form route (`/contentSubmission`) and then the progress
@@ -218,6 +228,14 @@ void main() {
         await tester.pumpWidget(app);
         await flushDebounce(tester);
         await pushProgress(tester, router);
+        expect(
+          // This is the explicit invariant that verifies Provider installed
+          // its ChangeNotifier listener for the regression harness.
+          // ignore: invalid_use_of_protected_member
+          vm.hasListeners,
+          isTrue,
+          reason: 'Provider must subscribe to the view model.',
+        );
         unawaited(vm.submit.execute());
         await tester.pump();
         repo.completeUpload(const Result.success(null));
@@ -227,6 +245,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(draftRepo.clearDraftCalled, isTrue);
+        expect(draftRepo.clearDraftCallCount, 1);
         // The completed exit pops the progress route once and lands on the
         // form route below; the form screen owns the reset of its fields when
         // `viewModel.clear` completes.
@@ -236,6 +255,7 @@ void main() {
           find.byType(ContentSubmissionProgressScreen),
           findsNothing,
         );
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -294,6 +314,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(draftRepo.clearDraftCalled, isTrue);
+        expect(draftRepo.clearDraftCallCount, 1);
         // The completed exit pops the progress route once and lands on the
         // form route below, which resets its own fields on clear.
         expect(find.byType(_FormMarker), findsOneWidget);
@@ -302,6 +323,7 @@ void main() {
           find.byType(ContentSubmissionProgressScreen),
           findsNothing,
         );
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -334,12 +356,14 @@ void main() {
 
         expect(handled, isTrue);
         expect(draftRepo.clearDraftCalled, isTrue);
+        expect(draftRepo.clearDraftCallCount, 1);
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
         expect(
           find.byType(ContentSubmissionProgressScreen),
           findsNothing,
         );
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -571,7 +595,7 @@ void main() {
       addTearDown(() => repo.completeUpload(const Result.success(null)));
     });
 
-    testWidgets('Torna alla home calls clear and navigates home', (
+    testWidgets('Torna alla home clears once and navigates home', (
       tester,
     ) async {
       final repo = ControllableSubmissionRepository();
@@ -592,8 +616,62 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(draftRepo.clearDraftCalled, isTrue);
+      expect(draftRepo.clearDraftCallCount, 1);
       expect(find.byType(_HomeMarker), findsOneWidget);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+      expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'completed exits on separate progress routes each clear once',
+      (tester) async {
+        final repo = ControllableSubmissionRepository();
+        final draftRepo = FakeContentSubmissionDraftRepository();
+        final vm = buildViewModel(
+          submissionRepository: repo,
+          draftRepository: draftRepo,
+        );
+
+        final (router, app) = buildHomeFirstApp(vm);
+        await tester.pumpWidget(app);
+        await flushDebounce(tester);
+        await pushProgress(tester, router);
+        unawaited(vm.submit.execute());
+        await tester.pump();
+        repo.completeUpload(const Result.success(null));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        expect(draftRepo.clearDraftCallCount, 1);
+        expect(find.byType(_FormMarker), findsOneWidget);
+
+        vm
+          ..setCity('Campobasso')
+          ..setName('Second test event')
+          ..setUserEmail('second@example.com')
+          ..setUserName('Second Test User');
+        await flushDebounce(tester);
+
+        await pushProgress(tester, router);
+        unawaited(vm.submit.execute());
+        await tester.pump();
+
+        expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+        expect(repo.uploadCallCount, 2);
+
+        repo.completeUpload(const Result.success(null));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        expect(draftRepo.clearDraftCallCount, 2);
+        expect(find.byType(_FormMarker), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
   });
 }
 

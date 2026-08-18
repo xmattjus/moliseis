@@ -115,6 +115,12 @@ SnackBar _buildSnackBar(
   SnackBarAction? action,
   Duration duration,
 ) {
+  const contentMaxLines = 2;
+  const horizontalMargin = 24.0;
+  const contentSpacing = 8.0;
+  const leadingIconSize = 20.0;
+  const fullWidthTextLength = 40;
+
   final appColors = context.appColors;
 
   final background = switch (type) {
@@ -140,6 +146,12 @@ SnackBar _buildSnackBar(
     SnackBarType.warning => Symbols.warning,
     SnackBarType.error => Symbols.error,
   };
+
+  final contentStyle = context.textTheme.bodyMedium?.copyWith(
+    color: foreground,
+  );
+
+  final width = MediaQuery.maybeWidthOf(context) ?? double.infinity;
 
   /// Rebuilds the call-site action with a per-type `textColor` so its label
   /// reads as a tappable text button on this snack bar's container background.
@@ -173,33 +185,76 @@ SnackBar _buildSnackBar(
           onPressed: action.onPressed,
         );
 
+  final textSpan = TextSpan(
+    text: textContent,
+    style: contentStyle,
+  );
+  final snackBarContentWidth = width - (horizontalMargin * 2);
+
+  final textPainter = TextPainter(
+    text: textSpan,
+    textDirection: TextDirection.ltr,
+  )..layout(maxWidth: snackBarContentWidth);
+
+  final contentLinesSpan = textPainter.computeLineMetrics().length;
+
+  // Keep long feedback readable by allowing its text to use the complete snack
+  // bar width below the leading icon. TextPainter may run before the app font
+  // has loaded, so the character threshold keeps this conservative.
+  final usesFullWidthText =
+      contentLinesSpan > 1 || textContent.length > fullWidthTextLength;
+
+  final leadingIcon = Icon(
+    icon,
+    color: foreground,
+    size: leadingIconSize,
+  );
+
+  final contentText = Text(
+    textContent,
+    style: contentStyle,
+    maxLines: contentMaxLines,
+    overflow: TextOverflow.ellipsis,
+  );
+
+  final row = Row(
+    spacing: contentSpacing,
+    children: [
+      leadingIcon,
+      Expanded(
+        child: contentText,
+      ),
+      if (!usesFullWidthText && contentLinesSpan == 1) ?recoloredAction,
+    ],
+  );
+
+  final snackBarContent = contentLinesSpan == 1
+      ? row
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: contentSpacing,
+          children: [
+            row,
+            if (recoloredAction != null)
+              Align(
+                alignment: AlignmentGeometry.bottomEnd,
+                child: recoloredAction,
+              ),
+          ],
+        );
+
   return SnackBar(
-    content: Row(
-      spacing: 8,
-      children: [
-        Icon(
-          icon,
-          color: foreground,
-        ),
-        Expanded(
-          child: Text(
-            textContent,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: foreground,
-            ),
-            softWrap: true,
-          ),
-        ),
-      ],
-    ),
+    content: snackBarContent,
     backgroundColor: background,
     elevation: 3,
-    margin: const EdgeInsetsDirectional.fromSTEB(24, 0, 24, 16),
+    margin: const EdgeInsetsDirectional.symmetric(
+      horizontal: horizontalMargin,
+      vertical: 16,
+    ),
     shape: RoundedRectangleBorder(
       borderRadius: context.appShapes.circular.cornerMedium,
     ),
     behavior: SnackBarBehavior.floating,
-    action: recoloredAction,
     duration: duration,
     persist: false,
   );

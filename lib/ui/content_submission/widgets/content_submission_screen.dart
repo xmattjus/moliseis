@@ -9,13 +9,16 @@ import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/category/widgets/category_content_wrap.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_description_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_form.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_date_chip.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 class ContentSubmissionScreen extends StatefulWidget {
   const ContentSubmissionScreen({required this.viewModel, super.key});
@@ -46,7 +49,32 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
     // (no dates shown until the user re-toggles the checkbox).
     final draft = widget.viewModel.state;
     _isEvent = draft.startDate != null || draft.endDate != null;
+    widget.viewModel.clear.addListener(_handleClearCompleted);
     unawaited(widget.viewModel.retrieveLostAssets.execute());
+  }
+
+  @override
+  void dispose() {
+    widget.viewModel.clear.removeListener(_handleClearCompleted);
+    super.dispose();
+  }
+
+  /// Resets the local form state after the [ContentSubmissionViewModel.clear]
+  /// command succeeds.
+  ///
+  /// While the clear command runs, the form is replaced by a loading state so
+  /// stale submitted values cannot be edited. A post-frame `FormState.reset()`
+  /// then reapplies the cleared initial values when the command completes.
+  void _handleClearCompleted() {
+    if (!mounted || !widget.viewModel.clear.completed) return;
+    setState(() {
+      _isEvent = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _form1Key.currentState?.reset();
+      _form2Key.currentState?.reset();
+    });
   }
 
   @override
@@ -69,10 +97,14 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
       child: Scaffold(
         body: SafeArea(
           child: ListenableBuilder(
-            listenable: widget.viewModel,
+            listenable: Listenable.merge([
+              widget.viewModel,
+              widget.viewModel.clear,
+            ]),
             builder: (context, child) {
               if (widget.viewModel.loadState ==
-                  ContentSubmissionDraftLoadState.loading) {
+                      ContentSubmissionDraftLoadState.loading ||
+                  widget.viewModel.clear.running) {
                 return const EmptyView.loading(
                   text: Text('Caricamento in corso...'),
                 );
@@ -99,9 +131,9 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                         ),
                         const TextSectionDivider(
                           'Dettagli',
-                          padding: EdgeInsetsDirectional.only(
+                          padding: EdgeInsets.only(
                             top: 16,
-                            bottom: 8,
+                            bottom: 12,
                           ),
                         ),
                         Form(
@@ -130,7 +162,8 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
 
                                   return null;
                                 },
-                                autovalidateMode: AutovalidateMode.onUnfocus,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
                               ),
                               TextFormField(
                                 initialValue: widget.viewModel.state.name,
@@ -144,7 +177,7 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                   if (value != null) {
                                     if (value.isEmpty) {
                                       return 'Inserisci il nome di un luogo o '
-                                          'di un evento.';
+                                          'di un evento';
                                     } else if (value.length > 150) {
                                       return "Il nome del luogo o dell'evento "
                                           'inserito è troppo lungo';
@@ -152,29 +185,15 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                   }
                                   return null;
                                 },
-                                autovalidateMode: AutovalidateMode.onUnfocus,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
                               ),
-                              TextFormField(
-                                initialValue:
+                              ContentDescriptionFormField(
+                                initialDescription:
                                     widget.viewModel.state.description,
-                                decoration: const InputDecoration(
-                                  labelText: 'Descrizione',
-                                  hintText:
-                                      'Raccontaci qualcosa di questo luogo o '
-                                      'evento',
-                                ),
-                                maxLines: 5,
-                                minLines: 2,
-                                onChanged: (value) =>
-                                    widget.viewModel.setDescription(value),
-                                validator: (value) {
-                                  if (value != null && value.length > 5000) {
-                                    return 'La descrizione inserita è troppo '
-                                        ' lunga';
-                                  }
-                                  return null;
-                                },
-                                autovalidateMode: AutovalidateMode.onUnfocus,
+                                initialDescriptionDelta:
+                                    widget.viewModel.state.descriptionDelta,
+                                onChanged: widget.viewModel.setDescription,
                               ),
                             ],
                           ),
@@ -263,7 +282,7 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                       ContentSubmissionAddAssetForm(
                         viewModel: widget.viewModel,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 32),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Column(
@@ -271,13 +290,15 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                           spacing: 8,
                           children: [
                             Text(
-                              'Il servizio è completamente gratuito.',
-                              style: TextStyle(fontWeight: FontWeight.bold),
+                              'Il servizio è completamente gratuito',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Text(
                               "Il luogo o l'evento da te segnalato verrà "
                               'pubblicato sulla piattaforma il prima '
-                              'possibile.',
+                              'possibile',
                             ),
                           ],
                         ),
@@ -292,7 +313,8 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                             children: [
                               SentryMask(
                                 TextFormField(
-                                  autovalidateMode: AutovalidateMode.onUnfocus,
+                                  autovalidateMode:
+                                      AutovalidateMode.onUserInteraction,
                                   initialValue:
                                       widget.viewModel.state.userEmail,
                                   decoration: const InputDecoration(
@@ -338,7 +360,8 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                     }
                                     return null;
                                   },
-                                  autovalidateMode: AutovalidateMode.onUnfocus,
+                                  autovalidateMode:
+                                      AutovalidateMode.onUserInteraction,
                                 ),
                               ),
                               const SizedBox(height: 16),
@@ -364,9 +387,17 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                             label: 'Termini di Servizio',
                                             excludeSemantics: true,
                                             child: InkWell(
-                                              onTap: () => context
-                                                  .read<UrlLaunchService>()
-                                                  .openTermsOfService(),
+                                              onTap: () async {
+                                                final launched = await context
+                                                    .read<UrlLaunchService>()
+                                                    .openTermsOfService();
+                                                if (context.mounted &&
+                                                    !launched) {
+                                                  showSnackBarGenericError(
+                                                    context: context,
+                                                  );
+                                                }
+                                              },
                                               child: Text(
                                                 'Termini di Servizio',
                                                 style: linkTextStyle,
@@ -374,15 +405,25 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                             ),
                                           ),
                                         ),
-                                        const WidgetSpan(child: Text(" e l'")),
+                                        const WidgetSpan(
+                                          child: Text(" e l'"),
+                                        ),
                                         WidgetSpan(
                                           child: Semantics(
                                             label: 'Informativa sulla privacy',
                                             excludeSemantics: true,
                                             child: InkWell(
-                                              onTap: () => context
-                                                  .read<UrlLaunchService>()
-                                                  .openPrivacyPolicy(),
+                                              onTap: () async {
+                                                final launched = await context
+                                                    .read<UrlLaunchService>()
+                                                    .openPrivacyPolicy();
+                                                if (context.mounted &&
+                                                    !launched) {
+                                                  showSnackBarGenericError(
+                                                    context: context,
+                                                  );
+                                                }
+                                              },
                                               child: Text(
                                                 'Informativa sulla privacy',
                                                 style: linkTextStyle,
@@ -411,29 +452,39 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          // The form keys are only attached once the form
-                          // widgets have been built. Guard against the null
-                          // case rather than forcing an unwrap, which would
-                          // crash if the button were ever enabled before the
-                          // forms were mounted.
-                          final form1State = _form1Key.currentState;
-                          final form2State = _form2Key.currentState;
-                          final isForm1Valid = form1State?.validate() ?? false;
-                          final isForm2Valid = form2State?.validate() ?? false;
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsetsDirectional.symmetric(
+                            horizontal: 16,
+                          ),
+                          child: FilledButton.tonalIcon(
+                            onPressed: () async {
+                              // The form keys are only attached once the form
+                              // widgets have been built. Guard against the null
+                              // case rather than forcing an unwrap, which would
+                              // crash if the button were ever enabled before
+                              // the forms were mounted.
+                              final form1State = _form1Key.currentState;
+                              final form2State = _form2Key.currentState;
+                              final isForm1Valid =
+                                  form1State?.validate() ?? false;
+                              final isForm2Valid =
+                                  form2State?.validate() ?? false;
 
-                          if (isForm1Valid && isForm2Valid) {
-                            unawaited(widget.viewModel.submit.execute());
-                            unawaited(
-                              context.pushNamed(
-                                RouteNames.contentSubmissionUploadProgress,
-                              ),
-                            );
-                          }
-                        },
-                        label: const Text('Invia'),
-                        icon: const Icon(Symbols.upload),
+                              if (isForm1Valid && isForm2Valid) {
+                                unawaited(widget.viewModel.submit.execute());
+                                unawaited(
+                                  context.pushNamed(
+                                    RouteNames.contentSubmissionUploadProgress,
+                                  ),
+                                );
+                              }
+                            },
+                            label: const Text('Invia'),
+                            icon: const Icon(Symbols.upload),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
