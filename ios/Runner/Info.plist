@@ -32,7 +32,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Questa app richiede l'accesso alla galleria fotografica per consentirti di caricare e condividere le tue immagini nei suggerimenti.</string>
+	<string>This app requires access to your photo library to let you select and attach images when suggesting new places or events, which will be reviewed by our editorial team.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

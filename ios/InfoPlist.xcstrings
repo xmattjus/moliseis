@@ -1,0 +1,23 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "NSPhotoLibraryUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This app requires access to your photo library to let you select and attach images when suggesting new places or events, which will be reviewed by our editorial team."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa app richiede l'accesso alla tua galleria per consentirti di selezionare e allegare immagini utili alla proposta di nuovi luoghi o eventi, che saranno successivamente verificate dalla nostra redazione."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.2"
+}
