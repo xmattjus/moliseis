@@ -8,6 +8,7 @@ import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
+import 'package:moliseis/ui/core/ui/description_delta_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/utils/quill_document_codec.dart';
 import 'package:provider/provider.dart';
@@ -140,22 +141,6 @@ class _PostDescriptionState extends State<PostDescription> {
     );
   }
 
-  DefaultStyles _readOnlyStyles(BuildContext context) {
-    final bodyStyle =
-        Theme.of(context).textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
-
-    return DefaultStyles(
-      paragraph: DefaultTextBlockStyle(
-        bodyStyle.copyWith(decoration: TextDecoration.none),
-        HorizontalSpacing.zero,
-        VerticalSpacing.zero,
-        VerticalSpacing.zero,
-        null,
-      ),
-      link: AppTextStyles.link(context),
-    );
-  }
-
   void _launchUrl(String url) {
     if (!QuillDocumentCodec.isValidLink(url)) return;
 
@@ -175,16 +160,22 @@ class _PostDescriptionState extends State<PostDescription> {
       return SliverList.list(
         children: <Widget>[
           Text('Descrizione', style: AppTextStyles.section(context)),
+          const SizedBox(
+            height: 8,
+          ),
           QuillEditor(
             controller: quillController,
             focusNode: _focusNode,
             scrollController: _scrollController,
             config: QuillEditorConfig(
-              customStyles: _readOnlyStyles(context),
+              customStyles: descriptionDeltaStyles(context),
               onLaunchUrl: _launchUrl,
               scrollable: false,
               showCursor: false,
             ),
+          ),
+          const SizedBox(
+            height: 16,
           ),
         ],
       );

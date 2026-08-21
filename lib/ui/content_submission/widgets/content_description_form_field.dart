@@ -3,6 +3,7 @@ import 'dart:async' show StreamSubscription, unawaited;
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:moliseis/ui/core/ui/description_delta_styles.dart';
 import 'package:moliseis/ui/core/utils/quill_document_codec.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
@@ -189,50 +190,6 @@ class _ContentDescriptionFormFieldState
     return null;
   }
 
-  static DefaultStyles _editorStyles(BuildContext context) {
-    final theme = Theme.of(context);
-    final baseStyle =
-        theme.textTheme.bodyLarge?.copyWith(
-          fontVariations: const <FontVariation>[],
-        ) ??
-        const TextStyle(fontSize: 16);
-
-    DefaultTextBlockStyle blockStyle(TextStyle style) {
-      return DefaultTextBlockStyle(
-        style,
-        HorizontalSpacing.zero,
-        VerticalSpacing.zero,
-        VerticalSpacing.zero,
-        null,
-      );
-    }
-
-    return DefaultStyles(
-      paragraph: blockStyle(baseStyle),
-      bold: const TextStyle(fontWeight: FontWeight.bold),
-      italic: const TextStyle(fontStyle: FontStyle.italic),
-      underline: const TextStyle(decoration: TextDecoration.underline),
-      link: TextStyle(
-        color: theme.colorScheme.secondary,
-        decoration: TextDecoration.underline,
-      ),
-      placeHolder: blockStyle(
-        baseStyle.copyWith(
-          color: context.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-        ),
-      ),
-      lists: DefaultListBlockStyle(
-        baseStyle,
-        HorizontalSpacing.zero,
-        VerticalSpacing.zero,
-        VerticalSpacing.zero,
-        null,
-        null,
-      ),
-      leading: blockStyle(baseStyle),
-    );
-  }
-
   final _fontSizes = const {
     '11px': '11',
     '12px': '12',
@@ -378,7 +335,7 @@ class _ContentDescriptionFormFieldState
                               config: QuillEditorConfig(
                                 minHeight: _minimumEditorHeight,
                                 maxHeight: _maximumEditorHeight,
-                                customStyles: _editorStyles(context),
+                                customStyles: descriptionDeltaStyles(context),
                                 placeholder:
                                     'Raccontaci qualcosa di questo luogo o '
                                     'evento',
