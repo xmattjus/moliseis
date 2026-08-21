@@ -560,6 +560,40 @@ void main() {
       },
     );
   });
+
+  group('ContentSubmissionScreen event dates', () {
+    testWidgets('unchecking the event flag clears the draft dates', (
+      tester,
+    ) async {
+      final repo = ControllableSubmissionRepository();
+      final vm = buildViewModel(submissionRepository: repo);
+      await vm.initialize();
+      vm
+        ..setStartDate(DateTime.utc(2026, 8, 20, 10))
+        ..setEndDate(DateTime.utc(2026, 8, 20, 12));
+
+      await tester.pumpWidget(buildApp(vm));
+      await flushDebounce(tester);
+
+      final eventCheckbox = find.descendant(
+        of: find
+            .ancestor(
+              of: find.text('È un evento?'),
+              matching: find.byType(Row),
+            )
+            .first,
+        matching: find.byType(Checkbox),
+      );
+      expect(tester.widget<Checkbox>(eventCheckbox).value, isTrue);
+
+      await tester.tap(eventCheckbox);
+      await tester.pump();
+
+      expect(vm.state.startDate, isNull);
+      expect(vm.state.endDate, isNull);
+      await flushDebounce(tester);
+    });
+  });
 }
 
 final class _GatedDraftRepository implements ContentSubmissionDraftRepository {

@@ -40,6 +40,7 @@ import 'package:provider/single_child_widget.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
+import '../support/mock_gotrue_client.dart';
 import '../support/mock_logger.dart';
 
 void main() {
@@ -416,7 +417,12 @@ final class _MapHarness {
   FakeEventRepository? eventRepository,
   FakePlaceRepository? placeRepository,
 }) {
-  final router = buildAppRouter(syncViewModel: harness.viewModel);
+  final auth = ControllableAdminAuth();
+  addTearDown(auth.dispose);
+  final router = buildAppRouter(
+    syncViewModel: harness.viewModel,
+    adminAuthViewModel: auth.viewModel,
+  );
 
   final app = MultiProvider(
     providers: _buildProviders(

@@ -15,6 +15,7 @@ import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_c
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
+import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
@@ -26,6 +27,7 @@ import 'package:moliseis/main.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/routing/router.dart';
+import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
@@ -44,6 +46,7 @@ import 'package:provider/single_child_widget.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
+import '../support/mock_gotrue_client.dart';
 import '../support/mock_logger.dart';
 
 void main() {
@@ -265,6 +268,60 @@ void main() {
         },
       );
     }
+
+    testWidgets(
+      'sync restores an admin user to /admin after completing',
+      (tester) async {
+        final auth = ControllableAdminAuth(
+          initialUser: makeAuthUser(isAdmin: true),
+        );
+        final harness = _SyncHarness();
+        final router = _buildTestRouterApp(harness, auth: auth);
+
+        router.router.go(RoutePaths.admin);
+        unawaited(harness.viewModel.sync.execute(true));
+        await tester.pumpWidget(router.app);
+        await _pumpRedirects(tester);
+
+        final syncUri = router.router.routeInformationProvider.value.uri;
+        expect(syncUri.path, RoutePaths.sync);
+        expect(syncUri.queryParameters['from'], RoutePaths.admin);
+
+        harness.release();
+        await _pumpRedirects(tester);
+
+        expect(
+          router.router.routeInformationProvider.value.uri.path,
+          RoutePaths.admin,
+        );
+      },
+    );
+
+    testWidgets(
+      'sync restores an anonymous user to /admin/login after completing',
+      (tester) async {
+        final auth = ControllableAdminAuth();
+        final harness = _SyncHarness();
+        final router = _buildTestRouterApp(harness, auth: auth);
+
+        router.router.go(RoutePaths.admin);
+        unawaited(harness.viewModel.sync.execute(true));
+        await tester.pumpWidget(router.app);
+        await _pumpRedirects(tester);
+
+        final syncUri = router.router.routeInformationProvider.value.uri;
+        expect(syncUri.path, RoutePaths.sync);
+        expect(syncUri.queryParameters['from'], RoutePaths.admin);
+
+        harness.release();
+        await _pumpRedirects(tester);
+
+        expect(
+          router.router.routeInformationProvider.value.uri.path,
+          RoutePaths.adminLoginLocation,
+        );
+      },
+    );
   });
 
   group('buildAppRouter sync restoration', () {
@@ -470,14 +527,19 @@ final class _SyncHarness {
 final class _SyncRestorationFixture {
   _SyncRestorationFixture({required FakeSettingsRepository settings}) {
     harness = _SyncHarness(settings: settings);
-    router = buildAppRouter(syncViewModel: harness.viewModel);
+    auth = ControllableAdminAuth();
+    router = buildAppRouter(
+      syncViewModel: harness.viewModel,
+      adminAuthViewModel: auth.viewModel,
+    );
   }
 
+  late final ControllableAdminAuth auth;
   late final _SyncHarness harness;
   late final GoRouter router;
 
   Widget get app => MultiProvider(
-    providers: _buildProviders(harness),
+    providers: _buildProviders(harness, auth: auth),
     child: MaterialApp.router(
       scaffoldMessengerKey: $scaffoldMessengerKey,
       restorationScopeId: 'app',
@@ -487,6 +549,7 @@ final class _SyncRestorationFixture {
 
   void dispose() {
     router.dispose();
+    auth.dispose();
 
     final sync = harness.viewModel.sync;
     if (!sync.running) {
@@ -595,28 +658,42 @@ final class _FakeSearchRepository implements SearchRepository {
 
 /// Builds the production router with the full provider tree the real screens
 /// require, plus the controlled [harness] sync view model.
-({GoRouter router, Widget app}) _buildTestRouterApp(
+({GoRouter router, Widget app, ControllableAdminAuth auth}) _buildTestRouterApp(
   _SyncHarness harness, {
   FakeEventRepository? eventRepository,
+  ControllableAdminAuth? auth,
 }) {
-  final router = buildAppRouter(syncViewModel: harness.viewModel);
+  final authHarness = auth ?? ControllableAdminAuth();
+  final router = buildAppRouter(
+    syncViewModel: harness.viewModel,
+    adminAuthViewModel: authHarness.viewModel,
+  );
+  addTearDown(authHarness.dispose);
+  addTearDown(router.dispose);
 
   final app = MultiProvider(
-    providers: _buildProviders(harness, eventRepository: eventRepository),
+    providers: _buildProviders(
+      harness,
+      auth: authHarness,
+      eventRepository: eventRepository,
+    ),
     child: MaterialApp.router(
       scaffoldMessengerKey: $scaffoldMessengerKey,
       routerConfig: router,
     ),
   );
 
-  return (router: router, app: app);
+  return (router: router, app: app, auth: authHarness);
 }
 
 /// Builds the production app root so the router lifecycle under theme rebuilds
 /// is exercised exactly as shipped.
 Widget _buildRealApp(_SyncHarness harness) {
+  final auth = ControllableAdminAuth();
+  addTearDown(auth.dispose);
+
   return MultiProvider(
-    providers: _buildProviders(harness),
+    providers: _buildProviders(harness, auth: auth),
     child: const MoliseIsApp(),
   );
 }
@@ -624,6 +701,7 @@ Widget _buildRealApp(_SyncHarness harness) {
 /// The providers the real screens resolved from the router tree require.
 List<SingleChildWidget> _buildProviders(
   _SyncHarness harness, {
+  required ControllableAdminAuth auth,
   FakeEventRepository? eventRepository,
 }) {
   final eventRepo = eventRepository ?? FakeEventRepository();
@@ -657,6 +735,9 @@ List<SingleChildWidget> _buildProviders(
   final settingsRepository = FakeSettingsRepository();
 
   return <SingleChildWidget>[
+    Provider<AdminContentSubmissionRepository>.value(
+      value: FakeAdminContentSubmissionRepository(),
+    ),
     Provider<EventRepository>.value(value: eventRepo),
     Provider<PlaceRepository>.value(value: placeRepo),
     Provider<SearchRepository>.value(value: _FakeSearchRepository()),
@@ -685,5 +766,8 @@ List<SingleChildWidget> _buildProviders(
       ),
     ),
     ChangeNotifierProvider<SyncViewModel>.value(value: harness.viewModel),
+    ChangeNotifierProvider<AdminAuthViewModel>.value(
+      value: auth.viewModel,
+    ),
   ];
 }

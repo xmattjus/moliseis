@@ -151,4 +151,24 @@ void main() {
       );
     });
   });
+
+  group('RouteParameters.submissionId', () {
+    test('parses positive ids', () {
+      expect(RouteParameters.submissionId('1'), 1);
+      expect(RouteParameters.submissionId('42'), 42);
+      expect(
+        RouteParameters.submissionId('9223372036854775807'),
+        9223372036854775807,
+      );
+    });
+
+    test('returns null for malformed, non-positive, and overflow ids', () {
+      expect(RouteParameters.submissionId(null), isNull);
+      expect(RouteParameters.submissionId(''), isNull);
+      expect(RouteParameters.submissionId('abc'), isNull);
+      expect(RouteParameters.submissionId('0'), isNull);
+      expect(RouteParameters.submissionId('-1'), isNull);
+      expect(RouteParameters.submissionId('9223372036854775808'), isNull);
+    });
+  });
 }

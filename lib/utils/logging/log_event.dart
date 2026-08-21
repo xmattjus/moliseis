@@ -6,6 +6,7 @@ part 'events/network_log_events.dart';
 part 'events/repository_log_events.dart';
 part 'events/service_log_events.dart';
 part 'events/content_submission_events.dart';
+part 'events/admin_events.dart';
 
 /// Regex that all event names must match: 3+ snake_case segments.
 final eventNamePattern = RegExp(r'^[a-z]+(_[a-z]+){2,}$');

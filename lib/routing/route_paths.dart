@@ -1,4 +1,19 @@
 abstract class RoutePaths {
+  static const admin = '/admin';
+
+  // Children of /admin, mirroring contentSubmissionUploadProgress. They are
+  // never valid redirect or context.go/context.push locations on their own.
+  static const adminLogin = 'login';
+  static const adminSubmissionsNew = 'submissions/new';
+  static const adminSubmission = 'submissions/:id';
+
+  /// Full location of the staff login page.
+  ///
+  /// A GoRouter redirect and imperative navigation resolve from the route
+  /// root. [adminLogin] is a child path, so every navigation to this page uses
+  /// the full location instead.
+  static const adminLoginLocation = '$admin/$adminLogin';
+
   static const category = 'category/:categorySlug';
   static const events = '/events';
   static const favourites = '/favourites';

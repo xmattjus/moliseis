@@ -1,4 +1,8 @@
 abstract class RouteNames {
+  static const adminDashboard = 'adminDashboard';
+  static const adminLogin = 'adminLogin';
+  static const adminSubmissionNew = 'adminSubmissionNew';
+  static const adminSubmissionEditor = 'adminSubmissionEditor';
   static const events = 'events';
   static const eventsCategory = 'eventsCategory';
   static const eventsCategoryPost = 'eventsCategoryPost';

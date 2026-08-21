@@ -114,4 +114,16 @@ abstract final class RouteParameters {
     }
     return id;
   }
+
+  /// Parses a raw admin submission path parameter into a positive id, or null.
+  ///
+  /// Route parameters are external input, so zero, negative, malformed, and
+  /// overflow values must not reach the editor route as valid identifiers.
+  static int? submissionId(String? raw) {
+    final id = int.tryParse(raw ?? '');
+    if (id == null || id <= 0) {
+      return null;
+    }
+    return id;
+  }
 }

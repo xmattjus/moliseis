@@ -4,25 +4,20 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:moliseis/main.dart';
+import 'package:moliseis/data/services/supabase_anonymous_session.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'support/mock_logger.dart';
-
-final class _MockGoTrueClient extends Mock implements GoTrueClient {}
-
-final class _MockUser extends Mock implements User {}
-
-final class _MockAuthResponse extends Mock implements AuthResponse {}
+import '../../support/mock_gotrue_client.dart';
+import '../../support/mock_logger.dart';
 
 void main() {
   group('ensureAnonymousSupabaseSession', () {
     test('reuses an existing user without signing in or logging', () async {
-      final authClient = _MockGoTrueClient();
+      final authClient = MockGoTrueClient();
       final logger = MockLogger();
 
-      when(() => authClient.currentUser).thenReturn(_MockUser());
+      when(() => authClient.currentUser).thenReturn(MockUser());
 
       await ensureAnonymousSupabaseSession(
         authClient: authClient,
@@ -34,13 +29,13 @@ void main() {
     });
 
     test('signs in once when there is no existing user', () async {
-      final authClient = _MockGoTrueClient();
+      final authClient = MockGoTrueClient();
       final logger = MockLogger();
 
       when(() => authClient.currentUser).thenReturn(null);
       when(
         () => authClient.signInAnonymously(),
-      ).thenAnswer((_) async => _MockAuthResponse());
+      ).thenAnswer((_) async => MockAuthResponse());
 
       await ensureAnonymousSupabaseSession(
         authClient: authClient,
@@ -54,7 +49,7 @@ void main() {
     test(
       'handles and logs a retryable auth failure without retrying',
       () async {
-        final authClient = _MockGoTrueClient();
+        final authClient = MockGoTrueClient();
         final logger = MockLogger();
         final exception = AuthRetryableFetchException(
           message: 'Synthetic retryable auth failure',
@@ -88,7 +83,7 @@ void main() {
     );
 
     test('handles and logs other auth failures without retrying', () async {
-      final authClient = _MockGoTrueClient();
+      final authClient = MockGoTrueClient();
       final logger = MockLogger();
       const exception = AuthException('Synthetic auth failure');
 

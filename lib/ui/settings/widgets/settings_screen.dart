@@ -1,8 +1,12 @@
+import 'dart:async' show unawaited;
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
+import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
@@ -130,6 +134,20 @@ class SettingsScreen extends StatelessWidget {
                               'automaticamente agli sviluppatori'
                         : "Gli errori dell'app non verranno inviati agli "
                               'sviluppatori',
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              title: const Text('Area redazione'),
+              subtitle: const Text(
+                'Rivedi e cura i contributi della community',
+              ),
+              onTap: () {
+                final isAdmin = context.read<AdminAuthViewModel>().isAdmin;
+                unawaited(
+                  context.push(
+                    isAdmin ? RoutePaths.admin : RoutePaths.adminLoginLocation,
                   ),
                 );
               },

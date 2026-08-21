@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/config/dependencies.dart';
+import 'package:moliseis/data/repositories/admin_content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
@@ -12,6 +13,7 @@ import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/services.dart';
+import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
@@ -19,6 +21,7 @@ import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
+import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
@@ -65,10 +68,9 @@ void main() {
 
   setUp(() async {
     logger = MockLogger();
-    // Supabase is never reached during provider construction; mark it
-    // unavailable so any accidental access fails loudly instead of hitting
-    // the network.
-    supabaseEnv = MockSupabaseEnvironment()..stubUnavailable();
+    // AdminAuthViewModel reads the Supabase auth client during construction,
+    // but no provider performs a network operation in this test.
+    supabaseEnv = MockSupabaseEnvironment();
     objectBoxEnv = await TestObjectBoxEnvironment.create();
     // A recent sync timestamp keeps SyncUseCase.isSyncRequired false, so
     // SyncViewModel does not auto-trigger a real sync (Sentry + network)
@@ -112,6 +114,8 @@ void main() {
                 resolved[UrlLaunchService] = context.read<UrlLaunchService>();
                 resolved[CachedWeatherApiClient] = context
                     .read<CachedWeatherApiClient>();
+                resolved[AdminContentSubmissionRepository] = context
+                    .read<AdminContentSubmissionRepository>();
                 resolved[PlaceRepository] = context.read<PlaceRepository>();
                 resolved[EventRepository] = context.read<EventRepository>();
                 resolved[MediaRepository] = context.read<MediaRepository>();
@@ -121,6 +125,8 @@ void main() {
                     .read<SettingsRepository>();
                 resolved[ContentSubmissionRepository] = context
                     .read<ContentSubmissionRepository>();
+                resolved[AdminAuthViewModel] = context
+                    .read<AdminAuthViewModel>();
                 resolved[ThemeViewModel] = context.read<ThemeViewModel>();
                 resolved[SyncViewModel] = context.read<SyncViewModel>();
                 resolved[SettingsViewModel] = context.read<SettingsViewModel>();
@@ -146,6 +152,10 @@ void main() {
       );
 
       // Repositories resolve to their concrete implementations.
+      expect(
+        resolved[AdminContentSubmissionRepository],
+        isA<AdminContentSubmissionRepositoryImpl>(),
+      );
       expect(resolved[PlaceRepository], isA<PlaceRepositoryImpl>());
       expect(resolved[EventRepository], isA<EventRepositoryImpl>());
       expect(resolved[MediaRepository], isA<MediaRepositoryImpl>());
@@ -157,6 +167,7 @@ void main() {
       );
 
       // View models are constructed and wired with their repositories.
+      expect(resolved[AdminAuthViewModel], isA<AdminAuthViewModel>());
       expect(resolved[ThemeViewModel], isA<ThemeViewModel>());
       expect(resolved[SyncViewModel], isA<SyncViewModel>());
       expect(resolved[SettingsViewModel], isA<SettingsViewModel>());

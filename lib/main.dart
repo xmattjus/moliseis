@@ -12,7 +12,9 @@ import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/data-sources/settings_local_data_source.dart';
 import 'package:moliseis/data/repositories/settings_repository_impl.dart';
 import 'package:moliseis/data/services/objectbox.dart';
+import 'package:moliseis/data/services/supabase_anonymous_session.dart';
 import 'package:moliseis/routing/router.dart';
+import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
@@ -40,29 +42,6 @@ void handleSettingsRepositoryInitialization(Result<void> result) {
     _logger.log(
       const LocalPersistenceSettingsInitFailed(),
       error: result.error,
-    );
-  }
-}
-
-/// Ensures that Supabase has an anonymous session without making startup fatal.
-///
-/// A session restored during Supabase initialization is reused as-is. When no
-/// session exists, anonymous sign-in is attempted once; expected Supabase Auth
-/// failures are logged and startup continues without an authenticated user.
-@visibleForTesting
-Future<void> ensureAnonymousSupabaseSession({
-  required GoTrueClient authClient,
-  required Logger logger,
-}) async {
-  if (authClient.currentUser != null) return;
-
-  try {
-    await authClient.signInAnonymously();
-  } on AuthException catch (error, stackTrace) {
-    logger.log(
-      const SupabaseAuthAnonymousLoginFailed(),
-      error: error,
-      stackTrace: stackTrace,
     );
   }
 }
@@ -198,6 +177,7 @@ class _MoliseIsAppState extends State<MoliseIsApp> {
     super.didChangeDependencies();
     _router ??= buildAppRouter(
       syncViewModel: context.read<SyncViewModel>(),
+      adminAuthViewModel: context.read<AdminAuthViewModel>(),
     );
   }
 

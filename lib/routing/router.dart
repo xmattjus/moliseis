@@ -3,12 +3,19 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/config/dependencies.dart';
+import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
+import 'package:moliseis/ui/admin/auth/widgets/admin_login_screen.dart';
+import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
+import 'package:moliseis/ui/admin/submissions/view_models/admin_submissions_view_model.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
@@ -44,14 +51,21 @@ final _favouritesShellNavigatorKey = GlobalKey<NavigatorState>();
 final _mapShellNavigatorKey = GlobalKey<NavigatorState>();
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter buildAppRouter({required SyncViewModel syncViewModel}) {
+GoRouter buildAppRouter({
+  required SyncViewModel syncViewModel,
+  required AdminAuthViewModel adminAuthViewModel,
+}) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: RoutePaths.home,
     restorationScopeId: 'router',
-    refreshListenable: syncViewModel.sync,
+    refreshListenable: Listenable.merge([
+      syncViewModel.sync,
+      adminAuthViewModel,
+    ]),
     redirect: (context, state) =>
-        _redirectForSync(context, syncViewModel, state),
+        _redirectForSync(context, syncViewModel, state) ??
+        _redirectForAdminAuth(adminAuthViewModel, state),
     errorBuilder: (_, state) => RouteErrorScreen(
       uri: state.uri,
       error: state.error,
@@ -90,6 +104,88 @@ GoRouter buildAppRouter({required SyncViewModel syncViewModel}) {
         builder: (_, _) {
           return LoggingScreen(talker: $talker);
         },
+      ),
+      GoRoute(
+        path: RoutePaths.admin,
+        name: RouteNames.adminDashboard,
+        builder: (context, state) {
+          if (state.uri.path == RoutePaths.adminLoginLocation) {
+            return const SizedBox.shrink();
+          }
+
+          return ChangeNotifierProvider<AdminSubmissionsViewModel>(
+            create: (context) {
+              final viewModel = AdminSubmissionsViewModel(
+                repository: context.read(),
+              );
+              unawaited(viewModel.load.execute());
+              return viewModel;
+            },
+            builder: (context, _) => AdminDashboardScreen(
+              viewModel: context.read<AdminSubmissionsViewModel>(),
+              authViewModel: context.read<AdminAuthViewModel>(),
+            ),
+          );
+        },
+        routes: <RouteBase>[
+          GoRoute(
+            path: RoutePaths.adminLogin,
+            name: RouteNames.adminLogin,
+            builder: (context, _) => AdminLoginScreen(
+              viewModel: context.read<AdminAuthViewModel>(),
+            ),
+          ),
+          GoRoute(
+            path: RoutePaths.adminSubmissionsNew,
+            name: RouteNames.adminSubmissionNew,
+            builder: (context, _) {
+              final auth = context.read<AdminAuthViewModel>();
+              return ChangeNotifierProvider<AdminSubmissionEditorViewModel>(
+                create: (context) => AdminSubmissionEditorViewModel(
+                  repository: context.read<AdminContentSubmissionRepository>(),
+                  creatorName: auth.displayName ?? auth.email,
+                  creatorEmail: auth.email,
+                ),
+                builder: (context, _) => AdminSubmissionEditorScreen(
+                  viewModel: context.read<AdminSubmissionEditorViewModel>(),
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: RoutePaths.adminSubmission,
+            name: RouteNames.adminSubmissionEditor,
+            builder: (context, state) {
+              final id = RouteParameters.submissionId(
+                state.pathParameters['id'],
+              );
+              if (id == null) {
+                return RouteErrorScreen(
+                  uri: state.uri,
+                  error: GoException(
+                    'Invalid submission id "${state.pathParameters['id']}"',
+                  ),
+                );
+              }
+
+              return ChangeNotifierProvider<AdminSubmissionEditorViewModel>(
+                key: ValueKey<int>(id),
+                create: (context) {
+                  final viewModel = AdminSubmissionEditorViewModel(
+                    repository: context
+                        .read<AdminContentSubmissionRepository>(),
+                    submissionId: id,
+                  );
+                  unawaited(viewModel.load.execute());
+                  return viewModel;
+                },
+                builder: (context, _) => AdminSubmissionEditorScreen(
+                  viewModel: context.read<AdminSubmissionEditorViewModel>(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: RoutePaths.gallery,
@@ -369,6 +465,28 @@ String? _redirectForSync(
         state.uri.queryParameters['from'],
       ) ??
       RoutePaths.home;
+}
+
+/// Guards the staff-only route subtree after the sync redirect declined.
+///
+/// Authenticated staff are sent from the login page to the dashboard. Everyone
+/// else is sent from a protected admin location to the full login location;
+/// public routes remain reachable for every session type.
+String? _redirectForAdminAuth(
+  AdminAuthViewModel adminAuthViewModel,
+  GoRouterState state,
+) {
+  final location = state.matchedLocation;
+  final isAdminRoute =
+      location == RoutePaths.admin ||
+      location.startsWith('${RoutePaths.admin}/');
+  if (!isAdminRoute) return null;
+
+  if (location == RoutePaths.adminLoginLocation) {
+    return adminAuthViewModel.isAdmin ? RoutePaths.admin : null;
+  }
+
+  return adminAuthViewModel.isAdmin ? null : RoutePaths.adminLoginLocation;
 }
 
 /// Returns the [from] query value only when it is a safe internal URI.

@@ -9,6 +9,10 @@ import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
+import 'package:moliseis/domain/models/admin_submission.dart';
+import 'package:moliseis/domain/models/admin_submission_asset.dart';
+import 'package:moliseis/domain/models/admin_submission_input.dart';
+import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
@@ -20,6 +24,7 @@ import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
+import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
@@ -72,6 +77,120 @@ final class TestException implements Exception {
 final class FakeTransactionCoordinator implements SyncTransactionCoordinator {
   @override
   Result<void> runInWriteTransaction(Result<void> Function() fn) => fn();
+}
+
+// ---------------------------------------------------------------------------
+// Admin submission support
+// ---------------------------------------------------------------------------
+
+/// Creates a deterministic admin submission for dashboard and editor tests.
+AdminSubmission sampleAdminSubmission({
+  int id = 1,
+  String city = 'Campobasso',
+  String name = 'Contributo di prova',
+  String? description = 'Descrizione di prova',
+  List<Map<String, dynamic>>? descriptionDelta,
+  DateTime? startDate,
+  DateTime? endDate,
+  ContentCategory category = ContentCategory.history,
+  String userName = 'Mario Rossi',
+  String userEmail = 'mario@example.com',
+  AdminSubmissionStatus status = AdminSubmissionStatus.pending,
+  DateTime? createdAt,
+  DateTime? modifiedAt,
+  List<AdminSubmissionAsset> assets = const [],
+}) {
+  final timestamp = DateTime.utc(2026, 8, 20);
+  return AdminSubmission(
+    id: id,
+    city: city,
+    name: name,
+    description: description,
+    descriptionDelta: descriptionDelta,
+    startDate: startDate,
+    endDate: endDate,
+    category: category,
+    userName: userName,
+    userEmail: userEmail,
+    status: status,
+    createdAt: createdAt ?? timestamp,
+    modifiedAt: modifiedAt ?? timestamp,
+    assets: assets,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FakeAdminContentSubmissionRepository
+// ---------------------------------------------------------------------------
+
+/// Configurable admin repository fake that fails closed for unknown IDs.
+final class FakeAdminContentSubmissionRepository
+    implements AdminContentSubmissionRepository {
+  FakeAdminContentSubmissionRepository({
+    this.listResult = const Result.success([]),
+    Map<int, Result<AdminSubmission>>? getByIdResults,
+    Result<AdminSubmission>? createResult,
+    Result<AdminSubmission>? updateResult,
+    this.changeStatusResult = const Result.success(null),
+  }) : getByIdResults = getByIdResults ?? {},
+       createResult = createResult ?? Result.success(sampleAdminSubmission()),
+       updateResult = updateResult ?? Result.success(sampleAdminSubmission());
+
+  Result<List<AdminSubmission>> listResult;
+  Map<int, Result<AdminSubmission>> getByIdResults;
+  Result<AdminSubmission> createResult;
+  Result<AdminSubmission> updateResult;
+  Result<void> changeStatusResult;
+
+  int listCallCount = 0;
+  final getByIdIds = <int>[];
+  final createInputs = <AdminSubmissionInput>[];
+  final updateIds = <int>[];
+  final updateInputs = <AdminSubmissionInput>[];
+  final changeStatusCalls = <(int, AdminSubmissionStatus)>[];
+
+  /// When non-null, holds list requests open until the test completes it.
+  Completer<Result<List<AdminSubmission>>>? pendingList;
+
+  @override
+  Future<Result<List<AdminSubmission>>> list() async {
+    listCallCount++;
+    final pending = pendingList;
+    if (pending != null) return pending.future;
+    return listResult;
+  }
+
+  @override
+  Future<Result<AdminSubmission>> getById(int id) async {
+    getByIdIds.add(id);
+    return getByIdResults[id] ??
+        Result.error(TestException('Admin submission $id not configured'));
+  }
+
+  @override
+  Future<Result<AdminSubmission>> create(AdminSubmissionInput input) async {
+    createInputs.add(input);
+    return createResult;
+  }
+
+  @override
+  Future<Result<AdminSubmission>> update(
+    int id,
+    AdminSubmissionInput input,
+  ) async {
+    updateIds.add(id);
+    updateInputs.add(input);
+    return updateResult;
+  }
+
+  @override
+  Future<Result<void>> changeStatus(
+    int id,
+    AdminSubmissionStatus status,
+  ) async {
+    changeStatusCalls.add((id, status));
+    return changeStatusResult;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -660,13 +779,17 @@ final class FakeContentSubmissionDraftRepository
   Result<void> clearDraftResult;
 
   bool saveDraftCalled = false;
+  int loadDraftCallCount = 0;
   int saveDraftCallCount = 0;
   bool clearDraftCalled = false;
   int clearDraftCallCount = 0;
   ContentSubmissionDraft? lastSavedState;
 
   @override
-  Future<Result<ContentSubmissionDraft?>> loadDraft() async => loadDraftResult;
+  Future<Result<ContentSubmissionDraft?>> loadDraft() async {
+    loadDraftCallCount++;
+    return loadDraftResult;
+  }
 
   @override
   Future<Result<void>> saveDraft(ContentSubmissionDraft state) async {

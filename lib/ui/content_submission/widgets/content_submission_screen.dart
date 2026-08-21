@@ -6,16 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/ui/category/widgets/category_content_wrap.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_description_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_form.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_submission_date_chip.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -33,22 +30,11 @@ class ContentSubmissionScreen extends StatefulWidget {
 class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
   final _form1Key = GlobalKey<FormState>();
   final _form2Key = GlobalKey<FormState>();
-
-  /// Whether the current content submission is an event or not.
-  bool _isEvent = false;
+  var _clearEpoch = 0;
 
   @override
   void initState() {
     super.initState();
-    // heuristically restore only if the draft has been loaded by this point;
-    // `ContentSubmissionViewModel.initialize()` is awaited `unawaited` from
-    // `lib/config/dependencies.dart`, so on a cold start the draft may not
-    // be ready yet. The form rebuilds on `notifyListeners` fires from
-    // `_loadState → ready`, but `_isEvent` is local `setState`-driven state
-    // and is not re-derived afterwards — accept the rare cold-start miss
-    // (no dates shown until the user re-toggles the checkbox).
-    final draft = widget.viewModel.state;
-    _isEvent = draft.startDate != null || draft.endDate != null;
     widget.viewModel.clear.addListener(_handleClearCompleted);
     unawaited(widget.viewModel.retrieveLostAssets.execute());
   }
@@ -59,17 +45,15 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
     super.dispose();
   }
 
-  /// Resets the local form state after the [ContentSubmissionViewModel.clear]
-  /// command succeeds.
+  /// Rebuilds the shared form with cleared state after a successful clear.
   ///
   /// While the clear command runs, the form is replaced by a loading state so
-  /// stale submitted values cannot be edited. A post-frame `FormState.reset()`
-  /// then reapplies the cleared initial values when the command completes.
+  /// stale submitted values cannot be edited. Incrementing [_clearEpoch]
+  /// replaces the shared form, including its local event-flag state, before a
+  /// post-frame `FormState.reset()` reapplies the cleared values.
   void _handleClearCompleted() {
     if (!mounted || !widget.viewModel.clear.completed) return;
-    setState(() {
-      _isEvent = false;
-    });
+    setState(() => _clearEpoch++);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _form1Key.currentState?.reset();
@@ -118,162 +102,27 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverList.list(
                       children: [
-                        const TextSectionDivider(
-                          'Categoria',
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                        ),
-                        CategoryContentWrap(
-                          selectedCategory: widget.viewModel.state.category,
+                        ContentSubmissionFields(
+                          key: ValueKey(_clearEpoch),
+                          formKey: _form1Key,
+                          category: widget.viewModel.state.category,
+                          city: widget.viewModel.state.city,
+                          name: widget.viewModel.state.name,
+                          description: widget.viewModel.state.description,
+                          descriptionDelta:
+                              widget.viewModel.state.descriptionDelta,
+                          startDate: widget.viewModel.state.startDate,
+                          endDate: widget.viewModel.state.endDate,
+                          onCategorySelected: widget.viewModel.setCategory,
                           onCategoryDeleted: () =>
                               widget.viewModel.setCategory(null),
-                          onCategorySelected: (value) =>
-                              widget.viewModel.setCategory(value),
+                          onCityChanged: widget.viewModel.setCity,
+                          onNameChanged: widget.viewModel.setName,
+                          onDescriptionChanged: widget.viewModel.setDescription,
+                          onStartDateChanged: widget.viewModel.setStartDate,
+                          onStartTimeChanged: widget.viewModel.setStartTime,
+                          onEndDateChanged: widget.viewModel.setEndDate,
                         ),
-                        const TextSectionDivider(
-                          'Dettagli',
-                          padding: EdgeInsets.only(
-                            top: 16,
-                            bottom: 12,
-                          ),
-                        ),
-                        Form(
-                          key: _form1Key,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            spacing: 12,
-                            children: [
-                              TextFormField(
-                                initialValue: widget.viewModel.state.city,
-                                decoration: const InputDecoration(
-                                  labelText: 'Città',
-                                  hintText: 'San Pietro Avellana',
-                                ),
-                                onChanged: (value) =>
-                                    widget.viewModel.setCity(value),
-                                validator: (value) {
-                                  if (value != null) {
-                                    if (value.isEmpty) {
-                                      return 'Inserisci il nome di una città';
-                                    } else if (value.length > 100) {
-                                      return 'Il nome della città inserito è '
-                                          'troppo lungo';
-                                    }
-                                  }
-
-                                  return null;
-                                },
-                                autovalidateMode:
-                                    AutovalidateMode.onUserInteraction,
-                              ),
-                              TextFormField(
-                                initialValue: widget.viewModel.state.name,
-                                decoration: const InputDecoration(
-                                  labelText: 'Luogo o evento',
-                                  hintText: 'Museo del Tartufo',
-                                ),
-                                onChanged: (value) =>
-                                    widget.viewModel.setName(value),
-                                validator: (value) {
-                                  if (value != null) {
-                                    if (value.isEmpty) {
-                                      return 'Inserisci il nome di un luogo o '
-                                          'di un evento';
-                                    } else if (value.length > 150) {
-                                      return "Il nome del luogo o dell'evento "
-                                          'inserito è troppo lungo';
-                                    }
-                                  }
-                                  return null;
-                                },
-                                autovalidateMode:
-                                    AutovalidateMode.onUserInteraction,
-                              ),
-                              ContentDescriptionFormField(
-                                initialDescription:
-                                    widget.viewModel.state.description,
-                                initialDescriptionDelta:
-                                    widget.viewModel.state.descriptionDelta,
-                                onChanged: widget.viewModel.setDescription,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          spacing: 16,
-                          children: [
-                            Text('È un evento?', style: textStyle),
-                            Checkbox(
-                              value: _isEvent,
-                              onChanged: (value) => setState(() {
-                                _isEvent = value ?? !_isEvent;
-                              }),
-                            ),
-                          ],
-                        ),
-                        if (_isEvent)
-                          Builder(
-                            builder: (context) {
-                              final startDate =
-                                  widget.viewModel.state.startDate;
-
-                              final endDate = widget.viewModel.state.endDate;
-
-                              final currentLocale = Localizations.localeOf(
-                                context,
-                              );
-
-                              return Wrap(
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  ContentSubmissionDateChip(
-                                    initialDate: startDate,
-                                    label: Text(
-                                      startDate != null
-                                          ? 'Inizia il ${startDate.formatDate(
-                                              currentLocale,
-                                            )}'
-                                          : 'Seleziona data di inizio',
-                                    ),
-                                    onDatePicked: (date) {
-                                      widget.viewModel.setStartDate(date);
-                                    },
-                                  ),
-                                  if (startDate != null)
-                                    ContentSubmissionDateChip(
-                                      initialDate: startDate,
-                                      label: Text(
-                                        'Inizia alle ${startDate.formatTime(
-                                          currentLocale,
-                                        )}',
-                                      ),
-                                      mode: ContentSubmissionDateChipMode.time,
-                                      onDatePicked: (date) {
-                                        widget.viewModel.setStartTime(date);
-                                      },
-                                    ),
-                                  ContentSubmissionDateChip(
-                                    firstDate: startDate,
-                                    initialDate: endDate ?? startDate,
-                                    label: Text(
-                                      endDate != null
-                                          ? 'Finisce il ${endDate.formatDate(
-                                              currentLocale,
-                                            )}'
-                                          : 'Seleziona data di fine',
-                                    ),
-                                    onDatePicked: (date) {
-                                      widget.viewModel.setEndDate(date);
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        if (_isEvent) const SizedBox(height: 8),
                       ],
                     ),
                   ),
