@@ -1,6 +1,10 @@
 import { assertEquals } from "jsr:@std/assert@1";
 
-import { parseRequest, serveRequest } from "./index.ts";
+import {
+  parseRequest,
+  serveRequest,
+  shouldSkipStatusNotification,
+} from "./index.ts";
 
 const webhookHeaders = (secret = "test-secret") => ({
   "content-type": "application/json",
@@ -97,4 +101,32 @@ Deno.test("parses valid manual retries and rejects invalid retry identifiers", (
   });
   assertEquals(parseRequest({ action: "retry", submission_id: "42" }), null);
   assertEquals(parseRequest({ action: "retry", submission_id: 0 }), null);
+});
+
+Deno.test("skips status notifications for the configured external-events importer", () => {
+  const importerUserId = "6f8a6e05-8c9d-4fb3-90dc-b3adb7bb45cb";
+
+  assertEquals(
+    shouldSkipStatusNotification(
+      { user_id: importerUserId },
+      importerUserId,
+    ),
+    true,
+  );
+
+  assertEquals(
+    shouldSkipStatusNotification(
+      { user_id: "11111111-1111-4111-8111-111111111111" },
+      importerUserId,
+    ),
+    false,
+  );
+
+  assertEquals(
+    shouldSkipStatusNotification(
+      { user_id: importerUserId },
+      null,
+    ),
+    false,
+  );
 });

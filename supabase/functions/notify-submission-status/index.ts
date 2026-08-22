@@ -12,6 +12,7 @@ type EmailState = "sending" | "sent" | "failed";
 
 type ContentSubmission = {
   id: number;
+  user_id: string;
   city: string;
   name: string;
   user_email: string;
@@ -192,6 +193,17 @@ function safeEqual(left: string, right: string): boolean {
   }
 
   return difference === 0;
+}
+
+export function shouldSkipStatusNotification(
+  submission: { user_id: string },
+  importerUserId: string | null,
+): boolean {
+  if (!importerUserId) {
+    return false;
+  }
+
+  return safeEqual(submission.user_id.trim(), importerUserId.trim());
 }
 
 function isFinalStatus(value: unknown): value is FinalSubmissionStatus {
@@ -622,6 +634,8 @@ export function parseContentSubmission(
 
   if (
     !isValidSubmissionId(row.id) ||
+    typeof row.user_id !== "string" ||
+    !row.user_id.trim() ||
     typeof row.city !== "string" ||
     typeof row.name !== "string" ||
     typeof row.user_email !== "string" ||
@@ -642,6 +656,7 @@ export function parseContentSubmission(
 
   return {
     id: row.id,
+    user_id: row.user_id,
     city: row.city,
     name: row.name,
     user_email: row.user_email,
@@ -666,6 +681,7 @@ async function fetchSubmission(
       .from("content_submissions")
       .select(`
         id,
+        user_id,
         city,
         name,
         user_email,
@@ -1084,6 +1100,24 @@ export async function handleRequest(
       ignored: true,
       reason: "The current submission is not in a final moderation state",
       currentStatus: submission.status,
+    });
+  }
+
+  if (
+    shouldSkipStatusNotification(
+      submission,
+      optionalEnv("EXTERNAL_EVENTS_IMPORTER_USER_ID"),
+    )
+  ) {
+    console.log("Skipping status email for automated importer submission", {
+      submissionId: submission.id,
+      submissionStatus: submission.status,
+    });
+
+    return jsonResponse({
+      ignored: true,
+      reason: "Submission belongs to the external-events importer",
+      submissionId: submission.id,
     });
   }
 
