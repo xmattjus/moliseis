@@ -1,0 +1,243 @@
+import type { Database, Json } from "../_shared/database.types.ts";
+import {
+  deltaAsJson,
+  parseQuillDelta,
+  type ValidationResult,
+} from "../submit-content/submission_validation.ts";
+
+export type ContentCategoryWire =
+  Database["public"]["Enums"]["content_category"];
+export type FinalSubmissionStatusWire = "accepted" | "rejected";
+
+export type AdminSubmissionInputWire = {
+  category: ContentCategoryWire;
+  city: string;
+  name: string;
+  description: string | null;
+  description_delta: unknown | null;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+export type ValidatedAdminSubmissionInput =
+  & Omit<AdminSubmissionInputWire, "description_delta">
+  & {
+    description_delta: Json | null;
+  };
+
+export type ValidatedAdminContentSubmissionsRequest =
+  | { operation: "list" }
+  | { operation: "getById"; submission_id: number }
+  | { operation: "create"; input: ValidatedAdminSubmissionInput }
+  | {
+    operation: "update";
+    submission_id: number;
+    input: ValidatedAdminSubmissionInput;
+  }
+  | {
+    operation: "changeStatus";
+    submission_id: number;
+    status: FinalSubmissionStatusWire;
+  };
+
+const CONTENT_CATEGORIES = [
+  "unknown",
+  "nature",
+  "history",
+  "folklore",
+  "food",
+  "allure",
+  "experience",
+] as const satisfies readonly ContentCategoryWire[];
+
+const INPUT_KEYS = [
+  "category",
+  "city",
+  "name",
+  "description",
+  "description_delta",
+  "start_date",
+  "end_date",
+] as const;
+
+function valid<T>(value: T): ValidationResult<T> {
+  return { ok: true, value };
+}
+
+function invalid<T = never>(message: string): ValidationResult<T> {
+  return { ok: false, message };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasExactKeys(
+  value: Record<string, unknown>,
+  keys: readonly string[],
+): boolean {
+  const actualKeys = Object.keys(value);
+  return actualKeys.length === keys.length &&
+    keys.every((key) => Object.hasOwn(value, key));
+}
+
+function parseSubmissionId(value: unknown): ValidationResult<number> {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? valid(value)
+    : invalid("submission_id must be a positive safe integer.");
+}
+
+function isContentCategory(value: unknown): value is ContentCategoryWire {
+  return CONTENT_CATEGORIES.some((allowed) => allowed === value);
+}
+
+function parseDate(
+  value: unknown,
+  name: "start_date" | "end_date",
+): ValidationResult<string | null> {
+  if (value === null) return valid(null);
+  if (
+    typeof value !== "string" || !value || !Number.isFinite(Date.parse(value))
+  ) {
+    return invalid(`${name} must be a parseable date-time string or null.`);
+  }
+  return valid(value);
+}
+
+function parseInput(
+  value: unknown,
+): ValidationResult<ValidatedAdminSubmissionInput> {
+  if (!isRecord(value)) return invalid("input must be a JSON object.");
+  if (!hasExactKeys(value, INPUT_KEYS)) {
+    return invalid("input contains unsupported or missing fields.");
+  }
+
+  const {
+    category,
+    city,
+    name,
+    description,
+    description_delta,
+    start_date,
+    end_date,
+  } = value;
+  if (typeof city !== "string" || !city.trim()) {
+    return invalid("city must be a non-empty string.");
+  }
+  const normalizedCity = city.trim();
+  if (normalizedCity.length > 100) {
+    return invalid("city exceeds maximum length of 100 characters.");
+  }
+
+  if (typeof name !== "string" || !name.trim()) {
+    return invalid("name must be a non-empty string.");
+  }
+  const normalizedName = name.trim();
+  if (normalizedName.length > 150) {
+    return invalid("name exceeds maximum length of 150 characters.");
+  }
+
+  if (!isContentCategory(category)) {
+    return invalid("category is not supported.");
+  }
+  if (description !== null && typeof description !== "string") {
+    return invalid("description must be a string or null.");
+  }
+  if (typeof description === "string" && description.length > 5000) {
+    return invalid("description exceeds maximum length of 5000 characters.");
+  }
+
+  const parsedStartDate = parseDate(start_date, "start_date");
+  if (!parsedStartDate.ok) return parsedStartDate;
+  const parsedEndDate = parseDate(end_date, "end_date");
+  if (!parsedEndDate.ok) return parsedEndDate;
+  const parsedDelta = parseQuillDelta(description_delta, description);
+  if (!parsedDelta.ok) return parsedDelta;
+
+  return valid({
+    category,
+    city: normalizedCity,
+    name: normalizedName,
+    description,
+    description_delta: deltaAsJson(parsedDelta.value),
+    start_date: parsedStartDate.value,
+    end_date: parsedEndDate.value,
+  });
+}
+
+export function parseAdminContentSubmissionsRequest(
+  value: unknown,
+): ValidationResult<ValidatedAdminContentSubmissionsRequest> {
+  if (!isRecord(value)) return invalid("Request body must be a JSON object.");
+  if (!Object.hasOwn(value, "operation")) {
+    return invalid("operation is required.");
+  }
+  if (
+    typeof value.operation !== "string" || ![
+      "list",
+      "getById",
+      "create",
+      "update",
+      "changeStatus",
+    ].includes(value.operation)
+  ) {
+    return invalid("operation is not supported.");
+  }
+
+  switch (value.operation) {
+    case "list":
+      return hasExactKeys(value, ["operation"])
+        ? valid({ operation: "list" })
+        : invalid("Request contains unsupported or missing fields.");
+    case "getById": {
+      if (!hasExactKeys(value, ["operation", "submission_id"])) {
+        return invalid("Request contains unsupported or missing fields.");
+      }
+      const submissionId = parseSubmissionId(value.submission_id);
+      return submissionId.ok
+        ? valid({ operation: "getById", submission_id: submissionId.value })
+        : submissionId;
+    }
+    case "create": {
+      if (!hasExactKeys(value, ["operation", "input"])) {
+        return invalid("Request contains unsupported or missing fields.");
+      }
+      const input = parseInput(value.input);
+      return input.ok
+        ? valid({ operation: "create", input: input.value })
+        : input;
+    }
+    case "update": {
+      if (!hasExactKeys(value, ["operation", "submission_id", "input"])) {
+        return invalid("Request contains unsupported or missing fields.");
+      }
+      const submissionId = parseSubmissionId(value.submission_id);
+      if (!submissionId.ok) return submissionId;
+      const input = parseInput(value.input);
+      return input.ok
+        ? valid({
+          operation: "update",
+          submission_id: submissionId.value,
+          input: input.value,
+        })
+        : input;
+    }
+    case "changeStatus": {
+      if (!hasExactKeys(value, ["operation", "submission_id", "status"])) {
+        return invalid("Request contains unsupported or missing fields.");
+      }
+      const submissionId = parseSubmissionId(value.submission_id);
+      if (!submissionId.ok) return submissionId;
+      if (value.status !== "accepted" && value.status !== "rejected") {
+        return invalid("status must be accepted or rejected.");
+      }
+      return valid({
+        operation: "changeStatus",
+        submission_id: submissionId.value,
+        status: value.status,
+      });
+    }
+  }
+
+  return invalid("operation is not supported.");
+}

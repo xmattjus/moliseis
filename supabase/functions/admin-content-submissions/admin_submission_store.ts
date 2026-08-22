@@ -1,0 +1,186 @@
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
+
+import type { Database } from "../_shared/database.types.ts";
+import type {
+  FinalSubmissionStatusWire,
+  ValidatedAdminSubmissionInput,
+} from "./admin_submission_validation.ts";
+
+type ContentSubmissionRow =
+  Database["public"]["Tables"]["content_submissions"]["Row"];
+type SubmissionAssetRow =
+  Database["public"]["Tables"]["submissions_assets"]["Row"];
+
+export type SubmissionRecord = Pick<
+  ContentSubmissionRow,
+  | "id"
+  | "city"
+  | "name"
+  | "description"
+  | "description_delta"
+  | "start_date"
+  | "end_date"
+  | "category"
+  | "user_name"
+  | "user_email"
+  | "status"
+  | "created_at"
+  | "modified_at"
+>;
+
+export type SubmissionAssetRecord = Pick<
+  SubmissionAssetRow,
+  "id" | "url" | "width" | "height"
+>;
+
+export type AdminSubmissionCreateValues = ValidatedAdminSubmissionInput & {
+  user_id: string;
+  user_email: string;
+  user_name: string;
+};
+
+export type ChangeStatusStoreResult = "updated" | "not_found" | "not_pending";
+
+export interface AdminSubmissionStore {
+  list(): Promise<SubmissionRecord[]>;
+  getById(id: number): Promise<
+    {
+      submission: SubmissionRecord;
+      assets: SubmissionAssetRecord[];
+    } | null
+  >;
+  create(values: AdminSubmissionCreateValues): Promise<SubmissionRecord>;
+  update(
+    id: number,
+    input: ValidatedAdminSubmissionInput,
+    modifiedAt: string,
+  ): Promise<SubmissionRecord | null>;
+  changeStatus(params: {
+    id: number;
+    status: FinalSubmissionStatusWire;
+    handledBy: string;
+    modifiedAt: string;
+  }): Promise<ChangeStatusStoreResult>;
+}
+
+export class AdminSubmissionStoreError extends Error {
+  constructor(override readonly cause: unknown) {
+    super("Admin submission store operation failed");
+    this.name = "AdminSubmissionStoreError";
+  }
+}
+
+export const SUBMISSION_SELECT =
+  "id,city,name,description,description_delta,start_date,end_date,category,user_name,user_email,status,created_at,modified_at";
+export const ASSET_SELECT = "id,url,width,height";
+
+function throwOnError(error: unknown): void {
+  if (error) throw new AdminSubmissionStoreError(error);
+}
+
+export function createAdminSubmissionStore(
+  client: SupabaseClient<Database>,
+): AdminSubmissionStore {
+  return {
+    async list(): Promise<SubmissionRecord[]> {
+      const { data, error } = await client
+        .from("content_submissions")
+        .select(SUBMISSION_SELECT)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false });
+      throwOnError(error);
+      return data ?? [];
+    },
+
+    async getById(id): Promise<
+      {
+        submission: SubmissionRecord;
+        assets: SubmissionAssetRecord[];
+      } | null
+    > {
+      const { data: submission, error: submissionError } = await client
+        .from("content_submissions")
+        .select(SUBMISSION_SELECT)
+        .eq("id", id)
+        .maybeSingle();
+      throwOnError(submissionError);
+      if (!submission) return null;
+
+      const { data: assets, error: assetsError } = await client
+        .from("submissions_assets")
+        .select(ASSET_SELECT)
+        .eq("content_submission_id", id)
+        .order("id", { ascending: true });
+      throwOnError(assetsError);
+      return { submission, assets: assets ?? [] };
+    },
+
+    async create(values): Promise<SubmissionRecord> {
+      const { data, error } = await client
+        .from("content_submissions")
+        .insert({
+          category: values.category,
+          city: values.city,
+          name: values.name,
+          description: values.description,
+          description_delta: values.description_delta,
+          start_date: values.start_date,
+          end_date: values.end_date,
+          user_id: values.user_id,
+          user_email: values.user_email,
+          user_name: values.user_name,
+        })
+        .select(SUBMISSION_SELECT)
+        .single();
+      throwOnError(error);
+      if (!data) {
+        throw new AdminSubmissionStoreError(
+          new Error("Insert returned no row"),
+        );
+      }
+      return data;
+    },
+
+    async update(id, input, modifiedAt): Promise<SubmissionRecord | null> {
+      const { data, error } = await client
+        .from("content_submissions")
+        .update({
+          category: input.category,
+          city: input.city,
+          name: input.name,
+          description: input.description,
+          description_delta: input.description_delta,
+          start_date: input.start_date,
+          end_date: input.end_date,
+          modified_at: modifiedAt,
+        })
+        .eq("id", id)
+        .select(SUBMISSION_SELECT)
+        .maybeSingle();
+      throwOnError(error);
+      return data;
+    },
+
+    async changeStatus(
+      { id, status, handledBy, modifiedAt },
+    ): Promise<ChangeStatusStoreResult> {
+      const { data, error } = await client
+        .from("content_submissions")
+        .update({ status, handled_by: handledBy, modified_at: modifiedAt })
+        .eq("id", id)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle();
+      throwOnError(error);
+      if (data) return "updated";
+
+      const { data: existing, error: existingError } = await client
+        .from("content_submissions")
+        .select("id,status")
+        .eq("id", id)
+        .maybeSingle();
+      throwOnError(existingError);
+      return existing ? "not_pending" : "not_found";
+    },
+  };
+}
