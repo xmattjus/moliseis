@@ -30,6 +30,18 @@ void main() {
       expect(auth.viewModel.displayName, 'Redazione Molise Is');
     });
 
+    test('ignores display_name metadata without name', () {
+      final auth = ControllableAdminAuth(
+        initialUser: makeAuthUser(
+          isAdmin: true,
+          displayName: 'Nome dashboard',
+        ),
+      );
+      addTearDown(auth.dispose);
+
+      expect(auth.viewModel.displayName, isNull);
+    });
+
     test('treats a permanent non-admin user as non-admin', () {
       final auth = ControllableAdminAuth(initialUser: makeAuthUser());
       addTearDown(auth.dispose);

@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
@@ -11,6 +12,7 @@ import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
+import 'package:moliseis/utils/result.dart';
 
 /// Form screen for creating and editing a moderation submission.
 class AdminSubmissionEditorScreen extends StatefulWidget {
@@ -31,6 +33,8 @@ class AdminSubmissionEditorScreen extends StatefulWidget {
 class _AdminSubmissionEditorScreenState
     extends State<AdminSubmissionEditorScreen> {
   final _formKey = GlobalKey<FormState>();
+  var _statusDialogOpen = false;
+  var _saveCompletedWhileStatusDialogOpen = false;
 
   @override
   void initState() {
@@ -51,9 +55,26 @@ class _AdminSubmissionEditorScreenState
 
     final save = widget.viewModel.save;
     if (save.completed) {
+      if (_statusDialogOpen) {
+        _saveCompletedWhileStatusDialogOpen = true;
+        return;
+      }
       context.pop(true);
     } else if (save.error) {
-      showSnackBarGenericError(context: context);
+      final result = save.result;
+      if (result
+          case Error<void>(:final AdminContentSubmissionApiException error)
+          when error.statusCode == 422 &&
+              error.code == 'ADMIN_PROFILE_INCOMPLETE') {
+        showSnackBar(
+          context: context,
+          textContent:
+              "Il profilo amministratore richiede un nome e un'email validi.",
+          type: SnackBarType.error,
+        );
+      } else {
+        showSnackBarGenericError(context: context);
+      }
     }
   }
 
@@ -68,39 +89,48 @@ class _AdminSubmissionEditorScreenState
     }
   }
 
-  Future<void> _confirmStatusChange(AdminSubmissionStatus status) async {
+  Future<void> _confirmStatusChange({
+    required AdminSubmissionStatus status,
+    required String confirmationText,
+  }) async {
     if (!mounted) return;
 
     final viewModel = widget.viewModel;
-    final confirmationText = switch (status) {
-      AdminSubmissionStatus.accepted =>
-        'Confermi di accettare questo contributo?',
-      AdminSubmissionStatus.rejected =>
-        'Confermi di voler rifiutare questo contributo?',
-      AdminSubmissionStatus.pending =>
-        'Confermi di voler modificare lo stato di questo contributo?',
-    };
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          content: Text(confirmationText),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annulla'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Conferma'),
-            ),
-          ],
-        );
-      },
-    );
-    if (!mounted || confirmed != true) return;
+    if (viewModel.save.running) return;
 
-    unawaited(viewModel.changeStatus.execute(status));
+    _statusDialogOpen = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            content: Text(confirmationText),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Conferma'),
+              ),
+            ],
+          );
+        },
+      );
+      final saveCompleted = _saveCompletedWhileStatusDialogOpen;
+      if (!mounted) return;
+      if (saveCompleted) {
+        context.pop(true);
+        return;
+      }
+      if (confirmed != true || viewModel.save.running) return;
+
+      unawaited(viewModel.changeStatus.execute(status));
+    } finally {
+      _statusDialogOpen = false;
+      _saveCompletedWhileStatusDialogOpen = false;
+    }
   }
 
   void _save() {
@@ -240,39 +270,52 @@ class _AdminSubmissionEditorScreenState
                         spacing: 8,
                         children: <Widget>[
                           Text(status.label),
-                          if (viewModel.isDirty)
-                            const Text(
-                              'Salva le modifiche prima di cambiare lo stato.',
+                          if (status == AdminSubmissionStatus.pending) ...[
+                            if (viewModel.isDirty)
+                              const Text(
+                                'Salva le modifiche prima di '
+                                'cambiare lo stato.',
+                              ),
+                            Wrap(
+                              spacing: 8,
+                              children: <Widget>[
+                                FilledButton.tonal(
+                                  onPressed:
+                                      viewModel.isDirty ||
+                                          viewModel.changeStatus.running ||
+                                          viewModel.save.running
+                                      ? null
+                                      : () => unawaited(
+                                          _confirmStatusChange(
+                                            status:
+                                                AdminSubmissionStatus.accepted,
+                                            confirmationText:
+                                                'Confermi di accettare questo '
+                                                'contributo?',
+                                          ),
+                                        ),
+                                  child: const Text('Accetta'),
+                                ),
+                                FilledButton.tonal(
+                                  onPressed:
+                                      viewModel.isDirty ||
+                                          viewModel.changeStatus.running ||
+                                          viewModel.save.running
+                                      ? null
+                                      : () => unawaited(
+                                          _confirmStatusChange(
+                                            status:
+                                                AdminSubmissionStatus.rejected,
+                                            confirmationText:
+                                                'Confermi di voler rifiutare '
+                                                'questo contributo?',
+                                          ),
+                                        ),
+                                  child: const Text('Rifiuta'),
+                                ),
+                              ],
                             ),
-                          Wrap(
-                            spacing: 8,
-                            children: <Widget>[
-                              FilledButton.tonal(
-                                onPressed:
-                                    viewModel.isDirty ||
-                                        viewModel.changeStatus.running
-                                    ? null
-                                    : () => unawaited(
-                                        _confirmStatusChange(
-                                          AdminSubmissionStatus.accepted,
-                                        ),
-                                      ),
-                                child: const Text('Accetta'),
-                              ),
-                              FilledButton.tonal(
-                                onPressed:
-                                    viewModel.isDirty ||
-                                        viewModel.changeStatus.running
-                                    ? null
-                                    : () => unawaited(
-                                        _confirmStatusChange(
-                                          AdminSubmissionStatus.rejected,
-                                        ),
-                                      ),
-                                child: const Text('Rifiuta'),
-                              ),
-                            ],
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -284,7 +327,11 @@ class _AdminSubmissionEditorScreenState
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: FilledButton.icon(
-                      onPressed: viewModel.save.running ? null : _save,
+                      onPressed:
+                          viewModel.save.running ||
+                              viewModel.changeStatus.running
+                          ? null
+                          : _save,
                       icon: const Icon(Symbols.save),
                       label: Text(
                         viewModel.isEditMode

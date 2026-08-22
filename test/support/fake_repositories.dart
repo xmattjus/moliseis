@@ -152,6 +152,15 @@ final class FakeAdminContentSubmissionRepository
   /// When non-null, holds list requests open until the test completes it.
   Completer<Result<List<AdminSubmission>>>? pendingList;
 
+  /// When non-null, holds create requests open until the test completes it.
+  Completer<Result<AdminSubmission>>? pendingCreate;
+
+  /// When non-null, holds update requests open until the test completes it.
+  Completer<Result<AdminSubmission>>? pendingUpdate;
+
+  /// When non-null, holds moderation requests open until the test completes it.
+  Completer<Result<void>>? pendingChangeStatus;
+
   @override
   Future<Result<List<AdminSubmission>>> list() async {
     listCallCount++;
@@ -170,6 +179,8 @@ final class FakeAdminContentSubmissionRepository
   @override
   Future<Result<AdminSubmission>> create(AdminSubmissionInput input) async {
     createInputs.add(input);
+    final pending = pendingCreate;
+    if (pending != null) return pending.future;
     return createResult;
   }
 
@@ -180,6 +191,8 @@ final class FakeAdminContentSubmissionRepository
   ) async {
     updateIds.add(id);
     updateInputs.add(input);
+    final pending = pendingUpdate;
+    if (pending != null) return pending.future;
     return updateResult;
   }
 
@@ -189,6 +202,8 @@ final class FakeAdminContentSubmissionRepository
     AdminSubmissionStatus status,
   ) async {
     changeStatusCalls.add((id, status));
+    final pending = pendingChangeStatus;
+    if (pending != null) return pending.future;
     return changeStatusResult;
   }
 }

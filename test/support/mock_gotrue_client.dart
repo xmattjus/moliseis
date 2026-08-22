@@ -26,12 +26,17 @@ User makeAuthUser({
   bool isAnonymous = false,
   String? email,
   String? name,
+  String? displayName,
 }) {
   final now = DateTime.utc(2026).toIso8601String();
   return User(
     id: 'test-auth-user-${_nextAuthUserId++}',
     appMetadata: {'admin': isAdmin},
-    userMetadata: name == null ? {} : {'name': name},
+    userMetadata: <String, dynamic>{
+      if (name case final String name) 'name': name,
+      if (displayName case final String displayName)
+        'display_name': displayName,
+    },
     aud: 'authenticated',
     createdAt: now,
     updatedAt: now,

@@ -208,6 +208,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _save() async {
+    if (changeStatus.running) {
+      return Result.error(
+        Exception('Attendi il completamento della moderazione.'),
+      );
+    }
+
     final city = _city;
     final name = _name;
     if (city == null || city.isEmpty || name == null || name.isEmpty) {
@@ -241,10 +247,18 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         Exception('Non puoi cambiare lo stato di un nuovo contributo.'),
       );
     }
+    if (save.running) {
+      return Result.error(
+        Exception('Attendi il completamento del salvataggio.'),
+      );
+    }
     if (_isDirty) {
       return Result.error(
         Exception('Salva le modifiche prima di cambiare lo stato.'),
       );
+    }
+    if (_status != AdminSubmissionStatus.pending) {
+      return Result.error(Exception('Questo contributo è già stato moderato.'));
     }
 
     final result = await _repository.changeStatus(submissionId, status);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
@@ -215,41 +217,192 @@ void main() {
       expect(notifications, 7);
     });
 
-    test('changes status only for a clean existing submission', () async {
-      final repository = FakeAdminContentSubmissionRepository();
+    test(
+      'delegates both final statuses for a clean pending submission',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          submissionId: 1,
+        );
+        addTearDown(viewModel.dispose);
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+
+        await viewModel.load.execute();
+
+        await viewModel.changeStatus.execute(AdminSubmissionStatus.accepted);
+
+        expect(viewModel.changeStatus.completed, isTrue);
+        expect(
+          repository.changeStatusCalls,
+          <(int, AdminSubmissionStatus)>[
+            (1, AdminSubmissionStatus.accepted),
+          ],
+        );
+        expect(viewModel.status, AdminSubmissionStatus.accepted);
+
+        final rejectedViewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          submissionId: 2,
+        );
+        addTearDown(rejectedViewModel.dispose);
+        repository.getByIdResults[2] = Result.success(
+          sampleAdminSubmission(id: 2),
+        );
+        await rejectedViewModel.load.execute();
+        await rejectedViewModel.changeStatus.execute(
+          AdminSubmissionStatus.rejected,
+        );
+
+        expect(rejectedViewModel.changeStatus.completed, isTrue);
+        expect(
+          repository.changeStatusCalls,
+          <(int, AdminSubmissionStatus)>[
+            (1, AdminSubmissionStatus.accepted),
+            (2, AdminSubmissionStatus.rejected),
+          ],
+        );
+
+        rejectedViewModel.setCity('Isernia');
+        await rejectedViewModel.changeStatus.execute(
+          AdminSubmissionStatus.accepted,
+        );
+
+        expect(rejectedViewModel.changeStatus.error, isTrue);
+        expect(repository.changeStatusCalls, hasLength(2));
+      },
+    );
+
+    test(
+      'does not delegate status changes for accepted or rejected submissions',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(
+              sampleAdminSubmission(status: AdminSubmissionStatus.accepted),
+            ),
+            2: Result.success(
+              sampleAdminSubmission(
+                id: 2,
+                status: AdminSubmissionStatus.rejected,
+              ),
+            ),
+          },
+        );
+        final accepted = AdminSubmissionEditorViewModel(
+          repository: repository,
+          submissionId: 1,
+        );
+        final rejected = AdminSubmissionEditorViewModel(
+          repository: repository,
+          submissionId: 2,
+        );
+        addTearDown(accepted.dispose);
+        addTearDown(rejected.dispose);
+
+        await accepted.load.execute();
+        await rejected.load.execute();
+        await accepted.changeStatus.execute(AdminSubmissionStatus.rejected);
+        await rejected.changeStatus.execute(AdminSubmissionStatus.accepted);
+
+        expect(accepted.changeStatus.error, isTrue);
+        expect(rejected.changeStatus.error, isTrue);
+        expect(repository.changeStatusCalls, isEmpty);
+      },
+    );
+
+    test('saves accepted and rejected content', () async {
+      final repository = FakeAdminContentSubmissionRepository(
+        getByIdResults: <int, Result<AdminSubmission>>{
+          1: Result.success(
+            sampleAdminSubmission(status: AdminSubmissionStatus.accepted),
+          ),
+          2: Result.success(
+            sampleAdminSubmission(
+              id: 2,
+              status: AdminSubmissionStatus.rejected,
+            ),
+          ),
+        },
+      );
+      final accepted = AdminSubmissionEditorViewModel(
+        repository: repository,
+        submissionId: 1,
+      );
+      final rejected = AdminSubmissionEditorViewModel(
+        repository: repository,
+        submissionId: 2,
+      );
+      addTearDown(accepted.dispose);
+      addTearDown(rejected.dispose);
+
+      await accepted.load.execute();
+      await rejected.load.execute();
+      accepted.setCity('Isernia');
+      rejected.setCity('Termoli');
+      await accepted.save.execute();
+      await rejected.save.execute();
+
+      expect(accepted.save.completed, isTrue);
+      expect(rejected.save.completed, isTrue);
+      expect(repository.updateIds, <int>[1, 2]);
+    });
+
+    test('blocks moderation while a save request is pending', () async {
+      final pendingUpdate = Completer<Result<AdminSubmission>>();
+      final repository = FakeAdminContentSubmissionRepository(
+        getByIdResults: <int, Result<AdminSubmission>>{
+          1: Result.success(sampleAdminSubmission()),
+        },
+      )..pendingUpdate = pendingUpdate;
       final viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         submissionId: 1,
       );
       addTearDown(viewModel.dispose);
+      await viewModel.load.execute();
+      viewModel.setCity('Isernia');
+
+      final saving = viewModel.save.execute();
+      expect(viewModel.save.running, isTrue);
+      expect(repository.updateIds, <int>[1]);
 
       await viewModel.changeStatus.execute(AdminSubmissionStatus.accepted);
 
-      expect(viewModel.changeStatus.completed, isTrue);
-      expect(
-        repository.changeStatusCalls,
-        <(int, AdminSubmissionStatus)>[
-          (1, AdminSubmissionStatus.accepted),
-        ],
-      );
-      expect(viewModel.status, AdminSubmissionStatus.accepted);
-
-      final createViewModel = AdminSubmissionEditorViewModel(
-        repository: repository,
-      );
-      addTearDown(createViewModel.dispose);
-      await createViewModel.changeStatus.execute(
-        AdminSubmissionStatus.rejected,
-      );
-
-      expect(createViewModel.changeStatus.error, isTrue);
-      expect(repository.changeStatusCalls, hasLength(1));
-
-      viewModel.setCity('Isernia');
-      await viewModel.changeStatus.execute(AdminSubmissionStatus.rejected);
-
       expect(viewModel.changeStatus.error, isTrue);
-      expect(repository.changeStatusCalls, hasLength(1));
+      expect(repository.changeStatusCalls, isEmpty);
+      pendingUpdate.complete(Result.success(sampleAdminSubmission()));
+      await saving;
+    });
+
+    test('blocks saving while a moderation request is pending', () async {
+      final pendingChangeStatus = Completer<Result<void>>();
+      final repository = FakeAdminContentSubmissionRepository(
+        getByIdResults: <int, Result<AdminSubmission>>{
+          1: Result.success(sampleAdminSubmission()),
+        },
+      )..pendingChangeStatus = pendingChangeStatus;
+      final viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        submissionId: 1,
+      );
+      addTearDown(viewModel.dispose);
+      await viewModel.load.execute();
+
+      final changingStatus = viewModel.changeStatus.execute(
+        AdminSubmissionStatus.accepted,
+      );
+      expect(viewModel.changeStatus.running, isTrue);
+      expect(repository.changeStatusCalls, <(int, AdminSubmissionStatus)>[
+        (1, AdminSubmissionStatus.accepted),
+      ]);
+
+      await viewModel.save.execute();
+
+      expect(viewModel.save.error, isTrue);
+      expect(repository.updateIds, isEmpty);
+      pendingChangeStatus.complete(const Result.success(null));
+      await changingStatus;
     });
   });
 }

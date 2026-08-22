@@ -114,6 +114,7 @@ List<SingleChildWidget> providers(
     create: (context) =>
         AdminContentSubmissionRepositoryImpl(
               logger: context.read(),
+              supabaseClient: supabase.client,
             )
             as AdminContentSubmissionRepository,
   ),

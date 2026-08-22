@@ -56,16 +56,18 @@ class AdminAuthStateError extends LogEvent {
   String get name => 'admin_auth_state_error';
 }
 
-/// Fired when an admin repository is invoked before its backend exists.
-class AdminBackendUnavailable extends LogEvent {
-  const AdminBackendUnavailable();
+/// Fired when an admin backend request fails.
+final class AdminBackendRequestFailed extends LogEvent {
+  const AdminBackendRequestFailed({required this.operation});
+
+  final String operation;
 
   @override
-  Map<String, Object?> get data => const {};
+  Map<String, Object?> get data => <String, Object?>{'operation': operation};
 
   @override
-  AppLogLevel get level => AppLogLevel.warning;
+  AppLogLevel get level => AppLogLevel.error;
 
   @override
-  String get name => 'admin_backend_unavailable';
+  String get name => 'admin_backend_request_failed';
 }

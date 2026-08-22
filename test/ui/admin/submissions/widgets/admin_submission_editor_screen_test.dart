@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Completer, unawaited;
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
@@ -8,6 +8,8 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/config/dependencies.dart';
+import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
+import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
@@ -310,6 +312,151 @@ void main() {
       expect(find.text('SHELL_MARKER'), findsOneWidget);
     });
 
+    testWidgets('disables moderation while a save request is pending', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pendingUpdate = Completer<Result<AdminSubmission>>();
+      repository
+        ..getByIdResults[1] = Result.success(sampleAdminSubmission())
+        ..pendingUpdate = pendingUpdate;
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Salva modifiche'),
+        200,
+        scrollable: scrollable,
+      );
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Salva modifiche'));
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Accetta'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Rifiuta'),
+            )
+            .onPressed,
+        isNull,
+      );
+      pendingUpdate.complete(Result.success(sampleAdminSubmission()));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
+      'does not auto-confirm moderation when save completes '
+      'during confirmation',
+      (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final pendingUpdate = Completer<Result<AdminSubmission>>();
+        repository
+          ..getByIdResults[1] = Result.success(sampleAdminSubmission())
+          ..pendingUpdate = pendingUpdate;
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        final scrollable = find
+            .descendant(
+              of: find.byKey(
+                const ValueKey<String>('admin_submission_editor_scroll'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final accept = find.widgetWithText(FilledButton, 'Accetta');
+        await tester.scrollUntilVisible(accept, 200, scrollable: scrollable);
+
+        await tester.tap(accept);
+        await tester.pump();
+        expect(
+          find.text('Confermi di accettare questo contributo?'),
+          findsOneWidget,
+        );
+
+        unawaited(viewModel.save.execute());
+        await tester.pump();
+        expect(viewModel.save.running, isTrue);
+        pendingUpdate.complete(Result.success(sampleAdminSubmission()));
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Confermi di accettare questo contributo?'),
+          findsOneWidget,
+        );
+        expect(repository.changeStatusCalls, isEmpty);
+
+        await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
+        await tester.pumpAndSettle();
+
+        expect(repository.changeStatusCalls, isEmpty);
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
+      },
+    );
+
+    testWidgets('disables save while a moderation request is pending', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pendingChangeStatus = Completer<Result<void>>();
+      repository
+        ..getByIdResults[1] = Result.success(sampleAdminSubmission())
+        ..pendingChangeStatus = pendingChangeStatus;
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      unawaited(viewModel.changeStatus.execute(AdminSubmissionStatus.accepted));
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Salva modifiche'),
+            )
+            .onPressed,
+        isNull,
+      );
+      pendingChangeStatus.complete(const Result.success(null));
+      await tester.pumpAndSettle();
+    });
+
     testWidgets(
       'keeps edited data on save failure and shows an error snackbar',
       (
@@ -464,6 +611,102 @@ void main() {
         ],
       );
       expect(find.text('SHELL_MARKER'), findsOneWidget);
+    });
+
+    testWidgets('shows only the accepted label while keeping save enabled', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(status: AdminSubmissionStatus.accepted),
+      );
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Accettato'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
+      expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Salva modifiche'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+    });
+
+    testWidgets('shows only the rejected label while keeping save enabled', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(status: AdminSubmissionStatus.rejected),
+      );
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Rifiutato'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
+      expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Salva modifiche'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+    });
+
+    testWidgets('shows the profile-specific create failure message', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      repository.createResult = const Result.error(
+        AdminContentSubmissionApiException(
+          statusCode: 422,
+          code: 'ADMIN_PROFILE_INCOMPLETE',
+          message: 'Profile is incomplete.',
+        ),
+      );
+      viewModel = AdminSubmissionEditorViewModel(repository: repository);
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Città'),
+        'Isernia',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Luogo o evento'),
+        'Palazzo',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Crea contributo'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          "Il profilo amministratore richiede un nome e un'email validi.",
+        ),
+        findsOneWidget,
+      );
+      $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
     });
   });
 }
