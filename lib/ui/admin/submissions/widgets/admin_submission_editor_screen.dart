@@ -12,6 +12,7 @@ import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
+import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Form screen for creating and editing a moderation submission.
@@ -41,12 +42,16 @@ class _AdminSubmissionEditorScreenState
     super.initState();
     widget.viewModel.save.addListener(_handleSaveCompleted);
     widget.viewModel.changeStatus.addListener(_handleStatusChangeCompleted);
+    widget.viewModel.addAsset.addListener(_handleAddAssetCompleted);
+    widget.viewModel.deleteAsset.addListener(_handleDeleteAssetCompleted);
   }
 
   @override
   void dispose() {
     widget.viewModel.save.removeListener(_handleSaveCompleted);
     widget.viewModel.changeStatus.removeListener(_handleStatusChangeCompleted);
+    widget.viewModel.addAsset.removeListener(_handleAddAssetCompleted);
+    widget.viewModel.deleteAsset.removeListener(_handleDeleteAssetCompleted);
     super.dispose();
   }
 
@@ -89,6 +94,20 @@ class _AdminSubmissionEditorScreenState
     }
   }
 
+  void _handleAddAssetCompleted() {
+    if (!mounted) return;
+    if (widget.viewModel.addAsset.error) {
+      showSnackBarGenericError(context: context);
+    }
+  }
+
+  void _handleDeleteAssetCompleted() {
+    if (!mounted) return;
+    if (widget.viewModel.deleteAsset.error) {
+      showSnackBarGenericError(context: context);
+    }
+  }
+
   Future<void> _confirmStatusChange({
     required AdminSubmissionStatus status,
     required String confirmationText,
@@ -96,7 +115,7 @@ class _AdminSubmissionEditorScreenState
     if (!mounted) return;
 
     final viewModel = widget.viewModel;
-    if (viewModel.save.running) return;
+    if (viewModel.operationRunning) return;
 
     _statusDialogOpen = true;
     try {
@@ -124,13 +143,43 @@ class _AdminSubmissionEditorScreenState
         context.pop(true);
         return;
       }
-      if (confirmed != true || viewModel.save.running) return;
+      if (confirmed != true || viewModel.operationRunning) return;
 
       unawaited(viewModel.changeStatus.execute(status));
     } finally {
       _statusDialogOpen = false;
       _saveCompletedWhileStatusDialogOpen = false;
     }
+  }
+
+  Future<void> _confirmAssetDeletion(int assetId) async {
+    if (!mounted) return;
+
+    final viewModel = widget.viewModel;
+    if (viewModel.operationRunning) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          content: const Text('Rimuovere questa foto dal suggerimento?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Conferma'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (confirmed != true || viewModel.operationRunning) return;
+
+    unawaited(viewModel.deleteAsset.execute(assetId));
   }
 
   void _save() {
@@ -150,6 +199,8 @@ class _AdminSubmissionEditorScreenState
           viewModel.load,
           viewModel.save,
           viewModel.changeStatus,
+          viewModel.addAsset,
+          viewModel.deleteAsset,
         ]),
         builder: (context, _) {
           final status = viewModel.status;
@@ -209,26 +260,82 @@ class _AdminSubmissionEditorScreenState
                   ],
                 ),
               ),
-              if (viewModel.isEditMode && viewModel.assets.isNotEmpty)
+              if (viewModel.isEditMode && viewModel.hasLoadedDetail)
                 SliverList.list(
                   children: <Widget>[
                     const TextSectionDivider('Foto'),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Wrap(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         spacing: 8,
-                        runSpacing: 8,
-                        children: viewModel.assets
-                            .map(
-                              (asset) => AppNetworkImage(
-                                url: asset.url,
-                                imageWidth: asset.width,
-                                imageHeight: asset.height,
-                                width: 100,
-                                height: 100,
+                        children: <Widget>[
+                          Text(
+                            '${viewModel.assets.length} / '
+                            '$kMaximumSubmissionAssetCount',
+                          ),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: <Widget>[
+                              ...viewModel.assets.map(
+                                (asset) => Stack(
+                                  key: ValueKey<String>(
+                                    'admin_submission_asset_${asset.id}',
+                                  ),
+                                  alignment: Alignment.topRight,
+                                  children: <Widget>[
+                                    AppNetworkImage(
+                                      url: asset.url,
+                                      imageWidth: asset.width,
+                                      imageHeight: asset.height,
+                                      width: 100,
+                                      height: 100,
+                                    ),
+                                    if (status == AdminSubmissionStatus.pending)
+                                      IconButton(
+                                        key: ValueKey<String>(
+                                          'admin_submission_delete_asset_'
+                                          '${asset.id}',
+                                        ),
+                                        onPressed: viewModel.operationRunning
+                                            ? null
+                                            : () => unawaited(
+                                                _confirmAssetDeletion(asset.id),
+                                              ),
+                                        tooltip: 'Rimuovi foto',
+                                        icon: const Icon(Symbols.delete),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            )
-                            .toList(),
+                              if (status == AdminSubmissionStatus.pending &&
+                                  viewModel.assets.length <
+                                      kMaximumSubmissionAssetCount)
+                                SizedBox(
+                                  width: 100,
+                                  height: 100,
+                                  child: OutlinedButton(
+                                    key: const ValueKey<String>(
+                                      'admin_submission_add_asset',
+                                    ),
+                                    onPressed: viewModel.operationRunning
+                                        ? null
+                                        : () => unawaited(
+                                            viewModel.addAsset.execute(),
+                                          ),
+                                    child: viewModel.addAsset.running
+                                        ? const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(),
+                                          )
+                                        : const Icon(Symbols.add_a_photo),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -282,8 +389,7 @@ class _AdminSubmissionEditorScreenState
                                 FilledButton.tonal(
                                   onPressed:
                                       viewModel.isDirty ||
-                                          viewModel.changeStatus.running ||
-                                          viewModel.save.running
+                                          viewModel.operationRunning
                                       ? null
                                       : () => unawaited(
                                           _confirmStatusChange(
@@ -299,8 +405,7 @@ class _AdminSubmissionEditorScreenState
                                 FilledButton.tonal(
                                   onPressed:
                                       viewModel.isDirty ||
-                                          viewModel.changeStatus.running ||
-                                          viewModel.save.running
+                                          viewModel.operationRunning
                                       ? null
                                       : () => unawaited(
                                           _confirmStatusChange(
@@ -327,11 +432,7 @@ class _AdminSubmissionEditorScreenState
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: FilledButton.icon(
-                      onPressed:
-                          viewModel.save.running ||
-                              viewModel.changeStatus.running
-                          ? null
-                          : _save,
+                      onPressed: viewModel.operationRunning ? null : _save,
                       icon: const Icon(Symbols.save),
                       label: Text(
                         viewModel.isEditMode

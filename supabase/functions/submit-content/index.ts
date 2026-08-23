@@ -179,14 +179,18 @@ export async function handleRequest(request: Request): Promise<Response> {
     }
 
     if (body.assets.length > 0) {
-      const { error: assetsInsertError } = await adminClient
-        .from("submissions_assets")
-        .insert(body.assets.map((asset) => ({
-          content_submission_id: submission.id,
-          ...asset,
-        })));
-      if (assetsInsertError) {
-        console.error(assetsInsertError);
+      const { data: assetInsertResults, error: assetsInsertError } =
+        await adminClient
+          .rpc("add_submission_assets", {
+            p_submission_id: submission.id,
+            p_assets: body.assets,
+          });
+      if (
+        assetsInsertError ||
+        assetInsertResults?.length !== body.assets.length ||
+        assetInsertResults.some((result) => result.outcome !== "created")
+      ) {
+        console.error(assetsInsertError ?? assetInsertResults);
         return errorResponse(
           "ASSET_INSERT_FAILED",
           "Unable to save submission assets",

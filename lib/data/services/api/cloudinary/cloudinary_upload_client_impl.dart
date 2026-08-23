@@ -3,6 +3,7 @@ import 'dart:convert' show jsonDecode, utf8;
 import 'dart:io' show File, HttpClient, HttpException, HttpHeaders;
 
 import 'package:meta/meta.dart';
+import 'package:moliseis/data/services/api/cloudinary/cloudinary_asset_mime_type.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_duplicate_detector.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_multipart_writer.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_public_id_generator.dart';
@@ -466,6 +467,7 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
         secureUrl: secureUrl,
         width: width,
         height: height,
+        mimeType: cloudinaryImageMimeType(responseJson['format']),
       );
 
       _logger.log(CloudinaryUploadCompleted(publicId: publicId));

@@ -17,6 +17,7 @@ import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
@@ -737,6 +738,9 @@ List<SingleChildWidget> _buildProviders(
   return <SingleChildWidget>[
     Provider<AdminContentSubmissionRepository>.value(
       value: FakeAdminContentSubmissionRepository(),
+    ),
+    Provider<ContentSubmissionRepository>.value(
+      value: FakeContentSubmissionRepository(),
     ),
     Provider<EventRepository>.value(value: eventRepo),
     Provider<PlaceRepository>.value(value: placeRepo),

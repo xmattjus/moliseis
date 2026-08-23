@@ -2,7 +2,9 @@ import { assert, assertEquals } from "jsr:@std/assert@1";
 
 import {
   MAX_REQUEST_BODY_BYTES,
+  MAX_SUBMISSION_ASSETS,
   parseContentSubmission,
+  parseSubmissionAsset,
   readJsonBodyWithLimit,
   RequestBodyTooLargeError,
   type ValidatedQuillOperation,
@@ -20,6 +22,15 @@ const validDelta = () => [
   { insert: "guidata", attributes: { bold: true } },
   { insert: "\n" },
 ];
+
+const validAsset = (overrides: Record<string, unknown> = {}) => ({
+  url: "https://res.cloudinary.com/demo/image/upload/v1/example.jpg",
+  width: 1600,
+  height: 1200,
+  mime_type: "image/jpeg",
+  duration_seconds: null,
+  ...overrides,
+});
 
 function expectInvalid(value: unknown, message: string): void {
   const result = parseContentSubmission(value);
@@ -278,6 +289,68 @@ Deno.test("rejects non-string submission and asset fields before normalization",
     },
     "asset is not valid",
   );
+});
+
+Deno.test("accepts five assets and rejects a sixth", () => {
+  const accepted = parseContentSubmission({
+    ...validSubmission(),
+    assets: Array.from(
+      { length: MAX_SUBMISSION_ASSETS },
+      (_, index) =>
+        validAsset({
+          url:
+            `https://res.cloudinary.com/demo/image/upload/v1/example-${index}.jpg`,
+        }),
+    ),
+  });
+
+  assert(accepted.ok);
+  assertEquals(accepted.value.assets.length, MAX_SUBMISSION_ASSETS);
+  expectInvalid(
+    {
+      ...validSubmission(),
+      assets: Array.from(
+        { length: MAX_SUBMISSION_ASSETS + 1 },
+        (_, index) =>
+          validAsset({
+            url:
+              `https://res.cloudinary.com/demo/image/upload/v1/example-${index}.jpg`,
+          }),
+      ),
+    },
+    "assets length is not valid",
+  );
+});
+
+Deno.test("single-asset parsing rejects values incompatible with integer columns", () => {
+  for (
+    const [asset, message] of [
+      [
+        validAsset({ width: 1.5 }),
+        "asset width must be a positive safe integer",
+      ],
+      [
+        validAsset({ height: Number.MAX_SAFE_INTEGER + 1 }),
+        "asset height must be a positive safe integer",
+      ],
+      [
+        validAsset({ width: 2_147_483_648 }),
+        "asset width must be a positive safe integer",
+      ],
+      [
+        validAsset({ duration_seconds: -1 }),
+        "asset duration_seconds must be a non-negative safe integer",
+      ],
+      [
+        validAsset({ duration_seconds: 1.5 }),
+        "asset duration_seconds must be a non-negative safe integer",
+      ],
+    ] as const
+  ) {
+    const result = parseSubmissionAsset(asset);
+    assert(!result.ok);
+    assertEquals(result.message, message);
+  }
 });
 
 Deno.test("enforces the streaming request-body limit", async () => {

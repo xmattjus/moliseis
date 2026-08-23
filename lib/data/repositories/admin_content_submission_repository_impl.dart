@@ -1,8 +1,11 @@
 import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
+import 'package:moliseis/data/mappers/submission_asset_mapper.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
+import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
@@ -86,6 +89,35 @@ final class AdminContentSubmissionRepositoryImpl
     );
   }
 
+  @override
+  Future<Result<AdminSubmissionAsset>> addAsset(
+    int submissionId,
+    SubmissionAsset asset,
+  ) {
+    return _invoke(
+      operation: 'addAsset',
+      body: <String, dynamic>{
+        'operation': 'addAsset',
+        'submission_id': submissionId,
+        'asset': asset.toDto().toMap(),
+      },
+      parse: _assetFromEnvelope,
+    );
+  }
+
+  @override
+  Future<Result<void>> deleteAsset(int submissionId, int assetId) {
+    return _invoke<void>(
+      operation: 'deleteAsset',
+      body: <String, dynamic>{
+        'operation': 'deleteAsset',
+        'submission_id': submissionId,
+        'asset_id': assetId,
+      },
+      parse: _deleteAssetFromEnvelope,
+    );
+  }
+
   Future<Result<T>> _invoke<T>({
     required String operation,
     required Map<String, dynamic> body,
@@ -155,6 +187,18 @@ List<AdminSubmission> _listFromEnvelope(Object? value) {
 AdminSubmission _submissionFromEnvelope(Object? value) {
   final envelope = _object(value, 'submission response');
   return adminSubmissionFromWire(envelope['submission']);
+}
+
+AdminSubmissionAsset _assetFromEnvelope(Object? value) {
+  final envelope = _object(value, 'add asset response');
+  return adminSubmissionAssetFromWire(envelope['asset']);
+}
+
+void _deleteAssetFromEnvelope(Object? value) {
+  final envelope = _object(value, 'delete asset response');
+  if (envelope['ok'] != true) {
+    throw const FormatException('ok is invalid');
+  }
 }
 
 void _changeStatusFromEnvelope(

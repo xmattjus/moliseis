@@ -42,13 +42,18 @@ void main() {
     });
 
     test(
-      'successful upload returns secure_url and reaches progress 1.0',
+      'successful jpg upload returns MIME metadata and reaches progress 1.0',
       () async {
         const secureUrl =
             'https://res.cloudinary.com/test_cloud/image/upload/v1/test';
         server.setUploadResponse(
           status: 200,
-          body: const {'secure_url': secureUrl, 'width': 100, 'height': 100},
+          body: const {
+            'secure_url': secureUrl,
+            'width': 100,
+            'height': 100,
+            'format': 'jpg',
+          },
         );
         final tempDir = await Directory.systemTemp.createTemp('upload_test_');
         final file = File('${tempDir.path}/image.jpg')
@@ -64,6 +69,7 @@ void main() {
         await progressSubscription.cancel();
         expect(result.isSuccess, isTrue);
         expect(result.getOrNull()?.secureUrl, secureUrl);
+        expect(result.getOrNull()?.mimeType, 'image/jpeg');
         expect(progressValues, contains(1));
         expect(
           server.requests.where((r) => r.method == 'POST'),
@@ -82,7 +88,56 @@ void main() {
     );
 
     test(
-      'duplicate short-circuit skips upload and returns existing url',
+      'successful webp upload maps Cloudinary format to MIME metadata',
+      () async {
+        server.setUploadResponse(
+          status: 200,
+          body: const {
+            'secure_url':
+                'https://res.cloudinary.com/test_cloud/image/upload/v1/webp',
+            'width': 100,
+            'height': 100,
+            'format': 'webp',
+          },
+        );
+        final tempDir = await Directory.systemTemp.createTemp('upload_test_');
+        final file = File('${tempDir.path}/image.webp')
+          ..writeAsBytesSync([1, 2, 3, 4, 5]);
+        addTearDown(() => tempDir.delete(recursive: true));
+
+        final result = await client.uploadImageTask(file).result;
+
+        expect(result.isSuccess, isTrue);
+        expect(result.getOrNull()?.mimeType, 'image/webp');
+      },
+    );
+
+    test(
+      'successful upload without a format keeps MIME metadata nullable',
+      () async {
+        server.setUploadResponse(
+          status: 200,
+          body: const {
+            'secure_url':
+                'https://res.cloudinary.com/test_cloud/image/upload/v1/no-format',
+            'width': 100,
+            'height': 100,
+          },
+        );
+        final tempDir = await Directory.systemTemp.createTemp('upload_test_');
+        final file = File('${tempDir.path}/image.jpg')
+          ..writeAsBytesSync([1, 2, 3, 4, 5]);
+        addTearDown(() => tempDir.delete(recursive: true));
+
+        final result = await client.uploadImageTask(file).result;
+
+        expect(result.isSuccess, isTrue);
+        expect(result.getOrNull()?.mimeType, isNull);
+      },
+    );
+
+    test(
+      'duplicate short-circuit skips upload and returns existing MIME metadata',
       () async {
         final tempDir = await Directory.systemTemp.createTemp(
           'upload_dup_test_',
@@ -94,7 +149,7 @@ void main() {
         const publicId = 'content_submissions/abc123';
         const existingUrl =
             'https://res.cloudinary.com/test_cloud/existing.jpg';
-        server.addExistingAsset(publicId, existingUrl);
+        server.addExistingAsset(publicId, existingUrl, format: 'jpeg');
 
         final task = client.uploadImageTask(
           file,
@@ -108,6 +163,7 @@ void main() {
         await progressSubscription.cancel();
         expect(result.isSuccess, isTrue);
         expect(result.getOrNull()?.secureUrl, existingUrl);
+        expect(result.getOrNull()?.mimeType, 'image/jpeg');
         expect(progressValues, contains(1));
         expect(
           server.requests.where((r) => r.method == 'POST'),

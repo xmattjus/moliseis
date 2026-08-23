@@ -1,18 +1,23 @@
 import 'dart:collection' show UnmodifiableListView;
+import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/image_upload_task.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/utils/command.dart';
+import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Route-scoped state for creating or editing an admin submission.
 ///
 /// The editor keeps its draft only in memory and deliberately has no public
-/// draft-repository dependency. Persisted assets are read-only in this MVP.
+/// draft-repository dependency.
 class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Creates editor state for a new submission or the supplied [submissionId].
   ///
@@ -20,18 +25,26 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// they are never included in an [AdminSubmissionInput].
   AdminSubmissionEditorViewModel({
     required AdminContentSubmissionRepository repository,
+    required ContentSubmissionRepository contentSubmissionRepository,
+    ImagePicker? imagePicker,
     this.submissionId,
     String? creatorName,
     String? creatorEmail,
   }) : _repository = repository,
+       _contentSubmissionRepository = contentSubmissionRepository,
+       _imagePicker = imagePicker ?? ImagePicker(),
        _contributorName = creatorName,
        _contributorEmail = creatorEmail {
     load = Command0<void>(_loadDetail);
     save = Command0<void>(_save);
     changeStatus = Command1<void, AdminSubmissionStatus>(_changeStatus);
+    addAsset = Command0<void>(_addAsset);
+    deleteAsset = Command1<void, int>(_deleteAsset);
   }
 
   final AdminContentSubmissionRepository _repository;
+  final ContentSubmissionRepository _contentSubmissionRepository;
+  final ImagePicker _imagePicker;
 
   /// The persisted identifier being edited, or null for a new submission.
   final int? submissionId;
@@ -49,6 +62,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   DateTime? _createdAt;
   DateTime? _modifiedAt;
   final List<AdminSubmissionAsset> _assets = <AdminSubmissionAsset>[];
+  ImageUploadTask? _activeImageUploadTask;
   var _hasLoadedDetail = false;
   var _isDirty = false;
   var _disposed = false;
@@ -61,6 +75,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Changes a clean persisted submission's moderation status.
   late Command1<void, AdminSubmissionStatus> changeStatus;
+
+  /// Adds one gallery image to the persisted pending submission.
+  late Command0<void> addAsset;
+
+  /// Removes one persisted image association from the pending submission.
+  late Command1<void, int> deleteAsset;
 
   /// Whether this route edits an existing persisted submission.
   bool get isEditMode => submissionId != null;
@@ -104,7 +124,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Timestamp at which the loaded submission was last modified.
   DateTime? get modifiedAt => _modifiedAt;
 
-  /// Persisted read-only assets from the loaded detail.
+  /// Persisted assets from the loaded detail and confirmed asset mutations.
   UnmodifiableListView<AdminSubmissionAsset> get assets =>
       UnmodifiableListView<AdminSubmissionAsset>(_assets);
 
@@ -116,6 +136,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Whether edits have not yet been saved.
   bool get isDirty => _isDirty;
+
+  /// Whether an asset add or delete operation is in progress.
+  bool get assetMutationRunning => addAsset.running || deleteAsset.running;
+
+  /// Whether any operation can mutate the editor or its submission.
+  bool get operationRunning =>
+      save.running || changeStatus.running || assetMutationRunning;
 
   /// Updates the selected category and marks the editor dirty.
   void setCategory(ContentCategory? category) {
@@ -208,7 +235,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _save() async {
-    if (changeStatus.running) {
+    if (changeStatus.running || assetMutationRunning) {
       return Result.error(
         Exception('Attendi il completamento della moderazione.'),
       );
@@ -247,7 +274,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         Exception('Non puoi cambiare lo stato di un nuovo contributo.'),
       );
     }
-    if (save.running) {
+    if (save.running || assetMutationRunning) {
       return Result.error(
         Exception('Attendi il completamento del salvataggio.'),
       );
@@ -268,6 +295,100 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     });
   }
 
+  Future<Result<void>> _addAsset() async {
+    final submissionId = this.submissionId;
+    if (submissionId == null) {
+      return Result.error(
+        Exception('Aggiungi foto solo dopo aver creato il contributo.'),
+      );
+    }
+    if (!_hasLoadedDetail) {
+      return Result.error(
+        Exception('Carica il contributo prima di aggiungere foto.'),
+      );
+    }
+    if (_status != AdminSubmissionStatus.pending) {
+      return Result.error(
+        Exception('Puoi modificare le foto solo dei contributi in attesa.'),
+      );
+    }
+    if (_assets.length >= kMaximumSubmissionAssetCount) {
+      return Result.error(Exception('Hai raggiunto il limite di foto.'));
+    }
+    if (save.running || changeStatus.running || deleteAsset.running) {
+      return Result.error(
+        Exception('Attendi il completamento dell’operazione in corso.'),
+      );
+    }
+
+    final selectedImage = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+    );
+    if (_disposed || selectedImage == null) return const Result.success(null);
+
+    final task = _contentSubmissionRepository.uploadImageTask(
+      File(selectedImage.path),
+    );
+    _activeImageUploadTask = task;
+
+    try {
+      final uploadResult = await task.result;
+      if (_disposed) return const Result.success(null);
+
+      return await uploadResult.asyncFlatMap((uploadedAsset) async {
+        final persistedAsset = await _repository.addAsset(
+          submissionId,
+          uploadedAsset,
+        );
+        if (_disposed) return const Result.success(null);
+
+        return persistedAsset.map((asset) {
+          _assets.add(asset);
+          _notifyListeners();
+        });
+      });
+    } finally {
+      if (identical(_activeImageUploadTask, task)) {
+        _activeImageUploadTask = null;
+      }
+    }
+  }
+
+  Future<Result<void>> _deleteAsset(int assetId) async {
+    final submissionId = this.submissionId;
+    if (submissionId == null) {
+      return Result.error(
+        Exception('Non puoi rimuovere foto da un nuovo contributo.'),
+      );
+    }
+    if (!_hasLoadedDetail) {
+      return Result.error(
+        Exception('Carica il contributo prima di rimuovere foto.'),
+      );
+    }
+    if (_status != AdminSubmissionStatus.pending) {
+      return Result.error(
+        Exception('Puoi modificare le foto solo dei contributi in attesa.'),
+      );
+    }
+    if (save.running || changeStatus.running || addAsset.running) {
+      return Result.error(
+        Exception('Attendi il completamento dell’operazione in corso.'),
+      );
+    }
+    if (!_assets.any((asset) => asset.id == assetId)) {
+      return Result.error(Exception('La foto non appartiene al contributo.'));
+    }
+
+    final result = await _repository.deleteAsset(submissionId, assetId);
+    if (_disposed) return const Result.success(null);
+
+    return result.map((_) {
+      _assets.removeWhere((asset) => asset.id == assetId);
+      _notifyListeners();
+    });
+  }
+
   void _markDirty() {
     _isDirty = true;
     _notifyListeners();
@@ -282,6 +403,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _activeImageUploadTask?.cancel();
+    _activeImageUploadTask = null;
     super.dispose();
   }
 }

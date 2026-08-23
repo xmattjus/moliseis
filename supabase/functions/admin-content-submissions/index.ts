@@ -315,6 +315,50 @@ export function createHandler(
           }
           return jsonResponse({ ok: true, status: parsed.value.status });
         }
+        case "addAsset": {
+          const result = await store.addAsset(
+            parsed.value.submission_id,
+            parsed.value.asset,
+          );
+          if (result.outcome === "not_found") {
+            return errorResponse("NOT_FOUND", "Submission not found.", 404);
+          }
+          if (result.outcome === "not_pending") {
+            return errorResponse(
+              "INVALID_STATUS_TRANSITION",
+              "Only pending submissions can be changed.",
+              409,
+            );
+          }
+          if (result.outcome === "limit_reached") {
+            return errorResponse(
+              "ASSET_LIMIT_REACHED",
+              "A submission can have at most five assets.",
+              409,
+            );
+          }
+          return jsonResponse({ asset: toAssetWire(result.asset) });
+        }
+        case "deleteAsset": {
+          const result = await store.deleteAsset(
+            parsed.value.submission_id,
+            parsed.value.asset_id,
+          );
+          if (result === "not_found") {
+            return errorResponse("NOT_FOUND", "Submission not found.", 404);
+          }
+          if (result === "asset_not_found") {
+            return errorResponse("ASSET_NOT_FOUND", "Asset not found.", 404);
+          }
+          if (result === "not_pending") {
+            return errorResponse(
+              "INVALID_STATUS_TRANSITION",
+              "Only pending submissions can be changed.",
+              409,
+            );
+          }
+          return jsonResponse({ ok: true });
+        }
       }
     } catch (error) {
       console.error("admin-content-submissions request failed", error);

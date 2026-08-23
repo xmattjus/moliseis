@@ -1,6 +1,8 @@
 import type { Database, Json } from "../_shared/database.types.ts";
 
 export const MAX_REQUEST_BODY_BYTES = 128 * 1024;
+export const MAX_SUBMISSION_ASSETS = 5;
+const MAX_POSTGRES_INTEGER = 2_147_483_647;
 
 const ALLOWED_ASSET_HOSTS = ["res.cloudinary.com"] as const;
 
@@ -259,43 +261,73 @@ export function parseQuillDelta(
   return valid(operations);
 }
 
+export function parseSubmissionAsset(
+  value: unknown,
+): ValidationResult<ValidatedSubmissionAsset> {
+  if (
+    !isRecord(value) ||
+    typeof value.url !== "string" ||
+    typeof value.width !== "number" ||
+    typeof value.height !== "number" ||
+    !isOptionalString(value.mime_type) ||
+    !isOptionalFiniteNumber(value.duration_seconds)
+  ) {
+    return invalid("asset is not valid");
+  }
+
+  if (!isValidAssetUrl(value.url)) {
+    return invalid("asset url is not valid");
+  }
+  if (
+    !Number.isSafeInteger(value.width) ||
+    value.width <= 0 ||
+    value.width > MAX_POSTGRES_INTEGER
+  ) {
+    return invalid("asset width must be a positive safe integer");
+  }
+  if (
+    !Number.isSafeInteger(value.height) ||
+    value.height <= 0 ||
+    value.height > MAX_POSTGRES_INTEGER
+  ) {
+    return invalid("asset height must be a positive safe integer");
+  }
+  if (
+    value.duration_seconds != null &&
+    (!Number.isSafeInteger(value.duration_seconds) ||
+      value.duration_seconds < 0 ||
+      value.duration_seconds > MAX_POSTGRES_INTEGER)
+  ) {
+    return invalid(
+      "asset duration_seconds must be a non-negative safe integer",
+    );
+  }
+  if (value.mime_type && !value.mime_type.includes("/")) {
+    return invalid("mime_type is not valid");
+  }
+
+  return valid({
+    url: value.url,
+    width: value.width,
+    height: value.height,
+    mime_type: value.mime_type ?? null,
+    duration_seconds: value.duration_seconds ?? null,
+  });
+}
+
 function parseAssets(
   value: unknown,
 ): ValidationResult<ValidatedSubmissionAsset[]> {
   if (value === undefined || value === null) return valid([]);
-  if (!Array.isArray(value) || value.length > 4) {
+  if (!Array.isArray(value) || value.length > MAX_SUBMISSION_ASSETS) {
     return invalid("assets length is not valid");
   }
 
   const assets: ValidatedSubmissionAsset[] = [];
   for (const rawAsset of value) {
-    if (
-      !isRecord(rawAsset) ||
-      typeof rawAsset.url !== "string" ||
-      !isOptionalFiniteNumber(rawAsset.width) || rawAsset.width == null ||
-      !isOptionalFiniteNumber(rawAsset.height) || rawAsset.height == null ||
-      !isOptionalString(rawAsset.mime_type) ||
-      !isOptionalFiniteNumber(rawAsset.duration_seconds)
-    ) {
-      return invalid("asset is not valid");
-    }
-
-    if (!isValidAssetUrl(rawAsset.url)) {
-      return invalid("asset url is not valid");
-    }
-    if (rawAsset.width <= 0) return invalid("asset width must be > 0");
-    if (rawAsset.height <= 0) return invalid("asset height must be > 0");
-    if (rawAsset.mime_type && !rawAsset.mime_type.includes("/")) {
-      return invalid("mime_type is not valid");
-    }
-
-    assets.push({
-      url: rawAsset.url,
-      width: rawAsset.width,
-      height: rawAsset.height,
-      mime_type: rawAsset.mime_type ?? null,
-      duration_seconds: rawAsset.duration_seconds ?? null,
-    });
+    const parsedAsset = parseSubmissionAsset(rawAsset);
+    if (!parsedAsset.ok) return parsedAsset;
+    assets.push(parsedAsset.value);
   }
 
   return valid(assets);

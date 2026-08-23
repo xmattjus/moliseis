@@ -1,6 +1,7 @@
 import 'dart:convert' show base64Encode, jsonDecode, utf8;
 import 'dart:io' show HttpClient, HttpClientResponse;
 
+import 'package:moliseis/data/services/api/cloudinary/cloudinary_asset_mime_type.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_cancellation_token.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/result.dart';
@@ -84,6 +85,7 @@ class CloudinaryDuplicateDetector {
           secureUrl: secureUrl,
           width: width,
           height: height,
+          mimeType: cloudinaryImageMimeType(json['format']),
         );
         return Result.success(submissionAsset);
       } on Exception catch (exception, stackTrace) {

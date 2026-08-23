@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';
@@ -143,6 +144,8 @@ GoRouter buildAppRouter({
               return ChangeNotifierProvider<AdminSubmissionEditorViewModel>(
                 create: (context) => AdminSubmissionEditorViewModel(
                   repository: context.read<AdminContentSubmissionRepository>(),
+                  contentSubmissionRepository: context
+                      .read<ContentSubmissionRepository>(),
                   creatorName: auth.displayName ?? auth.email,
                   creatorEmail: auth.email,
                 ),
@@ -174,6 +177,8 @@ GoRouter buildAppRouter({
                   final viewModel = AdminSubmissionEditorViewModel(
                     repository: context
                         .read<AdminContentSubmissionRepository>(),
+                    contentSubmissionRepository: context
+                        .read<ContentSubmissionRepository>(),
                     submissionId: id,
                   );
                   unawaited(viewModel.load.execute());

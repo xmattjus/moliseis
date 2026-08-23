@@ -2,6 +2,8 @@ import type { Database, Json } from "../_shared/database.types.ts";
 import {
   deltaAsJson,
   parseQuillDelta,
+  parseSubmissionAsset,
+  type ValidatedSubmissionAsset,
   type ValidationResult,
 } from "../submit-content/submission_validation.ts";
 
@@ -38,7 +40,13 @@ export type ValidatedAdminContentSubmissionsRequest =
     operation: "changeStatus";
     submission_id: number;
     status: FinalSubmissionStatusWire;
-  };
+  }
+  | {
+    operation: "addAsset";
+    submission_id: number;
+    asset: ValidatedSubmissionAsset;
+  }
+  | { operation: "deleteAsset"; submission_id: number; asset_id: number };
 
 const CONTENT_CATEGORIES = [
   "unknown",
@@ -81,10 +89,13 @@ function hasExactKeys(
     keys.every((key) => Object.hasOwn(value, key));
 }
 
-function parseSubmissionId(value: unknown): ValidationResult<number> {
+function parsePositiveSafeInteger(
+  value: unknown,
+  fieldName: "submission_id" | "asset_id",
+): ValidationResult<number> {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0
     ? valid(value)
-    : invalid("submission_id must be a positive safe integer.");
+    : invalid(`${fieldName} must be a positive safe integer.`);
 }
 
 function isContentCategory(value: unknown): value is ContentCategoryWire {
@@ -179,6 +190,8 @@ export function parseAdminContentSubmissionsRequest(
       "create",
       "update",
       "changeStatus",
+      "addAsset",
+      "deleteAsset",
     ].includes(value.operation)
   ) {
     return invalid("operation is not supported.");
@@ -193,7 +206,10 @@ export function parseAdminContentSubmissionsRequest(
       if (!hasExactKeys(value, ["operation", "submission_id"])) {
         return invalid("Request contains unsupported or missing fields.");
       }
-      const submissionId = parseSubmissionId(value.submission_id);
+      const submissionId = parsePositiveSafeInteger(
+        value.submission_id,
+        "submission_id",
+      );
       return submissionId.ok
         ? valid({ operation: "getById", submission_id: submissionId.value })
         : submissionId;
@@ -211,7 +227,10 @@ export function parseAdminContentSubmissionsRequest(
       if (!hasExactKeys(value, ["operation", "submission_id", "input"])) {
         return invalid("Request contains unsupported or missing fields.");
       }
-      const submissionId = parseSubmissionId(value.submission_id);
+      const submissionId = parsePositiveSafeInteger(
+        value.submission_id,
+        "submission_id",
+      );
       if (!submissionId.ok) return submissionId;
       const input = parseInput(value.input);
       return input.ok
@@ -226,7 +245,10 @@ export function parseAdminContentSubmissionsRequest(
       if (!hasExactKeys(value, ["operation", "submission_id", "status"])) {
         return invalid("Request contains unsupported or missing fields.");
       }
-      const submissionId = parseSubmissionId(value.submission_id);
+      const submissionId = parsePositiveSafeInteger(
+        value.submission_id,
+        "submission_id",
+      );
       if (!submissionId.ok) return submissionId;
       if (value.status !== "accepted" && value.status !== "rejected") {
         return invalid("status must be accepted or rejected.");
@@ -236,6 +258,42 @@ export function parseAdminContentSubmissionsRequest(
         submission_id: submissionId.value,
         status: value.status,
       });
+    }
+    case "addAsset": {
+      if (!hasExactKeys(value, ["operation", "submission_id", "asset"])) {
+        return invalid("Request contains unsupported or missing fields.");
+      }
+      const submissionId = parsePositiveSafeInteger(
+        value.submission_id,
+        "submission_id",
+      );
+      if (!submissionId.ok) return submissionId;
+      const asset = parseSubmissionAsset(value.asset);
+      return asset.ok
+        ? valid({
+          operation: "addAsset",
+          submission_id: submissionId.value,
+          asset: asset.value,
+        })
+        : asset;
+    }
+    case "deleteAsset": {
+      if (!hasExactKeys(value, ["operation", "submission_id", "asset_id"])) {
+        return invalid("Request contains unsupported or missing fields.");
+      }
+      const submissionId = parsePositiveSafeInteger(
+        value.submission_id,
+        "submission_id",
+      );
+      if (!submissionId.ok) return submissionId;
+      const assetId = parsePositiveSafeInteger(value.asset_id, "asset_id");
+      return assetId.ok
+        ? valid({
+          operation: "deleteAsset",
+          submission_id: submissionId.value,
+          asset_id: assetId.value,
+        })
+        : assetId;
     }
   }
 

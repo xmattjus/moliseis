@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -356,6 +357,9 @@ final class _AdminRouteHarness {
           value: auth.viewModel,
         ),
         Provider<AdminContentSubmissionRepository>.value(value: repository),
+        Provider<ContentSubmissionRepository>.value(
+          value: FakeContentSubmissionRepository(),
+        ),
         Provider<CacheManager>.value(value: FakeCacheManager()),
         if (withSettingsProviders) ...<SingleChildWidget>[
           Provider<SettingsRepository>.value(value: settingsRepository),

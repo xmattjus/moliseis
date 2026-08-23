@@ -87,7 +87,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   /// Maximum number of assets that a content submission can include.
-  static const int maximumAssetCount = 5;
+  static const int maximumAssetCount = kMaximumSubmissionAssetCount;
 
   bool _disposed = false;
 

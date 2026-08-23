@@ -4,10 +4,10 @@ import {
   type SupabaseClient,
 } from "npm:@supabase/supabase-js@2.112.3";
 
-import type { Database } from "../_shared/database.types.ts";
+import type { Database, Json } from "../_shared/database.types.ts";
 import {
-  destroyCloudinaryImage,
   type CloudinaryConfig,
+  destroyCloudinaryImage,
   uploadRemoteImage,
 } from "../_shared/cloudinary.ts";
 import {
@@ -18,8 +18,8 @@ import {
   addDaysToCalendarDate,
   buildDedupKey,
   calendarDateInRome,
-  prepareEvent,
   type PreparedExternalEvent,
+  prepareEvent,
   zonedDateTimeToIso,
 } from "./import_logic.ts";
 
@@ -49,6 +49,11 @@ type ExistingSubmission = {
   city: string;
   name: string;
   start_date: string | null;
+};
+
+type ImportedAssetDependencies = {
+  uploadRemoteImage: typeof uploadRemoteImage;
+  destroyCloudinaryImage: typeof destroyCloudinaryImage;
 };
 
 function requiredEnv(name: string): string {
@@ -162,7 +167,9 @@ async function loadImporterIdentity(
   const { data, error } = await admin.auth.admin.getUserById(importerId);
 
   if (error || !data.user) {
-    throw new Error("Could not load the configured external-events importer user");
+    throw new Error(
+      "Could not load the configured external-events importer user",
+    );
   }
 
   const email = data.user.email?.trim();
@@ -171,7 +178,9 @@ async function loadImporterIdentity(
     : "";
 
   if (!email || !displayName) {
-    throw new Error("External-events importer user requires email and display_name");
+    throw new Error(
+      "External-events importer user requires email and display_name",
+    );
   }
 
   return { id: data.user.id, email, name: displayName };
@@ -201,7 +210,9 @@ async function loadExistingKeys(
     .gte("start_date", lowerBound)
     .lt("start_date", upperBound);
 
-  if (error) throw new Error(`Could not load existing submissions: ${error.message}`);
+  if (error) {
+    throw new Error(`Could not load existing submissions: ${error.message}`);
+  }
 
   for (const row of (data ?? []) as ExistingSubmission[]) {
     if (!row.start_date) continue;
@@ -223,7 +234,8 @@ async function appendAssetFailureNote(
   const { error } = await admin
     .from("content_submissions")
     .update({
-      internal_notes: `${originalNotes}\nWarning: image import failed; reviewer may need to add it manually`,
+      internal_notes:
+        `${originalNotes}\nWarning: image import failed; reviewer may need to add it manually`,
     })
     .eq("id", submissionId);
 
@@ -232,6 +244,70 @@ async function appendAssetFailureNote(
       submissionId,
       error: error.message,
     });
+  }
+}
+
+const defaultImportedAssetDependencies: ImportedAssetDependencies = {
+  uploadRemoteImage,
+  destroyCloudinaryImage,
+};
+
+export async function uploadAndPersistImportedAsset(
+  admin: SupabaseClient<Database>,
+  params: {
+    submissionId: number;
+    sourceUrl: string;
+    cloudinary: CloudinaryConfig;
+  },
+  dependencies: ImportedAssetDependencies = defaultImportedAssetDependencies,
+): Promise<void> {
+  const uploaded = await dependencies.uploadRemoteImage({
+    sourceUrl: params.sourceUrl,
+    config: params.cloudinary,
+  });
+
+  try {
+    const { data: assetInsertResults, error: assetError } = await admin
+      .rpc("add_submission_assets", {
+        p_submission_id: params.submissionId,
+        p_assets: [{
+          url: uploaded.url,
+          width: uploaded.width,
+          height: uploaded.height,
+          mime_type: uploaded.mimeType,
+          duration_seconds: null,
+        }] as Json,
+      });
+    const assetInsertResult = assetInsertResults?.[0];
+    if (
+      assetError ||
+      assetInsertResults?.length !== 1 ||
+      assetInsertResult?.outcome !== "created"
+    ) {
+      throw new Error(
+        `Asset insert failed: ${
+          assetError?.message ??
+            `Asset insertion returned ${
+              assetInsertResult?.outcome ?? "no outcome"
+            }`
+        }`,
+      );
+    }
+  } catch (error) {
+    try {
+      await dependencies.destroyCloudinaryImage({
+        publicId: uploaded.publicId,
+        config: params.cloudinary,
+      });
+    } catch (cleanupError) {
+      console.error("Could not clean up orphaned Cloudinary image", {
+        publicId: uploaded.publicId,
+        error: cleanupError instanceof Error
+          ? cleanupError.message
+          : String(cleanupError),
+      });
+    }
+    throw error;
   }
 }
 
@@ -301,7 +377,9 @@ export async function handleRequest(request: Request): Promise<Response> {
       addError(errors, {
         stage: "fetch_date",
         date,
-        message: error instanceof Error ? error.message : "Unknown source error",
+        message: error instanceof Error
+          ? error.message
+          : "Unknown source error",
       });
     }
   }
@@ -316,13 +394,16 @@ export async function handleRequest(request: Request): Promise<Response> {
         stage: "prepare_event",
         sourceId: event.id,
         sourceUrl: event.url,
-        message: error instanceof Error ? error.message : "Could not prepare event",
+        message: error instanceof Error
+          ? error.message
+          : "Could not prepare event",
       });
     }
   }
 
   prepared.sort((left, right) =>
-    left.startDate.localeCompare(right.startDate) || left.sourceId - right.sourceId
+    left.startDate.localeCompare(right.startDate) ||
+    left.sourceId - right.sourceId
   );
 
   const sourceSeen = new Set<string>();
@@ -346,7 +427,9 @@ export async function handleRequest(request: Request): Promise<Response> {
     return jsonResponse({ code: "DEDUP_READ_FAILED" }, 500);
   }
 
-  const newEvents = sourceUnique.filter((event) => !existingKeys.has(event.dedupKey));
+  const newEvents = sourceUnique.filter((event) =>
+    !existingKeys.has(event.dedupKey)
+  );
   const existingDuplicates = sourceUnique.length - newEvents.length;
   const selectedEvents = newEvents.slice(0, parsed.limit);
   const limitReached = newEvents.length > selectedEvents.length;
@@ -425,38 +508,11 @@ export async function handleRequest(request: Request): Promise<Response> {
     }
 
     try {
-      const uploaded = await uploadRemoteImage({
+      await uploadAndPersistImportedAsset(admin, {
+        submissionId: submission.id,
         sourceUrl: event.imageUrl,
-        config: cloudinary,
+        cloudinary,
       });
-
-      const { error: assetError } = await admin
-        .from("submissions_assets")
-        .insert({
-          content_submission_id: submission.id,
-          url: uploaded.url,
-          width: uploaded.width,
-          height: uploaded.height,
-          mime_type: uploaded.mimeType,
-          duration_seconds: null,
-        });
-
-      if (assetError) {
-        try {
-          await destroyCloudinaryImage({
-            publicId: uploaded.publicId,
-            config: cloudinary,
-          });
-        } catch (cleanupError) {
-          console.error("Could not clean up orphaned Cloudinary image", {
-            publicId: uploaded.publicId,
-            error: cleanupError instanceof Error
-              ? cleanupError.message
-              : String(cleanupError),
-          });
-        }
-        throw new Error(`Asset insert failed: ${assetError.message}`);
-      }
 
       assetsUploaded += 1;
     } catch (error) {

@@ -5,9 +5,11 @@ import 'package:http/http.dart' as http;
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_repository_impl.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
+import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -214,6 +216,53 @@ void main() {
       expect(httpClient.requests, isEmpty);
       expect(logger.eventsOfType<AdminBackendRequestFailed>(), isEmpty);
     });
+
+    test('addAsset serializes metadata and maps the confirmed asset', () async {
+      httpClient.queueJson(<String, dynamic>{
+        'asset': <String, dynamic>{
+          'id': 11,
+          'url': 'https://res.cloudinary.com/moliseis/image/upload/photo.webp',
+          'width': 1600,
+          'height': 1200,
+        },
+      });
+      const uploadedAsset = SubmissionAsset(
+        secureUrl:
+            'https://res.cloudinary.com/moliseis/image/upload/photo.webp',
+        width: 1600,
+        height: 1200,
+        mimeType: 'image/webp',
+      );
+
+      final result = await repository.addAsset(7, uploadedAsset);
+
+      expect(result, isA<Success<AdminSubmissionAsset>>());
+      expect((result as Success<AdminSubmissionAsset>).value.id, 11);
+      expect(httpClient.requests.single.body, <String, dynamic>{
+        'operation': 'addAsset',
+        'submission_id': 7,
+        'asset': <String, dynamic>{
+          'url': uploadedAsset.secureUrl,
+          'width': 1600,
+          'height': 1200,
+          'mime_type': 'image/webp',
+          'duration_seconds': null,
+        },
+      });
+    });
+
+    test('deleteAsset sends the exact request and requires ok true', () async {
+      httpClient.queueJson(<String, dynamic>{'ok': true});
+
+      final result = await repository.deleteAsset(7, 11);
+
+      expect(result, isA<Success<void>>());
+      expect(httpClient.requests.single.body, <String, dynamic>{
+        'operation': 'deleteAsset',
+        'submission_id': 7,
+        'asset_id': 11,
+      });
+    });
   });
 
   group('contract and transport failures', () {
@@ -270,6 +319,27 @@ void main() {
         }
       },
     );
+
+    test('malformed asset mutation responses become logged errors', () async {
+      httpClient
+        ..queueJson(<String, dynamic>{'asset': <Object?>[]})
+        ..queueJson(<String, dynamic>{'ok': false});
+
+      final addResult = await repository.addAsset(
+        7,
+        const SubmissionAsset(
+          secureUrl:
+              'https://res.cloudinary.com/moliseis/image/upload/photo.jpg',
+          width: 1600,
+          height: 1200,
+        ),
+      );
+      final deleteResult = await repository.deleteAsset(7, 11);
+
+      expect(addResult, isA<Error<AdminSubmissionAsset>>());
+      expect(deleteResult, isA<Error<void>>());
+      expect(logger.eventsOfType<AdminBackendRequestFailed>(), hasLength(2));
+    });
 
     test(
       'preserves custom Function API errors and safe gateway errors',
@@ -357,6 +427,37 @@ void main() {
         expect(logger.eventsOfType<AdminBackendRequestFailed>(), hasLength(4));
       },
     );
+
+    test('normalizes addAsset API errors and logs the operation', () async {
+      httpClient.queueJson(
+        <String, dynamic>{
+          'code': 'ASSET_LIMIT_REACHED',
+          'message': 'A submission can have at most five assets.',
+        },
+        status: 409,
+      );
+
+      final result = await repository.addAsset(
+        7,
+        const SubmissionAsset(
+          secureUrl:
+              'https://res.cloudinary.com/moliseis/image/upload/photo.jpg',
+          width: 1600,
+          height: 1200,
+        ),
+      );
+
+      final error =
+          (result as Error).error as AdminContentSubmissionApiException;
+      expect(
+        (error.statusCode, error.code),
+        (409, 'ASSET_LIMIT_REACHED'),
+      );
+      expect(
+        logger.firstCallOfType<AdminBackendRequestFailed>()?.event.data,
+        <String, Object?>{'operation': 'addAsset'},
+      );
+    });
 
     test('uses reason phrases for malformed Function error maps', () async {
       httpClient.queueJson(

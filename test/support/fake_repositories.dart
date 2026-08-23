@@ -132,15 +132,29 @@ final class FakeAdminContentSubmissionRepository
     Result<AdminSubmission>? createResult,
     Result<AdminSubmission>? updateResult,
     this.changeStatusResult = const Result.success(null),
+    Result<AdminSubmissionAsset>? addAssetResult,
+    this.deleteAssetResult = const Result.success(null),
   }) : getByIdResults = getByIdResults ?? {},
        createResult = createResult ?? Result.success(sampleAdminSubmission()),
-       updateResult = updateResult ?? Result.success(sampleAdminSubmission());
+       updateResult = updateResult ?? Result.success(sampleAdminSubmission()),
+       addAssetResult =
+           addAssetResult ??
+           const Result.success(
+             AdminSubmissionAsset(
+               id: 1,
+               url: 'https://example.com/asset.jpg',
+               width: 1200,
+               height: 800,
+             ),
+           );
 
   Result<List<AdminSubmission>> listResult;
   Map<int, Result<AdminSubmission>> getByIdResults;
   Result<AdminSubmission> createResult;
   Result<AdminSubmission> updateResult;
   Result<void> changeStatusResult;
+  Result<AdminSubmissionAsset> addAssetResult;
+  Result<void> deleteAssetResult;
 
   int listCallCount = 0;
   final getByIdIds = <int>[];
@@ -148,6 +162,8 @@ final class FakeAdminContentSubmissionRepository
   final updateIds = <int>[];
   final updateInputs = <AdminSubmissionInput>[];
   final changeStatusCalls = <(int, AdminSubmissionStatus)>[];
+  final addAssetCalls = <(int, SubmissionAsset)>[];
+  final deleteAssetCalls = <(int, int)>[];
 
   /// When non-null, holds list requests open until the test completes it.
   Completer<Result<List<AdminSubmission>>>? pendingList;
@@ -160,6 +176,13 @@ final class FakeAdminContentSubmissionRepository
 
   /// When non-null, holds moderation requests open until the test completes it.
   Completer<Result<void>>? pendingChangeStatus;
+
+  /// When non-null, holds asset-add requests open until the test completes it.
+  Completer<Result<AdminSubmissionAsset>>? pendingAddAsset;
+
+  /// When non-null, holds asset-delete requests open until the test completes
+  /// it.
+  Completer<Result<void>>? pendingDeleteAsset;
 
   @override
   Future<Result<List<AdminSubmission>>> list() async {
@@ -205,6 +228,25 @@ final class FakeAdminContentSubmissionRepository
     final pending = pendingChangeStatus;
     if (pending != null) return pending.future;
     return changeStatusResult;
+  }
+
+  @override
+  Future<Result<AdminSubmissionAsset>> addAsset(
+    int submissionId,
+    SubmissionAsset asset,
+  ) async {
+    addAssetCalls.add((submissionId, asset));
+    final pending = pendingAddAsset;
+    if (pending != null) return pending.future;
+    return addAssetResult;
+  }
+
+  @override
+  Future<Result<void>> deleteAsset(int submissionId, int assetId) async {
+    deleteAssetCalls.add((submissionId, assetId));
+    final pending = pendingDeleteAsset;
+    if (pending != null) return pending.future;
+    return deleteAssetResult;
   }
 }
 
@@ -660,7 +702,7 @@ final class FakeContentSubmissionRepository
     ImageUploadTask? uploadImageTaskResult,
   }) : uploadImageTaskResult =
            uploadImageTaskResult ??
-           _FakeUploadTask.success(
+           FakeImageUploadTask.completed(
              const Result.success(
                SubmissionAsset(
                  secureUrl: '',
@@ -674,6 +716,7 @@ final class FakeContentSubmissionRepository
   ImageUploadTask uploadImageTaskResult;
 
   bool uploadCalled = false;
+  final uploadedImages = <File>[];
 
   /// Content submission received by the latest [upload] call.
   ContentSubmission? lastUploadedSubmission;
@@ -689,27 +732,45 @@ final class FakeContentSubmissionRepository
   }
 
   @override
-  ImageUploadTask uploadImageTask(File image) => uploadImageTaskResult;
+  ImageUploadTask uploadImageTask(File image) {
+    uploadedImages.add(image);
+    return uploadImageTaskResult;
+  }
 
   @override
   void dispose() {}
 }
 
 /// A stub [ImageUploadTask] for tests that do not exercise the upload pipeline.
-final class _FakeUploadTask implements ImageUploadTask {
-  _FakeUploadTask.success(Result<SubmissionAsset> result)
-    : _result = Future.value(result);
+final class FakeImageUploadTask implements ImageUploadTask {
+  FakeImageUploadTask.completed(Result<SubmissionAsset> result)
+    : _result = Future.value(result),
+      _pendingResult = null;
 
-  final Future<Result<SubmissionAsset>> _result;
+  FakeImageUploadTask.pending()
+    : _result = null,
+      _pendingResult = Completer<Result<SubmissionAsset>>();
+
+  final Future<Result<SubmissionAsset>>? _result;
+  final Completer<Result<SubmissionAsset>>? _pendingResult;
+  int cancelCallCount = 0;
+
+  /// Completes a task created with [FakeImageUploadTask.pending].
+  void complete(Result<SubmissionAsset> result) {
+    _pendingResult?.complete(result);
+  }
 
   @override
-  Future<Result<SubmissionAsset>> get result => _result;
+  Future<Result<SubmissionAsset>> get result =>
+      _result ?? _pendingResult!.future;
 
   @override
   Stream<double> get progress => Stream<double>.value(1);
 
   @override
-  void cancel() {}
+  void cancel() {
+    cancelCallCount++;
+  }
 }
 
 // ---------------------------------------------------------------------------

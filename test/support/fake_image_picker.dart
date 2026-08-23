@@ -10,13 +10,34 @@ import 'package:image_picker/image_picker.dart';
 ///
 /// When callbacks are `null`, returns empty/default responses.
 final class FakeImagePicker extends ImagePicker {
-  FakeImagePicker({this.onPickMultipleMedia, this.onRetrieveLostData});
+  FakeImagePicker({
+    this.onPickImage,
+    this.onPickMultipleMedia,
+    this.onRetrieveLostData,
+  });
 
+  final Future<XFile?> Function()? onPickImage;
   final Future<List<XFile>> Function()? onPickMultipleMedia;
   final Future<LostDataResponse> Function()? onRetrieveLostData;
 
   /// Picker limits supplied by callers, in invocation order.
   final pickMultipleMediaLimits = <int?>[];
+
+  /// Sources supplied to [pickImage], in invocation order.
+  final pickImageSources = <ImageSource>[];
+
+  @override
+  Future<XFile?> pickImage({
+    required ImageSource source,
+    double? maxWidth,
+    double? maxHeight,
+    int? imageQuality,
+    CameraDevice preferredCameraDevice = CameraDevice.rear,
+    bool requestFullMetadata = true,
+  }) async {
+    pickImageSources.add(source);
+    return onPickImage != null ? await onPickImage!() : null;
+  }
 
   @override
   Future<List<XFile>> pickMultipleMedia({

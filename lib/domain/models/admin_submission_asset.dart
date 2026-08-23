@@ -1,13 +1,12 @@
 import 'package:meta/meta.dart';
 
-/// Persisted remote image metadata displayed read-only in the admin editor.
+/// Persisted remote image metadata displayed in the admin editor.
 ///
 /// The backend schema also stores `mime_type` and `duration_seconds`, but
-/// those fields are deferred to the backend round because the MVP only renders
-/// images.
+/// the editor only needs image rendering metadata.
 @immutable
 class AdminSubmissionAsset {
-  /// Creates read-only metadata for a persisted submission asset.
+  /// Creates metadata for a persisted submission asset.
   const AdminSubmissionAsset({
     required this.id,
     required this.url,

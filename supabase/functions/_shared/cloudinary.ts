@@ -47,14 +47,30 @@ export async function cloudinarySignature(
 }
 
 function mimeTypeForFormat(format: unknown): string | null {
-  if (typeof format !== "string" || !format) return null;
-  const normalized = format.toLowerCase();
-  if (normalized === "jpg" || normalized === "jpeg") return "image/jpeg";
-  if (normalized === "svg") return "image/svg+xml";
-  if (["png", "gif", "webp", "avif", "bmp", "tiff"].includes(normalized)) {
-    return `image/${normalized}`;
+  if (typeof format !== "string") return null;
+
+  switch (format.trim().toLowerCase()) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "png":
+      return "image/png";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    case "avif":
+      return "image/avif";
+    case "bmp":
+      return "image/bmp";
+    case "tif":
+    case "tiff":
+      return "image/tiff";
+    case "svg":
+      return "image/svg+xml";
+    default:
+      return null;
   }
-  return null;
 }
 
 async function fetchWithTimeout(
@@ -92,7 +108,9 @@ export async function uploadRemoteImage(params: {
   form.set("signature", signature);
 
   const response = await fetchWithTimeout(
-    `https://api.cloudinary.com/v1_1/${encodeURIComponent(params.config.cloudName)}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${
+      encodeURIComponent(params.config.cloudName)
+    }/image/upload`,
     { method: "POST", body: form },
     fetchImpl,
   );
@@ -160,7 +178,9 @@ export async function destroyCloudinaryImage(params: {
   form.set("signature", signature);
 
   const response = await fetchWithTimeout(
-    `https://api.cloudinary.com/v1_1/${encodeURIComponent(params.config.cloudName)}/image/destroy`,
+    `https://api.cloudinary.com/v1_1/${
+      encodeURIComponent(params.config.cloudName)
+    }/image/destroy`,
     { method: "POST", body: form },
     fetchImpl,
   );

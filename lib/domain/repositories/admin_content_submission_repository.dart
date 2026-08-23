@@ -1,6 +1,8 @@
 import 'package:moliseis/domain/models/admin_submission.dart';
+import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Administration access to content submissions.
@@ -26,4 +28,13 @@ abstract class AdminContentSubmissionRepository {
 
   /// Transitions the moderation status of [id].
   Future<Result<void>> changeStatus(int id, AdminSubmissionStatus status);
+
+  /// Persists an uploaded [asset] association for submission [submissionId].
+  Future<Result<AdminSubmissionAsset>> addAsset(
+    int submissionId,
+    SubmissionAsset asset,
+  );
+
+  /// Removes the persisted asset association [assetId] from [submissionId].
+  Future<Result<void>> deleteAsset(int submissionId, int assetId);
 }

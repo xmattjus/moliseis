@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
 
-import type { Database } from "../_shared/database.types.ts";
+import type { Database, Json } from "../_shared/database.types.ts";
 import type {
   FinalSubmissionStatusWire,
   ValidatedAdminSubmissionInput,
 } from "./admin_submission_validation.ts";
+import type { ValidatedSubmissionAsset } from "../submit-content/submission_validation.ts";
 
 type ContentSubmissionRow =
   Database["public"]["Tables"]["content_submissions"]["Row"];
@@ -41,6 +42,18 @@ export type AdminSubmissionCreateValues = ValidatedAdminSubmissionInput & {
 
 export type ChangeStatusStoreResult = "updated" | "not_found" | "not_pending";
 
+export type AddAssetStoreResult =
+  | { outcome: "created"; asset: SubmissionAssetRecord }
+  | { outcome: "not_found" }
+  | { outcome: "not_pending" }
+  | { outcome: "limit_reached" };
+
+export type DeleteAssetStoreResult =
+  | "deleted"
+  | "not_found"
+  | "not_pending"
+  | "asset_not_found";
+
 export interface AdminSubmissionStore {
   list(): Promise<SubmissionRecord[]>;
   getById(id: number): Promise<
@@ -61,6 +74,14 @@ export interface AdminSubmissionStore {
     handledBy: string;
     modifiedAt: string;
   }): Promise<ChangeStatusStoreResult>;
+  addAsset(
+    submissionId: number,
+    asset: ValidatedSubmissionAsset,
+  ): Promise<AddAssetStoreResult>;
+  deleteAsset(
+    submissionId: number,
+    assetId: number,
+  ): Promise<DeleteAssetStoreResult>;
 }
 
 export class AdminSubmissionStoreError extends Error {
@@ -181,6 +202,72 @@ export function createAdminSubmissionStore(
         .maybeSingle();
       throwOnError(existingError);
       return existing ? "not_pending" : "not_found";
+    },
+
+    async addAsset(submissionId, asset): Promise<AddAssetStoreResult> {
+      const { data, error } = await client.rpc("add_submission_assets", {
+        p_submission_id: submissionId,
+        p_assets: [asset] as Json,
+      });
+      throwOnError(error);
+      const result = data?.[0];
+      if (!result) {
+        throw new AdminSubmissionStoreError(
+          new Error("Asset insertion returned no outcome"),
+        );
+      }
+
+      switch (result.outcome) {
+        case "not_found":
+          return { outcome: "not_found" };
+        case "not_pending":
+          return { outcome: "not_pending" };
+        case "limit_reached":
+          return { outcome: "limit_reached" };
+        case "created":
+          if (
+            result.id === null ||
+            result.url === null ||
+            result.width === null ||
+            result.height === null
+          ) {
+            throw new AdminSubmissionStoreError(
+              new Error("Asset insertion returned incomplete row"),
+            );
+          }
+          return {
+            outcome: "created",
+            asset: {
+              id: result.id,
+              url: result.url,
+              width: result.width,
+              height: result.height,
+            },
+          };
+        default:
+          throw new AdminSubmissionStoreError(
+            new Error("Asset insertion returned an unknown outcome"),
+          );
+      }
+    },
+
+    async deleteAsset(submissionId, assetId): Promise<DeleteAssetStoreResult> {
+      const { data, error } = await client.rpc("delete_submission_asset", {
+        p_submission_id: submissionId,
+        p_asset_id: assetId,
+      });
+      throwOnError(error);
+      switch (data) {
+        case "deleted":
+        case "not_found":
+        case "not_pending":
+        case "asset_not_found":
+          return data;
+        default:
+          throw new AdminSubmissionStoreError(
+            new Error("Asset deletion returned an unknown outcome"),
+          );
+      }
     },
   };
 }

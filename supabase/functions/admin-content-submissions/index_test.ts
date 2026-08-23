@@ -2,9 +2,11 @@ import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
 import type { User } from "npm:@supabase/supabase-js@2.112.3";
 
 import {
+  type AddAssetStoreResult,
   type AdminSubmissionStore,
   AdminSubmissionStoreError,
   type ChangeStatusStoreResult,
+  type DeleteAssetStoreResult,
   type SubmissionRecord,
 } from "./admin_submission_store.ts";
 import {
@@ -54,6 +56,8 @@ class FakeStore implements AdminSubmissionStore {
   createValues: unknown;
   updateValues: unknown;
   statusValues: unknown;
+  addAssetValues: unknown;
+  deleteAssetValues: unknown;
   listResult = [record];
   getResult: Awaited<ReturnType<AdminSubmissionStore["getById"]>> = {
     submission: record,
@@ -67,6 +71,16 @@ class FakeStore implements AdminSubmissionStore {
   createResult = { ...record, status: "pending" as const };
   updateResult: SubmissionRecord | null = { ...record, status: "accepted" };
   statusResults: ChangeStatusStoreResult[] = ["updated"];
+  addAssetResults: AddAssetStoreResult[] = [{
+    outcome: "created",
+    asset: {
+      id: 3,
+      url: "https://res.cloudinary.com/demo/image/upload/v1/new.jpg",
+      width: 1600,
+      height: 1200,
+    },
+  }];
+  deleteAssetResults: DeleteAssetStoreResult[] = ["deleted"];
   error: Error | null = null;
 
   async list(): Promise<SubmissionRecord[]> {
@@ -106,6 +120,24 @@ class FakeStore implements AdminSubmissionStore {
     this.statusValues = params;
     if (this.error) throw this.error;
     return this.statusResults.shift() ?? "not_pending";
+  }
+
+  async addAsset(
+    ...args: Parameters<AdminSubmissionStore["addAsset"]>
+  ): Promise<AddAssetStoreResult> {
+    this.calls.push("addAsset");
+    this.addAssetValues = args;
+    if (this.error) throw this.error;
+    return this.addAssetResults.shift() ?? { outcome: "not_pending" };
+  }
+
+  async deleteAsset(
+    ...args: Parameters<AdminSubmissionStore["deleteAsset"]>
+  ): Promise<DeleteAssetStoreResult> {
+    this.calls.push("deleteAsset");
+    this.deleteAssetValues = args;
+    if (this.error) throw this.error;
+    return this.deleteAssetResults.shift() ?? "not_pending";
   }
 }
 
@@ -393,6 +425,96 @@ Deno.test("updates all statuses and maps status transitions atomically", async (
     ok: true,
     status: "rejected",
   });
+});
+
+Deno.test("adds assets and maps expected asset-add outcomes", async () => {
+  const success = testHandler();
+  const asset = {
+    url: "https://res.cloudinary.com/demo/image/upload/v1/new.jpg",
+    width: 1600,
+    height: 1200,
+    mime_type: "image/jpeg",
+    duration_seconds: null,
+  };
+  const response = await success.handler(
+    request({ operation: "addAsset", submission_id: 7, asset }),
+  );
+  assertEquals(response.status, 200);
+  assertEquals(await responseJson(response), {
+    asset: {
+      id: 3,
+      url: asset.url,
+      width: asset.width,
+      height: asset.height,
+    },
+  });
+  assertEquals(success.store.addAssetValues, [7, asset]);
+
+  for (
+    const [result, status, code] of [
+      [{ outcome: "not_found" }, 404, "NOT_FOUND"],
+      [{ outcome: "not_pending" }, 409, "INVALID_STATUS_TRANSITION"],
+      [{ outcome: "limit_reached" }, 409, "ASSET_LIMIT_REACHED"],
+    ] as const
+  ) {
+    const test = testHandler();
+    test.store.addAssetResults = [result];
+    const failedResponse = await test.handler(
+      request({ operation: "addAsset", submission_id: 7, asset }),
+    );
+    assertEquals(failedResponse.status, status);
+    assertEquals((await responseJson(failedResponse)).code, code);
+  }
+});
+
+Deno.test("deletes assets and maps expected asset-delete outcomes", async () => {
+  const success = testHandler();
+  const response = await success.handler(
+    request({ operation: "deleteAsset", submission_id: 7, asset_id: 3 }),
+  );
+  assertEquals(response.status, 200);
+  assertEquals(await responseJson(response), { ok: true });
+  assertEquals(success.store.deleteAssetValues, [7, 3]);
+
+  for (
+    const [result, status, code] of [
+      ["not_found", 404, "NOT_FOUND"],
+      ["asset_not_found", 404, "ASSET_NOT_FOUND"],
+      ["not_pending", 409, "INVALID_STATUS_TRANSITION"],
+    ] as const
+  ) {
+    const test = testHandler();
+    test.store.deleteAssetResults = [result];
+    const failedResponse = await test.handler(
+      request({ operation: "deleteAsset", submission_id: 7, asset_id: 3 }),
+    );
+    assertEquals(failedResponse.status, status);
+    assertEquals((await responseJson(failedResponse)).code, code);
+  }
+});
+
+Deno.test("rejects non-admin asset mutations before store construction", async () => {
+  const { handler, created, store } = testHandler(
+    adminUser({ app_metadata: { admin: false } }),
+  );
+
+  const response = await handler(
+    request({
+      operation: "addAsset",
+      submission_id: 7,
+      asset: {
+        url: "https://res.cloudinary.com/demo/image/upload/v1/new.jpg",
+        width: 1600,
+        height: 1200,
+        mime_type: null,
+        duration_seconds: null,
+      },
+    }),
+  );
+
+  assertEquals(response.status, 403);
+  assertEquals(created(), 0);
+  assertEquals(store.calls, []);
 });
 
 Deno.test("sanitizes database and unexpected errors", async () => {

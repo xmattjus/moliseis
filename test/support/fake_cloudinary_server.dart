@@ -21,7 +21,7 @@ class FakeCloudinaryServer {
 
   HttpServer? _server;
   final _requests = <FakeCloudinaryRecordedRequest>[];
-  final _existingPublicIds = <String, String>{};
+  final _existingAssets = <String, Map<String, dynamic>>{};
   final _uploadDelays = <String, Completer<void>>{};
   final _slowUploadQueue = <Completer<void>>[];
   final _uploadResponseQueue = <_FakeUploadOverride>[];
@@ -86,14 +86,26 @@ class FakeCloudinaryServer {
     _server = null;
   }
 
-  /// Registers an existing asset so the Admin API returns [secureUrl].
-  void addExistingAsset(String publicId, String secureUrl) {
-    _existingPublicIds[publicId] = secureUrl;
+  /// Registers an existing asset returned by the Admin API.
+  void addExistingAsset(
+    String publicId,
+    String secureUrl, {
+    int width = 100,
+    int height = 100,
+    String? format,
+  }) {
+    final asset = <String, dynamic>{
+      'secure_url': secureUrl,
+      'width': width,
+      'height': height,
+    };
+    if (format != null) asset['format'] = format;
+    _existingAssets[publicId] = asset;
   }
 
   /// Removes a previously registered asset so the Admin API returns 404.
   void removeExistingAsset(String publicId) {
-    _existingPublicIds.remove(publicId);
+    _existingAssets.remove(publicId);
   }
 
   /// Configures the response returned by the upload endpoint.
@@ -252,8 +264,8 @@ class FakeCloudinaryServer {
       return;
     }
 
-    final existingUrl = _existingPublicIds[publicId];
-    if (existingUrl == null) {
+    final existingAsset = _existingAssets[publicId];
+    if (existingAsset == null) {
       request.response.statusCode = 404;
       await request.response.close();
       return;
@@ -261,9 +273,7 @@ class FakeCloudinaryServer {
 
     request.response.statusCode = 200;
     request.response.headers.contentType = null;
-    request.response.write(
-      '{"secure_url":"$existingUrl","width":100,"height":100}',
-    );
+    request.response.write(_jsonEncodeBody(existingAsset));
     await request.response.close();
   }
 

@@ -25,3 +25,6 @@ const String kUserAgent = 'it.benitomatteobercini.moliseis/2.1';
 /// the user gets immediate feedback instead of a `http_400
 /// "File size too large"` failure after the upload has already streamed.
 const int kCloudinaryMaxUploadBytes = 10 * 1024 * 1024;
+
+/// Maximum number of assets associated with one content submission.
+const int kMaximumSubmissionAssetCount = 5;

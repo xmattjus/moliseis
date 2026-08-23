@@ -13,6 +13,15 @@ const input = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const asset = (overrides: Record<string, unknown> = {}) => ({
+  url: "https://res.cloudinary.com/demo/image/upload/v1/example.jpg",
+  width: 1600,
+  height: 1200,
+  mime_type: "image/jpeg",
+  duration_seconds: null,
+  ...overrides,
+});
+
 function expectInvalid(value: unknown, message: string): void {
   const result = parseAdminContentSubmissionsRequest(value);
   assert(!result.ok);
@@ -26,6 +35,8 @@ Deno.test("accepts all operation envelopes and normalizes editor input", () => {
     { operation: "create", input: input() },
     { operation: "update", submission_id: 1, input: input() },
     { operation: "changeStatus", submission_id: 1, status: "accepted" },
+    { operation: "addAsset", submission_id: 1, asset: asset() },
+    { operation: "deleteAsset", submission_id: 1, asset_id: 2 },
   ];
   for (const request of requests) {
     assert(parseAdminContentSubmissionsRequest(request).ok);
@@ -38,6 +49,75 @@ Deno.test("accepts all operation envelopes and normalizes editor input", () => {
   assert(created.ok && created.value.operation === "create");
   assertEquals(created.value.input.city, "Campobasso");
   assertEquals(created.value.input.name, "Teatro");
+});
+
+Deno.test("validates exact add-asset and delete-asset request envelopes", () => {
+  const add = parseAdminContentSubmissionsRequest({
+    operation: "addAsset",
+    submission_id: 1,
+    asset: asset(),
+  });
+  assert(add.ok && add.value.operation === "addAsset");
+  assertEquals(add.value.asset.mime_type, "image/jpeg");
+
+  const deleted = parseAdminContentSubmissionsRequest({
+    operation: "deleteAsset",
+    submission_id: 1,
+    asset_id: 2,
+  });
+  assert(deleted.ok && deleted.value.operation === "deleteAsset");
+  assertEquals(deleted.value.asset_id, 2);
+
+  expectInvalid(
+    {
+      operation: "addAsset",
+      submission_id: 1,
+      asset: asset({ url: "http://res.cloudinary.com/demo/image.jpg" }),
+    },
+    "asset url is not valid",
+  );
+  expectInvalid(
+    { operation: "addAsset", submission_id: 1, asset: asset({ width: 0 }) },
+    "asset width must be a positive safe integer",
+  );
+  expectInvalid(
+    {
+      operation: "addAsset",
+      submission_id: 1,
+      asset: asset({ mime_type: "not-a-mime" }),
+    },
+    "mime_type is not valid",
+  );
+  for (
+    const request of [
+      { operation: "addAsset", asset: asset() },
+      { operation: "addAsset", submission_id: 1 },
+      { operation: "addAsset", submission_id: 1, asset: asset(), extra: true },
+      { operation: "deleteAsset", submission_id: 1 },
+      { operation: "deleteAsset", submission_id: 1, asset_id: 2, extra: true },
+    ]
+  ) {
+    expectInvalid(request, "Request contains unsupported or missing fields.");
+  }
+  for (
+    const [operation, key] of [
+      ["addAsset", "submission_id"],
+      ["deleteAsset", "submission_id"],
+      ["deleteAsset", "asset_id"],
+    ] as const
+  ) {
+    expectInvalid(
+      {
+        operation,
+        submission_id: key === "submission_id" ? 0 : 1,
+        ...(operation === "deleteAsset"
+          ? { asset_id: key === "asset_id" ? 0 : 2 }
+          : {}),
+        ...(operation === "addAsset" ? { asset: asset() } : {}),
+      },
+      `${key} must be a positive safe integer.`,
+    );
+  }
 });
 
 Deno.test("rejects invalid request envelopes, IDs, and status", () => {
