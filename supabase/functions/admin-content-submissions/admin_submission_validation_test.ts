@@ -10,6 +10,8 @@ const input = (overrides: Record<string, unknown> = {}) => ({
   description_delta: null,
   start_date: null,
   end_date: null,
+  latitude: null,
+  longitude: null,
   ...overrides,
 });
 
@@ -156,7 +158,7 @@ Deno.test("rejects invalid request envelopes, IDs, and status", () => {
   }
 });
 
-Deno.test("requires the exact seven editor input fields and rejects spoofing", () => {
+Deno.test("requires the exact nine editor input fields and rejects spoofing", () => {
   expectInvalid(
     { operation: "create", input: {} },
     "input contains unsupported or missing fields.",
@@ -166,7 +168,6 @@ Deno.test("requires the exact seven editor input fields and rejects spoofing", (
       "user_id",
       "status",
       "assets",
-      "latitude",
       "address",
       "handled_at",
       "status_email_key",
@@ -303,4 +304,112 @@ Deno.test("validates nullable dates without enforcing date ordering", () => {
       message,
     );
   }
+});
+
+Deno.test("accepts null and valid coordinate pairs with exact boundaries", () => {
+  assert(
+    parseAdminContentSubmissionsRequest({
+      operation: "create",
+      input: input(),
+    }).ok,
+  );
+  assert(
+    parseAdminContentSubmissionsRequest({
+      operation: "update",
+      submission_id: 1,
+      input: input({ latitude: null, longitude: null }),
+    }).ok,
+  );
+  const paired = parseAdminContentSubmissionsRequest({
+    operation: "create",
+    input: input({ latitude: 41.5575078, longitude: 14.6485406 }),
+  });
+  assert(paired.ok && paired.value.operation === "create");
+  assertEquals(paired.value.input.latitude, 41.5575078);
+  assertEquals(paired.value.input.longitude, 14.6485406);
+
+  for (
+    const [latitude, longitude] of [
+      [-90, -180],
+      [90, 180],
+    ] as const
+  ) {
+    const boundary = parseAdminContentSubmissionsRequest({
+      operation: "create",
+      input: input({ latitude, longitude }),
+    });
+    assert(boundary.ok && boundary.value.operation === "create");
+    assertEquals(boundary.value.input.latitude, latitude);
+    assertEquals(boundary.value.input.longitude, longitude);
+  }
+});
+
+Deno.test("rejects out-of-range coordinates with stable messages", () => {
+  expectInvalid(
+    {
+      operation: "create",
+      input: input({ latitude: -90.000001, longitude: 0 }),
+    },
+    "latitude must be between -90 and 90.",
+  );
+  expectInvalid(
+    {
+      operation: "create",
+      input: input({ latitude: 90.000001, longitude: 0 }),
+    },
+    "latitude must be between -90 and 90.",
+  );
+  expectInvalid(
+    {
+      operation: "create",
+      input: input({ latitude: 0, longitude: -180.000001 }),
+    },
+    "longitude must be between -180 and 180.",
+  );
+  expectInvalid(
+    {
+      operation: "create",
+      input: input({ latitude: 0, longitude: 180.000001 }),
+    },
+    "longitude must be between -180 and 180.",
+  );
+});
+
+Deno.test("rejects half-pairs, non-numbers, and non-finite numbers", () => {
+  expectInvalid(
+    {
+      operation: "create",
+      input: input({ latitude: 41.5575078 }),
+    },
+    "latitude and longitude must be provided together.",
+  );
+  expectInvalid(
+    {
+      operation: "update",
+      submission_id: 1,
+      input: input({ longitude: 14.6485406 }),
+    },
+    "latitude and longitude must be provided together.",
+  );
+  for (const badValue of ["41.55", true]) {
+    expectInvalid(
+      { operation: "create", input: input({ latitude: badValue }) },
+      "latitude must be a finite number.",
+    );
+    expectInvalid(
+      { operation: "create", input: input({ longitude: badValue }) },
+      "longitude must be a finite number.",
+    );
+  }
+  expectInvalid(
+    { operation: "create", input: input({ latitude: Number.NaN }) },
+    "latitude must be a finite number.",
+  );
+  expectInvalid(
+    {
+      operation: "create",
+      input: input({ latitude: 0, longitude: Number.POSITIVE_INFINITY }),
+    },
+    "longitude must be a finite number.",
+  );
 });

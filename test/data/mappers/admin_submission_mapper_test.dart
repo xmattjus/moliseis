@@ -23,7 +23,7 @@ void main() {
   };
 
   group('adminSubmissionInputToWireMap', () {
-    test('serializes exactly the seven editor-owned keys', () {
+    test('serializes exactly the nine editor-owned keys', () {
       final wire = adminSubmissionInputToWireMap(
         AdminSubmissionInput(
           category: ContentCategory.history,
@@ -43,11 +43,43 @@ void main() {
           'description_delta',
           'start_date',
           'end_date',
+          'latitude',
+          'longitude',
         ]),
       );
       expect(wire, isNot(contains('user_id')));
       expect(wire, isNot(contains('status')));
       expect(wire, isNot(contains('assets')));
+    });
+
+    test('serializes a null coordinate pair explicitly', () {
+      final wire = adminSubmissionInputToWireMap(
+        AdminSubmissionInput(
+          category: ContentCategory.history,
+          city: 'Isernia',
+          name: 'Palazzo storico',
+        ),
+      );
+
+      expect(wire.containsKey('latitude'), isTrue);
+      expect(wire.containsKey('longitude'), isTrue);
+      expect(wire['latitude'], isNull);
+      expect(wire['longitude'], isNull);
+    });
+
+    test('serializes a valid pair as numbers', () {
+      final wire = adminSubmissionInputToWireMap(
+        AdminSubmissionInput(
+          category: ContentCategory.history,
+          city: 'Campobasso',
+          name: 'Teatro',
+          latitude: 41.5575078,
+          longitude: 14.6485406,
+        ),
+      );
+
+      expect(wire['latitude'], 41.5575078);
+      expect(wire['longitude'], 14.6485406);
     });
 
     test('preserves null optional values and canonical Delta data', () {
@@ -109,6 +141,8 @@ void main() {
       expect(submission.descriptionDelta, isNull);
       expect(submission.startDate, isNull);
       expect(submission.endDate, isNull);
+      expect(submission.latitude, isNull);
+      expect(submission.longitude, isNull);
       expect(submission.assets, isEmpty);
       expect(
         submission.createdAt,
@@ -149,6 +183,33 @@ void main() {
       expect(submission.assets.single.height, 800);
     });
 
+    test('restores coordinates and normalizes JSON ints to doubles', () {
+      final submission = adminSubmissionFromWire(<String, dynamic>{
+        ...validWire,
+        'latitude': 41.5575078,
+        'longitude': 14.6485406,
+      });
+      expect(submission.latitude, 41.5575078);
+      expect(submission.longitude, 14.6485406);
+
+      final intTyped = adminSubmissionFromWire(<String, dynamic>{
+        ...validWire,
+        'latitude': 41,
+        'longitude': -14,
+      });
+      expect(intTyped.latitude, 41.0);
+      expect(intTyped.longitude, -14.0);
+    });
+
+    test('parses absent coordinate keys as null', () {
+      final wire = <String, dynamic>{...validWire}
+        ..remove('latitude')
+        ..remove('longitude');
+      final submission = adminSubmissionFromWire(wire);
+      expect(submission.latitude, isNull);
+      expect(submission.longitude, isNull);
+    });
+
     test('maps every category and final status', () {
       for (final category in ContentCategory.values) {
         final submission = adminSubmissionFromWire(<String, dynamic>{
@@ -181,6 +242,8 @@ void main() {
         <String, dynamic>{...validWire, 'modified_at': 'invalid'},
         <String, dynamic>{...validWire, 'start_date': 'invalid'},
         <String, dynamic>{...validWire, 'end_date': 'invalid'},
+        <String, dynamic>{...validWire, 'latitude': '41.55'},
+        <String, dynamic>{...validWire, 'longitude': true},
         <String, dynamic>{...validWire, 'description_delta': '[]'},
         <String, dynamic>{
           ...validWire,

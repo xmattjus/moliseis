@@ -27,6 +27,8 @@ export type SubmissionRecord = Pick<
   | "status"
   | "created_at"
   | "modified_at"
+  | "latitude"
+  | "longitude"
 >;
 
 export type SubmissionAssetRecord = Pick<
@@ -92,7 +94,7 @@ export class AdminSubmissionStoreError extends Error {
 }
 
 export const SUBMISSION_SELECT =
-  "id,city,name,description,description_delta,start_date,end_date,category,user_name,user_email,status,created_at,modified_at";
+  "id,city,name,description,description_delta,start_date,end_date,category,user_name,user_email,status,created_at,modified_at,latitude,longitude";
 export const ASSET_SELECT = "id,url,width,height";
 
 function throwOnError(error: unknown): void {
@@ -150,6 +152,8 @@ export function createAdminSubmissionStore(
           user_id: values.user_id,
           user_email: values.user_email,
           user_name: values.user_name,
+          latitude: values.latitude,
+          longitude: values.longitude,
         })
         .select(SUBMISSION_SELECT)
         .single();
@@ -173,6 +177,8 @@ export function createAdminSubmissionStore(
           description_delta: input.description_delta,
           start_date: input.start_date,
           end_date: input.end_date,
+          latitude: input.latitude,
+          longitude: input.longitude,
           modified_at: modifiedAt,
         })
         .eq("id", id)

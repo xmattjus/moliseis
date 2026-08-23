@@ -29,6 +29,8 @@ const record: SubmissionRecord = {
   status: "pending",
   created_at: "2026-08-21T10:00:00.000Z",
   modified_at: "2026-08-21T10:00:00.000Z",
+  latitude: null,
+  longitude: null,
 };
 
 const adminUser = (overrides: Partial<User> = {}): User => ({
@@ -49,6 +51,8 @@ const input = () => ({
   description_delta: null,
   start_date: null,
   end_date: null,
+  latitude: null,
+  longitude: null,
 });
 
 class FakeStore implements AdminSubmissionStore {
@@ -287,6 +291,8 @@ Deno.test("maps list and detail DTOs without exposing internal fields", async ()
       "description_delta",
       "end_date",
       "id",
+      "latitude",
+      "longitude",
       "modified_at",
       "name",
       "start_date",
@@ -313,6 +319,92 @@ Deno.test("maps list and detail DTOs without exposing internal fields", async ()
     request({ operation: "getById", submission_id: 8 }),
   );
   assertEquals(missing.status, 404);
+});
+
+Deno.test("passes validated coordinates to the store and round-trips them", async () => {
+  const locatedRecord = {
+    ...record,
+    latitude: 41.5575078,
+    longitude: 14.6485406,
+  };
+
+  const listedStore = new FakeStore();
+  listedStore.listResult = [locatedRecord];
+  const listed = testHandler(adminUser(), listedStore);
+  const listResponse = await listed.handler(request({ operation: "list" }));
+  assertEquals(listResponse.status, 200);
+  assertEquals(
+    (await responseJson(listResponse)).submissions,
+    [{ ...locatedRecord, assets: [] }],
+  );
+
+  const detailedStore = new FakeStore();
+  detailedStore.getResult = { submission: locatedRecord, assets: [] };
+  const detailed = testHandler(adminUser(), detailedStore);
+  const detailResponse = await detailed.handler(
+    request({ operation: "getById", submission_id: 7 }),
+  );
+  assertEquals(detailResponse.status, 200);
+  assertEquals(
+    await responseJson(detailResponse),
+    { submission: { ...locatedRecord, assets: [] } },
+  );
+
+  const createdInput = {
+    category: "unknown",
+    city: "Campobasso",
+    name: "Plan A",
+    description: null,
+    description_delta: null,
+    start_date: null,
+    end_date: null,
+    latitude: 41.5575078,
+    longitude: 14.6485406,
+  };
+  const createdStore = new FakeStore();
+  createdStore.createResult = { ...locatedRecord, status: "pending" as const };
+  const created = testHandler(adminUser(), createdStore);
+  const createResponse = await created.handler(
+    request({ operation: "create", input: createdInput }),
+  );
+  assertEquals(createResponse.status, 200);
+  assertEquals(created.store.createValues, {
+    ...createdInput,
+    user_id: "00000000-0000-4000-8000-000000000001",
+    user_email: "admin@example.test",
+    user_name: "Plan Admin",
+  });
+  assertEquals(
+    await responseJson(createResponse),
+    { submission: { ...locatedRecord, assets: [] } },
+  );
+
+  const updatedInput = {
+    ...createdInput,
+    latitude: null,
+    longitude: null,
+  };
+  const clearedRecord = { ...record, status: "accepted" as const };
+  const updatedStore = new FakeStore();
+  updatedStore.updateResult = clearedRecord;
+  const updated = testHandler(adminUser(), updatedStore);
+  const updateResponse = await updated.handler(
+    request({
+      operation: "update",
+      submission_id: 7,
+      input: updatedInput,
+    }),
+  );
+  assertEquals(updateResponse.status, 200);
+  assertEquals(updated.store.updateValues, [
+    7,
+    updatedInput,
+    "2026-08-21T11:00:00.000Z",
+  ]);
+  assertEquals(
+    await responseJson(updateResponse),
+    { submission: { ...clearedRecord, assets: [] } },
+  );
 });
 
 Deno.test("creates with server-authoritative identity and validates the admin profile first", async () => {

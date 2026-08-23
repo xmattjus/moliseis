@@ -56,6 +56,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   List<Map<String, dynamic>>? _descriptionDelta;
   DateTime? _startDate;
   DateTime? _endDate;
+  String _latitudeText = '';
+  String _longitudeText = '';
   String? _contributorName;
   String? _contributorEmail;
   AdminSubmissionStatus? _status;
@@ -108,6 +110,15 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Whether the editable dates identify an event.
   bool get isEvent => _startDate != null || _endDate != null;
+
+  /// Raw editable latitude draft text.
+  ///
+  /// May be empty, partial, or invalid while the user types; validation
+  /// happens at save time and in the location widget.
+  String get latitudeText => _latitudeText;
+
+  /// Raw editable longitude draft text.
+  String get longitudeText => _longitudeText;
 
   /// Read-only contributor name from the loaded detail or create context.
   String? get contributorName => _contributorName;
@@ -207,6 +218,31 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _markDirty();
   }
 
+  /// Updates the raw latitude draft and marks the editor dirty.
+  ///
+  /// Invalid or partial text is kept as-is so it stays visible and blocks
+  /// Save until corrected.
+  void setLatitudeText(String value) {
+    _latitudeText = value;
+    _markDirty();
+  }
+
+  /// Updates the raw longitude draft and marks the editor dirty.
+  void setLongitudeText(String value) {
+    _longitudeText = value;
+    _markDirty();
+  }
+
+  /// Updates both coordinate drafts from one map selection.
+  ///
+  /// This is one logical change: both drafts are written with six-decimal
+  /// formatting and the editor is marked dirty exactly once.
+  void setCoordinates(double latitude, double longitude) {
+    _latitudeText = latitude.toStringAsFixed(6);
+    _longitudeText = longitude.toStringAsFixed(6);
+    _markDirty();
+  }
+
   Future<Result<void>> _loadDetail() async {
     final submissionId = this.submissionId;
     if (submissionId == null) return const Result.success(null);
@@ -220,6 +256,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _descriptionDelta = submission.descriptionDelta;
       _startDate = submission.startDate;
       _endDate = submission.endDate;
+      // Lossless hydration: double.toString() round-trips exactly, unlike a
+      // fixed-precision rendering. A legacy half-pair hydrates asymmetric
+      // drafts on purpose so the problem stays visible until corrected.
+      _latitudeText = submission.latitude?.toString() ?? '';
+      _longitudeText = submission.longitude?.toString() ?? '';
       _contributorName = submission.userName;
       _contributorEmail = submission.userEmail;
       _status = submission.status;
@@ -247,6 +288,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       return Result.error(Exception('Compila i campi obbligatori.'));
     }
 
+    final coordinates = _parsedCoordinates();
+    if (coordinates == null) {
+      return Result.error(Exception('Inserisci coordinate valide.'));
+    }
+    final (latitude, longitude) = coordinates;
+
     final input = AdminSubmissionInput(
       category: _category ?? ContentCategory.unknown,
       city: city,
@@ -255,6 +302,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       descriptionDelta: _descriptionDelta,
       startDate: _startDate,
       endDate: _endDate,
+      latitude: latitude,
+      longitude: longitude,
     );
     final submissionId = this.submissionId;
     final result = submissionId == null
@@ -265,6 +314,52 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _isDirty = false;
       _notifyListeners();
     });
+  }
+
+  /// Parses the coordinate drafts into a nullable pair at the save boundary.
+  ///
+  /// Returns `null` when the draft is not a valid optional pair: both blank is
+  /// valid `(null, null)`; a half-pair, unparsable text, non-finite spellings,
+  /// or out-of-range values are all invalid.
+  (double?, double?)? _parsedCoordinates() {
+    final latitude = _parseCoordinateDraft(
+      _latitudeText,
+      minimum: -90,
+      maximum: 90,
+    );
+    if (latitude == null && _latitudeText.trim().isNotEmpty) {
+      return null;
+    }
+    final longitude = _parseCoordinateDraft(
+      _longitudeText,
+      minimum: -180,
+      maximum: 180,
+    );
+    if (longitude == null && _longitudeText.trim().isNotEmpty) {
+      return null;
+    }
+    if ((latitude == null) != (longitude == null)) {
+      return null;
+    }
+    return (latitude, longitude);
+  }
+
+  /// Parses one trimmed draft with narrow decimal-comma support.
+  ///
+  /// Returns `null` for blank input or any invalid value; blankness must be
+  /// distinguished by the caller.
+  double? _parseCoordinateDraft(
+    String raw, {
+    required double minimum,
+    required double maximum,
+  }) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    if (','.allMatches(trimmed).length > 1) return null;
+    final value = double.tryParse(trimmed.replaceFirst(',', '.'));
+    if (value == null || !value.isFinite) return null;
+    if (value < minimum || value > maximum) return null;
+    return value;
   }
 
   Future<Result<void>> _changeStatus(AdminSubmissionStatus status) async {

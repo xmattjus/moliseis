@@ -120,6 +120,50 @@ void main() {
         throwsUnsupportedError,
       );
     });
+
+    test('includes coordinates in equality and hashCode', () {
+      final plain = AdminSubmission(
+        id: 1,
+        city: 'Campobasso',
+        name: 'Palazzo',
+        category: ContentCategory.history,
+        userName: 'Mario Rossi',
+        userEmail: 'mario@example.com',
+        status: AdminSubmissionStatus.pending,
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026),
+      );
+      final located = AdminSubmission(
+        id: 1,
+        city: 'Campobasso',
+        name: 'Palazzo',
+        category: ContentCategory.history,
+        userName: 'Mario Rossi',
+        userEmail: 'mario@example.com',
+        status: AdminSubmissionStatus.pending,
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026),
+        latitude: 41.5575078,
+        longitude: 14.6485406,
+      );
+      final sameLocation = AdminSubmission(
+        id: 1,
+        city: 'Campobasso',
+        name: 'Palazzo',
+        category: ContentCategory.history,
+        userName: 'Mario Rossi',
+        userEmail: 'mario@example.com',
+        status: AdminSubmissionStatus.pending,
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026),
+        latitude: 41.5575078,
+        longitude: 14.6485406,
+      );
+
+      expect(plain, isNot(equals(located)));
+      expect(located, equals(sameLocation));
+      expect(located.hashCode, sameLocation.hashCode);
+    });
   });
 
   group('AdminSubmissionInput', () {

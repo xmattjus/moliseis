@@ -27,6 +27,8 @@ class AdminSubmission {
     required this.status,
     required this.createdAt,
     required this.modifiedAt,
+    this.latitude,
+    this.longitude,
     List<AdminSubmissionAsset> assets = const [],
   }) : descriptionDelta = freezeDescriptionDelta(descriptionDelta),
        assets = List<AdminSubmissionAsset>.unmodifiable(assets);
@@ -70,6 +72,15 @@ class AdminSubmission {
   /// Timestamp at which the submission was last modified.
   final DateTime modifiedAt;
 
+  /// Optional geographical latitude in decimal degrees, when present.
+  ///
+  /// Loaded values are transported faithfully; ranges and pairing are enforced
+  /// at the write boundaries, so legacy malformed rows can load for repair.
+  final double? latitude;
+
+  /// Optional geographical longitude in decimal degrees, when present.
+  final double? longitude;
+
   /// Immutable snapshot of persisted remote assets displayed read-only by the
   /// editor.
   final List<AdminSubmissionAsset> assets;
@@ -99,6 +110,8 @@ class AdminSubmission {
         other.status == status &&
         other.createdAt == createdAt &&
         other.modifiedAt == modifiedAt &&
+        other.latitude == latitude &&
+        other.longitude == longitude &&
         const DeepCollectionEquality().equals(other.assets, assets);
   }
 
@@ -117,6 +130,8 @@ class AdminSubmission {
     status,
     createdAt,
     modifiedAt,
+    latitude,
+    longitude,
     const DeepCollectionEquality().hash(assets),
   );
 }

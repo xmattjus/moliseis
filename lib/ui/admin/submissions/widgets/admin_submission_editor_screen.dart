@@ -6,6 +6,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
@@ -34,6 +35,7 @@ class AdminSubmissionEditorScreen extends StatefulWidget {
 class _AdminSubmissionEditorScreenState
     extends State<AdminSubmissionEditorScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _locationFormKey = GlobalKey<FormState>();
   var _statusDialogOpen = false;
   var _saveCompletedWhileStatusDialogOpen = false;
 
@@ -183,7 +185,9 @@ class _AdminSubmissionEditorScreenState
   }
 
   void _save() {
-    if (_formKey.currentState?.validate() ?? false) {
+    final contentOk = _formKey.currentState?.validate() ?? false;
+    final locationOk = _locationFormKey.currentState?.validate() ?? false;
+    if (contentOk && locationOk) {
       unawaited(widget.viewModel.save.execute());
     }
   }
@@ -259,6 +263,22 @@ class _AdminSubmissionEditorScreenState
                     ),
                   ],
                 ),
+              ),
+              SliverList.list(
+                children: <Widget>[
+                  const TextSectionDivider('Posizione'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: AdminSubmissionLocationEditor(
+                      latitudeText: viewModel.latitudeText,
+                      longitudeText: viewModel.longitudeText,
+                      formKey: _locationFormKey,
+                      onLatitudeTextChanged: viewModel.setLatitudeText,
+                      onLongitudeTextChanged: viewModel.setLongitudeText,
+                      onMapCoordinatesSelected: viewModel.setCoordinates,
+                    ),
+                  ),
+                ],
               ),
               if (viewModel.isEditMode && viewModel.hasLoadedDetail)
                 SliverList.list(

@@ -45,6 +45,8 @@ type AdminSubmissionWire = {
   status: "pending" | "accepted" | "rejected";
   created_at: string;
   modified_at: string;
+  latitude: number | null;
+  longitude: number | null;
   assets: AdminSubmissionAssetWire[];
 };
 
@@ -115,6 +117,8 @@ function toSubmissionWire(
     status: submission.status,
     created_at: submission.created_at,
     modified_at: submission.modified_at,
+    latitude: submission.latitude,
+    longitude: submission.longitude,
     assets: assets.map(toAssetWire),
   };
 }

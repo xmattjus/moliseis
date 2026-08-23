@@ -111,7 +111,7 @@ void main() {
       expect(httpClient.requests, hasLength(1));
     });
 
-    test('create sends only the seven editor-owned fields', () async {
+    test('create sends only the nine editor-owned fields', () async {
       httpClient.queueJson(<String, dynamic>{'submission': submission});
       final input = AdminSubmissionInput(
         category: ContentCategory.history,
@@ -140,12 +140,40 @@ void main() {
           'description_delta',
           'start_date',
           'end_date',
+          'latitude',
+          'longitude',
         ]),
       );
       expect(body['input'], isNot(contains('user_email')));
       expect(body['input'], isNot(contains('status')));
       expect(httpClient.requests, hasLength(1));
     });
+
+    test(
+      'create and update include populated coordinates when set',
+      () async {
+        httpClient
+          ..queueJson(<String, dynamic>{'submission': submission})
+          ..queueJson(<String, dynamic>{'submission': submission});
+        final input = AdminSubmissionInput(
+          category: ContentCategory.history,
+          city: 'Isernia',
+          name: 'Palazzo storico',
+          latitude: 41.5575078,
+          longitude: 14.6485406,
+        );
+
+        await repository.create(input);
+        await repository.update(7, input);
+
+        for (final request in httpClient.requests) {
+          final body = request.body! as Map<String, dynamic>;
+          final payload = body['input'] as Map<String, dynamic>;
+          expect(payload['latitude'], 41.5575078);
+          expect(payload['longitude'], 14.6485406);
+        }
+      },
+    );
 
     test('update maps its response without a follow-up request', () async {
       httpClient.queueJson(<String, dynamic>{'submission': submission});
@@ -171,10 +199,54 @@ void main() {
           'description_delta': null,
           'start_date': null,
           'end_date': null,
+          'latitude': null,
+          'longitude': null,
         },
       });
       expect(httpClient.requests, hasLength(1));
     });
+
+    test(
+      'maps response coordinates from JSON numbers to doubles',
+      () async {
+        httpClient.queueJson(
+          <String, dynamic>{
+            'submission': <String, dynamic>{
+              ...submission,
+              'latitude': 41,
+              'longitude': 14.5,
+            },
+          },
+        );
+
+        final result = await repository.getById(7);
+
+        expect((result as Success<AdminSubmission>).value.latitude, 41.0);
+        expect(result.value.longitude, 14.5);
+        expect(httpClient.requests, hasLength(1));
+      },
+    );
+
+    test(
+      'invalid response coordinate types fail once without retry',
+      () async {
+        httpClient.queueJson(
+          <String, dynamic>{
+            'submission': <String, dynamic>{...submission, 'latitude': '41'},
+          },
+        );
+
+        final result = await repository.getById(7);
+
+        expect(result, isA<Error<AdminSubmission>>());
+        expect(httpClient.requests, hasLength(1));
+        final failedCalls = logger.calls
+            .where((call) => call.event is AdminBackendRequestFailed)
+            .toList();
+        expect(failedCalls, hasLength(1));
+        expect(failedCalls.single.error, isA<FormatException>());
+      },
+    );
 
     test('changeStatus sends accepted and rejected final targets', () async {
       httpClient

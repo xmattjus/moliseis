@@ -18,6 +18,7 @@ import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_edito
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
@@ -1087,6 +1088,260 @@ void main() {
         findsOneWidget,
       );
       $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
+    });
+
+    group('location section', () {
+      Finder scrollableOf(WidgetTester tester) => find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+
+      Future<void> pushEditor(WidgetTester tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(app);
+        await tester.pumpAndSettle();
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> scrollTo(WidgetTester tester, Finder finder) => tester
+          .scrollUntilVisible(finder, 200, scrollable: scrollableOf(tester));
+
+      testWidgets('create screen exposes the Posizione section', (
+        tester,
+      ) async {
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          creatorName: 'Redattore',
+          creatorEmail: 'redattore@example.com',
+        );
+        await pushEditor(tester);
+
+        await scrollTo(tester, find.text('Posizione'));
+        expect(find.text('Posizione'), findsOneWidget);
+        expect(find.text('Mappa'), findsOneWidget);
+        expect(find.text('Coordinate'), findsOneWidget);
+        expect(find.byType(GeoMap), findsOneWidget);
+      });
+
+      testWidgets('edit screen exposes the Posizione section after load', (
+        tester,
+      ) async {
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await pushEditor(tester);
+
+        await scrollTo(tester, find.text('Posizione'));
+        expect(find.text('Posizione'), findsOneWidget);
+      });
+
+      testWidgets('loaded coordinates reach the location editor fields', (
+        tester,
+      ) async {
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(latitude: 41.5575078, longitude: 14.6485406),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await pushEditor(tester);
+
+        final latitudeField = find.widgetWithText(
+          TextFormField,
+          '41.5575078',
+          skipOffstage: false,
+        );
+        final longitudeField = find.widgetWithText(
+          TextFormField,
+          '14.6485406',
+          skipOffstage: false,
+        );
+        expect(latitudeField, findsOneWidget);
+        expect(longitudeField, findsOneWidget);
+      });
+
+      testWidgets('mode switching alone does not dirty the editor', (
+        tester,
+      ) async {
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await pushEditor(tester);
+
+        await scrollTo(tester, find.text('Posizione'));
+        await tester.tap(find.text('Coordinate'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Mappa'));
+        await tester.pumpAndSettle();
+
+        expect(viewModel.isDirty, isFalse);
+      });
+
+      testWidgets('a coordinate edit makes the editor dirty and disables '
+          'moderation', (tester) async {
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await pushEditor(tester);
+
+        await scrollTo(tester, find.text('Posizione'));
+        await tester.tap(find.text('Coordinate'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Latitudine'),
+          '41.55',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Longitudine'),
+          '14.64',
+        );
+        await tester.pump();
+        expect(viewModel.isDirty, isTrue);
+
+        await scrollTo(tester, find.widgetWithText(FilledButton, 'Accetta'));
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Accetta'),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Rifiuta'),
+              )
+              .onPressed,
+          isNull,
+        );
+      });
+
+      testWidgets('an invalid location prevents Save', (tester) async {
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(latitude: 12.5, longitude: -3),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await pushEditor(tester);
+
+        // Break the loaded pair into a half-location.
+        await scrollTo(tester, find.text('Posizione'));
+        await tester.tap(find.text('Coordinate'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Longitudine'),
+          '',
+        );
+        await tester.pump();
+
+        await scrollTo(
+          tester,
+          find.widgetWithText(FilledButton, 'Salva modifiche'),
+        );
+        await tester.tap(find.widgetWithText(FilledButton, 'Salva modifiche'));
+        await tester.pumpAndSettle();
+
+        expect(repository.updateIds, isEmpty);
+        expect(viewModel.isDirty, isTrue);
+      });
+
+      testWidgets('valid blank drafts permit Save directly from Map mode', (
+        tester,
+      ) async {
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          creatorName: 'Redattore',
+          creatorEmail: 'redattore@example.com',
+        );
+        await pushEditor(tester);
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Città'),
+          'Isernia',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Luogo o evento'),
+          'Museo',
+        );
+        await tester.pump();
+
+        await scrollTo(
+          tester,
+          find.widgetWithText(FilledButton, 'Crea contributo'),
+        );
+        await tester.tap(find.widgetWithText(FilledButton, 'Crea contributo'));
+        await tester.pumpAndSettle();
+
+        expect(repository.createInputs, isNotEmpty);
+        expect(repository.createInputs.single.latitude, isNull);
+        expect(repository.createInputs.single.longitude, isNull);
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
+      });
+
+      testWidgets('successful Save persists the updated coordinate pair', (
+        tester,
+      ) async {
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await pushEditor(tester);
+
+        await scrollTo(tester, find.text('Posizione'));
+        await tester.tap(find.text('Coordinate'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Latitudine'),
+          '41.55',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Longitudine'),
+          '14,64',
+        );
+        await tester.pump();
+
+        await scrollTo(
+          tester,
+          find.widgetWithText(FilledButton, 'Salva modifiche'),
+        );
+        await tester.tap(find.widgetWithText(FilledButton, 'Salva modifiche'));
+        await tester.pumpAndSettle();
+
+        expect(repository.updateIds, <int>[1]);
+        expect(repository.updateInputs.single.latitude, 41.55);
+        expect(repository.updateInputs.single.longitude, 14.64);
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
+      });
     });
   });
 }

@@ -939,5 +939,398 @@ void main() {
         expect(viewModel.assets, isEmpty);
       },
     );
+
+    group('coordinate draft semantics', () {
+      AdminSubmissionEditorViewModel createViewModel({
+        FakeAdminContentSubmissionRepository? repository,
+        int? submissionId,
+      }) {
+        return AdminSubmissionEditorViewModel(
+          repository: repository ?? FakeAdminContentSubmissionRepository(),
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          submissionId: submissionId,
+        );
+      }
+
+      test('create mode starts with an empty coordinate draft', () {
+        final viewModel = createViewModel();
+        addTearDown(viewModel.dispose);
+
+        expect(viewModel.latitudeText, '');
+        expect(viewModel.longitudeText, '');
+        expect(viewModel.isDirty, isFalse);
+      });
+
+      test(
+        'edit load hydrates existing coordinates without marking dirty',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              1: Result.success(
+                sampleAdminSubmission(
+                  latitude: 41.5575078,
+                  longitude: 14.6485406,
+                ),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 1,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+
+          expect(viewModel.latitudeText, '41.5575078');
+          expect(viewModel.longitudeText, '14.6485406');
+          expect(viewModel.isDirty, isFalse);
+        },
+      );
+
+      test('load with null coordinates stays empty', () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(sampleAdminSubmission()),
+          },
+        );
+        final viewModel = createViewModel(
+          repository: repository,
+          submissionId: 1,
+        );
+        addTearDown(viewModel.dispose);
+
+        await viewModel.load.execute();
+
+        expect(viewModel.latitudeText, '');
+        expect(viewModel.longitudeText, '');
+        expect(viewModel.isDirty, isFalse);
+      });
+
+      test('manual latitude and longitude edits each mark dirty', () {
+        final viewModel = createViewModel();
+        addTearDown(viewModel.dispose);
+        var notifications = 0;
+
+        viewModel
+          ..addListener(() => notifications++)
+          ..setLatitudeText('41.5');
+        expect(viewModel.isDirty, isTrue);
+        expect(notifications, 1);
+
+        viewModel.setLongitudeText('14.6');
+        expect(viewModel.isDirty, isTrue);
+        expect(notifications, 2);
+      });
+
+      test('map setCoordinates updates both values in one logical change', () {
+        final viewModel = createViewModel();
+        addTearDown(viewModel.dispose);
+        var notifications = 0;
+
+        viewModel
+          ..addListener(() => notifications++)
+          ..setCoordinates(41.123456789, 14.987654321);
+
+        expect(viewModel.latitudeText, '41.123457');
+        expect(viewModel.longitudeText, '14.987654');
+        expect(viewModel.isDirty, isTrue);
+        expect(notifications, 1);
+      });
+
+      test('both-empty coordinates save as null and null', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Museo');
+        expect(viewModel.isDirty, isTrue);
+        await viewModel.save.execute();
+
+        expect(viewModel.save.completed, isTrue);
+        expect(repository.createInputs.single.latitude, isNull);
+        expect(repository.createInputs.single.longitude, isNull);
+      });
+
+      test('a valid manual pair saves as doubles', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Museo')
+          ..setLatitudeText('41.5575078')
+          ..setLongitudeText('14.6485406');
+        await viewModel.save.execute();
+
+        expect(viewModel.save.completed, isTrue);
+        expect(repository.createInputs.single.latitude, 41.5575078);
+        expect(repository.createInputs.single.longitude, 14.6485406);
+      });
+
+      test('only one coordinate blocks persistence', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Museo')
+          ..setLatitudeText('41.55');
+        await viewModel.save.execute();
+
+        expect(viewModel.save.error, isTrue);
+        expect(repository.createInputs, isEmpty);
+
+        viewModel
+          ..setLatitudeText('')
+          ..setLongitudeText('14.64');
+        await viewModel.save.execute();
+
+        expect(viewModel.save.error, isTrue);
+        expect(repository.createInputs, isEmpty);
+      });
+
+      test('unparsable coordinates block persistence', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Museo')
+          ..setLatitudeText('not-a-number')
+          ..setLongitudeText('14.64');
+        await viewModel.save.execute();
+
+        expect(viewModel.save.error, isTrue);
+        expect(repository.createInputs, isEmpty);
+      });
+
+      test('out-of-range coordinates block persistence', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final latitudeViewModel = createViewModel(repository: repository);
+        addTearDown(latitudeViewModel.dispose);
+        latitudeViewModel
+          ..setCity('Isernia')
+          ..setName('Museo')
+          ..setLatitudeText('90.000001')
+          ..setLongitudeText('0');
+        await latitudeViewModel.save.execute();
+        expect(latitudeViewModel.save.error, isTrue);
+
+        latitudeViewModel
+          ..setLatitudeText('-91')
+          ..setLongitudeText('');
+        await latitudeViewModel.save.execute();
+        expect(latitudeViewModel.save.error, isTrue);
+        expect(repository.createInputs, isEmpty);
+
+        final longitudeViewModel = createViewModel(repository: repository);
+        addTearDown(longitudeViewModel.dispose);
+        longitudeViewModel
+          ..setCity('Isernia')
+          ..setName('Museo')
+          ..setLatitudeText('0')
+          ..setLongitudeText('180.000001');
+        await longitudeViewModel.save.execute();
+        expect(longitudeViewModel.save.error, isTrue);
+
+        longitudeViewModel.setLongitudeText('-180.5');
+        await longitudeViewModel.save.execute();
+        expect(longitudeViewModel.save.error, isTrue);
+        expect(repository.createInputs, isEmpty);
+      });
+
+      test('coordinates at exact legal boundaries save', () async {
+        for (final (latitude, longitude) in const [
+          (-90.0, -180.0),
+          (90.0, 180.0),
+        ]) {
+          final repository = FakeAdminContentSubmissionRepository();
+          final viewModel = createViewModel(repository: repository);
+          addTearDown(viewModel.dispose);
+          viewModel
+            ..setCity('Isernia')
+            ..setName('Museo')
+            ..setLatitudeText(latitude.toString())
+            ..setLongitudeText(longitude.toString());
+          await viewModel.save.execute();
+
+          expect(viewModel.save.completed, isTrue);
+          expect(repository.createInputs.single.latitude, latitude);
+          expect(repository.createInputs.single.longitude, longitude);
+        }
+      });
+
+      test('a location edit keeps moderation blocked while dirty', () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(sampleAdminSubmission()),
+          },
+        );
+        final viewModel = createViewModel(
+          repository: repository,
+          submissionId: 1,
+        );
+        addTearDown(viewModel.dispose);
+        await viewModel.load.execute();
+        viewModel.setLatitudeText('41');
+
+        await viewModel.changeStatus.execute(AdminSubmissionStatus.accepted);
+
+        expect(viewModel.changeStatus.error, isTrue);
+        expect(repository.changeStatusCalls, isEmpty);
+      });
+
+      test('successful save clears dirty exactly like other fields', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Museo')
+          ..setCoordinates(41.5, 14.6);
+        expect(viewModel.isDirty, isTrue);
+
+        await viewModel.save.execute();
+
+        expect(viewModel.save.completed, isTrue);
+        expect(viewModel.isDirty, isFalse);
+      });
+
+      test(
+        'loaded coordinates survive unrelated field edits and Save',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository();
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 3,
+          );
+          addTearDown(viewModel.dispose);
+          repository.getByIdResults[3] = Result.success(
+            sampleAdminSubmission(id: 3, latitude: 41.9, longitude: 14.9),
+          );
+          await viewModel.load.execute();
+
+          viewModel.setName('Nuovo nome');
+          await viewModel.save.execute();
+
+          expect(viewModel.save.completed, isTrue);
+          expect(repository.updateIds, <int>[3]);
+          expect(repository.updateInputs.single.latitude, 41.9);
+          expect(repository.updateInputs.single.longitude, 14.9);
+        },
+      );
+
+      test(
+        'map-selected coordinates survive unrelated field edits and Save',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository();
+          final viewModel = createViewModel(repository: repository);
+          addTearDown(viewModel.dispose);
+
+          viewModel
+            ..setCity('Isernia')
+            ..setName('Museo')
+            ..setCoordinates(41.123456789, 14.987654321)
+            ..setDescription(description: 'Testo', descriptionDelta: null);
+          await viewModel.save.execute();
+
+          expect(viewModel.save.completed, isTrue);
+          expect(repository.createInputs.single.latitude, 41.123457);
+          expect(repository.createInputs.single.longitude, 14.987654);
+        },
+      );
+
+      test('loaded high-precision coordinates persist bit-exact', () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(
+              sampleAdminSubmission(
+                latitude: 41.5575078123,
+                longitude: 14.6485406789,
+              ),
+            ),
+          },
+        );
+        final viewModel = createViewModel(
+          repository: repository,
+          submissionId: 1,
+        );
+        addTearDown(viewModel.dispose);
+        await viewModel.load.execute();
+
+        viewModel.setName('Solo nome');
+        await viewModel.save.execute();
+
+        expect(viewModel.save.completed, isTrue);
+        expect(repository.updateInputs.single.latitude, 41.5575078123);
+        expect(repository.updateInputs.single.longitude, 14.6485406789);
+      });
+
+      test(
+        'legacy half-pair row hydrates asymmetrically and blocks save',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              1: Result.success(sampleAdminSubmission(latitude: 41.5)),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 1,
+          );
+          addTearDown(viewModel.dispose);
+          await viewModel.load.execute();
+
+          expect(viewModel.latitudeText, '41.5');
+          expect(viewModel.longitudeText, '');
+          expect(viewModel.isDirty, isFalse);
+
+          await viewModel.save.execute();
+
+          expect(viewModel.save.error, isTrue);
+          expect(repository.updateIds, isEmpty);
+        },
+      );
+
+      test('single decimal comma parses and saves', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Museo')
+          ..setLatitudeText('41,55')
+          ..setLongitudeText('14,62');
+        await viewModel.save.execute();
+
+        expect(viewModel.save.completed, isTrue);
+        expect(repository.createInputs.single.latitude, 41.55);
+        expect(repository.createInputs.single.longitude, 14.62);
+      });
+
+      test('multiple commas block persistence', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Museo')
+          ..setLatitudeText('41,55,5')
+          ..setLongitudeText('14,62');
+        await viewModel.save.execute();
+
+        expect(viewModel.save.error, isTrue);
+        expect(repository.createInputs, isEmpty);
+      });
+    });
   });
 }

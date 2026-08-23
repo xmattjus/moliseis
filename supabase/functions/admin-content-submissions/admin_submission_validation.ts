@@ -19,6 +19,8 @@ export type AdminSubmissionInputWire = {
   description_delta: unknown | null;
   start_date: string | null;
   end_date: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export type ValidatedAdminSubmissionInput =
@@ -66,6 +68,8 @@ const INPUT_KEYS = [
   "description_delta",
   "start_date",
   "end_date",
+  "latitude",
+  "longitude",
 ] as const;
 
 function valid<T>(value: T): ValidationResult<T> {
@@ -115,6 +119,22 @@ function parseDate(
   return valid(value);
 }
 
+function parseOptionalCoordinate(
+  value: unknown,
+  name: string,
+  min: number,
+  max: number,
+): ValidationResult<number | null> {
+  if (value === null) return valid(null);
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return invalid(`${name} must be a finite number.`);
+  }
+  if (value < min || value > max) {
+    return invalid(`${name} must be between ${min} and ${max}.`);
+  }
+  return valid(value);
+}
+
 function parseInput(
   value: unknown,
 ): ValidationResult<ValidatedAdminSubmissionInput> {
@@ -131,6 +151,8 @@ function parseInput(
     description_delta,
     start_date,
     end_date,
+    latitude,
+    longitude,
   } = value;
   if (typeof city !== "string" || !city.trim()) {
     return invalid("city must be a non-empty string.");
@@ -165,6 +187,19 @@ function parseInput(
   const parsedDelta = parseQuillDelta(description_delta, description);
   if (!parsedDelta.ok) return parsedDelta;
 
+  const parsedLatitude = parseOptionalCoordinate(latitude, "latitude", -90, 90);
+  if (!parsedLatitude.ok) return parsedLatitude;
+  const parsedLongitude = parseOptionalCoordinate(
+    longitude,
+    "longitude",
+    -180,
+    180,
+  );
+  if (!parsedLongitude.ok) return parsedLongitude;
+  if ((parsedLatitude.value === null) !== (parsedLongitude.value === null)) {
+    return invalid("latitude and longitude must be provided together.");
+  }
+
   return valid({
     category,
     city: normalizedCity,
@@ -173,6 +208,8 @@ function parseInput(
     description_delta: deltaAsJson(parsedDelta.value),
     start_date: parsedStartDate.value,
     end_date: parsedEndDate.value,
+    latitude: parsedLatitude.value,
+    longitude: parsedLongitude.value,
   });
 }
 

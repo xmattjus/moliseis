@@ -98,6 +98,8 @@ AdminSubmission sampleAdminSubmission({
   AdminSubmissionStatus status = AdminSubmissionStatus.pending,
   DateTime? createdAt,
   DateTime? modifiedAt,
+  double? latitude,
+  double? longitude,
   List<AdminSubmissionAsset> assets = const [],
 }) {
   final timestamp = DateTime.utc(2026, 8, 20);
@@ -115,6 +117,8 @@ AdminSubmission sampleAdminSubmission({
     status: status,
     createdAt: createdAt ?? timestamp,
     modifiedAt: modifiedAt ?? timestamp,
+    latitude: latitude,
+    longitude: longitude,
     assets: assets,
   );
 }

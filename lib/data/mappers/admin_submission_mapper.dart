@@ -16,6 +16,8 @@ Map<String, dynamic> adminSubmissionInputToWireMap(
     'description_delta': input.descriptionDelta,
     'start_date': input.startDate?.toUtc().toIso8601String(),
     'end_date': input.endDate?.toUtc().toIso8601String(),
+    'latitude': input.latitude,
+    'longitude': input.longitude,
   };
 }
 
@@ -39,6 +41,8 @@ AdminSubmission adminSubmissionFromWire(Object? value) {
     status: adminSubmissionStatusFromWire(object['status']),
     createdAt: _requiredDateTime(object, 'created_at'),
     modifiedAt: _requiredDateTime(object, 'modified_at'),
+    latitude: _nullableDouble(object['latitude'], 'latitude'),
+    longitude: _nullableDouble(object['longitude'], 'longitude'),
     assets: assets,
   );
 }
@@ -107,6 +111,19 @@ String? _nullableString(Object? value, String field) {
   }
   if (value is String) {
     return value;
+  }
+  throw FormatException('$field is invalid');
+}
+
+/// Tolerant nullable coordinate parsing: absent keys and null values parse as
+/// null, JSON numbers normalize to double, and anything else is a contract
+/// violation. Ranges are not checked here; the mapper transports faithfully.
+double? _nullableDouble(Object? value, String field) {
+  if (value == null) {
+    return null;
+  }
+  if (value is num) {
+    return value.toDouble();
   }
   throw FormatException('$field is invalid');
 }
