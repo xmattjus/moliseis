@@ -184,16 +184,19 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _markDirty();
   }
 
-  /// Updates the start date while preserving its selected time.
+  /// Updates the start date while preserving the previous start's clock time.
   ///
-  /// An end date that the new start would overtake is repaired to the end of
-  /// the start's calendar day, preserving whether the dates are UTC- or
-  /// local-represented.
+  /// A date-only edit changes just the calendar day: the previous start's
+  /// hour, minute, and sub-second components and its UTC/local representation
+  /// are kept, because date pickers emit local-represented values while
+  /// loaded backend timestamps are commonly UTC-represented. An end date that
+  /// the new start would overtake is repaired to the end of the start's
+  /// calendar day, preserving whether the dates are UTC- or local-represented.
   void setStartDate(DateTime? date) {
-    final startDate = date?.copyWith(
-      hour: _startDate?.hour,
-      minute: _startDate?.minute,
-    );
+    final previousStart = _startDate;
+    final startDate = date == null || previousStart == null
+        ? date
+        : _withCalendarDate(previousStart, date);
 
     _startDate = startDate;
     if (startDate != null) {
@@ -286,6 +289,33 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _notifyListeners();
     });
   }
+
+  /// Returns [current] moved to the calendar day of [picked].
+  ///
+  /// The result keeps [current]'s hour, minute, second, millisecond,
+  /// microsecond, and UTC/local representation so a date-only edit cannot
+  /// shift the represented clock time or the instant it denotes.
+  DateTime _withCalendarDate(DateTime current, DateTime picked) => current.isUtc
+      ? DateTime.utc(
+          picked.year,
+          picked.month,
+          picked.day,
+          current.hour,
+          current.minute,
+          current.second,
+          current.millisecond,
+          current.microsecond,
+        )
+      : DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          current.hour,
+          current.minute,
+          current.second,
+          current.millisecond,
+          current.microsecond,
+        );
 
   /// Returns the end of [value]'s calendar day, keeping whether [value] is
   /// UTC- or local-represented.

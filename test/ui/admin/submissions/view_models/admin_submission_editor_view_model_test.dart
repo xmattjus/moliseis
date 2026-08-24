@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
@@ -467,6 +468,139 @@ void main() {
             DateTime.utc(2026, 8, 20, 23, 59, 59, 999, 999),
           );
           expect(input.endDate!.isUtc, isTrue);
+        },
+      );
+
+      test(
+        'a date-only edit of a loaded UTC start keeps its UTC clock',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              11: Result.success(
+                sampleAdminSubmission(
+                  id: 11,
+                  startDate: DateTime.utc(2026, 8, 20, 10, 30, 15, 123, 456),
+                  endDate: DateTime.utc(2026, 8, 22, 18),
+                ),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 11,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+
+          // The picker emits a local-represented calendar day.
+          viewModel.setStartDate(DateTime(2026, 8, 21));
+
+          expect(
+            viewModel.startDate,
+            DateTime.utc(2026, 8, 21, 10, 30, 15, 123, 456),
+          );
+          expect(viewModel.startDate!.isUtc, isTrue);
+          expect(viewModel.endDate, DateTime.utc(2026, 8, 22, 18));
+        },
+      );
+
+      test(
+        'a date-only edit of a loaded local start keeps its local clock',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              12: Result.success(
+                sampleAdminSubmission(
+                  id: 12,
+                  startDate: DateTime(2026, 8, 20, 9, 45),
+                ),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 12,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+
+          viewModel.setStartDate(DateTime(2026, 8, 25));
+
+          expect(viewModel.startDate, DateTime(2026, 8, 25, 9, 45));
+          expect(viewModel.startDate!.isUtc, isFalse);
+        },
+      );
+
+      test(
+        'repairing an overtaken end after a date-only edit stays UTC',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              13: Result.success(
+                sampleAdminSubmission(
+                  id: 13,
+                  startDate: DateTime.utc(2026, 8, 20, 22),
+                  endDate: DateTime.utc(2026, 8, 20, 23),
+                ),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 13,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+
+          viewModel.setStartDate(DateTime(2026, 8, 21));
+
+          expect(viewModel.startDate, DateTime.utc(2026, 8, 21, 22));
+          expect(viewModel.startDate!.isUtc, isTrue);
+          expect(
+            viewModel.endDate,
+            DateTime.utc(2026, 8, 21, 23, 59, 59, 999, 999),
+          );
+          expect(viewModel.endDate!.isUtc, isTrue);
+        },
+      );
+
+      test(
+        'a date-only edit round-trips without shifting the instant',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              14: Result.success(
+                sampleAdminSubmission(
+                  id: 14,
+                  startDate: DateTime.utc(2026, 8, 20, 10),
+                  endDate: DateTime.utc(2026, 8, 22, 18),
+                ),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 14,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+          viewModel
+            ..setStartDate(DateTime(2026, 8, 21))
+            ..setName('Sagra spostata');
+          await viewModel.save.execute();
+
+          expect(viewModel.save.completed, isTrue);
+          final wire = adminSubmissionInputToWireMap(
+            repository.updateInputs.single,
+          );
+          // Only the calendar day changed: the stored instant keeps its 10:00Z
+          // clock instead of being shifted by the local UTC offset.
+          expect(wire['start_date'], '2026-08-21T10:00:00.000Z');
+          expect(wire['end_date'], '2026-08-22T18:00:00.000Z');
         },
       );
 
