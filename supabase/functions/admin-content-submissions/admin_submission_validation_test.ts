@@ -270,16 +270,98 @@ Deno.test("preserves descriptions and applies the shared canonical Delta rules",
   }, "description_delta requires a non-null description");
 });
 
-Deno.test("validates nullable dates without enforcing date ordering", () => {
-  assert(
-    parseAdminContentSubmissionsRequest({
-      operation: "create",
-      input: input({
+Deno.test("validates nullable dates and enforces date pairing and ordering", () => {
+  const subMillisecondStart = "2026-08-20T10:00:00.000100Z";
+  const subMillisecondEnd = "2026-08-20T10:00:00.000900Z";
+
+  for (
+    const valid of [
+      input(),
+      input({ start_date: "2026-08-20T10:00:00.000Z" }),
+      // Equal instants remain valid even when spelled with different offsets.
+      input({
         start_date: "2026-08-21T10:00:00.000Z",
-        end_date: "2026-08-20T10:00:00.000Z",
+        end_date: "2026-08-21T12:00:00.000+02:00",
       }),
-    }).ok,
-  );
+      input({
+        start_date: "2026-08-20T10:00:00.000Z",
+        end_date: "2026-08-21T10:00:00.000Z",
+      }),
+      // An end later within the same millisecond stays valid.
+      input({
+        start_date: subMillisecondStart,
+        end_date: subMillisecondEnd,
+      }),
+      // Equal instants remain valid down to microsecond precision across
+      // different offsets.
+      input({
+        start_date: "2026-08-20T10:00:00.000500Z",
+        end_date: "2026-08-20T12:00:00.000500+02:00",
+      }),
+    ]
+  ) {
+    assert(
+      parseAdminContentSubmissionsRequest({ operation: "create", input: valid })
+        .ok,
+    );
+  }
+
+  const ordered = parseAdminContentSubmissionsRequest({
+    operation: "create",
+    input: input({
+      start_date: "2026-08-20T10:00:00.000+02:00",
+      end_date: "2026-08-20T09:00:00.000Z",
+    }),
+  });
+  assert(ordered.ok && ordered.value.operation === "create");
+  assertEquals(ordered.value.input.start_date, "2026-08-20T10:00:00.000+02:00");
+  assertEquals(ordered.value.input.end_date, "2026-08-20T09:00:00.000Z");
+
+  const precise = parseAdminContentSubmissionsRequest({
+    operation: "create",
+    input: input({
+      start_date: subMillisecondStart,
+      end_date: subMillisecondEnd,
+    }),
+  });
+  assert(precise.ok && precise.value.operation === "create");
+  assertEquals(precise.value.input.start_date, subMillisecondStart);
+  assertEquals(precise.value.input.end_date, subMillisecondEnd);
+
+  for (
+    const [invalid, message] of [
+      [
+        input({ start_date: null, end_date: "2026-08-20T10:00:00.000Z" }),
+        "end_date requires start_date.",
+      ],
+      [
+        input({
+          start_date: "2026-08-21T10:00:00.000Z",
+          end_date: "2026-08-20T10:00:00.000Z",
+        }),
+        "end_date must not be before start_date.",
+      ],
+      [
+        // Both instants collapse to the same JavaScript millisecond but the
+        // end is 998 microseconds earlier.
+        input({
+          start_date: "2026-08-20T10:00:00.000999Z",
+          end_date: "2026-08-20T10:00:00.000001Z",
+        }),
+        "end_date must not be before start_date.",
+      ],
+    ] as const
+  ) {
+    for (const operation of ["create", "update"] as const) {
+      expectInvalid(
+        operation === "create"
+          ? { operation, input: invalid }
+          : { operation, submission_id: 1, input: invalid },
+        message,
+      );
+    }
+  }
+
   for (
     const [key, value, message] of [
       [

@@ -15,6 +15,17 @@ import '../../../../support/fake_repositories.dart';
 
 void main() {
   group('AdminSubmissionEditorViewModel', () {
+    AdminSubmissionEditorViewModel createViewModel({
+      FakeAdminContentSubmissionRepository? repository,
+      int? submissionId,
+    }) {
+      return AdminSubmissionEditorViewModel(
+        repository: repository ?? FakeAdminContentSubmissionRepository(),
+        contentSubmissionRepository: FakeContentSubmissionRepository(),
+        submissionId: submissionId,
+      );
+    }
+
     test('create mode starts with empty clean state', () {
       final viewModel = AdminSubmissionEditorViewModel(
         repository: FakeAdminContentSubmissionRepository(),
@@ -72,6 +83,10 @@ void main() {
         expect(viewModel.name, 'Museo');
         expect(viewModel.description, 'Dettagli');
         expect(viewModel.isEvent, isTrue);
+        expect(viewModel.startDate, DateTime.utc(2026, 8, 20, 10));
+        expect(viewModel.startDate!.isUtc, isTrue);
+        expect(viewModel.endDate, DateTime.utc(2026, 8, 20, 12));
+        expect(viewModel.endDate!.isUtc, isTrue);
         expect(viewModel.contributorName, 'Anna Bianchi');
         expect(viewModel.contributorEmail, 'anna@example.com');
         expect(viewModel.status, AdminSubmissionStatus.accepted);
@@ -137,9 +152,6 @@ void main() {
           creatorEmail: 'redattore@example.com',
         );
         addTearDown(viewModel.dispose);
-        final startDate = DateTime.utc(2026, 8, 20, 10);
-        final endDate = DateTime.utc(2026, 8, 20, 12);
-
         viewModel
           ..setCity('Isernia')
           ..setName('Museo del Tartufo')
@@ -148,9 +160,7 @@ void main() {
             descriptionDelta: <Map<String, dynamic>>[
               <String, dynamic>{'insert': 'Descrizione\n'},
             ],
-          )
-          ..setStartDate(startDate)
-          ..setEndDate(endDate);
+          );
         await viewModel.save.execute();
 
         expect(viewModel.save.completed, isTrue);
@@ -163,8 +173,8 @@ void main() {
         expect(input.descriptionDelta, <Map<String, dynamic>>[
           <String, dynamic>{'insert': 'Descrizione\n'},
         ]);
-        expect(input.startDate, startDate);
-        expect(input.endDate, endDate);
+        expect(input.startDate, isNull);
+        expect(input.endDate, isNull);
         expect(viewModel.isDirty, isFalse);
       },
     );
@@ -231,6 +241,263 @@ void main() {
 
       expect(viewModel.isDirty, isTrue);
       expect(notifications, 7);
+    });
+
+    group('event date semantics', () {
+      test('saving a start-only submission persists it unchanged', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+        final startDate = DateTime.utc(2026, 8, 20, 10, 30);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Sagra del Tartufo')
+          ..setStartDate(startDate);
+        await viewModel.save.execute();
+
+        expect(viewModel.save.completed, isTrue);
+        final input = repository.createInputs.single;
+        expect(input.startDate, startDate);
+        expect(input.endDate, isNull);
+      });
+
+      test(
+        'an actively selected end date becomes end of day and saves',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository();
+          final viewModel = createViewModel(repository: repository);
+          addTearDown(viewModel.dispose);
+
+          viewModel
+            ..setCity('Isernia')
+            ..setName('Sagra del Tartufo')
+            ..setStartDate(DateTime(2026, 8, 20, 15))
+            // The date-only picker emits midnight for a same-day selection.
+            ..setEndDate(DateTime(2026, 8, 20));
+
+          expect(
+            viewModel.endDate,
+            DateTime(2026, 8, 20, 23, 59, 59, 999, 999),
+          );
+          expect(viewModel.endDate!.isUtc, isFalse);
+
+          await viewModel.save.execute();
+
+          expect(viewModel.save.completed, isTrue);
+          expect(
+            repository.createInputs.single.endDate,
+            DateTime(2026, 8, 20, 23, 59, 59, 999, 999),
+          );
+        },
+      );
+
+      test('end-only submissions cannot be created', () async {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setCity('Isernia')
+          ..setName('Sagra del Tartufo')
+          ..setEndDate(DateTime(2026, 8, 20));
+        await viewModel.save.execute();
+
+        expect(viewModel.save.error, isTrue);
+        expect(repository.createInputs, isEmpty);
+        expect(viewModel.isDirty, isTrue);
+      });
+
+      test(
+        'a normalized previous-day end still cannot precede the start',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository();
+          final viewModel = createViewModel(repository: repository);
+          addTearDown(viewModel.dispose);
+
+          viewModel
+            ..setCity('Isernia')
+            ..setName('Sagra del Tartufo')
+            ..setStartDate(DateTime(2026, 8, 25, 15))
+            ..setEndDate(DateTime(2026, 8, 24));
+
+          expect(
+            viewModel.endDate,
+            DateTime(2026, 8, 24, 23, 59, 59, 999, 999),
+          );
+
+          await viewModel.save.execute();
+
+          expect(viewModel.save.error, isTrue);
+          expect(repository.createInputs, isEmpty);
+          expect(viewModel.isDirty, isTrue);
+        },
+      );
+
+      test(
+        'a loaded end-only submission cannot update until repaired',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              3: Result.success(
+                sampleAdminSubmission(
+                  id: 3,
+                  endDate: DateTime.utc(2026, 8, 20, 12),
+                ),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 3,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+          viewModel.setName('Museo rinnovato');
+          await viewModel.save.execute();
+
+          expect(viewModel.save.error, isTrue);
+          expect(repository.updateInputs, isEmpty);
+          expect(viewModel.isDirty, isTrue);
+
+          viewModel.setEndDate(null);
+          await viewModel.save.execute();
+
+          expect(viewModel.save.completed, isTrue);
+          expect(viewModel.isDirty, isFalse);
+          final input = repository.updateInputs.single;
+          expect(input.name, 'Museo rinnovato');
+          expect(input.startDate, isNull);
+          expect(input.endDate, isNull);
+        },
+      );
+
+      test(
+        'an equal loaded pair round-trips untouched through an update',
+        () async {
+          final loadedDate = DateTime.utc(2026, 8, 20, 10, 30, 15, 123, 456);
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              5: Result.success(
+                sampleAdminSubmission(
+                  id: 5,
+                  startDate: loadedDate,
+                  endDate: loadedDate,
+                ),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 5,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+          expect(viewModel.startDate, loadedDate);
+          expect(viewModel.startDate!.isUtc, isTrue);
+          expect(viewModel.endDate, loadedDate);
+
+          viewModel.setName('Museo rinnovato');
+          await viewModel.save.execute();
+
+          expect(viewModel.save.completed, isTrue);
+          final input = repository.updateInputs.single;
+          expect(input.startDate, loadedDate);
+          expect(input.startDate!.isUtc, isTrue);
+          expect(input.endDate, loadedDate);
+          expect(input.endDate!.isUtc, isTrue);
+        },
+      );
+
+      test('moving the start date past the end moves the end to that day', () {
+        final repository = FakeAdminContentSubmissionRepository();
+        final viewModel = createViewModel(repository: repository);
+        addTearDown(viewModel.dispose);
+
+        viewModel
+          ..setStartDate(DateTime(2026, 8, 20))
+          ..setEndDate(DateTime(2026, 8, 22))
+          ..setStartDate(DateTime(2026, 8, 25));
+
+        expect(viewModel.endDate, DateTime(2026, 8, 25, 23, 59, 59, 999, 999));
+        expect(viewModel.endDate!.isUtc, isFalse);
+      });
+
+      test(
+        'moving a loaded UTC start past its end produces a UTC end of day',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              7: Result.success(
+                sampleAdminSubmission(
+                  id: 7,
+                  startDate: DateTime.utc(2026, 8, 20, 1),
+                  endDate: DateTime.utc(2026, 8, 20, 2),
+                ),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 7,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+
+          viewModel.setStartTime(DateTime.utc(2026, 8, 20, 5));
+
+          expect(viewModel.startDate, DateTime.utc(2026, 8, 20, 5));
+          expect(viewModel.startDate!.isUtc, isTrue);
+          expect(
+            viewModel.endDate,
+            DateTime.utc(2026, 8, 20, 23, 59, 59, 999, 999),
+          );
+          expect(viewModel.endDate!.isUtc, isTrue);
+
+          await viewModel.save.execute();
+
+          expect(viewModel.save.completed, isTrue);
+          final input = repository.updateInputs.single;
+          expect(input.startDate!.isUtc, isTrue);
+          expect(
+            input.endDate,
+            DateTime.utc(2026, 8, 20, 23, 59, 59, 999, 999),
+          );
+          expect(input.endDate!.isUtc, isTrue);
+        },
+      );
+
+      test('an automatic end repair still notifies exactly once', () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            9: Result.success(
+              sampleAdminSubmission(
+                id: 9,
+                startDate: DateTime(2026, 8, 20, 1),
+                endDate: DateTime(2026, 8, 20, 2),
+              ),
+            ),
+          },
+        );
+        final viewModel = createViewModel(
+          repository: repository,
+          submissionId: 9,
+        );
+        addTearDown(viewModel.dispose);
+
+        await viewModel.load.execute();
+        var notifications = 0;
+        viewModel
+          ..addListener(() => notifications++)
+          ..setStartTime(DateTime(2026, 8, 20, 5));
+
+        expect(notifications, 1);
+        expect(viewModel.endDate, DateTime(2026, 8, 20, 23, 59, 59, 999, 999));
+        expect(viewModel.endDate!.isUtc, isFalse);
+      });
     });
 
     test(
@@ -941,17 +1208,6 @@ void main() {
     );
 
     group('coordinate draft semantics', () {
-      AdminSubmissionEditorViewModel createViewModel({
-        FakeAdminContentSubmissionRepository? repository,
-        int? submissionId,
-      }) {
-        return AdminSubmissionEditorViewModel(
-          repository: repository ?? FakeAdminContentSubmissionRepository(),
-          contentSubmissionRepository: FakeContentSubmissionRepository(),
-          submissionId: submissionId,
-        );
-      }
-
       test('create mode starts with an empty coordinate draft', () {
         final viewModel = createViewModel();
         addTearDown(viewModel.dispose);

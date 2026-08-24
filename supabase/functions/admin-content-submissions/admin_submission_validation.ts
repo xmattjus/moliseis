@@ -119,6 +119,30 @@ function parseDate(
   return valid(value);
 }
 
+// JavaScript Dates carry only millisecond precision while validated wire
+// strings may preserve microseconds, so ordering compares an epoch-millisecond
+// key plus the retained fractional tail instead of raw Date.parse results.
+type InstantKey = [epochMilliseconds: number, subMilliseconds: string];
+
+function instantKey(value: string): InstantKey {
+  const match = /\.(\d+)/.exec(value);
+  if (!match) return [Date.parse(value), ""];
+  const digits = match[1];
+  const epochMilliseconds = digits.length <= 3
+    ? Date.parse(value)
+    : Date.parse(value.replace(`.${digits}`, `.${digits.slice(0, 3)}`));
+  return [epochMilliseconds, digits.length <= 3 ? "" : digits.slice(3)];
+}
+
+function isBeforeInstant(a: string, b: string): boolean {
+  const [aMilliseconds, aSubMilliseconds] = instantKey(a);
+  const [bMilliseconds, bSubMilliseconds] = instantKey(b);
+  if (aMilliseconds !== bMilliseconds) return aMilliseconds < bMilliseconds;
+  const width = Math.max(aSubMilliseconds.length, bSubMilliseconds.length);
+  return aSubMilliseconds.padEnd(width, "0") <
+    bSubMilliseconds.padEnd(width, "0");
+}
+
 function parseOptionalCoordinate(
   value: unknown,
   name: string,
@@ -184,6 +208,16 @@ function parseInput(
   if (!parsedStartDate.ok) return parsedStartDate;
   const parsedEndDate = parseDate(end_date, "end_date");
   if (!parsedEndDate.ok) return parsedEndDate;
+  if (parsedEndDate.value !== null && parsedStartDate.value === null) {
+    return invalid("end_date requires start_date.");
+  }
+  if (
+    parsedStartDate.value !== null &&
+    parsedEndDate.value !== null &&
+    isBeforeInstant(parsedEndDate.value, parsedStartDate.value)
+  ) {
+    return invalid("end_date must not be before start_date.");
+  }
   const parsedDelta = parseQuillDelta(description_delta, description);
   if (!parsedDelta.ok) return parsedDelta;
 

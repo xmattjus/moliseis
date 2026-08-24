@@ -12,6 +12,7 @@ import 'package:moliseis/domain/repositories/admin_content_submission_repository
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Route-scoped state for creating or editing an admin submission.
@@ -185,36 +186,47 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Updates the start date while preserving its selected time.
   ///
-  /// An end date before the new start is clamped to the end of the start day,
-  /// matching the public submission ViewModel's date behavior.
+  /// An end date that the new start would overtake is repaired to the end of
+  /// the start's calendar day, preserving whether the dates are UTC- or
+  /// local-represented.
   void setStartDate(DateTime? date) {
-    var endDate = _endDate;
     final startDate = date?.copyWith(
       hour: _startDate?.hour,
       minute: _startDate?.minute,
     );
 
-    if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
-      endDate = startDate.copyWith(hour: 23, minute: 55, second: 55);
-    }
-
     _startDate = startDate;
-    _endDate = endDate;
+    if (startDate != null) {
+      _ensureEndNotBefore(startDate);
+    }
     _markDirty();
   }
 
   /// Updates the time portion of the selected start date.
+  ///
+  /// Like [setStartDate], an end date overtaken by the new start time is
+  /// repaired to the end of the start's calendar day.
   void setStartTime(DateTime? date) {
-    _startDate = _startDate?.copyWith(
+    final startDate = _startDate?.copyWith(
       hour: date?.hour,
       minute: date?.minute,
     );
+
+    _startDate = startDate;
+    if (startDate != null) {
+      _ensureEndNotBefore(startDate);
+    }
     _markDirty();
   }
 
   /// Updates the end date and marks the editor dirty.
+  ///
+  /// An actively selected date is normalized to the end of that calendar day,
+  /// preserving UTC- or local-representation, so a same-day selection can
+  /// never land at midnight before a timed start. Loaded persisted values are
+  /// hydrated by [_loadDetail] directly and are never normalized here.
   void setEndDate(DateTime? date) {
-    _endDate = date;
+    _endDate = date == null ? null : _endOfDayPreservingZone(date);
     _markDirty();
   }
 
@@ -275,6 +287,28 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     });
   }
 
+  /// Returns the end of [value]'s calendar day, keeping whether [value] is
+  /// UTC- or local-represented.
+  ///
+  /// The shared `DateTime.endOfDay` extension always builds a local DateTime,
+  /// so UTC values are constructed explicitly to avoid changing the
+  /// represented zone of repaired or normalized timestamps.
+  DateTime _endOfDayPreservingZone(DateTime value) => value.isUtc
+      ? DateTime.utc(value.year, value.month, value.day, 23, 59, 59, 999, 999)
+      : value.endOfDay;
+
+  /// Repairs an end date that [startDate] would overtake.
+  ///
+  /// The repaired end becomes the end of the start's calendar day in the
+  /// same UTC/local representation as the start. This is an automatic fix
+  /// within the setter that triggered it and emits no extra notifications.
+  void _ensureEndNotBefore(DateTime startDate) {
+    final endDate = _endDate;
+    if (endDate != null && endDate.isBefore(startDate)) {
+      _endDate = _endOfDayPreservingZone(startDate);
+    }
+  }
+
   Future<Result<void>> _save() async {
     if (changeStatus.running || assetMutationRunning) {
       return Result.error(
@@ -286,6 +320,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     final name = _name;
     if (city == null || city.isEmpty || name == null || name.isEmpty) {
       return Result.error(Exception('Compila i campi obbligatori.'));
+    }
+
+    final startDate = _startDate;
+    final endDate = _endDate;
+    if (endDate != null && (startDate == null || endDate.isBefore(startDate))) {
+      return Result.error(Exception('Inserisci un intervallo di date valido.'));
     }
 
     final coordinates = _parsedCoordinates();
@@ -300,8 +340,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       name: name,
       description: _description,
       descriptionDelta: _descriptionDelta,
-      startDate: _startDate,
-      endDate: _endDate,
+      startDate: startDate,
+      endDate: endDate,
       latitude: latitude,
       longitude: longitude,
     );
