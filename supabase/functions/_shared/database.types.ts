@@ -78,6 +78,8 @@ export type Database = {
           longitude: number | null;
           modified_at: string;
           name: string;
+          promoted_event_id: number | null;
+          promoted_place_id: number | null;
           rejection_reason: string | null;
           start_date: string | null;
           status: Database["public"]["Enums"]["submission_status"];
@@ -107,6 +109,8 @@ export type Database = {
           longitude?: number | null;
           modified_at?: string;
           name: string;
+          promoted_event_id?: number | null;
+          promoted_place_id?: number | null;
           rejection_reason?: string | null;
           start_date?: string | null;
           status?: Database["public"]["Enums"]["submission_status"];
@@ -136,6 +140,8 @@ export type Database = {
           longitude?: number | null;
           modified_at?: string;
           name?: string;
+          promoted_event_id?: number | null;
+          promoted_place_id?: number | null;
           rejection_reason?: string | null;
           start_date?: string | null;
           status?: Database["public"]["Enums"]["submission_status"];
@@ -149,7 +155,22 @@ export type Database = {
           user_id?: string;
           user_name?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "content_submissions_promoted_event_id_fkey";
+            columns: ["promoted_event_id"];
+            isOneToOne: true;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "content_submissions_promoted_place_id_fkey";
+            columns: ["promoted_place_id"];
+            isOneToOne: true;
+            referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       events: {
         Row: {
@@ -394,6 +415,18 @@ export type Database = {
       delete_submission_asset: {
         Args: { p_asset_id: number; p_submission_id: number };
         Returns: string;
+      };
+      promote_content_submission: {
+        Args: {
+          p_handled_by: string;
+          p_submission_id: number;
+          p_target: string;
+        };
+        Returns: {
+          entity_id: number;
+          outcome: string;
+          target_type: string;
+        }[];
       };
     };
     Enums: {

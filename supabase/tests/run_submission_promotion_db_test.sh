@@ -9,7 +9,7 @@ if ! command -v supabase >/dev/null 2>&1; then
 fi
 
 if ! command -v deno >/dev/null 2>&1; then
-  printf '%s\n' 'Deno is required to run the database invariant tests.' >&2
+  printf '%s\n' 'Deno is required to run the database promotion tests.' >&2
   exit 1
 fi
 
@@ -40,4 +40,4 @@ fi
 
 export SUPABASE_DB_URL
 exec deno test --allow-env --allow-net --allow-read \
-  "${repository_root}/supabase/tests/submission_asset_invariants_db_test.ts"
+  "${repository_root}/supabase/tests/submission_promotion_db_test.ts"
