@@ -145,6 +145,12 @@
       "skillPath": "skills/flutter-use-http-package/SKILL.md",
       "computedHash": "17efcf4da9933afaf9c1d41940bd6b92f1ae73dcae4bf6c59cfe24f7e487ee9f"
     },
+    "security-and-hardening": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-and-hardening/SKILL.md",
+      "computedHash": "47d027526d7e0be784a19a034f18cba328009b3c8fe483f16e4b12530cf82183"
+    },
     "sentry-android-sdk": {
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
@@ -228,6 +234,18 @@
       "sourceType": "github",
       "skillPath": "src/skills/sentry-snapshots-cocoa/SKILL.md",
       "computedHash": "f4258d31d8eccbad531fe2bc4cdfcd3a8253d1d8e566f712372e93027c05654d"
+    },
+    "supabase": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase/SKILL.md",
+      "computedHash": "583344c20e90f3654dbb0632f088d89fd9f1dde8ac85e8a644dd12eee59b1380"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "e14e276241805c97dbcfe40dcbea1a3035269cc7293cac4b1832dda41a835e60"
     }
   }
 }
