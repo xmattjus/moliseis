@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
@@ -11,6 +12,39 @@ void main() {
       expect(AdminSubmissionStatus.pending.label, 'Da revisionare');
       expect(AdminSubmissionStatus.accepted.label, 'Accettato');
       expect(AdminSubmissionStatus.rejected.label, 'Rifiutato');
+    });
+  });
+
+  group('AdminSubmissionPromotion', () {
+    test('exposes both promotion targets', () {
+      expect(AdminPromotionTarget.values, <AdminPromotionTarget>[
+        AdminPromotionTarget.place,
+        AdminPromotionTarget.event,
+      ]);
+    });
+
+    test('includes target and entity id in equality and hashCode', () {
+      const place = AdminSubmissionPromotion(
+        target: AdminPromotionTarget.place,
+        entityId: 42,
+      );
+      const samePlace = AdminSubmissionPromotion(
+        target: AdminPromotionTarget.place,
+        entityId: 42,
+      );
+      const event = AdminSubmissionPromotion(
+        target: AdminPromotionTarget.event,
+        entityId: 42,
+      );
+      const otherPlace = AdminSubmissionPromotion(
+        target: AdminPromotionTarget.place,
+        entityId: 43,
+      );
+
+      expect(place, equals(samePlace));
+      expect(place.hashCode, samePlace.hashCode);
+      expect(place, isNot(equals(event)));
+      expect(place, isNot(equals(otherPlace)));
     });
   });
 
@@ -163,6 +197,52 @@ void main() {
       expect(plain, isNot(equals(located)));
       expect(located, equals(sameLocation));
       expect(located.hashCode, sameLocation.hashCode);
+    });
+
+    test('includes promotion in equality and hashCode', () {
+      const promotion = AdminSubmissionPromotion(
+        target: AdminPromotionTarget.place,
+        entityId: 42,
+      );
+      final unlinked = AdminSubmission(
+        id: 1,
+        city: 'Campobasso',
+        name: 'Palazzo',
+        category: ContentCategory.history,
+        userName: 'Mario Rossi',
+        userEmail: 'mario@example.com',
+        status: AdminSubmissionStatus.accepted,
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026),
+      );
+      final linked = AdminSubmission(
+        id: 1,
+        city: 'Campobasso',
+        name: 'Palazzo',
+        category: ContentCategory.history,
+        userName: 'Mario Rossi',
+        userEmail: 'mario@example.com',
+        status: AdminSubmissionStatus.accepted,
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026),
+        promotion: promotion,
+      );
+      final sameLink = AdminSubmission(
+        id: 1,
+        city: 'Campobasso',
+        name: 'Palazzo',
+        category: ContentCategory.history,
+        userName: 'Mario Rossi',
+        userEmail: 'mario@example.com',
+        status: AdminSubmissionStatus.accepted,
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026),
+        promotion: promotion,
+      );
+
+      expect(unlinked, isNot(equals(linked)));
+      expect(linked, equals(sameLink));
+      expect(linked.hashCode, sameLink.hashCode);
     });
   });
 

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
@@ -181,13 +182,21 @@ void main() {
     );
 
     test('updates an existing submission with the editor input', () async {
-      final repository = FakeAdminContentSubmissionRepository();
+      final repository = FakeAdminContentSubmissionRepository(
+        getByIdResults: <int, Result<AdminSubmission>>{
+          3: Result.success(sampleAdminSubmission(id: 3)),
+        },
+      );
       final viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: FakeContentSubmissionRepository(),
         submissionId: 3,
       );
       addTearDown(viewModel.dispose);
+
+      // Editorial updates are pending-only, so the detail must load first.
+      await viewModel.load.execute();
+      expect(viewModel.isEditable, isTrue);
 
       viewModel
         ..setCategory(ContentCategory.nature)
@@ -634,8 +643,119 @@ void main() {
       });
     });
 
+    group('moderation hydration and editability', () {
+      test('hydrates a null promotion for a pending submission', () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(sampleAdminSubmission()),
+          },
+        );
+        final viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          submissionId: 1,
+        );
+        addTearDown(viewModel.dispose);
+
+        await viewModel.load.execute();
+
+        expect(viewModel.promotion, isNull);
+        expect(viewModel.isEditable, isTrue);
+        expect(viewModel.isDirty, isFalse);
+      });
+
+      test(
+        'hydrates place and event promotions without disturbing state',
+        () async {
+          const placePromotion = AdminSubmissionPromotion(
+            target: AdminPromotionTarget.place,
+            entityId: 42,
+          );
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              1: Result.success(
+                sampleAdminSubmission(
+                  status: AdminSubmissionStatus.accepted,
+                  promotion: placePromotion,
+                ),
+              ),
+              2: Result.success(
+                sampleAdminSubmission(
+                  id: 2,
+                  status: AdminSubmissionStatus.accepted,
+                  promotion: const AdminSubmissionPromotion(
+                    target: AdminPromotionTarget.event,
+                    entityId: 43,
+                  ),
+                ),
+              ),
+            },
+          );
+
+          final promotedPlace = AdminSubmissionEditorViewModel(
+            repository: repository,
+            contentSubmissionRepository: FakeContentSubmissionRepository(),
+            submissionId: 1,
+          );
+          addTearDown(promotedPlace.dispose);
+          await promotedPlace.load.execute();
+
+          expect(promotedPlace.promotion, placePromotion);
+          expect(promotedPlace.status, AdminSubmissionStatus.accepted);
+          expect(promotedPlace.isEditable, isFalse);
+          expect(promotedPlace.isDirty, isFalse);
+
+          final promotedEvent = AdminSubmissionEditorViewModel(
+            repository: repository,
+            contentSubmissionRepository: FakeContentSubmissionRepository(),
+            submissionId: 2,
+          );
+          addTearDown(promotedEvent.dispose);
+          await promotedEvent.load.execute();
+
+          expect(
+            promotedEvent.promotion,
+            const AdminSubmissionPromotion(
+              target: AdminPromotionTarget.event,
+              entityId: 43,
+            ),
+          );
+        },
+      );
+
+      test('accepted historical rows keep a null promotion', () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(
+              sampleAdminSubmission(status: AdminSubmissionStatus.accepted),
+            ),
+          },
+        );
+        final viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          submissionId: 1,
+        );
+        addTearDown(viewModel.dispose);
+
+        await viewModel.load.execute();
+
+        expect(viewModel.status, AdminSubmissionStatus.accepted);
+        expect(viewModel.promotion, isNull);
+        expect(viewModel.isEditable, isFalse);
+      });
+
+      test('create mode is editable', () {
+        final viewModel = createViewModel();
+        addTearDown(viewModel.dispose);
+
+        expect(viewModel.isEditMode, isFalse);
+        expect(viewModel.isEditable, isTrue);
+      });
+    });
+
     test(
-      'delegates both final statuses for a clean pending submission',
+      'delegates promote and reject for a clean pending submission',
       () async {
         final repository = FakeAdminContentSubmissionRepository();
         final viewModel = AdminSubmissionEditorViewModel(
@@ -645,55 +765,120 @@ void main() {
         );
         addTearDown(viewModel.dispose);
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        var notifications = 0;
+        viewModel.addListener(() => notifications++);
 
         await viewModel.load.execute();
+        notifications = 0;
 
-        await viewModel.changeStatus.execute(AdminSubmissionStatus.accepted);
+        await viewModel.promote.execute(AdminPromotionTarget.place);
 
-        expect(viewModel.changeStatus.completed, isTrue);
-        expect(
-          repository.changeStatusCalls,
-          <(int, AdminSubmissionStatus)>[
-            (1, AdminSubmissionStatus.accepted),
-          ],
-        );
+        expect(viewModel.promote.completed, isTrue);
+        expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
+          (1, AdminPromotionTarget.place),
+        ]);
         expect(viewModel.status, AdminSubmissionStatus.accepted);
+        expect(
+          viewModel.promotion,
+          const AdminSubmissionPromotion(
+            target: AdminPromotionTarget.place,
+            entityId: 1,
+          ),
+        );
+        // One logical notification for the moderation success.
+        expect(notifications, 1);
 
-        final rejectedViewModel = AdminSubmissionEditorViewModel(
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        final rejectingViewModel = AdminSubmissionEditorViewModel(
           repository: repository,
           contentSubmissionRepository: FakeContentSubmissionRepository(),
           submissionId: 2,
         );
-        addTearDown(rejectedViewModel.dispose);
+        addTearDown(rejectingViewModel.dispose);
         repository.getByIdResults[2] = Result.success(
           sampleAdminSubmission(id: 2),
         );
-        await rejectedViewModel.load.execute();
-        await rejectedViewModel.changeStatus.execute(
-          AdminSubmissionStatus.rejected,
-        );
+        await rejectingViewModel.load.execute();
+        await rejectingViewModel.reject.execute();
 
-        expect(rejectedViewModel.changeStatus.completed, isTrue);
-        expect(
-          repository.changeStatusCalls,
-          <(int, AdminSubmissionStatus)>[
-            (1, AdminSubmissionStatus.accepted),
-            (2, AdminSubmissionStatus.rejected),
-          ],
-        );
-
-        rejectedViewModel.setCity('Isernia');
-        await rejectedViewModel.changeStatus.execute(
-          AdminSubmissionStatus.accepted,
-        );
-
-        expect(rejectedViewModel.changeStatus.error, isTrue);
-        expect(repository.changeStatusCalls, hasLength(2));
+        expect(rejectingViewModel.reject.completed, isTrue);
+        expect(repository.rejectIds, <int>[2]);
+        expect(rejectingViewModel.status, AdminSubmissionStatus.rejected);
       },
     );
 
     test(
-      'does not delegate status changes for accepted or rejected submissions',
+      'promotes with an explicit event target and keeps its result',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          promoteResults: <Result<AdminSubmissionPromotion>>[
+            const Result.success(
+              AdminSubmissionPromotion(
+                target: AdminPromotionTarget.event,
+                entityId: 77,
+              ),
+            ),
+          ],
+        );
+        final viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          submissionId: 4,
+        );
+        addTearDown(viewModel.dispose);
+        repository.getByIdResults[4] = Result.success(sampleAdminSubmission());
+
+        await viewModel.load.execute();
+        await viewModel.promote.execute(AdminPromotionTarget.event);
+
+        expect(viewModel.promote.completed, isTrue);
+        expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
+          (4, AdminPromotionTarget.event),
+        ]);
+        expect(viewModel.status, AdminSubmissionStatus.accepted);
+        expect(
+          viewModel.promotion,
+          const AdminSubmissionPromotion(
+            target: AdminPromotionTarget.event,
+            entityId: 77,
+          ),
+        );
+      },
+    );
+
+    test(
+      'a same-target idempotent retry behaves like a first success',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          promoteResults: <Result<AdminSubmissionPromotion>>[
+            const Result.success(
+              AdminSubmissionPromotion(
+                target: AdminPromotionTarget.place,
+                entityId: 42,
+              ),
+            ),
+          ],
+        );
+        final viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          submissionId: 5,
+        );
+        addTearDown(viewModel.dispose);
+        repository.getByIdResults[5] = Result.success(sampleAdminSubmission());
+
+        await viewModel.load.execute();
+        await viewModel.promote.execute(AdminPromotionTarget.place);
+        expect(viewModel.status, AdminSubmissionStatus.accepted);
+        expect(
+          viewModel.promotion?.entityId,
+          42,
+        );
+      },
+    );
+
+    test(
+      'does not moderate accepted or rejected submissions',
       () async {
         final repository = FakeAdminContentSubmissionRepository(
           getByIdResults: <int, Result<AdminSubmission>>{
@@ -723,16 +908,69 @@ void main() {
 
         await accepted.load.execute();
         await rejected.load.execute();
-        await accepted.changeStatus.execute(AdminSubmissionStatus.rejected);
-        await rejected.changeStatus.execute(AdminSubmissionStatus.accepted);
+        await accepted.promote.execute(AdminPromotionTarget.place);
+        await accepted.reject.execute();
+        await rejected.promote.execute(AdminPromotionTarget.place);
+        await rejected.reject.execute();
 
-        expect(accepted.changeStatus.error, isTrue);
-        expect(rejected.changeStatus.error, isTrue);
-        expect(repository.changeStatusCalls, isEmpty);
+        expect(accepted.promote.error, isTrue);
+        expect(accepted.reject.error, isTrue);
+        expect(rejected.promote.error, isTrue);
+        expect(rejected.reject.error, isTrue);
+        expect(repository.promoteCalls, isEmpty);
+        expect(repository.rejectIds, isEmpty);
       },
     );
 
-    test('saves accepted and rejected content', () async {
+    test(
+      'blocks moderation when dirty, unloaded, or in create mode',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(sampleAdminSubmission()),
+          },
+        );
+
+        // Create mode has no persisted ID.
+        final createMode = createViewModel(repository: repository);
+        addTearDown(createMode.dispose);
+        await createMode.promote.execute(AdminPromotionTarget.place);
+        await createMode.reject.execute();
+        expect(createMode.promote.error, isTrue);
+        expect(createMode.reject.error, isTrue);
+
+        // Detail not loaded yet.
+        final unloaded = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          submissionId: 1,
+        );
+        addTearDown(unloaded.dispose);
+        await unloaded.promote.execute(AdminPromotionTarget.place);
+        await unloaded.reject.execute();
+        expect(unloaded.promote.error, isTrue);
+        expect(unloaded.reject.error, isTrue);
+
+        // Dirty editor.
+        final dirty = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          submissionId: 1,
+        );
+        addTearDown(dirty.dispose);
+        await dirty.load.execute();
+        dirty.setCity('Isernia');
+        await dirty.promote.execute(AdminPromotionTarget.place);
+        await dirty.reject.execute();
+        expect(dirty.promote.error, isTrue);
+        expect(dirty.reject.error, isTrue);
+
+        expect(repository.promoteCalls, isEmpty);
+        expect(repository.rejectIds, isEmpty);
+      },
+    );
+
+    test('cannot save accepted or rejected content', () async {
       final repository = FakeAdminContentSubmissionRepository(
         getByIdResults: <int, Result<AdminSubmission>>{
           1: Result.success(
@@ -766,9 +1004,10 @@ void main() {
       await accepted.save.execute();
       await rejected.save.execute();
 
-      expect(accepted.save.completed, isTrue);
-      expect(rejected.save.completed, isTrue);
-      expect(repository.updateIds, <int>[1, 2]);
+      expect(accepted.save.error, isTrue);
+      expect(rejected.save.error, isTrue);
+      // A failed non-pending save never reaches the repository.
+      expect(repository.updateIds, isEmpty);
     });
 
     test('blocks moderation while a save request is pending', () async {
@@ -791,21 +1030,24 @@ void main() {
       expect(viewModel.save.running, isTrue);
       expect(repository.updateIds, <int>[1]);
 
-      await viewModel.changeStatus.execute(AdminSubmissionStatus.accepted);
+      await viewModel.promote.execute(AdminPromotionTarget.place);
+      await viewModel.reject.execute();
 
-      expect(viewModel.changeStatus.error, isTrue);
-      expect(repository.changeStatusCalls, isEmpty);
+      expect(viewModel.promote.error, isTrue);
+      expect(viewModel.reject.error, isTrue);
+      expect(repository.promoteCalls, isEmpty);
+      expect(repository.rejectIds, isEmpty);
       pendingUpdate.complete(Result.success(sampleAdminSubmission()));
       await saving;
     });
 
     test('blocks saving while a moderation request is pending', () async {
-      final pendingChangeStatus = Completer<Result<void>>();
+      final pendingPromote = Completer<Result<AdminSubmissionPromotion>>();
       final repository = FakeAdminContentSubmissionRepository(
         getByIdResults: <int, Result<AdminSubmission>>{
           1: Result.success(sampleAdminSubmission()),
         },
-      )..pendingChangeStatus = pendingChangeStatus;
+      )..pendingPromote = pendingPromote;
       final viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: FakeContentSubmissionRepository(),
@@ -814,20 +1056,26 @@ void main() {
       addTearDown(viewModel.dispose);
       await viewModel.load.execute();
 
-      final changingStatus = viewModel.changeStatus.execute(
-        AdminSubmissionStatus.accepted,
-      );
-      expect(viewModel.changeStatus.running, isTrue);
-      expect(repository.changeStatusCalls, <(int, AdminSubmissionStatus)>[
-        (1, AdminSubmissionStatus.accepted),
+      final publishing = viewModel.promote.execute(AdminPromotionTarget.place);
+      expect(viewModel.promote.running, isTrue);
+      expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
+        (1, AdminPromotionTarget.place),
       ]);
 
       await viewModel.save.execute();
 
       expect(viewModel.save.error, isTrue);
       expect(repository.updateIds, isEmpty);
-      pendingChangeStatus.complete(const Result.success(null));
-      await changingStatus;
+      pendingPromote.complete(
+        const Result.success(
+          AdminSubmissionPromotion(
+            target: AdminPromotionTarget.place,
+            entityId: 9,
+          ),
+        ),
+      );
+      await publishing;
+      expect(viewModel.status, AdminSubmissionStatus.accepted);
     });
 
     test(
@@ -1148,104 +1396,116 @@ void main() {
     );
 
     test(
-      'mutual exclusion covers picker, upload, persistence, save, '
-      'and moderation',
+      'a pending rejection excludes promotion, save, and asset mutations',
       () async {
-        final pickerResult = Completer<XFile?>();
-        final uploadTask = FakeImageUploadTask.pending();
-        final pendingAdd = Completer<Result<AdminSubmissionAsset>>();
+        final pendingReject = Completer<Result<void>>();
+        const asset = AdminSubmissionAsset(
+          id: 2,
+          url: 'https://example.com/existing.jpg',
+          width: 640,
+          height: 480,
+        );
         final repository = FakeAdminContentSubmissionRepository(
           getByIdResults: <int, Result<AdminSubmission>>{
             1: Result.success(
               sampleAdminSubmission(
-                assets: const <AdminSubmissionAsset>[
-                  AdminSubmissionAsset(
-                    id: 2,
-                    url: 'https://example.com/existing.jpg',
-                    width: 640,
-                    height: 480,
-                  ),
-                ],
+                assets: const <AdminSubmissionAsset>[asset],
               ),
             ),
           },
-        )..pendingAddAsset = pendingAdd;
+        )..pendingReject = pendingReject;
         final viewModel = AdminSubmissionEditorViewModel(
           repository: repository,
-          contentSubmissionRepository: FakeContentSubmissionRepository(
-            uploadImageTaskResult: uploadTask,
-          ),
-          imagePicker: FakeImagePicker(onPickImage: () => pickerResult.future),
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
           submissionId: 1,
         );
         addTearDown(viewModel.dispose);
         await viewModel.load.execute();
 
-        final adding = viewModel.addAsset.execute();
-        expect(viewModel.operationRunning, isTrue);
-        await viewModel.save.execute();
-        await viewModel.changeStatus.execute(AdminSubmissionStatus.accepted);
-        await viewModel.deleteAsset.execute(2);
-        expect(viewModel.save.error, isTrue);
-        expect(viewModel.changeStatus.error, isTrue);
-        expect(viewModel.deleteAsset.error, isTrue);
+        final rejecting = viewModel.reject.execute();
+        expect(viewModel.reject.running, isTrue);
 
-        pickerResult.complete(XFile('/tmp/image.jpg'));
-        await pumpEventQueue();
-        expect(viewModel.addAsset.running, isTrue);
-        uploadTask.complete(
+        await viewModel.promote.execute(AdminPromotionTarget.place);
+        await viewModel.save.execute();
+        await viewModel.addAsset.execute();
+        await viewModel.deleteAsset.execute(asset.id);
+
+        expect(viewModel.promote.error, isTrue);
+        expect(viewModel.save.error, isTrue);
+        expect(viewModel.addAsset.error, isTrue);
+        expect(viewModel.deleteAsset.error, isTrue);
+        expect(repository.promoteCalls, isEmpty);
+        expect(repository.updateIds, isEmpty);
+        expect(repository.addAssetCalls, isEmpty);
+        expect(repository.deleteAssetCalls, isEmpty);
+
+        pendingReject.complete(const Result.success(null));
+        await rejecting;
+        expect(viewModel.status, AdminSubmissionStatus.rejected);
+        expect(repository.rejectIds, <int>[1]);
+      },
+    );
+
+    test(
+      'a pending promotion excludes rejection, save, and asset mutations',
+      () async {
+        final pendingPromote = Completer<Result<AdminSubmissionPromotion>>();
+        const asset = AdminSubmissionAsset(
+          id: 2,
+          url: 'https://example.com/existing.jpg',
+          width: 640,
+          height: 480,
+        );
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(
+              sampleAdminSubmission(
+                assets: const <AdminSubmissionAsset>[asset],
+              ),
+            ),
+          },
+        )..pendingPromote = pendingPromote;
+        final viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          submissionId: 1,
+        );
+        addTearDown(viewModel.dispose);
+        await viewModel.load.execute();
+
+        final publishing = viewModel.promote.execute(
+          AdminPromotionTarget.place,
+        );
+        expect(viewModel.promote.running, isTrue);
+
+        await viewModel.reject.execute();
+        await viewModel.save.execute();
+        await viewModel.addAsset.execute();
+        await viewModel.deleteAsset.execute(asset.id);
+
+        expect(viewModel.reject.error, isTrue);
+        expect(viewModel.save.error, isTrue);
+        expect(viewModel.addAsset.error, isTrue);
+        expect(viewModel.deleteAsset.error, isTrue);
+        expect(repository.rejectIds, isEmpty);
+        expect(repository.updateIds, isEmpty);
+        expect(repository.addAssetCalls, isEmpty);
+        expect(repository.deleteAssetCalls, isEmpty);
+
+        pendingPromote.complete(
           const Result.success(
-            SubmissionAsset(
-              secureUrl:
-                  'https://res.cloudinary.com/moliseis/image/upload/image.jpg',
-              width: 1200,
-              height: 800,
+            AdminSubmissionPromotion(
+              target: AdminPromotionTarget.place,
+              entityId: 9,
             ),
           ),
         );
-        await pumpEventQueue();
-        expect(repository.addAssetCalls, hasLength(1));
-        expect(viewModel.operationRunning, isTrue);
-        await viewModel.save.execute();
-        await viewModel.changeStatus.execute(AdminSubmissionStatus.accepted);
-        await viewModel.deleteAsset.execute(2);
-        expect(viewModel.save.error, isTrue);
-        expect(viewModel.changeStatus.error, isTrue);
-        expect(viewModel.deleteAsset.error, isTrue);
-
-        pendingAdd.complete(
-          const Result.success(
-            AdminSubmissionAsset(
-              id: 3,
-              url: 'https://example.com/new.jpg',
-              width: 1200,
-              height: 800,
-            ),
-          ),
-        );
-        await adding;
-
-        final pendingUpdate = Completer<Result<AdminSubmission>>();
-        repository.pendingUpdate = pendingUpdate;
-        final saving = viewModel.save.execute();
-        await viewModel.addAsset.execute();
-        await viewModel.deleteAsset.execute(2);
-        expect(viewModel.addAsset.error, isTrue);
-        expect(viewModel.deleteAsset.error, isTrue);
-        pendingUpdate.complete(Result.success(sampleAdminSubmission()));
-        await saving;
-
-        final pendingStatus = Completer<Result<void>>();
-        repository.pendingChangeStatus = pendingStatus;
-        final changing = viewModel.changeStatus.execute(
-          AdminSubmissionStatus.accepted,
-        );
-        await viewModel.addAsset.execute();
-        await viewModel.deleteAsset.execute(2);
-        expect(viewModel.addAsset.error, isTrue);
-        expect(viewModel.deleteAsset.error, isTrue);
-        pendingStatus.complete(const Result.success(null));
-        await changing;
+        await publishing;
+        expect(viewModel.status, AdminSubmissionStatus.accepted);
+        expect(viewModel.promotion?.entityId, 9);
+        expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
+          (1, AdminPromotionTarget.place),
+        ]);
       },
     );
 
@@ -1556,25 +1816,31 @@ void main() {
         }
       });
 
-      test('a location edit keeps moderation blocked while dirty', () async {
-        final repository = FakeAdminContentSubmissionRepository(
-          getByIdResults: <int, Result<AdminSubmission>>{
-            1: Result.success(sampleAdminSubmission()),
-          },
-        );
-        final viewModel = createViewModel(
-          repository: repository,
-          submissionId: 1,
-        );
-        addTearDown(viewModel.dispose);
-        await viewModel.load.execute();
-        viewModel.setLatitudeText('41');
+      test(
+        'a location edit keeps promotion and rejection blocked while dirty',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              1: Result.success(sampleAdminSubmission()),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 1,
+          );
+          addTearDown(viewModel.dispose);
+          await viewModel.load.execute();
+          viewModel.setLatitudeText('41');
 
-        await viewModel.changeStatus.execute(AdminSubmissionStatus.accepted);
+          await viewModel.promote.execute(AdminPromotionTarget.place);
+          await viewModel.reject.execute();
 
-        expect(viewModel.changeStatus.error, isTrue);
-        expect(repository.changeStatusCalls, isEmpty);
-      });
+          expect(viewModel.promote.error, isTrue);
+          expect(viewModel.reject.error, isTrue);
+          expect(repository.promoteCalls, isEmpty);
+          expect(repository.rejectIds, isEmpty);
+        },
+      );
 
       test('successful save clears dirty exactly like other fields', () async {
         final repository = FakeAdminContentSubmissionRepository();

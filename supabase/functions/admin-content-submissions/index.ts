@@ -15,6 +15,7 @@ import {
   type AdminSubmissionStore,
   AdminSubmissionStoreError,
   createAdminSubmissionStore,
+  type PromoteStoreResult,
   type SubmissionAssetRecord,
   type SubmissionRecord,
 } from "./admin_submission_store.ts";
@@ -22,6 +23,7 @@ import {
   type ContentCategoryWire,
   type FinalSubmissionStatusWire,
   parseAdminContentSubmissionsRequest,
+  type PromotionTargetWire,
 } from "./admin_submission_validation.ts";
 
 type AdminSubmissionAssetWire = {
@@ -47,6 +49,8 @@ type AdminSubmissionWire = {
   modified_at: string;
   latitude: number | null;
   longitude: number | null;
+  promoted_place_id: number | null;
+  promoted_event_id: number | null;
   assets: AdminSubmissionAssetWire[];
 };
 
@@ -99,6 +103,95 @@ function toAssetWire(asset: SubmissionAssetRecord): AdminSubmissionAssetWire {
   };
 }
 
+function promotionResponse(
+  result: PromoteStoreResult,
+  requestedTarget: PromotionTargetWire,
+): Response {
+  switch (result.outcome) {
+    case "created":
+      // Store-level fail-closed validation guarantees a created target equals
+      // the requested one.
+      return jsonResponse({
+        promotion: {
+          target_type: result.target,
+          entity_id: result.entityId,
+        },
+      });
+    case "already_promoted":
+      // Same-target retry is idempotent success; a different target means the
+      // submission was published as the other kind and is a conflict.
+      if (result.target !== requestedTarget) {
+        return errorResponse(
+          "PROMOTION_TARGET_CONFLICT",
+          "The submission was already promoted with another target.",
+          409,
+        );
+      }
+      return jsonResponse({
+        promotion: {
+          target_type: result.target,
+          entity_id: result.entityId,
+        },
+      });
+    case "not_found":
+      return errorResponse("NOT_FOUND", "Submission not found.", 404);
+    case "not_pending":
+      return errorResponse(
+        "INVALID_STATUS_TRANSITION",
+        "Only pending submissions can be promoted.",
+        409,
+      );
+    case "invalid_name":
+      return errorResponse(
+        "PROMOTION_INVALID_NAME",
+        "The submission name is not publishable.",
+        422,
+      );
+    case "coordinates_required":
+      return errorResponse(
+        "PROMOTION_COORDINATES_REQUIRED",
+        "The submission requires coordinates to be published.",
+        422,
+      );
+    case "invalid_coordinates":
+      return errorResponse(
+        "PROMOTION_INVALID_COORDINATES",
+        "The submission coordinates are out of range.",
+        422,
+      );
+    case "city_not_found":
+      return errorResponse(
+        "PROMOTION_CITY_NOT_FOUND",
+        "The submission city does not match an available locality.",
+        422,
+      );
+    case "place_has_event_dates":
+      return errorResponse(
+        "PROMOTION_PLACE_HAS_EVENT_DATES",
+        "A submission with event dates cannot be published as a place.",
+        422,
+      );
+    case "start_date_required":
+      return errorResponse(
+        "PROMOTION_START_DATE_REQUIRED",
+        "An event publication requires a start date.",
+        422,
+      );
+    case "invalid_date_range":
+      return errorResponse(
+        "PROMOTION_INVALID_DATE_RANGE",
+        "The event end date must not precede its start date.",
+        422,
+      );
+    case "invalid_asset":
+      return errorResponse(
+        "PROMOTION_INVALID_ASSET",
+        "A submission asset violates publication requirements.",
+        422,
+      );
+  }
+}
+
 function toSubmissionWire(
   submission: SubmissionRecord,
   assets: SubmissionAssetRecord[] = [],
@@ -119,6 +212,8 @@ function toSubmissionWire(
     modified_at: submission.modified_at,
     latitude: submission.latitude,
     longitude: submission.longitude,
+    promoted_place_id: submission.promoted_place_id,
+    promoted_event_id: submission.promoted_event_id,
     assets: assets.map(toAssetWire),
   };
 }
@@ -290,15 +385,24 @@ export function createHandler(
           return jsonResponse({ submission: toSubmissionWire(submission) });
         }
         case "update": {
-          const submission = await store.update(
+          const result = await store.update(
             parsed.value.submission_id,
             parsed.value.input,
             dependencies.nowIso(),
           );
-          if (!submission) {
+          if (result.outcome === "not_found") {
             return errorResponse("NOT_FOUND", "Submission not found.", 404);
           }
-          return jsonResponse({ submission: toSubmissionWire(submission) });
+          if (result.outcome === "not_pending") {
+            return errorResponse(
+              "INVALID_STATUS_TRANSITION",
+              "Only pending submissions can be changed.",
+              409,
+            );
+          }
+          return jsonResponse({
+            submission: toSubmissionWire(result.submission),
+          });
         }
         case "changeStatus": {
           const result = await store.changeStatus({
@@ -318,6 +422,16 @@ export function createHandler(
             );
           }
           return jsonResponse({ ok: true, status: parsed.value.status });
+        }
+        case "promote": {
+          const result = await store.promote({
+            id: parsed.value.submission_id,
+            target: parsed.value.target,
+            // The authenticated administrator is always the handler; a
+            // client-supplied handled_by is never trusted.
+            handledBy: user.id,
+          });
+          return promotionResponse(result, parsed.value.target);
         }
         case "addAsset": {
           const result = await store.addAsset(

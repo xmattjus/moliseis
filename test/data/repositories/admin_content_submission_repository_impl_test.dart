@@ -7,7 +7,7 @@ import 'package:moliseis/data/repositories/admin_content_submission_repository_i
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
-import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/logging/logging.dart';
@@ -248,46 +248,67 @@ void main() {
       },
     );
 
-    test('changeStatus sends accepted and rejected final targets', () async {
-      httpClient
-        ..queueJson(<String, dynamic>{'ok': true, 'status': 'accepted'})
-        ..queueJson(<String, dynamic>{'ok': true, 'status': 'rejected'});
+    test('reject sends the exact reject-only request body', () async {
+      httpClient.queueJson(<String, dynamic>{'ok': true, 'status': 'rejected'});
 
-      final accepted = await repository.changeStatus(
-        7,
-        AdminSubmissionStatus.accepted,
-      );
-      final rejected = await repository.changeStatus(
-        8,
-        AdminSubmissionStatus.rejected,
-      );
+      final result = await repository.reject(7);
 
-      expect(accepted, isA<Success<void>>());
-      expect(rejected, isA<Success<void>>());
-      expect(httpClient.requests.map((request) => request.body), <Object?>[
-        <String, dynamic>{
-          'operation': 'changeStatus',
+      expect(result, isA<Success<void>>());
+      expect(httpClient.requests.single.body, <String, dynamic>{
+        'operation': 'changeStatus',
+        'submission_id': 7,
+        'status': 'rejected',
+      });
+    });
+
+    test('promote sends the exact request and parses the promotion', () async {
+      for (final target in AdminPromotionTarget.values) {
+        final entityId = target == AdminPromotionTarget.place ? 42 : 43;
+        httpClient.queueJson(<String, dynamic>{
+          'promotion': <String, dynamic>{
+            'target_type': target.name,
+            'entity_id': entityId,
+          },
+        });
+
+        final result = await repository.promote(7, target);
+
+        expect(
+          (result as Success<AdminSubmissionPromotion>).value,
+          AdminSubmissionPromotion(target: target, entityId: entityId),
+        );
+        expect(httpClient.requests.last.body, <String, dynamic>{
+          'operation': 'promote',
           'submission_id': 7,
-          'status': 'accepted',
-        },
-        <String, dynamic>{
-          'operation': 'changeStatus',
-          'submission_id': 8,
-          'status': 'rejected',
-        },
-      ]);
+          'target': target.name,
+        });
+      }
     });
 
-    test('rejects pending locally without a request or failure log', () async {
-      final result = await repository.changeStatus(
-        7,
-        AdminSubmissionStatus.pending,
-      );
+    test(
+      'list responses preserve durable promotion linkage',
+      () async {
+        httpClient.queueJson(<String, dynamic>{
+          'submissions': <Object?>[
+            <String, dynamic>{
+              ...submission,
+              'promoted_place_id': null,
+              'promoted_event_id': 43,
+            },
+          ],
+        });
 
-      expect(result, isA<Error<void>>());
-      expect(httpClient.requests, isEmpty);
-      expect(logger.eventsOfType<AdminBackendRequestFailed>(), isEmpty);
-    });
+        final result = await repository.list();
+
+        expect(
+          (result as Success<List<AdminSubmission>>).value.single.promotion,
+          const AdminSubmissionPromotion(
+            target: AdminPromotionTarget.event,
+            entityId: 43,
+          ),
+        );
+      },
+    );
 
     test('addAsset serializes metadata and maps the confirmed asset', () async {
       httpClient.queueJson(<String, dynamic>{
@@ -346,8 +367,18 @@ void main() {
           ..queueJson(<String, dynamic>{'submission': <Object?>[]})
           ..queueJson(<String, dynamic>{'submission': <Object?>[]})
           ..queueJson(<String, dynamic>{'submission': <Object?>[]})
-          ..queueJson(<String, dynamic>{'ok': false, 'status': 'accepted'})
-          ..queueJson(<String, dynamic>{'ok': true, 'status': 'rejected'});
+          ..queueJson(<String, dynamic>{'ok': false, 'status': 'rejected'})
+          ..queueJson(<String, dynamic>{
+            'promotion': <String, dynamic>{
+              'target_type': 'venue',
+              'entity_id': 1,
+            },
+          })
+          ..queueJson(
+            <String, dynamic>{
+              'promotion': <String, dynamic>{'target_type': 'place'},
+            },
+          );
 
         final list = await repository.list();
         final detail = await repository.getById(7);
@@ -366,13 +397,14 @@ void main() {
             name: 'Palazzo',
           ),
         );
-        final invalidStatus = await repository.changeStatus(
+        final invalidStatus = await repository.reject(7);
+        final malformedPromotion = await repository.promote(
           7,
-          AdminSubmissionStatus.accepted,
+          AdminPromotionTarget.place,
         );
-        final mismatchedStatus = await repository.changeStatus(
+        final malformedEnvelope = await repository.promote(
           8,
-          AdminSubmissionStatus.accepted,
+          AdminPromotionTarget.event,
         );
 
         expect(list, isA<Error<List<dynamic>>>());
@@ -380,9 +412,10 @@ void main() {
         expect(create, isA<Error<AdminSubmission>>());
         expect(update, isA<Error<AdminSubmission>>());
         expect(invalidStatus, isA<Error<void>>());
-        expect(mismatchedStatus, isA<Error<void>>());
-        expect(httpClient.requests, hasLength(6));
-        expect(logger.eventsOfType<AdminBackendRequestFailed>(), hasLength(6));
+        expect(malformedPromotion, isA<Error<AdminSubmissionPromotion>>());
+        expect(malformedEnvelope, isA<Error<AdminSubmissionPromotion>>());
+        expect(httpClient.requests, hasLength(7));
+        expect(logger.eventsOfType<AdminBackendRequestFailed>(), hasLength(7));
         for (final call in logger.calls) {
           expect(call.error, isA<FormatException>());
           expect(call.stackTrace, isNotNull);
@@ -448,9 +481,9 @@ void main() {
             name: 'Palazzo',
           ),
         );
-        final invalidTransition = await repository.changeStatus(
+        final invalidTransition = await repository.promote(
           7,
-          AdminSubmissionStatus.accepted,
+          AdminPromotionTarget.place,
         );
         final gateway = await repository.list();
 

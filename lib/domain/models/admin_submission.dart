@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 import 'package:moliseis/domain/core/description_delta.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
@@ -29,6 +30,7 @@ class AdminSubmission {
     required this.modifiedAt,
     this.latitude,
     this.longitude,
+    this.promotion,
     List<AdminSubmissionAsset> assets = const [],
   }) : descriptionDelta = freezeDescriptionDelta(descriptionDelta),
        assets = List<AdminSubmissionAsset>.unmodifiable(assets);
@@ -81,6 +83,13 @@ class AdminSubmission {
   /// Optional geographical longitude in decimal degrees, when present.
   final double? longitude;
 
+  /// Durable source-to-published linkage, when this submission was promoted.
+  ///
+  /// Null for pending and rejected submissions and for historical accepted
+  /// rows promoted before durable links existed; null absence never implies a
+  /// target.
+  final AdminSubmissionPromotion? promotion;
+
   /// Immutable snapshot of persisted remote assets displayed read-only by the
   /// editor.
   final List<AdminSubmissionAsset> assets;
@@ -112,6 +121,7 @@ class AdminSubmission {
         other.modifiedAt == modifiedAt &&
         other.latitude == latitude &&
         other.longitude == longitude &&
+        other.promotion == promotion &&
         const DeepCollectionEquality().equals(other.assets, assets);
   }
 
@@ -132,6 +142,7 @@ class AdminSubmission {
     modifiedAt,
     latitude,
     longitude,
+    promotion,
     const DeepCollectionEquality().hash(assets),
   );
 }

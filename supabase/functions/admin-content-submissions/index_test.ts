@@ -7,7 +7,9 @@ import {
   AdminSubmissionStoreError,
   type ChangeStatusStoreResult,
   type DeleteAssetStoreResult,
+  type PromoteStoreResult,
   type SubmissionRecord,
+  type UpdateStoreResult,
 } from "./admin_submission_store.ts";
 import {
   createHandler,
@@ -31,6 +33,8 @@ const record: SubmissionRecord = {
   modified_at: "2026-08-21T10:00:00.000Z",
   latitude: null,
   longitude: null,
+  promoted_place_id: null,
+  promoted_event_id: null,
 };
 
 const adminUser = (overrides: Partial<User> = {}): User => ({
@@ -60,6 +64,7 @@ class FakeStore implements AdminSubmissionStore {
   createValues: unknown;
   updateValues: unknown;
   statusValues: unknown;
+  promoteValues: unknown;
   addAssetValues: unknown;
   deleteAssetValues: unknown;
   listResult = [record];
@@ -73,8 +78,12 @@ class FakeStore implements AdminSubmissionStore {
     }],
   };
   createResult = { ...record, status: "pending" as const };
-  updateResult: SubmissionRecord | null = { ...record, status: "accepted" };
+  updateResults: UpdateStoreResult[] = [
+    { outcome: "updated", submission: { ...record, status: "pending" } },
+  ];
   statusResults: ChangeStatusStoreResult[] = ["updated"];
+  promoteResults: PromoteStoreResult[] = [];
+  promoteCalls: Array<Parameters<AdminSubmissionStore["promote"]>[0]> = [];
   addAssetResults: AddAssetStoreResult[] = [{
     outcome: "created",
     asset: {
@@ -110,11 +119,12 @@ class FakeStore implements AdminSubmissionStore {
 
   async update(
     ...args: Parameters<AdminSubmissionStore["update"]>
-  ): Promise<SubmissionRecord | null> {
+  ): Promise<UpdateStoreResult> {
     this.calls.push("update");
     this.updateValues = args;
     if (this.error) throw this.error;
-    return this.updateResult;
+    return this.updateResults.shift() ??
+      { outcome: "not_found" };
   }
 
   async changeStatus(
@@ -124,6 +134,16 @@ class FakeStore implements AdminSubmissionStore {
     this.statusValues = params;
     if (this.error) throw this.error;
     return this.statusResults.shift() ?? "not_pending";
+  }
+
+  async promote(
+    params: Parameters<AdminSubmissionStore["promote"]>[0],
+  ): Promise<PromoteStoreResult> {
+    this.calls.push("promote");
+    this.promoteCalls.push(params);
+    this.promoteValues = params;
+    if (this.error) throw this.error;
+    return this.promoteResults.shift() ?? { outcome: "not_pending" };
   }
 
   async addAsset(
@@ -295,6 +315,8 @@ Deno.test("maps list and detail DTOs without exposing internal fields", async ()
       "longitude",
       "modified_at",
       "name",
+      "promoted_event_id",
+      "promoted_place_id",
       "start_date",
       "status",
       "user_email",
@@ -384,9 +406,11 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
     latitude: null,
     longitude: null,
   };
-  const clearedRecord = { ...record, status: "accepted" as const };
+  const clearedRecord = { ...record, status: "pending" as const };
   const updatedStore = new FakeStore();
-  updatedStore.updateResult = clearedRecord;
+  updatedStore.updateResults = [
+    { outcome: "updated", submission: clearedRecord },
+  ];
   const updated = testHandler(adminUser(), updatedStore);
   const updateResponse = await updated.handler(
     request({
@@ -447,65 +471,45 @@ Deno.test("creates with server-authoritative identity and validates the admin pr
   }
 });
 
-Deno.test("updates all statuses and maps status transitions atomically", async () => {
-  const update = testHandler();
-  const updateResponse = await update.handler(
+Deno.test("maps pending-guarded update outcomes without collapsing 409", async () => {
+  const updated = testHandler();
+  const updatedResponse = await updated.handler(
     request({ operation: "update", submission_id: 7, input: input() }),
   );
-  assertEquals(updateResponse.status, 200);
-  assertEquals(update.created(), 1);
-  assertEquals(update.store.updateValues, [
+  assertEquals(updatedResponse.status, 200);
+  assertEquals(updated.created(), 1);
+  assertEquals(updated.store.updateValues, [
     7,
     input(),
     "2026-08-21T11:00:00.000Z",
   ]);
-
-  const status = testHandler();
-  status.store.statusResults = ["updated", "not_found"];
-  const accepted = await status.handler(
-    request({
-      operation: "changeStatus",
-      submission_id: 7,
-      status: "accepted",
-    }),
-  );
-  assertEquals(await responseJson(accepted), { ok: true, status: "accepted" });
-  assertEquals(status.store.statusValues, {
-    id: 7,
-    status: "accepted",
-    handledBy: "00000000-0000-4000-8000-000000000001",
-    modifiedAt: "2026-08-21T11:00:00.000Z",
+  assertEquals(await responseJson(updatedResponse), {
+    submission: { ...record, status: "pending", assets: [] },
   });
-  const concurrent = testHandler();
-  concurrent.store.statusResults = ["updated", "not_pending"];
-  const [first, late] = await Promise.all([
-    concurrent.handler(
-      request({
-        operation: "changeStatus",
-        submission_id: 7,
-        status: "accepted",
-      }),
-    ),
-    concurrent.handler(
-      request({
-        operation: "changeStatus",
-        submission_id: 7,
-        status: "accepted",
-      }),
-    ),
-  ]);
-  assertEquals(first.status, 200);
-  assertEquals(late.status, 409);
-  const absent = await status.handler(
-    request({
-      operation: "changeStatus",
-      submission_id: 8,
-      status: "rejected",
-    }),
-  );
-  assertEquals(absent.status, 404);
 
+  const missing = testHandler();
+  missing.store.updateResults = [{ outcome: "not_found" }];
+  const missingResponse = await missing.handler(
+    request({ operation: "update", submission_id: 8, input: input() }),
+  );
+  assertEquals(missingResponse.status, 404);
+  assertEquals((await responseJson(missingResponse)).code, "NOT_FOUND");
+
+  const moderated = testHandler();
+  moderated.store.updateResults = [{ outcome: "not_pending" }];
+  const moderatedResponse = await moderated.handler(
+    request({ operation: "update", submission_id: 7, input: input() }),
+  );
+  assertEquals(moderatedResponse.status, 409);
+  assertEquals(
+    (await responseJson(moderatedResponse)).code,
+    "INVALID_STATUS_TRANSITION",
+  );
+});
+
+Deno.test("rejects clean pending submissions and maps failure outcomes", async () => {
   const rejected = testHandler();
+  rejected.store.statusResults = ["updated"];
   const rejectedResponse = await rejected.handler(
     request({
       operation: "changeStatus",
@@ -513,10 +517,145 @@ Deno.test("updates all statuses and maps status transitions atomically", async (
       status: "rejected",
     }),
   );
+  assertEquals(rejectedResponse.status, 200);
   assertEquals(await responseJson(rejectedResponse), {
     ok: true,
     status: "rejected",
   });
+  assertEquals(rejected.store.statusValues, {
+    id: 7,
+    status: "rejected",
+    handledBy: "00000000-0000-4000-8000-000000000001",
+    modifiedAt: "2026-08-21T11:00:00.000Z",
+  });
+
+  for (
+    const [result, status, code] of [
+      ["not_found", 404, "NOT_FOUND"],
+      ["not_pending", 409, "INVALID_STATUS_TRANSITION"],
+    ] as const
+  ) {
+    const failed = testHandler();
+    failed.store.statusResults = [result];
+    const failedResponse = await failed.handler(
+      request({
+        operation: "changeStatus",
+        submission_id: 7,
+        status: "rejected",
+      }),
+    );
+    assertEquals(failedResponse.status, status);
+    assertEquals((await responseJson(failedResponse)).code, code);
+  }
+});
+
+Deno.test("rejects accepted-status requests before store construction", async () => {
+  const { handler, created, store } = testHandler();
+  const response = await handler(
+    request({
+      operation: "changeStatus",
+      submission_id: 7,
+      status: "accepted",
+    }),
+  );
+  assertEquals(response.status, 400);
+  assertEquals((await responseJson(response)).code, "VALIDATION_ERROR");
+  assertEquals(created(), 0);
+  assertEquals(store.calls, []);
+});
+
+Deno.test("promotes with the authenticated handler and returns the envelope", async () => {
+  const created = testHandler();
+  created.store.promoteResults = [{
+    outcome: "created",
+    target: "place",
+    entityId: 42,
+  }];
+  const createdResponse = await created.handler(
+    request({ operation: "promote", submission_id: 7, target: "place" }),
+  );
+  assertEquals(createdResponse.status, 200);
+  assertEquals(await responseJson(createdResponse), {
+    promotion: { target_type: "place", entity_id: 42 },
+  });
+  assertEquals(created.store.promoteValues, {
+    id: 7,
+    target: "place",
+    handledBy: "00000000-0000-4000-8000-000000000001",
+  });
+
+  // Same-target already_promoted retry is idempotent success with the same
+  // response envelope.
+  const retried = testHandler();
+  retried.store.promoteResults = [{
+    outcome: "already_promoted",
+    target: "event",
+    entityId: 43,
+  }];
+  const retriedResponse = await retried.handler(
+    request({ operation: "promote", submission_id: 7, target: "event" }),
+  );
+  assertEquals(retriedResponse.status, 200);
+  assertEquals(await responseJson(retriedResponse), {
+    promotion: { target_type: "event", entity_id: 43 },
+  });
+});
+
+Deno.test("conflicts when a promoted submission is retried with another target", async () => {
+  const conflict = testHandler();
+  conflict.store.promoteResults = [{
+    outcome: "already_promoted",
+    target: "event",
+    entityId: 43,
+  }];
+  const conflictResponse = await conflict.handler(
+    request({ operation: "promote", submission_id: 7, target: "place" }),
+  );
+  assertEquals(conflictResponse.status, 409);
+  assertEquals(
+    (await responseJson(conflictResponse)).code,
+    "PROMOTION_TARGET_CONFLICT",
+  );
+});
+
+Deno.test("maps every promotion readiness outcome to a stable error", async () => {
+  const outcomes: Array<[PromoteStoreResult, number, string]> = [
+    [{ outcome: "not_found" }, 404, "NOT_FOUND"],
+    [{ outcome: "not_pending" }, 409, "INVALID_STATUS_TRANSITION"],
+    [{ outcome: "invalid_name" }, 422, "PROMOTION_INVALID_NAME"],
+    [
+      { outcome: "coordinates_required" },
+      422,
+      "PROMOTION_COORDINATES_REQUIRED",
+    ],
+    [
+      { outcome: "invalid_coordinates" },
+      422,
+      "PROMOTION_INVALID_COORDINATES",
+    ],
+    [{ outcome: "city_not_found" }, 422, "PROMOTION_CITY_NOT_FOUND"],
+    [
+      { outcome: "place_has_event_dates" },
+      422,
+      "PROMOTION_PLACE_HAS_EVENT_DATES",
+    ],
+    [
+      { outcome: "start_date_required" },
+      422,
+      "PROMOTION_START_DATE_REQUIRED",
+    ],
+    [{ outcome: "invalid_date_range" }, 422, "PROMOTION_INVALID_DATE_RANGE"],
+    [{ outcome: "invalid_asset" }, 422, "PROMOTION_INVALID_ASSET"],
+  ];
+  for (const [result, status, code] of outcomes) {
+    const test = testHandler();
+    test.store.promoteResults = [result];
+    const response = await test.handler(
+      request({ operation: "promote", submission_id: 7, target: "place" }),
+    );
+    assertEquals(response.status, status);
+    assertEquals((await responseJson(response)).code, code);
+  }
 });
 
 Deno.test("adds assets and maps expected asset-add outcomes", async () => {

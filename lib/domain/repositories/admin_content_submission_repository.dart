@@ -1,7 +1,7 @@
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
-import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -26,8 +26,23 @@ abstract class AdminContentSubmissionRepository {
   /// Updates the editable fields of submission [id].
   Future<Result<AdminSubmission>> update(int id, AdminSubmissionInput input);
 
-  /// Transitions the moderation status of [id].
-  Future<Result<void>> changeStatus(int id, AdminSubmissionStatus status);
+  /// Rejects the pending submission [id].
+  ///
+  /// Rejection is the only non-promotion moderation transition; acceptance is
+  /// reachable exclusively through [promote], so this interface cannot express
+  /// a direct pending-to-accepted operation.
+  Future<Result<void>> reject(int id);
+
+  /// Publishes the clean, pending submission [id] as the kind of entity named
+  /// by [target].
+  ///
+  /// Returns the durable promotion pointing at the created place or event;
+  /// an idempotent same-target retry reports the original promotion exactly
+  /// like a first success.
+  Future<Result<AdminSubmissionPromotion>> promote(
+    int id,
+    AdminPromotionTarget target,
+  );
 
   /// Persists an uploaded [asset] association for submission [submissionId].
   Future<Result<AdminSubmissionAsset>> addAsset(

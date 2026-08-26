@@ -9,7 +9,8 @@ import {
 
 export type ContentCategoryWire =
   Database["public"]["Enums"]["content_category"];
-export type FinalSubmissionStatusWire = "accepted" | "rejected";
+export type FinalSubmissionStatusWire = "rejected";
+export type PromotionTargetWire = "place" | "event";
 
 export type AdminSubmissionInputWire = {
   category: ContentCategoryWire;
@@ -42,6 +43,11 @@ export type ValidatedAdminContentSubmissionsRequest =
     operation: "changeStatus";
     submission_id: number;
     status: FinalSubmissionStatusWire;
+  }
+  | {
+    operation: "promote";
+    submission_id: number;
+    target: PromotionTargetWire;
   }
   | {
     operation: "addAsset";
@@ -261,6 +267,7 @@ export function parseAdminContentSubmissionsRequest(
       "create",
       "update",
       "changeStatus",
+      "promote",
       "addAsset",
       "deleteAsset",
     ].includes(value.operation)
@@ -321,13 +328,33 @@ export function parseAdminContentSubmissionsRequest(
         "submission_id",
       );
       if (!submissionId.ok) return submissionId;
-      if (value.status !== "accepted" && value.status !== "rejected") {
-        return invalid("status must be accepted or rejected.");
+      // Acceptance is reachable only through the promotion RPC, so the
+      // standalone status transition is reject-only by construction.
+      if (value.status !== "rejected") {
+        return invalid("status must be rejected.");
       }
       return valid({
         operation: "changeStatus",
         submission_id: submissionId.value,
         status: value.status,
+      });
+    }
+    case "promote": {
+      if (!hasExactKeys(value, ["operation", "submission_id", "target"])) {
+        return invalid("Request contains unsupported or missing fields.");
+      }
+      const submissionId = parsePositiveSafeInteger(
+        value.submission_id,
+        "submission_id",
+      );
+      if (!submissionId.ok) return submissionId;
+      if (value.target !== "place" && value.target !== "event") {
+        return invalid("target must be place or event.");
+      }
+      return valid({
+        operation: "promote",
+        submission_id: submissionId.value,
+        target: value.target,
       });
     }
     case "addAsset": {

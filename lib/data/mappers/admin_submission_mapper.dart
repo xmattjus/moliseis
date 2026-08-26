@@ -1,6 +1,7 @@
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
@@ -43,7 +44,74 @@ AdminSubmission adminSubmissionFromWire(Object? value) {
     modifiedAt: _requiredDateTime(object, 'modified_at'),
     latitude: _nullableDouble(object['latitude'], 'latitude'),
     longitude: _nullableDouble(object['longitude'], 'longitude'),
+    promotion: _promotionFromLinks(
+      placeId: _nullablePositiveInt(
+        object['promoted_place_id'],
+        'promoted_place_id',
+      ),
+      eventId: _nullablePositiveInt(
+        object['promoted_event_id'],
+        'promoted_event_id',
+      ),
+    ),
     assets: assets,
+  );
+}
+
+/// Parses the promotion response envelope of a successful promote call.
+///
+/// Requires exactly the keys `target_type` and `entity_id`, a `target_type`
+/// of `place` or `event`, and a positive integer `entity_id`; unknown targets,
+/// missing or non-positive IDs, doubles, strings, and any other key set are
+/// contract violations.
+AdminSubmissionPromotion adminSubmissionPromotionFromWire(Object? value) {
+  final object = _object(value, 'promotion');
+  if (!hasExactKeys(object, const <String>{'target_type', 'entity_id'})) {
+    throw const FormatException('promotion envelope is invalid');
+  }
+  final target = switch (object['target_type']) {
+    'place' => AdminPromotionTarget.place,
+    'event' => AdminPromotionTarget.event,
+    _ => throw const FormatException('target_type is invalid'),
+  };
+  final entityId = object['entity_id'];
+  if (entityId is! int || entityId <= 0) {
+    throw const FormatException('entity_id is invalid');
+  }
+  return AdminSubmissionPromotion(
+    target: target,
+    entityId: entityId,
+  );
+}
+
+/// Whether [object] carries exactly [keys] and nothing else.
+bool hasExactKeys(Map<String, dynamic> object, Set<String> keys) {
+  final actualKeys = object.keys.toSet();
+  return actualKeys.length == keys.length && actualKeys.containsAll(keys);
+}
+
+/// Builds the durable promotion from the two nullable link fields.
+///
+/// Both links absent parses as no promotion; exactly one link selects its
+/// target. A row carrying both links violates the database CHECK constraint,
+/// so it is rejected defensively instead of being mapped.
+AdminSubmissionPromotion? _promotionFromLinks({
+  required int? placeId,
+  required int? eventId,
+}) {
+  if (placeId == null && eventId == null) {
+    return null;
+  }
+  if (placeId != null && eventId != null) {
+    throw const FormatException(
+      'promoted_place_id and promoted_event_id are mutually exclusive',
+    );
+  }
+  return AdminSubmissionPromotion(
+    target: placeId != null
+        ? AdminPromotionTarget.place
+        : AdminPromotionTarget.event,
+    entityId: placeId ?? eventId!,
   );
 }
 
@@ -124,6 +192,20 @@ double? _nullableDouble(Object? value, String field) {
   }
   if (value is num) {
     return value.toDouble();
+  }
+  throw FormatException('$field is invalid');
+}
+
+/// Tolerant nullable positive-integer parsing for durable link columns:
+/// absent keys and null values parse as null, a positive JSON integer parses
+/// as the value, and doubles, strings, zero, and negatives are contract
+/// violations.
+int? _nullablePositiveInt(Object? value, String field) {
+  if (value == null) {
+    return null;
+  }
+  if (value is int && value > 0) {
+    return value;
   }
   throw FormatException('$field is invalid');
 }

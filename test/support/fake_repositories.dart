@@ -12,6 +12,7 @@ import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
@@ -100,6 +101,7 @@ AdminSubmission sampleAdminSubmission({
   DateTime? modifiedAt,
   double? latitude,
   double? longitude,
+  AdminSubmissionPromotion? promotion,
   List<AdminSubmissionAsset> assets = const [],
 }) {
   final timestamp = DateTime.utc(2026, 8, 20);
@@ -119,6 +121,7 @@ AdminSubmission sampleAdminSubmission({
     modifiedAt: modifiedAt ?? timestamp,
     latitude: latitude,
     longitude: longitude,
+    promotion: promotion,
     assets: assets,
   );
 }
@@ -135,12 +138,23 @@ final class FakeAdminContentSubmissionRepository
     Map<int, Result<AdminSubmission>>? getByIdResults,
     Result<AdminSubmission>? createResult,
     Result<AdminSubmission>? updateResult,
-    this.changeStatusResult = const Result.success(null),
+    this.rejectResult = const Result.success(null),
+    List<Result<AdminSubmissionPromotion>>? promoteResults,
     Result<AdminSubmissionAsset>? addAssetResult,
     this.deleteAssetResult = const Result.success(null),
   }) : getByIdResults = getByIdResults ?? {},
        createResult = createResult ?? Result.success(sampleAdminSubmission()),
        updateResult = updateResult ?? Result.success(sampleAdminSubmission()),
+       promoteResults =
+           promoteResults ??
+           <Result<AdminSubmissionPromotion>>[
+             const Result.success(
+               AdminSubmissionPromotion(
+                 target: AdminPromotionTarget.place,
+                 entityId: 1,
+               ),
+             ),
+           ],
        addAssetResult =
            addAssetResult ??
            const Result.success(
@@ -156,7 +170,8 @@ final class FakeAdminContentSubmissionRepository
   Map<int, Result<AdminSubmission>> getByIdResults;
   Result<AdminSubmission> createResult;
   Result<AdminSubmission> updateResult;
-  Result<void> changeStatusResult;
+  Result<void> rejectResult;
+  final List<Result<AdminSubmissionPromotion>> promoteResults;
   Result<AdminSubmissionAsset> addAssetResult;
   Result<void> deleteAssetResult;
 
@@ -165,7 +180,8 @@ final class FakeAdminContentSubmissionRepository
   final createInputs = <AdminSubmissionInput>[];
   final updateIds = <int>[];
   final updateInputs = <AdminSubmissionInput>[];
-  final changeStatusCalls = <(int, AdminSubmissionStatus)>[];
+  final rejectIds = <int>[];
+  final promoteCalls = <(int, AdminPromotionTarget)>[];
   final addAssetCalls = <(int, SubmissionAsset)>[];
   final deleteAssetCalls = <(int, int)>[];
 
@@ -178,8 +194,11 @@ final class FakeAdminContentSubmissionRepository
   /// When non-null, holds update requests open until the test completes it.
   Completer<Result<AdminSubmission>>? pendingUpdate;
 
-  /// When non-null, holds moderation requests open until the test completes it.
-  Completer<Result<void>>? pendingChangeStatus;
+  /// When non-null, holds rejection requests open until the test completes it.
+  Completer<Result<void>>? pendingReject;
+
+  /// When non-null, holds promotion requests open until the test completes it.
+  Completer<Result<AdminSubmissionPromotion>>? pendingPromote;
 
   /// When non-null, holds asset-add requests open until the test completes it.
   Completer<Result<AdminSubmissionAsset>>? pendingAddAsset;
@@ -224,14 +243,25 @@ final class FakeAdminContentSubmissionRepository
   }
 
   @override
-  Future<Result<void>> changeStatus(
-    int id,
-    AdminSubmissionStatus status,
-  ) async {
-    changeStatusCalls.add((id, status));
-    final pending = pendingChangeStatus;
+  Future<Result<void>> reject(int id) async {
+    rejectIds.add(id);
+    final pending = pendingReject;
     if (pending != null) return pending.future;
-    return changeStatusResult;
+    return rejectResult;
+  }
+
+  @override
+  Future<Result<AdminSubmissionPromotion>> promote(
+    int id,
+    AdminPromotionTarget target,
+  ) async {
+    promoteCalls.add((id, target));
+    final pending = pendingPromote;
+    if (pending != null) return pending.future;
+    if (promoteResults.isEmpty) {
+      return Result.error(TestException('No queued promote result'));
+    }
+    return promoteResults.removeAt(0);
   }
 
   @override

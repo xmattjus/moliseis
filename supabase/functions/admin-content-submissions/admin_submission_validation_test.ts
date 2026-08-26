@@ -36,7 +36,9 @@ Deno.test("accepts all operation envelopes and normalizes editor input", () => {
     { operation: "getById", submission_id: 1 },
     { operation: "create", input: input() },
     { operation: "update", submission_id: 1, input: input() },
-    { operation: "changeStatus", submission_id: 1, status: "accepted" },
+    { operation: "changeStatus", submission_id: 1, status: "rejected" },
+    { operation: "promote", submission_id: 1, target: "place" },
+    { operation: "promote", submission_id: 2, target: "event" },
     { operation: "addAsset", submission_id: 1, asset: asset() },
     { operation: "deleteAsset", submission_id: 1, asset_id: 2 },
   ];
@@ -51,6 +53,15 @@ Deno.test("accepts all operation envelopes and normalizes editor input", () => {
   assert(created.ok && created.value.operation === "create");
   assertEquals(created.value.input.city, "Campobasso");
   assertEquals(created.value.input.name, "Teatro");
+
+  const promoted = parseAdminContentSubmissionsRequest({
+    operation: "promote",
+    submission_id: 1,
+    target: "place",
+  });
+  assert(promoted.ok && promoted.value.operation === "promote");
+  assertEquals(promoted.value.submission_id, 1);
+  assertEquals(promoted.value.target, "place");
 });
 
 Deno.test("validates exact add-asset and delete-asset request envelopes", () => {
@@ -139,9 +150,12 @@ Deno.test("rejects invalid request envelopes, IDs, and status", () => {
       {
         operation: "changeStatus",
         submission_id: 1,
-        status: "accepted",
+        status: "rejected",
         extra: true,
       },
+      { operation: "promote", submission_id: 1 },
+      { operation: "promote", target: "place" },
+      { operation: "promote", submission_id: 1, target: "place", extra: true },
     ]
   ) expectInvalid(request, "Request contains unsupported or missing fields.");
   for (const id of [0, -1, 1.5, "1", Number.MAX_SAFE_INTEGER + 1]) {
@@ -149,11 +163,27 @@ Deno.test("rejects invalid request envelopes, IDs, and status", () => {
       { operation: "getById", submission_id: id },
       "submission_id must be a positive safe integer.",
     );
+    expectInvalid(
+      { operation: "promote", submission_id: id, target: "place" },
+      "submission_id must be a positive safe integer.",
+    );
   }
-  for (const status of ["pending", "other"]) {
+  // The standalone accept path cannot survive through any request shape:
+  // accepted is no longer a valid changeStatus status.
+  expectInvalid(
+    { operation: "changeStatus", submission_id: 1, status: "accepted" },
+    "status must be rejected.",
+  );
+  for (const status of ["pending", "accepted", "other"]) {
     expectInvalid(
       { operation: "changeStatus", submission_id: 1, status },
-      "status must be accepted or rejected.",
+      "status must be rejected.",
+    );
+  }
+  for (const target of ["Place", "places", null, 1, undefined]) {
+    expectInvalid(
+      { operation: "promote", submission_id: 1, target },
+      "target must be place or event.",
     );
   }
 });

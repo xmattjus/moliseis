@@ -12,6 +12,7 @@ import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
@@ -227,6 +228,70 @@ void main() {
       expect(find.text('Proposto da'), findsOneWidget);
       expect(find.text('Anna Bianchi'), findsOneWidget);
       expect(find.text('anna@example.com'), findsOneWidget);
+    });
+
+    testWidgets('unfocuses the editor before opening the asset picker', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pendingPicker = Completer<XFile?>();
+      repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        imagePicker: FakeImagePicker(
+          onPickImage: () => pendingPicker.future,
+        ),
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      final cityField = find.widgetWithText(TextFormField, 'Città');
+      await tester.tap(cityField);
+      await tester.pump();
+      final cityEditable = find.descendant(
+        of: cityField,
+        matching: find.byType(EditableText),
+      );
+      final cityFocusNode = tester.widget<EditableText>(cityEditable).focusNode;
+      expect(FocusManager.instance.primaryFocus, same(cityFocusNode));
+
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final addAsset = find.byKey(
+        const ValueKey<String>('admin_submission_add_asset'),
+      );
+      await tester.scrollUntilVisible(addAsset, 200, scrollable: scrollable);
+      expect(FocusManager.instance.primaryFocus, same(cityFocusNode));
+
+      await tester.tap(addAsset);
+      await tester.pump();
+
+      expect(viewModel.addAsset.running, isTrue);
+      expect(FocusManager.instance.primaryFocus, isNot(same(cityFocusNode)));
+      // A keyboard event arriving after the picker starts cannot mutate the
+      // draft while the editor's focus barrier is active.
+      await tester.enterText(cityField, 'Changed while picking');
+      expect(viewModel.city, 'Campobasso');
+
+      pendingPicker.complete(null);
+      await tester.pumpAndSettle();
+      expect(viewModel.addAsset.completed, isTrue);
+
+      final restoredFocusNode =
+          tester.widget<EditableText>(cityEditable).focusNode..requestFocus();
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, same(restoredFocusNode));
     });
 
     testWidgets('never loads or saves the public draft after field edits', (
@@ -476,7 +541,15 @@ void main() {
         expect(
           tester
               .widget<FilledButton>(
-                find.widgetWithText(FilledButton, 'Accetta'),
+                find.widgetWithText(FilledButton, 'Pubblica come luogo'),
+              )
+              .onPressed,
+          isNull,
+        );
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Rifiuta'),
               )
               .onPressed,
           isNull,
@@ -523,9 +596,8 @@ void main() {
       expect(viewModel.isDirty, isTrue);
     });
 
-    testWidgets('disables status actions after edits and saves separately', (
-      tester,
-    ) async {
+    testWidgets('disables publish and reject after edits and saves '
+        'separately', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       repository.getByIdResults[1] = Result.success(
@@ -551,14 +623,18 @@ void main() {
           )
           .first;
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Accetta'),
+        find.widgetWithText(FilledButton, 'Pubblica come luogo'),
         200,
         scrollable: scrollable,
       );
-      final acceptButton = find.widgetWithText(FilledButton, 'Accetta');
+      final publishButton = find.widgetWithText(
+        FilledButton,
+        'Pubblica come luogo',
+      );
       final rejectButton = find.widgetWithText(FilledButton, 'Rifiuta');
-      expect(tester.widget<FilledButton>(acceptButton).onPressed, isNotNull);
+      expect(tester.widget<FilledButton>(publishButton).onPressed, isNotNull);
       expect(tester.widget<FilledButton>(rejectButton).onPressed, isNotNull);
+      expect(find.text('Accetta'), findsNothing);
 
       await tester.scrollUntilVisible(
         find.widgetWithText(TextFormField, 'Città'),
@@ -572,14 +648,14 @@ void main() {
       await tester.pump();
 
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Accetta'),
+        publishButton,
         200,
         scrollable: scrollable,
       );
-      expect(tester.widget<FilledButton>(acceptButton).onPressed, isNull);
+      expect(tester.widget<FilledButton>(publishButton).onPressed, isNull);
       expect(tester.widget<FilledButton>(rejectButton).onPressed, isNull);
       expect(
-        find.text('Salva le modifiche prima di cambiare lo stato.'),
+        find.text('Salva le modifiche prima di pubblicare o rifiutare.'),
         findsOneWidget,
       );
 
@@ -633,7 +709,7 @@ void main() {
       expect(
         tester
             .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Accetta'),
+              find.widgetWithText(FilledButton, 'Pubblica come luogo'),
             )
             .onPressed,
         isNull,
@@ -651,11 +727,9 @@ void main() {
     });
 
     testWidgets(
-      'does not auto-confirm moderation when save completes '
+      'does not auto-confirm publication when save completes '
       'during confirmation',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final pendingUpdate = Completer<Result<AdminSubmission>>();
@@ -679,13 +753,18 @@ void main() {
               matching: find.byType(Scrollable),
             )
             .first;
-        final accept = find.widgetWithText(FilledButton, 'Accetta');
-        await tester.scrollUntilVisible(accept, 200, scrollable: scrollable);
+        final publish = find.widgetWithText(
+          FilledButton,
+          'Pubblica come luogo',
+        );
+        await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
 
-        await tester.tap(accept);
+        await tester.tap(publish);
         await tester.pump();
         expect(
-          find.text('Confermi di accettare questo contributo?'),
+          find.text(
+            'Confermi di voler pubblicare questo contributo come luogo?',
+          ),
           findsOneWidget,
         );
 
@@ -696,20 +775,75 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.text('Confermi di accettare questo contributo?'),
+          find.text(
+            'Confermi di voler pubblicare questo contributo come luogo?',
+          ),
           findsOneWidget,
         );
-        expect(repository.changeStatusCalls, isEmpty);
+        expect(repository.promoteCalls, isEmpty);
 
         await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
         await tester.pumpAndSettle();
 
-        expect(repository.changeStatusCalls, isEmpty);
+        // The save completed while the dialog was open: closing the editor
+        // refreshes the dashboard instead of running a stale moderation.
+        expect(repository.promoteCalls, isEmpty);
         expect(find.text('SHELL_MARKER'), findsOneWidget);
       },
     );
 
-    testWidgets('rechecks busy state before confirming moderation', (
+    testWidgets(
+      'does not run a stale rejection when save completes '
+      'during its confirmation',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final pendingUpdate = Completer<Result<AdminSubmission>>();
+        repository
+          ..getByIdResults[1] = Result.success(sampleAdminSubmission())
+          ..pendingUpdate = pendingUpdate;
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        final scrollable = find
+            .descendant(
+              of: find.byKey(
+                const ValueKey<String>('admin_submission_editor_scroll'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final reject = find.widgetWithText(FilledButton, 'Rifiuta');
+        await tester.scrollUntilVisible(reject, 200, scrollable: scrollable);
+
+        await tester.tap(reject);
+        await tester.pump();
+        expect(
+          find.text('Confermi di voler rifiutare questo contributo?'),
+          findsOneWidget,
+        );
+
+        unawaited(viewModel.save.execute());
+        await tester.pump();
+        expect(viewModel.save.running, isTrue);
+        pendingUpdate.complete(Result.success(sampleAdminSubmission()));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
+        await tester.pumpAndSettle();
+
+        expect(repository.rejectIds, isEmpty);
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
+      },
+    );
+
+    testWidgets('rechecks busy state before confirming publication', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -736,9 +870,9 @@ void main() {
             matching: find.byType(Scrollable),
           )
           .first;
-      final accept = find.widgetWithText(FilledButton, 'Accetta');
-      await tester.scrollUntilVisible(accept, 200, scrollable: scrollable);
-      await tester.tap(accept);
+      final publish = find.widgetWithText(FilledButton, 'Pubblica come luogo');
+      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+      await tester.tap(publish);
       await tester.pumpAndSettle();
 
       unawaited(viewModel.addAsset.execute());
@@ -747,20 +881,20 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
       await tester.pump();
 
-      expect(repository.changeStatusCalls, isEmpty);
+      expect(repository.promoteCalls, isEmpty);
       pendingPick.complete(null);
       await tester.pumpAndSettle();
     });
 
-    testWidgets('disables save while a moderation request is pending', (
+    testWidgets('disables save while a rejection request is pending', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final pendingChangeStatus = Completer<Result<void>>();
+      final pendingReject = Completer<Result<void>>();
       repository
         ..getByIdResults[1] = Result.success(sampleAdminSubmission())
-        ..pendingChangeStatus = pendingChangeStatus;
+        ..pendingReject = pendingReject;
       viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: contentSubmissionRepository,
@@ -771,7 +905,7 @@ void main() {
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
 
-      unawaited(viewModel.changeStatus.execute(AdminSubmissionStatus.accepted));
+      unawaited(viewModel.reject.execute());
       await tester.pump();
 
       expect(
@@ -782,7 +916,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      pendingChangeStatus.complete(const Result.success(null));
+      pendingReject.complete(const Result.success(null));
       await tester.pumpAndSettle();
     });
 
@@ -879,23 +1013,18 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
       await tester.pumpAndSettle();
 
-      expect(repository.changeStatusCalls, isEmpty);
+      expect(repository.rejectIds, isEmpty);
 
       await tester.tap(find.widgetWithText(FilledButton, 'Rifiuta'));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
       await tester.pumpAndSettle();
 
-      expect(
-        repository.changeStatusCalls,
-        <(int, AdminSubmissionStatus)>[
-          (1, AdminSubmissionStatus.rejected),
-        ],
-      );
+      expect(repository.rejectIds, <int>[1]);
       expect(find.text('SHELL_MARKER'), findsOneWidget);
     });
 
-    testWidgets('accepts a clean submission after confirmation', (
+    testWidgets('publishes a place draft after explicit confirmation', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -922,30 +1051,327 @@ void main() {
           )
           .first;
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Accetta'),
+        find.widgetWithText(FilledButton, 'Pubblica come luogo'),
         200,
         scrollable: scrollable,
       );
-      await tester.tap(find.widgetWithText(FilledButton, 'Accetta'));
+      // A place draft offers exactly one publication CTA.
+      expect(
+        find.widgetWithText(FilledButton, 'Pubblica come evento'),
+        findsNothing,
+      );
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Pubblica come luogo'),
+      );
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Confermi di accettare questo contributo?'),
+        find.text('Confermi di voler pubblicare questo contributo come luogo?'),
         findsOneWidget,
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
       await tester.pumpAndSettle();
 
-      expect(
-        repository.changeStatusCalls,
-        <(int, AdminSubmissionStatus)>[
-          (1, AdminSubmissionStatus.accepted),
-        ],
-      );
+      expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
+        (1, AdminPromotionTarget.place),
+      ]);
       expect(find.text('SHELL_MARKER'), findsOneWidget);
     });
 
-    testWidgets('shows only the accepted label while keeping save enabled', (
+    testWidgets('publishes an event draft as an event', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(
+          startDate: DateTime.utc(2026, 9, 20, 10),
+          endDate: DateTime.utc(2026, 9, 20, 12),
+        ),
+      );
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Pubblica come evento'),
+        200,
+        scrollable: scrollable,
+      );
+      expect(
+        find.widgetWithText(FilledButton, 'Pubblica come luogo'),
+        findsNothing,
+      );
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Pubblica come evento'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Confermi di voler pubblicare questo contributo come evento?',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
+      await tester.pumpAndSettle();
+
+      expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
+        (1, AdminPromotionTarget.event),
+      ]);
+      expect(find.text('SHELL_MARKER'), findsOneWidget);
+    });
+
+    group('promotion error messages', () {
+      Future<void> pumpPendingEditor(WidgetTester tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('maps readiness codes to actionable Italian copy', (
+        tester,
+      ) async {
+        for (final entry in <(String?, String)>[
+          (
+            'PROMOTION_COORDINATES_REQUIRED',
+            'Imposta coordinate valide e salva prima di pubblicare.',
+          ),
+          (
+            'PROMOTION_CITY_NOT_FOUND',
+            'La città non corrisponde a una località disponibile. '
+                'Correggila e salva.',
+          ),
+          (
+            'PROMOTION_START_DATE_REQUIRED',
+            "Imposta una data di inizio e salva prima di pubblicare l'evento.",
+          ),
+          (
+            'PROMOTION_TARGET_CONFLICT',
+            'Il contributo è già stato pubblicato con un tipo diverso.',
+          ),
+        ]) {
+          await pumpPendingEditor(tester);
+          repository.promoteResults
+            ..clear()
+            ..add(
+              Result.error(
+                AdminContentSubmissionApiException(
+                  statusCode: entry.$1 == 'PROMOTION_TARGET_CONFLICT'
+                      ? 409
+                      : 422,
+                  code: entry.$1,
+                  message: 'API failure',
+                ),
+              ),
+            );
+
+          await viewModel.promote.execute(AdminPromotionTarget.place);
+          await tester.pump();
+
+          expect(find.text(entry.$2), findsOneWidget);
+          $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
+          router.go('/shell');
+          await tester.pumpAndSettle();
+        }
+      });
+    });
+
+    testWidgets('renders promoted accepted rows read-only with linkage', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(
+          status: AdminSubmissionStatus.accepted,
+          promotion: const AdminSubmissionPromotion(
+            target: AdminPromotionTarget.event,
+            entityId: 123,
+          ),
+          assets: const <AdminSubmissionAsset>[
+            AdminSubmissionAsset(
+              id: 2,
+              url: 'https://example.com/photo.jpg',
+              width: 640,
+              height: 480,
+            ),
+          ],
+        ),
+      );
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Accettato'), findsOneWidget);
+      expect(find.text('Pubblicato come evento · ID 123'), findsOneWidget);
+      expect(find.text('1 / 5'), findsOneWidget);
+      expect(find.byType(AppNetworkImage), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('admin_submission_add_asset')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(
+          const ValueKey<String>('admin_submission_delete_asset_2'),
+        ),
+        findsNothing,
+      );
+      // No moderation or Save controls remain.
+      expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
+      expect(
+        find.widgetWithText(FilledButton, 'Pubblica come luogo'),
+        findsNothing,
+      );
+      expect(
+        find.widgetWithText(FilledButton, 'Pubblica come evento'),
+        findsNothing,
+      );
+      expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
+      expect(
+        find.widgetWithText(FilledButton, 'Salva modifiche'),
+        findsNothing,
+      );
+
+      // Attempted interaction leaves the ViewModel untouched: the tap is
+      // suppressed by the pointer barrier, so no state can change.
+      final cityField = find.widgetWithText(TextFormField, 'Città');
+      expect(cityField, findsOneWidget);
+      await tester.tap(cityField, warnIfMissed: false);
+      await tester.pump();
+
+      expect(viewModel.isDirty, isFalse);
+      expect(viewModel.city, 'Campobasso');
+      // Requesting focus on the locked field cannot make it primary.
+      final lockedNode = _requestFocusOn(tester, cityField);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, isNot(equals(lockedNode)));
+    });
+
+    testWidgets('excludes keyboard focus from locked fields while busy', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pendingDelete = Completer<Result<void>>();
+      const asset = AdminSubmissionAsset(
+        id: 2,
+        url: 'https://example.com/photo.jpg',
+        width: 640,
+        height: 480,
+      );
+      repository
+        ..getByIdResults[1] = Result.success(
+          sampleAdminSubmission(assets: const <AdminSubmissionAsset>[asset]),
+        )
+        ..pendingDeleteAsset = pendingDelete;
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      unawaited(viewModel.deleteAsset.execute(2));
+      await tester.pump();
+      expect(viewModel.deleteAsset.running, isTrue);
+
+      final cityField = find.widgetWithText(TextFormField, 'Città');
+      // While locked, requesting focus on an inner field never makes it the
+      // primary focus.
+      final lockedNode = _requestFocusOn(tester, cityField);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, isNot(equals(lockedNode)));
+      expect(viewModel.isDirty, isFalse);
+
+      pendingDelete.complete(const Result.success(null));
+      await tester.pumpAndSettle();
+
+      // Unlocked again, the same request focuses the field normally.
+      final unlockedNode = _requestFocusOn(tester, cityField);
+      await tester.pump();
+      expect(FocusManager.instance.primaryFocus, equals(unlockedNode));
+    });
+
+    testWidgets('keeps drafts locked while a save is running and restores '
+        'interaction afterwards', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pendingUpdate = Completer<Result<AdminSubmission>>();
+      repository
+        ..getByIdResults[1] = Result.success(sampleAdminSubmission())
+        ..pendingUpdate = pendingUpdate;
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Salva modifiche'),
+        200,
+        scrollable: scrollable,
+      );
+
+      unawaited(viewModel.save.execute());
+      await tester.pump();
+
+      // Tapping the city field while saving cannot dirty the editor.
+      await tester.tap(
+        find.widgetWithText(TextFormField, 'Città'),
+        warnIfMissed: false,
+      );
+      await tester.pump();
+      expect(viewModel.isDirty, isFalse);
+      expect(viewModel.city, 'Campobasso');
+
+      pendingUpdate.complete(Result.success(sampleAdminSubmission()));
+      await tester.pumpAndSettle();
+      // The save success pops the editor back to the shell.
+      expect(find.text('SHELL_MARKER'), findsOneWidget);
+    });
+    testWidgets('renders historical accepted rows read-only without Save', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -974,6 +1400,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Accettato'), findsOneWidget);
+      // Historical accepted rows carry no durable link and none is invented.
+      expect(find.text('Pubblicato come evento · ID 123'), findsNothing);
+      expect(
+        find.textContaining('Pubblicato come'),
+        findsNothing,
+      );
       expect(find.text('1 / 5'), findsOneWidget);
       expect(find.byType(AppNetworkImage), findsOneWidget);
       expect(
@@ -988,17 +1420,20 @@ void main() {
       );
       expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Salva modifiche'),
-            )
-            .onPressed,
-        isNotNull,
+      // The Save control is hidden entirely for read-only rows.
+      expect(find.text('Salva modifiche'), findsNothing);
+
+      // Attempted interaction leaves the ViewModel untouched.
+      await tester.tap(
+        find.widgetWithText(TextFormField, 'Città'),
+        warnIfMissed: false,
       );
+      await tester.pump();
+      expect(viewModel.isDirty, isFalse);
+      expect(viewModel.city, 'Campobasso');
     });
 
-    testWidgets('shows only the rejected label while keeping save enabled', (
+    testWidgets('renders rejected rows read-only without Save', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1041,14 +1476,16 @@ void main() {
       );
       expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
-      expect(
-        tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Salva modifiche'),
-            )
-            .onPressed,
-        isNotNull,
+      expect(find.text('Salva modifiche'), findsNothing);
+
+      // Attempted interaction leaves the ViewModel untouched.
+      await tester.tap(
+        find.widgetWithText(TextFormField, 'Città'),
+        warnIfMissed: false,
       );
+      await tester.pump();
+      expect(viewModel.isDirty, isFalse);
+      expect(viewModel.city, 'Campobasso');
     });
 
     testWidgets('shows the profile-specific create failure message', (
@@ -1220,11 +1657,14 @@ void main() {
         await tester.pump();
         expect(viewModel.isDirty, isTrue);
 
-        await scrollTo(tester, find.widgetWithText(FilledButton, 'Accetta'));
+        await scrollTo(
+          tester,
+          find.widgetWithText(FilledButton, 'Pubblica come luogo'),
+        );
         expect(
           tester
               .widget<FilledButton>(
-                find.widgetWithText(FilledButton, 'Accetta'),
+                find.widgetWithText(FilledButton, 'Pubblica come luogo'),
               )
               .onPressed,
           isNull,
@@ -1344,4 +1784,17 @@ void main() {
       });
     });
   });
+}
+
+/// Requests keyboard focus on the editable text inside [fieldFinder].
+///
+/// Returns the field's own [FocusNode] so callers can assert whether the
+/// request made it the manager's primary focus.
+FocusNode _requestFocusOn(WidgetTester tester, Finder fieldFinder) {
+  final fieldNode = Focus.of(
+    tester.element(
+      find.descendant(of: fieldFinder, matching: find.byType(EditableText)),
+    ),
+  )..requestFocus();
+  return fieldNode;
 }

@@ -4,6 +4,7 @@ import 'package:moliseis/data/repositories/admin_content_submission_api_exceptio
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
@@ -69,23 +70,33 @@ final class AdminContentSubmissionRepositoryImpl
   }
 
   @override
-  Future<Result<void>> changeStatus(int id, AdminSubmissionStatus status) {
-    if (status == AdminSubmissionStatus.pending) {
-      return Future<Result<void>>.value(
-        Result.error(
-          Exception('Only accepted or rejected statuses can be sent.'),
-        ),
-      );
-    }
-
+  Future<Result<void>> reject(int id) {
     return _invoke<void>(
       operation: 'changeStatus',
       body: <String, dynamic>{
         'operation': 'changeStatus',
         'submission_id': id,
-        'status': status.name,
+        // Rejection is the only final transition this repository can express;
+        // acceptance is reachable exclusively through promote.
+        'status': AdminSubmissionStatus.rejected.name,
       },
-      parse: (data) => _changeStatusFromEnvelope(data, status),
+      parse: _rejectFromEnvelope,
+    );
+  }
+
+  @override
+  Future<Result<AdminSubmissionPromotion>> promote(
+    int id,
+    AdminPromotionTarget target,
+  ) {
+    return _invoke(
+      operation: 'promote',
+      body: <String, dynamic>{
+        'operation': 'promote',
+        'submission_id': id,
+        'target': target.name,
+      },
+      parse: _promotionFromEnvelope,
     );
   }
 
@@ -201,18 +212,21 @@ void _deleteAssetFromEnvelope(Object? value) {
   }
 }
 
-void _changeStatusFromEnvelope(
-  Object? value,
-  AdminSubmissionStatus requestedStatus,
-) {
+/// Requires the reject-only success contract of the changeStatus operation.
+void _rejectFromEnvelope(Object? value) {
   final envelope = _object(value, 'changeStatus response');
   if (envelope['ok'] != true) {
     throw const FormatException('ok is invalid');
   }
-  final status = adminSubmissionStatusFromWire(envelope['status']);
-  if (status != requestedStatus) {
+  if (adminSubmissionStatusFromWire(envelope['status']) !=
+      AdminSubmissionStatus.rejected) {
     throw const FormatException('status does not match request');
   }
+}
+
+AdminSubmissionPromotion _promotionFromEnvelope(Object? value) {
+  final envelope = _object(value, 'promotion response');
+  return adminSubmissionPromotionFromWire(envelope['promotion']);
 }
 
 Map<String, dynamic> _object(Object? value, String path) {

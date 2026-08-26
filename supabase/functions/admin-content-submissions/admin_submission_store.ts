@@ -3,6 +3,7 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
 import type { Database, Json } from "../_shared/database.types.ts";
 import type {
   FinalSubmissionStatusWire,
+  PromotionTargetWire,
   ValidatedAdminSubmissionInput,
 } from "./admin_submission_validation.ts";
 import type { ValidatedSubmissionAsset } from "../submit-content/submission_validation.ts";
@@ -29,6 +30,8 @@ export type SubmissionRecord = Pick<
   | "modified_at"
   | "latitude"
   | "longitude"
+  | "promoted_place_id"
+  | "promoted_event_id"
 >;
 
 export type SubmissionAssetRecord = Pick<
@@ -44,6 +47,11 @@ export type AdminSubmissionCreateValues = ValidatedAdminSubmissionInput & {
 
 export type ChangeStatusStoreResult = "updated" | "not_found" | "not_pending";
 
+export type UpdateStoreResult =
+  | { outcome: "updated"; submission: SubmissionRecord }
+  | { outcome: "not_found" }
+  | { outcome: "not_pending" };
+
 export type AddAssetStoreResult =
   | { outcome: "created"; asset: SubmissionAssetRecord }
   | { outcome: "not_found" }
@@ -55,6 +63,24 @@ export type DeleteAssetStoreResult =
   | "not_found"
   | "not_pending"
   | "asset_not_found";
+
+export type PromoteStoreResult =
+  | { outcome: "created"; target: PromotionTargetWire; entityId: number }
+  | {
+    outcome: "already_promoted";
+    target: PromotionTargetWire;
+    entityId: number;
+  }
+  | { outcome: "not_found" }
+  | { outcome: "not_pending" }
+  | { outcome: "invalid_name" }
+  | { outcome: "coordinates_required" }
+  | { outcome: "invalid_coordinates" }
+  | { outcome: "city_not_found" }
+  | { outcome: "place_has_event_dates" }
+  | { outcome: "start_date_required" }
+  | { outcome: "invalid_date_range" }
+  | { outcome: "invalid_asset" };
 
 export interface AdminSubmissionStore {
   list(): Promise<SubmissionRecord[]>;
@@ -69,13 +95,18 @@ export interface AdminSubmissionStore {
     id: number,
     input: ValidatedAdminSubmissionInput,
     modifiedAt: string,
-  ): Promise<SubmissionRecord | null>;
+  ): Promise<UpdateStoreResult>;
   changeStatus(params: {
     id: number;
     status: FinalSubmissionStatusWire;
     handledBy: string;
     modifiedAt: string;
   }): Promise<ChangeStatusStoreResult>;
+  promote(params: {
+    id: number;
+    target: PromotionTargetWire;
+    handledBy: string;
+  }): Promise<PromoteStoreResult>;
   addAsset(
     submissionId: number,
     asset: ValidatedSubmissionAsset,
@@ -94,7 +125,7 @@ export class AdminSubmissionStoreError extends Error {
 }
 
 export const SUBMISSION_SELECT =
-  "id,city,name,description,description_delta,start_date,end_date,category,user_name,user_email,status,created_at,modified_at,latitude,longitude";
+  "id,city,name,description,description_delta,start_date,end_date,category,user_name,user_email,status,created_at,modified_at,latitude,longitude,promoted_place_id,promoted_event_id";
 export const ASSET_SELECT = "id,url,width,height";
 
 function throwOnError(error: unknown): void {
@@ -166,7 +197,16 @@ export function createAdminSubmissionStore(
       return data;
     },
 
-    async update(id, input, modifiedAt): Promise<SubmissionRecord | null> {
+    async update(
+      id,
+      input,
+      modifiedAt,
+    ): Promise<UpdateStoreResult> {
+      // Pending-only predicate: the guarded UPDATE itself is the race
+      // protection against a concurrent promotion. Under READ COMMITTED it
+      // blocks on the promoted row's lock, re-evaluates the status predicate
+      // after the promote transaction commits, and matches zero rows, so an
+      // accepted source can never diverge from its published entity.
       const { data, error } = await client
         .from("content_submissions")
         .update({
@@ -182,10 +222,21 @@ export function createAdminSubmissionStore(
           modified_at: modifiedAt,
         })
         .eq("id", id)
+        .eq("status", "pending")
         .select(SUBMISSION_SELECT)
         .maybeSingle();
       throwOnError(error);
-      return data;
+      if (data) return { outcome: "updated", submission: data };
+
+      // Classification only: distinguishes an absent row from one that is no
+      // longer pending so the handler can answer 404 vs 409.
+      const { data: existing, error: existingError } = await client
+        .from("content_submissions")
+        .select("id,status")
+        .eq("id", id)
+        .maybeSingle();
+      throwOnError(existingError);
+      return existing ? { outcome: "not_pending" } : { outcome: "not_found" };
     },
 
     async changeStatus(
@@ -208,6 +259,99 @@ export function createAdminSubmissionStore(
         .maybeSingle();
       throwOnError(existingError);
       return existing ? "not_pending" : "not_found";
+    },
+
+    async promote(
+      { id, target, handledBy },
+    ): Promise<PromoteStoreResult> {
+      const { data, error } = await client.rpc("promote_content_submission", {
+        p_submission_id: id,
+        p_target: target,
+        p_handled_by: handledBy,
+      });
+      throwOnError(error);
+
+      // Generated database types declare entity_id/target_type non-null even
+      // though domain-failure rows contain SQL NULLs. Runtime validation never
+      // trusts that declaration. The RPC is a set-returning function whose
+      // every code path returns exactly one row, so anything else is a
+      // contract violation and fails closed instead of being interpreted.
+      if (!Array.isArray(data) || data.length !== 1) {
+        throw new AdminSubmissionStoreError(
+          new Error(
+            `Promotion returned ${
+              data === null ? "null" : String(data.length)
+            } outcome rows`,
+          ),
+        );
+      }
+      const row = data[0] as unknown;
+      if (row === null || typeof row !== "object" || Array.isArray(row)) {
+        throw new AdminSubmissionStoreError(
+          new Error("Promotion returned a non-object outcome row"),
+        );
+      }
+      const rowObject = row as Record<string, unknown>;
+      const outcome =
+        typeof rowObject.outcome === "string" ? rowObject.outcome : null;
+      const targetType = rowObject.target_type;
+      const entityId = rowObject.entity_id;
+
+      switch (outcome) {
+        case "created":
+        case "already_promoted": {
+          if (targetType !== "place" && targetType !== "event") {
+            throw new AdminSubmissionStoreError(
+              new Error(`Promotion returned an invalid target type`),
+            );
+          }
+          if (
+            typeof entityId !== "number" ||
+            !Number.isSafeInteger(entityId) ||
+            entityId <= 0
+          ) {
+            throw new AdminSubmissionStoreError(
+              new Error("Promotion returned an invalid entity ID"),
+            );
+          }
+          // A created result must match the requested target; any mismatch is
+          // impossible legitimate data and fails closed. An already_promoted
+          // result keeps the ACTUAL returned target so the handler can
+          // distinguish same-target retries from conflicts.
+          if (outcome === "created" && targetType !== target) {
+            throw new AdminSubmissionStoreError(
+              new Error(
+                "Promotion created a target that differs from the request",
+              ),
+            );
+          }
+          return { outcome, target: targetType, entityId };
+        }
+        case "not_found":
+        case "not_pending":
+        case "invalid_name":
+        case "coordinates_required":
+        case "invalid_coordinates":
+        case "city_not_found":
+        case "place_has_event_dates":
+        case "start_date_required":
+        case "invalid_date_range":
+        case "invalid_asset":
+          // Domain failures carry no payload; populated payload fields on a
+          // failure row are malformed data and fail closed.
+          if (targetType !== null || entityId !== null) {
+            throw new AdminSubmissionStoreError(
+              new Error(
+                `Promotion outcome ${outcome} unexpectedly carried a payload`,
+              ),
+            );
+          }
+          return { outcome };
+        default:
+          throw new AdminSubmissionStoreError(
+            new Error("Promotion returned an unknown outcome"),
+          );
+      }
     },
 
     async addAsset(submissionId, asset): Promise<AddAssetStoreResult> {

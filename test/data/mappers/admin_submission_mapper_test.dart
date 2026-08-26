@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
@@ -210,6 +211,62 @@ void main() {
       expect(submission.longitude, isNull);
     });
 
+    test('maps absent and null promotion links to no promotion', () {
+      expect(adminSubmissionFromWire(validWire).promotion, isNull);
+
+      final nullLinks = adminSubmissionFromWire(<String, dynamic>{
+        ...validWire,
+        'promoted_place_id': null,
+        'promoted_event_id': null,
+      });
+      expect(nullLinks.promotion, isNull);
+    });
+
+    test('maps a place link and an event link to their promotion', () {
+      final placeLink = adminSubmissionFromWire(<String, dynamic>{
+        ...validWire,
+        'promoted_place_id': 42,
+        'promoted_event_id': null,
+      });
+      expect(
+        placeLink.promotion,
+        const AdminSubmissionPromotion(
+          target: AdminPromotionTarget.place,
+          entityId: 42,
+        ),
+      );
+
+      final eventLink = adminSubmissionFromWire(<String, dynamic>{
+        ...validWire,
+        'promoted_place_id': null,
+        'promoted_event_id': 43,
+      });
+      expect(
+        eventLink.promotion,
+        const AdminSubmissionPromotion(
+          target: AdminPromotionTarget.event,
+          entityId: 43,
+        ),
+      );
+    });
+
+    test('rejects malformed promotion link wire data', () {
+      for (final value in <Object?>[
+        // Both links populated violate the database CHECK constraint.
+        <String, dynamic>{
+          ...validWire,
+          'promoted_place_id': 42,
+          'promoted_event_id': 43,
+        },
+        <String, dynamic>{...validWire, 'promoted_place_id': 42.0},
+        <String, dynamic>{...validWire, 'promoted_place_id': '42'},
+        <String, dynamic>{...validWire, 'promoted_event_id': 0},
+        <String, dynamic>{...validWire, 'promoted_event_id': -1},
+      ]) {
+        expect(() => adminSubmissionFromWire(value), throwsFormatException);
+      }
+    });
+
     test('maps every category and final status', () {
       for (final category in ContentCategory.values) {
         final submission = adminSubmissionFromWire(<String, dynamic>{
@@ -276,6 +333,58 @@ void main() {
 
       for (final value in malformedValues) {
         expect(() => adminSubmissionFromWire(value), throwsFormatException);
+      }
+    });
+  });
+
+  group('adminSubmissionPromotionFromWire', () {
+    test('parses a successful promotion envelope', () {
+      expect(
+        adminSubmissionPromotionFromWire(<String, dynamic>{
+          'target_type': 'place',
+          'entity_id': 42,
+        }),
+        const AdminSubmissionPromotion(
+          target: AdminPromotionTarget.place,
+          entityId: 42,
+        ),
+      );
+      expect(
+        adminSubmissionPromotionFromWire(<String, dynamic>{
+          'target_type': 'event',
+          'entity_id': 43,
+        }),
+        const AdminSubmissionPromotion(
+          target: AdminPromotionTarget.event,
+          entityId: 43,
+        ),
+      );
+    });
+
+    test('rejects unknown targets and malformed envelopes', () {
+      for (final value in <Object?>[
+        <Object?>[],
+        null,
+        <String, dynamic>{},
+        <String, dynamic>{'target_type': 'venue', 'entity_id': 1},
+        <String, dynamic>{'target_type': null, 'entity_id': 1},
+        <String, dynamic>{'target_type': 'place'},
+        <String, dynamic>{'entity_id': 1},
+        <String, dynamic>{'target_type': 'place', 'entity_id': null},
+        <String, dynamic>{'target_type': 'place', 'entity_id': 0},
+        <String, dynamic>{'target_type': 'place', 'entity_id': -1},
+        <String, dynamic>{'target_type': 'place', 'entity_id': '42'},
+        <String, dynamic>{'target_type': 'place', 'entity_id': 42.5},
+        <String, dynamic>{
+          'target_type': 'place',
+          'entity_id': 1,
+          'extra': true,
+        },
+      ]) {
+        expect(
+          () => adminSubmissionPromotionFromWire(value),
+          throwsFormatException,
+        );
       }
     });
   });

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
+import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/image_upload_task.dart';
@@ -38,7 +39,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
        _contributorEmail = creatorEmail {
     load = Command0<void>(_loadDetail);
     save = Command0<void>(_save);
-    changeStatus = Command1<void, AdminSubmissionStatus>(_changeStatus);
+    reject = Command0<void>(_reject);
+    promote = Command1<AdminSubmissionPromotion, AdminPromotionTarget>(
+      _promote,
+    );
     addAsset = Command0<void>(_addAsset);
     deleteAsset = Command1<void, int>(_deleteAsset);
   }
@@ -62,6 +66,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   String? _contributorName;
   String? _contributorEmail;
   AdminSubmissionStatus? _status;
+  AdminSubmissionPromotion? _promotion;
   DateTime? _createdAt;
   DateTime? _modifiedAt;
   final List<AdminSubmissionAsset> _assets = <AdminSubmissionAsset>[];
@@ -76,8 +81,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Saves the editor-owned fields by creating or updating a submission.
   late Command0<void> save;
 
-  /// Changes a clean persisted submission's moderation status.
-  late Command1<void, AdminSubmissionStatus> changeStatus;
+  /// Rejects a clean persisted pending submission.
+  late Command0<void> reject;
+
+  /// Publishes a clean persisted pending submission as an explicit target.
+  late Command1<AdminSubmissionPromotion, AdminPromotionTarget> promote;
 
   /// Adds one gallery image to the persisted pending submission.
   late Command0<void> addAsset;
@@ -130,6 +138,16 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Current moderation state for an existing submission.
   AdminSubmissionStatus? get status => _status;
 
+  /// Durable promotion linkage of the loaded submission, when promoted.
+  AdminSubmissionPromotion? get promotion => _promotion;
+
+  /// Whether this editor's content can currently be modified at all.
+  ///
+  /// Create mode is always editable; an existing submission stays editable
+  /// only while it is pending. Accepted and rejected rows are read-only.
+  bool get isEditable =>
+      !isEditMode || _status == AdminSubmissionStatus.pending;
+
   /// Timestamp at which the loaded submission was created.
   DateTime? get createdAt => _createdAt;
 
@@ -154,7 +172,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Whether any operation can mutate the editor or its submission.
   bool get operationRunning =>
-      save.running || changeStatus.running || assetMutationRunning;
+      save.running || promote.running || reject.running || assetMutationRunning;
 
   /// Updates the selected category and marks the editor dirty.
   void setCategory(ContentCategory? category) {
@@ -279,6 +297,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _contributorName = submission.userName;
       _contributorEmail = submission.userEmail;
       _status = submission.status;
+      _promotion = submission.promotion;
       _createdAt = submission.createdAt;
       _modifiedAt = submission.modifiedAt;
       _assets
@@ -340,9 +359,17 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _save() async {
-    if (changeStatus.running || assetMutationRunning) {
+    if (promote.running || reject.running || assetMutationRunning) {
       return Result.error(
         Exception('Attendi il completamento della moderazione.'),
+      );
+    }
+    // Editorial updates are pending-only for existing submissions. The
+    // backend enforces the same predicate authoritatively; create mode is
+    // unaffected.
+    if (isEditMode && _status != AdminSubmissionStatus.pending) {
+      return Result.error(
+        Exception('I contributi pubblicati o rifiutati non sono modificabili.'),
       );
     }
 
@@ -432,31 +459,63 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     return value;
   }
 
-  Future<Result<void>> _changeStatus(AdminSubmissionStatus status) async {
+  /// Guards shared by both moderation mutations: only a loaded, persisted,
+  /// clean, pending submission can be moderated while nothing else runs.
+  ///
+  /// [isPromoting] excludes the calling command from the mutual-exclusion
+  /// check, because its own `running` state is already true while its action
+  /// executes.
+  Exception? _moderationGuardError({required bool isPromoting}) {
     final submissionId = this.submissionId;
     if (submissionId == null) {
-      return Result.error(
-        Exception('Non puoi cambiare lo stato di un nuovo contributo.'),
-      );
+      return Exception('Non puoi moderare un nuovo contributo.');
     }
-    if (save.running || assetMutationRunning) {
-      return Result.error(
-        Exception('Attendi il completamento del salvataggio.'),
-      );
+    if (!_hasLoadedDetail) {
+      return Exception('Carica il contributo prima di moderarlo.');
+    }
+    final otherModerationRunning = isPromoting
+        ? reject.running
+        : promote.running;
+    if (save.running || otherModerationRunning || assetMutationRunning) {
+      return Exception('Attendi il completamento dell’operazione in corso.');
     }
     if (_isDirty) {
-      return Result.error(
-        Exception('Salva le modifiche prima di cambiare lo stato.'),
-      );
+      return Exception('Salva le modifiche prima di pubblicare o rifiutare.');
     }
     if (_status != AdminSubmissionStatus.pending) {
-      return Result.error(Exception('Questo contributo è già stato moderato.'));
+      return Exception('Questo contributo è già stato moderato.');
     }
+    return null;
+  }
 
-    final result = await _repository.changeStatus(submissionId, status);
+  Future<Result<void>> _reject() async {
+    final guard = _moderationGuardError(isPromoting: false);
+    if (guard != null) return Result.error(guard);
+
+    final submissionId = this.submissionId!;
+    final result = await _repository.reject(submissionId);
     return result.map((_) {
-      _status = status;
+      _status = AdminSubmissionStatus.rejected;
       _notifyListeners();
+    });
+  }
+
+  Future<Result<AdminSubmissionPromotion>> _promote(
+    AdminPromotionTarget target,
+  ) async {
+    final guard = _moderationGuardError(isPromoting: true);
+    if (guard != null) return Result.error(guard);
+
+    final submissionId = this.submissionId!;
+    final result = await _repository.promote(submissionId, target);
+    return result.map((promotion) {
+      // Same-target idempotent retries report the original promotion exactly
+      // like a first success; no reload is needed because the repository
+      // result already carries the durable linkage.
+      _status = AdminSubmissionStatus.accepted;
+      _promotion = promotion;
+      _notifyListeners();
+      return promotion;
     });
   }
 
@@ -480,7 +539,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (_assets.length >= kMaximumSubmissionAssetCount) {
       return Result.error(Exception('Hai raggiunto il limite di foto.'));
     }
-    if (save.running || changeStatus.running || deleteAsset.running) {
+    if (save.running ||
+        promote.running ||
+        reject.running ||
+        deleteAsset.running) {
       return Result.error(
         Exception('Attendi il completamento dell’operazione in corso.'),
       );
@@ -536,7 +598,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         Exception('Puoi modificare le foto solo dei contributi in attesa.'),
       );
     }
-    if (save.running || changeStatus.running || addAsset.running) {
+    if (save.running || promote.running || reject.running || addAsset.running) {
       return Result.error(
         Exception('Attendi il completamento dell’operazione in corso.'),
       );
