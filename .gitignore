@@ -130,9 +130,11 @@ app.*.symbols
 # ObjectBox native library
 lib/libobjectbox.dylib
 
+backups/
+
 # AI
 **/.claude/
-**/.github/
+**/.github/copilot-instructions.md
 .code-review-graphignore
 .mcp.json
 CLAUDE.md
