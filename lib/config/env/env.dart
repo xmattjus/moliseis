@@ -5,14 +5,6 @@ part 'env.g.dart';
 /// A class containing the app environment variables.
 @Envied(path: '.env')
 final class Env {
-  /// The Cloudinary production instance key.
-  @EnviedField(varName: 'CLOUDINARY_PROD_API_KEY', obfuscate: true)
-  static final String cloudinaryProdApiKey = _Env.cloudinaryProdApiKey;
-
-  /// The Cloudinary production instance secret.
-  @EnviedField(varName: 'CLOUDINARY_PROD_API_SECRET', obfuscate: true)
-  static final String cloudinaryProdApiSecret = _Env.cloudinaryProdApiSecret;
-
   /// The Cloudinary production instance URL.
   @EnviedField(varName: 'CLOUDINARY_PROD_CLOUD_NAME', obfuscate: true)
   static final String cloudinaryProdCloudName = _Env.cloudinaryProdCloudName;

@@ -15,6 +15,7 @@ import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client_impl.dart';
+import 'package:moliseis/data/services/api/cloudinary/supabase_cloudinary_upload_preparation_client.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
@@ -165,8 +166,9 @@ List<SingleChildWidget> providers(
       final cloudinaryUploadClient = CloudinaryUploadClientImpl(
         logger: context.read(),
         cloudName: Env.cloudinaryProdCloudName,
-        apiKey: Env.cloudinaryProdApiKey,
-        apiSecret: Env.cloudinaryProdApiSecret,
+        preparationClient: SupabaseCloudinaryUploadPreparationClient(
+          client: supabase.client,
+        ),
       );
 
       return ContentSubmissionRepositoryImpl(

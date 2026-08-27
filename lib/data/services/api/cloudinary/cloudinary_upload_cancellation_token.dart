@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Completer, unawaited;
 import 'dart:io' show HttpClientRequest;
 
 import 'package:moliseis/utils/logging/logging.dart';
@@ -18,6 +18,7 @@ class CloudinaryUploadCancellationToken {
   final Logger _logger;
 
   HttpClientRequest? _request;
+  final _cancelledCompleter = Completer<void>();
   bool _cancelled = false;
 
   /// Whether the currently attached request was aborted via
@@ -28,6 +29,9 @@ class CloudinaryUploadCancellationToken {
 
   /// Whether [cancel] has been called.
   bool get isCancelled => _cancelled;
+
+  /// Completes once [cancel] is called, including when no request is active.
+  Future<void> get whenCancelled => _cancelledCompleter.future;
 
   /// Attaches the token to the active request.
   ///
@@ -64,6 +68,7 @@ class CloudinaryUploadCancellationToken {
   void cancel() {
     if (_cancelled) return;
     _cancelled = true;
+    _cancelledCompleter.complete();
     _request?.abort();
   }
 

@@ -28,5 +28,8 @@ class CloudinaryUploadOptions {
   final int? maxHeight;
 
   /// Whether to overwrite an existing asset with the same public ID.
+  ///
+  /// Client upload preparation rejects `true`; overwriting requires a separate
+  /// server-authorized policy.
   final bool overwrite;
 }

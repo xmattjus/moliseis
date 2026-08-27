@@ -333,11 +333,11 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// with no rollback or cleanup performed here. This does NOT, however,
   /// leak on a subsequent retry: `CloudinaryPublicIdGenerator` derives each
   /// asset's public id from the file's SHA-256 digest, and
-  /// `CloudinaryUploadClientImpl.uploadImageTask` performs a duplicate
-  /// lookup against that id before uploading. Therefore media already sent
-  /// to the backend in a previous attempt is detected by its SHA-256 content
-  /// hash and reused rather than re-uploaded, so only assets that were not
-  /// yet uploaded in the last try are actually transferred again.
+  /// `CloudinaryUploadClientImpl.uploadImageTask` obtains server-side
+  /// duplicate preparation for that id before uploading. Therefore media
+  /// already sent to the backend in a previous attempt is detected by its
+  /// SHA-256 content hash and reused rather than re-uploaded, so only assets
+  /// that were not yet uploaded in the last try are actually transferred.
   Future<Result<void>> _submit() async {
     final city = _state.city;
     final name = _state.name;

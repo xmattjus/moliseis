@@ -1,29 +1,24 @@
 import 'dart:async' show Completer;
-import 'dart:convert' show base64Decode, jsonEncode, utf8;
+import 'dart:convert' show jsonEncode, utf8;
 import 'dart:io' show HttpException, HttpRequest, HttpServer, InternetAddress;
 
-import 'package:crypto/crypto.dart' show sha1;
-
-/// A loopback HTTP server that mimics Cloudinary Admin and Upload APIs.
+/// A loopback HTTP server that mimics Cloudinary's upload API.
 ///
 /// Use [baseUri] as the `baseUrl` override for the upload client so tests do
 /// not make real Cloudinary requests.
 class FakeCloudinaryServer {
   FakeCloudinaryServer({
     this.cloudName = 'test_cloud',
-    this.apiKey = 'test_key',
-    this.apiSecret = 'test_secret',
   });
 
   final String cloudName;
-  final String apiKey;
-  final String apiSecret;
 
   HttpServer? _server;
   final _requests = <FakeCloudinaryRecordedRequest>[];
-  final _existingAssets = <String, Map<String, dynamic>>{};
   final _uploadDelays = <String, Completer<void>>{};
   final _slowUploadQueue = <Completer<void>>[];
+  final _responseBodyDelays = <Completer<void>>[];
+  final _responseBodyStarted = <Completer<void>>[];
   final _uploadResponseQueue = <_FakeUploadOverride>[];
   var _uploadResponseStatus = 200;
   Map<String, dynamic> _uploadResponseBody = const <String, dynamic>{
@@ -31,19 +26,6 @@ class FakeCloudinaryServer {
     'width': 100,
     'height': 100,
   };
-
-  /// Whether to require Basic auth on Admin API requests.
-  bool requireAuth = true;
-
-  /// Whether to verify the signed upload signature against [apiSecret].
-  ///
-  /// Defaults to `true` so the fake server rejects malformed signatures the
-  /// way real Cloudinary does (HTTP 401). Disable for tests that need to
-  /// force a specific response regardless of signature validity.
-  bool verifySignature = true;
-
-  int? _adminErrorStatus;
-  String? _adminErrorBody;
 
   /// Base URI of the running server, e.g. `http://127.0.0.1:12345`.
   Uri get baseUri {
@@ -82,30 +64,17 @@ class FakeCloudinaryServer {
     }
     _slowUploadQueue.clear();
 
+    for (final completer in _responseBodyDelays) {
+      if (!completer.isCompleted) completer.complete();
+    }
+    _responseBodyDelays.clear();
+    for (final completer in _responseBodyStarted) {
+      if (!completer.isCompleted) completer.complete();
+    }
+    _responseBodyStarted.clear();
+
     await _server?.close(force: true);
     _server = null;
-  }
-
-  /// Registers an existing asset returned by the Admin API.
-  void addExistingAsset(
-    String publicId,
-    String secureUrl, {
-    int width = 100,
-    int height = 100,
-    String? format,
-  }) {
-    final asset = <String, dynamic>{
-      'secure_url': secureUrl,
-      'width': width,
-      'height': height,
-    };
-    if (format != null) asset['format'] = format;
-    _existingAssets[publicId] = asset;
-  }
-
-  /// Removes a previously registered asset so the Admin API returns 404.
-  void removeExistingAsset(String publicId) {
-    _existingAssets.remove(publicId);
   }
 
   /// Configures the response returned by the upload endpoint.
@@ -165,6 +134,16 @@ class FakeCloudinaryServer {
     _slowUploadQueue.clear();
   }
 
+  /// Makes the next upload send headers before parking its response body.
+  ({Completer<void> release, Future<void> headersSent})
+  makeNextResponseBodySlow() {
+    final release = Completer<void>();
+    final headersSent = Completer<void>();
+    _responseBodyDelays.add(release);
+    _responseBodyStarted.add(headersSent);
+    return (release: release, headersSent: headersSent.future);
+  }
+
   /// Enqueues a per-request response override. Each upload — regardless of
   /// `public_id` — pops the next queued override off and uses it instead of
   /// [setUploadResponse]. Use this to script a "fail N times then succeed"
@@ -179,18 +158,6 @@ class FakeCloudinaryServer {
     }
   }
 
-  /// Forces the Admin API to respond with [status] and optional [body]
-  /// regardless of whether the asset exists.
-  void setAdminError({required int status, String? body}) {
-    _adminErrorStatus = status;
-    _adminErrorBody = body;
-  }
-
-  void clearAdminError() {
-    _adminErrorStatus = null;
-    _adminErrorBody = null;
-  }
-
   Future<void> _handleRequest(HttpRequest request) async {
     final bodyBytes = <int>[];
     try {
@@ -203,34 +170,29 @@ class FakeCloudinaryServer {
     final recordedHeaders = <String, List<String>>{};
     request.headers.forEach((name, values) => recordedHeaders[name] = values);
 
+    final path = request.uri.path;
+    final uploadPattern = RegExp(r'^/v1_1/([^/]+)/image/upload$');
+    final uploadMatch = uploadPattern.firstMatch(path);
+    final multipartBody = utf8.decode(bodyBytes, allowMalformed: true);
+    final fields = uploadMatch == null
+        ? const <String, String>{}
+        : _extractMultipartFields(multipartBody);
     final recorded = FakeCloudinaryRecordedRequest(
       method: request.method,
-      path: request.uri.path,
+      path: path,
       headers: recordedHeaders,
       body: bodyBytes,
+      multipartFields: fields,
+      filePartCount: uploadMatch == null
+          ? 0
+          : RegExp(
+              r'Content-Disposition: form-data;[^\r\n]*filename="',
+            ).allMatches(multipartBody).length,
     );
     _requests.add(recorded);
 
-    final path = request.uri.path;
-    final adminPattern = RegExp(
-      r'^/v1_1/([^/]+)/resources/image/upload/(.+)$',
-    );
-    final adminMatch = adminPattern.firstMatch(path);
-
-    if (adminMatch != null) {
-      await _handleAdminRequest(
-        request,
-        adminMatch.group(1)!,
-        adminMatch.group(2)!,
-      );
-      return;
-    }
-
-    final uploadPattern = RegExp(r'^/v1_1/([^/]+)/image/upload$');
-    final uploadMatch = uploadPattern.firstMatch(path);
-
     if (uploadMatch != null && request.method == 'POST') {
-      await _handleUploadRequest(request, bodyBytes);
+      await _handleUploadRequest(request, fields);
       return;
     }
 
@@ -238,60 +200,11 @@ class FakeCloudinaryServer {
     await request.response.close();
   }
 
-  Future<void> _handleAdminRequest(
-    HttpRequest request,
-    String requestCloudName,
-    String publicId,
-  ) async {
-    if (requestCloudName != cloudName) {
-      request.response.statusCode = 404;
-      await request.response.close();
-      return;
-    }
-
-    if (_adminErrorStatus != null) {
-      request.response.statusCode = _adminErrorStatus!;
-      if (_adminErrorBody != null) {
-        request.response.write(_adminErrorBody);
-      }
-      await request.response.close();
-      return;
-    }
-
-    if (requireAuth && !_hasValidAuth(request)) {
-      request.response.statusCode = 401;
-      await request.response.close();
-      return;
-    }
-
-    final existingAsset = _existingAssets[publicId];
-    if (existingAsset == null) {
-      request.response.statusCode = 404;
-      await request.response.close();
-      return;
-    }
-
-    request.response.statusCode = 200;
-    request.response.headers.contentType = null;
-    request.response.write(_jsonEncodeBody(existingAsset));
-    await request.response.close();
-  }
-
   Future<void> _handleUploadRequest(
     HttpRequest request,
-    List<int> bodyBytes,
+    Map<String, String> fields,
   ) async {
-    final body = utf8.decode(bodyBytes, allowMalformed: true);
-    final fields = _extractMultipartFields(body);
     final publicId = fields['public_id'] ?? '';
-
-    if (verifySignature && !_hasValidSignature(fields)) {
-      request.response.statusCode = 401;
-      request.response.headers.contentType = null;
-      request.response.write('{"error":{"message":"Invalid signature"}}');
-      await request.response.close();
-      return;
-    }
 
     final delay = _uploadDelays.remove(publicId);
     if (delay != null && !delay.isCompleted) {
@@ -316,11 +229,19 @@ class FakeCloudinaryServer {
         : null;
     final status = override?.status ?? _uploadResponseStatus;
     final responseBody = override?.body ?? _uploadResponseBody;
+    final responseBodyDelay = _responseBodyDelays.isNotEmpty
+        ? _responseBodyDelays.removeAt(0)
+        : null;
+    final responseBodyStarted = _responseBodyStarted.isNotEmpty
+        ? _responseBodyStarted.removeAt(0)
+        : null;
 
     await _respond(
       request,
       status: status,
       body: _jsonEncodeBody(responseBody),
+      bodyDelay: responseBodyDelay,
+      bodyStarted: responseBodyStarted,
     );
   }
 
@@ -337,9 +258,16 @@ class FakeCloudinaryServer {
     HttpRequest request, {
     required int status,
     String? body,
+    Completer<void>? bodyDelay,
+    Completer<void>? bodyStarted,
   }) async {
     request.response.statusCode = status;
     request.response.headers.contentType = null;
+    if (bodyDelay != null) {
+      await request.response.flush();
+      bodyStarted?.complete();
+      await bodyDelay.future;
+    }
     if (body != null) {
       request.response.write(body);
     }
@@ -364,45 +292,6 @@ class FakeCloudinaryServer {
     };
   }
 
-  /// Verifies that the `api_key` and `signature` in [fields] are valid.
-  ///
-  /// Mirrors Cloudinary's signed-upload validation: every field except
-  /// `api_key`, `signature`, and `file` is part of the string to sign, which
-  /// is the sorted `k=v` pairs joined with `&` and immediately followed by
-  /// the API secret (no delimiter), hashed with SHA-1.
-  bool _hasValidSignature(Map<String, String> fields) {
-    final providedApiKey = fields['api_key'];
-    final providedSignature = fields['signature'];
-    if (providedApiKey != apiKey || providedSignature == null) {
-      return false;
-    }
-
-    final paramsToSign = Map<String, String>.from(fields)
-      ..remove('api_key')
-      ..remove('signature');
-
-    final sortedKeys = paramsToSign.keys.toList()..sort();
-    final pairs = sortedKeys.map((k) => '$k=${paramsToSign[k]}');
-    final payload = '${pairs.join('&')}$apiSecret';
-    final expectedSignature = sha1.convert(utf8.encode(payload)).toString();
-
-    return providedSignature == expectedSignature;
-  }
-
-  bool _hasValidAuth(HttpRequest request) {
-    final authHeader = request.headers.value('Authorization');
-    if (authHeader == null || !authHeader.startsWith('Basic ')) {
-      return false;
-    }
-    final encoded = authHeader.substring(6);
-    try {
-      final decoded = utf8.decode(base64Decode(encoded));
-      return decoded == '$apiKey:$apiSecret';
-    } on FormatException {
-      return false;
-    }
-  }
-
   String _jsonEncodeBody(Map<String, dynamic> body) => jsonEncode(body);
 }
 
@@ -413,12 +302,16 @@ class FakeCloudinaryRecordedRequest {
     required this.path,
     required this.headers,
     required this.body,
+    required this.multipartFields,
+    required this.filePartCount,
   });
 
   final String method;
   final String path;
   final Map<String, List<String>> headers;
   final List<int> body;
+  final Map<String, String> multipartFields;
+  final int filePartCount;
 }
 
 /// Per-request override popped from

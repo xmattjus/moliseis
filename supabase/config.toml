@@ -388,6 +388,9 @@ verify_jwt = true
 [functions.admin-content-submissions]
 verify_jwt = true
 
+[functions.prepare-cloudinary-upload]
+verify_jwt = true
+
 [functions.notify-submission-status]
 verify_jwt = false
 

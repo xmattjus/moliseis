@@ -1,16 +1,23 @@
-import 'dart:async' show StreamController, TimeoutException, Timer, unawaited;
+import 'dart:async'
+    show
+        Completer,
+        StreamController,
+        StreamSubscription,
+        TimeoutException,
+        Timer,
+        unawaited;
 import 'dart:convert' show jsonDecode, utf8;
 import 'dart:io' show File, HttpClient, HttpException, HttpHeaders;
 
 import 'package:meta/meta.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_asset_mime_type.dart';
-import 'package:moliseis/data/services/api/cloudinary/cloudinary_duplicate_detector.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_multipart_writer.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_public_id_generator.dart';
-import 'package:moliseis/data/services/api/cloudinary/cloudinary_signer.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_cancellation_token.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_options.dart';
+import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_preparation.dart';
+import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_preparation_client.dart';
 import 'package:moliseis/data/services/api/cloudinary/exceptions/empty_url_exception.dart';
 import 'package:moliseis/data/services/api/cloudinary/exceptions/file_too_large_exception.dart';
 import 'package:moliseis/data/services/api/cloudinary/exceptions/invalid_asset_dimensions.dart';
@@ -23,42 +30,29 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
 import 'package:path/path.dart' as p;
 
-// TODO(xmattjus): The API secret is currently embedded in the app via Envied
-//  and signing happens client-side. Cloudinary's documentation explicitly
-//  warns against exposing the API secret in mobile/client-side code. Move
-//  signature generation to a backend signing service, or switch to unsigned
-//  uploads with an upload preset, before relying on this in production.
 /// Concrete Cloudinary upload client backed by a dedicated [HttpClient].
 class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
   /// Creates a client that owns a dedicated [HttpClient].
   CloudinaryUploadClientImpl({
     required Logger logger,
     required String cloudName,
-    required String apiKey,
-    required String apiSecret,
+    required CloudinaryUploadPreparationClient preparationClient,
     @visibleForTesting String? baseUrl,
     @visibleForTesting Duration uploadTimeout = const Duration(seconds: 30),
+    @visibleForTesting Future<void> Function(Duration)? retryDelay,
   }) : _logger = logger,
        _cloudName = cloudName,
-       _apiKey = apiKey,
+       _preparationClient = preparationClient,
        _baseUrl = baseUrl,
        _uploadTimeout = uploadTimeout,
+       _retryDelay = retryDelay ?? Future<void>.delayed,
        _httpClient = HttpClient()
          ..connectionTimeout = const Duration(
            seconds: kDefaultNetworkTimeoutSeconds,
          )
          ..idleTimeout = const Duration(seconds: 15)
          ..userAgent = kUserAgent,
-       _signer = CloudinarySigner(apiSecret: apiSecret),
-       _publicIdGenerator = CloudinaryPublicIdGenerator() {
-    _duplicateDetector = CloudinaryDuplicateDetector(
-      httpClient: _httpClient,
-      cloudName: cloudName,
-      apiKey: apiKey,
-      apiSecret: apiSecret,
-      baseUrl: baseUrl,
-    );
-  }
+       _publicIdGenerator = CloudinaryPublicIdGenerator();
 
   static const _kMaxUploadAttempts = 3;
   static const _kUploadRetryBaseDelay = Duration(milliseconds: 500);
@@ -68,28 +62,25 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
 
   final Logger _logger;
   final String _cloudName;
-  final String _apiKey;
+  final CloudinaryUploadPreparationClient _preparationClient;
   final String? _baseUrl;
   final Duration _uploadTimeout;
+  final Future<void> Function(Duration) _retryDelay;
   final HttpClient _httpClient;
-  final CloudinarySigner _signer;
   final CloudinaryPublicIdGenerator _publicIdGenerator;
-  late final CloudinaryDuplicateDetector _duplicateDetector;
 
   /// Uploads [image] to Cloudinary, skipping duplicates by SHA-256 content
   /// hash.
   ///
   /// [CloudinaryPublicIdGenerator] derives a deterministic public id of the
   /// form `content_submissions/<sha256>` from [image]. Before transferring
-  /// any bytes, [_lookupDuplicate] queries Cloudinary for that public id:
+  /// any bytes, server-side preparation checks for that public id:
   /// if an asset already exists under it (i.e. the media was successfully
   /// sent to the backend in a previous attempt), the existing [SubmissionAsset]
   /// is returned and the multipart upload is skipped entirely. This makes the
   /// upload idempotent across retries triggered by partial failures higher up
   /// the call chain.
   ///
-  /// Set `options.overwrite` to `true` to force a fresh upload and bypass the
-  /// duplicate lookup.
   @override
   ImageUploadTask uploadImageTask(
     File image, {
@@ -145,29 +136,41 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
         token,
       );
     }
+    if (options.overwrite) {
+      return _finalizeUploadResult(
+        const Result.error(
+          FormatException('Cloudinary overwrite is not supported'),
+        ),
+        token,
+      );
+    }
 
     _logger.log(const CloudinaryRequestStarted());
     progressController.add(0);
 
     try {
+      if (token.isCancelled) throw const UploadCancelledException();
       final publicId =
           options.publicId ?? await _publicIdGenerator.generate(image);
-      final existingUrl = await _lookupDuplicate(
-        publicId,
-        overwrite: options.overwrite,
-        token: token,
+      if (token.isCancelled) throw const UploadCancelledException();
+      final preparation = await _preparationClient.prepare(
+        publicId: publicId,
+        options: options,
       );
-
-      if (existingUrl != null) {
+      if (token.isCancelled) throw const UploadCancelledException();
+      if (preparation case Error<CloudinaryUploadPreparation>(:final error)) {
+        return _finalizeUploadResult(Result.error(error), token);
+      }
+      final prepared =
+          (preparation as Success<CloudinaryUploadPreparation>).value;
+      if (prepared case CloudinaryDuplicateUploadPreparation(:final asset)) {
         _logger.log(CloudinaryDuplicateDetected(publicId: publicId));
         progressController.add(1);
-        return Result.success(existingUrl);
+        return Result.success(asset);
       }
-
-      final fields = _buildUploadFields(publicId, options);
       final multipartWriter = CloudinaryMultipartWriter(
         file: image,
-        fields: fields,
+        fields: (prepared as CloudinaryAuthorizedUploadPreparation).fields,
         fileName: _fileName(image),
       );
 
@@ -202,80 +205,6 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
         await progressController.close();
       }
     }
-  }
-
-  Future<SubmissionAsset?> _lookupDuplicate(
-    String publicId, {
-    required bool overwrite,
-    required CloudinaryUploadCancellationToken token,
-  }) async {
-    if (overwrite) {
-      return null;
-    }
-
-    final duplicateResult = await _duplicateDetector.checkExists(
-      publicId,
-      token: token,
-    );
-    switch (duplicateResult) {
-      case Success<SubmissionAsset?>(:final value):
-        return value;
-      case Error<SubmissionAsset?>(:final error):
-        _logger.log(
-          const CloudinaryRequestFailed(detail: 'duplicate_lookup_failed'),
-          error: error,
-        );
-        return null;
-    }
-  }
-
-  Map<String, String> _buildUploadFields(
-    String publicId,
-    CloudinaryUploadOptions options,
-  ) {
-    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    final paramsToSign = <String, String>{
-      'public_id': publicId,
-      'timestamp': timestamp.toString(),
-    };
-
-    final transformation = _buildTransformation(options);
-    if (transformation != null) {
-      paramsToSign['transformation'] = transformation;
-    }
-
-    if (options.tags.isNotEmpty) {
-      // Commas are the Cloudinary tag separator; a tag containing a comma
-      // would silently create multiple tags and corrupt the signed payload.
-      assert(
-        options.tags.every((tag) => !tag.contains(',')),
-        'Tag names must not contain commas',
-      );
-      paramsToSign['tags'] = options.tags.join(',');
-    }
-
-    if (options.context.isNotEmpty) {
-      // Context is encoded as `key=value` pairs joined by `|`.  Both keys and
-      // values are URI-encoded so that literal `=`, `|`, and `&` characters do
-      // not corrupt the format or produce a signature mismatch.
-      paramsToSign['context'] = options.context.entries
-          .map(
-            (e) =>
-                '${Uri.encodeQueryComponent(e.key)}'
-                '=${Uri.encodeQueryComponent(e.value)}',
-          )
-          .join('|');
-    }
-
-    if (options.overwrite) {
-      paramsToSign['overwrite'] = 'true';
-    }
-
-    return <String, String>{
-      'api_key': _apiKey,
-      ...paramsToSign,
-      'signature': _signer.sign(paramsToSign),
-    };
   }
 
   Future<Result<SubmissionAsset>> _uploadWithRetries({
@@ -361,9 +290,16 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
       if (attempt < _kMaxUploadAttempts) {
         final multiplier = 1 << (attempt - 1);
         final delay = _kUploadRetryBaseDelay * multiplier;
-        await Future<void>.delayed(
-          delay > _kUploadRetryMaxDelay ? _kUploadRetryMaxDelay : delay,
-        );
+        await Future.any<void>([
+          _retryDelay(
+            delay > _kUploadRetryMaxDelay ? _kUploadRetryMaxDelay : delay,
+          ),
+          token.whenCancelled,
+        ]);
+        if (token.isCancelled) {
+          result = const Result.error(UploadCancelledException());
+          break;
+        }
       }
     }
 
@@ -436,30 +372,31 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
       }
 
       final response = await request.close();
+      // HttpClientRequest.abort() cannot cancel a response once headers have
+      // arrived. Bound body consumption separately and cancel its subscription.
+      timer.cancel();
+      if (token.isCancelled) throw const UploadCancelledException();
+      final responseBytes = await _readResponseBytes(response, token, attempt);
+      if (token.isCancelled) throw const UploadCancelledException();
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        // Capture the error body for diagnostics before draining.
-        final errorBodyBytes = <int>[];
-        await response.forEach(errorBodyBytes.addAll);
-        final errorBody = utf8.decode(errorBodyBytes, allowMalformed: true);
+        final errorBody = utf8.decode(responseBytes, allowMalformed: true);
         return Result.error(
           _UploadHttpException(response.statusCode, errorBody),
         );
       }
 
-      final responseBytes = <int>[];
-      await response.forEach(responseBytes.addAll);
-      final responseJson =
-          jsonDecode(utf8.decode(responseBytes)) as Map<String, dynamic>;
-      final secureUrl = responseJson['secure_url'] as String?;
+      final responseJson = _responseObject(
+        jsonDecode(utf8.decode(responseBytes)),
+      );
+      final secureUrl = responseJson['secure_url'];
+      final width = responseJson['width'];
+      final height = responseJson['height'];
 
-      final width = responseJson['width'] as int?;
-      final height = responseJson['height'] as int?;
-
-      if (secureUrl == null || !StringValidator.isValidUrl(secureUrl)) {
+      if (secureUrl is! String || !StringValidator.isValidUrl(secureUrl)) {
         return const Result.error(EmptyUrlException());
       }
 
-      if (width == null || width <= 0 || height == null || height <= 0) {
+      if (width is! int || width <= 0 || height is! int || height <= 0) {
         return const Result.error(InvalidAssetDimensions());
       }
 
@@ -470,10 +407,14 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
         mimeType: cloudinaryImageMimeType(responseJson['format']),
       );
 
+      if (token.isCancelled) throw const UploadCancelledException();
       _logger.log(CloudinaryUploadCompleted(publicId: publicId));
       progressController.add(1);
       return Result.success(submissionAsset);
     } on Exception catch (exception) {
+      if (exception is TimeoutException) {
+        return Result.error(exception);
+      }
       if (timedOut) {
         // The timer fired and aborted the request: the thrown exception
         // (typically `HttpException` from `request.add`/`close`) is a
@@ -502,6 +443,66 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
     } finally {
       timer.cancel();
     }
+  }
+
+  Future<List<int>> _readResponseBytes(
+    Stream<List<int>> response,
+    CloudinaryUploadCancellationToken token,
+    int attempt,
+  ) {
+    final result = Completer<List<int>>();
+    final bytes = <int>[];
+    late final StreamSubscription<List<int>> subscription;
+    subscription = response.listen(
+      (chunk) {
+        if (token.isCancelled) {
+          unawaited(subscription.cancel());
+          if (!result.isCompleted) {
+            result.completeError(const UploadCancelledException());
+          }
+          return;
+        }
+        bytes.addAll(chunk);
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        if (!result.isCompleted) result.completeError(error, stackTrace);
+      },
+      onDone: () {
+        if (!result.isCompleted) result.complete(bytes);
+      },
+      cancelOnError: true,
+    );
+    final timer = Timer(_uploadTimeout, () {
+      unawaited(subscription.cancel());
+      if (!result.isCompleted) {
+        result.completeError(
+          TimeoutException(
+            'Cloudinary upload response body $attempt timed out after '
+            '${_uploadTimeout.inSeconds}s',
+            _uploadTimeout,
+          ),
+        );
+      }
+    });
+    final cancellation = token.whenCancelled.then<List<int>>((_) async {
+      await subscription.cancel();
+      throw const UploadCancelledException();
+    });
+    return Future.any([result.future, cancellation]).whenComplete(timer.cancel);
+  }
+
+  Map<String, Object?> _responseObject(Object? value) {
+    if (value is! Map) {
+      throw const FormatException('Cloudinary response is invalid');
+    }
+    final result = <String, Object?>{};
+    for (final entry in value.entries) {
+      if (entry.key is! String) {
+        throw const FormatException('Cloudinary response is invalid');
+      }
+      result[entry.key as String] = entry.value;
+    }
+    return result;
   }
 
   Result<SubmissionAsset> _finalizeUploadResult(
@@ -559,22 +560,6 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
     }
 
     return resolved;
-  }
-
-  String? _buildTransformation(CloudinaryUploadOptions options) {
-    if (options.maxWidth == null && options.maxHeight == null) {
-      return null;
-    }
-
-    final parts = <String>[];
-    if (options.maxWidth != null) {
-      parts.add('w_${options.maxWidth}');
-    }
-    if (options.maxHeight != null) {
-      parts.add('h_${options.maxHeight}');
-    }
-    parts.add('c_limit');
-    return parts.join(',');
   }
 
   bool _handlePotentialCancellation(
