@@ -3,18 +3,18 @@ import 'dart:async' show StreamSubscription, unawaited;
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field_toolbox.dart';
 import 'package:moliseis/ui/core/ui/description_delta_styles.dart';
 import 'package:moliseis/ui/core/utils/quill_document_codec.dart';
-import 'package:moliseis/utils/extensions/extensions.dart';
 
 /// An editable rich-text description field for a content submission form.
 ///
 /// The field owns its Quill resources and converts each document change into
 /// matching plain-text and Delta projections for the parent form state.
-class ContentDescriptionFormField extends StatefulWidget {
+class ContentSubmissionDescriptionFormField extends StatefulWidget {
   /// Creates a description field initialized from rich content when valid, or
   /// from [initialDescription] when no supported Delta is available.
-  const ContentDescriptionFormField({
+  const ContentSubmissionDescriptionFormField({
     required this.initialDescription,
     required this.initialDescriptionDelta,
     required this.onChanged,
@@ -36,12 +36,12 @@ class ContentDescriptionFormField extends StatefulWidget {
   onChanged;
 
   @override
-  State<ContentDescriptionFormField> createState() =>
-      _ContentDescriptionFormFieldState();
+  State<ContentSubmissionDescriptionFormField> createState() =>
+      _ContentSubmissionDescriptionFormFieldState();
 }
 
-class _ContentDescriptionFormFieldState
-    extends State<ContentDescriptionFormField> {
+class _ContentSubmissionDescriptionFormFieldState
+    extends State<ContentSubmissionDescriptionFormField> {
   static const _minimumEditorHeight = 72.0;
   static const _maximumEditorHeight = 144.0;
   static const _maximumDescriptionLength = 5000;
@@ -83,7 +83,9 @@ class _ContentDescriptionFormFieldState
   }
 
   @override
-  void didUpdateWidget(covariant ContentDescriptionFormField oldWidget) {
+  void didUpdateWidget(
+    covariant ContentSubmissionDescriptionFormField oldWidget,
+  ) {
     super.didUpdateWidget(oldWidget);
 
     if (widget.initialDescription == _lastSynchronizedDescription &&
@@ -190,28 +192,8 @@ class _ContentDescriptionFormFieldState
     return null;
   }
 
-  final _fontSizes = const {
-    '11px': '11',
-    '12px': '12',
-    '13px': '13',
-    '14px': '14',
-    '15px': '15',
-    '16px': '16',
-    '18px': '18',
-    '20px': '20',
-    '22px': '22',
-    '24px': '24',
-    '26px': '26',
-    '28px': '28',
-    '30px': '30',
-    '32px': '32',
-    '36px': '36',
-  };
-
   @override
   Widget build(BuildContext context) {
-    final dividerTheme = context.theme.dividerTheme;
-
     return FormField<String?>(
       key: _formFieldKey,
       initialValue: _lastSynchronizedDescription,
@@ -235,120 +217,47 @@ class _ContentDescriptionFormFieldState
                     bottom: 8,
                   ),
                 ),
-                child: Stack(
+                child: Column(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(
-                          height: 12,
-                        ),
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            QuillToolbarFontSizeButton(
-                              controller: _controller,
-                              options: QuillToolbarFontSizeButtonOptions(
-                                items: _fontSizes,
-                                initialValue: '16px',
-                                defaultDisplayText: '16px',
-                              ),
-                            ),
-                            Container(
-                              color: dividerTheme.color,
-                              width: 1,
-                              height: 36,
-                              margin: const EdgeInsets.symmetric(horizontal: 8),
-                            ),
-                            QuillToolbarToggleStyleButton(
-                              controller: _controller,
-                              attribute: Attribute.bold,
-                            ),
-                            QuillToolbarToggleStyleButton(
-                              controller: _controller,
-                              attribute: Attribute.italic,
-                            ),
-                            QuillToolbarToggleStyleButton(
-                              controller: _controller,
-                              attribute: Attribute.underline,
-                            ),
-                            QuillToolbarToggleStyleButton(
-                              controller: _controller,
-                              attribute: Attribute.leftAlignment,
-                            ),
-                            QuillToolbarToggleStyleButton(
-                              controller: _controller,
-                              attribute: Attribute.centerAlignment,
-                            ),
-                            QuillToolbarToggleStyleButton(
-                              controller: _controller,
-                              attribute: Attribute.rightAlignment,
-                            ),
-                            QuillToolbarToggleStyleButton(
-                              controller: _controller,
-                              attribute: Attribute.ol, // Ordered/numbered list
-                            ),
-                            QuillToolbarToggleStyleButton(
-                              controller: _controller,
-                              attribute:
-                                  Attribute.ul, // Unordered/bulleted list
-                            ),
-                            Container(
-                              color: dividerTheme.color,
-                              width: 1,
-                              height: 36,
-                              margin: const EdgeInsets.symmetric(horizontal: 8),
-                            ),
-                            QuillToolbarHistoryButton(
-                              controller: _controller,
-                              isUndo: true,
-                            ),
-                            QuillToolbarHistoryButton(
-                              controller: _controller,
-                              isUndo: false,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(
-                          height: 4,
-                        ),
-                        Container(
-                          color: dividerTheme.color,
-                          height: 1,
-                          margin: const EdgeInsetsDirectional.only(
-                            end: 12,
-                          ),
-                        ),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        16,
+                        16,
+                        16,
+                        4,
+                      ),
+                      child: ContentSubmissionDescriptionFormFieldToolbox(
+                        controller: _controller,
+                      ),
+                    ),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: _minimumEditorHeight,
+                        maxHeight: _maximumEditorHeight,
+                      ),
+                      child: Semantics(
+                        label: 'Descrizione',
+                        textField: true,
+                        multiline: true,
+                        child: QuillEditor(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          scrollController: _scrollController,
+                          config: QuillEditorConfig(
                             minHeight: _minimumEditorHeight,
                             maxHeight: _maximumEditorHeight,
-                          ),
-                          child: Semantics(
-                            label: 'Descrizione',
-                            textField: true,
-                            multiline: true,
-                            child: QuillEditor(
-                              controller: _controller,
-                              focusNode: _focusNode,
-                              scrollController: _scrollController,
-                              config: QuillEditorConfig(
-                                minHeight: _minimumEditorHeight,
-                                maxHeight: _maximumEditorHeight,
-                                customStyles: descriptionDeltaStyles(context),
-                                placeholder:
-                                    'Raccontaci qualcosa di questo luogo o '
-                                    'evento',
-                                padding: const EdgeInsetsDirectional.only(
-                                  top: 8,
-                                  end: 16,
-                                  bottom: 8,
-                                ),
-                              ),
+                            customStyles: descriptionDeltaStyles(context),
+                            placeholder:
+                                'Raccontaci qualcosa di questo luogo o '
+                                'evento',
+                            padding: const EdgeInsetsDirectional.only(
+                              top: 8,
+                              end: 16,
+                              bottom: 8,
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),

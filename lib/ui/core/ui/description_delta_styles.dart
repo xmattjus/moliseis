@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_description_form_field.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field.dart';
 import 'package:moliseis/ui/post/widgets/components/post_description.dart';
 
 /// Builds the [DefaultStyles] used by `QuillEditor` to render content
 /// descriptions.
 ///
 /// Shared by the editable editor in the content submission form
-/// ([ContentDescriptionFormField]) and the read-only description in the post
-/// detail ([PostDescription]), so rich-text descriptions look identical in
-/// both places and follow the active app theme.
+/// ([ContentSubmissionDescriptionFormField]) and the read-only description in
+/// the post detail ([PostDescription]), so rich-text descriptions look
+/// identical in both places and follow the active app theme.
 ///
 /// The base text style is the theme's `bodyLarge` with `fontVariations`
 /// cleared, so variable-font axes from the theme cannot interfere with the

@@ -10,7 +10,7 @@ import 'package:moliseis/domain/repositories/content_submission_draft_repository
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_description_form_field.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
 import 'package:moliseis/utils/result.dart';
@@ -465,7 +465,7 @@ void main() {
           'Test',
         );
         final descriptionEditor = find.descendant(
-          of: find.byType(ContentDescriptionFormField),
+          of: find.byType(ContentSubmissionDescriptionFormField),
           matching: find.byType(QuillEditor),
         );
         expect(
@@ -586,6 +586,8 @@ void main() {
       );
       expect(tester.widget<Checkbox>(eventCheckbox).value, isTrue);
 
+      await tester.ensureVisible(eventCheckbox);
+      await tester.pump();
       await tester.tap(eventCheckbox);
       await tester.pump();
 

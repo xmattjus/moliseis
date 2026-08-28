@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/ui/category/widgets/category_content_wrap.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_description_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_date_chip.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
@@ -138,7 +138,7 @@ class _ContentSubmissionFieldsState extends State<ContentSubmissionFields> {
                 },
                 autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
-              ContentDescriptionFormField(
+              ContentSubmissionDescriptionFormField(
                 initialDescription: widget.description,
                 initialDescriptionDelta: widget.descriptionDelta,
                 onChanged: widget.onDescriptionChanged,

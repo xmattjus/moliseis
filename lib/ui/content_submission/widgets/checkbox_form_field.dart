@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 
+/// A `FormField` that wraps a `Checkbox` with an optional label and error
+/// display beneath it.
+///
+/// The field integrates with Flutter's form validation system and passes the
+/// boolean value to `onChanged` after running the validator on the new value.
 class CheckboxFormField extends FormField<bool> {
+  /// Creates a checkbox-backed form field.
+  ///
+  /// `title` is displayed beside the checkbox. `onChanged` is called with the
+  /// new boolean value each time the checkbox state changes.
   CheckboxFormField({
     Widget? title,
     super.onSaved,

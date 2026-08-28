@@ -5,9 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
+/// Selection mode for `ContentSubmissionDateChip`.
+///
+/// `date` shows a date picker (or a wheel that emits a full date) while
+/// `time` only emits a time-of-day projected onto the current date.
 enum ContentSubmissionDateChipMode { date, time }
 
+/// A `ContentSubmissionDateChip` that opens a date or time picker to drive
+/// a submission field.
+///
+/// On iOS compact layouts the chip opens a Cupertino modal popup that hosts a
+/// `CupertinoDatePicker` with explicit Annulla/Conferma actions. All other
+/// platforms fall back to the Material `showDatePicker` / `showTimePicker`
+/// helpers. Bounds default to the current calendar year.
 class ContentSubmissionDateChip extends StatefulWidget {
+  /// Creates a date or time selection chip.
+  ///
+  /// `onDatePicked` receives the user-confirmed value. For `time` mode the
+  /// emitted `DateTime` reuses the current date and only the hour/minute
+  /// components are meaningful.
   const ContentSubmissionDateChip({
     super.key,
     this.firstDate,
@@ -18,11 +34,27 @@ class ContentSubmissionDateChip extends StatefulWidget {
     required this.onDatePicked,
   });
 
+  /// Lower bound of the selectable range. Defaults to the first day of the
+  /// current calendar year.
   final DateTime? firstDate;
+
+  /// Date the picker is initially focused on. When null, the picker falls
+  /// back to the current date and time (rounded to a 5-minute slot for time
+  /// mode).
   final DateTime? initialDate;
+
+  /// Label rendered inside the chip, typically the current selection or a
+  /// prompt asking the user to pick a value.
   final Widget label;
+
+  /// Optional leading widget shown before [label] in the chip.
   final Widget? leading;
+
+  /// Whether the chip selects a date or a time.
   final ContentSubmissionDateChipMode mode;
+
+  /// Called with the confirmed date or time. Not invoked when the user
+  /// dismisses the picker.
   final void Function(DateTime? date) onDatePicked;
 
   @override

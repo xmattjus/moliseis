@@ -7,9 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_form.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
-import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/logging/logging.dart';
@@ -32,7 +31,7 @@ void main() {
           scaffoldMessengerKey: $scaffoldMessengerKey,
           theme: AppThemeData.light(context: context),
           home: Scaffold(
-            body: ContentSubmissionAddAssetForm(viewModel: viewModel),
+            body: ContentSubmissionAssetList(viewModel: viewModel),
           ),
         ),
       ),
@@ -53,7 +52,7 @@ void main() {
     );
   }
 
-  group('ContentSubmissionAddAssetForm', () {
+  group('ContentSubmissionAssetList', () {
     testWidgets('shows add-photo button when idle with no asset', (
       tester,
     ) async {
@@ -144,7 +143,11 @@ void main() {
         );
 
         await tester.pumpWidget(buildTestApp(vm, logger: logger));
-        await tester.tap(find.byType(CardBase));
+        await tester.tap(
+          find.byKey(
+            const ValueKey('content-submission-asset-list-add-button'),
+          ),
+        );
         await tester.pump();
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 250));
@@ -182,7 +185,9 @@ void main() {
       );
 
       await tester.pumpWidget(buildTestApp(vm, logger: logger));
-      await tester.tap(find.byType(CardBase));
+      await tester.tap(
+        find.byKey(const ValueKey('content-submission-asset-list-add-button')),
+      );
       await tester.pump();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
@@ -232,7 +237,9 @@ void main() {
       );
 
       await tester.pumpWidget(buildTestApp(vm, logger: logger));
-      await tester.tap(find.byType(CardBase));
+      await tester.tap(
+        find.byKey(const ValueKey('content-submission-asset-list-add-button')),
+      );
       await tester.pump();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
@@ -272,7 +279,9 @@ void main() {
       );
 
       await tester.pumpWidget(buildTestApp(vm, logger: logger));
-      await tester.tap(find.byType(CardBase));
+      await tester.tap(
+        find.byKey(const ValueKey('content-submission-asset-list-add-button')),
+      );
       await tester.pump();
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));

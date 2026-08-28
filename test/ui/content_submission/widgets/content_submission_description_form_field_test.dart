@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_description_form_field.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field.dart';
 import 'package:moliseis/ui/core/utils/quill_document_codec.dart';
 
 void main() {
@@ -21,7 +21,7 @@ void main() {
       locale: locale,
       theme: theme,
       child: Form(
-        child: ContentDescriptionFormField(
+        child: ContentSubmissionDescriptionFormField(
           initialDescription: initialDescription,
           initialDescriptionDelta: initialDescriptionDelta,
           onChanged:
@@ -41,7 +41,7 @@ void main() {
     return tester.widget<QuillEditor>(find.byType(QuillEditor)).controller;
   }
 
-  group('ContentDescriptionFormField', () {
+  group('ContentSubmissionDescriptionFormField', () {
     testWidgets('initializes from a valid Delta', (tester) async {
       final delta = <Map<String, dynamic>>[
         <String, dynamic>{
@@ -302,7 +302,7 @@ void main() {
             builder: (context, setState) {
               setHostState = setState;
               return Form(
-                child: ContentDescriptionFormField(
+                child: ContentSubmissionDescriptionFormField(
                   initialDescription: description,
                   initialDescriptionDelta: descriptionDelta,
                   onChanged:
@@ -359,7 +359,7 @@ void main() {
             builder: (context, setState) {
               setHostState = setState;
               return Form(
-                child: ContentDescriptionFormField(
+                child: ContentSubmissionDescriptionFormField(
                   initialDescription: currentDescription,
                   initialDescriptionDelta: currentDescriptionDelta,
                   onChanged:

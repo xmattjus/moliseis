@@ -8,7 +8,7 @@ import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_form.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
@@ -17,6 +17,12 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+/// Main content submission form screen.
+///
+/// Composes shared fields, an asset list, and author/contact details into a
+/// scrollable form driven by [ContentSubmissionViewModel]. Handles draft
+/// restoration, validation, and submission flow including navigation to the
+/// progress screen.
 class ContentSubmissionScreen extends StatefulWidget {
   const ContentSubmissionScreen({required this.viewModel, super.key});
 
@@ -128,7 +134,7 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                   ),
                   SliverList.list(
                     children: [
-                      ContentSubmissionAddAssetForm(
+                      ContentSubmissionAssetList(
                         viewModel: widget.viewModel,
                       ),
                       const SizedBox(height: 32),

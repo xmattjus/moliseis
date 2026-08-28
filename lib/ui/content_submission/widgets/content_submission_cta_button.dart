@@ -5,7 +5,12 @@ import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 
+/// Call-to-action card inviting users to submit a place or event suggestion.
+///
+/// Renders a card with a descriptive label and an icon; tapping pushes the
+/// submission route onto the navigator.
 class ContentSubmissionCTAButton extends StatelessWidget {
+  /// Creates the call-to-action button.
   const ContentSubmissionCTAButton({super.key});
 
   @override

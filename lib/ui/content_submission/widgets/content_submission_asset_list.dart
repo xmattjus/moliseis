@@ -1,28 +1,40 @@
 import 'dart:io' show File;
 
 import 'package:flutter/material.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
-import 'package:moliseis/ui/core/ui/cards/card_base.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
-import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/ui/core/utils/content_submission_asset_size.dart';
 import 'package:moliseis/utils/result.dart';
 
-class ContentSubmissionAddAssetForm extends StatefulWidget {
-  const ContentSubmissionAddAssetForm({required this.viewModel, super.key});
+/// Horizontal scrollable list of selected assets with add/remove actions.
+///
+/// Renders a `ContentSubmissionAssetListItem` for each asset and, at the
+/// end, a trailing slot whose contents depend on the current view-model
+/// state: a progress indicator while assets are being added or restored,
+/// nothing once the maximum of 5 is reached, otherwise the
+/// `ContentSubmissionAddAssetButton`. Tap a thumbnail's remove overlay to
+/// delete that asset, or tap the add button to open the platform image
+/// picker. Assets larger than 10 MB are rejected by the view model and
+/// surface here as a warning snack bar.
+class ContentSubmissionAssetList extends StatefulWidget {
+  /// Creates an asset list for a content submission.
+  const ContentSubmissionAssetList({required this.viewModel, super.key});
 
+  /// ViewModel that manages the submission's asset state and operations.
   final ContentSubmissionViewModel viewModel;
 
   @override
-  State<ContentSubmissionAddAssetForm> createState() =>
-      _ContentSubmissionAddAssetFormState();
+  State<ContentSubmissionAssetList> createState() =>
+      _ContentSubmissionAssetListState();
 }
 
-class _ContentSubmissionAddAssetFormState
-    extends State<ContentSubmissionAddAssetForm> {
+class _ContentSubmissionAssetListState
+    extends State<ContentSubmissionAssetList> {
   // The merged [Listenable] is built once and reused across builds to avoid
   // allocating a new [_MergedListenable] on every frame.
   late final Listenable _assetListenables = Listenable.merge([
@@ -59,8 +71,6 @@ class _ContentSubmissionAddAssetFormState
 
   @override
   Widget build(BuildContext context) {
-    final appShapes = context.appShapes;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: 8,
@@ -70,7 +80,7 @@ class _ContentSubmissionAddAssetFormState
           padding: EdgeInsets.symmetric(horizontal: 16),
         ),
         SizedBox(
-          height: 72,
+          height: contentSubmissionAssetSize.height,
           child: ListenableBuilder(
             listenable: _assetListenables,
             builder: (context, child) {
@@ -98,12 +108,9 @@ class _ContentSubmissionAddAssetFormState
 
                     // Shows a button to append new assets to the content
                     // submission.
-                    return CardBase(
-                      width: 72,
-                      height: 72,
-                      elevation: 0,
-                      child: const Center(
-                        child: Icon(Symbols.add_a_photo, size: 24),
+                    return ContentSubmissionAddAssetButton(
+                      key: const ValueKey(
+                        'content-submission-asset-list-add-button',
                       ),
                       onPressed: () async {
                         final viewModel = widget.viewModel;
@@ -120,45 +127,21 @@ class _ContentSubmissionAddAssetFormState
                     );
                   }
 
-                  return Stack(
-                    key: ValueKey<String>(
-                      widget.viewModel.assets[index].digest,
+                  return ContentSubmissionAssetListItem(
+                    onPressed: () =>
+                        widget.viewModel.removeAssetAt.execute(index),
+                    image: Image.file(
+                      File(widget.viewModel.assets[index].file.path),
+                      width: contentSubmissionAssetSize.width,
+                      height: contentSubmissionAssetSize.height,
+                      cacheWidth: contentSubmissionAssetSize.width.toInt(),
+                      cacheHeight: contentSubmissionAssetSize.height.toInt(),
+                      fit: BoxFit.cover,
                     ),
-                    alignment: Alignment.topRight,
-                    clipBehavior: Clip.none,
-                    children: [
-                      ClipRRect(
-                        borderRadius: appShapes.circular.cornerMedium,
-                        child: Image.file(
-                          File(widget.viewModel.assets[index].file.path),
-                          width: 72,
-                          height: 72,
-                          cacheWidth: 72,
-                          cacheHeight: 72,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                      RawMaterialButton(
-                        onPressed: () =>
-                            widget.viewModel.removeAssetAt.execute(index),
-                        fillColor: context.colorScheme.primaryFixedDim,
-                        elevation: 0,
-                        constraints: const BoxConstraints(
-                          maxWidth: 56,
-                          maxHeight: 56,
-                        ),
-                        padding: const EdgeInsets.all(4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: appShapes.circular.cornerMedium,
-                        ),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        child: const Icon(Symbols.remove, size: 20),
-                      ),
-                    ],
                   );
                 },
                 itemCount: widget.viewModel.assets.length + 1,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
               );
             },
           ),

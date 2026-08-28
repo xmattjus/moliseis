@@ -10,12 +10,23 @@ import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
+/// Progress screen shown during and after content submission.
+///
+/// Displays an animated status icon and message reflecting the current state
+/// of the submission [Command] (running, idle, error, or completed). While an
+/// upload runs, navigation is blocked; once completed, state cleanup triggers
+/// after returning to the form screen.
 class ContentSubmissionProgressScreen extends StatefulWidget {
+  /// Creates the submission progress screen.
+  ///
+  /// [viewModel] owns the submission command and submit state. The screen
+  /// observes it live and never starts a new upload itself.
   const ContentSubmissionProgressScreen({
     super.key,
     required this.viewModel,
   });
 
+  /// ViewModel providing the current submission command state.
   final ContentSubmissionViewModel viewModel;
 
   @override
