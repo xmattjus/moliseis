@@ -2,16 +2,12 @@
 class CloudinaryUploadOptions {
   /// Creates upload options.
   const CloudinaryUploadOptions({
-    this.publicId,
     this.tags = const [],
     this.context = const {},
     this.maxWidth = 2048,
     this.maxHeight = 2048,
     this.overwrite = false,
   });
-
-  /// Optional explicit public ID. When omitted, a SHA-256 based ID is used.
-  final String? publicId;
 
   /// Tags to attach to the uploaded asset.
   final List<String> tags;

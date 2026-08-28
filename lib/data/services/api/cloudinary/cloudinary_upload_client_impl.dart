@@ -150,8 +150,7 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
 
     try {
       if (token.isCancelled) throw const UploadCancelledException();
-      final publicId =
-          options.publicId ?? await _publicIdGenerator.generate(image);
+      final publicId = await _publicIdGenerator.generate(image);
       if (token.isCancelled) throw const UploadCancelledException();
       final preparation = await _preparationClient.prepare(
         publicId: publicId,

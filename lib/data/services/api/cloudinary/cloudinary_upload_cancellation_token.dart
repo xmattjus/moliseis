@@ -17,15 +17,9 @@ class CloudinaryUploadCancellationToken {
 
   final Logger _logger;
 
-  HttpClientRequest? _request;
+  _RequestAttachment? _attachment;
   final _cancelledCompleter = Completer<void>();
   bool _cancelled = false;
-
-  /// Whether the currently attached request was aborted via
-  /// [abortCurrentRequest] (i.e. a per-attempt timeout). Reset to `false`
-  /// whenever a fresh request is attached so a later attempt's genuine
-  /// `request.done` errors are still logged.
-  bool _abortedForRetry = false;
 
   /// Whether [cancel] has been called.
   bool get isCancelled => _cancelled;
@@ -37,8 +31,8 @@ class CloudinaryUploadCancellationToken {
   ///
   /// If [cancel] was already called, the request is aborted immediately.
   void attach(HttpClientRequest request) {
-    _request = request;
-    _abortedForRetry = false;
+    final attachment = _RequestAttachment(request);
+    _attachment = attachment;
     // `request.done` is the same future returned by `request.close()`. The
     // upload pipeline awaits `request.close()` and routes its errors through
     // the surrounding try/catch, but `request.done` still needs a passive
@@ -49,7 +43,7 @@ class CloudinaryUploadCancellationToken {
       request.done.then(
         (_) {},
         onError: (Object error, StackTrace stackTrace) {
-          if (!_cancelled && !_abortedForRetry) {
+          if (!_cancelled && !attachment.abortedForRetry) {
             _logger.log(
               const CloudinaryRequestFailed(detail: 'request_done_error'),
               error: error,
@@ -60,7 +54,7 @@ class CloudinaryUploadCancellationToken {
       ),
     );
     if (_cancelled) {
-      request.abort();
+      attachment.request.abort();
     }
   }
 
@@ -69,7 +63,7 @@ class CloudinaryUploadCancellationToken {
     if (_cancelled) return;
     _cancelled = true;
     _cancelledCompleter.complete();
-    _request?.abort();
+    _attachment?.request.abort();
   }
 
   /// Aborts the currently attached request without marking the token as
@@ -82,7 +76,17 @@ class CloudinaryUploadCancellationToken {
   /// silenced for the aborted request so the timeout-induced socket closure
   /// is not logged as a genuine error.
   void abortCurrentRequest() {
-    _abortedForRetry = true;
-    _request?.abort();
+    final attachment = _attachment;
+    if (attachment == null) return;
+    attachment
+      ..abortedForRetry = true
+      ..request.abort();
   }
+}
+
+final class _RequestAttachment {
+  _RequestAttachment(this.request);
+
+  final HttpClientRequest request;
+  bool abortedForRetry = false;
 }

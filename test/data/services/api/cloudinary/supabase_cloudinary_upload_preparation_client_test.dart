@@ -82,6 +82,44 @@ void main() {
     expect(result.getOrNull(), isA<CloudinaryDuplicateUploadPreparation>());
   });
 
+  test('accepts additive response-envelope and duplicate-asset metadata', () {
+    final authorized =
+        SupabaseCloudinaryUploadPreparationClient.parseResponseForTesting(
+          <String, Object?>{
+            'outcome': 'authorized',
+            'fields': <String, Object?>{
+              'api_key': 'runtime-key',
+              'public_id': publicId,
+              'timestamp': '1',
+              'overwrite': 'false',
+              'upload_preset': 'preset',
+              'signature': 'signature',
+            },
+            'metadata': <String, Object?>{'version': 1},
+          },
+          publicId,
+        );
+    final duplicate =
+        SupabaseCloudinaryUploadPreparationClient.parseResponseForTesting(
+          <String, Object?>{
+            'outcome': 'duplicate',
+            'asset': <String, Object?>{
+              'secure_url': 'https://example.com/image.jpg',
+              'width': 100,
+              'height': 200,
+              'mime_type': 'image/jpeg',
+              'duration_seconds': null,
+              'metadata': <String, Object?>{'version': 1},
+            },
+            'metadata': <String, Object?>{'duplicate': true},
+          },
+          publicId,
+        );
+
+    expect(authorized, isA<CloudinaryAuthorizedUploadPreparation>());
+    expect(duplicate, isA<CloudinaryDuplicateUploadPreparation>());
+  });
+
   test('maps function, transport, and malformed responses to errors', () async {
     httpClient
       ..queueJson({'message': 'forbidden'}, status: 403)
@@ -125,6 +163,10 @@ void main() {
       },
       <String, Object?>{
         'outcome': 'authorized',
+        'fields': <String, Object?>{...validFields, 'unexpected': 'value'},
+      },
+      <String, Object?>{
+        'outcome': 'authorized',
         'fields': <String, Object?>{...validFields, 'api_key': ''},
       },
       <String, Object?>{
@@ -151,6 +193,23 @@ void main() {
         'outcome': 'duplicate',
         'asset': <Object?, Object?>{1: 'value'},
       },
+      for (final missingKey in const [
+        'secure_url',
+        'width',
+        'height',
+        'mime_type',
+        'duration_seconds',
+      ])
+        <String, Object?>{
+          'outcome': 'duplicate',
+          'asset': <String, Object?>{
+            'secure_url': 'https://example.com/image.jpg',
+            'width': 100,
+            'height': 100,
+            'mime_type': null,
+            'duration_seconds': null,
+          }..remove(missingKey),
+        },
       <String, Object?>{'outcome': 'duplicate', 'asset': 'not-a-map'},
       <String, Object?>{
         'outcome': 'duplicate',

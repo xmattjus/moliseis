@@ -274,6 +274,10 @@ export function createHandler(
         500,
       );
     }
+    // `content_sha256` is an unverified client-provided content-addressing
+    // hint, intentionally retained as the global deduplication key. The
+    // signed/preset `overwrite=false` policy prevents replacement; poisoning a
+    // never-seen digest first is an accepted residual risk at this stage.
     const publicId = `content_submissions/${intent.contentSha256}`;
     try {
       const duplicate = await dependencies.lookup({

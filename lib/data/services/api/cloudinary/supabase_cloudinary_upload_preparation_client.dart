@@ -59,7 +59,7 @@ final class SupabaseCloudinaryUploadPreparationClient
   ) {
     final body = _object(value, 'response');
     final outcome = body['outcome'];
-    if (outcome == 'authorized' && body.length == 2) {
+    if (outcome == 'authorized') {
       final fields = _stringMap(body['fields'], 'fields');
       const required = {
         'api_key',
@@ -82,19 +82,19 @@ final class SupabaseCloudinaryUploadPreparationClient
       }
       return CloudinaryAuthorizedUploadPreparation(fields);
     }
-    if (outcome == 'duplicate' && body.length == 2) {
+    if (outcome == 'duplicate') {
       final asset = _object(body['asset'], 'asset');
       final secureUrl = asset['secure_url'];
       final width = asset['width'];
       final height = asset['height'];
-      if (asset.keys.toSet().difference({
-            'secure_url',
-            'width',
-            'height',
-            'mime_type',
-            'duration_seconds',
-          }).isNotEmpty ||
-          asset.length != 5 ||
+      const requiredAssetKeys = {
+        'secure_url',
+        'width',
+        'height',
+        'mime_type',
+        'duration_seconds',
+      };
+      if (!requiredAssetKeys.every(asset.containsKey) ||
           secureUrl is! String ||
           width is! int ||
           width <= 0 ||

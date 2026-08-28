@@ -5,6 +5,7 @@ import 'dart:async' show Completer, TimeoutException, unawaited;
 import 'dart:io' show Directory, File;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/data/services/api/cloudinary/cloudinary_public_id_generator.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client_impl.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_options.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_preparation.dart';
@@ -153,7 +154,6 @@ void main() {
           ..writeAsBytesSync([1, 2, 3]);
         addTearDown(() => tempDir.delete(recursive: true));
 
-        const publicId = 'content_submissions/abc123';
         const existingUrl =
             'https://res.cloudinary.com/test_cloud/existing.jpg';
         preparationClient.enqueue(
@@ -169,10 +169,7 @@ void main() {
           ),
         );
 
-        final task = client.uploadImageTask(
-          file,
-          options: const CloudinaryUploadOptions(publicId: publicId),
-        );
+        final task = client.uploadImageTask(file);
         final progressValues = <double>[];
         final progressSubscription = task.progress.listen(progressValues.add);
 
@@ -183,6 +180,10 @@ void main() {
         expect(result.getOrNull()?.secureUrl, existingUrl);
         expect(result.getOrNull()?.mimeType, 'image/jpeg');
         expect(progressValues, contains(1));
+        expect(
+          preparationClient.calls.single.publicId,
+          matches(RegExp(r'^content_submissions/[0-9a-f]{64}$')),
+        );
         expect(
           server.requests.where((r) => r.method == 'POST'),
           isEmpty,
@@ -198,13 +199,9 @@ void main() {
         ..writeAsBytesSync(List<int>.generate(1024 * 1024, (i) => i % 256));
       addTearDown(() => tempDir.delete(recursive: true));
 
-      const publicId = 'content_submissions/cancel_me';
-      server.makeNextUploadSlow(publicId);
+      server.enqueueSlowUploads(1);
 
-      final task = client.uploadImageTask(
-        file,
-        options: const CloudinaryUploadOptions(publicId: publicId),
-      );
+      final task = client.uploadImageTask(file);
 
       // Cancel as soon as bytes actually start streaming.
       unawaited(
@@ -250,26 +247,11 @@ void main() {
           ..writeAsBytesSync([7, 8, 9]);
         addTearDown(() => tempDir.delete(recursive: true));
 
-        final taskA = client.uploadImageTask(
-          fileA,
-          options: const CloudinaryUploadOptions(
-            publicId: 'content_submissions/a',
-          ),
-        );
-        final taskB = client.uploadImageTask(
-          fileB,
-          options: const CloudinaryUploadOptions(
-            publicId: 'content_submissions/b',
-          ),
-        );
-        final taskC = client.uploadImageTask(
-          fileC,
-          options: const CloudinaryUploadOptions(
-            publicId: 'content_submissions/c',
-          ),
-        );
-
-        server.makeNextUploadSlow('content_submissions/b');
+        final publicIdB = await CloudinaryPublicIdGenerator().generate(fileB);
+        server.makeNextUploadSlow(publicIdB);
+        final taskA = client.uploadImageTask(fileA);
+        final taskB = client.uploadImageTask(fileB);
+        final taskC = client.uploadImageTask(fileC);
 
         // Start all three and cancel B as soon as it starts streaming.
         final futures = [
@@ -296,13 +278,10 @@ void main() {
           isA<UploadCancelledException>(),
         );
         expect(results[2].isSuccess, isTrue);
+        expect(preparationClient.calls, hasLength(3));
         expect(
           preparationClient.calls.map((call) => call.publicId),
-          containsAll([
-            'content_submissions/a',
-            'content_submissions/b',
-            'content_submissions/c',
-          ]),
+          everyElement(matches(RegExp(r'^content_submissions/[0-9a-f]{64}$'))),
         );
       },
     );
@@ -494,11 +473,7 @@ void main() {
         );
         addTearDown(shortTimeoutClient.dispose);
 
-        const publicId = 'content_submissions/timeout_retry';
-        final task = shortTimeoutClient.uploadImageTask(
-          file,
-          options: const CloudinaryUploadOptions(publicId: publicId),
-        );
+        final task = shortTimeoutClient.uploadImageTask(file);
         final progressValues = <double>[];
         final progressSubscription = task.progress.listen(progressValues.add);
 
@@ -756,8 +731,8 @@ void main() {
       final tempDir = await Directory.systemTemp.createTemp('opaque_fields_');
       final file = File('${tempDir.path}/image.jpg')..writeAsBytesSync([1]);
       addTearDown(() => tempDir.delete(recursive: true));
-      const publicId = 'content_submissions/opaque';
-      const fields = {
+      final publicId = await CloudinaryPublicIdGenerator().generate(file);
+      final fields = {
         'api_key': 'test-key',
         'public_id': publicId,
         'timestamp': '1',
@@ -771,12 +746,7 @@ void main() {
         Result.success(CloudinaryAuthorizedUploadPreparation(fields)),
       );
 
-      final result = await client
-          .uploadImageTask(
-            file,
-            options: const CloudinaryUploadOptions(publicId: publicId),
-          )
-          .result;
+      final result = await client.uploadImageTask(file).result;
 
       expect(result.isSuccess, isTrue);
       expect(server.requests.single.multipartFields, fields);

@@ -206,7 +206,7 @@ void main() {
       );
 
       test(
-        'resets with the next attach so genuine errors are logged again',
+        'does not log a delayed timeout-aborted request after a retry attaches',
         () async {
           final logger = MockLogger();
           final token = CloudinaryUploadCancellationToken(logger: logger);
@@ -218,13 +218,6 @@ void main() {
           token
             ..attach(firstRequest)
             ..abortCurrentRequest();
-          firstDone.completeError(
-            Exception('timeout-induced connection abort'),
-          );
-          await Future<void>.delayed(Duration.zero);
-          // No log for the aborted first request.
-          expect(logger.containsEvent<CloudinaryRequestFailed>(), isFalse);
-          logger.reset();
 
           final secondDone = Completer<HttpClientResponse>();
           final secondRequest = _FakeHttpClientRequest(
@@ -232,9 +225,16 @@ void main() {
           );
           token.attach(secondRequest);
 
-          // After re-attaching, a genuine (non-abort) error on the new
-          // request must be logged — the per-attempt abort flag must not
-          // leak across attempts.
+          // The first request's expected abort error must stay tied to its
+          // own attachment even though a retry has replaced the active one.
+          firstDone.completeError(
+            Exception('timeout-induced connection abort'),
+          );
+          await Future<void>.delayed(Duration.zero);
+          expect(logger.containsEvent<CloudinaryRequestFailed>(), isFalse);
+
+          // A genuine error from the currently attached retry remains
+          // observable and must not inherit the prior attempt's suppression.
           secondDone.completeError(
             Exception('genuine TLS failure'),
           );
