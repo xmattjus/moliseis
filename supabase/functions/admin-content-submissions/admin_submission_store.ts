@@ -80,7 +80,8 @@ export type PromoteStoreResult =
   | { outcome: "place_has_event_dates" }
   | { outcome: "start_date_required" }
   | { outcome: "invalid_date_range" }
-  | { outcome: "invalid_asset" };
+  | { outcome: "invalid_asset" }
+  | { outcome: "category_required" };
 
 export interface AdminSubmissionStore {
   list(): Promise<SubmissionRecord[]>;
@@ -292,8 +293,9 @@ export function createAdminSubmissionStore(
         );
       }
       const rowObject = row as Record<string, unknown>;
-      const outcome =
-        typeof rowObject.outcome === "string" ? rowObject.outcome : null;
+      const outcome = typeof rowObject.outcome === "string"
+        ? rowObject.outcome
+        : null;
       const targetType = rowObject.target_type;
       const entityId = rowObject.entity_id;
 
@@ -337,6 +339,7 @@ export function createAdminSubmissionStore(
         case "start_date_required":
         case "invalid_date_range":
         case "invalid_asset":
+        case "category_required":
           // Domain failures carry no payload; populated payload fields on a
           // failure row are malformed data and fail closed.
           if (targetType !== null || entityId !== null) {

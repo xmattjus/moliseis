@@ -646,6 +646,11 @@ Deno.test("maps every promotion readiness outcome to a stable error", async () =
     ],
     [{ outcome: "invalid_date_range" }, 422, "PROMOTION_INVALID_DATE_RANGE"],
     [{ outcome: "invalid_asset" }, 422, "PROMOTION_INVALID_ASSET"],
+    [
+      { outcome: "category_required" },
+      422,
+      "PROMOTION_CATEGORY_REQUIRED",
+    ],
   ];
   for (const [result, status, code] of outcomes) {
     const test = testHandler();
@@ -654,7 +659,14 @@ Deno.test("maps every promotion readiness outcome to a stable error", async () =
       request({ operation: "promote", submission_id: 7, target: "place" }),
     );
     assertEquals(response.status, status);
-    assertEquals((await responseJson(response)).code, code);
+    const responseBody = await responseJson(response);
+    assertEquals(responseBody.code, code);
+    if (result.outcome === "category_required") {
+      assertEquals(
+        responseBody.message,
+        "The submission requires a category before publication.",
+      );
+    }
   }
 });
 

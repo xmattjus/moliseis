@@ -337,6 +337,7 @@ Deno.test("promote maps every domain failure without treating payloads as succes
     "start_date_required",
     "invalid_date_range",
     "invalid_asset",
+    "category_required",
   ] as const;
   for (const outcome of failures) {
     const client = new FakeAdminClient();
@@ -476,6 +477,7 @@ Deno.test("promote fails closed when a domain failure carries a payload", async 
       promotionRow("invalid_name", null, 42),
       promotionRow("coordinates_required", "place", 42),
       promotionRow("city_not_found", "", null),
+      promotionRow("category_required", null, 42),
     ]
   ) {
     const client = new FakeAdminClient();
@@ -502,6 +504,7 @@ Deno.test("promote fails closed when a failure row omits its payload", async () 
       { outcome: "not_pending", entity_id: null },
       { outcome: "not_pending", target_type: null },
       { outcome: "not_pending" },
+      { outcome: "category_required", entity_id: null },
     ]
   ) {
     const client = new FakeAdminClient();

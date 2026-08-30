@@ -846,6 +846,8 @@ void main() {
         await viewModel.load.execute();
         notifications = 0;
 
+        expect(viewModel.hasPublishableCategory, isTrue);
+
         await viewModel.promote.execute(AdminPromotionTarget.place);
 
         expect(viewModel.promote.completed, isTrue);
@@ -879,6 +881,65 @@ void main() {
         expect(rejectingViewModel.reject.completed, isTrue);
         expect(repository.rejectIds, <int>[2]);
         expect(rejectingViewModel.status, AdminSubmissionStatus.rejected);
+      },
+    );
+
+    test(
+      'blocks unknown or unset categories locally without blocking rejection',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            1: Result.success(
+              sampleAdminSubmission(category: ContentCategory.unknown),
+            ),
+            2: Result.success(sampleAdminSubmission(id: 2)),
+          },
+        );
+        final unknown = createViewModel(
+          repository: repository,
+          submissionId: 1,
+        );
+        final unset = createViewModel(
+          repository: repository,
+          submissionId: 2,
+        );
+        addTearDown(unknown.dispose);
+        addTearDown(unset.dispose);
+
+        await unknown.load.execute();
+        expect(unknown.hasPublishableCategory, isFalse);
+        await unknown.promote.execute(AdminPromotionTarget.place);
+
+        expect(unknown.promote.error, isTrue);
+        expect(repository.promoteCalls, isEmpty);
+
+        await unknown.reject.execute();
+
+        expect(unknown.reject.completed, isTrue);
+        expect(repository.rejectIds, <int>[1]);
+
+        await unset.load.execute();
+        unset.setCategory(null);
+        expect(unset.hasPublishableCategory, isFalse);
+
+        await unset.save.execute();
+
+        expect(unset.save.completed, isTrue);
+        expect(
+          repository.updateInputs.single.category,
+          ContentCategory.unknown,
+        );
+        expect(unset.isDirty, isFalse);
+
+        await unset.promote.execute(AdminPromotionTarget.place);
+
+        expect(unset.promote.error, isTrue);
+        expect(
+          (unset.promote.result! as Error<AdminSubmissionPromotion>).error
+              .toString(),
+          'Exception: Seleziona una categoria e salva prima di pubblicare.',
+        );
+        expect(repository.promoteCalls, isEmpty);
       },
     );
 

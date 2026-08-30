@@ -161,6 +161,8 @@ class _AdminSubmissionEditorScreenState
       'Inserisci un nome valido e salva prima di pubblicare.',
     'PROMOTION_INVALID_ASSET' =>
       'Una foto associata non è valida e impedisce la pubblicazione.',
+    'PROMOTION_CATEGORY_REQUIRED' =>
+      'Seleziona una categoria e salva prima di pubblicare.',
     'PROMOTION_TARGET_CONFLICT' =>
       'Il contributo è già stato pubblicato con un tipo diverso.',
     'INVALID_STATUS_TRANSITION' =>
@@ -577,6 +579,11 @@ class _AdminSubmissionEditorScreenState
                               const Text(
                                 'Salva le modifiche prima di pubblicare o '
                                 'rifiutare.',
+                              )
+                            else if (!viewModel.hasPublishableCategory)
+                              const Text(
+                                'Seleziona una categoria e salva prima di '
+                                'pubblicare.',
                               ),
                             Wrap(
                               spacing: 8,
@@ -588,7 +595,8 @@ class _AdminSubmissionEditorScreenState
                                 FilledButton.tonal(
                                   onPressed:
                                       viewModel.isDirty ||
-                                          viewModel.operationRunning
+                                          viewModel.operationRunning ||
+                                          !viewModel.hasPublishableCategory
                                       ? null
                                       : () => unawaited(
                                           _confirmPublish(

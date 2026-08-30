@@ -64,6 +64,19 @@ Deno.test("accepts an empty Quill document as null projections", () => {
   assertEquals(result.value.description_delta, null);
 });
 
+Deno.test("normalizes omitted and null categories to null", () => {
+  const omitted = parseContentSubmission(validSubmission());
+  const explicitNull = parseContentSubmission({
+    ...validSubmission(),
+    category: null,
+  });
+
+  for (const result of [omitted, explicitNull]) {
+    assert(result.ok);
+    assertEquals(result.value.category, null);
+  }
+});
+
 Deno.test("rejects the non-null representation of an empty Quill document", () => {
   expectInvalid(
     {

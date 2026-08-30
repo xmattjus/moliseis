@@ -189,6 +189,12 @@ function promotionResponse(
         "A submission asset violates publication requirements.",
         422,
       );
+    case "category_required":
+      return errorResponse(
+        "PROMOTION_CATEGORY_REQUIRED",
+        "The submission requires a category before publication.",
+        422,
+      );
   }
 }
 

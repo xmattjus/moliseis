@@ -100,6 +100,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Selected content category, which is normalized on save when absent.
   ContentCategory? get category => _category;
 
+  /// Whether the persisted category is concrete enough for publication.
+  bool get hasPublishableCategory =>
+      _category != null && _category != ContentCategory.unknown;
+
   /// Editable municipality value.
   String? get city => _city;
 
@@ -497,6 +501,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   ) async {
     final guard = _moderationGuardError(isPromoting: true);
     if (guard != null) return Result.error(guard);
+
+    if (!hasPublishableCategory) {
+      return Result.error(
+        Exception('Seleziona una categoria e salva prima di pubblicare.'),
+      );
+    }
 
     if (target == AdminPromotionTarget.event &&
         !validateEventTimeForSave(

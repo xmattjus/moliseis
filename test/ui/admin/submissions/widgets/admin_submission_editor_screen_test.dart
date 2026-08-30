@@ -15,6 +15,7 @@ import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
@@ -672,6 +673,85 @@ void main() {
       expect(find.text('SHELL_MARKER'), findsOneWidget);
     });
 
+    testWidgets('requires a concrete saved category before publication', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(category: ContentCategory.unknown),
+      );
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final publish = find.widgetWithText(
+        FilledButton,
+        'Pubblica come luogo',
+      );
+      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+
+      final reject = find.widgetWithText(FilledButton, 'Rifiuta');
+      expect(tester.widget<FilledButton>(publish).onPressed, isNull);
+      expect(tester.widget<FilledButton>(reject).onPressed, isNotNull);
+      expect(
+        find.text('Seleziona una categoria e salva prima di pubblicare.'),
+        findsOneWidget,
+      );
+
+      await tester.scrollUntilVisible(
+        find.widgetWithText(InputChip, 'Natura'),
+        200,
+        scrollable: scrollable,
+      );
+      await tester.tap(find.widgetWithText(InputChip, 'Natura'));
+      await tester.pump();
+
+      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+      expect(tester.widget<FilledButton>(publish).onPressed, isNull);
+      expect(tester.widget<FilledButton>(reject).onPressed, isNull);
+      expect(
+        find.text('Salva le modifiche prima di pubblicare o rifiutare.'),
+        findsOneWidget,
+      );
+
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Salva modifiche'),
+        200,
+        scrollable: scrollable,
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Salva modifiche'));
+      await tester.pumpAndSettle();
+
+      expect(repository.updateInputs.single.category, ContentCategory.nature);
+      expect(viewModel.isDirty, isFalse);
+      expect(find.text('SHELL_MARKER'), findsOneWidget);
+
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+      expect(tester.widget<FilledButton>(publish).onPressed, isNotNull);
+      expect(tester.widget<FilledButton>(reject).onPressed, isNotNull);
+      expect(
+        find.text('Seleziona una categoria e salva prima di pubblicare.'),
+        findsNothing,
+      );
+    });
+
     testWidgets('disables moderation while a save request is pending', (
       tester,
     ) async {
@@ -1215,6 +1295,10 @@ void main() {
           (
             'PROMOTION_TARGET_CONFLICT',
             'Il contributo è già stato pubblicato con un tipo diverso.',
+          ),
+          (
+            'PROMOTION_CATEGORY_REQUIRED',
+            'Seleziona una categoria e salva prima di pubblicare.',
           ),
         ]) {
           await pumpPendingEditor(tester);

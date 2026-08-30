@@ -216,7 +216,7 @@ async function createSubmission(
       ${overrides.address ?? null},
       ${overrides.startDate ?? null},
       ${overrides.endDate ?? null},
-      ${overrides.category ?? "unknown"}::public.content_category,
+      ${overrides.category ?? "nature"}::public.content_category,
       ${overrides.status ?? "pending"}::public.submission_status,
       ${overrides.createdAt ?? new Date("2026-08-01T09:00:00.000Z")},
       ${overrides.modifiedAt ?? new Date("2026-08-01T09:00:00.000Z")}
@@ -604,6 +604,7 @@ async function fetchAssets(
 
 type SourceRow = {
   status: string;
+  category: string;
   promoted_place_id: DbBigint | null;
   promoted_event_id: DbBigint | null;
   handled_by: string | null;
@@ -618,6 +619,7 @@ async function fetchSource(
 ): Promise<SourceRow> {
   const [row] = await sql<SourceRow[]>`
     select status::text as status,
+           category::text as category,
            promoted_place_id,
            promoted_event_id,
            handled_by,
@@ -1372,28 +1374,64 @@ Deno.test("city resolution is exact and active-only", async () => {
   );
 });
 
-Deno.test("unknown category is a valid publication value", async () => {
+Deno.test("unknown category blocks otherwise-ready publication without mutation", async () => {
   const setup = client();
   const registry = newRegistry();
 
   await runFixtureScenario(
     async () => {
       const city = await createCity(setup, registry);
-      const fixture = await createSubmission(setup, registry, {
-        city: city.name,
-        category: "unknown",
-        latitude: 41.5629,
-        longitude: 14.6697,
-      });
+      for (
+        const [target, startDate] of [
+          ["place", null],
+          ["event", new Date("2026-09-01T10:00:00.000Z")],
+        ] as const
+      ) {
+        const uniqueName = `Unknown category ${target} ${crypto.randomUUID()}`;
+        const fixture = await createSubmission(setup, registry, {
+          city: city.name,
+          name: uniqueName,
+          category: "unknown",
+          latitude: 41.5629,
+          longitude: 14.6697,
+          startDate,
+        });
+        const asset = await seedAsset(setup, fixture.submissionId);
+        const sourceBefore = await fetchSource(setup, fixture.submissionId);
+        const assetsBefore = await fetchAssets(setup, fixture.submissionId);
 
-      const result = await promoteCreated(
-        setup,
-        registry,
-        fixture.submissionId,
-        "place",
-      );
-      const published = await fetchPublishedPlace(setup, result.entity_id!);
-      assertEquals(published.category, "unknown");
+        assertEquals(
+          await promote(setup, fixture.submissionId, target, handledByUser),
+          {
+            outcome: "category_required",
+            target_type: null,
+            entity_id: null,
+          },
+          target,
+        );
+
+        const [counts] = await setup<
+          { places: number; events: number; media: number }[]
+        >`
+          select
+            (select count(*)::integer from public.places where name = ${uniqueName}) as places,
+            (select count(*)::integer from public.events where name = ${uniqueName}) as events,
+            (select count(*)::integer from public.media where url = ${asset.url}) as media
+        `;
+        assertEquals(counts.places, 0, `${target} creates no place`);
+        assertEquals(counts.events, 0, `${target} creates no event`);
+        assertEquals(counts.media, 0, `${target} copies no media`);
+        assertEquals(
+          await fetchSource(setup, fixture.submissionId),
+          sourceBefore,
+          `${target} source remains unchanged`,
+        );
+        assertEquals(
+          await fetchAssets(setup, fixture.submissionId),
+          assetsBefore,
+          `${target} source assets remain unchanged`,
+        );
+      }
     },
     setup,
     registry,
@@ -1930,7 +1968,7 @@ Deno.test("aborted outer transaction rolls back target, media, linkage and statu
 // Idempotency
 // ---------------------------------------------------------------------------
 
-Deno.test("same-target retry returns already_promoted without duplicating content", async () => {
+Deno.test("unknown-category retries return the original promotion without duplicates", async () => {
   const setup = client();
   const registry = newRegistry();
 
@@ -1952,6 +1990,11 @@ Deno.test("same-target retry returns already_promoted without duplicating conten
         fixture.submissionId,
         "place",
       );
+      await setup`
+        update public.content_submissions
+        set category = 'unknown'::public.content_category
+        where id = ${fixture.submissionId}
+      `;
       const retry = await promote(
         setup,
         fixture.submissionId,
@@ -1965,10 +2008,26 @@ Deno.test("same-target retry returns already_promoted without duplicating conten
         entity_id: first.entity_id,
       });
 
+      const conflictingRetry = await promote(
+        setup,
+        fixture.submissionId,
+        "event",
+        handledByUser,
+      );
+      assertEquals(conflictingRetry, {
+        outcome: "already_promoted",
+        target_type: "place",
+        entity_id: first.entity_id,
+      });
+
       const [placeCount] = await setup<{ count: number }[]>`
       select count(*)::integer as count from public.places where name = ${uniqueName}
     `;
       assertEquals(placeCount.count, 1);
+      const [eventCount] = await setup<{ count: number }[]>`
+        select count(*)::integer as count from public.events where name = ${uniqueName}
+      `;
+      assertEquals(eventCount.count, 0);
       assertEquals(await countMediaForPlace(setup, first.entity_id!), 1);
     },
     setup,
