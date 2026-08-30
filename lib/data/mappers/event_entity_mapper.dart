@@ -24,10 +24,13 @@ extension EventEntityExtensions on EventEntity {
     modifiedAt: modifiedAt,
     name: name,
     remoteId: remoteId,
-    // A null startDate is a data integrity error; use epoch as a sentinel so
-    // the record is visibly wrong in the UI rather than silently showing today.
-    startDate: startDate ?? DateTime(0),
-    endDate: endDate,
+    startDate:
+        (startDate ??
+                (throw StateError(
+                  'Persisted event $remoteId has no start date.',
+                )))
+            .toUtc(),
+    endDate: endDate?.toUtc(),
     isSaved: isSaved,
   );
 }

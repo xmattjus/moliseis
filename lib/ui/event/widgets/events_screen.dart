@@ -4,6 +4,7 @@ import 'dart:ui' show clampDouble;
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/ui/core/ui/responsive_scaffold.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_calendar.dart';
@@ -31,7 +32,9 @@ class _EventsScreenState extends State<EventsScreen> {
   void initState() {
     super.initState();
 
-    unawaited(widget.viewModel.loadByDate.execute(DateTime.now()));
+    unawaited(
+      widget.viewModel.loadByDate.execute(widget.viewModel.currentCalendarDate),
+    );
 
     _draggableScrollableController = DraggableScrollableController();
     _draggableScrollableController.addListener(_draggableScrollableListener);
@@ -84,7 +87,9 @@ class _EventsScreenState extends State<EventsScreen> {
       },
       child: _CalendarWidget(
         viewModel: widget.viewModel,
-        onDayPressed: (date) => widget.viewModel.loadByDate.execute(date),
+        onDayPressed: (date) => widget.viewModel.loadByDate.execute(
+          EventCalendarDate(date.year, date.month, date.day),
+        ),
       ),
     ),
   );

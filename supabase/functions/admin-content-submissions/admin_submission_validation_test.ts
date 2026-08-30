@@ -305,6 +305,24 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
   const subMillisecondEnd = "2026-08-20T10:00:00.000900Z";
 
   for (
+    const startDate of [
+      "2026-08-20",
+      "2026-08-20T10:00:00",
+      "2026-08-20T10:00:00Z",
+      "2026-08-20T10:00:00+02:00",
+      "2026-08-20T10:00:00-02:00",
+      subMillisecondStart,
+    ]
+  ) {
+    const result = parseAdminContentSubmissionsRequest({
+      operation: "create",
+      input: input({ start_date: startDate }),
+    });
+    assert(result.ok && result.value.operation === "create");
+    assertEquals(result.value.input.start_date, startDate);
+  }
+
+  for (
     const valid of [
       input(),
       input({ start_date: "2026-08-20T10:00:00.000Z" }),
@@ -415,6 +433,47 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
       { operation: "create", input: input({ [key]: value }) },
       message,
     );
+  }
+
+  for (
+    const invalidDate of [
+      "2024-04-31",
+      "2024-04-31T10:00:00Z",
+      "2024-04-31T10:00:00+02:00",
+      "2024-04-31T10:00:00.000100Z",
+    ]
+  ) {
+    for (const operation of ["create", "update"] as const) {
+      expectInvalid(
+        operation === "create"
+          ? { operation, input: input({ start_date: invalidDate }) }
+          : {
+            operation,
+            submission_id: 1,
+            input: input({ start_date: invalidDate }),
+          },
+        "start_date must be a parseable date-time string or null.",
+      );
+      expectInvalid(
+        operation === "create"
+          ? {
+            operation,
+            input: input({
+              start_date: "2026-08-20",
+              end_date: invalidDate,
+            }),
+          }
+          : {
+            operation,
+            submission_id: 1,
+            input: input({
+              start_date: "2026-08-20",
+              end_date: invalidDate,
+            }),
+          },
+        "end_date must be a parseable date-time string or null.",
+      );
+    }
   }
 });
 

@@ -4,6 +4,7 @@ import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/data-sources/search_query.dart';
 import 'package:moliseis/data/services/objectbox.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
@@ -12,14 +13,20 @@ import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 
 class SearchRepositoryImpl implements SearchRepository {
-  SearchRepositoryImpl({required Logger logger, required ObjectBox objectBoxI})
-    : _logger = logger,
-      _objectBox = objectBoxI,
-      _searchHistoryBox = objectBoxI.store.box<SearchQuery>() {
+  SearchRepositoryImpl({
+    required Logger logger,
+    required ObjectBox objectBoxI,
+    DateTime Function()? nowUtc,
+  }) : _logger = logger,
+       _objectBox = objectBoxI,
+       _nowUtc = nowUtc ?? DateTime.now,
+       _searchHistoryBox = objectBoxI.store.box<SearchQuery>() {
     _init();
   }
 
   final Logger _logger;
+  final DateTime Function() _nowUtc;
+  final EventTimePolicy _eventTimePolicy = EventTimePolicy();
 
   late final Query<CityEntity> _cityQuery;
   final ObjectBox _objectBox;
@@ -32,6 +39,8 @@ class SearchRepositoryImpl implements SearchRepository {
 
   /// Whether the last search was made by category.
   var _categorySearched = false;
+
+  DateTime get _currentUtc => _nowUtc().toUtc();
 
   /// Caches the ObjectBox queries.
   void _init() {
@@ -81,15 +90,16 @@ class SearchRepositoryImpl implements SearchRepository {
 
   @override
   Future<Result<List<int>>> getEventIdsByQuery(String text) async {
-    // Queries are built fresh each call so that the year-boundary values in
-    // ObjectBoxConditions.visibleEventInCurrentYear always reflect the current
-    // date rather than the date at construction time.
+    final nowUtc = _currentUtc;
+    final currentYearCondition = ObjectBoxConditions.visibleEventInCurrentYear(
+      nowUtc,
+    );
     final eventQuery = _objectBox.store
         .box<EventEntity>()
         .query(
           EventEntity_.name
               .contains(text, caseSensitive: false)
-              .and(ObjectBoxConditions.visibleEventInCurrentYear),
+              .and(currentYearCondition),
         )
         .build();
 
@@ -98,7 +108,7 @@ class SearchRepositoryImpl implements SearchRepository {
         .query(
           EventEntity_.contentCategoryIndex
               .oneOf(_getCategoryIndexes(text))
-              .and(ObjectBoxConditions.visibleEventInCurrentYear),
+              .and(currentYearCondition),
         )
         .build();
 
@@ -115,9 +125,13 @@ class SearchRepositoryImpl implements SearchRepository {
 
       final cities = _objectBox.store.box<CityEntity>().getMany(cityQuery);
 
-      final now = DateTime.now();
-      final currentYearStart = DateTime(now.year);
-      final currentYearEnd = DateTime(now.year, 12, 31).endOfDay;
+      final currentYear = _eventTimePolicy.currentCalendarDate(nowUtc).year;
+      final currentYearStart = _eventTimePolicy
+          .utcRangeForCalendarDate(EventCalendarDate(currentYear, 1, 1))
+          .startUtc;
+      final currentYearEnd = _eventTimePolicy
+          .utcRangeForCalendarDate(EventCalendarDate(currentYear, 12, 31))
+          .endUtc;
 
       // Mirrors ObjectBoxConditions.visibleEventInCurrentYear so the in-memory
       // city traversal stays consistent with the ObjectBox query paths above.
@@ -346,11 +360,13 @@ class SearchRepositoryImpl implements SearchRepository {
     final endDate = event.endDate;
 
     if (endDate == null) {
-      return startDate.maybeGreaterOrEqualDate(startOfYear) &&
-          startDate.maybeLessOrEqualDate(endOfYear);
+      return startDate != null &&
+          !startDate.isBefore(startOfYear) &&
+          !startDate.isAfter(endOfYear);
     }
 
-    return startDate.maybeGreaterOrEqualDate(startOfYear) &&
-        endDate.maybeLessOrEqualDate(endOfYear);
+    return startDate != null &&
+        !startDate.isBefore(startOfYear) &&
+        !endDate.isAfter(endOfYear);
   }
 }

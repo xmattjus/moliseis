@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 
@@ -83,12 +84,13 @@ void main() {
             ),
           ),
           (
-            'startDate',
-            ContentSubmissionDraft(startDate: DateTime.utc(2026)),
-          ),
-          (
-            'endDate',
-            ContentSubmissionDraft(endDate: DateTime.utc(2026)),
+            'eventDates',
+            ContentSubmissionDraft(
+              eventDates: EventDateDraft.exact(
+                startCalendarDate: EventCalendarDate(2026, 1, 1),
+                startInstantUtc: DateTime.utc(2026),
+              ),
+            ),
           ),
           (
             'userEmail',
@@ -237,8 +239,7 @@ void main() {
         expect(result.userEmail, 'jane@example.com');
         expect(result.userName, 'Jane');
         expect(result.acceptedTerms, isTrue);
-        expect(result.startDate, isNull);
-        expect(result.endDate, isNull);
+        expect(result.eventDates, const EventDateDraft.disabled());
       });
 
       test('overwrites a single field with non-null value', () {
@@ -379,24 +380,15 @@ void main() {
         expect(result.category, ContentCategory.history);
       });
 
-      test('clears startDate to null when null is explicitly passed', () {
-        final state = populatedState().copyWith(
-          startDate: DateTime.utc(2026),
+      test('replaces eventDates', () {
+        final state = populatedState();
+        final eventDates = EventDateDraft.unresolvedStart(
+          EventCalendarDate(2026, 7, 25),
         );
-        expect(state.startDate, isNotNull);
 
-        final result = state.copyWith(startDate: null);
-        expect(result.startDate, isNull);
-      });
+        final result = state.copyWith(eventDates: eventDates);
 
-      test('clears endDate to null when null is explicitly passed', () {
-        final state = populatedState().copyWith(
-          endDate: DateTime.utc(2026),
-        );
-        expect(state.endDate, isNotNull);
-
-        final result = state.copyWith(endDate: null);
-        expect(result.endDate, isNull);
+        expect(result.eventDates, eventDates);
       });
 
       test('userName fallback uses userName not userEmail', () {

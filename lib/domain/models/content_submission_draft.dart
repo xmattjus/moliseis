@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 import 'package:moliseis/domain/core/description_delta.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
 @immutable
@@ -13,8 +14,7 @@ class ContentSubmissionDraft {
     this.name,
     this.description,
     List<Map<String, dynamic>>? descriptionDelta,
-    this.startDate,
-    this.endDate,
+    this.eventDates = const EventDateDraft.disabled(),
     this.userEmail,
     this.userName,
     this.acceptedTerms,
@@ -27,8 +27,7 @@ class ContentSubmissionDraft {
   final String? description;
   final List<Map<String, dynamic>>? descriptionDelta;
 
-  final DateTime? startDate;
-  final DateTime? endDate;
+  final EventDateDraft eventDates;
 
   final String? userName;
   final String? userEmail;
@@ -46,8 +45,7 @@ class ContentSubmissionDraft {
           other.descriptionDelta,
           descriptionDelta,
         ) &&
-        other.startDate == startDate &&
-        other.endDate == endDate &&
+        other.eventDates == eventDates &&
         other.userEmail == userEmail &&
         other.userName == userName &&
         other.acceptedTerms == acceptedTerms;
@@ -60,8 +58,7 @@ class ContentSubmissionDraft {
     name,
     description,
     const DeepCollectionEquality().hash(descriptionDelta),
-    startDate,
-    endDate,
+    eventDates,
     userEmail,
     userName,
     acceptedTerms,
@@ -72,7 +69,7 @@ class ContentSubmissionDraft {
       'ContentSubmissionDraft: category: $category, city: $city, '
       'name: $name, description (length): ${description?.length}, '
       'descriptionDelta (operation count): ${descriptionDelta?.length}, '
-      'startDate: $startDate, endDate: $endDate, '
+      'eventDates: $eventDates, '
       'userEmail (length): ${userEmail?.length}, '
       'userName (length): ${userName?.length}, acceptedTerms: $acceptedTerms,';
 
@@ -84,8 +81,7 @@ class ContentSubmissionDraft {
     Object? name = _unset,
     Object? description = _unset,
     Object? descriptionDelta = _unset,
-    Object? startDate = _unset,
-    Object? endDate = _unset,
+    Object? eventDates = _unset,
     Object? userEmail = _unset,
     Object? userName = _unset,
     Object? acceptedTerms = _unset,
@@ -101,10 +97,9 @@ class ContentSubmissionDraft {
     descriptionDelta: identical(descriptionDelta, _unset)
         ? this.descriptionDelta
         : descriptionDelta as List<Map<String, dynamic>>?,
-    startDate: identical(startDate, _unset)
-        ? this.startDate
-        : startDate as DateTime?,
-    endDate: identical(endDate, _unset) ? this.endDate : endDate as DateTime?,
+    eventDates: identical(eventDates, _unset)
+        ? this.eventDates
+        : eventDates! as EventDateDraft,
     userEmail: identical(userEmail, _unset)
         ? this.userEmail
         : userEmail as String?,

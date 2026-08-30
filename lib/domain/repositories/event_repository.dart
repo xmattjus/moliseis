@@ -1,4 +1,5 @@
 import 'package:moliseis/data/dtos/event_dto.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -17,19 +18,16 @@ abstract class EventRepository with Synchronizable<EventDto> {
   /// Returns all events occurring in the current calendar year.
   Future<Result<List<Event>>> getByCurrentYear();
 
-  /// Returns all events that overlap the provided [date].
-  ///
-  /// Implementations should normalize [date] to the full day interval,
-  /// from 00:00:00 to 23:59:59.999999.
-  Future<Result<List<Event>>> getByDate(DateTime date);
+  /// Returns all events that overlap the provided Rome calendar [date].
+  Future<Result<List<Event>>> getByDate(EventCalendarDate date);
 
   /// Returns all events that overlap the inclusive date range.
   ///
-  /// Implementations should normalize [start] to 00:00:00 and [end] to
-  /// 23:59:59.999999 before filtering.
-  ///
   /// Events with a null end date should be treated as single-day events.
-  Future<Result<List<Event>>> getByDateRange(DateTime start, DateTime end);
+  Future<Result<List<Event>>> getByDateRange(
+    EventCalendarDate start,
+    EventCalendarDate end,
+  );
 
   /// Returns all events belonging to any of the given [categories].
   Future<Result<List<Event>>> getByCategories(

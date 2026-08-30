@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -42,8 +43,8 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
 
   @override
   Widget build(BuildContext context) {
-    var startDate = widget.event.startDate;
-    var endDate = widget.event.endDate ?? widget.event.startDate;
+    var startInstant = widget.event.startDate;
+    var endInstant = widget.event.endDate ?? widget.event.startDate;
 
     final color = widget.iconColor ?? context.colorScheme.primary;
 
@@ -52,11 +53,28 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
     )?.copyWith(color: widget.textColor);
 
     // Normalize the event range to ensure startDate is before endDate.
-    if (startDate.isAfter(endDate)) {
-      final temp = startDate;
-      startDate = endDate;
-      endDate = temp;
+    if (startInstant.isAfter(endInstant)) {
+      final temp = startInstant;
+      startInstant = endInstant;
+      endInstant = temp;
     }
+
+    final policy = EventTimePolicy();
+    final startCalendar = policy.calendarDateForUtc(startInstant);
+    final endCalendar = policy.calendarDateForUtc(endInstant);
+    final startClock = policy.clockTimeForUtc(startInstant);
+    final startDate = DateTime.utc(
+      startCalendar.year,
+      startCalendar.month,
+      startCalendar.day,
+      startClock.hour,
+      startClock.minute,
+    );
+    final endDate = DateTime.utc(
+      endCalendar.year,
+      endCalendar.month,
+      endCalendar.day,
+    );
 
     // Whether the event spans multiple years or not.
     final isMultipleYears = endDate.year != startDate.year;

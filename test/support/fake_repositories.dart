@@ -8,6 +8,7 @@ import 'package:moliseis/data/dtos/media_dto.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
@@ -341,6 +342,8 @@ final class FakeEventRepository extends EventRepository {
   Result<List<int>> getFavouriteEventIdsResult;
   Result<Iterable<Event>> getFavouritesResult;
   Result<void> setFavouriteEventResult;
+  Completer<Result<List<Event>>>? pendingGetByCurrentYear;
+  Completer<Result<List<Event>>>? pendingGetByDate;
   Future<Result<void>> Function(int id, bool save)? setFavouriteEventHandler;
   Map<int, Result<Event>> getByIdResults;
 
@@ -354,6 +357,7 @@ final class FakeEventRepository extends EventRepository {
 
   // Argument captures (only where existing tests inspect them)
   List<double>? lastCoordinates;
+  EventCalendarDate? lastGetByDate;
   final setFavouriteEventCalls = <({int id, bool save})>[];
 
   @override
@@ -368,18 +372,19 @@ final class FakeEventRepository extends EventRepository {
 
   @override
   Future<Result<List<Event>>> getByCurrentYear() async =>
-      getByCurrentYearResult;
+      pendingGetByCurrentYear?.future ?? getByCurrentYearResult;
 
   @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async {
+  Future<Result<List<Event>>> getByDate(EventCalendarDate date) async {
     getByDateCallCount++;
-    return getByDateResult;
+    lastGetByDate = date;
+    return pendingGetByDate?.future ?? getByDateResult;
   }
 
   @override
   Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
+    EventCalendarDate start,
+    EventCalendarDate end,
   ) async => getByDateRangeResult;
 
   @override
@@ -466,13 +471,13 @@ final class ControllableEventRepository extends EventRepository {
       const Result.success([]);
 
   @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async =>
+  Future<Result<List<Event>>> getByDate(EventCalendarDate date) async =>
       const Result.success([]);
 
   @override
   Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
+    EventCalendarDate start,
+    EventCalendarDate end,
   ) async => const Result.success([]);
 
   @override

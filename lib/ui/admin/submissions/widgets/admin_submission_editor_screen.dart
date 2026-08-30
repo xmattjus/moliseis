@@ -324,7 +324,8 @@ class _AdminSubmissionEditorScreenState
   void _save() {
     final contentOk = _formKey.currentState?.validate() ?? false;
     final locationOk = _locationFormKey.currentState?.validate() ?? false;
-    if (contentOk && locationOk) {
+    final eventTimeOk = widget.viewModel.validateEventTimeForSave();
+    if (contentOk && locationOk && eventTimeOk) {
       _unfocus();
       unawaited(widget.viewModel.save.execute());
     }
@@ -404,17 +405,21 @@ class _AdminSubmissionEditorScreenState
                             name: viewModel.name,
                             description: viewModel.description,
                             descriptionDelta: viewModel.descriptionDelta,
-                            startDate: viewModel.startDate,
-                            endDate: viewModel.endDate,
+                            isEvent: viewModel.isEvent,
+                            startCalendarDate: viewModel.startCalendarDate,
+                            startClockTime: viewModel.startClockTime,
+                            endCalendarDate: viewModel.endCalendarDate,
+                            eventTimeIssue: viewModel.eventTimeIssue,
                             onCategorySelected: viewModel.setCategory,
                             onCategoryDeleted: () =>
                                 viewModel.setCategory(null),
                             onCityChanged: viewModel.setCity,
                             onNameChanged: viewModel.setName,
                             onDescriptionChanged: viewModel.setDescription,
-                            onStartDateChanged: viewModel.setStartDate,
-                            onStartTimeChanged: viewModel.setStartTime,
-                            onEndDateChanged: viewModel.setEndDate,
+                            onEventChanged: viewModel.setEventEnabled,
+                            onStartDateChanged: viewModel.setStartCalendarDate,
+                            onStartTimeChanged: viewModel.setStartClockTime,
+                            onEndDateChanged: viewModel.setEndCalendarDate,
                           ),
                         ),
                       ),

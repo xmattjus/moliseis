@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_month.dart';
 import 'package:paged_vertical_calendar/paged_vertical_calendar.dart';
-import 'package:paged_vertical_calendar/utils/date_utils.dart';
 
 class EventsCalendar extends StatefulWidget {
   const EventsCalendar({
@@ -17,6 +17,20 @@ class EventsCalendar extends StatefulWidget {
 
   final void Function(DateTime date) onDayPressed;
   final EventViewModel viewModel;
+
+  /// Converts an event calendar date into calendar-package date carriers.
+  static ({DateTime startDate, DateTime endDate, DateTime initialDate})
+  calendarDateBounds(
+    EventCalendarDate currentDate,
+  ) => (
+    startDate: DateTime.utc(currentDate.year),
+    endDate: DateTime.utc(currentDate.year, 12, 31),
+    initialDate: DateTime.utc(
+      currentDate.year,
+      currentDate.month,
+      currentDate.day,
+    ),
+  );
 
   @override
   State<EventsCalendar> createState() => _EventsCalendarState();
@@ -39,17 +53,18 @@ class _EventsCalendarState extends State<EventsCalendar> {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final startDate = DateTime(now.year);
-    final endDate = DateTime(now.year, 12, 31);
+    final currentDate = widget.viewModel.currentCalendarDate;
+    final (:startDate, :endDate, :initialDate) =
+        EventsCalendar.calendarDateBounds(currentDate);
     return ListenableBuilder(
       listenable: widget.viewModel.loadAll,
       builder: (context, child) {
         if (widget.viewModel.loadAll.completed) {
           return SliverFillRemaining(
-            child: PagedVerticalCalendar(
+            child: _buildCalendar(
               minDate: startDate,
               maxDate: endDate,
+              initialDate: initialDate,
               monthBuilder: (_, month, year) => EventsVerticalCalendarMonth(
                 dateSymbols: _dateSymbols,
                 month: month,
@@ -57,9 +72,10 @@ class _EventsCalendarState extends State<EventsCalendar> {
               ),
               dayBuilder: (_, date) => EventsVerticalCalendarDay(
                 date: date,
-                events: widget.viewModel.getEventsOnDay(date),
+                events: widget.viewModel.getEventsOnDay(_calendarDate(date)),
                 onPressed: () => widget.onDayPressed(date),
-                isSelected: date.isSameDay(widget.viewModel.selectedDate),
+                isSelected:
+                    _calendarDate(date) == widget.viewModel.selectedDate,
               ),
             ),
           );
@@ -84,4 +100,24 @@ class _EventsCalendarState extends State<EventsCalendar> {
       },
     );
   }
+
+  EventCalendarDate _calendarDate(DateTime carrier) => EventCalendarDate(
+    carrier.year,
+    carrier.month,
+    carrier.day,
+  );
+
+  static Widget _buildCalendar({
+    required DateTime minDate,
+    required DateTime maxDate,
+    required DateTime initialDate,
+    required MonthBuilder monthBuilder,
+    required DayBuilder dayBuilder,
+  }) => PagedVerticalCalendar(
+    minDate: minDate,
+    maxDate: maxDate,
+    initialDate: initialDate,
+    monthBuilder: monthBuilder,
+    dayBuilder: dayBuilder,
+  );
 }

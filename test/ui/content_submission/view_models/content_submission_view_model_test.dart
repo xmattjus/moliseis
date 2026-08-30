@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
@@ -759,18 +760,14 @@ void main() {
       });
 
       test('setting a field does not clear previously set date fields', () {
-        final vm = buildViewModel();
-
-        final start = DateTime.utc(2026, 7, 25);
-        final end = DateTime.utc(2026, 7, 26);
-
-        vm
-          ..setStartDate(start)
-          ..setEndDate(end)
+        final vm = buildViewModel()
+          ..setStartCalendarDate(EventCalendarDate(2026, 7, 25))
+          ..setStartClockTime(EventClockTime(10, 30))
+          ..setEndCalendarDate(EventCalendarDate(2026, 7, 26))
           ..setCity('Campobasso');
 
-        expect(vm.state.startDate, start);
-        expect(vm.state.endDate, end);
+        expect(vm.startCalendarDate, EventCalendarDate(2026, 7, 25));
+        expect(vm.endCalendarDate, EventCalendarDate(2026, 7, 26));
         expect(vm.state.city, 'Campobasso');
       });
 
@@ -787,17 +784,13 @@ void main() {
               ],
             )
             ..setUserEmail('jane@example.com')
-            ..setUserName('Jane');
+            ..setUserName('Jane')
+            ..setStartCalendarDate(EventCalendarDate(2026, 7, 25))
+            ..setStartClockTime(EventClockTime(10, 30))
+            ..setEndCalendarDate(EventCalendarDate(2026, 7, 26));
 
-          final start = DateTime.utc(2026, 7, 25);
-          final end = DateTime.utc(2026, 7, 26);
-
-          vm
-            ..setStartDate(start)
-            ..setEndDate(end);
-
-          expect(vm.state.startDate, start);
-          expect(vm.state.endDate, end);
+          expect(vm.startCalendarDate, EventCalendarDate(2026, 7, 25));
+          expect(vm.endCalendarDate, EventCalendarDate(2026, 7, 26));
           expect(vm.state.city, 'Rome');
           expect(vm.state.name, 'Colosseum');
           expect(vm.state.description, 'Ancient arena');
@@ -887,6 +880,57 @@ void main() {
         },
       );
 
+      testWidgets(
+        'persists and restores an enabled incomplete event draft',
+        (tester) async {
+          final draftRepository = FakeContentSubmissionDraftRepository();
+          final vm = buildViewModel(draftRepository: draftRepository);
+          addTearDown(vm.dispose);
+
+          await tester.pumpWidget(
+            const Directionality(
+              textDirection: TextDirection.ltr,
+              child: SizedBox.shrink(),
+            ),
+          );
+
+          vm
+            ..setEventEnabled(true)
+            ..setStartCalendarDate(EventCalendarDate(2026, 7, 25));
+          await tester.pump(const Duration(seconds: 3, milliseconds: 100));
+
+          final saved = draftRepository.lastSavedState;
+          expect(saved?.eventDates.startInstantUtc, isNull);
+          expect(
+            saved?.eventDates.startCalendarDate,
+            EventCalendarDate(2026, 7, 25),
+          );
+
+          final restoredRepository = FakeContentSubmissionDraftRepository(
+            loadDraftResult: Result.success(saved),
+          );
+          final restored = buildViewModel(draftRepository: restoredRepository);
+          addTearDown(restored.dispose);
+
+          await restored.initialize();
+
+          expect(restored.isEvent, isTrue);
+          expect(restored.startCalendarDate, EventCalendarDate(2026, 7, 25));
+          expect(restored.startClockTime, isNull);
+        },
+      );
+
+      test('repairs end day when a start edit overtakes it', () {
+        final vm = buildViewModel()
+          ..setStartCalendarDate(EventCalendarDate(2026, 7, 25))
+          ..setStartClockTime(EventClockTime(10, 30))
+          ..setEndCalendarDate(EventCalendarDate(2026, 7, 26))
+          ..setStartCalendarDate(EventCalendarDate(2026, 7, 27));
+
+        expect(vm.startCalendarDate, EventCalendarDate(2026, 7, 27));
+        expect(vm.endCalendarDate, EventCalendarDate(2026, 7, 27));
+      });
+
       test('clearing description clears both projections', () {
         final vm = buildViewModel()
           ..setDescription(
@@ -903,6 +947,80 @@ void main() {
     });
 
     group('submit', () {
+      test(
+        'blocks enabled incomplete events before any upload begins',
+        () async {
+          final submissionRepository = FakeContentSubmissionRepository();
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: submissionRepository,
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane')
+                ..setEventEnabled(true)
+                ..setStartCalendarDate(EventCalendarDate(2026, 7, 25));
+
+          await vm.submit.execute();
+
+          expect(vm.submit.error, isTrue);
+          expect(submissionRepository.uploadCalled, isFalse);
+          expect(submissionRepository.uploadedImages, isEmpty);
+        },
+      );
+
+      test('rejects DST-gap edits without replacing the valid event draft', () {
+        final vm = buildViewModel()
+          ..setStartCalendarDate(EventCalendarDate(2025, 3, 30))
+          ..setStartClockTime(EventClockTime(1, 30));
+        final prior = vm.state.eventDates;
+        var notifications = 0;
+        vm
+          ..addListener(() => notifications++)
+          ..setStartClockTime(EventClockTime(2, 30));
+
+        expect(vm.state.eventDates, prior);
+        expect(vm.eventTimeIssue, EventTimeIssue.nonexistentLocalTime);
+        expect(notifications, 1);
+      });
+
+      test(
+        'rejects DST-overlap edits without replacing the valid event draft',
+        () {
+          final vm = buildViewModel()
+            ..setStartCalendarDate(EventCalendarDate(2025, 10, 26))
+            ..setStartClockTime(EventClockTime(1, 30));
+          final prior = vm.state.eventDates;
+
+          vm.setStartClockTime(EventClockTime(2, 30));
+
+          expect(vm.state.eventDates, prior);
+          expect(vm.eventTimeIssue, EventTimeIssue.ambiguousLocalTime);
+        },
+      );
+
+      test('blocks upload while a live DST issue remains', () async {
+        final submissionRepository = FakeContentSubmissionRepository();
+        final vm =
+            buildViewModel(
+                contentSubmissionRepository: submissionRepository,
+              )
+              ..setCity('Rome')
+              ..setName('Colosseum')
+              ..setUserEmail('jane@example.com')
+              ..setUserName('Jane')
+              ..setStartCalendarDate(EventCalendarDate(2025, 3, 30))
+              ..setStartClockTime(EventClockTime(1, 30))
+              ..setStartClockTime(EventClockTime(2, 30));
+
+        await vm.submit.execute();
+
+        expect(vm.eventTimeIssue, EventTimeIssue.nonexistentLocalTime);
+        expect(submissionRepository.uploadCalled, isFalse);
+        expect(submissionRepository.uploadedImages, isEmpty);
+      });
+
       test(
         'fails without calling upload when all required fields are missing',
         () async {
@@ -1080,6 +1198,33 @@ void main() {
         expect(vm.clear.completed, isTrue);
         expect(vm.clear.error, isFalse);
       });
+
+      test(
+        'clears a live event-time issue before a place submission',
+        () async {
+          final submissionRepository = FakeContentSubmissionRepository();
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: submissionRepository,
+                )
+                ..setStartCalendarDate(EventCalendarDate(2025, 3, 30))
+                ..setStartClockTime(EventClockTime(1, 30))
+                ..setStartClockTime(EventClockTime(2, 30));
+          expect(vm.eventTimeIssue, EventTimeIssue.nonexistentLocalTime);
+
+          await vm.clear.execute();
+          vm
+            ..setCity('Rome')
+            ..setName('Colosseum')
+            ..setUserEmail('jane@example.com')
+            ..setUserName('Jane');
+          await vm.submit.execute();
+
+          expect(vm.eventTimeIssue, isNull);
+          expect(vm.submit.completed, isTrue);
+          expect(submissionRepository.uploadCalled, isTrue);
+        },
+      );
 
       test('clears in-memory state even when draft clear fails', () async {
         final file = XFile.fromData(

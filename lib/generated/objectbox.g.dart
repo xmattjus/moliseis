@@ -453,7 +453,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(20, 8436787422671765122),
     name: 'ContentSubmissionDraftEntity',
-    lastPropertyId: const obx_int.IdUid(15, 8592803869694869745),
+    lastPropertyId: const obx_int.IdUid(17, 7677321635689032617),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -520,6 +520,18 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(15, 8592803869694869745),
         name: 'descriptionDelta',
         type: 13,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(16, 4148033276290633264),
+        name: 'isEvent',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(17, 7677321635689032617),
+        name: 'pendingStartCalendarDate',
+        type: 9,
         flags: 0,
       ),
     ],
@@ -1430,7 +1442,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
                 : fbb.writeListInt8(
                     obx_int.toFlexBuffer(object.descriptionDelta!),
                   );
-            fbb.startTable(16);
+            final pendingStartCalendarDateOffset =
+                object.pendingStartCalendarDate == null
+                ? null
+                : fbb.writeString(object.pendingStartCalendarDate!);
+            fbb.startTable(18);
             fbb.addInt64(0, object.id);
             fbb.addOffset(1, cityOffset);
             fbb.addOffset(2, nameOffset);
@@ -1452,6 +1468,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
             fbb.addOffset(12, authorEmailOffset);
             fbb.addOffset(13, authorNameOffset);
             fbb.addOffset(14, descriptionDeltaOffset);
+            fbb.addBool(15, object.isEvent);
+            fbb.addOffset(16, pendingStartCalendarDateOffset);
             fbb.finish(fbb.endTable());
             return object.id;
           },
@@ -1497,6 +1515,14 @@ obx_int.ModelDefinition getObjectBoxModel() {
                 : DateTime.fromMicrosecondsSinceEpoch(
                     (endDateValue / 1000).round(),
                   );
+            final isEventParam = const fb.BoolReader().vTableGetNullable(
+              buffer,
+              rootOffset,
+              34,
+            );
+            final pendingStartCalendarDateParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 36);
             final authorEmailParam = const fb.StringReader(
               asciiOptimization: true,
             ).vTableGetNullable(buffer, rootOffset, 28);
@@ -1516,6 +1542,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
               descriptionDelta: descriptionDeltaParam,
               startDate: startDateParam,
               endDate: endDateParam,
+              isEvent: isEventParam,
+              pendingStartCalendarDate: pendingStartCalendarDateParam,
               authorEmail: authorEmailParam,
               authorName: authorNameParam,
               acceptedTerms: acceptedTermsParam,
@@ -1884,5 +1912,16 @@ class ContentSubmissionDraftEntity_ {
   static final authorName =
       obx.QueryStringProperty<ContentSubmissionDraftEntity>(
         _entities[6].properties[9],
+      );
+
+  /// See [ContentSubmissionDraftEntity.isEvent].
+  static final isEvent = obx.QueryBooleanProperty<ContentSubmissionDraftEntity>(
+    _entities[6].properties[11],
+  );
+
+  /// See [ContentSubmissionDraftEntity.pendingStartCalendarDate].
+  static final pendingStartCalendarDate =
+      obx.QueryStringProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[12],
       );
 }

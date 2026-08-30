@@ -77,7 +77,7 @@ class EventEntity implements SyncEntity {
     String? description,
     Object? descriptionDelta = _unset,
     DateTime? startDate,
-    DateTime? endDate,
+    Object? endDate = _unset,
     List<double>? coordinates,
     int? contentCategoryIndex,
     Object? cityToOneId = _unset,
@@ -93,7 +93,7 @@ class EventEntity implements SyncEntity {
         ? this.descriptionDelta
         : descriptionDelta as List<Map<String, dynamic>>?,
     startDate: startDate ?? this.startDate,
-    endDate: endDate ?? this.endDate,
+    endDate: identical(endDate, _unset) ? this.endDate : endDate as DateTime?,
     coordinates: coordinates ?? this.coordinates,
     contentCategoryIndex: contentCategoryIndex ?? this.contentCategoryIndex,
     cityToOneId: identical(cityToOneId, _unset)

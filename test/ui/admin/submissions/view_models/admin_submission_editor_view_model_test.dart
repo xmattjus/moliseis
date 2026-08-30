@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
@@ -245,9 +246,9 @@ void main() {
         ..setCity('Agnone')
         ..setName('Fonderia')
         ..setDescription(description: 'Dettagli', descriptionDelta: null)
-        ..setStartDate(DateTime.utc(2026, 8, 20))
-        ..setStartTime(DateTime.utc(2026, 8, 20, 9, 30))
-        ..setEndDate(DateTime.utc(2026, 8, 20, 12));
+        ..setStartCalendarDate(EventCalendarDate(2026, 8, 20))
+        ..setStartClockTime(EventClockTime(9, 30))
+        ..setEndCalendarDate(EventCalendarDate(2026, 8, 20));
 
       expect(viewModel.isDirty, isTrue);
       expect(notifications, 7);
@@ -258,17 +259,16 @@ void main() {
         final repository = FakeAdminContentSubmissionRepository();
         final viewModel = createViewModel(repository: repository);
         addTearDown(viewModel.dispose);
-        final startDate = DateTime.utc(2026, 8, 20, 10, 30);
-
         viewModel
           ..setCity('Isernia')
           ..setName('Sagra del Tartufo')
-          ..setStartDate(startDate);
+          ..setStartCalendarDate(EventCalendarDate(2026, 8, 20))
+          ..setStartClockTime(EventClockTime(10, 30));
         await viewModel.save.execute();
 
         expect(viewModel.save.completed, isTrue);
         final input = repository.createInputs.single;
-        expect(input.startDate, startDate);
+        expect(input.startDate, DateTime.utc(2026, 8, 20, 8, 30));
         expect(input.endDate, isNull);
       });
 
@@ -282,22 +282,23 @@ void main() {
           viewModel
             ..setCity('Isernia')
             ..setName('Sagra del Tartufo')
-            ..setStartDate(DateTime(2026, 8, 20, 15))
+            ..setStartCalendarDate(EventCalendarDate(2026, 8, 20))
+            ..setStartClockTime(EventClockTime(15, 0))
             // The date-only picker emits midnight for a same-day selection.
-            ..setEndDate(DateTime(2026, 8, 20));
+            ..setEndCalendarDate(EventCalendarDate(2026, 8, 20));
 
           expect(
             viewModel.endDate,
-            DateTime(2026, 8, 20, 23, 59, 59, 999, 999),
+            DateTime.utc(2026, 8, 20, 21, 59, 59, 999, 999),
           );
-          expect(viewModel.endDate!.isUtc, isFalse);
+          expect(viewModel.endDate!.isUtc, isTrue);
 
           await viewModel.save.execute();
 
           expect(viewModel.save.completed, isTrue);
           expect(
             repository.createInputs.single.endDate,
-            DateTime(2026, 8, 20, 23, 59, 59, 999, 999),
+            DateTime.utc(2026, 8, 20, 21, 59, 59, 999, 999),
           );
         },
       );
@@ -310,7 +311,7 @@ void main() {
         viewModel
           ..setCity('Isernia')
           ..setName('Sagra del Tartufo')
-          ..setEndDate(DateTime(2026, 8, 20));
+          ..setEndCalendarDate(EventCalendarDate(2026, 8, 20));
         await viewModel.save.execute();
 
         expect(viewModel.save.error, isTrue);
@@ -328,58 +329,18 @@ void main() {
           viewModel
             ..setCity('Isernia')
             ..setName('Sagra del Tartufo')
-            ..setStartDate(DateTime(2026, 8, 25, 15))
-            ..setEndDate(DateTime(2026, 8, 24));
+            ..setStartCalendarDate(EventCalendarDate(2026, 8, 25))
+            ..setStartClockTime(EventClockTime(15, 0))
+            ..setEndCalendarDate(EventCalendarDate(2026, 8, 24));
 
-          expect(
-            viewModel.endDate,
-            DateTime(2026, 8, 24, 23, 59, 59, 999, 999),
-          );
+          expect(viewModel.endDate, isNull);
+          expect(viewModel.eventTimeIssue, EventTimeIssue.invalidRange);
 
           await viewModel.save.execute();
 
           expect(viewModel.save.error, isTrue);
           expect(repository.createInputs, isEmpty);
           expect(viewModel.isDirty, isTrue);
-        },
-      );
-
-      test(
-        'a loaded end-only submission cannot update until repaired',
-        () async {
-          final repository = FakeAdminContentSubmissionRepository(
-            getByIdResults: <int, Result<AdminSubmission>>{
-              3: Result.success(
-                sampleAdminSubmission(
-                  id: 3,
-                  endDate: DateTime.utc(2026, 8, 20, 12),
-                ),
-              ),
-            },
-          );
-          final viewModel = createViewModel(
-            repository: repository,
-            submissionId: 3,
-          );
-          addTearDown(viewModel.dispose);
-
-          await viewModel.load.execute();
-          viewModel.setName('Museo rinnovato');
-          await viewModel.save.execute();
-
-          expect(viewModel.save.error, isTrue);
-          expect(repository.updateInputs, isEmpty);
-          expect(viewModel.isDirty, isTrue);
-
-          viewModel.setEndDate(null);
-          await viewModel.save.execute();
-
-          expect(viewModel.save.completed, isTrue);
-          expect(viewModel.isDirty, isFalse);
-          final input = repository.updateInputs.single;
-          expect(input.name, 'Museo rinnovato');
-          expect(input.startDate, isNull);
-          expect(input.endDate, isNull);
         },
       );
 
@@ -427,12 +388,16 @@ void main() {
         addTearDown(viewModel.dispose);
 
         viewModel
-          ..setStartDate(DateTime(2026, 8, 20))
-          ..setEndDate(DateTime(2026, 8, 22))
-          ..setStartDate(DateTime(2026, 8, 25));
+          ..setStartCalendarDate(EventCalendarDate(2026, 8, 20))
+          ..setStartClockTime(EventClockTime(0, 0))
+          ..setEndCalendarDate(EventCalendarDate(2026, 8, 22))
+          ..setStartCalendarDate(EventCalendarDate(2026, 8, 25));
 
-        expect(viewModel.endDate, DateTime(2026, 8, 25, 23, 59, 59, 999, 999));
-        expect(viewModel.endDate!.isUtc, isFalse);
+        expect(
+          viewModel.endDate,
+          DateTime.utc(2026, 8, 25, 21, 59, 59, 999, 999),
+        );
+        expect(viewModel.endDate!.isUtc, isTrue);
       });
 
       test(
@@ -457,13 +422,13 @@ void main() {
 
           await viewModel.load.execute();
 
-          viewModel.setStartTime(DateTime.utc(2026, 8, 20, 5));
+          viewModel.setStartClockTime(EventClockTime(5, 0));
 
-          expect(viewModel.startDate, DateTime.utc(2026, 8, 20, 5));
+          expect(viewModel.startDate, DateTime.utc(2026, 8, 20, 3));
           expect(viewModel.startDate!.isUtc, isTrue);
           expect(
             viewModel.endDate,
-            DateTime.utc(2026, 8, 20, 23, 59, 59, 999, 999),
+            DateTime.utc(2026, 8, 20, 21, 59, 59, 999, 999),
           );
           expect(viewModel.endDate!.isUtc, isTrue);
 
@@ -474,7 +439,7 @@ void main() {
           expect(input.startDate!.isUtc, isTrue);
           expect(
             input.endDate,
-            DateTime.utc(2026, 8, 20, 23, 59, 59, 999, 999),
+            DateTime.utc(2026, 8, 20, 21, 59, 59, 999, 999),
           );
           expect(input.endDate!.isUtc, isTrue);
         },
@@ -503,7 +468,7 @@ void main() {
           await viewModel.load.execute();
 
           // The picker emits a local-represented calendar day.
-          viewModel.setStartDate(DateTime(2026, 8, 21));
+          viewModel.setStartCalendarDate(EventCalendarDate(2026, 8, 21));
 
           expect(
             viewModel.startDate,
@@ -535,10 +500,10 @@ void main() {
 
           await viewModel.load.execute();
 
-          viewModel.setStartDate(DateTime(2026, 8, 25));
+          viewModel.setStartCalendarDate(EventCalendarDate(2026, 8, 25));
 
-          expect(viewModel.startDate, DateTime(2026, 8, 25, 9, 45));
-          expect(viewModel.startDate!.isUtc, isFalse);
+          expect(viewModel.startDate, DateTime.utc(2026, 8, 25, 7, 45));
+          expect(viewModel.startDate!.isUtc, isTrue);
         },
       );
 
@@ -564,13 +529,13 @@ void main() {
 
           await viewModel.load.execute();
 
-          viewModel.setStartDate(DateTime(2026, 8, 21));
+          viewModel.setStartCalendarDate(EventCalendarDate(2026, 8, 21));
 
-          expect(viewModel.startDate, DateTime.utc(2026, 8, 21, 22));
+          expect(viewModel.startDate, DateTime.utc(2026, 8, 20, 22));
           expect(viewModel.startDate!.isUtc, isTrue);
           expect(
             viewModel.endDate,
-            DateTime.utc(2026, 8, 21, 23, 59, 59, 999, 999),
+            DateTime.utc(2026, 8, 20, 23),
           );
           expect(viewModel.endDate!.isUtc, isTrue);
         },
@@ -598,7 +563,7 @@ void main() {
 
           await viewModel.load.execute();
           viewModel
-            ..setStartDate(DateTime(2026, 8, 21))
+            ..setStartCalendarDate(EventCalendarDate(2026, 8, 21))
             ..setName('Sagra spostata');
           await viewModel.save.execute();
 
@@ -635,12 +600,122 @@ void main() {
         var notifications = 0;
         viewModel
           ..addListener(() => notifications++)
-          ..setStartTime(DateTime(2026, 8, 20, 5));
+          ..setStartClockTime(EventClockTime(5, 0));
 
         expect(notifications, 1);
-        expect(viewModel.endDate, DateTime(2026, 8, 20, 23, 59, 59, 999, 999));
-        expect(viewModel.endDate!.isUtc, isFalse);
+        expect(
+          viewModel.endDate,
+          DateTime.utc(2026, 8, 20, 21, 59, 59, 999, 999),
+        );
+        expect(viewModel.endDate!.isUtc, isTrue);
       });
+    });
+
+    group('Rome event-time policy', () {
+      test(
+        'date edit across the CET/CEST transition preserves Rome precision',
+        () async {
+          final loaded = DateTime.utc(2026, 3, 28, 9, 30, 15, 123, 456);
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              31: Result.success(
+                sampleAdminSubmission(id: 31, startDate: loaded),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 31,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+          viewModel.setStartCalendarDate(EventCalendarDate(2026, 4, 1));
+
+          expect(
+            viewModel.startDate,
+            DateTime.utc(2026, 4, 1, 8, 30, 15, 123, 456),
+          );
+        },
+      );
+
+      test(
+        'time edit preserves Rome date and existing sub-minute precision',
+        () async {
+          final loaded = DateTime.utc(2026, 8, 20, 8, 30, 15, 123, 456);
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: <int, Result<AdminSubmission>>{
+              32: Result.success(
+                sampleAdminSubmission(id: 32, startDate: loaded),
+              ),
+            },
+          );
+          final viewModel = createViewModel(
+            repository: repository,
+            submissionId: 32,
+          );
+          addTearDown(viewModel.dispose);
+
+          await viewModel.load.execute();
+          viewModel.setStartClockTime(EventClockTime(14, 45));
+
+          expect(
+            viewModel.startDate,
+            DateTime.utc(2026, 8, 20, 12, 45, 15, 123, 456),
+          );
+        },
+      );
+
+      test(
+        'enabled incomplete event and live DST issue block repository writes',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository();
+          final viewModel = createViewModel(repository: repository);
+          addTearDown(viewModel.dispose);
+          viewModel
+            ..setCity('Isernia')
+            ..setName('Sagra')
+            ..setEventEnabled(true)
+            ..setStartCalendarDate(EventCalendarDate(2026, 3, 29));
+
+          await viewModel.save.execute();
+          expect(viewModel.save.error, isTrue);
+          expect(repository.createInputs, isEmpty);
+
+          viewModel
+            ..setStartClockTime(EventClockTime(1, 30))
+            ..setStartClockTime(EventClockTime(2, 30));
+          final prior = viewModel.startDate;
+          expect(viewModel.eventTimeIssue, EventTimeIssue.nonexistentLocalTime);
+          expect(viewModel.startDate, prior);
+
+          await viewModel.save.execute();
+          expect(repository.createInputs, isEmpty);
+        },
+      );
+
+      test(
+        'DST overlap marks dirty once and a valid edit clears its issue',
+        () {
+          final viewModel = createViewModel();
+          addTearDown(viewModel.dispose);
+          viewModel
+            ..setStartCalendarDate(EventCalendarDate(2026, 10, 25))
+            ..setStartClockTime(EventClockTime(1, 30));
+          final prior = viewModel.startDate;
+          var notifications = 0;
+          viewModel
+            ..addListener(() => notifications++)
+            ..setStartClockTime(EventClockTime(2, 30));
+          expect(viewModel.startDate, prior);
+          expect(viewModel.eventTimeIssue, EventTimeIssue.ambiguousLocalTime);
+          expect(viewModel.isDirty, isTrue);
+          expect(notifications, 1);
+
+          viewModel.setStartClockTime(EventClockTime(3, 30));
+          expect(viewModel.eventTimeIssue, isNull);
+        },
+      );
     });
 
     group('moderation hydration and editability', () {
@@ -826,7 +901,9 @@ void main() {
           submissionId: 4,
         );
         addTearDown(viewModel.dispose);
-        repository.getByIdResults[4] = Result.success(sampleAdminSubmission());
+        repository.getByIdResults[4] = Result.success(
+          sampleAdminSubmission(startDate: DateTime.utc(2026, 8, 20, 10)),
+        );
 
         await viewModel.load.execute();
         await viewModel.promote.execute(AdminPromotionTarget.event);
@@ -843,6 +920,58 @@ void main() {
             entityId: 77,
           ),
         );
+      },
+    );
+
+    test(
+      'blocks event promotion without dates after moderation eligibility '
+      'passes',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            6: Result.success(sampleAdminSubmission(id: 6)),
+          },
+        );
+        final viewModel = createViewModel(
+          repository: repository,
+          submissionId: 6,
+        );
+        addTearDown(viewModel.dispose);
+
+        await viewModel.load.execute();
+        await viewModel.promote.execute(AdminPromotionTarget.event);
+
+        expect(viewModel.promote.error, isTrue);
+        expect(
+          viewModel.promote.result,
+          isA<Error<AdminSubmissionPromotion>>(),
+        );
+        expect(viewModel.eventTimeIssue, EventTimeIssue.missingStartDate);
+        expect(repository.promoteCalls, isEmpty);
+      },
+    );
+
+    test(
+      'applies moderation eligibility before event-target validation',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: <int, Result<AdminSubmission>>{
+            7: Result.success(sampleAdminSubmission(id: 7)),
+          },
+        );
+        final viewModel = createViewModel(
+          repository: repository,
+          submissionId: 7,
+        );
+        addTearDown(viewModel.dispose);
+
+        await viewModel.load.execute();
+        viewModel.setName('Edited submission');
+        await viewModel.promote.execute(AdminPromotionTarget.event);
+
+        expect(viewModel.promote.error, isTrue);
+        expect(viewModel.eventTimeIssue, isNull);
+        expect(repository.promoteCalls, isEmpty);
       },
     );
 

@@ -7,6 +7,7 @@ import 'package:moliseis/data/core/relation_update.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -23,6 +24,7 @@ import '../../support/objectbox_test_store.dart';
 
 void main() {
   setUpAll(setUpMockSupabase);
+  final fixedNowUtc = DateTime.utc(2026, 3, 15, 12);
 
   group('EventRepositoryImpl - DateTime Overlap Logic', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
@@ -38,6 +40,7 @@ void main() {
         logger: mockLogger,
         supabaseI: MockSupabase(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+        nowUtc: () => fixedNowUtc,
       );
     });
 
@@ -54,8 +57,8 @@ void main() {
         'includes single-day event when start date is within range',
         () async {
           final now = DateTime(2026, 3, 15);
-          final rangeStart = DateTime(2026, 3, 10);
-          final rangeEnd = DateTime(2026, 3, 20);
+          final rangeStart = EventCalendarDate(2026, 3, 10);
+          final rangeEnd = EventCalendarDate(2026, 3, 20);
 
           final event = makeEventEntity(
             remoteId: 1,
@@ -83,8 +86,8 @@ void main() {
           ]);
 
           final result = await repository.getByDateRange(
-            DateTime(2026, 3, 10),
-            DateTime(2026, 3, 20),
+            EventCalendarDate(2026, 3, 10),
+            EventCalendarDate(2026, 3, 20),
           );
 
           expect(result, isA<Success<List<Event>>>());
@@ -104,8 +107,8 @@ void main() {
           ]);
 
           final result = await repository.getByDateRange(
-            DateTime(2026, 3, 10),
-            DateTime(2026, 3, 20),
+            EventCalendarDate(2026, 3, 10),
+            EventCalendarDate(2026, 3, 20),
           );
 
           expect(result, isA<Success<List<Event>>>());
@@ -125,8 +128,8 @@ void main() {
           ]);
 
           final result = await repository.getByDateRange(
-            DateTime(2026, 3, 10),
-            DateTime(2026, 3, 20),
+            EventCalendarDate(2026, 3, 10),
+            EventCalendarDate(2026, 3, 20),
           );
 
           expect(result, isA<Success<List<Event>>>());
@@ -144,8 +147,8 @@ void main() {
         seedEvents([event]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -162,8 +165,8 @@ void main() {
         seedEvents([event]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -183,8 +186,8 @@ void main() {
         seedEvents([event]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -202,8 +205,8 @@ void main() {
         seedEvents([event]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -221,8 +224,8 @@ void main() {
         seedEvents([event]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -240,8 +243,8 @@ void main() {
         seedEvents([event]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -259,8 +262,8 @@ void main() {
         ]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -278,8 +281,8 @@ void main() {
         ]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -297,8 +300,8 @@ void main() {
         seedEvents([event]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -316,8 +319,8 @@ void main() {
         seedEvents([event]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -342,8 +345,8 @@ void main() {
         seedEvents([singleDay, multiDay]);
 
         final result = await repository.getByDateRange(
-          DateTime(2026, 3, 10),
-          DateTime(2026, 3, 20),
+          EventCalendarDate(2026, 3, 10),
+          EventCalendarDate(2026, 3, 20),
         );
 
         expect(result, isA<Success<List<Event>>>());
@@ -375,7 +378,7 @@ void main() {
       test(
         'getByDate returns Result.error when _getByDateRange rethrows',
         () async {
-          final date = DateTime(2026, 3, 15);
+          final date = EventCalendarDate(2026, 3, 15);
 
           final result = await mockRepository.getByDate(date);
 
@@ -393,7 +396,7 @@ void main() {
             {
               'entityType': 'event',
               'method': 'getByDate',
-              'startDate': date.toIso8601String(),
+              'startDate': date.toString(),
             },
           );
           expect(failedCall.error, isNotNull);
@@ -404,8 +407,8 @@ void main() {
       test(
         'getByDateRange returns Result.error when _getByDateRange rethrows',
         () async {
-          final start = DateTime(2026, 3, 10);
-          final end = DateTime(2026, 3, 20);
+          final start = EventCalendarDate(2026, 3, 10);
+          final end = EventCalendarDate(2026, 3, 20);
 
           final result = await mockRepository.getByDateRange(start, end);
 
@@ -423,8 +426,8 @@ void main() {
             {
               'entityType': 'event',
               'method': 'getByDateRange',
-              'startDate': start.toIso8601String(),
-              'endDate': end.toIso8601String(),
+              'startDate': start.toString(),
+              'endDate': end.toString(),
             },
           );
           expect(failedCall.error, isNotNull);
@@ -442,7 +445,9 @@ void main() {
 
         seedEvents([event]);
 
-        final result = await repository.getByDate(DateTime(2026, 3, 15));
+        final result = await repository.getByDate(
+          EventCalendarDate(2026, 3, 15),
+        );
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
@@ -457,7 +462,9 @@ void main() {
           ),
         ]);
 
-        final result = await repository.getByDate(DateTime(2026, 3, 15));
+        final result = await repository.getByDate(
+          EventCalendarDate(2026, 3, 15),
+        );
 
         expect(result, isA<Success<List<Event>>>());
         final success = result as Success<List<Event>>;
@@ -478,6 +485,7 @@ void main() {
         logger: MockLogger(),
         supabaseI: MockSupabase(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+        nowUtc: () => fixedNowUtc,
       );
     });
 
@@ -488,11 +496,11 @@ void main() {
     test(
       'includes multi-day event that starts and ends within current year',
       () async {
-        final now = DateTime.now();
+        final now = fixedNowUtc;
         final event = makeEventEntity(
           remoteId: 1,
-          startDate: DateTime(now.year, 6),
-          endDate: DateTime(now.year, 6, 10),
+          startDate: DateTime.utc(now.year, 6),
+          endDate: DateTime.utc(now.year, 6, 10),
         );
         eventBox.put(event);
 
@@ -510,10 +518,10 @@ void main() {
       'includes single-day event (null endDate) whose startDate is in current '
       'year',
       () async {
-        final now = DateTime.now();
+        final now = fixedNowUtc;
         final event = makeEventEntity(
           remoteId: 2,
-          startDate: DateTime(now.year, 5, 15),
+          startDate: DateTime.utc(now.year, 5, 15),
         );
         eventBox.put(event);
 
@@ -561,11 +569,11 @@ void main() {
     });
 
     test('excludes soft-deleted current-year event', () async {
-      final now = DateTime.now();
+      final now = fixedNowUtc;
       final event = makeEventEntity(
         remoteId: 5,
-        startDate: DateTime(now.year, 4),
-        endDate: DateTime(now.year, 4, 10),
+        startDate: DateTime.utc(now.year, 4),
+        endDate: DateTime.utc(now.year, 4, 10),
         isDeleted: true,
       );
       eventBox.put(event);
@@ -599,6 +607,7 @@ void main() {
         logger: MockLogger(),
         supabaseI: MockSupabase(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+        nowUtc: () => fixedNowUtc,
       );
     });
 
@@ -609,11 +618,11 @@ void main() {
     test(
       'includes current-year multi-day event matching the requested category',
       () async {
-        final now = DateTime.now();
+        final now = fixedNowUtc;
         final event = makeEventEntity(
           remoteId: 1,
-          startDate: DateTime(now.year, 7),
-          endDate: DateTime(now.year, 7, 5),
+          startDate: DateTime.utc(now.year, 7),
+          endDate: DateTime.utc(now.year, 7, 5),
           contentCategoryIndex: ContentCategory.food.index,
         );
         eventBox.put(event);
@@ -632,10 +641,10 @@ void main() {
       'includes current-year single-day event (null endDate) matching the '
       'requested category',
       () async {
-        final now = DateTime.now();
+        final now = fixedNowUtc;
         final event = makeEventEntity(
           remoteId: 2,
-          startDate: DateTime(now.year, 9, 10),
+          startDate: DateTime.utc(now.year, 9, 10),
           contentCategoryIndex: ContentCategory.folklore.index,
         );
         eventBox.put(event);
@@ -671,11 +680,11 @@ void main() {
     });
 
     test('excludes current-year event whose category does not match', () async {
-      final now = DateTime.now();
+      final now = fixedNowUtc;
       final event = makeEventEntity(
         remoteId: 4,
-        startDate: DateTime(now.year, 6),
-        endDate: DateTime(now.year, 6, 5),
+        startDate: DateTime.utc(now.year, 6),
+        endDate: DateTime.utc(now.year, 6, 5),
         contentCategoryIndex: ContentCategory.history.index,
       );
       eventBox.put(event);
@@ -690,13 +699,13 @@ void main() {
     });
 
     test('sorts by name ascending when sort is byName', () async {
-      final now = DateTime.now();
+      final now = fixedNowUtc;
       eventBox.put(
         makeEventEntity(
           remoteId: 1,
           name: 'Zeta Festival',
-          startDate: DateTime(now.year, 7),
-          endDate: DateTime(now.year, 7, 5),
+          startDate: DateTime.utc(now.year, 7),
+          endDate: DateTime.utc(now.year, 7, 5),
           contentCategoryIndex: ContentCategory.folklore.index,
         ),
       );
@@ -704,8 +713,8 @@ void main() {
         makeEventEntity(
           remoteId: 2,
           name: 'Alpha Fair',
-          startDate: DateTime(now.year, 8),
-          endDate: DateTime(now.year, 8, 5),
+          startDate: DateTime.utc(now.year, 8),
+          endDate: DateTime.utc(now.year, 8, 5),
           contentCategoryIndex: ContentCategory.folklore.index,
         ),
       );
@@ -713,7 +722,7 @@ void main() {
         makeEventEntity(
           remoteId: 3,
           name: 'Middle Market',
-          startDate: DateTime(now.year, 9),
+          startDate: DateTime.utc(now.year, 9),
           contentCategoryIndex: ContentCategory.folklore.index,
         ),
       );
@@ -730,12 +739,12 @@ void main() {
     });
 
     test('sorts by modifiedAt descending when sort is byDate', () async {
-      final now = DateTime.now();
+      final now = fixedNowUtc;
       eventBox.put(
         makeEventEntity(
           remoteId: 1,
           name: 'Older',
-          startDate: DateTime(now.year, 7),
+          startDate: DateTime.utc(now.year, 7),
           contentCategoryIndex: ContentCategory.food.index,
           modifiedAt: DateTime(2025),
         ),
@@ -744,7 +753,7 @@ void main() {
         makeEventEntity(
           remoteId: 2,
           name: 'Newer',
-          startDate: DateTime(now.year, 8),
+          startDate: DateTime.utc(now.year, 8),
           contentCategoryIndex: ContentCategory.food.index,
           modifiedAt: DateTime(2026, 6),
         ),
@@ -753,7 +762,7 @@ void main() {
         makeEventEntity(
           remoteId: 3,
           name: 'Middle',
-          startDate: DateTime(now.year, 9),
+          startDate: DateTime.utc(now.year, 9),
           contentCategoryIndex: ContentCategory.food.index,
           modifiedAt: DateTime(2025, 12),
         ),
@@ -792,6 +801,7 @@ void main() {
         logger: mockLogger,
         supabaseI: supabaseEnv.mockSupabase,
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+        nowUtc: () => fixedNowUtc,
       );
     });
 
@@ -802,15 +812,15 @@ void main() {
     test(
       'reflects newly synced events after synchronize invalidates cache',
       () async {
-        final now = DateTime.now();
+        final now = fixedNowUtc;
 
         // Seed a current-year event in the local store.
         eventBox.put(
           makeEventEntity(
             remoteId: 1,
             name: 'Existing Event',
-            startDate: DateTime(now.year, 6),
-            endDate: DateTime(now.year, 6, 5),
+            startDate: DateTime.utc(now.year, 6),
+            endDate: DateTime.utc(now.year, 6, 5),
           ),
         );
 
@@ -866,6 +876,7 @@ void main() {
         logger: MockLogger(),
         supabaseI: supabaseEnv.mockSupabase,
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+        nowUtc: () => fixedNowUtc,
       );
     });
 
@@ -993,6 +1004,7 @@ void main() {
         logger: MockLogger(),
         supabaseI: MockSupabase(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+        nowUtc: () => fixedNowUtc,
       );
     });
 
@@ -1056,6 +1068,122 @@ void main() {
       expect(eventBox.get(1)?.cityToOneId, 7);
       expect(eventBox.get(1)?.city.targetId, 7);
     });
+  });
+
+  group('EventRepositoryImpl - Rome query boundaries', () {
+    late TestObjectBoxEnvironment environment;
+    late Box<EventEntity> eventBox;
+    late EventRepositoryImpl repository;
+
+    setUp(() async {
+      environment = await TestObjectBoxEnvironment.create();
+      eventBox = environment.store.box<EventEntity>();
+      repository = EventRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        objectBoxI: TestObjectBox(environment.store),
+        nowUtc: () => DateTime.utc(2026, 12, 31, 23, 30),
+      );
+    });
+
+    tearDown(() => environment.dispose());
+
+    test(
+      'uses Rome year containment and upcoming-day UTC boundaries',
+      () async {
+        eventBox.putMany([
+          makeEventEntity(
+            remoteId: 1,
+            startDate: DateTime.utc(2026, 12, 31, 23),
+          ),
+          makeEventEntity(remoteId: 2, startDate: DateTime.utc(2027, 1, 1, 1)),
+          makeEventEntity(remoteId: 3, startDate: DateTime.utc(2028, 2, 1, 1)),
+        ]);
+
+        final currentYear = await repository.getByCurrentYear();
+        final upcoming = await repository.getNextEventIds();
+
+        expect(
+          (currentYear as Success<List<Event>>).value.map((e) => e.remoteId),
+          [1, 2],
+        );
+        expect((upcoming as Success<List<int>>).value, [1, 2]);
+      },
+    );
+
+    test(
+      'uses Rome summer day and inclusive upcoming-window boundaries',
+      () async {
+        eventBox.putMany([
+          makeEventEntity(
+            remoteId: 10,
+            startDate: DateTime.utc(2026, 6, 1, 21, 59, 59, 999, 999),
+          ),
+          makeEventEntity(
+            remoteId: 11,
+            startDate: DateTime.utc(2026, 6, 1, 22),
+          ),
+          makeEventEntity(
+            remoteId: 12,
+            startDate: DateTime.utc(2026, 12, 31, 23),
+          ),
+          makeEventEntity(
+            remoteId: 13,
+            startDate: DateTime.utc(2027, 1, 31, 22, 59, 59, 999, 999),
+          ),
+          makeEventEntity(
+            remoteId: 14,
+            startDate: DateTime.utc(2027, 1, 31, 23),
+          ),
+        ]);
+
+        final summerDay = await repository.getByDate(
+          EventCalendarDate(2026, 6, 1),
+        );
+        final upcoming = await repository.getNextEventIds();
+        final summerEvents = (summerDay as Success<List<Event>>).value;
+        final upcomingIds = (upcoming as Success<List<int>>).value;
+
+        expect(summerEvents, containsEventId(10));
+        expect(summerEvents, isNot(containsEventId(11)));
+        expect(upcomingIds, containsAll([12, 13]));
+        expect(upcomingIds, isNot(contains(14)));
+      },
+    );
+
+    test(
+      'keeps Rome-year containment for category and coordinate queries',
+      () async {
+        eventBox.putMany([
+          makeEventEntity(
+            remoteId: 20,
+            startDate: DateTime.utc(2026, 12, 31, 23),
+            endDate: DateTime.utc(2027),
+            coordinates: const [0.01, 0.01],
+            contentCategoryIndex: ContentCategory.nature.index,
+          ),
+          makeEventEntity(
+            remoteId: 21,
+            startDate: DateTime.utc(2026, 12, 31, 22, 59),
+            endDate: DateTime.utc(2026, 12, 31, 23),
+            coordinates: const [0.02, 0.02],
+            contentCategoryIndex: ContentCategory.nature.index,
+          ),
+        ]);
+
+        final categories = await repository.getByCategories({
+          ContentCategory.nature,
+        });
+        final nearby = await repository.getByCoordinates(const [0, 0]);
+        final categoryEvents = (categories as Success<List<Event>>).value;
+        final nearbyEvents = (nearby as Success<List<Event>>).value;
+
+        expect(categoryEvents, containsEventId(20));
+        expect(categoryEvents, isNot(containsEventId(21)));
+        expect(nearbyEvents, containsEventId(20));
+        expect(nearbyEvents, isNot(containsEventId(21)));
+      },
+    );
   });
 }
 

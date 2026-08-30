@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 
 import '../../support/mock_logger.dart';
@@ -123,6 +124,19 @@ void main() {
       expect(saveResult.isSuccess, isTrue);
       expect(loaded?.description, draft.description);
       expect(loaded?.descriptionDelta, isNull);
+    });
+
+    test('persists an enabled incomplete event start day', () async {
+      final draft = ContentSubmissionDraft(
+        eventDates: EventDateDraft.unresolvedStart(
+          EventCalendarDate(2026, 7, 25),
+        ),
+      );
+
+      await repository.saveDraft(draft);
+      final loaded = (await repository.loadDraft()).getOrNull();
+
+      expect(loaded?.eventDates, draft.eventDates);
     });
   });
 }

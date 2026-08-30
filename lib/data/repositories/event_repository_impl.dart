@@ -4,12 +4,12 @@ import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/mappers/mappers.dart';
 import 'package:moliseis/data/services/objectbox.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
-import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,12 +20,18 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     required Logger logger,
     required Supabase supabaseI,
     required ObjectBox objectBoxI,
+    DateTime Function()? nowUtc,
   }) : _supabase = supabaseI,
        _box = objectBoxI.store.box<EventEntity>(),
+       _nowUtc = nowUtc ?? DateTime.now,
        super(logger);
 
   final Supabase _supabase;
   final Box<EventEntity> _box;
+  final DateTime Function() _nowUtc;
+  final EventTimePolicy _eventTimePolicy = EventTimePolicy();
+
+  DateTime get _currentUtc => _nowUtc().toUtc();
 
   @override
   String get tableName => 'events';
@@ -71,7 +77,9 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     Query<EventEntity>? query;
 
     try {
-      final condition = ObjectBoxConditions.visibleEventInCurrentYear;
+      final condition = ObjectBoxConditions.visibleEventInCurrentYear(
+        _currentUtc,
+      );
 
       final builder = _box
           .query(condition)
@@ -109,7 +117,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     try {
       final condition = EventEntity_.contentCategoryIndex
           .oneOf(categories.map((e) => e.index).toList())
-          .and(ObjectBoxConditions.visibleEventInCurrentYear);
+          .and(ObjectBoxConditions.visibleEventInCurrentYear(_currentUtc));
 
       query = _box.query(condition).build();
 
@@ -149,7 +157,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
     try {
       final condition = EventEntity_.coordinates
           .nearestNeighborsF32(coordinates, 200)
-          .and(ObjectBoxConditions.visibleEventInCurrentYear);
+          .and(ObjectBoxConditions.visibleEventInCurrentYear(_currentUtc));
 
       query = _box.query(condition).build()..limit = 2;
 
@@ -184,16 +192,15 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   // TODO(xmattjus): remove the try / catch block here since callers also wrap
   //  this function in a try / catch block.
   Future<Result<List<Event>>> _getByDateRange({
-    required DateTime start,
-    DateTime? end,
+    required EventCalendarDate start,
+    EventCalendarDate? end,
   }) async {
     Query<EventEntity>? query;
 
-    // Normalizes the start and end dates to include the entire day.
-    final startDate = start.startOfDay;
-    final endDate = end != null
-        ? DateTime(end.year, end.month, end.day).endOfDay
-        : DateTime(start.year, start.month, start.day).endOfDay;
+    final startDate = _eventTimePolicy.utcRangeForCalendarDate(start).startUtc;
+    final endDate = _eventTimePolicy
+        .utcRangeForCalendarDate(end ?? start)
+        .endUtc;
 
     try {
       // Uses overlap semantics (event overlaps [startDate, endDate]),
@@ -232,7 +239,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
 
   /// Loads events that overlap a specific calendar day.
   @override
-  Future<Result<List<Event>>> getByDate(DateTime date) async {
+  Future<Result<List<Event>>> getByDate(EventCalendarDate date) async {
     try {
       return await _getByDateRange(start: date);
     } on Exception catch (exception, stackTrace) {
@@ -241,7 +248,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
           'event',
           method: 'getByDate',
           extra: {
-            'startDate': date.toIso8601String(),
+            'startDate': date.toString(),
           },
         ),
         error: exception,
@@ -255,8 +262,8 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   /// Loads events that overlap the inclusive [start]-[end] date range.
   @override
   Future<Result<List<Event>>> getByDateRange(
-    DateTime start,
-    DateTime end,
+    EventCalendarDate start,
+    EventCalendarDate end,
   ) async {
     try {
       return await _getByDateRange(start: start, end: end);
@@ -266,8 +273,8 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
           'event',
           method: 'getByDateRange',
           extra: {
-            'startDate': start.toIso8601String(),
-            'endDate': end.toIso8601String(),
+            'startDate': start.toString(),
+            'endDate': end.toString(),
           },
         ),
         error: exception,
@@ -319,14 +326,20 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   Future<Result<List<int>>> getNextEventIds() async {
     Query<EventEntity>? query;
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final nextMonth = DateTime(now.year, now.month, now.day + 30).endOfDay;
+    final today = _eventTimePolicy.currentCalendarDate(_currentUtc);
+    final todayRange = _eventTimePolicy.utcRangeForCalendarDate(today);
+    final endCarrier = DateTime.utc(today.year, today.month, today.day + 30);
+    final endDate = EventCalendarDate(
+      endCarrier.year,
+      endCarrier.month,
+      endCarrier.day,
+    );
+    final endRange = _eventTimePolicy.utcRangeForCalendarDate(endDate);
 
     try {
       final condition = EventEntity_.startDate
-          .greaterOrEqualDate(today)
-          .and(EventEntity_.startDate.lessOrEqualDate(nextMonth))
+          .greaterOrEqualDate(todayRange.startUtc)
+          .and(EventEntity_.startDate.lessOrEqualDate(endRange.endUtc))
           .and(_isNotDeleted);
 
       final builder = _box

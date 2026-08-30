@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/content_submission_draft_entry.dart';
 import 'package:moliseis/data/mappers/content_submission_draft_mapper.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 
@@ -61,16 +62,67 @@ void main() {
       'silent date loss)',
       () {
         final draft = ContentSubmissionDraft(
-          startDate: startDate,
-          endDate: endDate,
+          eventDates: EventDateDraft.exact(
+            startCalendarDate: EventCalendarDate(2026, 7, 25),
+            startInstantUtc: startDate,
+            endInstantUtc: endDate,
+          ),
         );
 
         final restored = draft.toEntity().toModel();
 
-        expect(restored.startDate, startDate);
-        expect(restored.endDate, endDate);
+        expect(restored.eventDates.startInstantUtc, startDate);
+        expect(restored.eventDates.endInstantUtc, endDate);
       },
     );
+
+    test('preserves an enabled incomplete start day through a round-trip', () {
+      final draft = ContentSubmissionDraft(
+        eventDates: EventDateDraft.unresolvedStart(
+          EventCalendarDate(2026, 7, 25),
+        ),
+      );
+
+      final entity = draft.toEntity();
+      final restored = entity.toModel();
+
+      expect(entity.isEvent, isTrue);
+      expect(entity.pendingStartCalendarDate, '2026-07-25');
+      expect(restored.eventDates, draft.eventDates);
+    });
+
+    test('normalizes canonical persisted instants to UTC', () {
+      final instant = DateTime.fromMicrosecondsSinceEpoch(
+        123456789,
+      );
+      final startOnly = ContentSubmissionDraftEntity(
+        isEvent: true,
+        startDate: instant,
+      ).toModel();
+
+      expect(startOnly.eventDates.enabled, isTrue);
+      expect(startOnly.eventDates.startInstantUtc?.isUtc, isTrue);
+      expect(
+        startOnly.eventDates.startInstantUtc?.microsecondsSinceEpoch,
+        instant.microsecondsSinceEpoch,
+      );
+    });
+
+    test('maps disabled and ranged canonical rows', () {
+      final start = DateTime.utc(2026, 7, 25, 10, 30);
+      final end = DateTime.utc(2026, 7, 26, 18);
+      final disabled = ContentSubmissionDraftEntity(isEvent: false).toModel();
+      final range = ContentSubmissionDraftEntity(
+        isEvent: true,
+        startDate: start,
+        endDate: end,
+      ).toModel();
+
+      expect(disabled.eventDates, const EventDateDraft.disabled());
+      expect(range.eventDates.enabled, isTrue);
+      expect(range.eventDates.startInstantUtc, start);
+      expect(range.eventDates.endInstantUtc, end);
+    });
 
     test('round-trips an empty draft without data loss', () {
       final draft = ContentSubmissionDraft();
@@ -83,8 +135,7 @@ void main() {
       expect(restored.name, isNull);
       expect(restored.description, isNull);
       expect(restored.descriptionDelta, isNull);
-      expect(restored.startDate, isNull);
-      expect(restored.endDate, isNull);
+      expect(restored.eventDates, const EventDateDraft.disabled());
       expect(restored.userEmail, isNull);
       expect(restored.userName, isNull);
       expect(restored.acceptedTerms, isNull);

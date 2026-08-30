@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/routing/route_names.dart';
@@ -179,6 +180,46 @@ void main() {
       addTearDown(() => repo.completeUpload(const Result.success(null)));
     });
 
+    testWidgets(
+      'with an incomplete event shows the date issue and does not navigate',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final repo = ControllableSubmissionRepository();
+        final vm = buildViewModel(submissionRepository: repo);
+        addTearDown(vm.dispose);
+        await vm.initialize();
+
+        await tester.pumpWidget(buildApp(vm));
+        await fillValidForm(tester);
+        await flushDebounce(tester);
+        vm.setEventEnabled(true);
+        await tester.pump();
+
+        final submitButton = find.widgetWithText(FilledButton, 'Invia');
+        await tester.scrollUntilVisible(
+          submitButton,
+          200,
+          scrollable: mainScrollable,
+        );
+        await tester.ensureVisible(submitButton);
+        await tester.tap(submitButton);
+        await tester.pump();
+        await tester.scrollUntilVisible(
+          find.text('Seleziona una data di inizio.'),
+          -200,
+          scrollable: mainScrollable,
+        );
+
+        expect(find.text('Seleziona una data di inizio.'), findsOneWidget);
+        expect(vm.eventTimeIssue, EventTimeIssue.missingStartDate);
+        expect(repo.uploadCallCount, 0);
+        expect(vm.submit.result, isNull);
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        await flushDebounce(tester);
+      },
+    );
+
     testWidgets('completes the upload pipeline on success', (tester) async {
       final repo = ControllableSubmissionRepository();
       final vm = buildViewModel(submissionRepository: repo);
@@ -226,6 +267,32 @@ void main() {
     });
   });
 
+  testWidgets('restored incomplete event draft controls the checkbox', (
+    tester,
+  ) async {
+    final repo = ControllableSubmissionRepository();
+    final vm = buildViewModel(
+      submissionRepository: repo,
+      draftRepository: FakeContentSubmissionDraftRepository(
+        loadDraftResult: Result.success(
+          ContentSubmissionDraft(
+            eventDates: EventDateDraft.unresolvedStart(
+              EventCalendarDate(2026, 8, 20),
+            ),
+          ),
+        ),
+      ),
+    );
+    addTearDown(vm.dispose);
+
+    await tester.pumpWidget(buildApp(vm));
+    await vm.initialize();
+    await tester.pump();
+
+    expect(tester.widget<Checkbox>(find.byType(Checkbox).first).value, isTrue);
+    expect(find.textContaining('Inizia il'), findsOneWidget);
+  });
+
   group('ContentSubmissionScreen back navigation', () {
     testWidgets(
       'completed back pops once and leaves a clean form',
@@ -237,28 +304,6 @@ void main() {
         await tester.pumpWidget(buildApp(vm));
         await fillValidForm(tester);
         await flushDebounce(tester);
-
-        // Enable the event path so the local `_isEvent` state is true before
-        // submitting; the completed back must reset it.
-        final eventCheckbox = find.descendant(
-          of: find
-              .ancestor(
-                of: find.text('È un evento?'),
-                matching: find.byType(Row),
-              )
-              .first,
-          matching: find.byType(Checkbox),
-        );
-        await tester.scrollUntilVisible(
-          find.text('È un evento?'),
-          200,
-          scrollable: mainScrollable,
-        );
-        await tester.ensureVisible(eventCheckbox);
-        await tester.pump();
-        await tester.tap(eventCheckbox);
-        await tester.pump();
-        expect(tester.widget<Checkbox>(eventCheckbox).value, isTrue);
 
         await tester.scrollUntilVisible(
           find.widgetWithText(FilledButton, 'Invia'),
@@ -290,7 +335,16 @@ void main() {
         expect(find.widgetWithText(TextFormField, 'Campobasso'), findsNothing);
         expect(find.widgetWithText(TextFormField, 'Test Event'), findsNothing);
 
-        // The local `_isEvent` state is reset and the event checkbox cleared.
+        // The controlled event state remains disabled after the clear.
+        final eventCheckbox = find.descendant(
+          of: find
+              .ancestor(
+                of: find.text('È un evento?'),
+                matching: find.byType(Row),
+              )
+              .first,
+          matching: find.byType(Checkbox),
+        );
         await tester.scrollUntilVisible(
           find.text('È un evento?'),
           -200,
@@ -569,8 +623,9 @@ void main() {
       final vm = buildViewModel(submissionRepository: repo);
       await vm.initialize();
       vm
-        ..setStartDate(DateTime.utc(2026, 8, 20, 10))
-        ..setEndDate(DateTime.utc(2026, 8, 20, 12));
+        ..setStartCalendarDate(EventCalendarDate(2026, 8, 20))
+        ..setStartClockTime(EventClockTime(10, 0))
+        ..setEndCalendarDate(EventCalendarDate(2026, 8, 20));
 
       await tester.pumpWidget(buildApp(vm));
       await flushDebounce(tester);
@@ -591,8 +646,8 @@ void main() {
       await tester.tap(eventCheckbox);
       await tester.pump();
 
-      expect(vm.state.startDate, isNull);
-      expect(vm.state.endDate, isNull);
+      expect(vm.state.eventDates.startInstantUtc, isNull);
+      expect(vm.state.eventDates.endInstantUtc, isNull);
       await flushDebounce(tester);
     });
   });

@@ -291,6 +291,93 @@ Deno.test("rejects non-string submission and asset fields before normalization",
   );
 });
 
+Deno.test("preserves compatible dates and rejects invalid public ranges", () => {
+  for (
+    const start_date of [
+      "2026-08-20",
+      "2026-08-20T10:00:00",
+      "2026-08-20T10:00:00Z",
+      "2026-08-20T10:00:00+02:00",
+      "2026-08-20T10:00:00-02:00",
+      "2026-08-20T10:00:00.000100Z",
+    ]
+  ) {
+    const result = parseContentSubmission({ ...validSubmission(), start_date });
+    assert(result.ok);
+    assertEquals(result.value.start_date, start_date);
+    assertEquals(result.value.end_date, null);
+  }
+
+  const offsetEquivalent = parseContentSubmission({
+    ...validSubmission(),
+    start_date: "2026-08-21T10:00:00.000Z",
+    end_date: "2026-08-21T12:00:00.000+02:00",
+  });
+  assert(offsetEquivalent.ok);
+  assertEquals(
+    offsetEquivalent.value.start_date,
+    "2026-08-21T10:00:00.000Z",
+  );
+  assertEquals(
+    offsetEquivalent.value.end_date,
+    "2026-08-21T12:00:00.000+02:00",
+  );
+
+  for (
+    const submission of [
+      validSubmission(),
+      { ...validSubmission(), start_date: null, end_date: null },
+    ]
+  ) {
+    const result = parseContentSubmission(submission);
+    assert(result.ok);
+    assertEquals(result.value.start_date, null);
+    assertEquals(result.value.end_date, null);
+  }
+
+  expectInvalid(
+    { ...validSubmission(), start_date: "not-a-date" },
+    "start_date is not valid",
+  );
+  expectInvalid(
+    { ...validSubmission(), end_date: "not-a-date" },
+    "end_date is not valid",
+  );
+  for (
+    const invalidDate of [
+      "2024-04-31",
+      "2024-04-31T10:00:00Z",
+      "2024-04-31T10:00:00+02:00",
+      "2024-04-31T10:00:00.000100Z",
+    ]
+  ) {
+    expectInvalid(
+      { ...validSubmission(), start_date: invalidDate },
+      "start_date is not valid",
+    );
+    expectInvalid(
+      {
+        ...validSubmission(),
+        start_date: "2026-08-20",
+        end_date: invalidDate,
+      },
+      "end_date is not valid",
+    );
+  }
+  expectInvalid(
+    { ...validSubmission(), end_date: "2026-08-20T10:00:00Z" },
+    "end_date requires start_date",
+  );
+  expectInvalid(
+    {
+      ...validSubmission(),
+      start_date: "2026-08-21T10:00:00.000999Z",
+      end_date: "2026-08-21T10:00:00.000001Z",
+    },
+    "end_date must not be before start_date",
+  );
+});
+
 Deno.test("accepts five assets and rejects a sixth", () => {
   const accepted = parseContentSubmission({
     ...validSubmission(),

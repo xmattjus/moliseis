@@ -349,7 +349,7 @@
     },
     {
       "id": "20:8436787422671765122",
-      "lastPropertyId": "15:8592803869694869745",
+      "lastPropertyId": "17:7677321635689032617",
       "name": "ContentSubmissionDraftEntity",
       "properties": [
         {
@@ -407,6 +407,16 @@
           "id": "15:8592803869694869745",
           "name": "descriptionDelta",
           "type": 13
+        },
+        {
+          "id": "16:4148033276290633264",
+          "name": "isEvent",
+          "type": 1
+        },
+        {
+          "id": "17:7677321635689032617",
+          "name": "pendingStartCalendarDate",
+          "type": 9
         }
       ],
       "relations": []

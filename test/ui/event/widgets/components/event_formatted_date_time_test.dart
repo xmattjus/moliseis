@@ -58,6 +58,17 @@ void main() {
       expect(find.text(time), findsOneWidget);
     });
 
+    testWidgets('renders a UTC instant on its Europe/Rome calendar day', (
+      tester,
+    ) async {
+      final event = makeEvent(startDate: DateTime.utc(2026, 1, 10, 23, 30));
+
+      await pumpDateTime(tester, event, alwaysUse24HourFormat: true);
+
+      expect(find.text('11 January'), findsOneWidget);
+      expect(find.text('00:30'), findsOneWidget);
+    });
+
     testWidgets('renders same-day event range with start time', (
       tester,
     ) async {

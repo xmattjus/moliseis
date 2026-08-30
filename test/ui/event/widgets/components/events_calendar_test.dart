@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
+import 'package:moliseis/ui/event/widgets/components/events_calendar.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day_markers.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
@@ -9,46 +11,6 @@ import '../../../../support/fake_repositories.dart';
 import '../../../../support/fixtures.dart';
 
 void main() {
-  group('EventViewModel.isEventOnDay', () {
-    late EventViewModel viewModel;
-
-    setUp(() {
-      viewModel = EventViewModel(repository: FakeEventRepository());
-    });
-
-    test('returns true for each day in an inclusive multi-day span', () {
-      final event = makeEvent(
-        startDate: DateTime(2026, 3, 10, 10, 30),
-        endDate: DateTime(2026, 3, 12, 22, 45),
-      );
-
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 9)), isFalse);
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 10)), isTrue);
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 11)), isTrue);
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 12)), isTrue);
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 13)), isFalse);
-    });
-
-    test('treats null end date as a single-day event', () {
-      final event = makeEvent(startDate: DateTime(2026, 3, 15, 18));
-
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 14)), isFalse);
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 15)), isTrue);
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 16)), isFalse);
-    });
-
-    test('falls back to start day when end date is before start date', () {
-      final event = makeEvent(
-        startDate: DateTime(2026, 3, 20, 10),
-        endDate: DateTime(2026, 3, 19, 10),
-      );
-
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 19)), isFalse);
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 20)), isTrue);
-      expect(viewModel.isEventOnDay(event, DateTime(2026, 3, 21)), isFalse);
-    });
-  });
-
   group('EventViewModel.loadByDate', () {
     test(
       'includes multi-day event on middle day when repository getByDate is '
@@ -66,7 +28,7 @@ void main() {
         final viewModel = EventViewModel(repository: repository);
 
         await _waitForCommand(viewModel.loadAll);
-        await viewModel.loadByDate.execute(DateTime(2026, 3, 11));
+        await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
         await _waitForCommand(viewModel.loadByDate);
 
         expect(viewModel.byMonth, hasLength(1));
@@ -74,6 +36,19 @@ void main() {
         expect(repository.getByDateCallCount, 0);
       },
     );
+
+    test('uses semantic Rome calendar dates for repository fetches', () async {
+      final repository = FakeEventRepository();
+      final viewModel = EventViewModel(
+        repository: repository,
+        nowUtc: () => DateTime.utc(2026, 3, 1, 1),
+      );
+
+      await _waitForCommand(viewModel.loadAll);
+      await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
+
+      expect(repository.lastGetByDate, EventCalendarDate(2026, 3, 11));
+    });
 
     test('returns cached events on same day without repository call', () async {
       final event = makeEvent(
@@ -86,15 +61,44 @@ void main() {
       final viewModel = EventViewModel(repository: repository);
 
       await _waitForCommand(viewModel.loadAll);
-      await viewModel.loadByDate.execute(DateTime(2026, 3, 11));
+      await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
       await _waitForCommand(viewModel.loadByDate);
 
       expect(repository.getByDateCallCount, 0);
 
-      await viewModel.loadByDate.execute(DateTime(2026, 3, 11));
+      await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
       await _waitForCommand(viewModel.loadByDate);
 
       expect(repository.getByDateCallCount, 0);
+    });
+
+    test('retries a date after its repository load fails', () async {
+      final repository = FakeEventRepository();
+      final viewModel = EventViewModel(repository: repository);
+      final loadedDate = EventCalendarDate(2026, 3, 11);
+      final failedDate = EventCalendarDate(2026, 3, 12);
+
+      await _waitForCommand(viewModel.loadAll);
+      await viewModel.loadByDate.execute(loadedDate);
+      await _waitForCommand(viewModel.loadByDate);
+
+      expect(repository.getByDateCallCount, 1);
+
+      repository.getByDateResult = Result.error(
+        TestException('temporary failure'),
+      );
+      await viewModel.loadByDate.execute(failedDate);
+      await _waitForCommand(viewModel.loadByDate);
+
+      expect(repository.getByDateCallCount, 2);
+      expect(viewModel.loadByDate.error, isTrue);
+
+      repository.getByDateResult = const Result.success([]);
+      await viewModel.loadByDate.execute(failedDate);
+      await _waitForCommand(viewModel.loadByDate);
+
+      expect(repository.getByDateCallCount, 3);
+      expect(viewModel.loadByDate.completed, isTrue);
     });
   });
 
@@ -115,7 +119,7 @@ void main() {
 
       expect(
         viewModel
-            .getEventsOnDay(DateTime(2026, 3, 11))
+            .getEventsOnDay(EventCalendarDate(2026, 3, 11))
             .map((event) => event.remoteId)
             .toList(growable: false),
         <int>[3, 1, 2],
@@ -166,6 +170,19 @@ void main() {
       );
     });
   });
+
+  test(
+    'derives calendar package bounds from canonical Rome calendar values',
+    () {
+      final bounds = EventsCalendar.calendarDateBounds(
+        EventCalendarDate(2027, 1, 1),
+      );
+
+      expect(bounds.startDate, DateTime.utc(2027));
+      expect(bounds.endDate, DateTime.utc(2027, 12, 31));
+      expect(bounds.initialDate, DateTime.utc(2027));
+    },
+  );
 }
 
 Future<void> _waitForCommand(Command<void> command) async {

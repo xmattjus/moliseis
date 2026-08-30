@@ -47,4 +47,28 @@ void main() {
 
     expect(dto.toMap()['description_delta'], descriptionDelta);
   });
+
+  test('serializes event instants as UTC ISO strings', () {
+    final start = DateTime.fromMicrosecondsSinceEpoch(
+      DateTime.utc(2026, 7, 25, 10, 30).microsecondsSinceEpoch,
+    );
+    final end = DateTime.fromMicrosecondsSinceEpoch(
+      DateTime.utc(2026, 7, 26, 21, 59, 59).microsecondsSinceEpoch,
+    );
+    final dto = ContentSubmission(
+      city: 'Isernia',
+      name: 'Visita guidata',
+      startDate: start,
+      endDate: end,
+      userEmail: 'author@example.com',
+      userName: 'Author',
+    ).toDto(userId: 'user-id');
+
+    final map = dto.toMap();
+
+    expect(start.isUtc, isFalse);
+    expect(end.isUtc, isFalse);
+    expect(map['start_date'], '2026-07-25T10:30:00.000Z');
+    expect(map['end_date'], '2026-07-26T21:59:59.000Z');
+  });
 }

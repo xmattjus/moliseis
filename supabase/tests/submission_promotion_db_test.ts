@@ -1188,6 +1188,42 @@ Deno.test("event promotion rejects missing start and inverted ranges", async () 
   );
 });
 
+Deno.test("event promotion rejects an inverted sub-millisecond SQL timestamp range", async () => {
+  const setup = client();
+  const registry = newRegistry();
+
+  await runFixtureScenario(
+    async () => {
+      const city = await createCity(setup, registry);
+      const fixture = await createSubmission(setup, registry, {
+        city: city.name,
+        latitude: 41.5629,
+        longitude: 14.6697,
+      });
+
+      // Keep this precision entirely in PostgreSQL: JavaScript Date and its
+      // getTime() representation cannot prove microsecond ordering.
+      await setup`
+        update public.content_submissions
+        set start_date = '2026-09-03 18:00:00.123457+00'::timestamptz,
+            end_date = '2026-09-03 18:00:00.123456+00'::timestamptz
+        where id = ${fixture.submissionId}
+      `;
+
+      assertEquals(
+        await promote(setup, fixture.submissionId, "event", handledByUser),
+        {
+          outcome: "invalid_date_range",
+          target_type: null,
+          entity_id: null,
+        },
+      );
+    },
+    setup,
+    registry,
+  );
+});
+
 Deno.test("incomplete coordinate pairs report coordinates_required", async () => {
   const setup = client();
   const registry = newRegistry();
@@ -1549,6 +1585,57 @@ Deno.test("event promotion additionally copies dates losslessly", async () => {
 
       // The address is not invented anywhere in the event mapping either.
       assertEquals(source.address, null);
+    },
+    setup,
+    registry,
+  );
+});
+
+Deno.test("event promotion preserves sub-millisecond SQL timestamp precision", async () => {
+  const setup = client();
+  const registry = newRegistry();
+
+  await runFixtureScenario(
+    async () => {
+      const city = await createCity(setup, registry);
+      const fixture = await createSubmission(setup, registry, {
+        city: city.name,
+        latitude: 41.7,
+        longitude: 14.8,
+      });
+
+      // Direct PostgreSQL literals retain the six-digit fractional seconds
+      // that cannot safely travel through JavaScript Date.
+      await setup`
+        update public.content_submissions
+        set start_date = '2026-09-01 10:00:00.123456+00'::timestamptz,
+            end_date = '2026-09-01 10:00:00.123457+00'::timestamptz
+        where id = ${fixture.submissionId}
+      `;
+      const [source] = await setup<{ start: string; end: string }[]>`
+        select to_char(start_date at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') as start,
+               to_char(end_date at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') as end
+        from public.content_submissions
+        where id = ${fixture.submissionId}
+      `;
+      assertEquals(source, {
+        start: "2026-09-01 10:00:00.123456",
+        end: "2026-09-01 10:00:00.123457",
+      });
+
+      const result = await promoteCreated(
+        setup,
+        registry,
+        fixture.submissionId,
+        "event",
+      );
+      const [published] = await setup<{ start: string; end: string }[]>`
+        select to_char(start_date at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') as start,
+               to_char(end_date at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') as end
+        from public.events
+        where id = ${result.entity_id}
+      `;
+      assertEquals(published, source);
     },
     setup,
     registry,

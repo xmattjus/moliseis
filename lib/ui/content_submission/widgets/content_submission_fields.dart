@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/ui/category/widgets/category_content_wrap.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_date_chip.dart';
@@ -6,12 +7,9 @@ import 'package:moliseis/ui/content_submission/widgets/content_submission_descri
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-/// Category, city/name/description fields, event flag, and date chips shared
-/// by the public submission form and the admin submission editor.
-///
-/// Receives state values and callbacks only; it never depends on a specific
-/// ViewModel.
-class ContentSubmissionFields extends StatefulWidget {
+/// Category, content, and controlled event-date fields shared by submission
+/// editors.
+class ContentSubmissionFields extends StatelessWidget {
   /// Creates the shared editable content-submission fields.
   const ContentSubmissionFields({
     required this.formKey,
@@ -20,13 +18,17 @@ class ContentSubmissionFields extends StatefulWidget {
     required this.name,
     required this.description,
     required this.descriptionDelta,
-    required this.startDate,
-    required this.endDate,
+    required this.isEvent,
+    required this.startCalendarDate,
+    required this.startClockTime,
+    required this.endCalendarDate,
+    required this.eventTimeIssue,
     required this.onCategorySelected,
     required this.onCategoryDeleted,
     required this.onCityChanged,
     required this.onNameChanged,
     required this.onDescriptionChanged,
+    required this.onEventChanged,
     required this.onStartDateChanged,
     required this.onStartTimeChanged,
     required this.onEndDateChanged,
@@ -39,8 +41,11 @@ class ContentSubmissionFields extends StatefulWidget {
   final String? name;
   final String? description;
   final List<Map<String, dynamic>>? descriptionDelta;
-  final DateTime? startDate;
-  final DateTime? endDate;
+  final bool isEvent;
+  final EventCalendarDate? startCalendarDate;
+  final EventClockTime? startClockTime;
+  final EventCalendarDate? endCalendarDate;
+  final EventTimeIssue? eventTimeIssue;
   final ValueChanged<ContentCategory> onCategorySelected;
   final VoidCallback onCategoryDeleted;
   final ValueChanged<String?> onCityChanged;
@@ -50,31 +55,16 @@ class ContentSubmissionFields extends StatefulWidget {
     required List<Map<String, dynamic>>? descriptionDelta,
   })
   onDescriptionChanged;
-  final ValueChanged<DateTime?> onStartDateChanged;
-  final ValueChanged<DateTime?> onStartTimeChanged;
-  final ValueChanged<DateTime?> onEndDateChanged;
-
-  @override
-  State<ContentSubmissionFields> createState() =>
-      _ContentSubmissionFieldsState();
-}
-
-class _ContentSubmissionFieldsState extends State<ContentSubmissionFields> {
-  var _isEvent = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Heuristically restores event state from the values supplied at creation.
-    // The public draft can load after this widget's first build, but the event
-    // state is local and not re-derived after that update; accept the rare
-    // cold-start miss until the user re-toggles the checkbox.
-    _isEvent = widget.startDate != null || widget.endDate != null;
-  }
+  final ValueChanged<bool> onEventChanged;
+  final ValueChanged<EventCalendarDate> onStartDateChanged;
+  final ValueChanged<EventClockTime> onStartTimeChanged;
+  final ValueChanged<EventCalendarDate> onEndDateChanged;
 
   @override
   Widget build(BuildContext context) {
     final textStyle = context.textTheme.bodyLarge;
+    final locale = Localizations.localeOf(context);
+    final issueText = _eventTimeIssueText(eventTimeIssue);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,64 +74,61 @@ class _ContentSubmissionFieldsState extends State<ContentSubmissionFields> {
           padding: EdgeInsets.symmetric(vertical: 8),
         ),
         CategoryContentWrap(
-          selectedCategory: widget.category,
-          onCategoryDeleted: widget.onCategoryDeleted,
-          onCategorySelected: widget.onCategorySelected,
+          selectedCategory: category,
+          onCategoryDeleted: onCategoryDeleted,
+          onCategorySelected: onCategorySelected,
         ),
         const TextSectionDivider(
           'Dettagli',
           padding: EdgeInsets.only(top: 16, bottom: 12),
         ),
         Form(
-          key: widget.formKey,
+          key: formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             spacing: 12,
             children: <Widget>[
               TextFormField(
-                initialValue: widget.city,
+                initialValue: city,
                 decoration: const InputDecoration(
                   labelText: 'Città',
                   hintText: 'San Pietro Avellana',
                 ),
-                onChanged: widget.onCityChanged,
+                onChanged: onCityChanged,
                 validator: (value) {
-                  if (value != null) {
-                    if (value.isEmpty) {
-                      return 'Inserisci il nome di una città';
-                    } else if (value.length > 100) {
-                      return 'Il nome della città inserito è troppo lungo';
-                    }
+                  if (value?.isEmpty ?? false) {
+                    return 'Inserisci il nome di una città';
                   }
-
+                  if ((value?.length ?? 0) > 100) {
+                    return 'Il nome della città inserito è troppo lungo';
+                  }
                   return null;
                 },
                 autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
               TextFormField(
-                initialValue: widget.name,
+                initialValue: name,
                 decoration: const InputDecoration(
                   labelText: 'Luogo o evento',
                   hintText: 'Museo del Tartufo',
                 ),
-                onChanged: widget.onNameChanged,
+                onChanged: onNameChanged,
                 validator: (value) {
-                  if (value != null) {
-                    if (value.isEmpty) {
-                      return 'Inserisci il nome di un luogo o di un evento';
-                    } else if (value.length > 150) {
-                      return "Il nome del luogo o dell'evento inserito è "
-                          'troppo lungo';
-                    }
+                  if (value?.isEmpty ?? false) {
+                    return 'Inserisci il nome di un luogo o di un evento';
+                  }
+                  if ((value?.length ?? 0) > 150) {
+                    return "Il nome del luogo o dell'evento inserito è "
+                        'troppo lungo';
                   }
                   return null;
                 },
                 autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
               ContentSubmissionDescriptionFormField(
-                initialDescription: widget.description,
-                initialDescriptionDelta: widget.descriptionDelta,
-                onChanged: widget.onDescriptionChanged,
+                initialDescription: description,
+                initialDescriptionDelta: descriptionDelta,
+                onChanged: onDescriptionChanged,
               ),
             ],
           ),
@@ -153,68 +140,75 @@ class _ContentSubmissionFieldsState extends State<ContentSubmissionFields> {
           children: <Widget>[
             Text('È un evento?', style: textStyle),
             Checkbox(
-              value: _isEvent,
-              onChanged: (value) {
-                if (value == true) {
-                  setState(() => _isEvent = true);
-                  return;
-                }
-
-                // Turning an event into a place must clear persisted dates so
-                // the submission cannot retain an invisible event state.
-                widget.onStartDateChanged(null);
-                widget.onEndDateChanged(null);
-                setState(() => _isEvent = false);
-              },
+              value: isEvent,
+              onChanged: (value) => onEventChanged(value ?? false),
             ),
           ],
         ),
-        if (_isEvent)
-          Builder(
-            builder: (context) {
-              final startDate = widget.startDate;
-              final endDate = widget.endDate;
-              final currentLocale = Localizations.localeOf(context);
-
-              return Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: <Widget>[
-                  ContentSubmissionDateChip(
-                    initialDate: startDate,
-                    label: Text(
-                      startDate != null
-                          ? 'Inizia il ${startDate.formatDate(currentLocale)}'
-                          : 'Seleziona data di inizio',
-                    ),
-                    onDatePicked: widget.onStartDateChanged,
+        if (isEvent)
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              ContentSubmissionDateChip.date(
+                selectedDate: startCalendarDate,
+                label: Text(
+                  startCalendarDate == null
+                      ? 'Seleziona data di inizio'
+                      : 'Inizia il ${_formatDate(startCalendarDate!, locale)}',
+                ),
+                onDatePicked: onStartDateChanged,
+              ),
+              if (startCalendarDate != null)
+                ContentSubmissionDateChip.time(
+                  selectedTime: startClockTime,
+                  label: Text(
+                    startClockTime == null
+                        ? 'Seleziona ora di inizio'
+                        : 'Inizia alle ${_formatTime(startClockTime!, locale)}',
                   ),
-                  if (startDate != null)
-                    ContentSubmissionDateChip(
-                      initialDate: startDate,
-                      label: Text(
-                        'Inizia alle ${startDate.formatTime(currentLocale)}',
-                      ),
-                      mode: ContentSubmissionDateChipMode.time,
-                      onDatePicked: widget.onStartTimeChanged,
-                    ),
-                  ContentSubmissionDateChip(
-                    firstDate: startDate,
-                    initialDate: endDate ?? startDate,
-                    label: Text(
-                      endDate != null
-                          ? 'Finisce il ${endDate.formatDate(currentLocale)}'
-                          : 'Seleziona data di fine',
-                    ),
-                    onDatePicked: widget.onEndDateChanged,
-                  ),
-                ],
-              );
-            },
+                  onTimePicked: onStartTimeChanged,
+                ),
+              ContentSubmissionDateChip.date(
+                firstDate: startCalendarDate,
+                selectedDate: endCalendarDate ?? startCalendarDate,
+                label: Text(
+                  endCalendarDate == null
+                      ? 'Seleziona data di fine'
+                      : 'Finisce il ${_formatDate(endCalendarDate!, locale)}',
+                ),
+                onDatePicked: onEndDateChanged,
+              ),
+            ],
           ),
-        if (_isEvent) const SizedBox(height: 8),
+        if (issueText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              issueText,
+              style: TextStyle(color: context.colorScheme.error),
+            ),
+          ),
+        if (isEvent) const SizedBox(height: 8),
       ],
     );
   }
+
+  String _formatDate(EventCalendarDate date, Locale locale) =>
+      DateTime(date.year, date.month, date.day).formatDate(locale);
+
+  String _formatTime(EventClockTime time, Locale locale) =>
+      DateTime(2000, 1, 1, time.hour, time.minute).formatTime(locale);
+
+  String? _eventTimeIssueText(EventTimeIssue? issue) => switch (issue) {
+    EventTimeIssue.nonexistentLocalTime =>
+      "L'orario selezionato non esiste in Italia per il cambio dell'ora.",
+    EventTimeIssue.ambiguousLocalTime =>
+      "L'orario selezionato è ambiguo per il cambio dell'ora.",
+    EventTimeIssue.missingStartDate => 'Seleziona una data di inizio.',
+    EventTimeIssue.missingStartTime => 'Seleziona un orario di inizio.',
+    EventTimeIssue.invalidRange => 'Inserisci un intervallo di date valido.',
+    null => null,
+  };
 }

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
@@ -1134,6 +1135,50 @@ void main() {
       expect(find.text('SHELL_MARKER'), findsOneWidget);
     });
 
+    testWidgets('keeps event publication CTA and renders a temporal issue', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(startDate: DateTime.utc(2026, 3, 29, 0, 30)),
+      );
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      viewModel.setStartClockTime(EventClockTime(2, 30));
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('non esiste in Italia'), findsOneWidget);
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Pubblica come evento'),
+        200,
+        scrollable: scrollable,
+      );
+      expect(
+        find.widgetWithText(FilledButton, 'Pubblica come evento'),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(FilledButton, 'Pubblica come luogo'),
+        findsNothing,
+      );
+    });
+
     group('promotion error messages', () {
       Future<void> pumpPendingEditor(WidgetTester tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1526,6 +1571,108 @@ void main() {
       );
       $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
     });
+
+    testWidgets('blocks an incomplete event save with a date-section issue', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      viewModel =
+          AdminSubmissionEditorViewModel(
+              repository: repository,
+              contentSubmissionRepository: contentSubmissionRepository,
+            )
+            ..setCity('Isernia')
+            ..setName('Sagra del Tartufo')
+            ..setEventEnabled(true);
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Crea contributo'),
+        200,
+        scrollable: scrollable,
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Crea contributo'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Seleziona una data di inizio.'),
+        -200,
+        scrollable: scrollable,
+      );
+
+      expect(find.text('Seleziona una data di inizio.'), findsOneWidget);
+      expect(viewModel.eventTimeIssue, EventTimeIssue.missingStartDate);
+      expect(repository.createInputs, isEmpty);
+      expect(viewModel.save.result, isNull);
+    });
+
+    testWidgets(
+      'cancelling an inverted end-date picker preserves the invalid draft',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final originalStart = DateTime.utc(2027, 1, 1, 10);
+        final originalEnd = DateTime.utc(2026, 12, 31, 22, 59, 59, 999, 999);
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(startDate: originalStart, endDate: originalEnd),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+
+        final endDateChip = find.textContaining('Finisce il');
+        await tester.tap(endDateChip);
+        await tester.pump();
+        expect(find.byType(DatePickerDialog), findsOneWidget);
+
+        var pickerActions = find.descendant(
+          of: find.byType(DatePickerDialog),
+          matching: find.byType(TextButton),
+        );
+        expect(pickerActions, findsNWidgets(2));
+        await tester.tap(pickerActions.first);
+        await tester.pumpAndSettle();
+
+        expect(viewModel.startDate, originalStart);
+        expect(viewModel.endDate, originalEnd);
+        expect(viewModel.isDirty, isFalse);
+        expect(repository.updateInputs, isEmpty);
+        expect(viewModel.validateEventTimeForSave(), isFalse);
+        expect(viewModel.eventTimeIssue, EventTimeIssue.invalidRange);
+        await viewModel.save.execute();
+        expect(repository.updateInputs, isEmpty);
+
+        await tester.tap(endDateChip);
+        await tester.pump();
+        pickerActions = find.descendant(
+          of: find.byType(DatePickerDialog),
+          matching: find.byType(TextButton),
+        );
+        await tester.tap(pickerActions.last);
+        await tester.pumpAndSettle();
+
+        expect(viewModel.endCalendarDate, EventCalendarDate(2027, 1, 1));
+        expect(viewModel.endDate!.isBefore(viewModel.startDate!), isFalse);
+        expect(viewModel.eventTimeIssue, isNull);
+        expect(viewModel.isDirty, isTrue);
+      },
+    );
 
     group('location section', () {
       Finder scrollableOf(WidgetTester tester) => find

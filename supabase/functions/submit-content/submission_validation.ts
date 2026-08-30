@@ -1,4 +1,5 @@
 import type { Database, Json } from "../_shared/database.types.ts";
+import { validateSubmissionDates } from "../_shared/submission_dates.ts";
 
 export const MAX_REQUEST_BODY_BYTES = 128 * 1024;
 export const MAX_SUBMISSION_ASSETS = 5;
@@ -372,17 +373,21 @@ export function parseContentSubmission(
   if (!isOptionalString(address)) {
     return invalid("address must be a string or null");
   }
-  if (
-    !isOptionalString(start_date) ||
-    (start_date != null && Number.isNaN(Date.parse(start_date)))
-  ) {
-    return invalid("start_date is not valid");
-  }
-  if (
-    !isOptionalString(end_date) ||
-    (end_date != null && Number.isNaN(Date.parse(end_date)))
-  ) {
-    return invalid("end_date is not valid");
+  const parsedDates = validateSubmissionDates(
+    start_date ?? null,
+    end_date ?? null,
+  );
+  if (!parsedDates.ok) {
+    switch (parsedDates.error) {
+      case "invalid_start_date":
+        return invalid("start_date is not valid");
+      case "invalid_end_date":
+        return invalid("end_date is not valid");
+      case "end_date_requires_start_date":
+        return invalid("end_date requires start_date");
+      case "end_date_before_start_date":
+        return invalid("end_date must not be before start_date");
+    }
   }
   if (
     category !== undefined && category !== null && !isAllowedCategory(category)
@@ -437,8 +442,8 @@ export function parseContentSubmission(
     latitude: latitude ?? null,
     longitude: longitude ?? null,
     address: address?.trim() ?? null,
-    start_date: start_date ?? null,
-    end_date: end_date ?? null,
+    start_date: parsedDates.value.start_date,
+    end_date: parsedDates.value.end_date,
     category: category ?? null,
     user_email: user_email.trim(),
     user_name: user_name.trim(),

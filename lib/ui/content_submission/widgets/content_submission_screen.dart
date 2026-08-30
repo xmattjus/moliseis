@@ -55,8 +55,8 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
   ///
   /// While the clear command runs, the form is replaced by a loading state so
   /// stale submitted values cannot be edited. Incrementing [_clearEpoch]
-  /// replaces the shared form, including its local event-flag state, before a
-  /// post-frame `FormState.reset()` reapplies the cleared values.
+  /// replaces the shared form before a post-frame `FormState.reset()` reapplies
+  /// the cleared values.
   void _handleClearCompleted() {
     if (!mounted || !widget.viewModel.clear.completed) return;
     setState(() => _clearEpoch++);
@@ -117,17 +117,23 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                           description: widget.viewModel.state.description,
                           descriptionDelta:
                               widget.viewModel.state.descriptionDelta,
-                          startDate: widget.viewModel.state.startDate,
-                          endDate: widget.viewModel.state.endDate,
+                          isEvent: widget.viewModel.isEvent,
+                          startCalendarDate: widget.viewModel.startCalendarDate,
+                          startClockTime: widget.viewModel.startClockTime,
+                          endCalendarDate: widget.viewModel.endCalendarDate,
+                          eventTimeIssue: widget.viewModel.eventTimeIssue,
                           onCategorySelected: widget.viewModel.setCategory,
                           onCategoryDeleted: () =>
                               widget.viewModel.setCategory(null),
                           onCityChanged: widget.viewModel.setCity,
                           onNameChanged: widget.viewModel.setName,
                           onDescriptionChanged: widget.viewModel.setDescription,
-                          onStartDateChanged: widget.viewModel.setStartDate,
-                          onStartTimeChanged: widget.viewModel.setStartTime,
-                          onEndDateChanged: widget.viewModel.setEndDate,
+                          onEventChanged: widget.viewModel.setEventEnabled,
+                          onStartDateChanged:
+                              widget.viewModel.setStartCalendarDate,
+                          onStartTimeChanged:
+                              widget.viewModel.setStartClockTime,
+                          onEndDateChanged: widget.viewModel.setEndCalendarDate,
                         ),
                       ],
                     ),
@@ -327,7 +333,11 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                               final isForm2Valid =
                                   form2State?.validate() ?? false;
 
-                              if (isForm1Valid && isForm2Valid) {
+                              final eventTimeValid = widget.viewModel
+                                  .validateEventTimeForSubmission();
+                              if (isForm1Valid &&
+                                  isForm2Valid &&
+                                  eventTimeValid) {
                                 unawaited(widget.viewModel.submit.execute());
                                 unawaited(
                                   context.pushNamed(

@@ -13,6 +13,8 @@ class ContentSubmissionDraftEntity {
     this.descriptionDelta,
     this.startDate,
     this.endDate,
+    this.isEvent,
+    this.pendingStartCalendarDate,
     this.authorEmail,
     this.authorName,
     this.acceptedTerms,
@@ -33,6 +35,10 @@ class ContentSubmissionDraftEntity {
 
   @Property(type: PropertyType.dateNano)
   final DateTime? endDate;
+
+  final bool? isEvent;
+
+  final String? pendingStartCalendarDate;
 
   final String? authorEmail;
   final String? authorName;

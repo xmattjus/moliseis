@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
@@ -105,6 +106,8 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   ContentSubmissionDraft _state = ContentSubmissionDraft();
   ContentSubmissionDraftLoadState _loadState =
       ContentSubmissionDraftLoadState.loading;
+  final EventTimePolicy _eventTimePolicy = EventTimePolicy();
+  EventTimeIssue? _eventTimeIssue;
   final _assets = <Asset>[];
 
   ContentSubmissionDraft get state => _state;
@@ -112,6 +115,21 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   UnmodifiableListView<Asset> get assets => UnmodifiableListView(_assets);
 
   ContentSubmissionDraftLoadState get loadState => _loadState;
+
+  bool get isEvent => _state.eventDates.enabled;
+  EventCalendarDate? get startCalendarDate =>
+      _state.eventDates.startCalendarDate;
+  EventClockTime? get startClockTime {
+    final start = _state.eventDates.startInstantUtc;
+    return start == null ? null : _eventTimePolicy.clockTimeForUtc(start);
+  }
+
+  EventCalendarDate? get endCalendarDate {
+    final end = _state.eventDates.endInstantUtc;
+    return end == null ? null : _eventTimePolicy.calendarDateForUtc(end);
+  }
+
+  EventTimeIssue? get eventTimeIssue => _eventTimeIssue;
 
   int get _remainingAssetCapacity {
     final capacity = maximumAssetCount - _assets.length;
@@ -279,35 +297,71 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     _emit();
   }
 
-  void setStartDate(DateTime? date) {
-    var endDate = _state.endDate;
-
-    final startDate = date?.copyWith(
-      hour: _state.startDate?.hour,
-      minute: _state.startDate?.minute,
-    );
-
-    if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
-      endDate = startDate.copyWith(hour: 23, minute: 55, second: 55);
-    }
-
-    _state = _state.copyWith(startDate: startDate, endDate: endDate);
-    _emit();
-  }
-
-  void setEndDate(DateTime? date) {
-    _state = _state.copyWith(endDate: date);
-    _emit();
-  }
-
-  void setStartTime(DateTime? date) {
+  void setEventEnabled(bool enabled) {
     _state = _state.copyWith(
-      startDate: _state.startDate?.copyWith(
-        hour: date?.hour,
-        minute: date?.minute,
+      eventDates: enabled
+          ? _eventTimePolicy.enable(_state.eventDates)
+          : _eventTimePolicy.disable(_state.eventDates),
+    );
+    _eventTimeIssue = null;
+    _emit();
+  }
+
+  /// Updates the selected semantic start calendar day.
+  void setStartCalendarDate(EventCalendarDate date) {
+    final draft = _eventTimePolicy.enable(_state.eventDates);
+    _applyEventEdit(
+      _eventTimePolicy.changeStartCalendarDate(
+        draft,
+        date,
       ),
     );
+  }
+
+  /// Updates the selected semantic inclusive end calendar day.
+  void setEndCalendarDate(EventCalendarDate date) {
+    _applyEventEdit(
+      _eventTimePolicy.changeEndCalendarDate(
+        _eventTimePolicy.enable(_state.eventDates),
+        date,
+      ),
+    );
+  }
+
+  /// Updates the selected semantic start clock time.
+  void setStartClockTime(EventClockTime time) {
+    final draft = _eventTimePolicy.enable(_state.eventDates);
+    _applyEventEdit(
+      _eventTimePolicy.changeStartClockTime(
+        draft,
+        time,
+      ),
+    );
+  }
+
+  void _applyEventEdit(EventTimeEditResult result) {
+    _state = _state.copyWith(eventDates: result.draft);
+    _eventTimeIssue = result.issue;
     _emit();
+  }
+
+  /// Publishes a persistence-blocking event-time issue for the controlled UI.
+  ///
+  /// Returns whether the current temporal draft is eligible for submission.
+  /// The issue is transient and is cleared by the next valid temporal edit.
+  bool validateEventTimeForSubmission() {
+    final issue =
+        _eventTimeIssue ??
+        _eventTimePolicy.validateForPersistence(_state.eventDates);
+    if (issue == null) return true;
+
+    if (_eventTimeIssue != issue) {
+      _eventTimeIssue = issue;
+      if (!_disposed) {
+        notifyListeners();
+      }
+    }
+    return false;
   }
 
   void setUserEmail(String? userEmail) {
@@ -339,6 +393,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// SHA-256 content hash and reused rather than re-uploaded, so only assets
   /// that were not yet uploaded in the last try are actually transferred.
   Future<Result<void>> _submit() async {
+    if (!validateEventTimeForSubmission()) {
+      return Result.error(Exception('Cannot submit: invalid event time.'));
+    }
     final city = _state.city;
     final name = _state.name;
     final userEmail = _state.userEmail;
@@ -404,8 +461,8 @@ class ContentSubmissionViewModel extends ChangeNotifier {
         name: n,
         description: _state.description,
         descriptionDelta: _state.descriptionDelta,
-        startDate: _state.startDate,
-        endDate: _state.endDate,
+        startDate: _state.eventDates.startInstantUtc,
+        endDate: _state.eventDates.endInstantUtc,
         userEmail: ue,
         userName: un,
       );
@@ -432,6 +489,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     _assets.clear();
 
     _state = ContentSubmissionDraft();
+    _eventTimeIssue = null;
     notifyListeners();
     _logger.log(const ContentSubmissionStateClearSuccess());
 

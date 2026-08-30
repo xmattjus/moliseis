@@ -3,6 +3,7 @@ import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
@@ -13,7 +14,6 @@ import 'package:moliseis/domain/repositories/admin_content_submission_repository
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
-import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Route-scoped state for creating or editing an admin submission.
@@ -59,8 +59,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   String? _name;
   String? _description;
   List<Map<String, dynamic>>? _descriptionDelta;
-  DateTime? _startDate;
-  DateTime? _endDate;
+  final EventTimePolicy _eventTimePolicy = EventTimePolicy();
+  EventDateDraft _eventDates = const EventDateDraft.disabled();
+  EventTimeIssue? _eventTimeIssue;
   String _latitudeText = '';
   String _longitudeText = '';
   String? _contributorName;
@@ -111,14 +112,35 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Editable rich-text Delta projection.
   List<Map<String, dynamic>>? get descriptionDelta => _descriptionDelta;
 
-  /// Editable event start date and time.
-  DateTime? get startDate => _startDate;
+  /// Event temporal state shared with the public editor.
+  EventDateDraft get eventDates => _eventDates;
 
-  /// Editable event end date and time.
-  DateTime? get endDate => _endDate;
+  /// Exact UTC event start used at the save boundary.
+  DateTime? get startDate => _eventDates.startInstantUtc;
 
-  /// Whether the editable dates identify an event.
-  bool get isEvent => _startDate != null || _endDate != null;
+  /// Exact UTC event end used at the save boundary.
+  DateTime? get endDate => _eventDates.endInstantUtc;
+
+  /// Whether the controlled temporal draft identifies an event.
+  bool get isEvent => _eventDates.enabled;
+
+  /// Selected Rome calendar day for the event start.
+  EventCalendarDate? get startCalendarDate => _eventDates.startCalendarDate;
+
+  /// Selected Rome start clock time when an exact start exists.
+  EventClockTime? get startClockTime {
+    final start = _eventDates.startInstantUtc;
+    return start == null ? null : _eventTimePolicy.clockTimeForUtc(start);
+  }
+
+  /// Selected Rome calendar day for the inclusive event end.
+  EventCalendarDate? get endCalendarDate {
+    final end = _eventDates.endInstantUtc;
+    return end == null ? null : _eventTimePolicy.calendarDateForUtc(end);
+  }
+
+  /// Transient validation issue from an attempted temporal edit.
+  EventTimeIssue? get eventTimeIssue => _eventTimeIssue;
 
   /// Raw editable latitude draft text.
   ///
@@ -202,53 +224,62 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _markDirty();
   }
 
-  /// Updates the start date while preserving the previous start's clock time.
-  ///
-  /// A date-only edit changes just the calendar day: the previous start's
-  /// hour, minute, and sub-second components and its UTC/local representation
-  /// are kept, because date pickers emit local-represented values while
-  /// loaded backend timestamps are commonly UTC-represented. An end date that
-  /// the new start would overtake is repaired to the end of the start's
-  /// calendar day, preserving whether the dates are UTC- or local-represented.
-  void setStartDate(DateTime? date) {
-    final previousStart = _startDate;
-    final startDate = date == null || previousStart == null
-        ? date
-        : _withCalendarDate(previousStart, date);
-
-    _startDate = startDate;
-    if (startDate != null) {
-      _ensureEndNotBefore(startDate);
-    }
+  /// Enables or disables event mode without inventing an instant.
+  void setEventEnabled(bool enabled) {
+    _eventDates = enabled
+        ? _eventTimePolicy.enable(_eventDates)
+        : _eventTimePolicy.disable(_eventDates);
+    _eventTimeIssue = null;
     _markDirty();
   }
 
-  /// Updates the time portion of the selected start date.
-  ///
-  /// Like [setStartDate], an end date overtaken by the new start time is
-  /// repaired to the end of the start's calendar day.
-  void setStartTime(DateTime? date) {
-    final startDate = _startDate?.copyWith(
-      hour: date?.hour,
-      minute: date?.minute,
+  /// Changes the start's Rome calendar day while preserving exact precision.
+  void setStartCalendarDate(EventCalendarDate date) {
+    _applyTemporalEdit(
+      _eventTimePolicy.changeStartCalendarDate(
+        _eventTimePolicy.enable(_eventDates),
+        date,
+      ),
     );
+  }
 
-    _startDate = startDate;
-    if (startDate != null) {
-      _ensureEndNotBefore(startDate);
-    }
+  /// Changes the start's Rome clock time while preserving sub-minute precision.
+  void setStartClockTime(EventClockTime time) {
+    final draft = _eventTimePolicy.enable(_eventDates);
+    _applyTemporalEdit(_eventTimePolicy.changeStartClockTime(draft, time));
+  }
+
+  /// Changes the inclusive Rome calendar day for the event end.
+  void setEndCalendarDate(EventCalendarDate date) {
+    _applyTemporalEdit(
+      _eventTimePolicy.changeEndCalendarDate(
+        _eventTimePolicy.enable(_eventDates),
+        date,
+      ),
+    );
+  }
+
+  void _applyTemporalEdit(EventTimeEditResult result) {
+    _eventDates = result.draft;
+    _eventTimeIssue = result.issue;
     _markDirty();
   }
 
-  /// Updates the end date and marks the editor dirty.
+  /// Publishes a persistence-blocking event-time issue for the controlled UI.
   ///
-  /// An actively selected date is normalized to the end of that calendar day,
-  /// preserving UTC- or local-representation, so a same-day selection can
-  /// never land at midnight before a timed start. Loaded persisted values are
-  /// hydrated by [_loadDetail] directly and are never normalized here.
-  void setEndDate(DateTime? date) {
-    _endDate = date == null ? null : _endOfDayPreservingZone(date);
-    _markDirty();
+  /// Returns whether the current temporal draft is eligible for saving. The
+  /// issue is transient and is cleared by the next valid temporal edit.
+  bool validateEventTimeForSave({EventDateDraft? draft}) {
+    final issue =
+        _eventTimeIssue ??
+        _eventTimePolicy.validateForPersistence(draft ?? _eventDates);
+    if (issue == null) return true;
+
+    if (_eventTimeIssue != issue) {
+      _eventTimeIssue = issue;
+      _notifyListeners();
+    }
+    return false;
   }
 
   /// Updates the raw latitude draft and marks the editor dirty.
@@ -287,11 +318,23 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _name = submission.name;
       _description = submission.description;
       _descriptionDelta = submission.descriptionDelta;
-      _startDate = submission.startDate;
-      _endDate = submission.endDate;
+      final start = submission.startDate?.toUtc();
+      final end = submission.endDate?.toUtc();
+      _eventDates = switch ((start, end)) {
+        (final start?, final end) => EventDateDraft.exact(
+          startCalendarDate: _eventTimePolicy.calendarDateForUtc(start),
+          startInstantUtc: start,
+          endInstantUtc: end,
+        ),
+        (null, final end?) => throw StateError(
+          'Persisted submission $submissionId has an end date without a '
+          'start date: $end.',
+        ),
+        (null, null) => const EventDateDraft.disabled(),
+      };
+      _eventTimeIssue = null;
       // Lossless hydration: double.toString() round-trips exactly, unlike a
-      // fixed-precision rendering. A legacy half-pair hydrates asymmetric
-      // drafts on purpose so the problem stays visible until corrected.
+      // fixed-precision rendering.
       _latitudeText = submission.latitude?.toString() ?? '';
       _longitudeText = submission.longitude?.toString() ?? '';
       _contributorName = submission.userName;
@@ -307,55 +350,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _isDirty = false;
       _notifyListeners();
     });
-  }
-
-  /// Returns [current] moved to the calendar day of [picked].
-  ///
-  /// The result keeps [current]'s hour, minute, second, millisecond,
-  /// microsecond, and UTC/local representation so a date-only edit cannot
-  /// shift the represented clock time or the instant it denotes.
-  DateTime _withCalendarDate(DateTime current, DateTime picked) => current.isUtc
-      ? DateTime.utc(
-          picked.year,
-          picked.month,
-          picked.day,
-          current.hour,
-          current.minute,
-          current.second,
-          current.millisecond,
-          current.microsecond,
-        )
-      : DateTime(
-          picked.year,
-          picked.month,
-          picked.day,
-          current.hour,
-          current.minute,
-          current.second,
-          current.millisecond,
-          current.microsecond,
-        );
-
-  /// Returns the end of [value]'s calendar day, keeping whether [value] is
-  /// UTC- or local-represented.
-  ///
-  /// The shared `DateTime.endOfDay` extension always builds a local DateTime,
-  /// so UTC values are constructed explicitly to avoid changing the
-  /// represented zone of repaired or normalized timestamps.
-  DateTime _endOfDayPreservingZone(DateTime value) => value.isUtc
-      ? DateTime.utc(value.year, value.month, value.day, 23, 59, 59, 999, 999)
-      : value.endOfDay;
-
-  /// Repairs an end date that [startDate] would overtake.
-  ///
-  /// The repaired end becomes the end of the start's calendar day in the
-  /// same UTC/local representation as the start. This is an automatic fix
-  /// within the setter that triggered it and emits no extra notifications.
-  void _ensureEndNotBefore(DateTime startDate) {
-    final endDate = _endDate;
-    if (endDate != null && endDate.isBefore(startDate)) {
-      _endDate = _endOfDayPreservingZone(startDate);
-    }
   }
 
   Future<Result<void>> _save() async {
@@ -379,9 +373,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       return Result.error(Exception('Compila i campi obbligatori.'));
     }
 
-    final startDate = _startDate;
-    final endDate = _endDate;
-    if (endDate != null && (startDate == null || endDate.isBefore(startDate))) {
+    if (!validateEventTimeForSave()) {
       return Result.error(Exception('Inserisci un intervallo di date valido.'));
     }
 
@@ -397,8 +389,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       name: name,
       description: _description,
       descriptionDelta: _descriptionDelta,
-      startDate: startDate,
-      endDate: endDate,
+      startDate: _eventDates.startInstantUtc,
+      endDate: _eventDates.endInstantUtc,
       latitude: latitude,
       longitude: longitude,
     );
@@ -505,6 +497,15 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   ) async {
     final guard = _moderationGuardError(isPromoting: true);
     if (guard != null) return Result.error(guard);
+
+    if (target == AdminPromotionTarget.event &&
+        !validateEventTimeForSave(
+          draft: _eventTimePolicy.enable(_eventDates),
+        )) {
+      return Result.error(
+        Exception('Completa i dati temporali prima di pubblicare l’evento.'),
+      );
+    }
 
     final submissionId = this.submissionId!;
     final result = await _repository.promote(submissionId, target);

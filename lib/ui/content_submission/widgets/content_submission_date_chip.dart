@@ -1,209 +1,249 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
-/// Selection mode for `ContentSubmissionDateChip`.
+/// A semantic date or time picker chip for content submission editors.
 ///
-/// `date` shows a date picker (or a wheel that emits a full date) while
-/// `time` only emits a time-of-day projected onto the current date.
-enum ContentSubmissionDateChipMode { date, time }
-
-/// A `ContentSubmissionDateChip` that opens a date or time picker to drive
-/// a submission field.
-///
-/// On iOS compact layouts the chip opens a Cupertino modal popup that hosts a
-/// `CupertinoDatePicker` with explicit Annulla/Conferma actions. All other
-/// platforms fall back to the Material `showDatePicker` / `showTimePicker`
-/// helpers. Bounds default to the current calendar year.
+/// The picker-only [DateTime] carriers never cross this widget boundary:
+/// [ContentSubmissionDateChip.date] exchanges calendar days, while
+/// [ContentSubmissionDateChip.time] exchanges clock times.
 class ContentSubmissionDateChip extends StatefulWidget {
-  /// Creates a date or time selection chip.
-  ///
-  /// `onDatePicked` receives the user-confirmed value. For `time` mode the
-  /// emitted `DateTime` reuses the current date and only the hour/minute
-  /// components are meaningful.
-  const ContentSubmissionDateChip({
+  /// Creates a chip that selects an event calendar day.
+  const ContentSubmissionDateChip.date({
     super.key,
     this.firstDate,
-    this.initialDate,
+    this.selectedDate,
     required this.label,
     this.leading,
-    this.mode = ContentSubmissionDateChipMode.date,
     required this.onDatePicked,
-  });
+    this.nowUtc,
+  }) : _mode = _ContentSubmissionDateChipMode.date,
+       onTimePicked = null,
+       selectedTime = null;
 
-  /// Lower bound of the selectable range. Defaults to the first day of the
-  /// current calendar year.
-  final DateTime? firstDate;
+  /// Creates a chip that selects an event clock time.
+  const ContentSubmissionDateChip.time({
+    super.key,
+    this.selectedTime,
+    required this.label,
+    this.leading,
+    required this.onTimePicked,
+    this.nowUtc,
+  }) : _mode = _ContentSubmissionDateChipMode.time,
+       onDatePicked = null,
+       firstDate = null,
+       selectedDate = null;
 
-  /// Date the picker is initially focused on. When null, the picker falls
-  /// back to the current date and time (rounded to a 5-minute slot for time
-  /// mode).
-  final DateTime? initialDate;
+  /// Lower selectable date bound, when this is a date chip.
+  final EventCalendarDate? firstDate;
 
-  /// Label rendered inside the chip, typically the current selection or a
-  /// prompt asking the user to pick a value.
+  /// Selected calendar day, when this is a date chip.
+  final EventCalendarDate? selectedDate;
+
+  /// Selected clock time, when this is a time chip.
+  final EventClockTime? selectedTime;
+
+  /// Testable UTC source for Rome-based picker defaults.
+  final DateTime? nowUtc;
+
+  /// Label rendered inside the chip.
   final Widget label;
 
-  /// Optional leading widget shown before [label] in the chip.
+  /// Optional leading widget shown before [label].
   final Widget? leading;
 
-  /// Whether the chip selects a date or a time.
-  final ContentSubmissionDateChipMode mode;
-
-  /// Called with the confirmed date or time. Not invoked when the user
-  /// dismisses the picker.
-  final void Function(DateTime? date) onDatePicked;
+  final _ContentSubmissionDateChipMode _mode;
+  final ValueChanged<EventCalendarDate>? onDatePicked;
+  final ValueChanged<EventClockTime>? onTimePicked;
 
   @override
   State<ContentSubmissionDateChip> createState() =>
       _ContentSubmissionDateChipState();
 }
 
+enum _ContentSubmissionDateChipMode { date, time }
+
 class _ContentSubmissionDateChipState extends State<ContentSubmissionDateChip> {
+  final _eventTimePolicy = EventTimePolicy();
   DateTime? _selectedDateTime;
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-
-    // The lower and upper bounds of selectable dates.
-    final firstDate = DateTime(now.year);
-    final lastDate = DateTime(now.year, 12, 31).endOfDay;
-
     return InputChip(
       avatar: widget.leading,
       label: widget.label,
-      onPressed: () async {
-        if (Platform.isIOS) {
-          if (context.windowSizeClass.isCompact) {
-            // Seed the pending selection so that confirming without scrolling
-            // the wheel still selects the initial date shown by the picker.
-            // Without this, `_selectedDateTime` stays null until the first
-            // `onDateTimeChanged` event and the Conferma button would close
-            // the modal without emitting a value.
-            _selectedDateTime =
-                widget.initialDate ?? now.copyWith(minute: now.minute % 5 * 5);
-            return _showDialog(
-              context,
-              Column(
-                children: [
-                  CupertinoTheme(
-                    data: const CupertinoThemeData(
-                      primaryColor: CupertinoColors.activeBlue,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        CupertinoButton(
-                          sizeStyle: CupertinoButtonSize.medium,
-                          child: const Text('Annulla'),
-                          onPressed: () => context.pop(),
-                        ),
-                        Expanded(
-                          child: Text(
-                            widget.mode == ContentSubmissionDateChipMode.date
-                                ? 'Seleziona una data'
-                                : "Seleziona un'ora",
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'system',
-                                ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        CupertinoButton(
-                          sizeStyle: CupertinoButtonSize.medium,
-                          child: const Text('Conferma'),
-                          onPressed: () {
-                            if (_selectedDateTime != null) {
-                              widget.onDatePicked(_selectedDateTime);
-                            }
-                            context.pop();
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+      onPressed: _openPicker,
+    );
+  }
 
-                  Expanded(
-                    child: CupertinoDatePicker(
-                      mode: widget.mode == ContentSubmissionDateChipMode.date
-                          ? CupertinoDatePickerMode.date
-                          : CupertinoDatePickerMode.time,
-                      onDateTimeChanged: (value) => _selectedDateTime = value,
-                      initialDateTime:
-                          widget.initialDate ??
-                          now.copyWith(minute: now.minute % 5 * 5),
-                      minimumDate: widget.firstDate ?? firstDate,
-                      maximumDate: lastDate,
-                      minuteInterval: 5,
-                      use24hFormat: true,
-                      dateOrder: DatePickerDateOrder.dmy,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-        }
+  DateTime get _nowUtc => (widget.nowUtc ?? DateTime.now()).toUtc();
 
-        return _showMaterialDatePicker(now, firstDate, lastDate);
+  DateTime _dateCarrier(EventCalendarDate date) =>
+      DateTime(date.year, date.month, date.day);
+
+  DateTime _timeCarrier(EventClockTime time) =>
+      DateTime(2000, 1, 1, time.hour, time.minute);
+
+  EventCalendarDate get _defaultDate =>
+      _eventTimePolicy.currentCalendarDate(_nowUtc);
+
+  EventClockTime get _defaultTime {
+    final now = _eventTimePolicy.currentClockTime(_nowUtc);
+    return EventClockTime(now.hour, now.minute - (now.minute % 5));
+  }
+
+  Future<void> _openPicker() async {
+    final selectedDate = widget.selectedDate ?? _defaultDate;
+    final selectedTime = widget.selectedTime ?? _defaultTime;
+    final requestedFirstDate =
+        widget.firstDate ?? EventCalendarDate(selectedDate.year, 1, 1);
+    final effectiveInitialDate =
+        _dateCarrier(selectedDate).isBefore(
+          _dateCarrier(requestedFirstDate),
+        )
+        ? requestedFirstDate
+        : selectedDate;
+    final lastDate = EventCalendarDate(effectiveInitialDate.year, 12, 31);
+    final initial = widget._mode == _ContentSubmissionDateChipMode.date
+        ? _dateCarrier(effectiveInitialDate)
+        : _timeCarrier(selectedTime);
+
+    if (defaultTargetPlatform == TargetPlatform.iOS &&
+        context.windowSizeClass.isCompact) {
+      _selectedDateTime = initial;
+      await _showCupertinoPicker(
+        initial: initial,
+        firstDate: widget._mode == _ContentSubmissionDateChipMode.date
+            ? _dateCarrier(requestedFirstDate)
+            : null,
+        lastDate: widget._mode == _ContentSubmissionDateChipMode.date
+            ? _dateCarrier(lastDate)
+            : null,
+      );
+      return;
+    }
+
+    await _showMaterialPicker(
+      initial: initial,
+      firstDate: _dateCarrier(requestedFirstDate),
+      lastDate: _dateCarrier(lastDate),
+    );
+  }
+
+  Future<void> _showCupertinoPicker({
+    required DateTime initial,
+    required DateTime? firstDate,
+    required DateTime? lastDate,
+  }) async {
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (dialogContext) {
+        if (!mounted) return const SizedBox.shrink();
+        return Container(
+          constraints: const BoxConstraints.expand(height: 216),
+          margin: EdgeInsets.only(
+            bottom: MediaQuery.of(dialogContext).viewInsets.bottom,
+          ),
+          color: CupertinoColors.systemBackground.resolveFrom(dialogContext),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                CupertinoTheme(
+                  data: const CupertinoThemeData(
+                    primaryColor: CupertinoColors.activeBlue,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      CupertinoButton(
+                        sizeStyle: CupertinoButtonSize.medium,
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: const Text('Annulla'),
+                      ),
+                      Expanded(
+                        child: Text(
+                          widget._mode == _ContentSubmissionDateChipMode.date
+                              ? 'Seleziona una data'
+                              : "Seleziona un'ora",
+                          style: Theme.of(dialogContext).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'system',
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      CupertinoButton(
+                        sizeStyle: CupertinoButtonSize.medium,
+                        onPressed: () {
+                          final value = _selectedDateTime;
+                          if (value != null) _emit(value);
+                          Navigator.of(dialogContext).pop();
+                        },
+                        child: const Text('Conferma'),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: CupertinoDatePicker(
+                    mode: widget._mode == _ContentSubmissionDateChipMode.date
+                        ? CupertinoDatePickerMode.date
+                        : CupertinoDatePickerMode.time,
+                    initialDateTime: initial,
+                    minimumDate: firstDate,
+                    maximumDate: lastDate,
+                    minuteInterval: 5,
+                    use24hFormat: true,
+                    dateOrder: DatePickerDateOrder.dmy,
+                    onDateTimeChanged: (value) => _selectedDateTime = value,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       },
     );
   }
 
-  // This function displays a CupertinoModalPopup with a reasonable fixed height
-  // which hosts CupertinoDatePicker.
-  Future<void> _showDialog(BuildContext context, Widget child) async {
-    await showCupertinoModalPopup<void>(
-      context: context,
-      builder: (context) => Container(
-        constraints: const BoxConstraints.expand(height: 216),
-        // The Bottom margin is provided to align the popup above the system
-        // navigation bar.
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        // Provide a background color for the popup.
-        color: CupertinoColors.systemBackground.resolveFrom(context),
-        // Use a SafeArea widget to avoid system overlaps.
-        child: SafeArea(top: false, child: child),
-      ),
-    );
-  }
-
-  Future<void> _showMaterialDatePicker(
-    DateTime now,
-    DateTime firstDate,
-    DateTime lastDate,
-  ) async {
-    switch (widget.mode) {
-      case ContentSubmissionDateChipMode.date:
-        final selectedDate = await showDatePicker(
+  Future<void> _showMaterialPicker({
+    required DateTime initial,
+    required DateTime firstDate,
+    required DateTime lastDate,
+  }) async {
+    switch (widget._mode) {
+      case _ContentSubmissionDateChipMode.date:
+        final selected = await showDatePicker(
           context: context,
-          initialDate: widget.initialDate ?? now,
-          firstDate: widget.firstDate ?? firstDate,
+          initialDate: initial,
+          firstDate: firstDate,
           lastDate: lastDate,
         );
-
-        if (selectedDate != null) {
-          widget.onDatePicked.call(selectedDate);
-        }
-      case ContentSubmissionDateChipMode.time:
-        final selectedTime = await showTimePicker(
+        if (!mounted || selected == null) return;
+        _emit(selected);
+      case _ContentSubmissionDateChipMode.time:
+        final selected = await showTimePicker(
           context: context,
-          initialTime: TimeOfDay(hour: now.hour, minute: now.minute),
+          initialTime: TimeOfDay.fromDateTime(initial),
         );
+        if (!mounted || selected == null) return;
+        _emit(DateTime(2000, 1, 1, selected.hour, selected.minute));
+    }
+  }
 
-        if (selectedTime != null) {
-          widget.onDatePicked.call(
-            now.copyWith(hour: selectedTime.hour, minute: selectedTime.minute),
-          );
-        }
+  void _emit(DateTime value) {
+    if (!mounted) return;
+    switch (widget._mode) {
+      case _ContentSubmissionDateChipMode.date:
+        widget.onDatePicked!(
+          EventCalendarDate(value.year, value.month, value.day),
+        );
+      case _ContentSubmissionDateChipMode.time:
+        widget.onTimePicked!(EventClockTime(value.hour, value.minute));
     }
   }
 }

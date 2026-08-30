@@ -14,6 +14,8 @@ import '../../support/mock_logger.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
+  final fixedNowUtc = DateTime.utc(2026, 3, 15, 12);
+
   group('SearchRepositoryImpl - getEventIdsByQuery', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late Box<CityEntity> cityBox;
@@ -27,6 +29,7 @@ void main() {
       repository = SearchRepositoryImpl(
         logger: MockLogger(),
         objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+        nowUtc: () => fixedNowUtc,
       );
     });
 
@@ -39,14 +42,60 @@ void main() {
     // -------------------------------------------------------------------------
 
     group('direct event name match', () {
+      test('uses Rome year bounds for direct and city event paths', () async {
+        final city = makeCityEntity(remoteId: 50, name: 'Termoli');
+        cityBox.put(city);
+        eventBox.putMany([
+          makeEventEntity(
+            remoteId: 50,
+            name: 'Rome year event',
+            startDate: DateTime.utc(2026, 12, 31, 23),
+            cityId: city.remoteId,
+          ),
+          makeEventEntity(
+            remoteId: 52,
+            name: 'Nature event',
+            startDate: DateTime.utc(2026, 12, 31, 23),
+            contentCategoryIndex: 1,
+          ),
+          makeEventEntity(
+            remoteId: 53,
+            name: 'Past nature event',
+            startDate: DateTime.utc(2026, 12, 31, 22, 59),
+            contentCategoryIndex: 1,
+          ),
+          makeEventEntity(
+            remoteId: 51,
+            name: 'Past event',
+            startDate: DateTime.utc(2026, 12, 31, 21),
+            cityId: city.remoteId,
+          ),
+        ]);
+        final romeRepository = SearchRepositoryImpl(
+          logger: MockLogger(),
+          objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+          nowUtc: () => DateTime.utc(2026, 12, 31, 23, 30),
+        );
+
+        final direct = await romeRepository.getEventIdsByQuery('Rome year');
+        final cityResult = await romeRepository.getEventIdsByQuery('Termoli');
+        final category = await romeRepository.getEventIdsByQuery('natura');
+
+        expect(direct.getOrNull(), contains(50));
+        expect(cityResult.getOrNull(), contains(50));
+        expect(cityResult.getOrNull(), isNot(contains(51)));
+        expect(category.getOrNull(), contains(52));
+        expect(category.getOrNull(), isNot(contains(53)));
+      });
+
       test('includes current-year event whose name matches query', () async {
-        final now = DateTime.now();
+        final now = fixedNowUtc;
         eventBox.put(
           makeEventEntity(
             remoteId: 1,
             name: 'Sagra del tartufo',
-            startDate: DateTime(now.year, 8),
-            endDate: DateTime(now.year, 8, 5),
+            startDate: DateTime.utc(now.year, 8),
+            endDate: DateTime.utc(now.year, 8, 5),
           ),
         );
 
@@ -103,15 +152,15 @@ void main() {
       test(
         'includes current-year multi-day event linked to a matching city',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           final city = makeCityEntity(remoteId: 10, name: 'Campobasso');
           cityBox.put(city);
 
           final event = makeEventEntity(
             remoteId: 4,
             name: 'Non matching name',
-            startDate: DateTime(now.year, 9),
-            endDate: DateTime(now.year, 9, 5),
+            startDate: DateTime.utc(now.year, 9),
+            endDate: DateTime.utc(now.year, 9, 5),
             cityId: city.remoteId,
           );
           eventBox.put(event);
@@ -150,14 +199,14 @@ void main() {
       test(
         'includes single-day event (null endDate) linked to a matching city',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           final city = makeCityEntity(remoteId: 12, name: 'Bojano');
           cityBox.put(city);
 
           final event = makeEventEntity(
             remoteId: 6,
             name: 'Giornata speciale',
-            startDate: DateTime(now.year, 5, 15),
+            startDate: DateTime.utc(now.year, 5, 15),
             cityId: city.remoteId,
           );
           eventBox.put(event);
@@ -179,13 +228,13 @@ void main() {
       test(
         'excludes soft-deleted current-year event whose name matches query',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           eventBox.put(
             makeEventEntity(
               remoteId: 200,
               name: 'Sagra fantasma',
-              startDate: DateTime(now.year, 8),
-              endDate: DateTime(now.year, 8, 5),
+              startDate: DateTime.utc(now.year, 8),
+              endDate: DateTime.utc(now.year, 8, 5),
               isDeleted: true,
             ),
           );
@@ -201,13 +250,13 @@ void main() {
       test(
         'excludes soft-deleted current-year event whose category matches query',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           eventBox.put(
             makeEventEntity(
               remoteId: 201,
               name: 'Escursione cancellata',
-              startDate: DateTime(now.year, 6),
-              endDate: DateTime(now.year, 6, 10),
+              startDate: DateTime.utc(now.year, 6),
+              endDate: DateTime.utc(now.year, 6, 10),
               contentCategoryIndex: 1, // ContentCategory.nature
               isDeleted: true,
             ),
@@ -224,15 +273,15 @@ void main() {
       test(
         'excludes soft-deleted current-year event linked to a matching city',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           final city = makeCityEntity(remoteId: 30, name: 'Termoli');
           cityBox.put(city);
 
           final event = makeEventEntity(
             remoteId: 202,
             name: 'Evento fantasma',
-            startDate: DateTime(now.year, 9),
-            endDate: DateTime(now.year, 9, 5),
+            startDate: DateTime.utc(now.year, 9),
+            endDate: DateTime.utc(now.year, 9, 5),
             cityId: city.remoteId,
             isDeleted: true,
           );
@@ -278,7 +327,7 @@ void main() {
       test(
         'returns each event ID only once when it matches both name and city',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           final city = makeCityEntity(remoteId: 20, name: 'Venafro');
           cityBox.put(city);
 
@@ -287,8 +336,8 @@ void main() {
           final event = makeEventEntity(
             remoteId: 7,
             name: 'Festa di Venafro',
-            startDate: DateTime(now.year, 10),
-            endDate: DateTime(now.year, 10, 3),
+            startDate: DateTime.utc(now.year, 10),
+            endDate: DateTime.utc(now.year, 10, 3),
             cityId: city.remoteId,
           );
           eventBox.put(event);
@@ -321,13 +370,13 @@ void main() {
       test(
         'includes current-year event whose category label matches query',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           eventBox.put(
             makeEventEntity(
               remoteId: 100,
               name: 'Escursione guidata',
-              startDate: DateTime(now.year, 6),
-              endDate: DateTime(now.year, 6, 10),
+              startDate: DateTime.utc(now.year, 6),
+              endDate: DateTime.utc(now.year, 6, 10),
               contentCategoryIndex: 1, // ContentCategory.nature
             ),
           );
@@ -344,13 +393,13 @@ void main() {
         'excludes event with non-matching category when querying by '
         'category label',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           eventBox.put(
             makeEventEntity(
               remoteId: 101,
               name: 'Mostra storica',
-              startDate: DateTime(now.year, 6),
-              endDate: DateTime(now.year, 6, 10),
+              startDate: DateTime.utc(now.year, 6),
+              endDate: DateTime.utc(now.year, 6, 10),
               contentCategoryIndex: 2, // ContentCategory.history
             ),
           );
@@ -367,13 +416,13 @@ void main() {
         'includes current-year event with food category when querying '
         '"cibo"',
         () async {
-          final now = DateTime.now();
+          final now = fixedNowUtc;
           eventBox.put(
             makeEventEntity(
               remoteId: 102,
               name: 'Degustazione vini',
-              startDate: DateTime(now.year, 9),
-              endDate: DateTime(now.year, 9, 5),
+              startDate: DateTime.utc(now.year, 9),
+              endDate: DateTime.utc(now.year, 9, 5),
               contentCategoryIndex: 4, // ContentCategory.food
             ),
           );

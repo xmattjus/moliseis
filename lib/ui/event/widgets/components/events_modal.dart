@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
@@ -10,7 +11,6 @@ import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart'
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
-import 'package:paged_vertical_calendar/utils/date_utils.dart';
 
 class EventsModal extends StatelessWidget {
   const EventsModal({
@@ -22,7 +22,7 @@ class EventsModal extends StatelessWidget {
   });
 
   final List<String> localizedMonths;
-  final DateTime selectedDate;
+  final EventCalendarDate selectedDate;
   final EventViewModel viewModel;
   final ScrollController? scrollController;
 
@@ -32,7 +32,7 @@ class EventsModal extends StatelessWidget {
 
     final localizedSelectedMonth = localizedMonths[selectedDate.month - 1];
 
-    final bottomSheetTitle = selectedDate.isSameDay(DateTime.now())
+    final bottomSheetTitle = selectedDate == viewModel.currentCalendarDate
         ? 'Eventi di oggi ${selectedDate.day} $localizedSelectedMonth'
         : 'Eventi del ${selectedDate.day} $localizedSelectedMonth';
 

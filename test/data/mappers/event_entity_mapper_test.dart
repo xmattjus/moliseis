@@ -107,13 +107,47 @@ void main() {
       ]);
     });
 
-    test('null startDate falls back to a non-null DateTime', () {
-      // Documents the current ?? DateTime.now() fallback in the mapper.
+    test('rejects a persisted event without its required startDate', () {
       final entityWithNullStart = makeEventEntity(
         remoteId: 1,
         city: ToOne<CityEntity>(target: cityEntity()),
       );
-      expect(entityWithNullStart.toModel().startDate, isNotNull);
+
+      expect(
+        entityWithNullStart.toModel,
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'Persisted event 1 has no start date.',
+          ),
+        ),
+      );
+    });
+
+    test('normalizes stored non-UTC event instants without changing epoch', () {
+      final storedStart = DateTime.fromMicrosecondsSinceEpoch(
+        DateTime.utc(2026, 7, 1, 10, 15).microsecondsSinceEpoch,
+      );
+      final storedEnd = DateTime.fromMicrosecondsSinceEpoch(
+        DateTime.utc(2026, 7, 1, 12, 15).microsecondsSinceEpoch,
+      );
+
+      final mapped = entity(
+        startDate: storedStart,
+        endDate: storedEnd,
+      ).toModel();
+
+      expect(mapped.startDate.isUtc, isTrue);
+      expect(mapped.endDate!.isUtc, isTrue);
+      expect(
+        mapped.startDate.microsecondsSinceEpoch,
+        storedStart.microsecondsSinceEpoch,
+      );
+      expect(
+        mapped.endDate!.microsecondsSinceEpoch,
+        storedEnd.microsecondsSinceEpoch,
+      );
     });
 
     test('unresolved city relation produces null city', () {
@@ -124,6 +158,33 @@ void main() {
   });
 
   group('EventDtoExtensions', () {
+    test('normalizes event instants to UTC without changing their epoch', () {
+      final localStart = DateTime(2026, 7, 1, 10, 15);
+      final localEnd = DateTime(2026, 7, 1, 12, 15);
+      final mapped = EventDto(
+        id: 3,
+        name: 'Sagra della Tintilia',
+        description: 'A local festival',
+        startDate: localStart,
+        endDate: localEnd,
+        latitude: 41.5,
+        longitude: 14.2,
+        category: ContentCategory.folklore,
+        createdAt: now,
+        modifiedAt: now,
+      ).toEntity();
+
+      expect(mapped.startDate, localStart.toUtc());
+      expect(mapped.endDate, localEnd.toUtc());
+      expect(
+        mapped.startDate!.microsecondsSinceEpoch,
+        localStart.microsecondsSinceEpoch,
+      );
+      expect(
+        mapped.endDate!.microsecondsSinceEpoch,
+        localEnd.microsecondsSinceEpoch,
+      );
+    });
     test('copyWith preserves an omitted city scalar relation id', () {
       final copy = makeEventEntity(remoteId: 3, cityId: 7).copyWith(
         isDeleted: true,
@@ -140,6 +201,16 @@ void main() {
 
       expect(copy.cityToOneId, isNull);
     });
+
+    test(
+      'copyWith preserves an omitted end date and clears an explicit null',
+      () {
+        final existing = entity(endDate: end);
+
+        expect(existing.copyWith(isDeleted: true).endDate, end);
+        expect(existing.copyWith(endDate: null).endDate, isNull);
+      },
+    );
 
     test('merge keeps, clears, and assigns city scalar and target ids', () {
       final kept = dto().mergeInto(
