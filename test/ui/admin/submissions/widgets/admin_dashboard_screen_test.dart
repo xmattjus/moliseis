@@ -45,9 +45,17 @@ void main() {
             path: '/new',
             name: RouteNames.adminSubmissionNew,
             builder: (context, _) => Scaffold(
-              body: TextButton(
-                onPressed: () => context.pop(true),
-                child: const Text('CREATE_EDITOR_MARKER'),
+              body: Column(
+                children: <Widget>[
+                  TextButton(
+                    onPressed: () => context.pop(true),
+                    child: const Text('CREATE_EDITOR_MARKER'),
+                  ),
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('CREATE_EDITOR_NO_RESULT'),
+                  ),
+                ],
               ),
             ),
           ),
@@ -55,9 +63,17 @@ void main() {
             path: '/editor/:id',
             name: RouteNames.adminSubmissionEditor,
             builder: (context, _) => Scaffold(
-              body: TextButton(
-                onPressed: () => context.pop(true),
-                child: const Text('EDIT_EDITOR_MARKER'),
+              body: Column(
+                children: <Widget>[
+                  TextButton(
+                    onPressed: () => context.pop(true),
+                    child: const Text('EDIT_EDITOR_MARKER'),
+                  ),
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('EDIT_EDITOR_NO_RESULT'),
+                  ),
+                ],
               ),
             ),
           ),
@@ -235,6 +251,63 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.listCallCount, 2);
+    });
+
+    testWidgets('reloads after either editor route returns without a result', (
+      tester,
+    ) async {
+      final submission = sampleAdminSubmission();
+      repository.listResult = Result.success(<AdminSubmission>[submission]);
+      unawaited(viewModel.load.execute());
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Nuovo contributo'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CREATE_EDITOR_NO_RESULT'));
+      await tester.pumpAndSettle();
+      expect(repository.listCallCount, 2);
+
+      await tester.tap(find.byType(CustomInkWell));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('EDIT_EDITOR_NO_RESULT'));
+      await tester.pumpAndSettle();
+      expect(repository.listCallCount, 3);
+    });
+
+    testWidgets('serializes a fresh reload when an older list is active on '
+        'editor return', (tester) async {
+      final oldSubmission = sampleAdminSubmission(name: 'Old submission');
+      final refreshedSubmission = sampleAdminSubmission(
+        name: 'Refreshed submission',
+      );
+      final initialList = Completer<Result<List<AdminSubmission>>>();
+      final refreshedList = Completer<Result<List<AdminSubmission>>>();
+      repository.pendingList = initialList;
+      unawaited(viewModel.load.execute());
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pump();
+      await tester.tap(find.text('Nuovo contributo'));
+      await tester.pumpAndSettle();
+
+      repository.pendingList = refreshedList;
+      await tester.tap(find.text('CREATE_EDITOR_NO_RESULT'));
+      await tester.pump();
+      initialList.complete(Result.success(<AdminSubmission>[oldSubmission]));
+      await tester.pump();
+      await tester.pump();
+
+      expect(repository.listCallCount, 2);
+      expect(find.text(oldSubmission.name), findsNothing);
+
+      refreshedList.complete(
+        Result.success(<AdminSubmission>[refreshedSubmission]),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(refreshedSubmission.name), findsOneWidget);
+      expect(find.text(oldSubmission.name), findsNothing);
     });
   });
 }

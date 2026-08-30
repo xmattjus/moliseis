@@ -33,14 +33,17 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Future<void> _openEditor({int? submissionId}) async {
     final router = GoRouter.of(context);
-    final changed = submissionId == null
-        ? await router.pushNamed<bool>(RouteNames.adminSubmissionNew)
-        : await router.pushNamed<bool>(
-            RouteNames.adminSubmissionEditor,
-            pathParameters: <String, String>{'id': submissionId.toString()},
-          );
-    if (!mounted || changed != true) return;
-    await widget.viewModel.load.execute();
+    final viewModel = widget.viewModel;
+    if (submissionId == null) {
+      await router.pushNamed<bool>(RouteNames.adminSubmissionNew);
+    } else {
+      await router.pushNamed<bool>(
+        RouteNames.adminSubmissionEditor,
+        pathParameters: <String, String>{'id': submissionId.toString()},
+      );
+    }
+    if (!mounted) return;
+    await viewModel.reloadAfterEditor();
   }
 
   @override
