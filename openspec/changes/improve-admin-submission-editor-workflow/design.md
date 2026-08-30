@@ -2,7 +2,7 @@
 
 See `proposal.md` for motivation and `specs/admin-submission-editor/spec.md` for the required behavior.
 
-This design was revalidated on 2026-08-30 against current repository HEAD `a12be30107dc767f64c73a91aa35992b6c152cc0` and the current working tree. Unrelated modifications to `analysis_options.yaml`, `pubspec.yaml`, and `.agents/skills/strict-conventional-commit/` are outside this change and must be preserved.
+This design was minimally revalidated on 2026-08-30 against clean repository HEAD `19fb5c0d021b8756794d6ffceeb987f5b4546643`. The material editor, navigation, repository, upload, backend-contract, and focused-test paths are unchanged from the previously validated implementation baseline, so the approved frontend-only architecture remains current.
 
 Verified repository facts:
 
@@ -13,17 +13,19 @@ Verified repository facts:
 - `AdminSubmissionEditorScreen` listens to successful Save and calls `context.pop(true)`. It also carries `_saveCompletedWhileStatusDialogOpen` specifically to defer that pop while a moderation confirmation dialog is open.
 - The photo section renders only when `viewModel.isEditMode && viewModel.hasLoadedDetail`.
 - Existing widget tests explicitly assert that `Foto` is absent in create mode.
-- The app-bar title, photo/status/contributor sections, and Save label read `isEditMode` inside the editor's existing `ListenableBuilder`, so they can react to an in-place identity transition. The city/name `TextFormField`s use `initialValue`, but the current create path echoes the submitted editable values; create adoption does not require replacing those active field values.
+- The app-bar title, photo/status/contributor sections, and Save label read `isEditMode` inside the editor's existing `ListenableBuilder`, so they can react to an in-place identity transition. The city/name `TextFormField`s use `initialValue`, which Flutter does not reapply to an already-mounted `FormFieldState` merely because the parent rebuilds.
+- Admin input validation trims `city` and `name` for both create and update before persistence, so a successful response can legitimately differ from the mounted field text even though the remaining editable values normally round-trip unchanged.
 - Production has one editor-opening method in `AdminDashboardScreen`, with create and edit route branches. It currently reloads only when the editor route returns `true`.
+- `AdminSubmissionsViewModel.load` is a `Command0`; while it is running, another `execute()` returns without waiting for or scheduling a later request. Because dashboard editor entry remains possible during an in-flight list refresh, a direct post-route `load.execute()` can be coalesced away and fail to provide a request initiated after the editor returns.
 - `AdminContentSubmissionRepository.create` returns a complete authoritative `AdminSubmission`. The create Edge Function response includes the new identifier, pending status, contributor metadata, timestamps, promotion fields, and an empty asset list, so no `getById` reload is needed.
 - Admin create has no client idempotency key or equivalent exactly-once contract: the repository sends only `operation: create` plus input, the store performs a plain insert, and an invocation error carries no reconciliation identity. If the insert commits but the successful response is lost, the live editor cannot know the persisted identifier and a later retry may create a duplicate submission.
-- The update Edge Function also serializes an empty asset list because it does not reload associations. Therefore an update response must not be adopted wholesale in a way that clears the ViewModel's confirmed assets.
+- The update Edge Function returns the authoritative updated editable/scalar row but serializes an empty asset list because it does not reload associations. Therefore update values should be applied while preserving the ViewModel's confirmed assets rather than either discarding normalization or adopting the empty asset envelope wholesale.
 - Existing asset addition is `ContentSubmissionRepository.uploadImageTask(File)` followed by `AdminContentSubmissionRepository.addAsset`. The latter uses `add_submission_assets`, which locks the submission row and authoritatively enforces pending status and a maximum of five associations.
 - Cloudinary uploads use a deterministic SHA-256 public ID and duplicate lookup, but `add_submission_assets` has no URL uniqueness or idempotency key. Upload retry can avoid retransferring bytes; backend association retry is not exactly-once if a response is lost after commit.
 - A privileged Cloudinary destroy helper exists for the unrelated `import-external-events` Edge Function. It is not available through the Flutter/admin repository path and is not a reusable cleanup mechanism for this change.
 - The public contribution flow already demonstrates the useful minimal pattern of holding selected local images before persistence and uploading them sequentially during submit. This change should reuse that pattern conceptually without creating a generic shared abstraction unless the codebase now contains a third concrete use case.
 - `AdminSubmissionEditorViewModel.dispose()` already marks the ViewModel disposed and cancels its active `ImageUploadTask`, but create/update repository futures have no cancellation contract. A remote write may therefore complete after disposal; staged Save work must prevent result adoption and all other state mutation after disposal rather than assuming the remote operation was cancelled.
-- Current working-tree `flutter analyze` reports 20 pre-existing informational diagnostics, none in the planned admin editor/dashboard source or focused test files.
+- On clean HEAD under the repository's current stricter `very_good_analysis` configuration, repository-wide `flutter analyze` reports 189 pre-existing diagnostics: 0 errors, 6 warnings, and 183 information diagnostics. The command exits non-zero because Flutter analysis treats warnings and information diagnostics as fatal by default. Targeted `dart analyze` of the nine expected authored source/test/support files reports 3 pre-existing information diagnostics and no warnings or errors: one `avoid_positional_boolean_parameters` diagnostic in `admin_submission_editor_view_model.dart` and two in `test/support/fake_repositories.dart`; the editor screen, dashboard screen, four focused tests, and `fake_image_picker.dart` are zero-clean. These baselines are for regression comparison only and do not make unrelated lint cleanup, lint-rule changes, or suppressions part of this feature.
 
 The verified implementation boundary is frontend-only. If implementation discovers that the specified behavior requires a database, Edge Function, Cloudinary contract, domain repository API, dependency, or generated-code change, stop and update the OpenSpec artifacts instead of expanding scope.
 
@@ -86,9 +88,9 @@ Rationale: the existing ViewModel already owns all other route-scoped lifecycle 
 
 The create repository call already returns the authoritative row. After a successful response, first confirm the ViewModel is still live, then synchronously adopt its identifier, returned category, pending status, promotion, contributor metadata, timestamps, assets, and loaded-detail state before starting any staged image work. Reuse a narrow internal application helper with normal detail hydration where that removes duplication, while making its create/load differences explicit. A remotely committed insert whose response is not observed, or whose result arrives after disposal, is not adopted state.
 
-The current backend returns the editable create values that were submitted (with the existing null-category-to-`unknown` normalization already performed by Save). Keep the active editable projections semantically aligned without rebuilding the route. Do not issue `getById` merely to enter persisted mode.
+The current backend returns the authoritative editable create values, including its existing validation normalization such as trimmed city/name and the null-category-to-`unknown` normalization already performed by Save. Keep the active editable projections semantically aligned without rebuilding the route. Do not issue `getById` merely to enter persisted mode.
 
-Do not apply the update response through a helper that replaces `_assets`: the current update response carries `assets: []` because the handler does not query associations. A successful update may mark field changes persisted and apply safe scalar metadata if useful, but it must preserve the ViewModel's confirmed asset list.
+Apply a successful update response through the same narrow submission helper so the live editor adopts returned editable/scalar normalization, but call that helper in a mode that preserves `_assets`: the current update response carries `assets: []` because the handler does not query associations. Create/load may replace assets from their authoritative envelopes; update must not clear the ViewModel's separately confirmed asset list.
 
 Rationale: an observed create response is authoritative and contains the new identity. A second detail request after adoption increases latency and creates an avoidable failure boundary, but the response itself remains the only identity handoff under the current contract.
 
@@ -187,7 +189,9 @@ For staged images, use local file rendering and a local remove action with no co
 
 Disable conflicting actions while Save/image work is running according to existing command mutual-exclusion rules. Do not allow Publish/Reject while staged images remain or Save is in a partial-error state; this should fall out of the clean/persistence-incomplete guard rather than a one-off button condition.
 
-The existing `ListenableBuilder` already recomputes title, contributor section, status controls, photo behavior, and Save label from ViewModel state. Preserve that reactive structure and prove a mounted create screen changes from “Nuovo/Crea” presentation to persisted “Modifica/Salva” presentation after create. The current backend echoes city/name/description/location input, so no route key or broad controller rewrite is needed. If implementation reveals a returned editable value that materially differs and is stale in an `initialValue`-backed field, stop and update this design rather than introducing route replacement.
+The existing `ListenableBuilder` already recomputes title, contributor section, status controls, photo behavior, and Save label from ViewModel state. Preserve that reactive structure and prove a mounted create screen changes from “Nuovo/Crea” presentation to persisted “Modifica/Salva” presentation after create.
+
+Because city/name are `initialValue`-backed and persistence trims them, add one route-scoped monotonically increasing authoritative editable-state revision to the ViewModel. Increment it only when load, successful create, or successful update response state is applied; ordinary field setters and staged-only retries must not increment it. Key the existing `ContentSubmissionFields` subtree by that revision so response adoption remounts those fields from the ViewModel's authoritative values. Save already locks editing while the request is in flight, so this narrow remount cannot discard a post-snapshot user edit. Do not replace the route or introduce a broad controller rewrite.
 
 For partial image failure, existing Save error feedback may remain generic, but the staged preview and dirty/readiness copy must continue to communicate that persistence is incomplete. Do not add a new modal workflow.
 
@@ -195,7 +199,9 @@ Rationale: one section avoids duplicating UX and makes the transition from stage
 
 ### 10. Refresh the dashboard whenever the editor route returns
 
-At the sole dashboard `_openEditor` call site, await either create/edit route, check `mounted`, and execute the existing list load regardless of whether the route returned `true` or `null`.
+At the sole dashboard `_openEditor` call site, await either create/edit route, check `mounted`, and request a post-editor reload regardless of whether the route returned `true` or `null`.
+
+Implement that request as a narrow `AdminSubmissionsViewModel` operation. If `load` is idle, execute it normally. If a list request is already running, set a coalesced follow-up flag that the active load observes after its await and satisfy the request with a new repository list call started after the editor return; do not let the older response alone satisfy the post-return obligation. Apply the final request's result through the existing list-state path. This keeps refresh serialization local to the dashboard ViewModel and avoids concurrent list requests or a repository-wide change to `Command` semantics.
 
 Do not introduce a route-scoped `didPersistChanges` tracker, `PopScope` mutation protocol, or special handling for every possible back-navigation mechanism merely to avoid one harmless admin list read.
 
@@ -226,15 +232,16 @@ Client combined-count checks are proactive UX only. If concurrent remote mutatio
 - [Create/load adoption accidentally clears assets on update] → Reuse hydration narrowly and never replace confirmed assets from the current update response's empty asset envelope.
 - [Cloudinary upload succeeds but association fails] → Retain the upload result and retry association without re-upload or rollback. Accept possible orphaned Cloudinary media and the current RPC's ambiguous-response duplicate risk; do not claim exactly-once association.
 - [Disposal occurs during a multi-phase Save] → Check disposal after every await, cancel the active upload, and never adopt a result, start later work, or mutate disposed state; an already-started create/update/association may finish remotely without local retention or rollback.
-- [In-place mode change leaves stale UI] → Exercise the mounted create-to-persisted transition in widget tests; current editable values are echoed, while title/status/contributor/photo/Save controls rebuild from ViewModel state.
+- [Successful persistence normalizes mounted editable values] → Apply authoritative create/update values while preserving update assets, advance the authoritative editable-state revision, and remount only the shared fields subtree; prove trimmed city/name become visible without route replacement.
+- [An older dashboard load is still running when the editor returns] → Queue one serialized follow-up list request in `AdminSubmissionsViewModel`; the older response alone cannot satisfy post-return freshness, and global `Command` behavior remains unchanged.
 - [Dashboard performs an extra read after a no-op visit] → Accept the small cost instead of building mutation-result plumbing.
 - [Existing tests encode Save-pop and hidden-create-photo behavior] → Update those assertions deliberately while retaining Reject/Promote exit, final-status read-only, and immediate persisted-asset regressions.
 - [Implementation HEAD changes a verified contract] → Re-audit the named paths and update OpenSpec instead of forcing this design onto changed code.
 
 ## Migration Plan
 
-1. Implement the route-scoped ViewModel state/orchestration and focused tests without changing repository or backend contracts.
-2. Update the editor screen and dashboard return handling, then run focused and repository-level verification from `tasks.md`.
+1. Implement the route-scoped editor state/orchestration, authoritative field synchronization, and focused tests without changing repository or backend contracts.
+2. Update the editor screen and serialized dashboard return refresh, then run focused and repository-level verification from `tasks.md`.
 3. Inspect the final diff for backend, dependency, generated, or unrelated drift before handoff.
 
 This is a Flutter source-only behavior change with no data or deployment migration. Rollback restores the prior ViewModel/screen/dashboard behavior; no database or Cloudinary cleanup step is implied. OpenSpec must be updated before implementation if any backend contract change becomes necessary.
