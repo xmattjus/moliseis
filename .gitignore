@@ -3,7 +3,6 @@
 
 # Miscellaneous
 *.class
-*.lock
 *.log
 *.pyc
 *.swp
@@ -139,7 +138,3 @@ backups/
 .mcp.json
 CLAUDE.md
 **/.opencode/
-**/docs/
-**/plans/
-# Added by code-review-graph
-.code-review-graph/
