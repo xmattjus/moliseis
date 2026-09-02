@@ -4,7 +4,10 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 
 void main() {
+  const clientSubmissionId = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+
   ContentSubmissionDraft populatedState() => ContentSubmissionDraft(
+    clientSubmissionId: clientSubmissionId,
     category: ContentCategory.history,
     city: 'Rome',
     name: 'Colosseum',
@@ -25,10 +28,12 @@ void main() {
     group('equality', () {
       test('same values are equal', () {
         final a = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
           category: ContentCategory.nature,
           city: 'Milan',
         );
         final b = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
           category: ContentCategory.nature,
           city: 'Milan',
         );
@@ -37,47 +42,103 @@ void main() {
       });
 
       test('default (all null) states are equal', () {
-        final a = ContentSubmissionDraft();
-        final b = ContentSubmissionDraft();
+        final a = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+        );
+        final b = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+        );
         expect(a, equals(b));
         expect(a.hashCode, equals(b.hashCode));
       });
 
       test('keeps null Delta distinct from an empty Delta', () {
-        final nullDelta = ContentSubmissionDraft();
-        final emptyDelta = ContentSubmissionDraft(descriptionDelta: const []);
+        final nullDelta = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+        );
+        final emptyDelta = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+          descriptionDelta: const [],
+        );
 
         expect(nullDelta.descriptionDelta, isNull);
         expect(emptyDelta.descriptionDelta, isEmpty);
         expect(nullDelta, isNot(equals(emptyDelta)));
       });
 
+      test('includes client submission identity in equality and hash code', () {
+        final a = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+        );
+        final b = ContentSubmissionDraft(
+          clientSubmissionId: '3b2c1d4e-5f6a-4b7c-9d0e-1f2a3b4c5d6e',
+        );
+
+        expect(a, isNot(equals(b)));
+        expect(a.hashCode, isNot(equals(b.hashCode)));
+      });
+
       test('differing field makes state unequal', () {
-        final a = ContentSubmissionDraft(category: ContentCategory.nature);
-        final b = ContentSubmissionDraft(category: ContentCategory.food);
+        final a = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+          category: ContentCategory.nature,
+        );
+        final b = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+          category: ContentCategory.food,
+        );
         expect(a, isNot(equals(b)));
       });
 
       test('null vs non-null field makes state unequal', () {
-        final a = ContentSubmissionDraft(city: 'Rome');
-        final b = ContentSubmissionDraft();
+        final a = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+          city: 'Rome',
+        );
+        final b = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+        );
         expect(a, isNot(equals(b)));
       });
 
       test('each field independently affects equality', () {
-        final base = ContentSubmissionDraft();
+        final base = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+        );
 
         final fieldVariants = <(String, ContentSubmissionDraft)>[
           (
             'category',
-            ContentSubmissionDraft(category: ContentCategory.nature),
+            ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
+              category: ContentCategory.nature,
+            ),
           ),
-          ('city', ContentSubmissionDraft(city: 'Rome')),
-          ('name', ContentSubmissionDraft(name: 'Name')),
-          ('description', ContentSubmissionDraft(description: 'Desc')),
+          (
+            'city',
+            ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
+              city: 'Rome',
+            ),
+          ),
+          (
+            'name',
+            ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
+              name: 'Name',
+            ),
+          ),
+          (
+            'description',
+            ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
+              description: 'Desc',
+            ),
+          ),
           (
             'descriptionDelta',
             ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
               descriptionDelta: const [
                 {'insert': 'Desc\n'},
               ],
@@ -86,6 +147,7 @@ void main() {
           (
             'eventDates',
             ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
               eventDates: EventDateDraft.exact(
                 startCalendarDate: EventCalendarDate(2026, 1, 1),
                 startInstantUtc: DateTime.utc(2026),
@@ -94,12 +156,24 @@ void main() {
           ),
           (
             'userEmail',
-            ContentSubmissionDraft(userEmail: 'a@b.com'),
+            ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
+              userEmail: 'a@b.com',
+            ),
           ),
-          ('userName', ContentSubmissionDraft(userName: 'User')),
+          (
+            'userName',
+            ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
+              userName: 'User',
+            ),
+          ),
           (
             'acceptedTerms',
-            ContentSubmissionDraft(acceptedTerms: true),
+            ContentSubmissionDraft(
+              clientSubmissionId: clientSubmissionId,
+              acceptedTerms: true,
+            ),
           ),
         ];
 
@@ -114,6 +188,7 @@ void main() {
 
       test('uses deep, order-sensitive equality for descriptionDelta', () {
         final original = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
           descriptionDelta: const [
             {
               'insert': 'Visita ',
@@ -123,6 +198,7 @@ void main() {
           ],
         );
         final equivalentWithReorderedMapKeys = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
           descriptionDelta: const [
             {
               'attributes': {'bold': true},
@@ -132,6 +208,7 @@ void main() {
           ],
         );
         final reorderedOperations = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
           descriptionDelta: const [
             {'insert': 'guidata\n'},
             {
@@ -141,6 +218,7 @@ void main() {
           ],
         );
         final changedText = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
           descriptionDelta: const [
             {
               'insert': 'Visita ',
@@ -232,6 +310,7 @@ void main() {
         final result = state.copyWith();
 
         expect(result.category, ContentCategory.history);
+        expect(result.clientSubmissionId, clientSubmissionId);
         expect(result.city, 'Rome');
         expect(result.name, 'Colosseum');
         expect(result.description, 'Ancient arena');
@@ -247,6 +326,7 @@ void main() {
         final result = state.copyWith(category: ContentCategory.food);
 
         expect(result.category, ContentCategory.food);
+        expect(result.clientSubmissionId, clientSubmissionId);
         expect(result.city, 'Rome');
         expect(result.name, 'Colosseum');
         expect(result.description, 'Ancient arena');
@@ -427,6 +507,30 @@ void main() {
         expect(result.category, ContentCategory.experience);
         expect(result.city, isNull);
       });
+    });
+
+    test('generates canonical UUID v4 identities', () {
+      final draft = ContentSubmissionDraft();
+
+      expect(
+        draft.clientSubmissionId,
+        matches(
+          RegExp(
+            <String>[
+              '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-',
+              '[89ab][0-9a-f]{3}-[0-9a-f]{12}',
+              String.fromCharCode(36),
+            ].join(),
+          ),
+        ),
+      );
+    });
+
+    test('rejects an explicitly malformed client submission identity', () {
+      expect(
+        () => ContentSubmissionDraft(clientSubmissionId: 'not-a-uuid'),
+        throwsArgumentError,
+      );
     });
 
     test('does not include raw Delta content in toString', () {

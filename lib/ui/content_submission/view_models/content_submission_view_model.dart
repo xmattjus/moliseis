@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:collection' show UnmodifiableListView;
 import 'dart:io' show File;
 
@@ -15,7 +14,6 @@ import 'package:moliseis/domain/repositories/content_submission_draft_repository
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
-import 'package:moliseis/utils/debounceable.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/string_validator.dart';
@@ -76,15 +74,12 @@ class ContentSubmissionViewModel extends ChangeNotifier {
        _contentSubmissionRepository = contentSubmissionRepository,
        _draftRepository = draftRepository,
        _imagePicker = imagePicker ?? ImagePicker() {
+    _checkpointedDraft = _state;
     addAsset = Command0(_addAsset);
     removeAssetAt = Command1(_removeAssetAt);
     submit = Command0(_submit);
     clear = Command0(_clear);
     retrieveLostAssets = Command0(_retrieveLostAssets);
-    _debounced = debounce<Result<void>, void>(
-      duration: const Duration(seconds: 3),
-      function: ([_]) => _draftRepository.saveDraft(state),
-    );
   }
 
   /// Maximum number of assets that a content submission can include.
@@ -95,7 +90,6 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _debounced.cancel();
     super.dispose();
   }
 
@@ -104,6 +98,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   final ContentSubmissionDraftRepository _draftRepository;
   final ImagePicker _imagePicker;
   ContentSubmissionDraft _state = ContentSubmissionDraft();
+  late ContentSubmissionDraft _checkpointedDraft;
   ContentSubmissionDraftLoadState _loadState =
       ContentSubmissionDraftLoadState.loading;
   final EventTimePolicy _eventTimePolicy = EventTimePolicy();
@@ -111,6 +106,8 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   final _assets = <Asset>[];
 
   ContentSubmissionDraft get state => _state;
+
+  bool get hasUnsavedChanges => _state != _checkpointedDraft;
 
   UnmodifiableListView<Asset> get assets => UnmodifiableListView(_assets);
 
@@ -147,10 +144,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   late Command1<void, int> removeAssetAt;
   late Command0<void> submit;
 
-  /// Clears in-memory form state, then clears the persisted draft on a
-  /// best-effort basis. Errors while clearing the draft are logged by the
-  /// draft repository but never surfaced to the UI — in-memory state is always
-  /// cleared and there is no actionable recovery step for the user.
+  /// Clears persisted draft state before resetting the in-memory session.
   late Command0<void> clear;
 
   /// Recovers assets lost during a previous image-picker session due to
@@ -159,8 +153,6 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// recoverable alternative path for the user to take.
   late Command0<void> retrieveLostAssets;
 
-  late final Debounced<Result<void>, void> _debounced;
-
   /// Loads the last [ContentSubmissionDraft] saved to local persistance
   /// if any.
   Future<void> initialize() async {
@@ -168,6 +160,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
 
     if (result is Success<ContentSubmissionDraft?> && result.value != null) {
       _state = result.value!;
+      _checkpointedDraft = _state;
     }
     // On error, fall back to an empty draft — the repository already
     // logged the failure, and blocking the form is worse than losing
@@ -260,10 +253,23 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   void _emit() {
-    unawaited(_debounced.call());
     if (!_disposed) {
       notifyListeners();
     }
+  }
+
+  Future<Result<void>> checkpointDraft() async {
+    final snapshot = _state;
+    if (snapshot == _checkpointedDraft) return const Result.success(null);
+
+    final result = await _draftRepository.saveDraft(snapshot);
+    if (result is Success<void>) {
+      _checkpointedDraft = snapshot;
+      if (!_disposed) {
+        notifyListeners();
+      }
+    }
+    return result;
   }
 
   void setCategory(ContentCategory? category) {
@@ -284,8 +290,8 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// Stores matching plain-text and Delta description projections in one
   /// update.
   ///
-  /// A single state emission keeps the draft debounce from persisting a
-  /// transient representation where only one projection has changed.
+  /// A single emission ensures both projections appear together in the same
+  /// current and checkpoint snapshot.
   void setDescription({
     required String? description,
     required List<Map<String, dynamic>>? descriptionDelta,
@@ -483,24 +489,25 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _clear() async {
-    // Process 1 — in-memory state clear. Always runs; its outcome is the only
-    // one reflected on the UI.
     _logger.log(const ContentSubmissionStateClearStarted());
+    final result = await _draftRepository.clearDraft();
+    if (result is Error<void>) {
+      _logger.log(
+        const ContentSubmissionStateClearFailed(),
+        error: result.error,
+      );
+      return result;
+    }
+
     _assets.clear();
-
-    _state = ContentSubmissionDraft();
     _eventTimeIssue = null;
-    notifyListeners();
+    _state = ContentSubmissionDraft();
+    _checkpointedDraft = _state;
+    if (!_disposed) {
+      notifyListeners();
+    }
     _logger.log(const ContentSubmissionStateClearSuccess());
-
-    // Process 2 — persisted draft clear. Best-effort: the draft repository
-    // owns the Started/Success/Failed logging for this step, so its [Result]
-    // is intentionally discarded here. In-memory state is already cleared
-    // and the user has no actionable recovery path, so no error is ever
-    // surfaced to the UI.
-    await _draftRepository.clearDraft();
-
-    return const Result.success(null);
+    return result;
   }
 
   void _handleRetrieveLostMediaErrors(Object error, StackTrace? stackTrace) {

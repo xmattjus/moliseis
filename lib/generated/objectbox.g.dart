@@ -453,7 +453,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(20, 8436787422671765122),
     name: 'ContentSubmissionDraftEntity',
-    lastPropertyId: const obx_int.IdUid(17, 7677321635689032617),
+    lastPropertyId: const obx_int.IdUid(18, 4578999261153036819),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -531,6 +531,12 @@ final _entities = <obx_int.ModelEntity>[
       obx_int.ModelProperty(
         id: const obx_int.IdUid(17, 7677321635689032617),
         name: 'pendingStartCalendarDate',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(18, 4578999261153036819),
+        name: 'clientSubmissionId',
         type: 9,
         flags: 0,
       ),
@@ -1446,7 +1452,10 @@ obx_int.ModelDefinition getObjectBoxModel() {
                 object.pendingStartCalendarDate == null
                 ? null
                 : fbb.writeString(object.pendingStartCalendarDate!);
-            fbb.startTable(18);
+            final clientSubmissionIdOffset = object.clientSubmissionId == null
+                ? null
+                : fbb.writeString(object.clientSubmissionId!);
+            fbb.startTable(19);
             fbb.addInt64(0, object.id);
             fbb.addOffset(1, cityOffset);
             fbb.addOffset(2, nameOffset);
@@ -1470,6 +1479,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
             fbb.addOffset(14, descriptionDeltaOffset);
             fbb.addBool(15, object.isEvent);
             fbb.addOffset(16, pendingStartCalendarDateOffset);
+            fbb.addOffset(17, clientSubmissionIdOffset);
             fbb.finish(fbb.endTable());
             return object.id;
           },
@@ -1486,6 +1496,9 @@ obx_int.ModelDefinition getObjectBoxModel() {
               rootOffset,
               16,
             );
+            final clientSubmissionIdParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 38);
             final categoryIndexParam = const fb.Int64Reader().vTableGetNullable(
               buffer,
               rootOffset,
@@ -1535,6 +1548,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
               22,
             );
             final object = ContentSubmissionDraftEntity(
+              clientSubmissionId: clientSubmissionIdParam,
               categoryIndex: categoryIndexParam,
               city: cityParam,
               name: nameParam,
@@ -1923,5 +1937,11 @@ class ContentSubmissionDraftEntity_ {
   static final pendingStartCalendarDate =
       obx.QueryStringProperty<ContentSubmissionDraftEntity>(
         _entities[6].properties[12],
+      );
+
+  /// See [ContentSubmissionDraftEntity.clientSubmissionId].
+  static final clientSubmissionId =
+      obx.QueryStringProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[13],
       );
 }

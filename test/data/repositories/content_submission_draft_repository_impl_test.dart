@@ -1,7 +1,9 @@
 import 'package:collection/collection.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/data/data-sources/content_submission_draft_entry.dart';
 import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
 import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 
 import '../../support/mock_logger.dart';
@@ -138,5 +140,67 @@ void main() {
 
       expect(loaded?.eventDates, draft.eventDates);
     });
+
+    test(
+      'round-trips a complete session and safely projects pre-identity '
+      'records',
+      () async {
+        const identity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+        await objectBoxEnvironment.store
+            .box<ContentSubmissionDraftEntity>()
+            .putAsync(ContentSubmissionDraftEntity(city: 'Legacy Rome'));
+
+        final legacyLoad = await repository.loadDraft();
+        expect(legacyLoad.getOrNull(), isNull);
+        expect(
+          await objectBoxEnvironment.store
+              .box<ContentSubmissionDraftEntity>()
+              .getAsync(1),
+          isNotNull,
+        );
+
+        final draft = ContentSubmissionDraft(
+          clientSubmissionId: identity,
+          category: ContentCategory.history,
+          city: 'Rome',
+          name: 'Colosseum',
+          description: 'Ancient arena',
+          descriptionDelta: const [
+            {
+              'insert': 'Ancient ',
+              'attributes': {'bold': true},
+            },
+            {'insert': 'arena\n'},
+          ],
+          eventDates: EventDateDraft.exact(
+            startCalendarDate: EventCalendarDate(2026, 7, 25),
+            startInstantUtc: DateTime.utc(2026, 7, 25, 10),
+            endInstantUtc: DateTime.utc(2026, 7, 26, 18),
+          ),
+          userEmail: 'jane@example.com',
+          userName: 'Jane',
+          acceptedTerms: true,
+        );
+        expect((await repository.saveDraft(draft)).isSuccess, isTrue);
+        final loaded = (await repository.loadDraft()).getOrNull();
+        expect(loaded, draft);
+        expect(loaded?.clientSubmissionId, identity);
+
+        final updated = draft.copyWith(description: 'Restored ancient arena');
+        expect((await repository.saveDraft(updated)).isSuccess, isTrue);
+        final reloaded = (await repository.loadDraft()).getOrNull();
+        expect(reloaded, updated);
+        expect(reloaded?.clientSubmissionId, identity);
+
+        expect((await repository.clearDraft()).isSuccess, isTrue);
+        expect(
+          await objectBoxEnvironment.store
+              .box<ContentSubmissionDraftEntity>()
+              .getAsync(1),
+          isNull,
+        );
+        expect((await repository.loadDraft()).getOrNull(), isNull);
+      },
+    );
   });
 }

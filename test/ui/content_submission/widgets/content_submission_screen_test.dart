@@ -1,12 +1,15 @@
 import 'dart:async' show Completer;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
+import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
@@ -24,19 +27,16 @@ void main() {
   ContentSubmissionViewModel buildViewModel({
     required ControllableSubmissionRepository submissionRepository,
     ContentSubmissionDraftRepository? draftRepository,
+    FakeImagePicker? imagePicker,
   }) {
     return ContentSubmissionViewModel(
       logger: MockLogger(),
       contentSubmissionRepository: submissionRepository,
       draftRepository:
           draftRepository ?? FakeContentSubmissionDraftRepository(),
-      imagePicker: FakeImagePicker(),
+      imagePicker: imagePicker ?? FakeImagePicker(),
     );
   }
-
-  /// Flushes the 3s debounce timer scheduled by field onChanged callbacks.
-  Future<void> flushDebounce(WidgetTester tester) =>
-      tester.pump(const Duration(seconds: 3, milliseconds: 100));
 
   // The screen hosts several nested Scrollables (the main CustomScrollView
   // plus the horizontal asset ListView). Picking the first one in widget
@@ -136,7 +136,6 @@ void main() {
       await vm.initialize();
 
       await tester.pumpWidget(buildApp(vm));
-      await flushDebounce(tester);
 
       await scrollToAndTap(
         tester,
@@ -159,7 +158,6 @@ void main() {
 
       await tester.pumpWidget(buildApp(vm));
       await fillValidForm(tester);
-      await flushDebounce(tester);
 
       await scrollToAndTap(
         tester,
@@ -192,7 +190,6 @@ void main() {
 
         await tester.pumpWidget(buildApp(vm));
         await fillValidForm(tester);
-        await flushDebounce(tester);
         vm.setEventEnabled(true);
         await tester.pump();
 
@@ -216,7 +213,6 @@ void main() {
         expect(repo.uploadCallCount, 0);
         expect(vm.submit.result, isNull);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
-        await flushDebounce(tester);
       },
     );
 
@@ -227,7 +223,6 @@ void main() {
 
       await tester.pumpWidget(buildApp(vm));
       await fillValidForm(tester);
-      await flushDebounce(tester);
 
       await scrollToAndTap(
         tester,
@@ -250,7 +245,6 @@ void main() {
 
       await tester.pumpWidget(buildApp(vm));
       await fillValidForm(tester);
-      await flushDebounce(tester);
 
       await scrollToAndTap(
         tester,
@@ -303,7 +297,6 @@ void main() {
 
         await tester.pumpWidget(buildApp(vm));
         await fillValidForm(tester);
-        await flushDebounce(tester);
 
         await tester.scrollUntilVisible(
           find.widgetWithText(FilledButton, 'Invia'),
@@ -328,8 +321,7 @@ void main() {
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(find.byType(ContentSubmissionScreen), findsOneWidget);
 
-        // The completed pop cleared the in-memory state; the form fields reset
-        // to empty and re-sync the draft with empty values.
+        // The completed pop cleared the in-memory state and reset the form.
         expect(vm.state.city, isEmpty);
         expect(vm.state.name, isEmpty);
         expect(find.widgetWithText(TextFormField, 'Campobasso'), findsNothing);
@@ -374,26 +366,42 @@ void main() {
           ),
         );
         expect(termsCheckbox.value, isFalse);
-        // The reset re-synced the draft through the field onChanged callbacks,
-        // scheduling the 3s draft-save debounce again; drain it.
-        await flushDebounce(tester);
       },
     );
 
     testWidgets(
       'completed pop hides stale form while persisted clear is pending',
       (tester) async {
-        final repo = ControllableSubmissionRepository();
-        final draftRepo = _GatedDraftRepository();
+        final repo = ControllableSubmissionRepository(
+          uploadImageTaskResult: FakeImageUploadTask.completed(
+            const Result.success(
+              SubmissionAsset(
+                secureUrl: 'https://assets.example/a.jpg',
+                width: 1,
+                height: 1,
+              ),
+            ),
+          ),
+        );
+        final clearGate = Completer<Result<void>>();
+        final asset = XFile.fromData(
+          Uint8List.fromList([1, 2, 3]),
+          name: 'a.jpg',
+        );
+        final draftRepo = FakeContentSubmissionDraftRepository()
+          ..pendingClearDraft = clearGate;
         final vm = buildViewModel(
           submissionRepository: repo,
           draftRepository: draftRepo,
+          imagePicker: FakeImagePicker(
+            onPickMultipleMedia: () async => [asset],
+          ),
         );
         await vm.initialize();
+        await vm.addAsset.execute();
 
         await tester.pumpWidget(buildApp(vm));
         await fillValidForm(tester);
-        await flushDebounce(tester);
         await scrollToAndTap(
           tester,
           find.widgetWithText(FilledButton, 'Invia'),
@@ -403,6 +411,10 @@ void main() {
         repo.completeUpload(const Result.success(null));
         await tester.pumpAndSettle();
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+        final previousState = vm.state;
+        final previousIdentity = vm.state.clientSubmissionId;
+        final previousAsset = vm.assets.single;
+        expect(vm.hasUnsavedChanges, isTrue);
 
         expect(await tester.binding.handlePopRoute(), isTrue);
         await tester.pump();
@@ -412,15 +424,19 @@ void main() {
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(find.text('Caricamento in corso...'), findsOneWidget);
         expect(find.text('Campobasso'), findsNothing);
+        expect(vm.state, previousState);
+        expect(vm.state.clientSubmissionId, previousIdentity);
+        expect(vm.assets, [previousAsset]);
+        expect(vm.hasUnsavedChanges, isTrue);
 
-        draftRepo.releaseClear();
+        clearGate.complete(const Result.success(null));
         await tester.pumpAndSettle();
 
         expect(vm.clear.completed, isTrue);
         expect(find.byType(ContentSubmissionScreen), findsOneWidget);
         expect(vm.state.city, isEmpty);
+        expect(vm.assets, isEmpty);
         expect(find.text('Campobasso'), findsNothing);
-        await flushDebounce(tester);
       },
     );
 
@@ -433,7 +449,6 @@ void main() {
 
       await tester.pumpWidget(buildApp(vm));
       await fillValidForm(tester);
-      await flushDebounce(tester);
 
       await scrollToAndTap(
         tester,
@@ -497,7 +512,6 @@ void main() {
         await vm.initialize();
 
         await tester.pumpWidget(buildApp(vm));
-        await flushDebounce(tester);
 
         // The standard form fields retain their initial values while the
         // description field reconstructs its owned Quill document from the
@@ -607,10 +621,9 @@ void main() {
         await tester.pump();
         await tester.tap(termsCheckbox);
         await tester.pump();
-        await flushDebounce(tester);
 
         expect(vm.state.acceptedTerms, isFalse);
-        expect(draftRepo.lastSavedState?.acceptedTerms, isFalse);
+        expect(draftRepo.lastSavedState, isNull);
       },
     );
   });
@@ -628,7 +641,6 @@ void main() {
         ..setEndCalendarDate(EventCalendarDate(2026, 8, 20));
 
       await tester.pumpWidget(buildApp(vm));
-      await flushDebounce(tester);
 
       final eventCheckbox = find.descendant(
         of: find
@@ -648,27 +660,6 @@ void main() {
 
       expect(vm.state.eventDates.startInstantUtc, isNull);
       expect(vm.state.eventDates.endInstantUtc, isNull);
-      await flushDebounce(tester);
     });
   });
-}
-
-final class _GatedDraftRepository implements ContentSubmissionDraftRepository {
-  final _clearGate = Completer<void>();
-
-  void releaseClear() => _clearGate.complete();
-
-  @override
-  Future<Result<void>> clearDraft() async {
-    await _clearGate.future;
-    return const Result.success(null);
-  }
-
-  @override
-  Future<Result<ContentSubmissionDraft?>> loadDraft() async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<void>> saveDraft(ContentSubmissionDraft state) async =>
-      const Result.success(null);
 }

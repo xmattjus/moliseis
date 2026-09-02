@@ -6,6 +6,8 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 
 void main() {
+  const clientSubmissionId = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+
   group('ContentSubmissionDraftMapper round-trip', () {
     final startDate = DateTime.utc(2026, 7, 25, 10, 30);
     final endDate = DateTime.utc(2026, 7, 26, 18);
@@ -46,7 +48,7 @@ void main() {
         for (final category in ContentCategory.values) {
           final draft = ContentSubmissionDraft(category: category);
 
-          final restored = draft.toEntity().toModel();
+          final restored = draft.toEntity().toModel()!;
 
           expect(
             restored.category,
@@ -69,7 +71,7 @@ void main() {
           ),
         );
 
-        final restored = draft.toEntity().toModel();
+        final restored = draft.toEntity().toModel()!;
 
         expect(restored.eventDates.startInstantUtc, startDate);
         expect(restored.eventDates.endInstantUtc, endDate);
@@ -84,7 +86,7 @@ void main() {
       );
 
       final entity = draft.toEntity();
-      final restored = entity.toModel();
+      final restored = entity.toModel()!;
 
       expect(entity.isEvent, isTrue);
       expect(entity.pendingStartCalendarDate, '2026-07-25');
@@ -96,9 +98,10 @@ void main() {
         123456789,
       );
       final startOnly = ContentSubmissionDraftEntity(
+        clientSubmissionId: clientSubmissionId,
         isEvent: true,
         startDate: instant,
-      ).toModel();
+      ).toModel()!;
 
       expect(startOnly.eventDates.enabled, isTrue);
       expect(startOnly.eventDates.startInstantUtc?.isUtc, isTrue);
@@ -111,12 +114,16 @@ void main() {
     test('maps disabled and ranged canonical rows', () {
       final start = DateTime.utc(2026, 7, 25, 10, 30);
       final end = DateTime.utc(2026, 7, 26, 18);
-      final disabled = ContentSubmissionDraftEntity(isEvent: false).toModel();
+      final disabled = ContentSubmissionDraftEntity(
+        clientSubmissionId: clientSubmissionId,
+        isEvent: false,
+      ).toModel()!;
       final range = ContentSubmissionDraftEntity(
+        clientSubmissionId: clientSubmissionId,
         isEvent: true,
         startDate: start,
         endDate: end,
-      ).toModel();
+      ).toModel()!;
 
       expect(disabled.eventDates, const EventDateDraft.disabled());
       expect(range.eventDates.enabled, isTrue);
@@ -127,7 +134,7 @@ void main() {
     test('round-trips an empty draft without data loss', () {
       final draft = ContentSubmissionDraft();
 
-      final restored = draft.toEntity().toModel();
+      final restored = draft.toEntity().toModel()!;
 
       expect(restored, equals(draft));
       expect(restored.category, isNull);
@@ -144,7 +151,7 @@ void main() {
     test('null categoryIndex round-trips to null category and back', () {
       final entity = ContentSubmissionDraftEntity();
 
-      expect(entity.toModel().category, isNull);
+      expect(entity.toModel(), isNull);
       // And the reverse: a model with null category writes a null index.
       expect(ContentSubmissionDraft().toEntity().categoryIndex, isNull);
     });
@@ -164,11 +171,12 @@ void main() {
     test('reads the enum index for each category', () {
       for (final category in ContentCategory.values) {
         final entity = ContentSubmissionDraftEntity(
+          clientSubmissionId: clientSubmissionId,
           categoryIndex: category.index,
         );
 
         expect(
-          entity.toModel().category,
+          entity.toModel()!.category,
           category,
           reason: '${category.index} should deserialise back to $category',
         );
@@ -196,7 +204,7 @@ void main() {
         },
       ]);
 
-      final model = entity.toModel();
+      final model = entity.toModel()!;
 
       expect(
         identical(model.descriptionDelta, entity.descriptionDelta),
@@ -206,6 +214,15 @@ void main() {
         identical(model.descriptionDelta![0], entity.descriptionDelta![0]),
         isFalse,
       );
+    });
+
+    test('does not recover an entity with an invalid client identity', () {
+      final entity = ContentSubmissionDraftEntity(
+        clientSubmissionId: 'not-a-uuid',
+        city: 'Rome',
+      );
+
+      expect(entity.toModel(), isNull);
     });
   });
 }

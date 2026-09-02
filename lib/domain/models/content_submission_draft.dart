@@ -1,3 +1,5 @@
+import 'dart:math' show Random;
+
 import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 import 'package:moliseis/domain/core/description_delta.dart';
@@ -9,6 +11,7 @@ class ContentSubmissionDraft {
   /// Creates a draft that retains a deeply copied, recursively unmodifiable
   /// snapshot of [descriptionDelta].
   ContentSubmissionDraft({
+    String? clientSubmissionId,
     this.category,
     this.city,
     this.name,
@@ -18,7 +21,42 @@ class ContentSubmissionDraft {
     this.userEmail,
     this.userName,
     this.acceptedTerms,
-  }) : descriptionDelta = freezeDescriptionDelta(descriptionDelta);
+  }) : clientSubmissionId = clientSubmissionId == null
+           ? _generateClientSubmissionId()
+           : _requireValidClientSubmissionId(clientSubmissionId),
+       descriptionDelta = freezeDescriptionDelta(descriptionDelta);
+
+  static final RegExp _clientSubmissionIdPattern = RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+  );
+
+  static String _generateClientSubmissionId() {
+    final bytes = List<int>.generate(16, (_) => Random.secure().nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes
+        .map((byte) => byte.toRadixString(16).padLeft(2, '0'))
+        .join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
+        '${hex.substring(20)}';
+  }
+
+  static String _requireValidClientSubmissionId(String value) {
+    if (!isValidClientSubmissionId(value)) {
+      throw ArgumentError.value(
+        value,
+        'clientSubmissionId',
+        'must be a canonical UUID v4',
+      );
+    }
+    return value;
+  }
+
+  static bool isValidClientSubmissionId(String value) =>
+      _clientSubmissionIdPattern.hasMatch(value);
+
+  final String clientSubmissionId;
 
   final ContentCategory? category;
 
@@ -37,6 +75,7 @@ class ContentSubmissionDraft {
   @override
   bool operator ==(Object other) {
     return other is ContentSubmissionDraft &&
+        other.clientSubmissionId == clientSubmissionId &&
         other.category == category &&
         other.city == city &&
         other.name == name &&
@@ -53,6 +92,7 @@ class ContentSubmissionDraft {
 
   @override
   int get hashCode => Object.hash(
+    clientSubmissionId,
     category,
     city,
     name,
@@ -86,6 +126,7 @@ class ContentSubmissionDraft {
     Object? userName = _unset,
     Object? acceptedTerms = _unset,
   }) => ContentSubmissionDraft(
+    clientSubmissionId: clientSubmissionId,
     category: identical(category, _unset)
         ? this.category
         : category as ContentCategory?,

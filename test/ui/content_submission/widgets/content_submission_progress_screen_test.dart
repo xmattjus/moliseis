@@ -37,12 +37,6 @@ void main() {
       ..setUserName('Test User');
   }
 
-  /// Flushes the 3s debounce timer scheduled by the setters in
-  /// [buildViewModel] so the test binding does not fail its "no pending
-  /// timers" invariant.
-  Future<void> flushDebounce(WidgetTester tester) =>
-      tester.pump(const Duration(seconds: 3, milliseconds: 100));
-
   /// Harness mounting the progress screen as the initial route. Use for tests
   /// that never need to pop to a previous page.
   Widget buildProgressFirstApp(ContentSubmissionViewModel viewModel) {
@@ -132,7 +126,6 @@ void main() {
       final vm = buildViewModel(submissionRepository: repo);
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
-      await flushDebounce(tester);
 
       expect(find.byIcon(Symbols.upload), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
@@ -150,7 +143,6 @@ void main() {
       final vm = buildViewModel(submissionRepository: repo);
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
-      await flushDebounce(tester);
 
       unawaited(vm.submit.execute());
       await tester.pump();
@@ -172,7 +164,6 @@ void main() {
       final vm = buildViewModel(submissionRepository: repo);
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
-      await flushDebounce(tester);
 
       unawaited(vm.submit.execute());
       await tester.pump();
@@ -193,7 +184,6 @@ void main() {
       final vm = buildViewModel(submissionRepository: repo);
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
-      await flushDebounce(tester);
 
       unawaited(vm.submit.execute());
       await tester.pump();
@@ -226,7 +216,6 @@ void main() {
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
-        await flushDebounce(tester);
         await pushProgress(tester, router);
         expect(
           // This is the explicit invariant that verifies Provider installed
@@ -271,7 +260,6 @@ void main() {
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
-        await flushDebounce(tester);
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());
         await tester.pump();
@@ -303,7 +291,6 @@ void main() {
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
-        await flushDebounce(tester);
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());
         await tester.pump();
@@ -341,7 +328,6 @@ void main() {
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
-        await flushDebounce(tester);
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());
         await tester.pump();
@@ -379,7 +365,6 @@ void main() {
 
       final (router, app) = buildHomeFirstApp(vm);
       await tester.pumpWidget(app);
-      await flushDebounce(tester);
       await pushProgress(tester, router);
       unawaited(vm.submit.execute());
       await tester.pump();
@@ -407,7 +392,6 @@ void main() {
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
-        await flushDebounce(tester);
         await pushProgress(tester, router);
 
         await tester.tap(find.byType(BackButton));
@@ -433,7 +417,6 @@ void main() {
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
-        await flushDebounce(tester);
         await pushProgress(tester, router);
 
         await tester.tap(find.text('Torna al modulo'));
@@ -461,7 +444,6 @@ void main() {
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
-        await flushDebounce(tester);
         await pushProgress(tester, router);
 
         final handled = await tester.binding.handlePopRoute();
@@ -484,7 +466,6 @@ void main() {
 
       final (router, app) = buildHomeFirstApp(vm);
       await tester.pumpWidget(app);
-      await flushDebounce(tester);
       await pushProgress(tester, router);
       unawaited(vm.submit.execute());
       await tester.pump();
@@ -515,7 +496,6 @@ void main() {
 
           final (router, app) = buildHomeFirstApp(vm);
           await tester.pumpWidget(app);
-          await flushDebounce(tester);
           await pushProgress(tester, router);
 
           await startPredictiveBack(tester);
@@ -544,7 +524,6 @@ void main() {
 
           final (router, app) = buildHomeFirstApp(vm);
           await tester.pumpWidget(app);
-          await flushDebounce(tester);
           await pushProgress(tester, router);
           unawaited(vm.submit.execute());
           await tester.pump();
@@ -578,7 +557,6 @@ void main() {
       );
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
-      await flushDebounce(tester);
       unawaited(vm.submit.execute());
       await tester.pump();
       repo.completeUpload(Result.error(Exception('first')));
@@ -606,7 +584,6 @@ void main() {
       );
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
-      await flushDebounce(tester);
       unawaited(vm.submit.execute());
       await tester.pump();
       repo.completeUpload(const Result.success(null));
@@ -634,7 +611,6 @@ void main() {
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
-        await flushDebounce(tester);
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());
         await tester.pump();
@@ -652,7 +628,6 @@ void main() {
           ..setName('Second test event')
           ..setUserEmail('second@example.com')
           ..setUserName('Second Test User');
-        await flushDebounce(tester);
 
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());

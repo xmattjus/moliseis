@@ -900,6 +900,13 @@ final class FakeContentSubmissionDraftRepository
   int clearDraftCallCount = 0;
   ContentSubmissionDraft? lastSavedState;
 
+  /// When non-null, holds the next draft save open until the test completes it.
+  Completer<Result<void>>? pendingSaveDraft;
+
+  /// When non-null, holds the next draft clear open until the test completes
+  /// it.
+  Completer<Result<void>>? pendingClearDraft;
+
   @override
   Future<Result<ContentSubmissionDraft?>> loadDraft() async {
     loadDraftCallCount++;
@@ -911,14 +918,18 @@ final class FakeContentSubmissionDraftRepository
     saveDraftCalled = true;
     saveDraftCallCount++;
     lastSavedState = state;
-    return saveDraftResult;
+    final pending = pendingSaveDraft;
+    pendingSaveDraft = null;
+    return pending?.future ?? saveDraftResult;
   }
 
   @override
   Future<Result<void>> clearDraft() async {
     clearDraftCalled = true;
     clearDraftCallCount++;
-    return clearDraftResult;
+    final pending = pendingClearDraft;
+    pendingClearDraft = null;
+    return pending?.future ?? clearDraftResult;
   }
 }
 

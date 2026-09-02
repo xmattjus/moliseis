@@ -6,6 +6,7 @@ const _draftId = 1;
 @Entity()
 class ContentSubmissionDraftEntity {
   ContentSubmissionDraftEntity({
+    this.clientSubmissionId,
     this.categoryIndex,
     this.city,
     this.name,
@@ -24,6 +25,8 @@ class ContentSubmissionDraftEntity {
   int id;
 
   final int? categoryIndex;
+
+  final String? clientSubmissionId;
 
   final String? city;
   final String? name;

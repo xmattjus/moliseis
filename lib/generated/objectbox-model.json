@@ -349,7 +349,7 @@
     },
     {
       "id": "20:8436787422671765122",
-      "lastPropertyId": "17:7677321635689032617",
+      "lastPropertyId": "18:4578999261153036819",
       "name": "ContentSubmissionDraftEntity",
       "properties": [
         {
@@ -416,6 +416,11 @@
         {
           "id": "17:7677321635689032617",
           "name": "pendingStartCalendarDate",
+          "type": 9
+        },
+        {
+          "id": "18:4578999261153036819",
+          "name": "clientSubmissionId",
           "type": 9
         }
       ],

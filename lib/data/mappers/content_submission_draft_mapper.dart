@@ -5,19 +5,28 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 
 extension ContentSubmissionDraftEntityMapper on ContentSubmissionDraftEntity {
-  ContentSubmissionDraft toModel() => ContentSubmissionDraft(
-    category: categoryIndex != null
-        ? contentCategoryFromIndex(categoryIndex!)
-        : null,
-    city: city,
-    name: name,
-    description: description,
-    descriptionDelta: freezeDescriptionDelta(descriptionDelta),
-    eventDates: _eventDatesFromEntity(),
-    userEmail: authorEmail,
-    userName: authorName,
-    acceptedTerms: acceptedTerms,
-  );
+  ContentSubmissionDraft? toModel() {
+    final identity = clientSubmissionId;
+    if (identity == null ||
+        !ContentSubmissionDraft.isValidClientSubmissionId(identity)) {
+      return null;
+    }
+
+    return ContentSubmissionDraft(
+      clientSubmissionId: identity,
+      category: categoryIndex != null
+          ? contentCategoryFromIndex(categoryIndex!)
+          : null,
+      city: city,
+      name: name,
+      description: description,
+      descriptionDelta: freezeDescriptionDelta(descriptionDelta),
+      eventDates: _eventDatesFromEntity(),
+      userEmail: authorEmail,
+      userName: authorName,
+      acceptedTerms: acceptedTerms,
+    );
+  }
 }
 
 extension on ContentSubmissionDraftEntity {
@@ -76,6 +85,7 @@ extension on ContentSubmissionDraftEntity {
 
 extension ContentSubmissionDraftMapper on ContentSubmissionDraft {
   ContentSubmissionDraftEntity toEntity() => ContentSubmissionDraftEntity(
+    clientSubmissionId: clientSubmissionId,
     categoryIndex: category?.index,
     city: city,
     name: name,

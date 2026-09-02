@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -437,6 +439,22 @@ void main() {
           expect(result.value.rejectedNames, isEmpty);
         },
       );
+
+      test(
+        'keeps the fresh clean session when no draft is recoverable',
+        () async {
+          final repository = FakeContentSubmissionDraftRepository();
+          final vm = buildViewModel(draftRepository: repository);
+          final identity = vm.state.clientSubmissionId;
+
+          await vm.initialize();
+
+          expect(vm.state.clientSubmissionId, identity);
+          expect(vm.hasUnsavedChanges, isFalse);
+          expect(repository.saveDraftCallCount, 0);
+          expect(repository.clearDraftCallCount, 0);
+        },
+      );
     });
 
     group('removeAssetAt', () {
@@ -811,13 +829,8 @@ void main() {
         expect(vm.state.name, 'Colosseum');
       });
 
-      // Regression guard: a previous change removed the only test that
-      // asserted emit() schedules _debounced(). If someone deletes the
-      // unawaited(_debounced()) line in _emit(), this test catches it:
-      // three seconds after a setter fires, the draft repository must
-      // have received a saveDraft call carrying the VM's current state.
       testWidgets(
-        'schedules a debounced saveDraft 3s after each setter',
+        'does not save after the former debounce interval',
         (tester) async {
           final draftRepo = FakeContentSubmissionDraftRepository();
           final vm = buildViewModel(draftRepository: draftRepo);
@@ -836,20 +849,16 @@ void main() {
             ..setName('Test event');
           await tester.pump();
 
-          // While the debounce window is open, the call has not landed yet.
           expect(draftRepo.saveDraftCalled, isFalse);
-
-          // Crossing the 3s debounce window fires the timer scheduled by
-          // _emit() -> unawaited(_debounced()).
           await tester.pump(const Duration(seconds: 3, milliseconds: 100));
 
-          expect(draftRepo.saveDraftCalled, isTrue);
-          expect(draftRepo.lastSavedState, vm.state);
+          expect(draftRepo.saveDraftCalled, isFalse);
+          expect(vm.hasUnsavedChanges, isTrue);
         },
       );
 
       testWidgets(
-        'schedules one debounced save carrying both description projections',
+        'checkpoints both description projections only when requested',
         (tester) async {
           final draftRepo = FakeContentSubmissionDraftRepository();
           final vm = buildViewModel(draftRepository: draftRepo);
@@ -872,8 +881,9 @@ void main() {
           await tester.pump();
           expect(draftRepo.saveDraftCallCount, 0);
 
-          await tester.pump(const Duration(seconds: 3, milliseconds: 100));
+          final result = await vm.checkpointDraft();
 
+          expect(result, isA<Success<void>>());
           expect(draftRepo.saveDraftCallCount, 1);
           expect(draftRepo.lastSavedState?.description, 'Descrizione');
           expect(draftRepo.lastSavedState?.descriptionDelta, descriptionDelta);
@@ -897,7 +907,7 @@ void main() {
           vm
             ..setEventEnabled(true)
             ..setStartCalendarDate(EventCalendarDate(2026, 7, 25));
-          await tester.pump(const Duration(seconds: 3, milliseconds: 100));
+          await vm.checkpointDraft();
 
           final saved = draftRepository.lastSavedState;
           expect(saved?.eventDates.startInstantUtc, isNull);
@@ -944,6 +954,140 @@ void main() {
         expect(vm.state.description, isNull);
         expect(vm.state.descriptionDelta, isNull);
       });
+    });
+
+    group('draft checkpoints', () {
+      test(
+        'starts clean and writes only after an explicit checkpoint',
+        () async {
+          final repository = FakeContentSubmissionDraftRepository();
+          final vm = buildViewModel(draftRepository: repository);
+          final identity = vm.state.clientSubmissionId;
+
+          expect(vm.hasUnsavedChanges, isFalse);
+          expect(repository.saveDraftCallCount, 0);
+
+          vm.setCity('Campobasso');
+          expect(vm.hasUnsavedChanges, isTrue);
+          expect(vm.state.clientSubmissionId, identity);
+
+          expect(await vm.checkpointDraft(), isA<Success<void>>());
+          expect(repository.saveDraftCallCount, 1);
+          expect(repository.lastSavedState?.city, 'Campobasso');
+          expect(repository.lastSavedState?.clientSubmissionId, identity);
+          expect(vm.hasUnsavedChanges, isFalse);
+
+          expect(await vm.checkpointDraft(), isA<Success<void>>());
+          expect(repository.saveDraftCallCount, 1);
+        },
+      );
+
+      test('a no-op setter preserves derived dirty state without a save', () {
+        final repository = FakeContentSubmissionDraftRepository();
+        final vm = buildViewModel(draftRepository: repository)..setCity(null);
+
+        expect(vm.hasUnsavedChanges, isFalse);
+        expect(repository.saveDraftCallCount, 0);
+
+        vm
+          ..setCity('Rome')
+          ..setCity('Rome');
+        expect(vm.hasUnsavedChanges, isTrue);
+        expect(repository.saveDraftCallCount, 0);
+      });
+
+      test(
+        'preserves the dirty baseline after a failed checkpoint and retry',
+        () async {
+          final repository = FakeContentSubmissionDraftRepository(
+            saveDraftResult: Result.error(Exception('disk full')),
+          );
+          final vm = buildViewModel(draftRepository: repository)
+            ..setCity('Rome');
+          final identity = vm.state.clientSubmissionId;
+
+          expect(await vm.checkpointDraft(), isA<Error<void>>());
+          expect(vm.hasUnsavedChanges, isTrue);
+          expect(vm.state.clientSubmissionId, identity);
+
+          repository.saveDraftResult = const Result.success(null);
+          expect(await vm.checkpointDraft(), isA<Success<void>>());
+          expect(repository.saveDraftCallCount, 2);
+          expect(vm.hasUnsavedChanges, isFalse);
+        },
+      );
+
+      test('keeps a mutation made during a checkpoint dirty', () async {
+        final pendingSave = Completer<Result<void>>();
+        final repository = FakeContentSubmissionDraftRepository()
+          ..pendingSaveDraft = pendingSave;
+        final vm = buildViewModel(draftRepository: repository)..setCity('Rome');
+
+        final checkpoint = vm.checkpointDraft();
+        vm.setCity('Isernia');
+        pendingSave.complete(const Result.success(null));
+
+        expect(await checkpoint, isA<Success<void>>());
+        expect(repository.lastSavedState?.city, 'Rome');
+        expect(vm.state.city, 'Isernia');
+        expect(vm.hasUnsavedChanges, isTrue);
+      });
+
+      test(
+        'recovers a valid identity as a clean session without a write',
+        () async {
+          const identity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+          final repository = FakeContentSubmissionDraftRepository(
+            loadDraftResult: Result.success(
+              ContentSubmissionDraft(
+                clientSubmissionId: identity,
+                city: 'Rome',
+              ),
+            ),
+          );
+          final vm = buildViewModel(draftRepository: repository);
+
+          await vm.initialize();
+
+          expect(vm.state.clientSubmissionId, identity);
+          expect(vm.state.city, 'Rome');
+          expect(vm.hasUnsavedChanges, isFalse);
+          expect(repository.saveDraftCallCount, 0);
+        },
+      );
+
+      test(
+        'falls back from an unsupported legacy projection and checkpoints '
+        'the fresh identity',
+        () async {
+          const unsupportedLegacyIdentity = 'not-a-valid-legacy-identity';
+          // The mapper/repository project unsupported stored identities to
+          // `Success(null)` rather than exposing a domain draft.
+          final repository = FakeContentSubmissionDraftRepository();
+          final vm = buildViewModel(draftRepository: repository);
+
+          await vm.initialize();
+
+          final freshIdentity = vm.state.clientSubmissionId;
+          expect(freshIdentity, isNot(unsupportedLegacyIdentity));
+          expect(
+            ContentSubmissionDraft.isValidClientSubmissionId(freshIdentity),
+            isTrue,
+          );
+          expect(vm.state.city, isNull);
+          expect(vm.hasUnsavedChanges, isFalse);
+          expect(repository.saveDraftCallCount, 0);
+          expect(repository.clearDraftCallCount, 0);
+
+          vm.setCity('Isernia');
+          expect(vm.hasUnsavedChanges, isTrue);
+
+          expect(await vm.checkpointDraft(), isA<Success<void>>());
+          expect(repository.lastSavedState?.city, 'Isernia');
+          expect(repository.lastSavedState?.clientSubmissionId, freshIdentity);
+          expect(repository.clearDraftCallCount, 0);
+        },
+      );
     });
 
     group('submit', () {
@@ -1146,26 +1290,13 @@ void main() {
         expect(vm.state.acceptedTerms, isTrue);
       });
 
-      testWidgets('schedules a debounced saveDraft carrying the new value', (
-        tester,
-      ) async {
+      test('does not save accepted terms implicitly', () {
         final draftRepo = FakeContentSubmissionDraftRepository();
-        final vm = buildViewModel(draftRepository: draftRepo);
+        final vm = buildViewModel(draftRepository: draftRepo)
+          ..setAcceptedTerms(true);
 
-        await tester.pumpWidget(
-          const Directionality(
-            textDirection: TextDirection.ltr,
-            child: SizedBox.shrink(),
-          ),
-        );
-
-        vm.setAcceptedTerms(true);
-        await tester.pump();
         expect(draftRepo.saveDraftCalled, isFalse);
-
-        await tester.pump(const Duration(seconds: 3, milliseconds: 100));
-        expect(draftRepo.saveDraftCalled, isTrue);
-        expect(draftRepo.lastSavedState?.acceptedTerms, isTrue);
+        expect(vm.hasUnsavedChanges, isTrue);
       });
 
       test('passing null resets the field to null', () {
@@ -1178,15 +1309,54 @@ void main() {
     });
 
     group('clear', () {
+      test('retains the session until a pending clear succeeds', () async {
+        final pendingClear = Completer<Result<void>>();
+        final file = XFile.fromData(
+          Uint8List.fromList([1, 2, 3]),
+          name: 'a.jpg',
+        );
+        final repository = FakeContentSubmissionDraftRepository()
+          ..pendingClearDraft = pendingClear;
+        final vm = buildViewModel(
+          draftRepository: repository,
+          imagePicker: FakeImagePicker(
+            onPickMultipleMedia: () async => [file],
+          ),
+        );
+        await vm.addAsset.execute();
+        vm.setCity('Rome');
+        final oldIdentity = vm.state.clientSubmissionId;
+        final oldAsset = vm.assets.single;
+
+        final clear = vm.clear.execute();
+        await Future<void>.delayed(Duration.zero);
+
+        expect(vm.clear.running, isTrue);
+        expect(vm.state.city, 'Rome');
+        expect(vm.state.clientSubmissionId, oldIdentity);
+        expect(vm.hasUnsavedChanges, isTrue);
+        expect(vm.assets, [oldAsset]);
+
+        pendingClear.complete(const Result.success(null));
+        await clear;
+
+        expect(vm.state.city, isNull);
+        expect(vm.state.clientSubmissionId, isNot(oldIdentity));
+        expect(vm.hasUnsavedChanges, isFalse);
+        expect(vm.assets, isEmpty);
+      });
+
       test('clears assets and form state on success', () async {
         final file = XFile.fromData(
           Uint8List.fromList([1, 2, 3]),
           name: 'a.jpg',
         );
+        final logger = MockLogger();
         final vm = buildViewModel(
           imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async => [file],
           ),
+          logger: logger,
         );
 
         await vm.addAsset.execute();
@@ -1194,9 +1364,21 @@ void main() {
         await vm.clear.execute();
 
         expect(vm.assets, isEmpty);
-        expect(vm.state, ContentSubmissionDraft());
+        expect(vm.state.city, isNull);
         expect(vm.clear.completed, isTrue);
         expect(vm.clear.error, isFalse);
+        expect(
+          logger.eventsOfType<ContentSubmissionStateClearStarted>(),
+          hasLength(1),
+        );
+        expect(
+          logger.eventsOfType<ContentSubmissionStateClearSuccess>(),
+          hasLength(1),
+        );
+        expect(
+          logger.eventsOfType<ContentSubmissionStateClearFailed>(),
+          isEmpty,
+        );
       });
 
       test(
@@ -1226,7 +1408,7 @@ void main() {
         },
       );
 
-      test('clears in-memory state even when draft clear fails', () async {
+      test('preserves in-memory state when draft clear fails', () async {
         final file = XFile.fromData(
           Uint8List.fromList([1, 2, 3]),
           name: 'a.jpg',
@@ -1243,18 +1425,20 @@ void main() {
 
         await vm.addAsset.execute();
         vm.setCity('Campobasso');
+        final identity = vm.state.clientSubmissionId;
         await vm.clear.execute();
 
-        expect(vm.assets, isEmpty);
-        expect(vm.state, ContentSubmissionDraft());
+        expect(vm.assets, hasLength(1));
+        expect(vm.state.city, 'Campobasso');
+        expect(vm.state.clientSubmissionId, identity);
+        expect(vm.hasUnsavedChanges, isTrue);
         expect(draftRepository.clearDraftCalled, isTrue);
-        expect(vm.clear.completed, isTrue);
-        expect(vm.clear.error, isFalse);
+        expect(vm.clear.completed, isFalse);
+        expect(vm.clear.error, isTrue);
       });
 
       test(
-        'logs StateClearStarted and StateClearSuccess regardless of draft '
-        'outcome',
+        'logs StateClearStarted and StateClearFailed on draft clear failure',
         () async {
           final draftRepository = FakeContentSubmissionDraftRepository(
             clearDraftResult: Result.error(Exception('disk dead')),
@@ -1272,14 +1456,14 @@ void main() {
             hasLength(1),
           );
           expect(
-            logger.eventsOfType<ContentSubmissionStateClearSuccess>(),
+            logger.eventsOfType<ContentSubmissionStateClearFailed>(),
             hasLength(1),
           );
         },
       );
 
       test(
-        'does not emit StateClearFailed when only the draft clear fails',
+        'does not emit StateClearSuccess when the draft clear fails',
         () async {
           final draftRepository = FakeContentSubmissionDraftRepository(
             clearDraftResult: Result.error(Exception('disk dead')),
@@ -1293,7 +1477,7 @@ void main() {
           await vm.clear.execute();
 
           expect(
-            logger.containsEvent<ContentSubmissionStateClearFailed>(),
+            logger.containsEvent<ContentSubmissionStateClearSuccess>(),
             isFalse,
           );
         },
