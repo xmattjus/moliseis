@@ -4,14 +4,12 @@ import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/domain/core/event_time.dart';
-import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/image_upload_task.dart';
-import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/utils/command.dart';
@@ -31,11 +29,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     required AdminContentSubmissionRepository repository,
     required ContentSubmissionRepository contentSubmissionRepository,
     ImagePicker? imagePicker,
-    int? submissionId,
+    this.submissionId,
     String? creatorName,
     String? creatorEmail,
-  }) : _submissionId = submissionId,
-       _repository = repository,
+  }) : _repository = repository,
        _contentSubmissionRepository = contentSubmissionRepository,
        _imagePicker = imagePicker ?? ImagePicker(),
        _contributorName = creatorName,
@@ -54,11 +51,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   final ContentSubmissionRepository _contentSubmissionRepository;
   final ImagePicker _imagePicker;
 
-  /// The persisted identifier being edited, or null before create adoption.
-  int? _submissionId;
-
   /// The persisted identifier being edited, or null for a new submission.
-  int? get submissionId => _submissionId;
+  final int? submissionId;
 
   ContentCategory? _category;
   String? _city;
@@ -77,11 +71,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   DateTime? _createdAt;
   DateTime? _modifiedAt;
   final List<AdminSubmissionAsset> _assets = <AdminSubmissionAsset>[];
-  final List<_StagedSubmissionAsset> _stagedAssets = <_StagedSubmissionAsset>[];
   ImageUploadTask? _activeImageUploadTask;
   var _hasLoadedDetail = false;
-  var _hasUnsavedFieldChanges = false;
-  var _authoritativeEditableStateRevision = 0;
+  var _isDirty = false;
   var _disposed = false;
 
   /// Loads a persisted submission when editing.
@@ -192,27 +184,14 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   UnmodifiableListView<AdminSubmissionAsset> get assets =>
       UnmodifiableListView<AdminSubmissionAsset>(_assets);
 
-  /// Local image files that await persistence during this route session.
-  UnmodifiableListView<File> get stagedAssetFiles => UnmodifiableListView<File>(
-    _stagedAssets.map((asset) => asset.file).toList(growable: false),
-  );
-
-  /// Total persisted and staged images used for proactive capacity checks.
-  int get assetCount => _assets.length + _stagedAssets.length;
-
   /// Whether edit-mode detail data has successfully loaded.
   bool get hasLoadedDetail => _hasLoadedDetail;
 
   /// Whether a detail request is in progress.
   bool get loading => load.running;
 
-  /// Whether fields or staged image work have not yet been persisted.
-  bool get isDirty => _hasUnsavedFieldChanges || _stagedAssets.isNotEmpty;
-
-  /// Revision applied to initial-value-backed editable fields after a
-  /// successful load or persistence response.
-  int get authoritativeEditableStateRevision =>
-      _authoritativeEditableStateRevision;
+  /// Whether edits have not yet been saved.
+  bool get isDirty => _isDirty;
 
   /// Whether an asset add or delete operation is in progress.
   bool get assetMutationRunning => addAsset.running || deleteAsset.running;
@@ -337,9 +316,43 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (submissionId == null) return const Result.success(null);
 
     final result = await _repository.getById(submissionId);
-    if (_disposed) return const Result.success(null);
     return result.map((submission) {
-      _applySubmission(submission, replaceAssets: true);
+      _category = submission.category;
+      _city = submission.city;
+      _name = submission.name;
+      _description = submission.description;
+      _descriptionDelta = submission.descriptionDelta;
+      final start = submission.startDate?.toUtc();
+      final end = submission.endDate?.toUtc();
+      _eventDates = switch ((start, end)) {
+        (final start?, final end) => EventDateDraft.exact(
+          startCalendarDate: _eventTimePolicy.calendarDateForUtc(start),
+          startInstantUtc: start,
+          endInstantUtc: end,
+        ),
+        (null, final end?) => throw StateError(
+          'Persisted submission $submissionId has an end date without a '
+          'start date: $end.',
+        ),
+        (null, null) => const EventDateDraft.disabled(),
+      };
+      _eventTimeIssue = null;
+      // Lossless hydration: double.toString() round-trips exactly, unlike a
+      // fixed-precision rendering.
+      _latitudeText = submission.latitude?.toString() ?? '';
+      _longitudeText = submission.longitude?.toString() ?? '';
+      _contributorName = submission.userName;
+      _contributorEmail = submission.userEmail;
+      _status = submission.status;
+      _promotion = submission.promotion;
+      _createdAt = submission.createdAt;
+      _modifiedAt = submission.modifiedAt;
+      _assets
+        ..clear()
+        ..addAll(submission.assets);
+      _hasLoadedDetail = true;
+      _isDirty = false;
+      _notifyListeners();
     });
   }
 
@@ -358,57 +371,42 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       );
     }
 
-    final mustPersistFields = submissionId == null || _hasUnsavedFieldChanges;
-    final mustValidateFields = mustPersistFields || _stagedAssets.isEmpty;
     final city = _city;
     final name = _name;
-    if (mustValidateFields &&
-        (city == null || city.isEmpty || name == null || name.isEmpty)) {
+    if (city == null || city.isEmpty || name == null || name.isEmpty) {
       return Result.error(Exception('Compila i campi obbligatori.'));
     }
 
-    if (mustValidateFields && !validateEventTimeForSave()) {
+    if (!validateEventTimeForSave()) {
       return Result.error(Exception('Inserisci un intervallo di date valido.'));
     }
 
-    final coordinates = mustValidateFields ? _parsedCoordinates() : null;
-    if (mustValidateFields && coordinates == null) {
+    final coordinates = _parsedCoordinates();
+    if (coordinates == null) {
       return Result.error(Exception('Inserisci coordinate valide.'));
     }
-    if (mustPersistFields) {
-      final (latitude, longitude) = coordinates!;
-      final input = AdminSubmissionInput(
-        category: _category ?? ContentCategory.unknown,
-        city: city!,
-        name: name!,
-        description: _description,
-        descriptionDelta: _descriptionDelta,
-        startDate: _eventDates.startInstantUtc,
-        endDate: _eventDates.endInstantUtc,
-        latitude: latitude,
-        longitude: longitude,
-      );
-      final result = submissionId == null
-          ? await _repository.create(input)
-          : await _repository.update(submissionId!, input);
-      if (_disposed) return const Result.success(null);
+    final (latitude, longitude) = coordinates;
 
-      switch (result) {
-        case Error<AdminSubmission>(:final error):
-          return Result.error(error);
-        case Success<AdminSubmission>(:final value):
-          if (submissionId == null) {
-            _submissionId = value.id;
-            _applySubmission(value, replaceAssets: true);
-          } else {
-            // The update response intentionally omits stored associations.
-            // Keep confirmed assets rather than applying its empty envelope.
-            _applySubmission(value, replaceAssets: false);
-          }
-      }
-    }
+    final input = AdminSubmissionInput(
+      category: _category ?? ContentCategory.unknown,
+      city: city,
+      name: name,
+      description: _description,
+      descriptionDelta: _descriptionDelta,
+      startDate: _eventDates.startInstantUtc,
+      endDate: _eventDates.endInstantUtc,
+      latitude: latitude,
+      longitude: longitude,
+    );
+    final submissionId = this.submissionId;
+    final result = submissionId == null
+        ? await _repository.create(input)
+        : await _repository.update(submissionId, input);
 
-    return _persistStagedAssets();
+    return result.map((_) {
+      _isDirty = false;
+      _notifyListeners();
+    });
   }
 
   /// Parses the coordinate drafts into a nullable pair at the save boundary.
@@ -477,7 +475,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (save.running || otherModerationRunning || assetMutationRunning) {
       return Exception('Attendi il completamento dell’operazione in corso.');
     }
-    if (isDirty) {
+    if (_isDirty) {
       return Exception('Salva le modifiche prima di pubblicare o rifiutare.');
     }
     if (_status != AdminSubmissionStatus.pending) {
@@ -534,17 +532,22 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   Future<Result<void>> _addAsset() async {
     final submissionId = this.submissionId;
-    if (submissionId != null && !_hasLoadedDetail) {
+    if (submissionId == null) {
+      return Result.error(
+        Exception('Aggiungi foto solo dopo aver creato il contributo.'),
+      );
+    }
+    if (!_hasLoadedDetail) {
       return Result.error(
         Exception('Carica il contributo prima di aggiungere foto.'),
       );
     }
-    if (submissionId != null && _status != AdminSubmissionStatus.pending) {
+    if (_status != AdminSubmissionStatus.pending) {
       return Result.error(
         Exception('Puoi modificare le foto solo dei contributi in attesa.'),
       );
     }
-    if (assetCount >= kMaximumSubmissionAssetCount) {
+    if (_assets.length >= kMaximumSubmissionAssetCount) {
       return Result.error(Exception('Hai raggiunto il limite di foto.'));
     }
     if (save.running ||
@@ -560,12 +563,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       source: ImageSource.gallery,
     );
     if (_disposed || selectedImage == null) return const Result.success(null);
-
-    if (submissionId == null) {
-      _stagedAssets.add(_StagedSubmissionAsset(File(selectedImage.path)));
-      _notifyListeners();
-      return const Result.success(null);
-    }
 
     final task = _contentSubmissionRepository.uploadImageTask(
       File(selectedImage.path),
@@ -630,104 +627,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     });
   }
 
-  /// Removes a local staged image without mutating backend asset state.
-  void removeStagedAssetAt(int index) {
-    if (index < 0 || index >= _stagedAssets.length || save.running) return;
-    _stagedAssets.removeAt(index);
-    _notifyListeners();
-  }
-
-  void _applySubmission(
-    AdminSubmission submission, {
-    required bool replaceAssets,
-  }) {
-    _category = submission.category;
-    _city = submission.city;
-    _name = submission.name;
-    _description = submission.description;
-    _descriptionDelta = submission.descriptionDelta;
-    final start = submission.startDate?.toUtc();
-    final end = submission.endDate?.toUtc();
-    _eventDates = switch ((start, end)) {
-      (final start?, final end) => EventDateDraft.exact(
-        startCalendarDate: _eventTimePolicy.calendarDateForUtc(start),
-        startInstantUtc: start,
-        endInstantUtc: end,
-      ),
-      (null, final end?) => throw StateError(
-        'Persisted submission ${submission.id} has an end date without a '
-        'start date: $end.',
-      ),
-      (null, null) => const EventDateDraft.disabled(),
-    };
-    _eventTimeIssue = null;
-    // Lossless hydration: double.toString() round-trips exactly, unlike a
-    // fixed-precision rendering.
-    _latitudeText = submission.latitude?.toString() ?? '';
-    _longitudeText = submission.longitude?.toString() ?? '';
-    _contributorName = submission.userName;
-    _contributorEmail = submission.userEmail;
-    _status = submission.status;
-    _promotion = submission.promotion;
-    _createdAt = submission.createdAt;
-    _modifiedAt = submission.modifiedAt;
-    if (replaceAssets) {
-      _assets
-        ..clear()
-        ..addAll(submission.assets);
-    }
-    _hasLoadedDetail = true;
-    _hasUnsavedFieldChanges = false;
-    _authoritativeEditableStateRevision++;
-    _notifyListeners();
-  }
-
-  Future<Result<void>> _persistStagedAssets() async {
-    final submissionId = this.submissionId;
-    if (submissionId == null) return const Result.success(null);
-
-    while (_stagedAssets.isNotEmpty) {
-      if (_disposed) return const Result.success(null);
-      final stagedAsset = _stagedAssets.first;
-      var uploadedAsset = stagedAsset.uploadedAsset;
-      if (uploadedAsset == null) {
-        final task = _contentSubmissionRepository.uploadImageTask(
-          stagedAsset.file,
-        );
-        _activeImageUploadTask = task;
-        final uploadResult = await task.result;
-        if (_disposed) return const Result.success(null);
-        if (identical(_activeImageUploadTask, task)) {
-          _activeImageUploadTask = null;
-        }
-        switch (uploadResult) {
-          case Error<SubmissionAsset>(:final error):
-            return Result.error(error);
-          case Success<SubmissionAsset>(:final value):
-            stagedAsset.uploadedAsset = value;
-            uploadedAsset = value;
-        }
-      }
-
-      final associationResult = await _repository.addAsset(
-        submissionId,
-        uploadedAsset,
-      );
-      if (_disposed) return const Result.success(null);
-      switch (associationResult) {
-        case Error<AdminSubmissionAsset>(:final error):
-          return Result.error(error);
-        case Success<AdminSubmissionAsset>(:final value):
-          _assets.add(value);
-          _stagedAssets.removeAt(0);
-          _notifyListeners();
-      }
-    }
-    return const Result.success(null);
-  }
-
   void _markDirty() {
-    _hasUnsavedFieldChanges = true;
+    _isDirty = true;
     _notifyListeners();
   }
 
@@ -744,11 +645,4 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _activeImageUploadTask = null;
     super.dispose();
   }
-}
-
-final class _StagedSubmissionAsset {
-  _StagedSubmissionAsset(this.file);
-
-  final File file;
-  SubmissionAsset? uploadedAsset;
 }

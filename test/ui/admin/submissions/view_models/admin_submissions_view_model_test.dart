@@ -1,5 +1,3 @@
-import 'dart:async' show Completer;
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
@@ -58,99 +56,6 @@ void main() {
       expect(viewModel.items, <AdminSubmission>[submission]);
       expect(repository.listCallCount, 2);
     });
-
-    test(
-      'serializes a fresh post-editor reload after an active load',
-      () async {
-        final oldSubmission = sampleAdminSubmission(name: 'Old submission');
-        final refreshedSubmission = sampleAdminSubmission(
-          name: 'Refreshed submission',
-        );
-        final initialList = Completer<Result<List<AdminSubmission>>>();
-        final refreshedList = Completer<Result<List<AdminSubmission>>>();
-        final repository = FakeAdminContentSubmissionRepository()
-          ..pendingList = initialList;
-        final viewModel = AdminSubmissionsViewModel(repository: repository);
-        addTearDown(viewModel.dispose);
-
-        final loading = viewModel.load.execute();
-        await pumpEventQueue();
-        final refreshing = viewModel.reloadAfterEditor();
-        final coalescedRefresh = viewModel.reloadAfterEditor();
-        repository.pendingList = refreshedList;
-        initialList.complete(Result.success(<AdminSubmission>[oldSubmission]));
-        await pumpEventQueue();
-
-        expect(repository.listCallCount, 2);
-        expect(viewModel.items, isEmpty);
-
-        refreshedList.complete(
-          Result.success(<AdminSubmission>[refreshedSubmission]),
-        );
-        await Future.wait<void>(
-          <Future<void>>[loading, refreshing, coalescedRefresh],
-        );
-
-        expect(viewModel.items, <AdminSubmission>[refreshedSubmission]);
-      },
-    );
-
-    test(
-      'starts a post-editor reload after command finalization begins',
-      () async {
-        final oldSubmission = sampleAdminSubmission(name: 'Old submission');
-        final refreshedSubmission = sampleAdminSubmission(
-          name: 'Refreshed submission',
-        );
-        final initialList = Completer<Result<List<AdminSubmission>>>();
-        final refreshedList = Completer<Result<List<AdminSubmission>>>();
-        final repository = FakeAdminContentSubmissionRepository()
-          ..pendingList = initialList;
-        final viewModel = AdminSubmissionsViewModel(repository: repository);
-        addTearDown(viewModel.dispose);
-
-        final loading = viewModel.load.execute();
-        await pumpEventQueue();
-        repository.pendingList = refreshedList;
-        final editorRouteResult = Completer<void>.sync();
-        var loadWasRunningWhenEditorReturned = false;
-        late Future<void> refreshing;
-        final editorReturn = editorRouteResult.future.then<void>((_) {
-          loadWasRunningWhenEditorReturned = viewModel.load.running;
-          refreshing = viewModel.reloadAfterEditor();
-        });
-        void completeEditorRouteAfterOlderLoad() {
-          if (viewModel.items.length == 1 &&
-              identical(viewModel.items.single, oldSubmission) &&
-              !editorRouteResult.isCompleted) {
-            // Complete the route result synchronously after `_load` has
-            // handled the older repository response. Its continuation runs
-            // before the command's pending finalization continuation.
-            editorRouteResult.complete();
-          }
-        }
-
-        viewModel.addListener(completeEditorRouteAfterOlderLoad);
-        addTearDown(
-          () => viewModel.removeListener(completeEditorRouteAfterOlderLoad),
-        );
-        initialList.complete(Result.success(<AdminSubmission>[oldSubmission]));
-        await editorReturn;
-
-        expect(loadWasRunningWhenEditorReturned, isTrue);
-        expect(viewModel.items, <AdminSubmission>[oldSubmission]);
-        await pumpEventQueue();
-
-        expect(repository.listCallCount, 2);
-
-        refreshedList.complete(
-          Result.success(<AdminSubmission>[refreshedSubmission]),
-        );
-        await Future.wait<void>(<Future<void>>[loading, refreshing]);
-
-        expect(viewModel.items, <AdminSubmission>[refreshedSubmission]);
-      },
-    );
 
     test(
       'filters loaded summaries by status and restores all summaries',

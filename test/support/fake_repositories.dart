@@ -138,17 +138,13 @@ final class FakeAdminContentSubmissionRepository
     this.listResult = const Result.success([]),
     Map<int, Result<AdminSubmission>>? getByIdResults,
     Result<AdminSubmission>? createResult,
-    List<Result<AdminSubmission>>? createResults,
     Result<AdminSubmission>? updateResult,
     this.rejectResult = const Result.success(null),
     List<Result<AdminSubmissionPromotion>>? promoteResults,
     Result<AdminSubmissionAsset>? addAssetResult,
-    List<Result<AdminSubmissionAsset>>? addAssetResults,
     this.deleteAssetResult = const Result.success(null),
-    this.callLog,
   }) : getByIdResults = getByIdResults ?? {},
        createResult = createResult ?? Result.success(sampleAdminSubmission()),
-       createResults = createResults ?? <Result<AdminSubmission>>[],
        updateResult = updateResult ?? Result.success(sampleAdminSubmission()),
        promoteResults =
            promoteResults ??
@@ -169,22 +165,16 @@ final class FakeAdminContentSubmissionRepository
                width: 1200,
                height: 800,
              ),
-           ),
-       addAssetResults = addAssetResults ?? <Result<AdminSubmissionAsset>>[];
+           );
 
   Result<List<AdminSubmission>> listResult;
   Map<int, Result<AdminSubmission>> getByIdResults;
   Result<AdminSubmission> createResult;
-  final List<Result<AdminSubmission>> createResults;
   Result<AdminSubmission> updateResult;
   Result<void> rejectResult;
   final List<Result<AdminSubmissionPromotion>> promoteResults;
   Result<AdminSubmissionAsset> addAssetResult;
-  final List<Result<AdminSubmissionAsset>> addAssetResults;
   Result<void> deleteAssetResult;
-
-  /// Optional cross-repository call ordering record for focused tests.
-  final List<String>? callLog;
 
   int listCallCount = 0;
   final getByIdIds = <int>[];
@@ -236,10 +226,8 @@ final class FakeAdminContentSubmissionRepository
   @override
   Future<Result<AdminSubmission>> create(AdminSubmissionInput input) async {
     createInputs.add(input);
-    callLog?.add('create');
     final pending = pendingCreate;
     if (pending != null) return pending.future;
-    if (createResults.isNotEmpty) return createResults.removeAt(0);
     return createResult;
   }
 
@@ -283,10 +271,8 @@ final class FakeAdminContentSubmissionRepository
     SubmissionAsset asset,
   ) async {
     addAssetCalls.add((submissionId, asset));
-    callLog?.add('addAsset:$submissionId');
     final pending = pendingAddAsset;
     if (pending != null) return pending.future;
-    if (addAssetResults.isNotEmpty) return addAssetResults.removeAt(0);
     return addAssetResult;
   }
 
@@ -753,8 +739,6 @@ final class FakeContentSubmissionRepository
   FakeContentSubmissionRepository({
     this.uploadResult = const Result.success(null),
     ImageUploadTask? uploadImageTaskResult,
-    List<ImageUploadTask>? uploadImageTaskResults,
-    this.callLog,
   }) : uploadImageTaskResult =
            uploadImageTaskResult ??
            FakeImageUploadTask.completed(
@@ -765,15 +749,10 @@ final class FakeContentSubmissionRepository
                  height: 2048,
                ),
              ),
-           ),
-       uploadImageTaskResults = uploadImageTaskResults ?? <ImageUploadTask>[];
+           );
 
   Result<void> uploadResult;
   ImageUploadTask uploadImageTaskResult;
-  final List<ImageUploadTask> uploadImageTaskResults;
-
-  /// Optional cross-repository call ordering record for focused tests.
-  final List<String>? callLog;
 
   bool uploadCalled = false;
   final uploadedImages = <File>[];
@@ -794,10 +773,6 @@ final class FakeContentSubmissionRepository
   @override
   ImageUploadTask uploadImageTask(File image) {
     uploadedImages.add(image);
-    callLog?.add('upload:${image.path}');
-    if (uploadImageTaskResults.isNotEmpty) {
-      return uploadImageTaskResults.removeAt(0);
-    }
     return uploadImageTaskResult;
   }
 

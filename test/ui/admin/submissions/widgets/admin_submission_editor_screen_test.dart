@@ -16,8 +16,6 @@ import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/models/image_upload_task.dart';
-import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
@@ -86,58 +84,50 @@ void main() {
       viewModel.dispose();
     });
 
-    testWidgets(
-      'renders the shared create fields with a staged asset section',
-      (
-        tester,
-      ) async {
-        await tester.binding.setSurfaceSize(const Size(800, 1600));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        viewModel = AdminSubmissionEditorViewModel(
-          repository: repository,
-          contentSubmissionRepository: contentSubmissionRepository,
-          creatorName: 'Redattore',
-          creatorEmail: 'redattore@example.com',
-        );
-        await tester.pumpWidget(app);
-        await tester.pumpAndSettle();
-        unawaited(router.push('/editor'));
-        await tester.pumpAndSettle();
+    testWidgets('renders the shared create fields without an asset section', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        creatorName: 'Redattore',
+        creatorEmail: 'redattore@example.com',
+      );
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
 
-        expect(find.text('Nuovo contributo'), findsOneWidget);
-        expect(find.text('Categoria'), findsOneWidget);
-        expect(find.text('Dettagli'), findsOneWidget);
-        expect(find.widgetWithText(TextFormField, 'Città'), findsOneWidget);
-        expect(
-          find.widgetWithText(TextFormField, 'Luogo o evento'),
-          findsOneWidget,
-        );
-        expect(find.text('È un evento?'), findsOneWidget);
-        final scrollable = find
-            .descendant(
-              of: find.byKey(
-                const ValueKey<String>('admin_submission_editor_scroll'),
-              ),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        await tester.scrollUntilVisible(
-          find.widgetWithText(FilledButton, 'Crea contributo'),
-          200,
-          scrollable: scrollable,
-        );
-        expect(
-          find.widgetWithText(FilledButton, 'Crea contributo'),
-          findsOneWidget,
-        );
-        expect(find.text('Foto'), findsOneWidget);
-        expect(find.text('0 / 5'), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey<String>('admin_submission_add_asset')),
-          findsOneWidget,
-        );
-      },
-    );
+      expect(find.text('Nuovo contributo'), findsOneWidget);
+      expect(find.text('Categoria'), findsOneWidget);
+      expect(find.text('Dettagli'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Città'), findsOneWidget);
+      expect(
+        find.widgetWithText(TextFormField, 'Luogo o evento'),
+        findsOneWidget,
+      );
+      expect(find.text('È un evento?'), findsOneWidget);
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Crea contributo'),
+        200,
+        scrollable: scrollable,
+      );
+      expect(
+        find.widgetWithText(FilledButton, 'Crea contributo'),
+        findsOneWidget,
+      );
+      expect(find.text('Foto'), findsNothing);
+    });
 
     testWidgets('shows creator identity read-only without public fields', (
       tester,
@@ -175,239 +165,6 @@ void main() {
       expect(find.widgetWithText(TextFormField, 'E-mail'), findsNothing);
       expect(find.widgetWithText(TextFormField, 'Autore'), findsNothing);
       expect(find.byType(CheckboxFormField), findsNothing);
-    });
-
-    testWidgets('renders and removes a staged create-mode photo locally', (
-      tester,
-    ) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1600));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      viewModel = AdminSubmissionEditorViewModel(
-        repository: repository,
-        contentSubmissionRepository: contentSubmissionRepository,
-        imagePicker: FakeImagePicker(
-          onPickImage: () async => XFile('/tmp/staged.jpg'),
-        ),
-      );
-      await tester.pumpWidget(app);
-      unawaited(router.push('/editor'));
-      await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      final add = find.byKey(
-        const ValueKey<String>('admin_submission_add_asset'),
-      );
-      await tester.scrollUntilVisible(add, 200, scrollable: scrollable);
-      await tester.tap(add);
-      await tester.pump();
-
-      expect(find.text('In attesa'), findsOneWidget);
-      expect(find.text('1 / 5'), findsOneWidget);
-      await tester.tap(
-        find.byKey(
-          const ValueKey<String>('admin_submission_remove_staged_asset_0'),
-        ),
-      );
-      await tester.pump();
-
-      expect(find.text('In attesa'), findsNothing);
-      expect(find.text('0 / 5'), findsOneWidget);
-      expect(repository.deleteAssetCalls, isEmpty);
-    });
-
-    testWidgets('retains failed and unstarted staged photos after Save', (
-      tester,
-    ) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1600));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      var picks = 0;
-      repository = FakeAdminContentSubmissionRepository(
-        createResult: Result.success(
-          sampleAdminSubmission(id: 7, category: ContentCategory.nature),
-        ),
-        addAssetResults: <Result<AdminSubmissionAsset>>[
-          const Result.success(
-            AdminSubmissionAsset(
-              id: 1,
-              url: 'https://example.com/one.jpg',
-              width: 100,
-              height: 100,
-            ),
-          ),
-          Result.error(TestException('association failed')),
-        ],
-      );
-      contentSubmissionRepository = FakeContentSubmissionRepository(
-        uploadImageTaskResults: <ImageUploadTask>[
-          FakeImageUploadTask.completed(
-            const Result.success(
-              SubmissionAsset(
-                secureUrl: 'https://example.com/one.jpg',
-                width: 100,
-                height: 100,
-              ),
-            ),
-          ),
-          FakeImageUploadTask.completed(
-            const Result.success(
-              SubmissionAsset(
-                secureUrl: 'https://example.com/two.jpg',
-                width: 200,
-                height: 200,
-              ),
-            ),
-          ),
-        ],
-      );
-      viewModel = AdminSubmissionEditorViewModel(
-        repository: repository,
-        contentSubmissionRepository: contentSubmissionRepository,
-        imagePicker: FakeImagePicker(
-          onPickImage: () async => XFile('/tmp/staged-${picks++}.jpg'),
-        ),
-      );
-      await tester.pumpWidget(app);
-      unawaited(router.push('/editor'));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Città'),
-        'Isernia',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Luogo o evento'),
-        'Museo',
-      );
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      final add = find.byKey(
-        const ValueKey<String>('admin_submission_add_asset'),
-      );
-      await tester.scrollUntilVisible(add, 200, scrollable: scrollable);
-      for (var index = 0; index < 3; index++) {
-        await tester.tap(add);
-        await tester.pumpAndSettle();
-      }
-
-      await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Crea contributo'),
-        200,
-        scrollable: scrollable,
-      );
-      await tester.tap(find.widgetWithText(FilledButton, 'Crea contributo'));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('Modifica contributo', skipOffstage: false),
-        findsOneWidget,
-      );
-      await tester.scrollUntilVisible(
-        find.text('Foto'),
-        -200,
-        scrollable: scrollable,
-      );
-      expect(find.byType(AppNetworkImage), findsOneWidget);
-      expect(find.text('In attesa'), findsNWidgets(2));
-      expect(find.text('3 / 5'), findsOneWidget);
-      final publish = find.widgetWithText(FilledButton, 'Pubblica come luogo');
-      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
-      expect(
-        find.text(
-          'Completa il salvataggio delle foto prima di pubblicare o '
-          'rifiutare.',
-        ),
-        findsOneWidget,
-      );
-      expect(tester.widget<FilledButton>(publish).onPressed, isNull);
-      expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Rifiuta'))
-            .onPressed,
-        isNull,
-      );
-    });
-
-    testWidgets('adopts trimmed create values in the mounted fields', (
-      tester,
-    ) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1600));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      repository.createResult = Result.success(
-        sampleAdminSubmission(
-          id: 7,
-          city: 'Isernia',
-          name: 'Museo',
-          category: ContentCategory.unknown,
-        ),
-      );
-      viewModel = AdminSubmissionEditorViewModel(
-        repository: repository,
-        contentSubmissionRepository: contentSubmissionRepository,
-      );
-      await tester.pumpWidget(app);
-      unawaited(router.push('/editor'));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Città'),
-        ' Isernia ',
-      );
-      await tester.enterText(
-        find.widgetWithText(TextFormField, 'Luogo o evento'),
-        ' Museo ',
-      );
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Crea contributo'),
-        200,
-        scrollable: scrollable,
-      );
-      await tester.tap(find.widgetWithText(FilledButton, 'Crea contributo'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Modifica contributo'), findsOneWidget);
-      expect(
-        tester
-            .widget<TextFormField>(
-              find.widgetWithText(TextFormField, 'Città'),
-            )
-            .initialValue,
-        'Isernia',
-      );
-      expect(
-        tester
-            .widget<TextFormField>(
-              find.widgetWithText(TextFormField, 'Luogo o evento'),
-            )
-            .initialValue,
-        'Museo',
-      );
-      final publish = find.widgetWithText(FilledButton, 'Pubblica come luogo');
-      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
-      expect(tester.widget<FilledButton>(publish).onPressed, isNull);
-      expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Rifiuta'))
-            .onPressed,
-        isNotNull,
-      );
     });
 
     testWidgets('shows loaded edit details, assets, count, and add control', (
@@ -845,22 +602,8 @@ void main() {
         'separately', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      const confirmedAsset = AdminSubmissionAsset(
-        id: 2,
-        url: 'https://example.com/confirmed.jpg',
-        width: 100,
-        height: 100,
-      );
       repository.getByIdResults[1] = Result.success(
-        sampleAdminSubmission(
-          assets: const <AdminSubmissionAsset>[confirmedAsset],
-        ),
-      );
-      repository.updateResult = Result.success(
-        sampleAdminSubmission(
-          city: 'Isernia',
-          name: 'Museo autorevole',
-        ),
+        sampleAdminSubmission(),
       );
       viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
@@ -902,7 +645,7 @@ void main() {
       );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Città'),
-        ' Isernia ',
+        'Isernia',
       );
       await tester.pump();
 
@@ -927,36 +670,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.updateIds, <int>[1]);
-      expect(find.text('Modifica contributo'), findsOneWidget);
-      expect(find.byType(AppNetworkImage), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.widgetWithText(TextFormField, 'Città'),
-        -200,
-        scrollable: scrollable,
-      );
-      expect(
-        tester
-            .widget<TextFormField>(
-              find.widgetWithText(TextFormField, 'Città'),
-            )
-            .initialValue,
-        'Isernia',
-      );
-      expect(
-        tester
-            .widget<TextFormField>(
-              find.widgetWithText(TextFormField, 'Luogo o evento'),
-            )
-            .initialValue,
-        'Museo autorevole',
-      );
-      await tester.scrollUntilVisible(
-        publishButton,
-        200,
-        scrollable: scrollable,
-      );
-      expect(tester.widget<FilledButton>(publishButton).onPressed, isNotNull);
-      expect(tester.widget<FilledButton>(rejectButton).onPressed, isNotNull);
+      expect(find.text('SHELL_MARKER'), findsOneWidget);
     });
 
     testWidgets('requires a concrete saved category before publication', (
@@ -1025,6 +739,10 @@ void main() {
 
       expect(repository.updateInputs.single.category, ContentCategory.nature);
       expect(viewModel.isDirty, isFalse);
+      expect(find.text('SHELL_MARKER'), findsOneWidget);
+
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
       expect(tester.widget<FilledButton>(publish).onPressed, isNotNull);
       expect(tester.widget<FilledButton>(reject).onPressed, isNotNull);
@@ -1049,7 +767,6 @@ void main() {
         submissionId: 1,
       );
       await viewModel.load.execute();
-      viewModel.setCity('Isernia');
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1132,7 +849,6 @@ void main() {
           findsOneWidget,
         );
 
-        viewModel.setCity('Isernia');
         unawaited(viewModel.save.execute());
         await tester.pump();
         expect(viewModel.save.running, isTrue);
@@ -1150,9 +866,10 @@ void main() {
         await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
         await tester.pumpAndSettle();
 
-        // Save does not defer a route exit while the dialog is open.
+        // The save completed while the dialog was open: closing the editor
+        // refreshes the dashboard instead of running a stale moderation.
         expect(repository.promoteCalls, isEmpty);
-        expect(find.text('Modifica contributo'), findsOneWidget);
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
       },
     );
 
@@ -1193,7 +910,6 @@ void main() {
           findsOneWidget,
         );
 
-        viewModel.setCity('Isernia');
         unawaited(viewModel.save.execute());
         await tester.pump();
         expect(viewModel.save.running, isTrue);
@@ -1204,7 +920,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(repository.rejectIds, isEmpty);
-        expect(find.text('Modifica contributo'), findsOneWidget);
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
       },
     );
 
@@ -1781,7 +1497,8 @@ void main() {
 
       pendingUpdate.complete(Result.success(sampleAdminSubmission()));
       await tester.pumpAndSettle();
-      expect(find.text('Modifica contributo'), findsOneWidget);
+      // The save success pops the editor back to the shell.
+      expect(find.text('SHELL_MARKER'), findsOneWidget);
     });
     testWidgets('renders historical accepted rows read-only without Save', (
       tester,
@@ -2256,22 +1973,7 @@ void main() {
         expect(repository.createInputs, isNotEmpty);
         expect(repository.createInputs.single.latitude, isNull);
         expect(repository.createInputs.single.longitude, isNull);
-        expect(find.text('Modifica contributo'), findsOneWidget);
-        expect(find.text('Proposto da'), findsOneWidget);
-        expect(find.text('Mario Rossi'), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey<String>('admin_submission_add_asset')),
-          findsOneWidget,
-        );
-        expect(
-          find.widgetWithText(FilledButton, 'Salva modifiche'),
-          findsOneWidget,
-        );
-        expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsOneWidget);
-        expect(
-          find.widgetWithText(FilledButton, 'Pubblica come luogo'),
-          findsOneWidget,
-        );
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
       });
 
       testWidgets('successful Save persists the updated coordinate pair', (
@@ -2309,7 +2011,7 @@ void main() {
         expect(repository.updateIds, <int>[1]);
         expect(repository.updateInputs.single.latitude, 41.55);
         expect(repository.updateInputs.single.longitude, 14.64);
-        expect(find.text('Modifica contributo'), findsOneWidget);
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
       });
     });
   });

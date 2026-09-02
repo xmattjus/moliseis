@@ -1,5 +1,4 @@
 import 'dart:async' show unawaited;
-import 'dart:io' show File;
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -38,6 +37,8 @@ class _AdminSubmissionEditorScreenState
     extends State<AdminSubmissionEditorScreen> {
   final _formKey = GlobalKey<FormState>();
   final _locationFormKey = GlobalKey<FormState>();
+  var _statusDialogOpen = false;
+  var _saveCompletedWhileStatusDialogOpen = false;
 
   @override
   void initState() {
@@ -63,7 +64,13 @@ class _AdminSubmissionEditorScreenState
     if (!mounted) return;
 
     final save = widget.viewModel.save;
-    if (save.error) {
+    if (save.completed) {
+      if (_statusDialogOpen) {
+        _saveCompletedWhileStatusDialogOpen = true;
+        return;
+      }
+      context.pop(true);
+    } else if (save.error) {
       final result = save.result;
       if (result
           case Error<void>(:final AdminContentSubmissionApiException error)
@@ -177,7 +184,8 @@ class _AdminSubmissionEditorScreenState
     }
   }
 
-  /// Closes the keyboard before an editor action opens another interaction.
+  /// Closes the keyboard so an already-focused input cannot swallow edits
+  /// after the request snapshot pops the route on success.
   void _unfocus() {
     FocusManager.instance.primaryFocus?.unfocus();
   }
@@ -199,34 +207,45 @@ class _AdminSubmissionEditorScreenState
     if (viewModel.operationRunning) return;
 
     _unfocus();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final question = switch (target) {
-          AdminPromotionTarget.event =>
-            'Confermi di voler pubblicare questo contributo come evento?',
-          AdminPromotionTarget.place =>
-            'Confermi di voler pubblicare questo contributo come luogo?',
-        };
-        return AlertDialog(
-          content: Text(question),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annulla'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Conferma'),
-            ),
-          ],
-        );
-      },
-    );
-    if (!mounted) return;
-    if (confirmed != true || viewModel.operationRunning) return;
+    _statusDialogOpen = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          final question = switch (target) {
+            AdminPromotionTarget.event =>
+              'Confermi di voler pubblicare questo contributo come evento?',
+            AdminPromotionTarget.place =>
+              'Confermi di voler pubblicare questo contributo come luogo?',
+          };
+          return AlertDialog(
+            content: Text(question),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Conferma'),
+              ),
+            ],
+          );
+        },
+      );
+      final saveCompleted = _saveCompletedWhileStatusDialogOpen;
+      if (!mounted) return;
+      if (saveCompleted) {
+        context.pop(true);
+        return;
+      }
+      if (confirmed != true || viewModel.operationRunning) return;
 
-    unawaited(viewModel.promote.execute(target));
+      unawaited(viewModel.promote.execute(target));
+    } finally {
+      _statusDialogOpen = false;
+      _saveCompletedWhileStatusDialogOpen = false;
+    }
   }
 
   Future<void> _confirmReject() async {
@@ -236,28 +255,41 @@ class _AdminSubmissionEditorScreenState
     if (viewModel.operationRunning) return;
 
     _unfocus();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          content: const Text('Confermi di voler rifiutare questo contributo?'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annulla'),
+    _statusDialogOpen = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            content: const Text(
+              'Confermi di voler rifiutare questo contributo?',
             ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Conferma'),
-            ),
-          ],
-        );
-      },
-    );
-    if (!mounted) return;
-    if (confirmed != true || viewModel.operationRunning) return;
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Conferma'),
+              ),
+            ],
+          );
+        },
+      );
+      final saveCompleted = _saveCompletedWhileStatusDialogOpen;
+      if (!mounted) return;
+      if (saveCompleted) {
+        context.pop(true);
+        return;
+      }
+      if (confirmed != true || viewModel.operationRunning) return;
 
-    unawaited(viewModel.reject.execute());
+      unawaited(viewModel.reject.execute());
+    } finally {
+      _statusDialogOpen = false;
+      _saveCompletedWhileStatusDialogOpen = false;
+    }
   }
 
   Future<void> _confirmAssetDeletion(int assetId) async {
@@ -369,9 +401,6 @@ class _AdminSubmissionEditorScreenState
                           // transient busy states stay fully visible.
                           opacity: viewModel.isEditable ? 1.0 : 0.55,
                           child: ContentSubmissionFields(
-                            key: ValueKey<int>(
-                              viewModel.authoritativeEditableStateRevision,
-                            ),
                             formKey: _formKey,
                             category: viewModel.category,
                             city: viewModel.city,
@@ -426,7 +455,7 @@ class _AdminSubmissionEditorScreenState
                   ),
                 ],
               ),
-              if (!viewModel.isEditMode || viewModel.hasLoadedDetail)
+              if (viewModel.isEditMode && viewModel.hasLoadedDetail)
                 SliverList.list(
                   children: <Widget>[
                     const TextSectionDivider('Foto'),
@@ -437,7 +466,7 @@ class _AdminSubmissionEditorScreenState
                         spacing: 8,
                         children: <Widget>[
                           Text(
-                            '${viewModel.assetCount} / '
+                            '${viewModel.assets.length} / '
                             '$kMaximumSubmissionAssetCount',
                           ),
                           Wrap(
@@ -475,63 +504,8 @@ class _AdminSubmissionEditorScreenState
                                   ],
                                 ),
                               ),
-                              ...viewModel.stagedAssetFiles.indexed.map(
-                                (entry) => Stack(
-                                  key: ValueKey<String>(
-                                    'admin_submission_staged_asset_'
-                                    '${entry.$1}',
-                                  ),
-                                  alignment: Alignment.topRight,
-                                  children: <Widget>[
-                                    Image.file(
-                                      File(entry.$2.path),
-                                      width: 100,
-                                      height: 100,
-                                      fit: BoxFit.cover,
-                                    ),
-                                    const Positioned(
-                                      left: 4,
-                                      bottom: 4,
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          color: Colors.black54,
-                                          borderRadius: BorderRadius.all(
-                                            Radius.circular(4),
-                                          ),
-                                        ),
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(
-                                            horizontal: 4,
-                                            vertical: 2,
-                                          ),
-                                          child: Text(
-                                            'In attesa',
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      key: ValueKey<String>(
-                                        'admin_submission_remove_staged_asset_'
-                                        '${entry.$1}',
-                                      ),
-                                      onPressed: viewModel.operationRunning
-                                          ? null
-                                          : () => viewModel.removeStagedAssetAt(
-                                              entry.$1,
-                                            ),
-                                      tooltip: 'Rimuovi foto in attesa',
-                                      icon: const Icon(Symbols.delete),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (viewModel.isEditable &&
-                                  viewModel.assetCount <
+                              if (status == AdminSubmissionStatus.pending &&
+                                  viewModel.assets.length <
                                       kMaximumSubmissionAssetCount)
                                 SizedBox(
                                   width: 100,
@@ -602,12 +576,9 @@ class _AdminSubmissionEditorScreenState
                         children: <Widget>[
                           if (status == AdminSubmissionStatus.pending) ...[
                             if (viewModel.isDirty)
-                              Text(
-                                viewModel.stagedAssetFiles.isNotEmpty
-                                    ? 'Completa il salvataggio delle foto '
-                                          'prima di pubblicare o rifiutare.'
-                                    : 'Salva le modifiche prima di pubblicare '
-                                          'o rifiutare.',
+                              const Text(
+                                'Salva le modifiche prima di pubblicare o '
+                                'rifiutare.',
                               )
                             else if (!viewModel.hasPublishableCategory)
                               const Text(
