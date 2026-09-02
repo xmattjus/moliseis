@@ -32,14 +32,6 @@ A successful admin create or update Save SHALL keep the current editor session o
 - **AND** Publish SHALL become available only when every existing publication-readiness rule is satisfied
 - **AND** an `unknown` category SHALL continue to block Publish without blocking Reject
 
-#### Scenario: Save reflects authoritative editable values in the mounted form
-- **GIVEN** a live new or persisted pending editor submits editable values
-- **AND** persistence normalizes one or more of those values, such as trimming the city or name
-- **WHEN** Save receives a successful create or update response
-- **THEN** the editor's mounted controls SHALL reflect the authoritative editable values returned by persistence
-- **AND** applying an update response that omits loaded asset associations SHALL preserve every confirmed asset already held by the editor
-- **AND** the synchronization SHALL NOT replace the editor route or require a detail reload solely to display the authoritative values
-
 #### Scenario: Save completes while a moderation confirmation is open
 - **GIVEN** a Save was already in flight
 - **AND** a moderation confirmation is open when that Save completes
@@ -240,10 +232,3 @@ The admin submissions dashboard SHALL refresh after an editor route opened from 
 - **WHEN** the editor exits
 - **THEN** refreshing the dashboard SHALL remain valid behavior
 - **AND** the system SHALL NOT require mutation-tracking complexity solely to suppress that refresh
-
-#### Scenario: An older list request is in flight when the editor returns
-- **GIVEN** a dashboard list request that started before the editor route returned is still in flight
-- **WHEN** the editor route returns to the dashboard
-- **THEN** that older request alone SHALL NOT satisfy the post-return refresh obligation
-- **AND** the dashboard SHALL ensure that another list request starts after the editor has returned
-- **AND** the post-return request MAY wait for the older request to settle rather than running concurrently
