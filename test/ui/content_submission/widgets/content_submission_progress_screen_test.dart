@@ -22,6 +22,7 @@ void main() {
   ContentSubmissionViewModel buildViewModel({
     required ControllableSubmissionRepository submissionRepository,
     ContentSubmissionDraftRepository? draftRepository,
+    FakeContentSubmissionStagedAssetRepository? stagedAssetRepository,
   }) {
     // _submit null-checks these fields; populate them so the Command can run.
     return ContentSubmissionViewModel(
@@ -29,6 +30,9 @@ void main() {
         contentSubmissionRepository: submissionRepository,
         draftRepository:
             draftRepository ?? FakeContentSubmissionDraftRepository(),
+        stagedAssetRepository:
+            stagedAssetRepository ??
+            FakeContentSubmissionStagedAssetRepository(),
         imagePicker: FakeImagePicker(),
       )
       ..setCity('Campobasso')
@@ -209,10 +213,13 @@ void main() {
       (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
+        final stagedRepo = FakeContentSubmissionStagedAssetRepository();
         final vm = buildViewModel(
           submissionRepository: repo,
           draftRepository: draftRepo,
+          stagedAssetRepository: stagedRepo,
         );
+        final completedIdentity = vm.state.clientSubmissionId;
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
@@ -235,6 +242,7 @@ void main() {
 
         expect(draftRepo.clearDraftCalled, isTrue);
         expect(draftRepo.clearDraftCallCount, 1);
+        expect(stagedRepo.clearedSessions, [completedIdentity]);
         // The completed exit pops the progress route once and lands on the
         // form route below; the form screen owns the reset of its fields when
         // `viewModel.clear` completes.
@@ -253,9 +261,11 @@ void main() {
       (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
+        final stagedRepo = FakeContentSubmissionStagedAssetRepository();
         final vm = buildViewModel(
           submissionRepository: repo,
           draftRepository: draftRepo,
+          stagedAssetRepository: stagedRepo,
         );
 
         final (router, app) = buildHomeFirstApp(vm);
@@ -274,6 +284,7 @@ void main() {
         // retry. With the production-shaped harness the previous screen is
         // `_FormMarker`, not home.
         expect(draftRepo.clearDraftCalled, isFalse);
+        expect(stagedRepo.clearedSessions, isEmpty);
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
       },
@@ -284,10 +295,13 @@ void main() {
       (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
+        final stagedRepo = FakeContentSubmissionStagedAssetRepository();
         final vm = buildViewModel(
           submissionRepository: repo,
           draftRepository: draftRepo,
+          stagedAssetRepository: stagedRepo,
         );
+        final completedIdentity = vm.state.clientSubmissionId;
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
@@ -302,6 +316,7 @@ void main() {
 
         expect(draftRepo.clearDraftCalled, isTrue);
         expect(draftRepo.clearDraftCallCount, 1);
+        expect(stagedRepo.clearedSessions, [completedIdentity]);
         // The completed exit pops the progress route once and lands on the
         // form route below, which resets its own fields on clear.
         expect(find.byType(_FormMarker), findsOneWidget);
@@ -321,9 +336,11 @@ void main() {
       ) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
+        final stagedRepo = FakeContentSubmissionStagedAssetRepository();
         final vm = buildViewModel(
           submissionRepository: repo,
           draftRepository: draftRepo,
+          stagedAssetRepository: stagedRepo,
         );
 
         final (router, app) = buildHomeFirstApp(vm);
@@ -358,9 +375,11 @@ void main() {
     ) async {
       final repo = ControllableSubmissionRepository();
       final draftRepo = FakeContentSubmissionDraftRepository();
+      final stagedRepo = FakeContentSubmissionStagedAssetRepository();
       final vm = buildViewModel(
         submissionRepository: repo,
         draftRepository: draftRepo,
+        stagedAssetRepository: stagedRepo,
       );
 
       final (router, app) = buildHomeFirstApp(vm);
@@ -376,6 +395,7 @@ void main() {
 
       expect(handled, isTrue);
       expect(draftRepo.clearDraftCalled, isFalse);
+      expect(stagedRepo.clearedSessions, isEmpty);
       expect(find.byType(_FormMarker), findsOneWidget);
       expect(find.byType(_HomeMarker), findsNothing);
     });
@@ -385,9 +405,11 @@ void main() {
       (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
+        final stagedRepo = FakeContentSubmissionStagedAssetRepository();
         final vm = buildViewModel(
           submissionRepository: repo,
           draftRepository: draftRepo,
+          stagedAssetRepository: stagedRepo,
         );
 
         final (router, app) = buildHomeFirstApp(vm);
@@ -398,6 +420,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(draftRepo.clearDraftCalled, isFalse);
+        expect(stagedRepo.clearedSessions, isEmpty);
         expect(repo.uploadCallCount, 0);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(find.byType(_FormMarker), findsOneWidget);
@@ -578,10 +601,13 @@ void main() {
     ) async {
       final repo = ControllableSubmissionRepository();
       final draftRepo = FakeContentSubmissionDraftRepository();
+      final stagedRepo = FakeContentSubmissionStagedAssetRepository();
       final vm = buildViewModel(
         submissionRepository: repo,
         draftRepository: draftRepo,
+        stagedAssetRepository: stagedRepo,
       );
+      final completedIdentity = vm.state.clientSubmissionId;
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
       unawaited(vm.submit.execute());
@@ -594,6 +620,7 @@ void main() {
 
       expect(draftRepo.clearDraftCalled, isTrue);
       expect(draftRepo.clearDraftCallCount, 1);
+      expect(stagedRepo.clearedSessions, [completedIdentity]);
       expect(find.byType(_HomeMarker), findsOneWidget);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
       expect(tester.takeException(), isNull);

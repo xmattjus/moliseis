@@ -10,6 +10,7 @@ import 'package:moliseis/data/repositories/admin_content_submission_repository_i
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_repository_impl.dart';
+import 'package:moliseis/data/repositories/content_submission_staged_asset_repository_impl.dart';
 import 'package:moliseis/data/repositories/event_repository_impl.dart';
 import 'package:moliseis/data/repositories/media_repository_impl.dart';
 import 'package:moliseis/data/repositories/place_repository_impl.dart';
@@ -27,6 +28,7 @@ import 'package:moliseis/domain/repositories/admin_content_submission_repository
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_staged_asset_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
@@ -186,6 +188,12 @@ List<SingleChildWidget> providers(
       objectBoxI: objectBox,
     ),
   ),
+  Provider<ContentSubmissionStagedAssetRepository>(
+    create: (context) => ContentSubmissionStagedAssetRepositoryImpl(
+      logger: context.read(),
+      objectBoxI: objectBox,
+    ),
+  ),
   //#endregion
 
   //#region ViewModels (sorted by use!)
@@ -241,6 +249,8 @@ List<SingleChildWidget> providers(
         contentSubmissionRepository: context
             .read<ContentSubmissionRepository>(),
         draftRepository: context.read<ContentSubmissionDraftRepository>(),
+        stagedAssetRepository: context
+            .read<ContentSubmissionStagedAssetRepository>(),
       );
       unawaited(viewModel.initialize());
       return viewModel;

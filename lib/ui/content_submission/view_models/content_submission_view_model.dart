@@ -1,3 +1,4 @@
+import 'dart:async' show Completer, unawaited;
 import 'dart:collection' show UnmodifiableListView;
 import 'dart:io' show File;
 
@@ -9,9 +10,11 @@ import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
+import 'package:moliseis/domain/models/content_submission_staged_asset.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_staged_asset_repository.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/logging/logging.dart';
@@ -64,15 +67,25 @@ enum ContentSubmissionDraftLoadState {
   ready,
 }
 
+enum _AssetCandidateDisposition {
+  added,
+  duplicate,
+  oversized,
+  overCapacity,
+  discarded,
+}
+
 class ContentSubmissionViewModel extends ChangeNotifier {
   ContentSubmissionViewModel({
     required Logger logger,
     required ContentSubmissionRepository contentSubmissionRepository,
     required ContentSubmissionDraftRepository draftRepository,
+    required ContentSubmissionStagedAssetRepository stagedAssetRepository,
     ImagePicker? imagePicker,
   }) : _logger = logger,
        _contentSubmissionRepository = contentSubmissionRepository,
        _draftRepository = draftRepository,
+       _stagedAssetRepository = stagedAssetRepository,
        _imagePicker = imagePicker ?? ImagePicker() {
     _checkpointedDraft = _state;
     addAsset = Command0(_addAsset);
@@ -96,9 +109,17 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   final Logger _logger;
   final ContentSubmissionRepository _contentSubmissionRepository;
   final ContentSubmissionDraftRepository _draftRepository;
+  final ContentSubmissionStagedAssetRepository _stagedAssetRepository;
   final ImagePicker _imagePicker;
   ContentSubmissionDraft _state = ContentSubmissionDraft();
   late ContentSubmissionDraft _checkpointedDraft;
+  bool _hasDurableCheckpoint = false;
+  Future<void>? _initializationFuture;
+  final Completer<void> _initializationBarrier = Completer<void>();
+  Future<void> _lifecycleTail = Future<void>.value();
+  bool _stagedStateAvailable = false;
+  Exception? _stagedReconciliationError;
+  String? _recoveryEligibleClientSubmissionId;
   ContentSubmissionDraftLoadState _loadState =
       ContentSubmissionDraftLoadState.loading;
   final EventTimePolicy _eventTimePolicy = EventTimePolicy();
@@ -155,74 +176,252 @@ class ContentSubmissionViewModel extends ChangeNotifier {
 
   /// Loads the last [ContentSubmissionDraft] saved to local persistance
   /// if any.
-  Future<void> initialize() async {
-    final result = await _draftRepository.loadDraft();
+  Future<void> initialize() => _initializationFuture ??= _initialize();
 
-    if (result is Success<ContentSubmissionDraft?> && result.value != null) {
-      _state = result.value!;
-      _checkpointedDraft = _state;
+  Future<void> _initialize() async {
+    try {
+      final result = await _draftRepository.loadDraft();
+      String? activeClientSubmissionId;
+
+      if (result is Success<ContentSubmissionDraft?> && result.value != null) {
+        _state = result.value!;
+        _checkpointedDraft = _state;
+        _hasDurableCheckpoint = true;
+        activeClientSubmissionId = _state.clientSubmissionId;
+      }
+      // On error, fall back to an empty draft — the repository already
+      // logged the failure, and blocking the form is worse than losing
+      // an unsaved draft.
+
+      final reconciled = await _reconcileStagedAssets(activeClientSubmissionId);
+      if (activeClientSubmissionId != null && reconciled is Success<void>) {
+        _recoveryEligibleClientSubmissionId = activeClientSubmissionId;
+      }
+    } on Object catch (error) {
+      _stagedStateAvailable = false;
+      _stagedReconciliationError = error is Exception
+          ? error
+          : Exception(error.toString());
+      _assets.clear();
+    } finally {
+      _loadState = ContentSubmissionDraftLoadState.ready;
+      if (!_initializationBarrier.isCompleted) {
+        _initializationBarrier.complete();
+      }
+      if (!_disposed) {
+        notifyListeners();
+      }
     }
-    // On error, fall back to an empty draft — the repository already
-    // logged the failure, and blocking the form is worse than losing
-    // an unsaved draft.
-
-    _loadState = ContentSubmissionDraftLoadState.ready;
-
-    notifyListeners();
   }
 
-  Future<void> _calculateHashAndAdd(XFile asset) async {
+  /// Reconciles durable staged descriptors and publishes only a complete,
+  /// validated runtime list. A failure leaves the current list unavailable so
+  /// a subsequent pre-picker retry cannot mutate uncertain state.
+  Future<Result<void>> _reconcileStagedAssets(
+    String? activeClientSubmissionId,
+  ) async {
+    final staged = await _stagedAssetRepository.reconcileAndLoad(
+      activeClientSubmissionId,
+    );
+    if (staged case Error<List<ContentSubmissionStagedAsset>>(:final error)) {
+      _stagedStateAvailable = false;
+      _stagedReconciliationError = error;
+      _assets.clear();
+      return Result.error(error);
+    }
+
+    final descriptors =
+        (staged as Success<List<ContentSubmissionStagedAsset>>).value;
+    if (descriptors.length > maximumAssetCount) {
+      final error = Exception('Restored staged assets exceed the asset limit.');
+      _stagedStateAvailable = false;
+      _stagedReconciliationError = error;
+      _assets.clear();
+      return Result.error(error);
+    }
+
+    final restored = <Asset>[];
+    for (final descriptor in descriptors) {
+      final resolved = await _stagedAssetRepository.resolveAbsolutePath(
+        descriptor,
+      );
+      if (resolved case Error<File>(:final error)) {
+        _stagedStateAvailable = false;
+        _stagedReconciliationError = error;
+        _assets.clear();
+        return Result.error(error);
+      }
+      restored.add((
+        file: XFile((resolved as Success<File>).value.path),
+        digest: descriptor.digest,
+      ));
+    }
+
+    _assets
+      ..clear()
+      ..addAll(restored);
+    _stagedStateAvailable = true;
+    _stagedReconciliationError = null;
+    return const Result.success(null);
+  }
+
+  /// Validates and commits one picker/recovery candidate into staged storage.
+  ///
+  /// Both picker and Android-recovery flows use this routine so their capacity,
+  /// size, SHA-1 deduplication, and runtime-path ownership rules cannot drift.
+  Future<Result<_AssetCandidateDisposition>> _processAssetCandidate(
+    XFile asset,
+  ) async {
+    if (_disposed) {
+      return const Result.success(_AssetCandidateDisposition.discarded);
+    }
+    if (_remainingAssetCapacity == 0) {
+      return const Result.success(_AssetCandidateDisposition.overCapacity);
+    }
+    if (await asset.length() > kCloudinaryMaxUploadBytes) {
+      return const Result.success(_AssetCandidateDisposition.oversized);
+    }
+    if (_disposed) {
+      return const Result.success(_AssetCandidateDisposition.discarded);
+    }
+
     // SHA-1 is used purely for content-based deduplication; collision
     // resistance beyond accidental duplicates is not required here.
     final digest = await sha1.bind(asset.openRead()).first;
     final digestString = digest.toString();
 
-    if (_assets.length < maximumAssetCount &&
-        !_assets.any((e) => e.digest == digestString)) {
-      _assets.add((file: asset, digest: digestString));
+    if (_disposed) {
+      return const Result.success(_AssetCandidateDisposition.discarded);
     }
+
+    if (_assets.any((e) => e.digest == digestString)) {
+      return const Result.success(_AssetCandidateDisposition.duplicate);
+    }
+    final staged = await _stagedAssetRepository.acquire(
+      clientSubmissionId: _state.clientSubmissionId,
+      digest: digestString,
+      source: File(asset.path),
+    );
+    if (staged case Error<ContentSubmissionStagedAsset>(:final error)) {
+      return Result.error(error);
+    }
+    if (_disposed) {
+      return const Result.success(_AssetCandidateDisposition.discarded);
+    }
+    final descriptor = (staged as Success<ContentSubmissionStagedAsset>).value;
+    // Acquisition has durably committed the descriptor and final file. Until
+    // its runtime path is resolved and published, submission must not observe
+    // the previous (now incomplete) runtime attachment list.
+    _stagedStateAvailable = false;
+    final resolved = await _stagedAssetRepository.resolveAbsolutePath(
+      descriptor,
+    );
+    if (_disposed) {
+      return const Result.success(_AssetCandidateDisposition.discarded);
+    }
+    if (resolved case Error<File>(:final error)) {
+      _stagedReconciliationError = error;
+      _assets.clear();
+      return Result.error(error);
+    }
+    _assets.add((
+      file: XFile((resolved as Success<File>).value.path),
+      digest: digestString,
+    ));
+    _stagedStateAvailable = true;
+    _stagedReconciliationError = null;
+    return const Result.success(_AssetCandidateDisposition.added);
   }
 
   Future<Result<AssetSelectionOutcome>> _addAsset() async {
     try {
-      final capacityBeforePicking = _remainingAssetCapacity;
-      if (capacityBeforePicking == 0) {
+      await initialize();
+      if (_disposed) return const Result.success(AssetSelectionOutcome());
+      final prePicker = await _serialize<String?>(() async {
+        if (_disposed) return const Result.success(null);
+        if (_remainingAssetCapacity == 0) return const Result.success(null);
+        if (!_stagedStateAvailable) {
+          final reconciled = await _reconcileStagedAssets(
+            _hasDurableCheckpoint ? _state.clientSubmissionId : null,
+          );
+          if (reconciled case Error<void>(:final error)) {
+            return Result.error(_stagedReconciliationError ?? error);
+          }
+        }
+        final checkpoint = await _checkpointDraftInsideBoundary();
+        if (checkpoint case Error<void>(:final error)) {
+          return Result.error(error);
+        }
+        return Result.success(_state.clientSubmissionId);
+      });
+      if (prePicker case Error<String?>(:final error)) {
+        return Result.error(error);
+      }
+      final capturedClientSubmissionId = (prePicker as Success<String?>).value;
+      if (capturedClientSubmissionId == null) {
         return const Result.success(AssetSelectionOutcome());
       }
+
+      final capacityBeforePicking = _remainingAssetCapacity;
 
       final selectedAssets = await _imagePicker.pickMultipleMedia(
         limit: capacityBeforePicking,
       );
 
-      final capacityAfterPicking = _remainingAssetCapacity;
-      final rejectedForLimitCount = selectedAssets.length > capacityAfterPicking
-          ? selectedAssets.length - capacityAfterPicking
-          : 0;
-
-      final rejectedNames = <String>[];
-      for (final asset in selectedAssets.take(capacityAfterPicking)) {
-        final length = await asset.length();
-        if (length > kCloudinaryMaxUploadBytes) {
-          rejectedNames.add(asset.name);
-          continue;
+      final committed = await _serialize<AssetSelectionOutcome>(() async {
+        if (_disposed ||
+            _state.clientSubmissionId != capturedClientSubmissionId) {
+          return const Result.success(AssetSelectionOutcome());
         }
-        await _calculateHashAndAdd(asset);
+        final capacityAfterPicking = _remainingAssetCapacity;
+        final rejectedForLimitCount =
+            selectedAssets.length > capacityAfterPicking
+            ? selectedAssets.length - capacityAfterPicking
+            : 0;
+        final rejectedNames = <String>[];
+        for (final asset in selectedAssets.take(capacityAfterPicking)) {
+          final result = await _processAssetCandidate(asset);
+          switch (result) {
+            case Error<_AssetCandidateDisposition>(:final error):
+              return Result.error(error);
+            case Success<_AssetCandidateDisposition>(
+              value: _AssetCandidateDisposition.oversized,
+            ):
+              rejectedNames.add(asset.name);
+            case Success<_AssetCandidateDisposition>():
+              // Duplicates retain the existing soft-skip behavior. Capacity is
+              // represented by the picker-result overflow count above.
+              break;
+          }
+        }
+        return Result.success(
+          AssetSelectionOutcome(
+            rejectedNames: rejectedNames,
+            rejectedForLimitCount: rejectedForLimitCount,
+          ),
+        );
+      });
+      if (committed case Error<AssetSelectionOutcome>(:final error)) {
+        if (!_disposed) {
+          notifyListeners();
+        }
+        return Result.error(error);
       }
+      final outcome = (committed as Success<AssetSelectionOutcome>).value;
 
-      if (rejectedNames.isNotEmpty) {
+      if (outcome.rejectedNames.isNotEmpty) {
         _logger.log(
-          ContentSubmissionAssetSkippedTooLarge(rejectedNames: rejectedNames),
+          ContentSubmissionAssetSkippedTooLarge(
+            rejectedNames: outcome.rejectedNames,
+          ),
         );
       }
 
-      notifyListeners();
+      if (!_disposed) {
+        notifyListeners();
+      }
 
-      return Result.success(
-        AssetSelectionOutcome(
-          rejectedNames: rejectedNames,
-          rejectedForLimitCount: rejectedForLimitCount,
-        ),
-      );
+      return Result.success(outcome);
     } on Exception catch (exception, stackTrace) {
       _logger.log(
         const ContentSubmissionAssetAddFailed(),
@@ -236,9 +435,38 @@ class ContentSubmissionViewModel extends ChangeNotifier {
 
   Future<Result<void>> _removeAssetAt(int index) async {
     try {
-      _assets.removeAt(index);
+      // Preserve the meaning of the user's request at Command action entry.
+      // Initialization and lifecycle work must never make an invalid index
+      // valid or reinterpret it as a newly restored/replacement asset.
+      if (index < 0 || index >= _assets.length) {
+        return Result.error(Exception(RangeError.index(index, _assets)));
+      }
+      final captured = (
+        clientSubmissionId: _state.clientSubmissionId,
+        digest: _assets[index].digest,
+      );
+      await initialize();
+      if (_disposed) return const Result.success(null);
+      final result = await _serialize<void>(() async {
+        if (_disposed ||
+            _state.clientSubmissionId != captured.clientSubmissionId ||
+            !_assets.any((asset) => asset.digest == captured.digest)) {
+          return const Result.success(null);
+        }
+        final removed = await _stagedAssetRepository.remove(
+          clientSubmissionId: captured.clientSubmissionId,
+          digest: captured.digest,
+        );
+        if (removed case Error<void>(:final error)) return Result.error(error);
+        if (_disposed) return const Result.success(null);
+        _assets.removeWhere((asset) => asset.digest == captured.digest);
+        return const Result.success(null);
+      });
+      if (result case Error<void>(:final error)) return Result.error(error);
 
-      notifyListeners();
+      if (!_disposed) {
+        notifyListeners();
+      }
 
       return const Result.success(null);
     } on Exception catch (exception, stackTrace) {
@@ -259,17 +487,44 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> checkpointDraft() async {
+    unawaited(initialize());
+    await _initializationBarrier.future;
+    return _serialize(_checkpointDraftInsideBoundary);
+  }
+
+  Future<Result<void>> _checkpointDraftInsideBoundary() async {
     final snapshot = _state;
-    if (snapshot == _checkpointedDraft) return const Result.success(null);
+    if (_hasDurableCheckpoint && snapshot == _checkpointedDraft) {
+      return const Result.success(null);
+    }
 
     final result = await _draftRepository.saveDraft(snapshot);
     if (result is Success<void>) {
       _checkpointedDraft = snapshot;
+      _hasDurableCheckpoint = true;
       if (!_disposed) {
         notifyListeners();
       }
     }
     return result;
+  }
+
+  Future<Result<T>> _serialize<T>(
+    Future<Result<T>> Function() action,
+  ) async {
+    final previous = _lifecycleTail;
+    final release = Completer<void>();
+    _lifecycleTail = release.future;
+    await previous;
+    try {
+      return await action();
+    } on Exception catch (exception) {
+      return Result.error(exception);
+    } on Object catch (error) {
+      return Result.error(Exception(error));
+    } finally {
+      release.complete();
+    }
   }
 
   void setCategory(ContentCategory? category) {
@@ -399,6 +654,15 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// SHA-256 content hash and reused rather than re-uploaded, so only assets
   /// that were not yet uploaded in the last try are actually transferred.
   Future<Result<void>> _submit() async {
+    await initialize();
+    if (!_stagedStateAvailable) {
+      return Result.error(
+        Exception('Cannot submit: staged assets unavailable.'),
+      );
+    }
+    if (_assets.length > maximumAssetCount) {
+      return Result.error(Exception('Cannot submit: too many assets.'));
+    }
     if (!validateEventTimeForSubmission()) {
       return Result.error(Exception('Cannot submit: invalid event time.'));
     }
@@ -489,8 +753,30 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _clear() async {
+    await initialize();
     _logger.log(const ContentSubmissionStateClearStarted());
-    final result = await _draftRepository.clearDraft();
+    final result = await _serialize<void>(() async {
+      final oldClientSubmissionId = _state.clientSubmissionId;
+      final cleared = await _draftRepository.clearDraft();
+      if (cleared is Error<void>) return cleared;
+      final staged = await _stagedAssetRepository.clearSession(
+        oldClientSubmissionId,
+      );
+      if (staged is Error<void>) {
+        _logger.log(
+          const ContentSubmissionAssetRemovalFailed(),
+          error: staged.error,
+        );
+      }
+      _assets.clear();
+      _eventTimeIssue = null;
+      _state = ContentSubmissionDraft();
+      _checkpointedDraft = _state;
+      _hasDurableCheckpoint = false;
+      _stagedStateAvailable = true;
+      _recoveryEligibleClientSubmissionId = null;
+      return const Result.success(null);
+    });
     if (result is Error<void>) {
       _logger.log(
         const ContentSubmissionStateClearFailed(),
@@ -499,10 +785,6 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       return result;
     }
 
-    _assets.clear();
-    _eventTimeIssue = null;
-    _state = ContentSubmissionDraft();
-    _checkpointedDraft = _state;
     if (!_disposed) {
       notifyListeners();
     }
@@ -525,47 +807,77 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       return const Result.success(null);
     }
 
-    final response = await _imagePicker.retrieveLostData();
+    LostDataResponse? response;
+    try {
+      response = await _imagePicker.retrieveLostData();
+    } on Object catch (error, stackTrace) {
+      _handleRetrieveLostMediaErrors(error, stackTrace);
+    }
+    await initialize();
+
+    if (response == null) return const Result.success(null);
 
     if (response.isEmpty) {
       return const Result.success(null);
     }
 
-    if (response.file != null) {
-      _logger.log(const ContentSubmissionAssetRetrievalStarted());
-
-      try {
-        // When files is non-null it contains all recovered files; file points
-        // to the first item. Fall back to file for single-result responses.
-        final files = response.files ?? [response.file!];
-        final rejectedNames = <String>[];
-        for (final file in files.take(_remainingAssetCapacity)) {
-          final length = await file.length();
-          if (length > kCloudinaryMaxUploadBytes) {
-            // Lost-data recovery is best-effort and silent: oversized
-            // recovered files are dropped without surfacing to the UI.
-            rejectedNames.add(file.name);
-            continue;
-          }
-          await _calculateHashAndAdd(file);
-        }
-
-        if (rejectedNames.isNotEmpty) {
-          _logger.log(
-            ContentSubmissionAssetSkippedTooLarge(rejectedNames: rejectedNames),
-          );
-        }
-
-        notifyListeners();
-      } on Object catch (error, stackTrace) {
-        _handleRetrieveLostMediaErrors(error, stackTrace);
-      }
-    } else if (response.exception != null) {
+    if (response.exception != null) {
       final exception = response.exception!;
       _handleRetrieveLostMediaErrors(
         exception,
         StackTrace.fromString(exception.stacktrace ?? ''),
       );
+      return const Result.success(null);
+    }
+
+    // Prefer the complete multi-file response; `file` is only the legacy
+    // single-result fallback and must not gate a files-only response.
+    final files =
+        response.files ??
+        (response.file == null ? const <XFile>[] : [response.file!]);
+    if (files.isEmpty) return const Result.success(null);
+
+    final capturedClientSubmissionId = _recoveryEligibleClientSubmissionId;
+    if (capturedClientSubmissionId == null) {
+      return const Result.success(null);
+    }
+
+    _logger.log(const ContentSubmissionAssetRetrievalStarted());
+
+    try {
+      final rejectedNames = <String>[];
+      await _serialize<void>(() async {
+        if (_state.clientSubmissionId != capturedClientSubmissionId ||
+            !_stagedStateAvailable) {
+          return const Result.success(null);
+        }
+        for (final file in files) {
+          final added = await _processAssetCandidate(file);
+          switch (added) {
+            case Error<_AssetCandidateDisposition>(:final error):
+              return Result.error(error);
+            case Success<_AssetCandidateDisposition>(
+              value: _AssetCandidateDisposition.oversized,
+            ):
+              rejectedNames.add(file.name);
+            case Success<_AssetCandidateDisposition>():
+              break;
+          }
+        }
+        return const Result.success(null);
+      });
+
+      if (rejectedNames.isNotEmpty) {
+        _logger.log(
+          ContentSubmissionAssetSkippedTooLarge(rejectedNames: rejectedNames),
+        );
+      }
+
+      if (!_disposed) {
+        notifyListeners();
+      }
+    } on Object catch (error, stackTrace) {
+      _handleRetrieveLostMediaErrors(error, stackTrace);
     }
 
     // Lost media recovery is best-effort; surfacing errors to the UI would

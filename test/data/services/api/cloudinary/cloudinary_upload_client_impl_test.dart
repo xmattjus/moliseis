@@ -4,6 +4,7 @@
 import 'dart:async' show Completer, TimeoutException, unawaited;
 import 'dart:io' show Directory, File;
 
+import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_public_id_generator.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client_impl.dart';
@@ -92,6 +93,40 @@ void main() {
           'upload_preset': 'test-preset',
           'signature': 'test-signature',
         });
+      },
+    );
+
+    test(
+      'uploads an extensionless staged digest file as octet-stream',
+      () async {
+        server.setUploadResponse(
+          status: 200,
+          body: const {
+            'secure_url':
+                'https://res.cloudinary.com/test_cloud/image/upload/v1/staged',
+            'width': 100,
+            'height': 100,
+            'format': 'jpg',
+          },
+        );
+        const payload = <int>[9, 8, 7, 6, 0, 255, 13, 10, 128];
+        final digest = sha1.convert(payload).toString();
+        final tempDir = await Directory.systemTemp.createTemp('staged_upload_');
+        final file = File('${tempDir.path}/$digest')..writeAsBytesSync(payload);
+        addTearDown(() => tempDir.delete(recursive: true));
+
+        final result = await client.uploadImageTask(file).result;
+
+        expect(result.isSuccess, isTrue);
+        final request = server.requests.singleWhere(
+          (request) => request.method == 'POST',
+        );
+        expect(request.fileParts, hasLength(1));
+        final filePart = request.fileParts.single;
+        expect(filePart.fieldName, 'file');
+        expect(filePart.filename, digest);
+        expect(filePart.contentType, 'application/octet-stream');
+        expect(filePart.bytes, payload);
       },
     );
 

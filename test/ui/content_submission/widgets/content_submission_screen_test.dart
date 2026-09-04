@@ -34,6 +34,7 @@ void main() {
       contentSubmissionRepository: submissionRepository,
       draftRepository:
           draftRepository ?? FakeContentSubmissionDraftRepository(),
+      stagedAssetRepository: FakeContentSubmissionStagedAssetRepository(),
       imagePicker: imagePicker ?? FakeImagePicker(),
     );
   }
@@ -504,6 +505,7 @@ void main() {
           logger: MockLogger(),
           contentSubmissionRepository: repo,
           draftRepository: draftRepo,
+          stagedAssetRepository: FakeContentSubmissionStagedAssetRepository(),
           imagePicker: FakeImagePicker(),
         );
         // The screen gates its body on
@@ -597,6 +599,7 @@ void main() {
           logger: MockLogger(),
           contentSubmissionRepository: repo,
           draftRepository: draftRepo,
+          stagedAssetRepository: FakeContentSubmissionStagedAssetRepository(),
           imagePicker: FakeImagePicker(),
         );
         await vm.initialize();

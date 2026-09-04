@@ -1,17 +1,25 @@
 import 'dart:async' show Completer, unawaited;
+import 'dart:io' show Directory, File;
 
+import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:moliseis/config/dependencies.dart';
+import 'package:moliseis/domain/models/content_submission_draft.dart';
+import 'package:moliseis/domain/models/content_submission_staged_asset.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
+import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/logging/logging.dart';
+import 'package:moliseis/utils/result.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 
 import '../../../support/fake_image_picker.dart';
@@ -41,6 +49,7 @@ void main() {
   ContentSubmissionViewModel buildViewModel({
     FakeImagePicker? imagePicker,
     FakeContentSubmissionDraftRepository? draftRepository,
+    FakeContentSubmissionStagedAssetRepository? stagedAssetRepository,
     MockLogger? logger,
   }) {
     return ContentSubmissionViewModel(
@@ -48,6 +57,8 @@ void main() {
       contentSubmissionRepository: FakeContentSubmissionRepository(),
       draftRepository:
           draftRepository ?? FakeContentSubmissionDraftRepository(),
+      stagedAssetRepository:
+          stagedAssetRepository ?? FakeContentSubmissionStagedAssetRepository(),
       imagePicker: imagePicker ?? FakeImagePicker(),
     );
   }
@@ -264,17 +275,25 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('does not show a warning when every selected image is valid', (
+    testWidgets('renders a selected thumbnail from its staged file', (
       tester,
     ) async {
       final imageFiles = TestImageFiles.create();
       addTearDown(imageFiles.dispose);
-      final file = imageFiles.createPng(name: 'valid.png');
+      final pickerFile = imageFiles.createPng(name: 'valid.png');
+      final stagingDirectory = Directory.systemTemp.createTempSync(
+        'content_submission_widget_staging_',
+      );
+      addTearDown(() => stagingDirectory.deleteSync(recursive: true));
+      final stagedRepository = FakeContentSubmissionStagedAssetRepository(
+        stagingDirectory: stagingDirectory,
+      );
       final logger = MockLogger();
       final vm = buildViewModel(
         logger: logger,
+        stagedAssetRepository: stagedRepository,
         imagePicker: FakeImagePicker(
-          onPickMultipleMedia: () async => [file],
+          onPickMultipleMedia: () async => [pickerFile],
         ),
       );
 
@@ -287,7 +306,93 @@ void main() {
       await tester.pump(const Duration(milliseconds: 250));
 
       expect(vm.assets, hasLength(1));
+      final stagedPath = vm.assets.single.file.path;
+      expect(stagedPath, isNot(pickerFile.path));
+      expect(p.isWithin(stagingDirectory.path, stagedPath), isTrue);
+      expect(File(stagedPath).existsSync(), isTrue);
+      expect(
+        File(stagedPath).readAsBytesSync(),
+        File(pickerFile.path).readAsBytesSync(),
+      );
+      expect(find.byType(ContentSubmissionAssetListItem), findsOneWidget);
+      final renderedImage = tester.widget<Image>(find.byType(Image));
+      expect(renderedImage.image, isA<ResizeImage>());
+      final fileImage = (renderedImage.image as ResizeImage).imageProvider;
+      expect(fileImage, isA<FileImage>());
+      expect((fileImage as FileImage).file.path, stagedPath);
       expect(find.byType(SnackBar), findsNothing);
+      await tester.pump(const Duration(milliseconds: 250));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('hides add photo after restoring five staged assets', (
+      tester,
+    ) async {
+      const identity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+      final imageFiles = TestImageFiles.create();
+      addTearDown(imageFiles.dispose);
+      final stagingDirectory = Directory.systemTemp.createTempSync(
+        'content_submission_widget_restored_',
+      );
+      addTearDown(() => stagingDirectory.deleteSync(recursive: true));
+      final descriptors = <ContentSubmissionStagedAsset>[];
+      for (
+        var index = 0;
+        index < ContentSubmissionViewModel.maximumAssetCount;
+        index++
+      ) {
+        final validImage = imageFiles.createPng(name: 'restored-$index.png');
+        final bytes = File(validImage.path).readAsBytesSync();
+        final digest = sha1.convert(bytes).toString();
+        final relativePath = '$identity/$digest';
+        final stagedFile = File(p.join(stagingDirectory.path, relativePath));
+        stagedFile.parent.createSync(recursive: true);
+        stagedFile.writeAsBytesSync(bytes);
+        descriptors.add(
+          ContentSubmissionStagedAsset(
+            clientSubmissionId: identity,
+            digest: digest,
+            relativePath: relativePath,
+          ),
+        );
+      }
+      final vm = buildViewModel(
+        draftRepository: FakeContentSubmissionDraftRepository(
+          loadDraftResult: Result.success(
+            ContentSubmissionDraft(clientSubmissionId: identity),
+          ),
+        ),
+        stagedAssetRepository: FakeContentSubmissionStagedAssetRepository(
+          reconcileResult: Result.success(descriptors),
+          stagingDirectory: stagingDirectory,
+        ),
+      );
+
+      await vm.initialize();
+      await tester.pumpWidget(buildTestApp(vm));
+      await tester.drag(find.byType(ListView), const Offset(-2000, 0));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(
+        vm.assets,
+        hasLength(ContentSubmissionViewModel.maximumAssetCount),
+      );
+      expect(
+        vm.assets.map((asset) => asset.file.path),
+        everyElement(startsWith('${stagingDirectory.path}${p.separator}')),
+      );
+      expect(
+        vm.assets.map((asset) => File(asset.file.path).existsSync()),
+        everyElement(isTrue),
+      );
+      expect(
+        find.byKey(
+          const ValueKey('content-submission-asset-list-add-button'),
+        ),
+        findsNothing,
+      );
+      expect(find.byType(EmptyBox), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

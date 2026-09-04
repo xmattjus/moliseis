@@ -18,16 +18,16 @@ final class TestImageFiles {
 
   /// Writes a valid one-pixel PNG and returns it as an [XFile].
   ///
-  /// The picker bytes vary per file so digest-based selection treats generated
-  /// images as distinct while `Image.file` reads the valid file at
-  /// [XFile.path].
+  /// Each generated file contains a different valid ancillary text chunk so
+  /// digest-based selection treats it as distinct while `Image.file` can decode
+  /// the exact bytes available through [XFile.path].
   XFile createPng({String? name}) {
     final fileIndex = _nextFileIndex++;
     final fileName = name ?? 'image_$fileIndex.png';
-    final file = File('${_directory.path}/$fileName')
-      ..writeAsBytesSync(_onePixelPng);
+    final bytes = _pngBytesForIndex(fileIndex);
+    final file = File('${_directory.path}/$fileName')..writeAsBytesSync(bytes);
     return XFile.fromData(
-      Uint8List.fromList([fileIndex]),
+      Uint8List.fromList(bytes),
       mimeType: 'image/png',
       path: file.path,
     );
@@ -35,6 +35,51 @@ final class TestImageFiles {
 
   /// Deletes every temporary image file owned by this fixture.
   void dispose() => _directory.deleteSync(recursive: true);
+}
+
+List<int> _pngBytesForIndex(int index) {
+  final textData = <int>[
+    102, // f
+    105, // i
+    120, // x
+    116, // t
+    117, // u
+    114, // r
+    101, // e
+    0,
+    ...index.toString().codeUnits,
+  ];
+  final typeAndData = <int>[116, 69, 88, 116, ...textData]; // tEXt
+  final crc = _crc32(typeAndData);
+  final chunk = <int>[
+    ..._uint32Bytes(textData.length),
+    ...typeAndData,
+    ..._uint32Bytes(crc),
+  ];
+  final iendStart = _onePixelPng.length - 12;
+  return <int>[
+    ..._onePixelPng.sublist(0, iendStart),
+    ...chunk,
+    ..._onePixelPng.sublist(iendStart),
+  ];
+}
+
+List<int> _uint32Bytes(int value) => <int>[
+  (value >> 24) & 0xff,
+  (value >> 16) & 0xff,
+  (value >> 8) & 0xff,
+  value & 0xff,
+];
+
+int _crc32(List<int> bytes) {
+  var crc = 0xffffffff;
+  for (final byte in bytes) {
+    crc ^= byte;
+    for (var bit = 0; bit < 8; bit++) {
+      crc = (crc & 1) == 0 ? crc >> 1 : (crc >> 1) ^ 0xedb88320;
+    }
+  }
+  return (crc ^ 0xffffffff) & 0xffffffff;
 }
 
 const _onePixelPng = <int>[

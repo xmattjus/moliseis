@@ -425,9 +425,38 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "21:4363184663950376915",
+      "lastPropertyId": "4:7822739019162523808",
+      "name": "ContentSubmissionStagedAssetEntity",
+      "properties": [
+        {
+          "id": "1:483025281401696395",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:7146935856563399810",
+          "name": "clientSubmissionId",
+          "type": 9
+        },
+        {
+          "id": "3:822517176110457736",
+          "name": "digest",
+          "type": 9
+        },
+        {
+          "id": "4:7822739019162523808",
+          "name": "relativePath",
+          "type": 9
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "20:8436787422671765122",
+  "lastEntityId": "21:4363184663950376915",
   "lastIndexId": "51:4917123769674284820",
   "lastRelationId": "2:6027552760664793313",
   "lastSequenceId": "0:0",

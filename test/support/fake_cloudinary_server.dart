@@ -1,5 +1,5 @@
 import 'dart:async' show Completer;
-import 'dart:convert' show jsonEncode, utf8;
+import 'dart:convert' show ascii, jsonEncode, latin1, utf8;
 import 'dart:io' show HttpException, HttpRequest, HttpServer, InternetAddress;
 
 /// A loopback HTTP server that mimics Cloudinary's upload API.
@@ -173,26 +173,22 @@ class FakeCloudinaryServer {
     final path = request.uri.path;
     final uploadPattern = RegExp(r'^/v1_1/([^/]+)/image/upload$');
     final uploadMatch = uploadPattern.firstMatch(path);
-    final multipartBody = utf8.decode(bodyBytes, allowMalformed: true);
-    final fields = uploadMatch == null
-        ? const <String, String>{}
-        : _extractMultipartFields(multipartBody);
+    final boundary = request.headers.contentType?.parameters['boundary'];
+    final multipart = uploadMatch == null || boundary == null
+        ? const _FakeParsedMultipart(fields: {}, fileParts: [])
+        : _parseMultipart(bodyBytes, boundary);
     final recorded = FakeCloudinaryRecordedRequest(
       method: request.method,
       path: path,
       headers: recordedHeaders,
       body: bodyBytes,
-      multipartFields: fields,
-      filePartCount: uploadMatch == null
-          ? 0
-          : RegExp(
-              r'Content-Disposition: form-data;[^\r\n]*filename="',
-            ).allMatches(multipartBody).length,
+      multipartFields: multipart.fields,
+      fileParts: multipart.fileParts,
     );
     _requests.add(recorded);
 
     if (uploadMatch != null && request.method == 'POST') {
-      await _handleUploadRequest(request, fields);
+      await _handleUploadRequest(request, multipart.fields);
       return;
     }
 
@@ -278,18 +274,121 @@ class FakeCloudinaryServer {
     }
   }
 
-  /// Extracts all text fields from a multipart/form-data body.
-  ///
-  /// The file part is skipped because its `Content-Disposition` carries a
-  /// `filename` parameter, which the regex below does not match.
-  Map<String, String> _extractMultipartFields(String body) {
-    final pattern = RegExp(
-      r'Content-Disposition: form-data; name="([^"]+)"\r\n\r\n([^\r]*)\r\n',
+  _FakeParsedMultipart _parseMultipart(List<int> body, String boundary) {
+    final boundaryBytes = ascii.encode('--$boundary');
+    final nextBoundaryPrefix = <int>[13, 10, ...boundaryBytes];
+    const headerSeparator = <int>[13, 10, 13, 10];
+    final fields = <String, String>{};
+    final fileParts = <FakeCloudinaryMultipartFilePart>[];
+    var boundaryStart = _indexOfBytes(body, boundaryBytes);
+
+    while (boundaryStart >= 0) {
+      var cursor = boundaryStart + boundaryBytes.length;
+      if (_bytesStartWith(body, const [45, 45], cursor)) break;
+      if (!_bytesStartWith(body, const [13, 10], cursor)) {
+        throw const FormatException('Malformed multipart boundary');
+      }
+      cursor += 2;
+
+      final headersEnd = _indexOfBytes(body, headerSeparator, cursor);
+      if (headersEnd < 0) {
+        throw const FormatException('Missing multipart header terminator');
+      }
+      final headers = _parseMultipartHeaders(body.sublist(cursor, headersEnd));
+      final contentStart = headersEnd + headerSeparator.length;
+      final nextBoundaryStart = _findMultipartBoundary(
+        body,
+        nextBoundaryPrefix,
+        contentStart,
+      );
+      if (nextBoundaryStart < 0) {
+        throw const FormatException('Missing closing multipart boundary');
+      }
+
+      final disposition = headers['content-disposition'];
+      final fieldName = disposition == null
+          ? null
+          : _multipartParameter(disposition, 'name');
+      if (fieldName == null) {
+        throw const FormatException('Multipart part has no field name');
+      }
+      final filename = _multipartParameter(disposition!, 'filename');
+      final bytes = body.sublist(contentStart, nextBoundaryStart);
+      if (filename == null) {
+        fields[fieldName] = utf8.decode(bytes);
+      } else {
+        fileParts.add(
+          FakeCloudinaryMultipartFilePart(
+            fieldName: fieldName,
+            filename: filename,
+            contentType: headers['content-type'] ?? '',
+            bytes: bytes,
+          ),
+        );
+      }
+
+      boundaryStart = nextBoundaryStart + 2;
+    }
+
+    return _FakeParsedMultipart(
+      fields: Map.unmodifiable(fields),
+      fileParts: List.unmodifiable(fileParts),
     );
-    return {
-      for (final match in pattern.allMatches(body))
-        match.group(1)!: match.group(2)!,
-    };
+  }
+
+  int _findMultipartBoundary(
+    List<int> body,
+    List<int> boundaryPrefix,
+    int start,
+  ) {
+    var candidate = _indexOfBytes(body, boundaryPrefix, start);
+    while (candidate >= 0) {
+      final suffixStart = candidate + boundaryPrefix.length;
+      if (_bytesStartWith(body, const [45, 45], suffixStart) ||
+          _bytesStartWith(body, const [13, 10], suffixStart)) {
+        return candidate;
+      }
+      candidate = _indexOfBytes(body, boundaryPrefix, candidate + 1);
+    }
+    return -1;
+  }
+
+  Map<String, String> _parseMultipartHeaders(List<int> bytes) {
+    final headers = <String, String>{};
+    for (final line in latin1.decode(bytes).split('\r\n')) {
+      final separator = line.indexOf(':');
+      if (separator <= 0) {
+        throw const FormatException('Malformed multipart header');
+      }
+      headers[line.substring(0, separator).toLowerCase()] = line
+          .substring(separator + 1)
+          .trim();
+    }
+    return headers;
+  }
+
+  String? _multipartParameter(String value, String parameter) {
+    final match = RegExp(
+      '(?:^|;\\s*)${RegExp.escape(parameter)}="([^"]*)"',
+      caseSensitive: false,
+    ).firstMatch(value);
+    return match?.group(1);
+  }
+
+  int _indexOfBytes(List<int> bytes, List<int> pattern, [int start = 0]) {
+    if (pattern.isEmpty) return start <= bytes.length ? start : -1;
+    for (var index = start; index <= bytes.length - pattern.length; index++) {
+      if (_bytesStartWith(bytes, pattern, index)) return index;
+    }
+    return -1;
+  }
+
+  bool _bytesStartWith(List<int> bytes, List<int> pattern, int start) {
+    if (start < 0 || start + pattern.length > bytes.length) return false;
+    for (var index = 0; index < pattern.length; index++) {
+      if (bytes[start + index] != pattern[index]) return false;
+    }
+    return true;
   }
 
   String _jsonEncodeBody(Map<String, dynamic> body) => jsonEncode(body);
@@ -297,21 +396,46 @@ class FakeCloudinaryServer {
 
 /// A recorded request received by [FakeCloudinaryServer].
 class FakeCloudinaryRecordedRequest {
-  const FakeCloudinaryRecordedRequest({
+  FakeCloudinaryRecordedRequest({
     required this.method,
     required this.path,
     required this.headers,
     required this.body,
     required this.multipartFields,
-    required this.filePartCount,
-  });
+    required List<FakeCloudinaryMultipartFilePart> fileParts,
+  }) : fileParts = List.unmodifiable(fileParts);
 
   final String method;
   final String path;
   final Map<String, List<String>> headers;
   final List<int> body;
   final Map<String, String> multipartFields;
-  final int filePartCount;
+  final List<FakeCloudinaryMultipartFilePart> fileParts;
+
+  /// Number of parsed multipart file parts in this request.
+  int get filePartCount => fileParts.length;
+}
+
+/// A binary-safe parsed multipart file part received by the fake server.
+class FakeCloudinaryMultipartFilePart {
+  FakeCloudinaryMultipartFilePart({
+    required this.fieldName,
+    required this.filename,
+    required this.contentType,
+    required List<int> bytes,
+  }) : bytes = List.unmodifiable(bytes);
+
+  final String fieldName;
+  final String filename;
+  final String contentType;
+  final List<int> bytes;
+}
+
+class _FakeParsedMultipart {
+  const _FakeParsedMultipart({required this.fields, required this.fileParts});
+
+  final Map<String, String> fields;
+  final List<FakeCloudinaryMultipartFilePart> fileParts;
 }
 
 /// Per-request override popped from

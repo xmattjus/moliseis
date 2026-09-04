@@ -1,5 +1,5 @@
 import 'dart:async' show Completer;
-import 'dart:io' show File;
+import 'dart:io' show Directory, File;
 
 import 'package:http/http.dart' as http;
 import 'package:moliseis/data/dtos/city_dto.dart';
@@ -19,6 +19,7 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
+import 'package:moliseis/domain/models/content_submission_staged_asset.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/image_upload_task.dart';
 import 'package:moliseis/domain/models/media.dart';
@@ -30,6 +31,7 @@ import 'package:moliseis/domain/repositories/admin_content_submission_repository
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/content_submission_staged_asset_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
@@ -739,6 +741,7 @@ final class FakeContentSubmissionRepository
   FakeContentSubmissionRepository({
     this.uploadResult = const Result.success(null),
     ImageUploadTask? uploadImageTaskResult,
+    List<ImageUploadTask>? uploadImageTaskResults,
   }) : uploadImageTaskResult =
            uploadImageTaskResult ??
            FakeImageUploadTask.completed(
@@ -749,10 +752,12 @@ final class FakeContentSubmissionRepository
                  height: 2048,
                ),
              ),
-           );
+           ),
+       uploadImageTaskResults = uploadImageTaskResults ?? <ImageUploadTask>[];
 
   Result<void> uploadResult;
   ImageUploadTask uploadImageTaskResult;
+  final List<ImageUploadTask> uploadImageTaskResults;
 
   bool uploadCalled = false;
   final uploadedImages = <File>[];
@@ -773,7 +778,9 @@ final class FakeContentSubmissionRepository
   @override
   ImageUploadTask uploadImageTask(File image) {
     uploadedImages.add(image);
-    return uploadImageTaskResult;
+    return uploadImageTaskResults.isNotEmpty
+        ? uploadImageTaskResults.removeAt(0)
+        : uploadImageTaskResult;
   }
 
   @override
@@ -880,6 +887,105 @@ final class ControllableSubmissionRepository
 // FakeContentSubmissionDraftRepository
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// FakeContentSubmissionStagedAssetRepository
+// ---------------------------------------------------------------------------
+
+/// Configurable local staged-asset repository fake for ViewModel tests.
+final class FakeContentSubmissionStagedAssetRepository
+    implements ContentSubmissionStagedAssetRepository {
+  FakeContentSubmissionStagedAssetRepository({
+    this.reconcileResult = const Result.success([]),
+    this.removeResult = const Result.success(null),
+    this.clearSessionResult = const Result.success(null),
+    this.stagingDirectory,
+  });
+
+  Result<List<ContentSubmissionStagedAsset>> reconcileResult;
+  Result<void> removeResult;
+  Result<void> clearSessionResult;
+  final Directory? stagingDirectory;
+  Completer<Result<List<ContentSubmissionStagedAsset>>>? pendingReconcile;
+  Completer<Result<ContentSubmissionStagedAsset>>? pendingAcquire;
+  Completer<Result<void>>? pendingRemove;
+  Completer<Result<void>>? pendingClearSession;
+  final acquired =
+      <({String clientSubmissionId, String digest, File source})>[];
+  int reconcileCallCount = 0;
+  final removed = <({String clientSubmissionId, String digest})>[];
+  final clearedSessions = <String>[];
+
+  @override
+  Future<Result<ContentSubmissionStagedAsset>> acquire({
+    required String clientSubmissionId,
+    required String digest,
+    required File source,
+  }) async {
+    acquired.add((
+      clientSubmissionId: clientSubmissionId,
+      digest: digest,
+      source: source,
+    ));
+    final pending = pendingAcquire;
+    pendingAcquire = null;
+    if (pending != null) return pending.future;
+    final relativePath = '$clientSubmissionId/$digest';
+    final root = stagingDirectory;
+    if (root != null) {
+      final staged = File('${root.path}/$relativePath');
+      staged.parent.createSync(recursive: true);
+      source.copySync(staged.path);
+    }
+    return Result.success(
+      ContentSubmissionStagedAsset(
+        clientSubmissionId: clientSubmissionId,
+        digest: digest,
+        relativePath: relativePath,
+      ),
+    );
+  }
+
+  @override
+  Future<Result<void>> clearSession(String clientSubmissionId) async {
+    clearedSessions.add(clientSubmissionId);
+    final pending = pendingClearSession;
+    pendingClearSession = null;
+    return pending?.future ?? clearSessionResult;
+  }
+
+  @override
+  Future<Result<List<ContentSubmissionStagedAsset>>> reconcileAndLoad(
+    String? activeClientSubmissionId,
+  ) async {
+    reconcileCallCount++;
+    final pending = pendingReconcile;
+    pendingReconcile = null;
+    return pending?.future ?? reconcileResult;
+  }
+
+  @override
+  Future<Result<void>> remove({
+    required String clientSubmissionId,
+    required String digest,
+  }) async {
+    removed.add((clientSubmissionId: clientSubmissionId, digest: digest));
+    final pending = pendingRemove;
+    pendingRemove = null;
+    return pending?.future ?? removeResult;
+  }
+
+  @override
+  Future<Result<File>> resolveAbsolutePath(
+    ContentSubmissionStagedAsset asset,
+  ) async => Result.success(
+    File('${stagingDirectory?.path ?? '/staged'}/${asset.relativePath}'),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FakeContentSubmissionDraftRepository
+// ---------------------------------------------------------------------------
+
 /// Create a fresh instance per test to avoid state bleed between tests.
 final class FakeContentSubmissionDraftRepository
     implements ContentSubmissionDraftRepository {
@@ -900,6 +1006,9 @@ final class FakeContentSubmissionDraftRepository
   int clearDraftCallCount = 0;
   ContentSubmissionDraft? lastSavedState;
 
+  /// When non-null, holds the next draft load open until the test completes it.
+  Completer<Result<ContentSubmissionDraft?>>? pendingLoadDraft;
+
   /// When non-null, holds the next draft save open until the test completes it.
   Completer<Result<void>>? pendingSaveDraft;
 
@@ -910,7 +1019,9 @@ final class FakeContentSubmissionDraftRepository
   @override
   Future<Result<ContentSubmissionDraft?>> loadDraft() async {
     loadDraftCallCount++;
-    return loadDraftResult;
+    final pending = pendingLoadDraft;
+    pendingLoadDraft = null;
+    return pending?.future ?? loadDraftResult;
   }
 
   @override

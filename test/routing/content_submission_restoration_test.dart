@@ -103,6 +103,7 @@ final class _RestorationFixture {
       logger: MockLogger(),
       contentSubmissionRepository: submissionRepository,
       draftRepository: draftRepository,
+      stagedAssetRepository: FakeContentSubmissionStagedAssetRepository(),
       imagePicker: FakeImagePicker(),
     );
     unawaited(viewModel.initialize());
