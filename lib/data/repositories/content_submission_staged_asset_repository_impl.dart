@@ -183,12 +183,8 @@ class ContentSubmissionStagedAssetRepositoryImpl
     try {
       await _clearSessionUnchecked(clientSubmissionId);
       return const Result.success(null);
-    } on Exception catch (exception, stackTrace) {
-      _logger.log(
-        const ContentSubmissionAssetRemovalFailed(),
-        error: exception,
-        stackTrace: stackTrace,
-      );
+    } on Exception catch (exception) {
+      _logCleanupFailure(exception);
       return Result.error(exception);
     }
   }
@@ -468,14 +464,27 @@ class ContentSubmissionStagedAssetRepositoryImpl
     final type = FileSystemEntity.typeSync(entry.path, followLinks: false);
     if (type == FileSystemEntityType.notFound) return;
     if (type != FileSystemEntityType.directory) {
-      await entry.delete();
+      await _deleteEntryIfPresent(entry);
       return;
     }
     final directory = Directory(entry.path);
     await for (final child in directory.list(followLinks: false)) {
       await _deleteTreeWithoutFollowingLinks(child);
     }
-    await directory.delete();
+    await _deleteEntryIfPresent(directory);
+  }
+
+  /// Emits useful cleanup context without forwarding a filesystem exception,
+  /// whose message may contain a private local path.
+  void _logCleanupFailure(Exception error) {
+    _logger.log(
+      const ContentSubmissionAssetRemovalFailed(),
+      extra: {
+        'operation': 'clear_session',
+        'errorType': error.runtimeType.toString(),
+        'reason': 'staged cleanup failed',
+      },
+    );
   }
 
   Future<void> _ensureDirectory(Directory directory) async {

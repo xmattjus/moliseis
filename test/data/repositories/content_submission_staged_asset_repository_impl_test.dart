@@ -7,6 +7,7 @@ import 'package:moliseis/data/repositories/content_submission_staged_asset_repos
 import 'package:moliseis/domain/models/content_submission_staged_asset.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:path/path.dart' as p;
 
@@ -313,6 +314,55 @@ void main() {
               .count(),
           0,
         );
+      },
+    );
+
+    test(
+      'clearSession logs cleanup failure without its private path',
+      () async {
+        const privatePath =
+            '/Users/example/private/content_submission/staged/secret-file';
+        final logger = MockLogger();
+        repository = ContentSubmissionStagedAssetRepositoryImpl(
+          logger: logger,
+          objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+          getSupportDirectory: () async => supportDirectory,
+          deleteEntry: (_) async => throw const FileSystemException(
+            'cannot remove staged file',
+            privatePath,
+          ),
+        );
+        final bytes = <int>[1, 2, 3];
+        final digest = sha1.convert(bytes).toString();
+        final source = File('${supportDirectory.path}/picker-source.jpg')
+          ..writeAsBytesSync(bytes);
+        await repository.acquire(
+          clientSubmissionId: sessionA,
+          digest: digest,
+          source: source,
+        );
+
+        final result = await repository.clearSession(sessionA);
+
+        expect(result, isA<Error<void>>());
+        expect(
+          logger.eventsOfType<ContentSubmissionAssetRemovalFailed>(),
+          hasLength(1),
+        );
+        for (final call in logger.calls) {
+          expect(call.event.data.toString(), isNot(contains(privatePath)));
+          expect(call.error?.toString(), isNot(contains(privatePath)));
+          expect(call.extra.toString(), isNot(contains(privatePath)));
+        }
+        final cleanupDiagnostic = logger
+            .firstCallOfType<ContentSubmissionAssetRemovalFailed>();
+        expect(cleanupDiagnostic?.error, isNull);
+        expect(cleanupDiagnostic?.stackTrace, isNull);
+        expect(cleanupDiagnostic?.extra, {
+          'operation': 'clear_session',
+          'errorType': 'FileSystemException',
+          'reason': 'staged cleanup failed',
+        });
       },
     );
 

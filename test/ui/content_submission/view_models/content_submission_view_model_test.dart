@@ -204,6 +204,154 @@ void main() {
     );
 
     test(
+      'preserves unknown staged ownership and blocks asset addition after a '
+      'draft-load failure',
+      () async {
+        const persistedIdentity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+        final objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+        final supportDirectory = await Directory.systemTemp.createTemp(
+          'moliseis_content_submission_draft_load_failure_',
+        );
+        addTearDown(() async {
+          await objectBoxEnvironment.dispose();
+          await supportDirectory.delete(recursive: true);
+        });
+        final objectBox = TestObjectBox(objectBoxEnvironment.store);
+        final logger = MockLogger();
+        final staged = ContentSubmissionStagedAssetRepositoryImpl(
+          logger: logger,
+          objectBoxI: objectBox,
+          getSupportDirectory: () async => supportDirectory,
+        );
+        final stagedBytes = <int>[1, 2, 3];
+        final stagedDigest = sha1.convert(stagedBytes).toString();
+        final stagedSource = File(
+          '${supportDirectory.path}/persisted-source.jpg',
+        )..writeAsBytesSync(stagedBytes);
+        await staged.acquire(
+          clientSubmissionId: persistedIdentity,
+          digest: stagedDigest,
+          source: stagedSource,
+        );
+        var pickerCalled = false;
+        final drafts = FakeContentSubmissionDraftRepository(
+          loadDraftResult: Result.error(TestException('draft read failed')),
+        );
+        final vm = ContentSubmissionViewModel(
+          logger: logger,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          draftRepository: drafts,
+          stagedAssetRepository: staged,
+          imagePicker: FakeImagePicker(
+            onPickMultipleMedia: () async {
+              pickerCalled = true;
+              return [XFile('${supportDirectory.path}/picker-source.jpg')];
+            },
+          ),
+        );
+        final freshIdentity = vm.state.clientSubmissionId;
+        final persistedPath =
+            '${supportDirectory.path}/content_submission/staged/'
+            '$persistedIdentity/$stagedDigest';
+
+        await vm.initialize();
+        await vm.addAsset.execute();
+
+        expect(vm.state.clientSubmissionId, freshIdentity);
+        expect(vm.assets, isEmpty);
+        expect(vm.addAsset.error, isTrue);
+        expect(pickerCalled, isFalse);
+        expect(drafts.saveDraftCallCount, 0);
+        expect(File(persistedPath).existsSync(), isTrue);
+        expect(
+          objectBoxEnvironment.store
+              .box<ContentSubmissionStagedAssetEntity>()
+              .count(),
+          1,
+        );
+        expect(
+          Directory(
+            '${supportDirectory.path}/content_submission/staged/$freshIdentity',
+          ).existsSync(),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'does not checkpoint a fresh draft after a draft-load failure',
+      () async {
+        final loadError = TestException('draft read failed');
+        final drafts = FakeContentSubmissionDraftRepository(
+          loadDraftResult: Result.error(loadError),
+        );
+        final vm = buildViewModel(draftRepository: drafts);
+        final freshIdentity = vm.state.clientSubmissionId;
+
+        final checkpoint = await vm.checkpointDraft();
+
+        expect(checkpoint, isA<Error<void>>());
+        expect((checkpoint as Error<void>).error, same(loadError));
+        expect(drafts.saveDraftCallCount, 0);
+        expect(vm.state.clientSubmissionId, freshIdentity);
+      },
+    );
+
+    test(
+      'cleans staged orphans only when draft absence is authoritative',
+      () async {
+        const persistedIdentity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+        final objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+        final supportDirectory = await Directory.systemTemp.createTemp(
+          'moliseis_content_submission_known_absence_',
+        );
+        addTearDown(() async {
+          await objectBoxEnvironment.dispose();
+          await supportDirectory.delete(recursive: true);
+        });
+        final objectBox = TestObjectBox(objectBoxEnvironment.store);
+        final staged = ContentSubmissionStagedAssetRepositoryImpl(
+          logger: MockLogger(),
+          objectBoxI: objectBox,
+          getSupportDirectory: () async => supportDirectory,
+        );
+        final bytes = <int>[1, 2, 3];
+        final digest = sha1.convert(bytes).toString();
+        final source = File('${supportDirectory.path}/orphaned-source.jpg')
+          ..writeAsBytesSync(bytes);
+        await staged.acquire(
+          clientSubmissionId: persistedIdentity,
+          digest: digest,
+          source: source,
+        );
+        final vm = ContentSubmissionViewModel(
+          logger: MockLogger(),
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          draftRepository: FakeContentSubmissionDraftRepository(),
+          stagedAssetRepository: staged,
+          imagePicker: FakeImagePicker(),
+        );
+
+        await vm.initialize();
+
+        expect(vm.assets, isEmpty);
+        expect(
+          File(
+            '${supportDirectory.path}/content_submission/staged/'
+            '$persistedIdentity/$digest',
+          ).existsSync(),
+          isFalse,
+        );
+        expect(
+          objectBoxEnvironment.store
+              .box<ContentSubmissionStagedAssetEntity>()
+              .count(),
+          0,
+        );
+      },
+    );
+
+    test(
       'quarantines over-capacity restored descriptors without opening picker',
       () async {
         const identity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
@@ -2053,6 +2201,8 @@ void main() {
         const identity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
         final restoredBytes = <int>[1, 2, 3];
         final restoredDigest = sha1.convert(restoredBytes).toString();
+        final recoveryError = TestException('recovered staging failed');
+        final logger = MockLogger();
         final stagedRepository =
             FakeContentSubmissionStagedAssetRepository(
                 reconcileResult: Result.success([
@@ -2066,9 +2216,10 @@ void main() {
               ..pendingAcquire =
                   Completer<Result<ContentSubmissionStagedAsset>>()
               ..pendingAcquire!.complete(
-                Result.error(TestException('recovered staging failed')),
+                Result.error(recoveryError),
               );
         final vm = buildViewModel(
+          logger: logger,
           draftRepository: FakeContentSubmissionDraftRepository(
             loadDraftResult: Result.success(
               ContentSubmissionDraft(clientSubmissionId: identity),
@@ -2091,6 +2242,14 @@ void main() {
           '/staged/$identity/$restoredDigest',
         );
         expect(stagedRepository.acquired, hasLength(1));
+        expect(
+          logger.eventsOfType<ContentSubmissionAssetRetrievalFailed>(),
+          hasLength(1),
+        );
+        final diagnostic = logger
+            .firstCallOfType<ContentSubmissionAssetRetrievalFailed>();
+        expect(diagnostic, isNotNull);
+        expect(diagnostic?.error, same(recoveryError));
       });
 
       test('does not attach lost media to a fresh non-durable draft', () async {
@@ -2112,27 +2271,82 @@ void main() {
         expect(stagedRepository.acquired, isEmpty);
       });
 
-      test('does not attach lost media after draft loading fails', () async {
-        debugDefaultTargetPlatformOverride = TargetPlatform.android;
-        addTearDown(() => debugDefaultTargetPlatformOverride = null);
-        final stagedRepository = FakeContentSubmissionStagedAssetRepository();
-        final vm = buildViewModel(
-          draftRepository: FakeContentSubmissionDraftRepository(
-            loadDraftResult: Result.error(TestException('draft load failed')),
-          ),
-          stagedAssetRepository: stagedRepository,
-          imagePicker: FakeImagePicker(
-            onRetrieveLostData: () async => LostDataResponse(
-              file: XFile.fromData(Uint8List.fromList([1, 2, 3])),
+      test(
+        'preserves existing staged state when Android recovery follows a '
+        'draft-load failure',
+        () async {
+          debugDefaultTargetPlatformOverride = TargetPlatform.android;
+          addTearDown(() => debugDefaultTargetPlatformOverride = null);
+          const persistedIdentity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+          final objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+          final supportDirectory = await Directory.systemTemp.createTemp(
+            'moliseis_content_submission_lost_data_load_failure_',
+          );
+          addTearDown(() async {
+            await objectBoxEnvironment.dispose();
+            await supportDirectory.delete(recursive: true);
+          });
+          final objectBox = TestObjectBox(objectBoxEnvironment.store);
+          final staged = ContentSubmissionStagedAssetRepositoryImpl(
+            logger: MockLogger(),
+            objectBoxI: objectBox,
+            getSupportDirectory: () async => supportDirectory,
+          );
+          final bytes = <int>[1, 2, 3];
+          final digest = sha1.convert(bytes).toString();
+          final source = File('${supportDirectory.path}/persisted-source.jpg')
+            ..writeAsBytesSync(bytes);
+          await staged.acquire(
+            clientSubmissionId: persistedIdentity,
+            digest: digest,
+            source: source,
+          );
+          var lostDataRetrieved = false;
+          final vm = ContentSubmissionViewModel(
+            logger: MockLogger(),
+            contentSubmissionRepository: FakeContentSubmissionRepository(),
+            draftRepository: FakeContentSubmissionDraftRepository(
+              loadDraftResult: Result.error(
+                TestException('draft load failed'),
+              ),
             ),
-          ),
-        );
+            stagedAssetRepository: staged,
+            imagePicker: FakeImagePicker(
+              onRetrieveLostData: () async {
+                lostDataRetrieved = true;
+                return LostDataResponse(
+                  file: XFile.fromData(Uint8List.fromList([4, 5, 6])),
+                );
+              },
+            ),
+          );
+          final freshIdentity = vm.state.clientSubmissionId;
 
-        await vm.retrieveLostAssets.execute();
+          await vm.retrieveLostAssets.execute();
 
-        expect(vm.assets, isEmpty);
-        expect(stagedRepository.acquired, isEmpty);
-      });
+          expect(lostDataRetrieved, isTrue);
+          expect(vm.assets, isEmpty);
+          expect(
+            File(
+              '${supportDirectory.path}/content_submission/staged/'
+              '$persistedIdentity/$digest',
+            ).existsSync(),
+            isTrue,
+          );
+          expect(
+            objectBoxEnvironment.store
+                .box<ContentSubmissionStagedAssetEntity>()
+                .count(),
+            1,
+          );
+          expect(
+            Directory(
+              '${supportDirectory.path}/content_submission/staged/$freshIdentity',
+            ).existsSync(),
+            isFalse,
+          );
+        },
+      );
 
       test(
         'does not attach lost media after staged reconciliation fails',

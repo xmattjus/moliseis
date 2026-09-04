@@ -67,6 +67,16 @@ enum ContentSubmissionDraftLoadState {
   ready,
 }
 
+/// Whether initialization authoritatively determined persisted draft state.
+///
+/// A failed read is deliberately distinct from a successfully absent draft: it
+/// must not authorize orphan cleanup or a fresh draft write.
+enum _PersistedDraftState {
+  unknown,
+  absent,
+  restored,
+}
+
 enum _AssetCandidateDisposition {
   added,
   duplicate,
@@ -114,6 +124,8 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   ContentSubmissionDraft _state = ContentSubmissionDraft();
   late ContentSubmissionDraft _checkpointedDraft;
   bool _hasDurableCheckpoint = false;
+  _PersistedDraftState _persistedDraftState = _PersistedDraftState.unknown;
+  Exception? _draftLoadError;
   Future<void>? _initializationFuture;
   final Completer<void> _initializationBarrier = Completer<void>();
   Future<void> _lifecycleTail = Future<void>.value();
@@ -179,29 +191,47 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   Future<void> initialize() => _initializationFuture ??= _initialize();
 
   Future<void> _initialize() async {
+    var draftReadCompleted = false;
     try {
       final result = await _draftRepository.loadDraft();
-      String? activeClientSubmissionId;
-
-      if (result is Success<ContentSubmissionDraft?> && result.value != null) {
-        _state = result.value!;
-        _checkpointedDraft = _state;
-        _hasDurableCheckpoint = true;
-        activeClientSubmissionId = _state.clientSubmissionId;
-      }
-      // On error, fall back to an empty draft — the repository already
-      // logged the failure, and blocking the form is worse than losing
-      // an unsaved draft.
-
-      final reconciled = await _reconcileStagedAssets(activeClientSubmissionId);
-      if (activeClientSubmissionId != null && reconciled is Success<void>) {
-        _recoveryEligibleClientSubmissionId = activeClientSubmissionId;
+      draftReadCompleted = true;
+      switch (result) {
+        case Success<ContentSubmissionDraft?>(value: final draft):
+          _draftLoadError = null;
+          if (draft == null) {
+            _persistedDraftState = _PersistedDraftState.absent;
+            await _reconcileStagedAssets(null);
+          } else {
+            _persistedDraftState = _PersistedDraftState.restored;
+            _state = draft;
+            _checkpointedDraft = _state;
+            _hasDurableCheckpoint = true;
+            final reconciled = await _reconcileStagedAssets(
+              _state.clientSubmissionId,
+            );
+            if (reconciled is Success<void>) {
+              _recoveryEligibleClientSubmissionId = _state.clientSubmissionId;
+            }
+          }
+        case Error<ContentSubmissionDraft?>(:final error):
+          // A failed read leaves existing persisted ownership unknown. Do not
+          // reconcile with null, because that contract removes all orphans.
+          _persistedDraftState = _PersistedDraftState.unknown;
+          _draftLoadError = error;
+          _stagedStateAvailable = false;
+          _stagedReconciliationError = error;
+          _assets.clear();
       }
     } on Object catch (error) {
-      _stagedStateAvailable = false;
-      _stagedReconciliationError = error is Exception
+      final exception = error is Exception
           ? error
           : Exception(error.toString());
+      if (!draftReadCompleted) {
+        _persistedDraftState = _PersistedDraftState.unknown;
+        _draftLoadError = exception;
+      }
+      _stagedStateAvailable = false;
+      _stagedReconciliationError = exception;
       _assets.clear();
     } finally {
       _loadState = ContentSubmissionDraftLoadState.ready;
@@ -340,6 +370,14 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       final prePicker = await _serialize<String?>(() async {
         if (_disposed) return const Result.success(null);
         if (_remainingAssetCapacity == 0) return const Result.success(null);
+        if (_persistedDraftState == _PersistedDraftState.unknown) {
+          return Result.error(
+            _draftLoadError ??
+                Exception(
+                  'Cannot add assets while persisted draft state is unknown.',
+                ),
+          );
+        }
         if (!_stagedStateAvailable) {
           final reconciled = await _reconcileStagedAssets(
             _hasDurableCheckpoint ? _state.clientSubmissionId : null,
@@ -493,6 +531,14 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _checkpointDraftInsideBoundary() async {
+    if (_persistedDraftState == _PersistedDraftState.unknown) {
+      return Result.error(
+        _draftLoadError ??
+            Exception(
+              'Cannot checkpoint while persisted draft state is unknown.',
+            ),
+      );
+    }
     final snapshot = _state;
     if (_hasDurableCheckpoint && snapshot == _checkpointedDraft) {
       return const Result.success(null);
@@ -502,6 +548,8 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     if (result is Success<void>) {
       _checkpointedDraft = snapshot;
       _hasDurableCheckpoint = true;
+      _persistedDraftState = _PersistedDraftState.restored;
+      _draftLoadError = null;
       if (!_disposed) {
         notifyListeners();
       }
@@ -759,15 +807,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       final oldClientSubmissionId = _state.clientSubmissionId;
       final cleared = await _draftRepository.clearDraft();
       if (cleared is Error<void>) return cleared;
-      final staged = await _stagedAssetRepository.clearSession(
-        oldClientSubmissionId,
-      );
-      if (staged is Error<void>) {
-        _logger.log(
-          const ContentSubmissionAssetRemovalFailed(),
-          error: staged.error,
-        );
-      }
+      await _stagedAssetRepository.clearSession(oldClientSubmissionId);
+      _persistedDraftState = _PersistedDraftState.absent;
+      _draftLoadError = null;
       _assets.clear();
       _eventTimeIssue = null;
       _state = ContentSubmissionDraft();
@@ -846,7 +888,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
 
     try {
       final rejectedNames = <String>[];
-      await _serialize<void>(() async {
+      final processed = await _serialize<void>(() async {
         if (_state.clientSubmissionId != capturedClientSubmissionId ||
             !_stagedStateAvailable) {
           return const Result.success(null);
@@ -866,6 +908,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
         }
         return const Result.success(null);
       });
+      if (processed case Error<void>(:final error)) {
+        _handleRetrieveLostMediaErrors(error, null);
+      }
 
       if (rejectedNames.isNotEmpty) {
         _logger.log(
