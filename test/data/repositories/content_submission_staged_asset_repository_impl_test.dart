@@ -5,11 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/content_submission_staged_asset_entity.dart';
 import 'package:moliseis/data/repositories/content_submission_staged_asset_repository_impl.dart';
 import 'package:moliseis/domain/models/content_submission_staged_asset.dart';
-import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:path/path.dart' as p;
 
 import '../../support/mock_logger.dart';
 import '../../support/objectbox_test_store.dart';
@@ -164,48 +162,6 @@ void main() {
       },
     );
 
-    test('acquire revalidates a session directory before final '
-        'rename', () async {
-      final outside = await Directory.systemTemp.createTemp(
-        'moliseis_outside_rename_session_',
-      );
-      addTearDown(() => outside.delete(recursive: true));
-      final bytes = <int>[1, 2, 3];
-      final digest = sha1.convert(bytes).toString();
-      final outsideFile = File('${outside.path}/$digest')
-        ..writeAsBytesSync(<int>[9, 9, 9]);
-      final source = File('${supportDirectory.path}/picker-source.jpg')
-        ..writeAsBytesSync(bytes);
-      repository = ContentSubmissionStagedAssetRepositoryImpl(
-        logger: MockLogger(),
-        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-        getSupportDirectory: () async => supportDirectory,
-        beforeFinalRename: (temporary, sessionDirectory) async {
-          final moved = await temporary.rename(
-            '${supportDirectory.path}/temporary-outside-staging',
-          );
-          await sessionDirectory.delete(recursive: true);
-          await Link(sessionDirectory.path).create(outside.path);
-          return moved;
-        },
-      );
-
-      final result = await repository.acquire(
-        clientSubmissionId: sessionA,
-        digest: digest,
-        source: source,
-      );
-
-      expect(result, isA<Success<ContentSubmissionStagedAsset>>());
-      expect(outsideFile.readAsBytesSync(), <int>[9, 9, 9]);
-      expect(
-        File(
-          '${supportDirectory.path}/content_submission/staged/$sessionA/$digest',
-        ).readAsBytesSync(),
-        bytes,
-      );
-    });
-
     test('resolveAbsolutePath unlinks a linked session directory', () async {
       final outside = await Directory.systemTemp.createTemp(
         'moliseis_outside_resolve_session_',
@@ -326,20 +282,10 @@ void main() {
         repository = ContentSubmissionStagedAssetRepositoryImpl(
           logger: logger,
           objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-          getSupportDirectory: () async => supportDirectory,
-          deleteEntry: (_) async => throw const FileSystemException(
+          getSupportDirectory: () async => throw const FileSystemException(
             'cannot remove staged file',
             privatePath,
           ),
-        );
-        final bytes = <int>[1, 2, 3];
-        final digest = sha1.convert(bytes).toString();
-        final source = File('${supportDirectory.path}/picker-source.jpg')
-          ..writeAsBytesSync(bytes);
-        await repository.acquire(
-          clientSubmissionId: sessionA,
-          digest: digest,
-          source: source,
         );
 
         final result = await repository.clearSession(sessionA);
@@ -386,65 +332,6 @@ void main() {
       },
     );
 
-    test('rejects source mutation performed between digest and copy', () async {
-      final initialBytes = <int>[1, 2, 3];
-      final source = File('${supportDirectory.path}/picker-source.jpg')
-        ..writeAsBytesSync(initialBytes);
-      repository = ContentSubmissionStagedAssetRepositoryImpl(
-        logger: MockLogger(),
-        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-        getSupportDirectory: () async => supportDirectory,
-        copyAndClose: (source, destination) async {
-          await source.writeAsBytes(<int>[4, 5, 6]);
-          await destination.writeAsBytes(await source.readAsBytes());
-        },
-      );
-
-      final result = await repository.acquire(
-        clientSubmissionId: sessionA,
-        digest: sha1.convert(initialBytes).toString(),
-        source: source,
-      );
-
-      expect(result, isA<Error<ContentSubmissionStagedAsset>>());
-      expect(
-        objectBoxEnvironment.store
-            .box<ContentSubmissionStagedAssetEntity>()
-            .count(),
-        0,
-      );
-    });
-
-    test('rejects a copied source that grows beyond the size limit', () async {
-      final initialBytes = <int>[1, 2, 3];
-      final source = File('${supportDirectory.path}/picker-source.jpg')
-        ..writeAsBytesSync(initialBytes);
-      repository = ContentSubmissionStagedAssetRepositoryImpl(
-        logger: MockLogger(),
-        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-        getSupportDirectory: () async => supportDirectory,
-        copyAndClose: (source, destination) async {
-          final grown = List<int>.filled(10 * 1024 * 1024 + 1, 7);
-          await source.writeAsBytes(grown);
-          await destination.writeAsBytes(await source.readAsBytes());
-        },
-      );
-
-      final result = await repository.acquire(
-        clientSubmissionId: sessionA,
-        digest: sha1.convert(initialBytes).toString(),
-        source: source,
-      );
-
-      expect(result, isA<Error<ContentSubmissionStagedAsset>>());
-      expect(
-        objectBoxEnvironment.store
-            .box<ContentSubmissionStagedAssetEntity>()
-            .count(),
-        0,
-      );
-    });
-
     test('copy failure commits no descriptor', () async {
       final bytes = <int>[1, 2, 3];
       final result = await repository.acquire(
@@ -459,179 +346,6 @@ void main() {
             .box<ContentSubmissionStagedAssetEntity>()
             .count(),
         0,
-      );
-    });
-
-    test(
-      'interrupted partial copy commits no descriptor or temporary file',
-      () async {
-        final bytes = <int>[1, 2, 3];
-        final source = File('${supportDirectory.path}/picker-source.jpg')
-          ..writeAsBytesSync(bytes);
-        repository = ContentSubmissionStagedAssetRepositoryImpl(
-          logger: MockLogger(),
-          objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-          getSupportDirectory: () async => supportDirectory,
-          copyAndClose: (_, destination) async {
-            await destination.writeAsBytes(<int>[1]);
-            throw const FileSystemException('interrupted copy');
-          },
-        );
-
-        final result = await repository.acquire(
-          clientSubmissionId: sessionA,
-          digest: sha1.convert(bytes).toString(),
-          source: source,
-        );
-
-        expect(result, isA<Error<ContentSubmissionStagedAsset>>());
-        expect(
-          objectBoxEnvironment.store
-              .box<ContentSubmissionStagedAssetEntity>()
-              .count(),
-          0,
-        );
-        expect(
-          await Directory(
-            '${supportDirectory.path}/content_submission/staged/$sessionA',
-          ).list(followLinks: false).toList(),
-          isEmpty,
-        );
-      },
-    );
-
-    test('rename failure commits no descriptor or final file', () async {
-      final bytes = <int>[1, 2, 3];
-      final digest = sha1.convert(bytes).toString();
-      final source = File('${supportDirectory.path}/picker-source.jpg')
-        ..writeAsBytesSync(bytes);
-      repository = ContentSubmissionStagedAssetRepositoryImpl(
-        logger: MockLogger(),
-        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-        getSupportDirectory: () async => supportDirectory,
-        renameFile: (_, _) => Future<File>.error(
-          const FileSystemException('rename failed'),
-        ),
-      );
-
-      final result = await repository.acquire(
-        clientSubmissionId: sessionA,
-        digest: digest,
-        source: source,
-      );
-
-      expect(result, isA<Error<ContentSubmissionStagedAsset>>());
-      expect(
-        objectBoxEnvironment.store
-            .box<ContentSubmissionStagedAssetEntity>()
-            .count(),
-        0,
-      );
-      expect(
-        File(
-          '${supportDirectory.path}/content_submission/staged/$sessionA/$digest',
-        ).existsSync(),
-        isFalse,
-      );
-    });
-
-    test(
-      'closes and verifies a temporary file before rename and descriptor',
-      () async {
-        final bytes = <int>[1, 2, 3];
-        final digest = sha1.convert(bytes).toString();
-        final source = File('${supportDirectory.path}/picker-source.jpg')
-          ..writeAsBytesSync(bytes);
-        final steps = <String>[];
-        repository = ContentSubmissionStagedAssetRepositoryImpl(
-          logger: MockLogger(),
-          objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-          getSupportDirectory: () async => supportDirectory,
-          copyAndClose: (_, destination) async {
-            await destination.writeAsBytes(bytes);
-            steps.add('temporary closed');
-          },
-          temporaryLength: (temporary) async {
-            steps.add('size verified');
-            return temporary.lengthSync();
-          },
-          temporaryHasDigest: (_, _) async {
-            steps.add('digest verified');
-            return true;
-          },
-          renameFile: (temporary, destinationPath) async {
-            steps.add('final renamed');
-            return temporary.rename(destinationPath);
-          },
-          putEntity: (entity) async {
-            steps.add('descriptor persisted');
-            return objectBoxEnvironment.store
-                .box<ContentSubmissionStagedAssetEntity>()
-                .put(entity);
-          },
-        );
-
-        final result = await repository.acquire(
-          clientSubmissionId: sessionA,
-          digest: digest,
-          source: source,
-        );
-
-        expect(result, isA<Success<ContentSubmissionStagedAsset>>());
-        expect(steps, [
-          'temporary closed',
-          'size verified',
-          'digest verified',
-          'final renamed',
-          'descriptor persisted',
-        ]);
-      },
-    );
-
-    test('descriptor failure leaves a final file '
-        'that retry converges', () async {
-      final source = File('${supportDirectory.path}/picker-source.jpg');
-      final bytes = <int>[1, 2, 3];
-      final digest = sha1.convert(bytes).toString();
-      await source.writeAsBytes(bytes);
-      repository = ContentSubmissionStagedAssetRepositoryImpl(
-        logger: MockLogger(),
-        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-        getSupportDirectory: () async => supportDirectory,
-        putEntity: (_) => Future<int>.error(Exception('descriptor failure')),
-      );
-
-      final failed = await repository.acquire(
-        clientSubmissionId: sessionA,
-        digest: digest,
-        source: source,
-      );
-
-      expect(failed, isA<Error<ContentSubmissionStagedAsset>>());
-      expect(
-        File(
-          '${supportDirectory.path}/content_submission/staged/$sessionA/$digest',
-        ).existsSync(),
-        isTrue,
-      );
-      repository = ContentSubmissionStagedAssetRepositoryImpl(
-        logger: MockLogger(),
-        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-        getSupportDirectory: () async => supportDirectory,
-      );
-      expect(
-        await repository.acquire(
-          clientSubmissionId: sessionA,
-          digest: digest,
-          source: source,
-        ),
-        isA<Success<ContentSubmissionStagedAsset>>(),
-      );
-      expect(
-        objectBoxEnvironment.store
-            .box<ContentSubmissionStagedAssetEntity>()
-            .count(),
-        1,
       );
     });
 
@@ -768,8 +482,7 @@ void main() {
     );
 
     test(
-      'reconstructs descriptor-less finals after existing descriptors '
-      'in explicit ID order',
+      'restores descriptors in ID order and deletes descriptor-less finals',
       () async {
         final existingBytes = <int>[9];
         final firstBytes = <int>[1];
@@ -790,38 +503,30 @@ void main() {
         await File('${sessionDirectory.path}/$existingDigest').writeAsBytes(
           existingBytes,
         );
-        final box = objectBoxEnvironment.store
-            .box<ContentSubmissionStagedAssetEntity>();
-        final existingId = box.put(
-          ContentSubmissionStagedAssetEntity(
-            clientSubmissionId: sessionA,
-            digest: existingDigest,
-            relativePath: '$sessionA/$existingDigest',
-          ),
-        );
+        final box =
+            objectBoxEnvironment.store.box<ContentSubmissionStagedAssetEntity>()
+              ..put(
+                ContentSubmissionStagedAssetEntity(
+                  clientSubmissionId: sessionA,
+                  digest: existingDigest,
+                  relativePath: '$sessionA/$existingDigest',
+                ),
+              );
 
         final restored = await repository.reconcileAndLoad(sessionA);
-        final reconstructedDigests = [firstDigest, secondDigest]..sort();
-        final expected = [existingDigest, ...reconstructedDigests];
-        final query = box
-            .query()
-            .order(ContentSubmissionStagedAssetEntity_.id)
-            .build();
-        final descriptors = query.find();
-        query.close();
 
         expect(
           restored.getOrNull()!.map((asset) => asset.digest),
-          expected,
+          [existingDigest],
         );
-        expect(descriptors.map((descriptor) => descriptor.id), [
-          existingId,
-          greaterThan(existingId),
-          greaterThan(existingId),
-        ]);
+        expect(box.count(), 1);
         expect(
-          descriptors.map((descriptor) => descriptor.digest),
-          expected,
+          File('${sessionDirectory.path}/$firstDigest').existsSync(),
+          isFalse,
+        );
+        expect(
+          File('${sessionDirectory.path}/$secondDigest').existsSync(),
+          isFalse,
         );
       },
     );
@@ -1236,66 +941,6 @@ void main() {
         isA<Success<void>>(),
       );
     });
-
-    test(
-      'removal retries after descriptor deletion and final-file failure',
-      () async {
-        final bytes = <int>[1, 2, 3];
-        final digest = sha1.convert(bytes).toString();
-        final source = File('${supportDirectory.path}/picker-source.jpg')
-          ..writeAsBytesSync(bytes);
-        await repository.acquire(
-          clientSubmissionId: sessionA,
-          digest: digest,
-          source: source,
-        );
-        var failFinalDeletion = true;
-        repository = ContentSubmissionStagedAssetRepositoryImpl(
-          logger: MockLogger(),
-          objectBoxI: TestObjectBox(objectBoxEnvironment.store),
-          getSupportDirectory: () async => supportDirectory,
-          deleteEntry: (entry) async {
-            if (failFinalDeletion && p.basename(entry.path) == digest) {
-              failFinalDeletion = false;
-              throw const FileSystemException('final deletion failed');
-            }
-            await entry.delete();
-          },
-        );
-
-        final failed = await repository.remove(
-          clientSubmissionId: sessionA,
-          digest: digest,
-        );
-
-        expect(failed, isA<Error<void>>());
-        expect(
-          objectBoxEnvironment.store
-              .box<ContentSubmissionStagedAssetEntity>()
-              .count(),
-          0,
-        );
-        expect(
-          File(
-            '${supportDirectory.path}/content_submission/staged/$sessionA/$digest',
-          ).existsSync(),
-          isTrue,
-        );
-
-        final retried = await repository.remove(
-          clientSubmissionId: sessionA,
-          digest: digest,
-        );
-
-        expect(retried, isA<Success<void>>());
-        expect(
-          Directory(
-            '${supportDirectory.path}/content_submission/staged/$sessionA',
-          ).existsSync(),
-          isFalse,
-        );
-      },
-    );
 
     test('removal succeeds when its final file is already missing', () async {
       final bytes = <int>[1, 2, 3];

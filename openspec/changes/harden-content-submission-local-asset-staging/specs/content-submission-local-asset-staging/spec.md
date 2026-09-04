@@ -5,7 +5,7 @@ Make locally selected Content Submission attachments a durable, recoverable part
 ## ADDED Requirements
 
 ### Requirement: Asset picking starts only for a durably identified draft
-Before launching an external asset picker, the system SHALL await completion of the one idempotent draft/staged-state initialization, establish durable existence of the resulting current draft, and capture its `clientSubmissionId` as the picker operation's ownership snapshot. Durable existence SHALL be tracked independently from equality with the last checkpoint snapshot: a fresh in-memory draft SHALL be written once even when its value equals that snapshot, while a draft already known to exist durably MAY retain the unchanged-checkpoint write optimization. A successful `loadDraft() == null` authoritatively establishes absence; a draft-load error establishes unknown persisted state and SHALL NOT authorize saving a fresh identity. If initialization/reconciliation or the required checkpoint fails, the system SHALL return the persistence error without opening the picker, staging files, or mutating the current assets.
+Before launching an external asset picker, the system SHALL await completion of the one idempotent draft/staged-state initialization, establish durable existence of the resulting current draft, and capture its `clientSubmissionId` as the picker operation's ownership snapshot. The persisted-draft state SHALL be the authoritative durability contract: `unknown` forbids identity-dependent persistence, cleanup, and picking; `absent` requires the first checkpoint for the current identity to perform a real save; and `restored` permits the unchanged-checkpoint write optimization. A successful `loadDraft() == null` authoritatively establishes absence; a draft-load error establishes unknown persisted state and SHALL NOT authorize saving a fresh identity. If initialization/reconciliation or the required checkpoint fails, the system SHALL return the persistence error without opening the picker, staging files, or mutating the current assets.
 
 #### Scenario: Fresh equal snapshot is physically checkpointed before picking
 - **GIVEN** a newly constructed draft whose current value equals its in-memory checkpoint snapshot
@@ -37,7 +37,7 @@ Before launching an external asset picker, the system SHALL await completion of 
 #### Scenario: Persisted draft establishes durable existence on initialization
 - **GIVEN** initialization successfully loads a valid persisted draft
 - **WHEN** that draft and its exact `clientSubmissionId` become active
-- **THEN** the system SHALL record that identity as durably existing without issuing an initialization save
+- **THEN** the system SHALL enter restored persisted-draft state without issuing an initialization save
 
 #### Scenario: Early asset addition cannot overwrite a loading persisted draft
 - **GIVEN** ViewModel construction created a fresh in-memory identity
@@ -166,7 +166,7 @@ The system SHALL preserve SHA-1 as the local accidental-content-deduplication di
 - **AND** valid candidates in the same batch MAY continue
 
 ### Requirement: Initialization restores one coordinated durable session
-Initialization SHALL be idempotent and shared by all local checkpoint/session mutations. It SHALL first resolve the persisted draft result and distinguish successful restoration, authoritative absence, and read failure. It SHALL reconcile and restore staged state only for a successfully restored identity; only authoritative absence (`Success(null)`) SHALL reconcile with no active identity and permit orphan cleanup. A draft-load error SHALL leave persisted ownership unknown, preserve staged state without reconciliation or adoption into the fresh identity, and leave identity-dependent mutations unavailable. Only after the applicable restoration or authoritative-absence reconciliation returns SHALL initialization mark complete, expose `loadState == ready`, and notify listeners. Repeated callers SHALL await the same work rather than load twice. Valid descriptors SHALL be loaded using explicit ascending local entity-ID order, and runtime assets SHALL be reconstructed with staged absolute paths.
+Initialization SHALL use one memoized future as its authoritative single-flight operation and shared completion point for all local checkpoint/session mutations. It SHALL first resolve the persisted draft result and distinguish successful restoration, authoritative absence, and read failure. It SHALL reconcile and restore staged state only for a successfully restored identity; only authoritative absence (`Success(null)`) SHALL reconcile with no active identity and permit orphan cleanup. A draft-load error SHALL leave persisted ownership unknown, preserve staged state without reconciliation or adoption into the fresh identity, and leave identity-dependent mutations unavailable. Only after the applicable restoration or authoritative-absence reconciliation returns SHALL initialization complete, expose `loadState == ready`, and notify listeners. Repeated callers SHALL await the same future rather than load twice. Valid descriptors SHALL be loaded using explicit ascending local entity-ID order, and runtime assets SHALL be reconstructed with staged absolute paths.
 
 #### Scenario: Ready waits for staged restoration
 - **GIVEN** draft loading has completed but staged reconciliation is still pending
@@ -205,7 +205,7 @@ Initialization SHALL be idempotent and shared by all local checkpoint/session mu
 - **GIVEN** active staged reconciliation returns an infrastructure error
 - **WHEN** initialization completes its reconciliation attempt
 - **THEN** no partially restored runtime assets SHALL be exposed
-- **AND** the initialization barrier SHALL complete without introducing an indefinite loading wait
+- **AND** the shared initialization future SHALL complete without introducing an indefinite loading wait
 - **AND** normal asset addition SHALL retry reconciliation and SHALL NOT open the picker while staged state remains unknown
 - **AND** lost-data processing SHALL NOT commit against that unknown state
 
@@ -217,7 +217,7 @@ Initialization SHALL be idempotent and shared by all local checkpoint/session mu
 - **AND** the durable descriptors and files SHALL remain unchanged for later recovery or explicit discard
 
 ### Requirement: Filesystem and descriptor state reconcile deterministically
-The local staged-asset boundary SHALL reconcile ObjectBox descriptors and filesystem state without exposing temporary, symlinked, digest-mismatched, oversized, path-escaping, or broken assets and without a transaction journal or staging state machine. For the active durable identity it SHALL restore descriptor/final-file pairs whose bytes match their digest, remove descriptors whose final files are missing or invalid, delete temporary files, and reconstruct missing descriptors only for deterministic final files whose bytes match their basename digest and remain within the file-size maximum. It SHALL sort descriptor-less valid finals lexicographically by digest before assigning their new auto IDs, retain the lowest valid auto-ID row when duplicate descriptors exist, and remove later duplicates. It SHALL exclude and clean descriptor/directory state owned by every non-active identity; only authoritative persisted-draft absence SHALL treat all staged session state as orphaned. Cleanup SHALL remove malformed rows by technical ID and SHALL NOT follow filesystem links outside the staging root.
+The local staged-asset boundary SHALL reconcile ObjectBox descriptors and filesystem state without exposing temporary, symlinked, digest-mismatched, oversized, path-escaping, or broken assets and without a transaction journal or staging state machine. For the active durable identity it SHALL validate each descriptor-backed final file once at the reconciliation trust boundary, restore valid descriptor/final-file pairs, remove descriptors whose final files are missing or invalid, and delete temporary files. A deterministic final staged file without a descriptor SHALL be treated as uncommitted orphan state: it SHALL NOT be reconstructed or exposed and SHALL be deleted best-effort. The boundary SHALL retain the lowest valid auto-ID row when duplicate descriptors exist and remove later duplicates. It SHALL exclude and clean descriptor/directory state owned by every non-active identity; only authoritative persisted-draft absence SHALL treat all staged session state as orphaned. Cleanup SHALL enumerate with links disabled, unlink link entries themselves, remove malformed rows by technical ID, and SHALL NOT recursively follow filesystem links outside the staging root. After acquisition or successful reconciliation, absolute-path resolution SHALL be structural and SHALL NOT repeat full-file digest validation.
 
 #### Scenario: Descriptor and final file restore normally
 - **GIVEN** an active-session descriptor points to its existing valid final staged file
@@ -236,36 +236,24 @@ The local staged-asset boundary SHALL reconcile ObjectBox descriptors and filesy
 - **THEN** those files SHALL be deleted
 - **AND** they SHALL NOT create descriptors or runtime assets
 
-#### Scenario: Valid final file reconstructs a missing descriptor
+#### Scenario: Descriptor-less final file is cleaned as orphan state
 - **GIVEN** an active draft directory contains a valid deterministic final staged file
 - **AND** ObjectBox contains no descriptor for its digest
 - **WHEN** reconciliation runs
-- **THEN** exactly one active-session descriptor SHALL be reconstructed from that file
-- **AND** the asset SHALL be eligible for restoration
-
-#### Scenario: Filename digest must match final-file content
-- **GIVEN** a descriptor-less final file has a deterministic digest basename but different content
-- **WHEN** reconciliation runs
-- **THEN** no descriptor SHALL be reconstructed for that file
-- **AND** the mismatched file SHALL NOT be exposed as a runtime asset
+- **THEN** no descriptor SHALL be reconstructed from that file
+- **AND** the file SHALL be deleted best-effort and SHALL NOT be restored
 
 #### Scenario: Existing invalid active files are not retained or reconstructed
-- **GIVEN** an active descriptor/final pair or descriptor-less final has mismatched content, an oversized final, or a structurally plausible relative filename that does not match its digest
+- **GIVEN** an active descriptor/final pair has mismatched content, an oversized final, or a structurally plausible relative filename that does not match its digest
 - **WHEN** reconciliation runs
-- **THEN** the invalid asset SHALL not be restored or reconstructed
-- **AND** its stale descriptor, if any, and invalid in-root file SHALL be removed without affecting valid active assets or their explicit ID order
+- **THEN** the invalid asset SHALL not be restored
+- **AND** its stale descriptor and invalid in-root file SHALL be removed without affecting valid active assets or their explicit ID order
 
 #### Scenario: Duplicate descriptors retain deterministic order
 - **GIVEN** multiple active-session descriptor rows exist for one digest
 - **WHEN** reconciliation runs
 - **THEN** the lowest valid auto-ID descriptor SHALL be retained
 - **AND** every later duplicate row SHALL be removed
-
-#### Scenario: Missing descriptors are reconstructed in stable order
-- **GIVEN** multiple valid descriptor-less final files exist for the active session
-- **WHEN** reconciliation reconstructs their rows
-- **THEN** it SHALL sort the files lexicographically by digest before insertion
-- **AND** subsequent explicit auto-ID ordering SHALL produce a stable restored order
 
 #### Scenario: Foreign session state is orphaned
 - **GIVEN** a persisted active draft has identity A
@@ -282,7 +270,7 @@ The local staged-asset boundary SHALL reconcile ObjectBox descriptors and filesy
 - **AND** in-root link entries SHALL be unlinked rather than traversed
 
 ### Requirement: Android lost data is acquired early and processed after restoration
-On Android, the recovery Command SHALL be allowed to call the platform lost-data API immediately when triggered, including before ViewModel initialization completes. It SHALL retain that response in memory for the operation, await the initialization/reconciliation barrier, and only then process recovered files within local lifecycle arbitration through the same candidate pipeline as normal selection. After every attempted Android platform call, including a thrown exception, recovery SHALL start and await the shared initialization result before returning. Recovery SHALL be best-effort: empty, error, oversized, or duplicate results SHALL NOT invalidate existing staged assets. Recovered files SHALL NOT be associated with a newly generated identity when initialization did not restore a matching durable draft. A candidate-pipeline `Result.error` after successful retrieval SHALL be recorded through the recovery diagnostic path without becoming a user-facing Command error.
+On Android, the recovery Command SHALL be allowed to call the platform lost-data API immediately when triggered, including before ViewModel initialization completes. It SHALL retain that response in memory for the operation, await the shared initialization future, and only then process recovered files within local lifecycle arbitration through the same candidate pipeline as normal selection. After every attempted Android platform call, including a thrown exception, recovery SHALL start and await that same initialization result before returning. Recovery SHALL be best-effort: empty, error, oversized, or duplicate results SHALL NOT invalidate existing staged assets. Recovered files SHALL NOT be associated with a newly generated identity when initialization did not restore a matching durable draft. A candidate-pipeline `Result.error` after successful retrieval SHALL be recorded through the recovery diagnostic path without becoming a user-facing Command error.
 
 #### Scenario: Production startup ordering waits after retrieval
 - **GIVEN** a ViewModel is created and initialization starts without being awaited
@@ -342,11 +330,11 @@ On Android, the recovery Command SHALL be allowed to call the platform lost-data
 - **AND** the Android lost-data platform call throws
 - **WHEN** recovery completes non-actionably
 - **THEN** draft loading and staged reconciliation SHALL each have run once
-- **AND** the initialization barrier SHALL complete with `loadState == ready`
+- **AND** the shared initialization future SHALL complete with `loadState == ready`
 - **AND** no recovered or valid existing staged asset SHALL be mutated
 
 ### Requirement: Disposed ViewModels do not publish late local asset mutations
-After disposal, local asset commands SHALL not add or remove runtime assets or notify listeners after an asynchronous picker, staging, path-resolution, or persistent-removal operation completes. A durable staging/removal operation that committed before disposal is detected SHALL remain recoverable through the ordinary next initialization; this capability SHALL not introduce cancellation, rollback, or a generic scheduler.
+After disposal, local asset commands SHALL not publish additions or removals to runtime assets or notify listeners. Disposal SHALL be checked before beginning a new user-visible operation and at runtime publication boundaries, but already-started repository work MAY complete durably for ordinary next-initialization recovery. A successfully staged file SHALL NOT be rolled back merely because runtime publication is skipped. This capability SHALL not introduce cancellation, rollback, or a generic scheduler.
 
 #### Scenario: Disposed picker result is not published
 - **GIVEN** a picker or staging operation remains in flight
@@ -358,6 +346,15 @@ After disposal, local asset commands SHALL not add or remove runtime assets or n
 - **GIVEN** persistent removal remains in flight
 - **WHEN** the ViewModel is disposed before it completes
 - **THEN** its completion SHALL not mutate runtime assets or notify listeners
+
+### Requirement: Final rename without descriptor is an accepted narrow loss window
+The staging boundary SHALL preserve the safe publication order `source → temporary staged file → completed verification → final rename → descriptor persistence`. A process termination after final rename but before descriptor persistence MAY lose that one not-yet-committed attachment. On reconciliation, the unreferenced final file SHALL be cleaned as orphan state. Previously committed descriptor-backed attachments and the persisted form draft SHALL remain recoverable. This is an intentional maintainability trade-off and SHALL NOT be replaced by descriptor reconstruction.
+
+#### Scenario: Termination after final rename leaves orphan state
+- **GIVEN** a candidate reached its deterministic final path but its descriptor was not persisted
+- **WHEN** the application later reconciles the active session
+- **THEN** the unreferenced final file SHALL be deleted best-effort without restoration
+- **AND** the draft and previously committed descriptor-backed attachments SHALL remain recoverable
 
 ### Requirement: Removal and discard clean persistent staged ownership
 Single-asset removal SHALL run inside lifecycle arbitration and remove the active session's descriptor, staged file, and matching runtime asset before notifying the UI; an already-missing file SHALL not prevent successful removal. The staged-asset boundary SHALL also expose one idempotent primitive that clears all descriptors, final files, temporary files, and the empty directory for one `clientSubmissionId`. Explicit discard SHALL preserve the existing persistence-first draft-clear guarantee, SHALL perform old-session staged cleanup before rotating runtime identity, and SHALL leave any interruption residue safely orphaned for later reconciliation rather than attaching it to a new session. If pre-clear persisted ownership was unknown, successful draft deletion SHALL establish authoritative absence and SHALL clean all quarantined staged state as orphans before rotation rather than targeting the unrelated fresh in-memory identity. A best-effort staged-cleanup failure SHALL emit one path-free diagnostic without forwarding a raw filesystem exception, local path, or path-bearing stack trace to the logger.

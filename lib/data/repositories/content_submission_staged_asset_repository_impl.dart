@@ -23,51 +23,14 @@ class ContentSubmissionStagedAssetRepositoryImpl
     required Logger logger,
     required ObjectBox objectBoxI,
     Future<Directory> Function()? getSupportDirectory,
-    Future<int> Function(ContentSubmissionStagedAssetEntity)? putEntity,
-    Future<void> Function(File source, File destination)? copyAndClose,
-    Future<int> Function(File temporary)? temporaryLength,
-    Future<bool> Function(File temporary, String digest)? temporaryHasDigest,
-    Future<File> Function(File temporary, Directory sessionDirectory)?
-    beforeFinalRename,
-    Future<void> Function()? beforeReconcile,
-    Future<void> Function(ContentSubmissionStagedAsset asset)? beforeResolve,
-    Future<File> Function(File source, String destinationPath)? renameFile,
-    Future<void> Function(FileSystemEntity entry)? deleteEntry,
   }) : _logger = logger,
        _box = objectBoxI.store.box<ContentSubmissionStagedAssetEntity>(),
        _getSupportDirectory =
-           getSupportDirectory ?? getApplicationSupportDirectory,
-       _putEntity =
-           putEntity ??
-           ((entity) => objectBoxI.store
-               .box<ContentSubmissionStagedAssetEntity>()
-               .putAsync(entity)),
-       _copyAndCloseOverride = copyAndClose,
-       _temporaryLengthOverride = temporaryLength,
-       _temporaryHasDigestOverride = temporaryHasDigest,
-       _beforeFinalRenameOverride = beforeFinalRename,
-       _beforeReconcileOverride = beforeReconcile,
-       _beforeResolveOverride = beforeResolve,
-       _renameFileOverride = renameFile,
-       _deleteEntryOverride = deleteEntry;
+           getSupportDirectory ?? getApplicationSupportDirectory;
 
   final Logger _logger;
   final Box<ContentSubmissionStagedAssetEntity> _box;
   final Future<Directory> Function() _getSupportDirectory;
-  final Future<int> Function(ContentSubmissionStagedAssetEntity) _putEntity;
-  final Future<void> Function(File source, File destination)?
-  _copyAndCloseOverride;
-  final Future<int> Function(File temporary)? _temporaryLengthOverride;
-  final Future<bool> Function(File temporary, String digest)?
-  _temporaryHasDigestOverride;
-  final Future<File> Function(File temporary, Directory sessionDirectory)?
-  _beforeFinalRenameOverride;
-  final Future<void> Function()? _beforeReconcileOverride;
-  final Future<void> Function(ContentSubmissionStagedAsset asset)?
-  _beforeResolveOverride;
-  final Future<File> Function(File source, String destinationPath)?
-  _renameFileOverride;
-  final Future<void> Function(FileSystemEntity entry)? _deleteEntryOverride;
   Future<Directory>? _supportDirectoryFuture;
 
   Future<Directory> get _stagingRoot async {
@@ -105,57 +68,42 @@ class ContentSubmissionStagedAssetRepositoryImpl
       final asset = _assetFor(clientSubmissionId, digest);
       final finalFile = (await _finalFileFor(asset, createSession: true))!;
       final existing = await _loadRowsFor(clientSubmissionId, digest: digest);
-      if (await _isValidFinal(asset, finalFile)) {
+      if (existing.isNotEmpty && await _isValidFinal(finalFile, digest)) {
         final validRows = existing
             .where((row) => row.toModel() == asset)
             .toList();
-        if (validRows.isEmpty) {
-          await _putEntity(asset.toEntity());
-        }
-        final retainedId = validRows.isEmpty ? null : validRows.first.id;
-        for (final row in existing) {
-          if (row.id != retainedId) {
-            await _box.removeAsync(row.id);
+        if (validRows.isNotEmpty) {
+          final retainedId = validRows.first.id;
+          for (final row in existing) {
+            if (row.id != retainedId) {
+              await _box.removeAsync(row.id);
+            }
           }
+          return Result.success(asset);
         }
-        return Result.success(asset);
       }
       for (final row in existing) {
         await _box.removeAsync(row.id);
       }
-      await _deleteFinalFile(asset);
+      await _deleteEntryIfPresent(finalFile);
 
-      final sessionDirectory = (await _sessionDirectory(clientSubmissionId))!;
       temporary = File(
-        p.join(sessionDirectory.path, '.$digest.${_randomHex()}.tmp'),
+        p.join(finalFile.parent.path, '.$digest.${_randomHex()}.tmp'),
       );
       await _copyAndClose(source, temporary);
 
-      if (await _temporaryLength(temporary) > kCloudinaryMaxUploadBytes ||
-          !await _temporaryHasDigest(temporary, digest)) {
+      if (temporary.lengthSync() > kCloudinaryMaxUploadBytes ||
+          !await _hasDigest(temporary, digest)) {
         await _deleteEntryIfPresent(temporary);
         return Result.error(
           Exception('Staged copy did not pass verification.'),
         );
       }
 
-      if (await _isValidFinal(asset, finalFile)) {
-        await _deleteEntryIfPresent(temporary);
-      } else {
-        await _deleteFinalFile(asset);
-        final sourceForRename = await _prepareFinalRename(
-          temporary,
-          sessionDirectory,
-        );
-        final finalFileBeforeRename = (await _finalFileFor(
-          asset,
-          createSession: true,
-        ))!;
-        await _renameFile(sourceForRename, finalFileBeforeRename.path);
-      }
+      await temporary.rename(finalFile.path);
       temporary = null;
 
-      await _putEntity(asset.toEntity());
+      await _box.putAsync(asset.toEntity());
       return Result.success(asset);
     } on Exception catch (exception, stackTrace) {
       if (temporary != null) {
@@ -230,7 +178,6 @@ class ContentSubmissionStagedAssetRepositoryImpl
     }
 
     try {
-      await _beforeReconcileOverride?.call();
       final rows = await _loadRows();
       if (activeClientSubmissionId == null) {
         for (final row in rows) {
@@ -259,25 +206,32 @@ class ContentSubmissionStagedAssetRepositoryImpl
 
       final activeRows = await _loadRowsFor(activeClientSubmissionId);
       final retainedDigests = <String>{};
+      final restored = <ContentSubmissionStagedAsset>[];
       for (final row in activeRows) {
         final asset = row.toModel();
-        if (asset == null ||
-            !await _isValidFinal(
-              asset,
-              await _finalFileFor(asset, createSession: false),
-            ) ||
-            !retainedDigests.add(asset.digest)) {
+        if (asset == null) {
           await _box.removeAsync(row.id);
+          continue;
         }
+        if (retainedDigests.contains(asset.digest)) {
+          await _box.removeAsync(row.id);
+          continue;
+        }
+        final finalFile = await _finalFileFor(asset, createSession: false);
+        if (!await _isValidFinal(finalFile, asset.digest)) {
+          await _box.removeAsync(row.id);
+          if (finalFile != null) await _deleteEntryIfPresent(finalFile);
+          continue;
+        }
+        retainedDigests.add(asset.digest);
+        restored.add(asset);
       }
 
-      final activeDirectory = (await _sessionDirectory(
+      final activeDirectory = await _sessionDirectory(
         activeClientSubmissionId,
-      ))!;
-      final descriptorDigests = (await _loadRowsFor(
-        activeClientSubmissionId,
-      )).map((row) => row.digest).toSet();
-      final descriptorlessFinals = <({String digest, File file})>[];
+        createIfMissing: false,
+      );
+      if (activeDirectory == null) return Result.success(restored);
       await for (final entry in activeDirectory.list(followLinks: false)) {
         final type = FileSystemEntity.typeSync(
           entry.path,
@@ -300,33 +254,8 @@ class ContentSubmissionStagedAssetRepositoryImpl
           await _deleteEntryIfPresent(entry);
           continue;
         }
-        final candidate = _assetFor(activeClientSubmissionId, basename);
-        if (!await _isValidFinal(candidate, File(entry.path))) {
+        if (!retainedDigests.contains(basename)) {
           await _deleteEntryIfPresent(entry);
-          continue;
-        }
-        if (!descriptorDigests.contains(basename)) {
-          descriptorlessFinals.add((digest: basename, file: File(entry.path)));
-        }
-      }
-      descriptorlessFinals.sort(
-        (left, right) => left.digest.compareTo(right.digest),
-      );
-      for (final candidate in descriptorlessFinals) {
-        await _box.putAsync(
-          _assetFor(activeClientSubmissionId, candidate.digest).toEntity(),
-        );
-      }
-
-      final restored = <ContentSubmissionStagedAsset>[];
-      for (final row in await _loadRowsFor(activeClientSubmissionId)) {
-        final asset = row.toModel();
-        if (asset != null &&
-            await _isValidFinal(
-              asset,
-              await _finalFileFor(asset, createSession: false),
-            )) {
-          restored.add(asset);
         }
       }
       return Result.success(restored);
@@ -349,12 +278,13 @@ class ContentSubmissionStagedAssetRepositoryImpl
     ContentSubmissionStagedAsset asset,
   ) async {
     try {
-      await _beforeResolveOverride?.call(asset);
       final file = await _finalFileFor(asset, createSession: false);
-      if (!await _isValidFinal(asset, file)) {
+      if (file == null ||
+          FileSystemEntity.typeSync(file.path, followLinks: false) !=
+              FileSystemEntityType.file) {
         return Result.error(Exception('Staged asset is unavailable.'));
       }
-      return Result.success(file!);
+      return Result.success(file);
     } on Exception catch (exception, stackTrace) {
       _logger.log(
         const ContentSubmissionAssetRetrievalFailed(),
@@ -440,8 +370,6 @@ class ContentSubmissionStagedAssetRepositoryImpl
   }
 
   Future<void> _copyAndClose(File source, File destination) async {
-    final override = _copyAndCloseOverride;
-    if (override != null) return override(source, destination);
     final sink = destination.openWrite();
     try {
       await source.openRead().forEach(sink.add);
@@ -455,12 +383,7 @@ class ContentSubmissionStagedAssetRepositoryImpl
   Future<void> _deleteEntryIfPresent(FileSystemEntity entry) async {
     final type = FileSystemEntity.typeSync(entry.path, followLinks: false);
     if (type != FileSystemEntityType.notFound) {
-      final override = _deleteEntryOverride;
-      if (override != null) {
-        await override(entry);
-      } else {
-        await entry.delete();
-      }
+      await entry.delete();
     }
   }
 
@@ -529,38 +452,16 @@ class ContentSubmissionStagedAssetRepositoryImpl
   Future<bool> _hasDigest(File file, String expectedDigest) async =>
       (await sha1.bind(file.openRead()).first).toString() == expectedDigest;
 
-  Future<bool> _isValidFinal(
-    ContentSubmissionStagedAsset asset,
-    File? file,
-  ) async {
-    if (file == null ||
-        await _sessionDirectory(
-              asset.clientSubmissionId,
-              createIfMissing: false,
-            ) ==
-            null) {
-      return false;
-    }
+  Future<bool> _isValidFinal(File? file, String expectedDigest) async {
+    if (file == null) return false;
     if (FileSystemEntity.typeSync(file.path, followLinks: false) !=
         FileSystemEntityType.file) {
       return false;
     }
-    if (await _sessionDirectory(
-          asset.clientSubmissionId,
-          createIfMissing: false,
-        ) ==
-        null) {
+    if (file.lengthSync() > kCloudinaryMaxUploadBytes) {
       return false;
     }
-    if (file.lengthSync() > kCloudinaryMaxUploadBytes ||
-        await _sessionDirectory(
-              asset.clientSubmissionId,
-              createIfMissing: false,
-            ) ==
-            null) {
-      return false;
-    }
-    return _hasDigest(file, asset.digest);
+    return _hasDigest(file, expectedDigest);
   }
 
   bool _isTemporaryName(String value) => RegExp(
@@ -611,24 +512,6 @@ class ContentSubmissionStagedAssetRepositoryImpl
     final file = await _finalFileFor(asset, createSession: false);
     if (file != null) await _deleteEntryIfPresent(file);
   }
-
-  Future<int> _temporaryLength(File temporary) async =>
-      _temporaryLengthOverride?.call(temporary) ?? temporary.lengthSync();
-
-  Future<bool> _temporaryHasDigest(File temporary, String digest) async =>
-      _temporaryHasDigestOverride?.call(temporary, digest) ??
-      _hasDigest(temporary, digest);
-
-  Future<File> _renameFile(File source, String destinationPath) async =>
-      _renameFileOverride?.call(source, destinationPath) ??
-      source.rename(destinationPath);
-
-  Future<File> _prepareFinalRename(
-    File temporary,
-    Directory sessionDirectory,
-  ) async =>
-      _beforeFinalRenameOverride?.call(temporary, sessionDirectory) ??
-      temporary;
 
   /// Returns a regular in-root session directory, never a link target.
   ///

@@ -395,23 +395,27 @@ void main() {
         });
         final objectBox = TestObjectBox(objectBoxEnvironment.store);
         final logger = MockLogger();
-        final staged = ContentSubmissionStagedAssetRepositoryImpl(
+        final setupStaged = ContentSubmissionStagedAssetRepositoryImpl(
           logger: logger,
           objectBoxI: objectBox,
           getSupportDirectory: () async => supportDirectory,
-          deleteEntry: (_) async => throw const FileSystemException(
-            'cannot remove staged file',
-            privatePath,
-          ),
         );
         final bytes = <int>[1, 2, 3];
         final digest = sha1.convert(bytes).toString();
         final source = File('${supportDirectory.path}/persisted-source.jpg')
           ..writeAsBytesSync(bytes);
-        await staged.acquire(
+        await setupStaged.acquire(
           clientSubmissionId: persistedIdentity,
           digest: digest,
           source: source,
+        );
+        final staged = ContentSubmissionStagedAssetRepositoryImpl(
+          logger: logger,
+          objectBoxI: objectBox,
+          getSupportDirectory: () async => throw const FileSystemException(
+            'cannot remove staged file',
+            privatePath,
+          ),
         );
         final drafts = FakeContentSubmissionDraftRepository(
           loadDraftResult: Result.error(TestException('draft read failed')),
@@ -717,12 +721,10 @@ void main() {
           logger: logger,
           contentSubmissionRepository: submissionRepository,
           draftRepository: drafts,
-          stagedAssetRepository: ContentSubmissionStagedAssetRepositoryImpl(
-            logger: logger,
-            objectBoxI: objectBox,
-            getSupportDirectory: () async => supportDirectory,
-            beforeReconcile: () async =>
-                throw const FileSystemException('reconciliation failed'),
+          stagedAssetRepository: FakeContentSubmissionStagedAssetRepository(
+            reconcileResult: const Result.error(
+              FileSystemException('reconciliation failed'),
+            ),
           ),
           imagePicker: FakeImagePicker(),
         );
@@ -793,12 +795,17 @@ void main() {
           logger: logger,
           contentSubmissionRepository: submissionRepository,
           draftRepository: drafts,
-          stagedAssetRepository: ContentSubmissionStagedAssetRepositoryImpl(
-            logger: logger,
-            objectBoxI: objectBox,
-            getSupportDirectory: () async => supportDirectory,
-            beforeResolve: (_) async =>
-                throw const FileSystemException('path resolution failed'),
+          stagedAssetRepository: FakeContentSubmissionStagedAssetRepository(
+            reconcileResult: Result.success([
+              ContentSubmissionStagedAsset(
+                clientSubmissionId: identity,
+                digest: digest,
+                relativePath: '$identity/$digest',
+              ),
+            ]),
+            resolveResult: const Result.error(
+              FileSystemException('path resolution failed'),
+            ),
           ),
           imagePicker: FakeImagePicker(),
         );
@@ -820,103 +827,6 @@ void main() {
           ).existsSync(),
           isTrue,
         );
-      },
-    );
-
-    test(
-      'quarantines a post-acquisition resolution failure until reconciliation '
-      'restores the committed asset',
-      () async {
-        final objectBoxEnvironment = await TestObjectBoxEnvironment.create();
-        final supportDirectory = await Directory.systemTemp.createTemp(
-          'moliseis_content_submission_candidate_resolve_error_',
-        );
-        addTearDown(() async {
-          await objectBoxEnvironment.dispose();
-          await supportDirectory.delete(recursive: true);
-        });
-        final logger = MockLogger();
-        final objectBox = TestObjectBox(objectBoxEnvironment.store);
-        final drafts = ContentSubmissionDraftRepositoryImpl(
-          logger: logger,
-          objectBoxI: objectBox,
-        );
-        var failNextResolution = true;
-        final staged = ContentSubmissionStagedAssetRepositoryImpl(
-          logger: logger,
-          objectBoxI: objectBox,
-          getSupportDirectory: () async => supportDirectory,
-          beforeResolve: (_) async {
-            if (failNextResolution) {
-              failNextResolution = false;
-              throw const FileSystemException('path resolution failed');
-            }
-          },
-        );
-        final source = File('${supportDirectory.path}/picker-source.jpg');
-        final bytes = <int>[1, 2, 3];
-        await source.writeAsBytes(bytes);
-        final digest = sha1.convert(bytes).toString();
-        var pickerCallCount = 0;
-        final submissionRepository = FakeContentSubmissionRepository();
-        final vm =
-            ContentSubmissionViewModel(
-                logger: logger,
-                contentSubmissionRepository: submissionRepository,
-                draftRepository: drafts,
-                stagedAssetRepository: staged,
-                imagePicker: FakeImagePicker(
-                  onPickMultipleMedia: () async {
-                    pickerCallCount++;
-                    return pickerCallCount == 1 ? [XFile(source.path)] : [];
-                  },
-                ),
-              )
-              ..setCity('Rome')
-              ..setName('Colosseum')
-              ..setUserEmail('jane@example.com')
-              ..setUserName('Jane');
-        addTearDown(vm.dispose);
-
-        await vm.addAsset.execute();
-
-        final identity = vm.state.clientSubmissionId;
-        final stagedPath =
-            '${supportDirectory.path}/content_submission/staged/$identity/'
-            '$digest';
-        expect(vm.addAsset.error, isTrue);
-        expect(vm.assets, isEmpty);
-        expect(
-          objectBoxEnvironment.store
-              .box<ContentSubmissionStagedAssetEntity>()
-              .count(),
-          1,
-        );
-        expect(File(stagedPath).existsSync(), isTrue);
-        expect(
-          (await staged.reconcileAndLoad(identity)).getOrNull(),
-          hasLength(1),
-        );
-
-        await vm.submit.execute();
-
-        expect(vm.submit.error, isTrue);
-        expect(submissionRepository.uploadedImages, isEmpty);
-        expect(submissionRepository.uploadCalled, isFalse);
-        expect(File(stagedPath).existsSync(), isTrue);
-
-        await vm.addAsset.execute();
-
-        expect(vm.addAsset.completed, isTrue);
-        expect(vm.assets, hasLength(1));
-        expect(vm.assets.single.digest, digest);
-        expect(vm.assets.single.file.path, stagedPath);
-
-        await vm.submit.execute();
-
-        expect(vm.submit.completed, isTrue);
-        expect(submissionRepository.uploadedImages.single.path, stagedPath);
-        expect(submissionRepository.uploadCalled, isTrue);
       },
     );
 
@@ -2117,6 +2027,117 @@ void main() {
 
     group('disposal', () {
       test(
+        'does not publish initialization completed after disposal',
+        () async {
+          const restoredIdentity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+          final pendingLoad = Completer<Result<ContentSubmissionDraft?>>();
+          final drafts = FakeContentSubmissionDraftRepository()
+            ..pendingLoadDraft = pendingLoad;
+          final staged = FakeContentSubmissionStagedAssetRepository();
+          final vm = buildViewModel(
+            draftRepository: drafts,
+            stagedAssetRepository: staged,
+          );
+          final initialIdentity = vm.state.clientSubmissionId;
+          var notifications = 0;
+          vm.addListener(() => notifications++);
+
+          final initialization = vm.initialize();
+          while (drafts.loadDraftCallCount == 0) {
+            await Future<void>.value();
+          }
+          vm.dispose();
+          pendingLoad.complete(
+            Result.success(
+              ContentSubmissionDraft(clientSubmissionId: restoredIdentity),
+            ),
+          );
+          await initialization;
+
+          expect(vm.state.clientSubmissionId, initialIdentity);
+          expect(vm.assets, isEmpty);
+          expect(vm.loadState, ContentSubmissionDraftLoadState.loading);
+          expect(staged.reconcileCallCount, 0);
+          expect(notifications, 0);
+        },
+      );
+
+      test('does not start user operations after disposal', () async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        var retrieveLostDataCalled = false;
+        final picker = FakeImagePicker(
+          onPickMultipleMedia: () async => [
+            XFile.fromData(Uint8List.fromList([1]), name: 'late.jpg'),
+          ],
+          onRetrieveLostData: () async {
+            retrieveLostDataCalled = true;
+            return LostDataResponse.empty();
+          },
+        );
+        final drafts = FakeContentSubmissionDraftRepository();
+        final staged = FakeContentSubmissionStagedAssetRepository();
+        final submissions = FakeContentSubmissionRepository();
+        final vm =
+            buildViewModel(
+                imagePicker: picker,
+                contentSubmissionRepository: submissions,
+                draftRepository: drafts,
+                stagedAssetRepository: staged,
+              )
+              ..setCity('Rome')
+              ..setName('Colosseum')
+              ..setUserEmail('jane@example.com')
+              ..setUserName('Jane');
+        await vm.initialize();
+        final reconcileCallCount = staged.reconcileCallCount;
+
+        vm.dispose();
+        await vm.checkpointDraft();
+        await vm.addAsset.execute();
+        await vm.clear.execute();
+        await vm.submit.execute();
+        await vm.retrieveLostAssets.execute();
+
+        expect(drafts.saveDraftCallCount, 0);
+        expect(drafts.clearDraftCallCount, 0);
+        expect(staged.reconcileCallCount, reconcileCallCount);
+        expect(picker.pickMultipleMediaLimits, isEmpty);
+        expect(retrieveLostDataCalled, isFalse);
+        expect(submissions.uploadedImages, isEmpty);
+        expect(submissions.uploadCalled, isFalse);
+      });
+
+      test(
+        'finishes in-flight clear durably without publishing a new identity '
+        'after disposal',
+        () async {
+          final pendingClear = Completer<Result<void>>();
+          final drafts = FakeContentSubmissionDraftRepository()
+            ..pendingClearDraft = pendingClear;
+          final staged = FakeContentSubmissionStagedAssetRepository();
+          final vm = buildViewModel(
+            draftRepository: drafts,
+            stagedAssetRepository: staged,
+          );
+          await vm.initialize();
+          final oldIdentity = vm.state.clientSubmissionId;
+
+          final clear = vm.clear.execute();
+          while (drafts.clearDraftCallCount == 0) {
+            await Future<void>.value();
+          }
+          vm.dispose();
+          pendingClear.complete(const Result.success(null));
+          await clear;
+
+          expect(staged.clearedSessions, [oldIdentity]);
+          expect(vm.state.clientSubmissionId, oldIdentity);
+          expect(vm.assets, isEmpty);
+        },
+      );
+
+      test(
         'does not publish a picker result received after disposal',
         () async {
           final pendingPicker = Completer<List<XFile>>();
@@ -2188,96 +2209,6 @@ void main() {
         expect(stagedRepository.acquired, hasLength(1));
         expect(notifications, 0);
       });
-
-      test(
-        'restores a real commit completed before disposal during resolution',
-        () async {
-          final objectBoxEnvironment = await TestObjectBoxEnvironment.create();
-          final supportDirectory = await Directory.systemTemp.createTemp(
-            'moliseis_content_submission_disposed_resolution_',
-          );
-          addTearDown(() async {
-            await objectBoxEnvironment.dispose();
-            await supportDirectory.delete(recursive: true);
-          });
-          final logger = MockLogger();
-          final objectBox = TestObjectBox(objectBoxEnvironment.store);
-          final drafts = ContentSubmissionDraftRepositoryImpl(
-            logger: logger,
-            objectBoxI: objectBox,
-          );
-          final resolutionStarted = Completer<void>();
-          final releaseResolution = Completer<void>();
-          final staged = ContentSubmissionStagedAssetRepositoryImpl(
-            logger: logger,
-            objectBoxI: objectBox,
-            getSupportDirectory: () async => supportDirectory,
-            beforeResolve: (_) async {
-              resolutionStarted.complete();
-              await releaseResolution.future;
-            },
-          );
-          final bytes = <int>[7, 8, 9];
-          final digest = sha1.convert(bytes).toString();
-          final source = File('${supportDirectory.path}/picker-source.jpg')
-            ..writeAsBytesSync(bytes);
-          final vm = ContentSubmissionViewModel(
-            logger: logger,
-            contentSubmissionRepository: FakeContentSubmissionRepository(),
-            draftRepository: drafts,
-            stagedAssetRepository: staged,
-            imagePicker: FakeImagePicker(
-              onPickMultipleMedia: () async => [XFile(source.path)],
-            ),
-          );
-          await vm.initialize();
-          var notifications = 0;
-          vm.addListener(() => notifications++);
-
-          final add = vm.addAsset.execute();
-          await resolutionStarted.future;
-          final identity = vm.state.clientSubmissionId;
-          final stagedPath =
-              '${supportDirectory.path}/content_submission/staged/$identity/'
-              '$digest';
-          expect(
-            objectBoxEnvironment.store
-                .box<ContentSubmissionStagedAssetEntity>()
-                .count(),
-            1,
-          );
-          expect(File(stagedPath).existsSync(), isTrue);
-          notifications = 0;
-          vm.dispose();
-          releaseResolution.complete();
-          await add;
-
-          expect(vm.assets, isEmpty);
-          expect(notifications, 0);
-          expect(File(stagedPath).existsSync(), isTrue);
-
-          final restored = ContentSubmissionViewModel(
-            logger: logger,
-            contentSubmissionRepository: FakeContentSubmissionRepository(),
-            draftRepository: drafts,
-            stagedAssetRepository: ContentSubmissionStagedAssetRepositoryImpl(
-              logger: logger,
-              objectBoxI: objectBox,
-              getSupportDirectory: () async => supportDirectory,
-            ),
-            imagePicker: FakeImagePicker(),
-          );
-          addTearDown(restored.dispose);
-
-          await restored.initialize();
-
-          expect(restored.state.clientSubmissionId, identity);
-          expect(restored.assets, hasLength(1));
-          expect(restored.assets.single.digest, digest);
-          expect(restored.assets.single.file.path, stagedPath);
-          expect(await File(stagedPath).readAsBytes(), bytes);
-        },
-      );
 
       test('does not publish a persistent removal after disposal', () async {
         final pendingRemove = Completer<Result<void>>();

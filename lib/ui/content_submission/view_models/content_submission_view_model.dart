@@ -1,4 +1,4 @@
-import 'dart:async' show Completer, unawaited;
+import 'dart:async' show Completer;
 import 'dart:collection' show UnmodifiableListView;
 import 'dart:io' show File;
 
@@ -123,11 +123,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   final ImagePicker _imagePicker;
   ContentSubmissionDraft _state = ContentSubmissionDraft();
   late ContentSubmissionDraft _checkpointedDraft;
-  bool _hasDurableCheckpoint = false;
   _PersistedDraftState _persistedDraftState = _PersistedDraftState.unknown;
   Exception? _draftLoadError;
   Future<void>? _initializationFuture;
-  final Completer<void> _initializationBarrier = Completer<void>();
   Future<void> _lifecycleTail = Future<void>.value();
   bool _stagedStateAvailable = false;
   Exception? _stagedReconciliationError;
@@ -194,6 +192,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     var draftReadCompleted = false;
     try {
       final result = await _draftRepository.loadDraft();
+      if (_disposed) return;
       draftReadCompleted = true;
       switch (result) {
         case Success<ContentSubmissionDraft?>(value: final draft):
@@ -205,7 +204,6 @@ class ContentSubmissionViewModel extends ChangeNotifier {
             _persistedDraftState = _PersistedDraftState.restored;
             _state = draft;
             _checkpointedDraft = _state;
-            _hasDurableCheckpoint = true;
             final reconciled = await _reconcileStagedAssets(
               _state.clientSubmissionId,
             );
@@ -223,6 +221,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
           _assets.clear();
       }
     } on Object catch (error) {
+      if (_disposed) return;
       final exception = error is Exception
           ? error
           : Exception(error.toString());
@@ -234,11 +233,8 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       _stagedReconciliationError = exception;
       _assets.clear();
     } finally {
-      _loadState = ContentSubmissionDraftLoadState.ready;
-      if (!_initializationBarrier.isCompleted) {
-        _initializationBarrier.complete();
-      }
       if (!_disposed) {
+        _loadState = ContentSubmissionDraftLoadState.ready;
         notifyListeners();
       }
     }
@@ -253,6 +249,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     final staged = await _stagedAssetRepository.reconcileAndLoad(
       activeClientSubmissionId,
     );
+    if (_disposed) return const Result.success(null);
     if (staged case Error<List<ContentSubmissionStagedAsset>>(:final error)) {
       _stagedStateAvailable = false;
       _stagedReconciliationError = error;
@@ -275,6 +272,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       final resolved = await _stagedAssetRepository.resolveAbsolutePath(
         descriptor,
       );
+      if (_disposed) return const Result.success(null);
       if (resolved case Error<File>(:final error)) {
         _stagedStateAvailable = false;
         _stagedReconciliationError = error;
@@ -311,18 +309,11 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     if (await asset.length() > kCloudinaryMaxUploadBytes) {
       return const Result.success(_AssetCandidateDisposition.oversized);
     }
-    if (_disposed) {
-      return const Result.success(_AssetCandidateDisposition.discarded);
-    }
 
     // SHA-1 is used purely for content-based deduplication; collision
     // resistance beyond accidental duplicates is not required here.
     final digest = await sha1.bind(asset.openRead()).first;
     final digestString = digest.toString();
-
-    if (_disposed) {
-      return const Result.success(_AssetCandidateDisposition.discarded);
-    }
 
     if (_assets.any((e) => e.digest == digestString)) {
       return const Result.success(_AssetCandidateDisposition.duplicate);
@@ -332,11 +323,11 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       digest: digestString,
       source: File(asset.path),
     );
-    if (staged case Error<ContentSubmissionStagedAsset>(:final error)) {
-      return Result.error(error);
-    }
     if (_disposed) {
       return const Result.success(_AssetCandidateDisposition.discarded);
+    }
+    if (staged case Error<ContentSubmissionStagedAsset>(:final error)) {
+      return Result.error(error);
     }
     final descriptor = (staged as Success<ContentSubmissionStagedAsset>).value;
     // Acquisition has durably committed the descriptor and final file. Until
@@ -364,6 +355,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<AssetSelectionOutcome>> _addAsset() async {
+    if (_disposed) return const Result.success(AssetSelectionOutcome());
     try {
       await initialize();
       if (_disposed) return const Result.success(AssetSelectionOutcome());
@@ -380,7 +372,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
         }
         if (!_stagedStateAvailable) {
           final reconciled = await _reconcileStagedAssets(
-            _hasDurableCheckpoint ? _state.clientSubmissionId : null,
+            _persistedDraftState == _PersistedDraftState.restored
+                ? _state.clientSubmissionId
+                : null,
           );
           if (reconciled case Error<void>(:final error)) {
             return Result.error(_stagedReconciliationError ?? error);
@@ -390,6 +384,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
         if (checkpoint case Error<void>(:final error)) {
           return Result.error(error);
         }
+        if (_disposed) return const Result.success(null);
         return Result.success(_state.clientSubmissionId);
       });
       if (prePicker case Error<String?>(:final error)) {
@@ -472,6 +467,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _removeAssetAt(int index) async {
+    if (_disposed) return const Result.success(null);
     try {
       // Preserve the meaning of the user's request at Command action entry.
       // Initialization and lifecycle work must never make an invalid index
@@ -525,8 +521,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> checkpointDraft() async {
-    unawaited(initialize());
-    await _initializationBarrier.future;
+    if (_disposed) return const Result.success(null);
+    await initialize();
+    if (_disposed) return const Result.success(null);
     return _serialize(_checkpointDraftInsideBoundary);
   }
 
@@ -540,14 +537,15 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       );
     }
     final snapshot = _state;
-    if (_hasDurableCheckpoint && snapshot == _checkpointedDraft) {
+    if (_persistedDraftState == _PersistedDraftState.restored &&
+        snapshot == _checkpointedDraft) {
       return const Result.success(null);
     }
 
     final result = await _draftRepository.saveDraft(snapshot);
+    if (_disposed) return result;
     if (result is Success<void>) {
       _checkpointedDraft = snapshot;
-      _hasDurableCheckpoint = true;
       _persistedDraftState = _PersistedDraftState.restored;
       _draftLoadError = null;
       if (!_disposed) {
@@ -702,7 +700,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// SHA-256 content hash and reused rather than re-uploaded, so only assets
   /// that were not yet uploaded in the last try are actually transferred.
   Future<Result<void>> _submit() async {
+    if (_disposed) return const Result.success(null);
     await initialize();
+    if (_disposed) return const Result.success(null);
     if (!_stagedStateAvailable) {
       return Result.error(
         Exception('Cannot submit: staged assets unavailable.'),
@@ -801,7 +801,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _clear() async {
+    if (_disposed) return const Result.success(null);
     await initialize();
+    if (_disposed) return const Result.success(null);
     _logger.log(const ContentSubmissionStateClearStarted());
     final result = await _serialize<void>(() async {
       final persistedStateBeforeClear = _persistedDraftState;
@@ -816,13 +818,13 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       } else {
         await _stagedAssetRepository.clearSession(oldClientSubmissionId);
       }
+      if (_disposed) return const Result.success(null);
       _persistedDraftState = _PersistedDraftState.absent;
       _draftLoadError = null;
       _assets.clear();
       _eventTimeIssue = null;
       _state = ContentSubmissionDraft();
       _checkpointedDraft = _state;
-      _hasDurableCheckpoint = false;
       _stagedStateAvailable = true;
       _recoveryEligibleClientSubmissionId = null;
       return const Result.success(null);
@@ -853,6 +855,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// Implements the lost-data recovery pattern recommended by image_picker.
   /// See: https://github.com/flutter/packages/blob/e37fa8ff337214ed3d5dc83f9ba229c6b9ccc1c0/packages/image_picker/image_picker/example/lib/main.dart#L308
   Future<Result<void>> _retrieveLostAssets() async {
+    if (_disposed) return const Result.success(null);
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
       return const Result.success(null);
     }
@@ -864,6 +867,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       _handleRetrieveLostMediaErrors(error, stackTrace);
     }
     await initialize();
+    if (_disposed) return const Result.success(null);
 
     if (response == null) return const Result.success(null);
 

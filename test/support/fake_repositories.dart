@@ -898,12 +898,14 @@ final class FakeContentSubmissionStagedAssetRepository
     this.reconcileResult = const Result.success([]),
     this.removeResult = const Result.success(null),
     this.clearSessionResult = const Result.success(null),
+    this.resolveResult,
     this.stagingDirectory,
   });
 
   Result<List<ContentSubmissionStagedAsset>> reconcileResult;
   Result<void> removeResult;
   Result<void> clearSessionResult;
+  Result<File>? resolveResult;
   final Directory? stagingDirectory;
   Completer<Result<List<ContentSubmissionStagedAsset>>>? pendingReconcile;
   Completer<Result<ContentSubmissionStagedAsset>>? pendingAcquire;
@@ -977,9 +979,11 @@ final class FakeContentSubmissionStagedAssetRepository
   @override
   Future<Result<File>> resolveAbsolutePath(
     ContentSubmissionStagedAsset asset,
-  ) async => Result.success(
-    File('${stagingDirectory?.path ?? '/staged'}/${asset.relativePath}'),
-  );
+  ) async =>
+      resolveResult ??
+      Result.success(
+        File('${stagingDirectory?.path ?? '/staged'}/${asset.relativePath}'),
+      );
 }
 
 // ---------------------------------------------------------------------------
