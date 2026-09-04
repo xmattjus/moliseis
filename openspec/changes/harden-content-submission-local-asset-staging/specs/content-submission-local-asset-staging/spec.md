@@ -360,7 +360,7 @@ After disposal, local asset commands SHALL not add or remove runtime assets or n
 - **THEN** its completion SHALL not mutate runtime assets or notify listeners
 
 ### Requirement: Removal and discard clean persistent staged ownership
-Single-asset removal SHALL run inside lifecycle arbitration and remove the active session's descriptor, staged file, and matching runtime asset before notifying the UI; an already-missing file SHALL not prevent successful removal. The staged-asset boundary SHALL also expose one idempotent primitive that clears all descriptors, final files, temporary files, and the empty directory for one `clientSubmissionId`. Explicit discard SHALL preserve the existing persistence-first draft-clear guarantee, SHALL perform old-session staged cleanup before rotating runtime identity, and SHALL leave any interruption residue safely orphaned for later reconciliation rather than attaching it to a new session. A best-effort staged-cleanup failure SHALL emit one path-free diagnostic without forwarding a raw filesystem exception, local path, or path-bearing stack trace to the logger.
+Single-asset removal SHALL run inside lifecycle arbitration and remove the active session's descriptor, staged file, and matching runtime asset before notifying the UI; an already-missing file SHALL not prevent successful removal. The staged-asset boundary SHALL also expose one idempotent primitive that clears all descriptors, final files, temporary files, and the empty directory for one `clientSubmissionId`. Explicit discard SHALL preserve the existing persistence-first draft-clear guarantee, SHALL perform old-session staged cleanup before rotating runtime identity, and SHALL leave any interruption residue safely orphaned for later reconciliation rather than attaching it to a new session. If pre-clear persisted ownership was unknown, successful draft deletion SHALL establish authoritative absence and SHALL clean all quarantined staged state as orphans before rotation rather than targeting the unrelated fresh in-memory identity. A best-effort staged-cleanup failure SHALL emit one path-free diagnostic without forwarding a raw filesystem exception, local path, or path-bearing stack trace to the logger.
 
 #### Scenario: Removing one asset persists the removal
 - **GIVEN** the active session owns a staged runtime asset
@@ -397,6 +397,20 @@ Single-asset removal SHALL run inside lifecycle arbitration and remove the activ
 - **WHEN** clear continues inside lifecycle arbitration
 - **THEN** old-session staged cleanup SHALL run before a fresh in-memory identity becomes active
 - **AND** interrupted cleanup residue SHALL remain foreign orphan state eligible for the next reconciliation
+
+#### Scenario: Successful discard resolves previously unknown ownership
+- **GIVEN** draft loading failed while staged state for identity A remained quarantined
+- **AND** the ViewModel holds an unrelated fresh in-memory identity B
+- **WHEN** persistence-first `clearDraft()` succeeds
+- **THEN** clear SHALL treat persisted absence as authoritative and clean A's staged state as orphaned before rotation
+- **AND** it SHALL NOT scope cleanup only to B
+- **AND** the ViewModel SHALL expose one new fresh identity after cleanup
+
+#### Scenario: Failed discard preserves previously unknown ownership
+- **GIVEN** draft loading failed while staged state for identity A remained quarantined
+- **WHEN** persistence-first `clearDraft()` returns an error
+- **THEN** A's staged descriptors and files SHALL remain untouched
+- **AND** the ViewModel SHALL not rotate or persist its unrelated fresh identity
 
 #### Scenario: Cleanup diagnostics do not disclose local paths
 - **GIVEN** best-effort staged cleanup fails with an error containing a private local filesystem path

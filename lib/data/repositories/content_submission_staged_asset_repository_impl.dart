@@ -331,11 +331,15 @@ class ContentSubmissionStagedAssetRepositoryImpl
       }
       return Result.success(restored);
     } on Exception catch (exception, stackTrace) {
-      _logger.log(
-        const ContentSubmissionAssetRetrievalFailed(),
-        error: exception,
-        stackTrace: stackTrace,
-      );
+      if (activeClientSubmissionId == null) {
+        _logCleanupFailure(exception, operation: 'clear_orphans');
+      } else {
+        _logger.log(
+          const ContentSubmissionAssetRetrievalFailed(),
+          error: exception,
+          stackTrace: stackTrace,
+        );
+      }
       return Result.error(exception);
     }
   }
@@ -476,11 +480,14 @@ class ContentSubmissionStagedAssetRepositoryImpl
 
   /// Emits useful cleanup context without forwarding a filesystem exception,
   /// whose message may contain a private local path.
-  void _logCleanupFailure(Exception error) {
+  void _logCleanupFailure(
+    Exception error, {
+    String operation = 'clear_session',
+  }) {
     _logger.log(
       const ContentSubmissionAssetRemovalFailed(),
       extra: {
-        'operation': 'clear_session',
+        'operation': operation,
         'errorType': error.runtimeType.toString(),
         'reason': 'staged cleanup failed',
       },

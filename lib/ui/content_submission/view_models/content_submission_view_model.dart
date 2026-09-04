@@ -804,10 +804,18 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     await initialize();
     _logger.log(const ContentSubmissionStateClearStarted());
     final result = await _serialize<void>(() async {
+      final persistedStateBeforeClear = _persistedDraftState;
       final oldClientSubmissionId = _state.clientSubmissionId;
       final cleared = await _draftRepository.clearDraft();
       if (cleared is Error<void>) return cleared;
-      await _stagedAssetRepository.clearSession(oldClientSubmissionId);
+      if (persistedStateBeforeClear == _PersistedDraftState.unknown) {
+        // A successful persistence-first clear authoritatively establishes that
+        // no draft owns the quarantined staged state, so clean it as orphans
+        // rather than targeting this fresh in-memory identity.
+        await _stagedAssetRepository.reconcileAndLoad(null);
+      } else {
+        await _stagedAssetRepository.clearSession(oldClientSubmissionId);
+      }
       _persistedDraftState = _PersistedDraftState.absent;
       _draftLoadError = null;
       _assets.clear();

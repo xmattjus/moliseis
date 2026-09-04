@@ -204,8 +204,8 @@ void main() {
     );
 
     test(
-      'preserves unknown staged ownership and blocks asset addition after a '
-      'draft-load failure',
+      'cleans unknown staged ownership only after an explicit successful '
+      'draft clear',
       () async {
         const persistedIdentity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
         final objectBoxEnvironment = await TestObjectBoxEnvironment.create();
@@ -275,6 +275,182 @@ void main() {
           ).existsSync(),
           isFalse,
         );
+
+        await vm.clear.execute();
+
+        final postClearIdentity = vm.state.clientSubmissionId;
+        expect(drafts.clearDraftCallCount, 1);
+        expect(vm.clear.completed, isTrue);
+        expect(postClearIdentity, isNot(freshIdentity));
+        expect(postClearIdentity, isNot(persistedIdentity));
+        expect(vm.assets, isEmpty);
+        expect(File(persistedPath).existsSync(), isFalse);
+        expect(
+          Directory(
+            '${supportDirectory.path}/content_submission/staged/$persistedIdentity',
+          ).existsSync(),
+          isFalse,
+        );
+        expect(
+          objectBoxEnvironment.store
+              .box<ContentSubmissionStagedAssetEntity>()
+              .count(),
+          0,
+        );
+        expect(
+          Directory(
+            '${supportDirectory.path}/content_submission/staged/$freshIdentity',
+          ).existsSync(),
+          isFalse,
+        );
+
+        await vm.checkpointDraft();
+
+        expect(drafts.saveDraftCallCount, 1);
+      },
+    );
+
+    test(
+      'preserves unknown staged ownership when its draft clear fails',
+      () async {
+        const persistedIdentity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+        final objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+        final supportDirectory = await Directory.systemTemp.createTemp(
+          'moliseis_content_submission_unknown_clear_failure_',
+        );
+        addTearDown(() async {
+          await objectBoxEnvironment.dispose();
+          await supportDirectory.delete(recursive: true);
+        });
+        final objectBox = TestObjectBox(objectBoxEnvironment.store);
+        final staged = ContentSubmissionStagedAssetRepositoryImpl(
+          logger: MockLogger(),
+          objectBoxI: objectBox,
+          getSupportDirectory: () async => supportDirectory,
+        );
+        final stagedBytes = <int>[1, 2, 3];
+        final stagedDigest = sha1.convert(stagedBytes).toString();
+        final stagedSource = File(
+          '${supportDirectory.path}/persisted-source.jpg',
+        )..writeAsBytesSync(stagedBytes);
+        await staged.acquire(
+          clientSubmissionId: persistedIdentity,
+          digest: stagedDigest,
+          source: stagedSource,
+        );
+        final clearError = TestException('draft clear failed');
+        final drafts = FakeContentSubmissionDraftRepository(
+          loadDraftResult: Result.error(TestException('draft read failed')),
+          clearDraftResult: Result.error(clearError),
+        );
+        final vm = ContentSubmissionViewModel(
+          logger: MockLogger(),
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          draftRepository: drafts,
+          stagedAssetRepository: staged,
+          imagePicker: FakeImagePicker(),
+        );
+        final freshIdentity = vm.state.clientSubmissionId;
+        final persistedPath =
+            '${supportDirectory.path}/content_submission/staged/'
+            '$persistedIdentity/$stagedDigest';
+
+        await vm.initialize();
+        await vm.clear.execute();
+
+        expect(drafts.clearDraftCallCount, 1);
+        expect(vm.clear.error, isTrue);
+        expect(vm.state.clientSubmissionId, freshIdentity);
+        expect(vm.assets, isEmpty);
+        expect(drafts.saveDraftCallCount, 0);
+        expect(File(persistedPath).existsSync(), isTrue);
+        expect(
+          Directory(
+            '${supportDirectory.path}/content_submission/staged/$persistedIdentity',
+          ).existsSync(),
+          isTrue,
+        );
+        expect(
+          objectBoxEnvironment.store
+              .box<ContentSubmissionStagedAssetEntity>()
+              .count(),
+          1,
+        );
+      },
+    );
+
+    test(
+      'rotates after path-safe global cleanup failure from unknown ownership',
+      () async {
+        const persistedIdentity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+        const privatePath =
+            '/Users/example/private/content_submission/staged/secret-file';
+        final objectBoxEnvironment = await TestObjectBoxEnvironment.create();
+        final supportDirectory = await Directory.systemTemp.createTemp(
+          'moliseis_content_submission_unknown_clear_cleanup_failure_',
+        );
+        addTearDown(() async {
+          await objectBoxEnvironment.dispose();
+          await supportDirectory.delete(recursive: true);
+        });
+        final objectBox = TestObjectBox(objectBoxEnvironment.store);
+        final logger = MockLogger();
+        final staged = ContentSubmissionStagedAssetRepositoryImpl(
+          logger: logger,
+          objectBoxI: objectBox,
+          getSupportDirectory: () async => supportDirectory,
+          deleteEntry: (_) async => throw const FileSystemException(
+            'cannot remove staged file',
+            privatePath,
+          ),
+        );
+        final bytes = <int>[1, 2, 3];
+        final digest = sha1.convert(bytes).toString();
+        final source = File('${supportDirectory.path}/persisted-source.jpg')
+          ..writeAsBytesSync(bytes);
+        await staged.acquire(
+          clientSubmissionId: persistedIdentity,
+          digest: digest,
+          source: source,
+        );
+        final drafts = FakeContentSubmissionDraftRepository(
+          loadDraftResult: Result.error(TestException('draft read failed')),
+        );
+        final vm = ContentSubmissionViewModel(
+          logger: logger,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          draftRepository: drafts,
+          stagedAssetRepository: staged,
+          imagePicker: FakeImagePicker(),
+        );
+        final freshIdentity = vm.state.clientSubmissionId;
+
+        await vm.initialize();
+        await vm.clear.execute();
+
+        expect(drafts.clearDraftCallCount, 1);
+        expect(vm.clear.completed, isTrue);
+        expect(vm.state.clientSubmissionId, isNot(freshIdentity));
+        expect(vm.assets, isEmpty);
+        expect(
+          logger.eventsOfType<ContentSubmissionAssetRemovalFailed>(),
+          hasLength(1),
+        );
+        final cleanupDiagnostic = logger
+            .firstCallOfType<ContentSubmissionAssetRemovalFailed>();
+        expect(cleanupDiagnostic?.error, isNull);
+        expect(cleanupDiagnostic?.stackTrace, isNull);
+        expect(cleanupDiagnostic?.extra, {
+          'operation': 'clear_orphans',
+          'errorType': 'FileSystemException',
+          'reason': 'staged cleanup failed',
+        });
+        for (final call in logger.calls) {
+          expect(call.event.data.toString(), isNot(contains(privatePath)));
+          expect(call.error?.toString(), isNot(contains(privatePath)));
+          expect(call.stackTrace?.toString(), isNot(contains(privatePath)));
+          expect(call.extra.toString(), isNot(contains(privatePath)));
+        }
       },
     );
 
