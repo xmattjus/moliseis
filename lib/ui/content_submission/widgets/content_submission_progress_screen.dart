@@ -14,8 +14,8 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 ///
 /// Displays an animated status icon and message reflecting the current state
 /// of the submission [Command] (running, idle, error, or completed). While an
-/// upload runs, navigation is blocked; once completed, state cleanup triggers
-/// after returning to the form screen.
+/// upload or local finalization runs, navigation is blocked. Session retirement
+/// remains owned by the submission lifecycle in the ViewModel.
 class ContentSubmissionProgressScreen extends StatefulWidget {
   /// Creates the submission progress screen.
   ///
@@ -36,11 +36,7 @@ class ContentSubmissionProgressScreen extends StatefulWidget {
 
 class _ContentSubmissionProgressScreenState
     extends State<ContentSubmissionProgressScreen> {
-  Future<void>? _clearFuture;
-
   ContentSubmissionViewModel get _viewModel => widget.viewModel;
-
-  Future<void> _clearOnce() => _clearFuture ??= _viewModel.clear.execute();
 
   @override
   Widget build(BuildContext context) {
@@ -53,27 +49,17 @@ class _ContentSubmissionProgressScreenState
       listenable: _viewModel.submit,
       builder: (context, child) {
         final submit = _viewModel.submit;
+        final finalizationPending = _viewModel.submissionFinalizationPending;
+        final finalizationError = submit.error && finalizationPending;
         final color = _buildColor(colorScheme, submit);
-        final canPop = !submit.running;
+        final canPop = !submit.running && !finalizationPending;
 
         return PopScope(
-          // Only an active upload blocks navigation. A recreated view model is
-          // idle after process restoration; that state cannot resume the lost
-          // operation and must let the user return to the form.
+          // A recreated ViewModel is idle after process restoration; that
+          // state cannot resume the lost operation and must let the user
+          // return to the form.
           canPop: canPop,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) return;
-            // A completed submission triggers state cleanup after the pop: the
-            // form screen below reacts to `viewModel.clear` and resets its
-            // fields. The viewModel outlives this route, so the popped
-            // `BuildContext` is never used here. Idle and error pops preserve
-            // the editable form state.
-            if (submit.completed) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                unawaited(_clearOnce());
-              });
-            }
-          },
+          onPopInvokedWithResult: (_, _) {},
           child: Scaffold(
             appBar: AppBar(
               leading: canPop
@@ -95,7 +81,7 @@ class _ContentSubmissionProgressScreenState
                     text: Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
-                        _buildTextDescription(submit),
+                        _buildTextDescription(submit, finalizationPending),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -108,17 +94,19 @@ class _ContentSubmissionProgressScreenState
                             onPressed: () => context.pop(),
                             child: const Text('Torna al modulo'),
                           )
+                        : finalizationError
+                        ? _primaryActionButton(
+                            colorScheme: colorScheme,
+                            onPressed: () => unawaited(submit.execute()),
+                            child: const Text('Riprova'),
+                          )
                         : Wrap(
                             spacing: 4,
                             runSpacing: 4,
                             children: [
                               TextButton(
-                                onPressed: () async {
-                                  await _clearState(
-                                    context,
-                                    () => context.goNamed(RouteNames.home),
-                                  );
-                                },
+                                onPressed: () =>
+                                    context.goNamed(RouteNames.home),
                                 child: const Text('Torna alla home'),
                               ),
                               if (submit.completed)
@@ -154,11 +142,17 @@ class _ContentSubmissionProgressScreenState
       ? colorScheme.primary
       : colorScheme.onSurfaceVariant;
 
-  String _buildTextDescription(Command<void> command) => command.running
+  String _buildTextDescription(
+    Command<void> command,
+    bool finalizationPending,
+  ) => command.running
       ? 'Invio in corso...'
       : command.idle
       ? "L'invio è stato interrotto. Torna al modulo per controllare i dati "
             'prima di riprovare.'
+      : command.error && finalizationPending
+      ? 'Il suggerimento è stato inviato, ma non è stato possibile '
+            'completare il salvataggio locale. Riprova senza inviare di nuovo.'
       : command.error
       ? "Si è verificato un problema durante l'invio"
       : 'Grazie, il suggerimento è stato inviato con successo e verrà '
@@ -188,15 +182,4 @@ class _ContentSubmissionProgressScreenState
       child: child,
     ),
   );
-
-  Future<void> _clearState(BuildContext context, void Function()? fn) async {
-    // Waits for the command to finish before
-    // going back to the main screen to block
-    // user from interacting with stale/sent
-    // data.
-    await _clearOnce();
-    if (context.mounted) {
-      fn?.call();
-    }
-  }
 }

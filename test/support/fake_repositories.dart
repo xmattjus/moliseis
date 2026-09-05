@@ -760,6 +760,7 @@ final class FakeContentSubmissionRepository
   final List<ImageUploadTask> uploadImageTaskResults;
 
   bool uploadCalled = false;
+  int uploadCallCount = 0;
   final uploadedImages = <File>[];
 
   /// Content submission received by the latest [upload] call.
@@ -771,6 +772,7 @@ final class FakeContentSubmissionRepository
     List<SubmissionAsset> submissionAssets,
   ) async {
     uploadCalled = true;
+    uploadCallCount++;
     lastUploadedSubmission = contentSubmission;
     return uploadResult;
   }

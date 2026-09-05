@@ -3243,6 +3243,81 @@ void main() {
           expect(repository.clearDraftCallCount, 0);
         },
       );
+
+      test(
+        'restores only dirty form fields to the durable checkpoint',
+        () async {
+          final drafts = FakeContentSubmissionDraftRepository();
+          final staged = FakeContentSubmissionStagedAssetRepository();
+          final vm = buildViewModel(
+            draftRepository: drafts,
+            stagedAssetRepository: staged,
+            imagePicker: FakeImagePicker(
+              onPickMultipleMedia: () async => [
+                XFile.fromData(Uint8List.fromList([1, 2, 3]), name: 'a.jpg'),
+              ],
+            ),
+          );
+          await vm.addAsset.execute();
+          vm.setCity('Campobasso');
+          await vm.checkpointDraft();
+          final checkpoint = vm.state;
+          final identity = vm.state.clientSubmissionId;
+          final asset = vm.assets.single;
+          vm
+            ..setCity('Isernia')
+            ..setStartCalendarDate(EventCalendarDate(2025, 3, 30))
+            ..setStartClockTime(EventClockTime(2, 30));
+
+          expect(vm.eventTimeIssue, EventTimeIssue.nonexistentLocalTime);
+          expect(await vm.restoreCheckpointDraft(), isA<Success<void>>());
+
+          expect(vm.state, checkpoint);
+          expect(vm.state.clientSubmissionId, identity);
+          expect(vm.assets, [asset]);
+          expect(vm.eventTimeIssue, isNull);
+          expect(vm.hasUnsavedChanges, isFalse);
+          expect(drafts.saveDraftCallCount, 2);
+          expect(drafts.clearDraftCallCount, 0);
+          expect(staged.clearedSessions, isEmpty);
+
+          expect(await vm.restoreCheckpointDraft(), isA<Success<void>>());
+          expect(drafts.saveDraftCallCount, 2);
+
+          final reopened = buildViewModel(
+            draftRepository: FakeContentSubmissionDraftRepository(
+              loadDraftResult: Result.success(drafts.lastSavedState),
+            ),
+          );
+          await reopened.initialize();
+          expect(reopened.state.city, 'Campobasso');
+          expect(reopened.state.clientSubmissionId, identity);
+        },
+      );
+
+      test(
+        'refuses checkpoint restoration when persisted ownership is unknown',
+        () async {
+          final loadError = TestException('draft load failed');
+          final drafts = FakeContentSubmissionDraftRepository(
+            loadDraftResult: Result.error(loadError),
+          );
+          final vm = buildViewModel(draftRepository: drafts)
+            ..setCity('Isernia');
+          final state = vm.state;
+          final identity = state.clientSubmissionId;
+
+          final result = await vm.restoreCheckpointDraft();
+
+          expect(result, isA<Error<void>>());
+          expect((result as Error<void>).error, same(loadError));
+          expect(vm.state, state);
+          expect(vm.state.clientSubmissionId, identity);
+          expect(vm.assets, isEmpty);
+          expect(drafts.saveDraftCallCount, 0);
+          expect(drafts.clearDraftCallCount, 0);
+        },
+      );
     });
 
     group('submit', () {
@@ -3405,6 +3480,91 @@ void main() {
       });
 
       test(
+        'keeps submit running through local finalization and retires once',
+        () async {
+          final pendingClear = Completer<Result<void>>();
+          final drafts = FakeContentSubmissionDraftRepository()
+            ..pendingClearDraft = pendingClear;
+          final staged = FakeContentSubmissionStagedAssetRepository();
+          final repository = FakeContentSubmissionRepository();
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: repository,
+                  draftRepository: drafts,
+                  stagedAssetRepository: staged,
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane');
+          final identity = vm.state.clientSubmissionId;
+
+          final submission = vm.submit.execute();
+          while (drafts.clearDraftCallCount == 0) {
+            await Future<void>.value();
+          }
+
+          expect(vm.submit.running, isTrue);
+          expect(vm.submissionFinalizationPending, isTrue);
+          expect(repository.uploadCallCount, 1);
+          expect(vm.state.clientSubmissionId, identity);
+          pendingClear.complete(const Result.success(null));
+          await submission;
+
+          expect(vm.submit.completed, isTrue);
+          expect(vm.submissionFinalizationPending, isFalse);
+          expect(vm.state.clientSubmissionId, isNot(identity));
+          expect(drafts.clearDraftCallCount, 1);
+          expect(staged.clearedSessions, [identity]);
+        },
+      );
+
+      test(
+        'retries failed local finalization without resending remote content',
+        () async {
+          final finalizationError = TestException('clear failed');
+          final drafts = FakeContentSubmissionDraftRepository(
+            clearDraftResult: Result.error(finalizationError),
+          );
+          final repository = FakeContentSubmissionRepository();
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: repository,
+                  draftRepository: drafts,
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane');
+          final identity = vm.state.clientSubmissionId;
+          final state = vm.state;
+
+          await vm.submit.execute();
+
+          expect(vm.submit.error, isTrue);
+          expect(vm.submissionFinalizationPending, isTrue);
+          expect(vm.state, state);
+          expect(vm.state.clientSubmissionId, identity);
+          expect(repository.uploadCallCount, 1);
+          expect(drafts.clearDraftCallCount, 1);
+
+          await vm.submit.execute();
+          expect(vm.submit.error, isTrue);
+          expect(repository.uploadCallCount, 1);
+          expect(drafts.clearDraftCallCount, 2);
+
+          drafts.clearDraftResult = const Result.success(null);
+          await vm.submit.execute();
+
+          expect(vm.submit.completed, isTrue);
+          expect(vm.submissionFinalizationPending, isFalse);
+          expect(repository.uploadCallCount, 1);
+          expect(drafts.clearDraftCallCount, 3);
+          expect(vm.state.clientSubmissionId, isNot(identity));
+        },
+      );
+
+      test(
         'uploads the staged copy after the picker source is deleted',
         () async {
           final temporaryDirectory = await Directory.systemTemp.createTemp(
@@ -3523,6 +3683,7 @@ void main() {
                 ..setUserName('Jane');
 
           await vm.addAsset.execute();
+          final submittedIdentity = vm.state.clientSubmissionId;
           final stagedPaths = vm.assets
               .map((asset) => asset.file.path)
               .toList();
@@ -3588,7 +3749,7 @@ void main() {
               ...stagedPaths,
             ],
           );
-          expect(stagedRepository.clearedSessions, isEmpty);
+          expect(stagedRepository.clearedSessions, [submittedIdentity]);
         },
       );
 

@@ -130,6 +130,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   bool _stagedStateAvailable = false;
   Exception? _stagedReconciliationError;
   String? _recoveryEligibleClientSubmissionId;
+  bool _submissionFinalizationPending = false;
   ContentSubmissionDraftLoadState _loadState =
       ContentSubmissionDraftLoadState.loading;
   final EventTimePolicy _eventTimePolicy = EventTimePolicy();
@@ -139,6 +140,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   ContentSubmissionDraft get state => _state;
 
   bool get hasUnsavedChanges => _state != _checkpointedDraft;
+
+  /// Whether remote submission succeeded but local session retirement failed.
+  bool get submissionFinalizationPending => _submissionFinalizationPending;
 
   UnmodifiableListView<Asset> get assets => UnmodifiableListView(_assets);
 
@@ -527,6 +531,32 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     return _serialize(_checkpointDraftInsideBoundary);
   }
 
+  /// Restores the current draft fields to their last durable checkpoint.
+  ///
+  /// Durable staged assets remain owned by the current session and are not
+  /// part of this field-level restore operation.
+  Future<Result<void>> restoreCheckpointDraft() async {
+    if (_disposed) return const Result.success(null);
+    await initialize();
+    if (_disposed) return const Result.success(null);
+    return _serialize(() async {
+      if (_persistedDraftState == _PersistedDraftState.unknown) {
+        return Result.error(
+          _draftLoadError ??
+              Exception(
+                'Cannot restore while persisted draft state is unknown.',
+              ),
+        );
+      }
+      if (_state == _checkpointedDraft) return const Result.success(null);
+
+      _state = _checkpointedDraft;
+      _eventTimeIssue = null;
+      if (!_disposed) notifyListeners();
+      return const Result.success(null);
+    });
+  }
+
   Future<Result<void>> _checkpointDraftInsideBoundary() async {
     if (_persistedDraftState == _PersistedDraftState.unknown) {
       return Result.error(
@@ -703,6 +733,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     if (_disposed) return const Result.success(null);
     await initialize();
     if (_disposed) return const Result.success(null);
+    if (_submissionFinalizationPending) return _finalizeSubmittedSession();
     if (!_stagedStateAvailable) {
       return Result.error(
         Exception('Cannot submit: staged assets unavailable.'),
@@ -790,7 +821,10 @@ class ContentSubmissionViewModel extends ChangeNotifier {
         submissionAssets,
       );
 
-      return result;
+      if (result is Error<void>) return result;
+
+      _submissionFinalizationPending = true;
+      return _finalizeSubmittedSession();
     }
 
     // Unreachable: the `missing` guard above guarantees every required field
@@ -798,6 +832,22 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     return Result.error(
       Exception('Cannot submit: unknown validation failure.'),
     );
+  }
+
+  Future<Result<void>> _finalizeSubmittedSession() async {
+    await clear.execute();
+    return switch (clear.result) {
+      Success<void>() => _completeSubmissionFinalization(),
+      Error<void>(:final error) => Result.error(error),
+      null => Result.error(
+        Exception('Submission finalization did not complete.'),
+      ),
+    };
+  }
+
+  Result<void> _completeSubmissionFinalization() {
+    _submissionFinalizationPending = false;
+    return const Result.success(null);
   }
 
   Future<Result<void>> _clear() async {

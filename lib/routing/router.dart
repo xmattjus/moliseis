@@ -20,6 +20,7 @@ import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_sc
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/logging_screen.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
@@ -42,6 +43,7 @@ import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
+import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -52,10 +54,33 @@ final _favouritesShellNavigatorKey = GlobalKey<NavigatorState>();
 final _mapShellNavigatorKey = GlobalKey<NavigatorState>();
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
+enum _ContentSubmissionExitChoice { save, discard, cancel }
+
 GoRouter buildAppRouter({
   required SyncViewModel syncViewModel,
   required AdminAuthViewModel adminAuthViewModel,
 }) {
+  Object? contentSubmissionTransitionOwner;
+
+  Object? acquireContentSubmissionTransition() {
+    if (contentSubmissionTransitionOwner != null) return null;
+    final token = Object();
+    contentSubmissionTransitionOwner = token;
+    return token;
+  }
+
+  void releaseContentSubmissionTransition(Object token) {
+    if (identical(contentSubmissionTransitionOwner, token)) {
+      contentSubmissionTransitionOwner = null;
+    }
+  }
+
+  void releaseAfterRouteRemoval(Object token) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      releaseContentSubmissionTransition(token);
+    });
+  }
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: RoutePaths.home,
@@ -84,9 +109,80 @@ GoRouter buildAppRouter({
       GoRoute(
         path: RoutePaths.contentSubmission,
         name: RouteNames.contentSubmission,
+        onExit: (context, _) async {
+          final token = acquireContentSubmissionTransition();
+          if (token == null) return false;
+
+          try {
+            final viewModel = context.read<ContentSubmissionViewModel>();
+            if (!viewModel.hasUnsavedChanges) {
+              releaseAfterRouteRemoval(token);
+              return true;
+            }
+
+            final choice = await showDialog<_ContentSubmissionExitChoice>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Salvare le modifiche?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(
+                      context,
+                      _ContentSubmissionExitChoice.cancel,
+                    ),
+                    child: const Text('Annulla'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(
+                      context,
+                      _ContentSubmissionExitChoice.discard,
+                    ),
+                    child: const Text('Esci senza salvare'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(
+                      context,
+                      _ContentSubmissionExitChoice.save,
+                    ),
+                    child: const Text('Salva ed esci'),
+                  ),
+                ],
+              ),
+            );
+
+            final result = switch (choice) {
+              _ContentSubmissionExitChoice.save =>
+                await viewModel.checkpointDraft(),
+              _ContentSubmissionExitChoice.discard =>
+                await viewModel.restoreCheckpointDraft(),
+              _ContentSubmissionExitChoice.cancel || null => null,
+            };
+
+            if (result == null) {
+              releaseContentSubmissionTransition(token);
+              return false;
+            }
+            if (result is Error<void>) {
+              releaseContentSubmissionTransition(token);
+              if (context.mounted) showSnackBarGenericError(context: context);
+              return false;
+            }
+
+            releaseAfterRouteRemoval(token);
+            return true;
+          } on Object {
+            releaseContentSubmissionTransition(token);
+            if (context.mounted) showSnackBarGenericError(context: context);
+            return false;
+          }
+        },
         builder: (context, _) {
           final viewModel = context.read<ContentSubmissionViewModel>();
-          return ContentSubmissionScreen(viewModel: viewModel);
+          return ContentSubmissionScreen(
+            viewModel: viewModel,
+            acquireTransition: acquireContentSubmissionTransition,
+            releaseTransition: releaseContentSubmissionTransition,
+          );
         },
         routes: <RouteBase>[
           GoRoute(

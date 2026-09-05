@@ -1,7 +1,8 @@
 import 'dart:async' show Completer;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderSliver;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -78,6 +79,16 @@ void main() {
   }
 
   Widget buildApp(ContentSubmissionViewModel viewModel) {
+    Object? transitionOwner;
+    Object? acquireTransition() {
+      if (transitionOwner != null) return null;
+      return transitionOwner = Object();
+    }
+
+    void releaseTransition(Object token) {
+      if (identical(transitionOwner, token)) transitionOwner = null;
+    }
+
     final router = GoRouter(
       initialLocation: '/submission',
       routes: <RouteBase>[
@@ -89,7 +100,11 @@ void main() {
         GoRoute(
           path: '/submission',
           name: RouteNames.contentSubmission,
-          builder: (_, _) => ContentSubmissionScreen(viewModel: viewModel),
+          builder: (_, _) => ContentSubmissionScreen(
+            viewModel: viewModel,
+            acquireTransition: acquireTransition,
+            releaseTransition: releaseTransition,
+          ),
           routes: <RouteBase>[
             GoRoute(
               path: 'uploadProgress',
@@ -262,6 +277,91 @@ void main() {
     });
   });
 
+  group('ContentSubmissionScreen dirty iOS gesture guard', () {
+    testWidgets('derives the status and pop disposition from dirty state', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final vm = buildViewModel(
+        submissionRepository: ControllableSubmissionRepository(),
+      );
+      await vm.initialize();
+
+      await tester.pumpWidget(buildApp(vm));
+      await tester.pump();
+      await tester.pump();
+      final cleanExtent = tester
+          .renderObject<RenderSliver>(
+            find.byType(SliverAppBar, skipOffstage: false),
+          )
+          .geometry!
+          .scrollExtent;
+      expect(find.text('Modifiche non salvate'), findsNothing);
+      expect(
+        tester
+            .widget<PopScope<dynamic>>(
+              find.byWidgetPredicate(
+                (widget) => widget is PopScope,
+                skipOffstage: false,
+              ),
+            )
+            .canPop,
+        isTrue,
+      );
+
+      vm.setCity('Campobasso');
+      await tester.pump();
+
+      expect(find.text('Modifiche non salvate'), findsOneWidget);
+      expect(
+        tester
+            .widget<PopScope<dynamic>>(
+              find.byWidgetPredicate(
+                (widget) => widget is PopScope,
+                skipOffstage: false,
+              ),
+            )
+            .canPop,
+        isFalse,
+      );
+      expect(
+        tester
+            .renderObject<RenderSliver>(
+              find.byType(SliverAppBar, skipOffstage: false),
+            )
+            .geometry!
+            .scrollExtent,
+        cleanExtent,
+      );
+
+      await vm.checkpointDraft();
+      await tester.pump();
+
+      expect(find.text('Modifiche non salvate'), findsNothing);
+      expect(
+        tester
+            .widget<PopScope<dynamic>>(
+              find.byWidgetPredicate(
+                (widget) => widget is PopScope,
+                skipOffstage: false,
+              ),
+            )
+            .canPop,
+        isTrue,
+      );
+      expect(
+        tester
+            .renderObject<RenderSliver>(
+              find.byType(SliverAppBar, skipOffstage: false),
+            )
+            .geometry!
+            .scrollExtent,
+        cleanExtent,
+      );
+      debugDefaultTargetPlatformOverride = null;
+    });
+  });
+
   testWidgets('restored incomplete event draft controls the checkbox', (
     tester,
   ) async {
@@ -371,7 +471,7 @@ void main() {
     );
 
     testWidgets(
-      'completed pop hides stale form while persisted clear is pending',
+      'completed submission blocks progress exit while local clear is pending',
       (tester) async {
         final repo = ControllableSubmissionRepository(
           uploadImageTaskResult: FakeImageUploadTask.completed(
@@ -410,30 +510,30 @@ void main() {
         await tester.pump();
 
         repo.completeUpload(const Result.success(null));
-        await tester.pumpAndSettle();
+        await tester.pump();
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         final previousState = vm.state;
         final previousIdentity = vm.state.clientSubmissionId;
         final previousAsset = vm.assets.single;
-        expect(vm.hasUnsavedChanges, isTrue);
+        expect(vm.hasUnsavedChanges, isFalse);
 
         expect(await tester.binding.handlePopRoute(), isTrue);
         await tester.pump();
         await tester.pump(const Duration(seconds: 1));
 
         expect(vm.clear.running, isTrue);
-        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
-        expect(find.text('Caricamento in corso...'), findsOneWidget);
-        expect(find.text('Campobasso'), findsNothing);
+        expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         expect(vm.state, previousState);
         expect(vm.state.clientSubmissionId, previousIdentity);
         expect(vm.assets, [previousAsset]);
-        expect(vm.hasUnsavedChanges, isTrue);
+        expect(vm.hasUnsavedChanges, isFalse);
 
         clearGate.complete(const Result.success(null));
         await tester.pumpAndSettle();
 
         expect(vm.clear.completed, isTrue);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
         expect(find.byType(ContentSubmissionScreen), findsOneWidget);
         expect(vm.state.city, isEmpty);
         expect(vm.assets, isEmpty);
