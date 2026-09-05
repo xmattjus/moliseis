@@ -35,6 +35,7 @@ import 'package:moliseis/domain/repositories/content_submission_staged_asset_rep
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
+import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/utils/command.dart' show Command;
 import 'package:moliseis/utils/result.dart';
@@ -1048,6 +1049,37 @@ final class FakeContentSubmissionDraftRepository
     pendingClearDraft = null;
     return pending?.future ?? clearDraftResult;
   }
+}
+
+// ---------------------------------------------------------------------------
+// FakeSearchRepository
+// ---------------------------------------------------------------------------
+
+/// A [SearchRepository] fake that never exposes persisted search data.
+final class FakeSearchRepository implements SearchRepository {
+  @override
+  Future<Result<void>> addToPastSearches(String text) async =>
+      const Result.success(null);
+
+  @override
+  Future<Result<List<int>>> getEventIdsByQuery(String text) async =>
+      const Result.success(<int>[]);
+
+  @override
+  Future<Result<List<int>>> getPlaceIdsByQuery(String text) async =>
+      const Result.success(<int>[]);
+
+  @override
+  Future<Result<List<int>>> getRelatedResults(String text) async =>
+      const Result.success(<int>[]);
+
+  @override
+  Future<Result<List<String>>> getPastSearches() async =>
+      const Result.success(<String>[]);
+
+  @override
+  Future<Result<void>> removeFromPastSearches(String text) async =>
+      const Result.success(null);
 }
 
 // ---------------------------------------------------------------------------

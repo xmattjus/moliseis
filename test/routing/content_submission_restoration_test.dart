@@ -18,7 +18,8 @@ import '../support/mock_logger.dart';
 void main() {
   group('content submission restoration', () {
     testWidgets(
-      'restored idle progress returns to the form without retrying or clearing',
+      'restored idle progress returns to the recoverable form without '
+      'retrying or clearing',
       (tester) async {
         final holder = _FixtureHolder();
 
@@ -35,7 +36,7 @@ void main() {
           before.router.pushNamed(RouteNames.contentSubmissionUploadProgress),
         );
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump();
 
         expect(before.viewModel.submit.running, isTrue);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
@@ -55,17 +56,40 @@ void main() {
         expect(after, isNot(same(before)));
         expect(after.viewModel, isNot(same(before.viewModel)));
         expect(after.viewModel.submit.idle, isTrue);
+        expect(after.viewModel.state.city, 'Campobasso');
+        expect(after.viewModel.state.name, 'Test event');
+        expect(
+          after.viewModel.state.clientSubmissionId,
+          _FixtureHolder.persistedClientSubmissionId,
+        );
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         expect(find.byIcon(Symbols.upload), findsOneWidget);
         expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.byType(BackButton), findsOneWidget);
         expect(find.text('Torna al modulo'), findsOneWidget);
         expect(after.submissionRepository.uploadCallCount, 0);
 
+        expect(await tester.binding.handlePopRoute(), isTrue);
+        await tester.pumpAndSettle();
+
+        expect(holder.draftRepository.clearDraftCalled, isFalse);
+        expect(after.submissionRepository.uploadCallCount, 0);
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.byType(_FormMarker), findsOneWidget);
+
+        unawaited(
+          after.router.pushNamed(RouteNames.contentSubmissionUploadProgress),
+        );
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Torna al modulo'));
         await tester.pumpAndSettle();
 
         expect(holder.draftRepository.clearDraftCalled, isFalse);
         expect(after.submissionRepository.uploadCallCount, 0);
+        expect(
+          after.viewModel.state.clientSubmissionId,
+          _FixtureHolder.persistedClientSubmissionId,
+        );
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(find.byType(_FormMarker), findsOneWidget);
 
@@ -84,6 +108,7 @@ final class _FixtureHolder {
     : draftRepository = FakeContentSubmissionDraftRepository(
         loadDraftResult: Result.success(
           ContentSubmissionDraft(
+            clientSubmissionId: persistedClientSubmissionId,
             city: 'Campobasso',
             name: 'Test event',
             userEmail: 'test@example.com',
@@ -91,6 +116,9 @@ final class _FixtureHolder {
           ),
         ),
       );
+
+  static const persistedClientSubmissionId =
+      '00000000-0000-4000-8000-000000000001';
 
   final FakeContentSubmissionDraftRepository draftRepository;
   _RestorationFixture? fixture;

@@ -93,14 +93,12 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
 
     setState(() => _allowIosExplicitPop = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.pop();
+      if (!mounted) return;
+      context.pop();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _allowIosExplicitPop = false);
+      });
     });
-  }
-
-  void _handleIosPopInvoked(bool didPop, Object? _) {
-    if (!didPop && _allowIosExplicitPop && mounted) {
-      setState(() => _allowIosExplicitPop = false);
-    }
   }
 
   Future<void> _openExternalLink(Future<bool> Function() open) async {
@@ -108,6 +106,7 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
     if (token == null) return;
 
     final viewModel = widget.viewModel;
+    final releaseTransition = widget.releaseTransition;
     _setBoundaryPending(true);
     try {
       if (viewModel.hasUnsavedChanges) {
@@ -124,26 +123,30 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
       if (!mounted) return;
       if (!launched) showSnackBarGenericError(context: context);
     } finally {
-      widget.releaseTransition(token);
+      releaseTransition(token);
       _setBoundaryPending(false);
     }
   }
 
   Future<void> _submit() async {
+    if (!mounted) return;
+
     // The form keys are only attached once the form widgets have been built.
     // Guard against the null case rather than forcing an unwrap, which would
     // crash if the button were ever enabled before the forms were mounted.
+    final viewModel = widget.viewModel;
+    final acquireTransition = widget.acquireTransition;
+    final releaseTransition = widget.releaseTransition;
     final form1State = _form1Key.currentState;
     final form2State = _form2Key.currentState;
     final isForm1Valid = form1State?.validate() ?? false;
     final isForm2Valid = form2State?.validate() ?? false;
-    final eventTimeValid = widget.viewModel.validateEventTimeForSubmission();
+    final eventTimeValid = viewModel.validateEventTimeForSubmission();
     if (!isForm1Valid || !isForm2Valid || !eventTimeValid) return;
 
-    final token = widget.acquireTransition();
+    final token = acquireTransition();
     if (token == null) return;
 
-    final viewModel = widget.viewModel;
     _setBoundaryPending(true);
     var handedOffToProgress = false;
     try {
@@ -164,14 +167,14 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
         return;
       }
 
-      widget.releaseTransition(token);
+      releaseTransition(token);
       handedOffToProgress = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _setBoundaryPending(false);
       });
     } finally {
       if (!handedOffToProgress) {
-        widget.releaseTransition(token);
+        releaseTransition(token);
         _setBoundaryPending(false);
       }
     }
@@ -213,11 +216,10 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
               final isDirty = widget.viewModel.hasUnsavedChanges;
               final blocksIosGesture =
                   defaultTargetPlatform == TargetPlatform.iOS &&
-                  isDirty &&
+                  (isDirty || _boundaryPending) &&
                   !_allowIosExplicitPop;
               return PopScope<Object?>(
                 canPop: !blocksIosGesture,
-                onPopInvokedWithResult: _handleIosPopInvoked,
                 child: AbsorbPointer(
                   absorbing: _boundaryPending,
                   child: CustomScrollView(
@@ -351,11 +353,11 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                           if (!widget.viewModel.validateEmail(
                                             value,
                                           )) {
-                                            return 'Inserisci un indirizzo e-mail '
-                                                'valido';
+                                            return 'Inserisci un '
+                                                'indirizzo e-mail valido';
                                           } else if (value.length > 320) {
-                                            return "L'indirizzo e-mail inserito è "
-                                                'troppo lungo';
+                                            return "L'indirizzo e-mail "
+                                                'inserito è troppo lungo';
                                           }
                                         }
                                         return null;
@@ -402,8 +404,8 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                           children: [
                                             const WidgetSpan(
                                               child: Text(
-                                                'Inviando il suggerimento, accetti '
-                                                'i ',
+                                                'Inviando il suggerimento, '
+                                                'accetti i ',
                                               ),
                                             ),
                                             WidgetSpan(

@@ -124,6 +124,7 @@ void main() {
           vm.assets.map((asset) => asset.file.path),
           ['/staged/$identity/$secondDigest', '/staged/$identity/$firstDigest'],
         );
+        expect(vm.hasUnsavedChanges, isFalse);
       },
     );
 
@@ -3129,6 +3130,56 @@ void main() {
 
           expect(await vm.checkpointDraft(), isA<Success<void>>());
           expect(repository.saveDraftCallCount, 1);
+        },
+      );
+
+      test(
+        'keeps dirty state scoped to draft fields across asset mutations',
+        () async {
+          final secondPickerResult = Completer<List<XFile>>();
+          var pickerInvocation = 0;
+          final vm = buildViewModel(
+            imagePicker: FakeImagePicker(
+              onPickMultipleMedia: () async {
+                if (pickerInvocation++ == 0) {
+                  return [
+                    XFile.fromData(
+                      Uint8List.fromList([1, 2, 3]),
+                      name: 'first.jpg',
+                    ),
+                  ];
+                }
+                return secondPickerResult.future;
+              },
+            ),
+          );
+
+          await vm.addAsset.execute();
+          expect(vm.assets, hasLength(1));
+          expect(vm.hasUnsavedChanges, isFalse);
+
+          await vm.removeAssetAt.execute(0);
+          expect(vm.assets, isEmpty);
+          expect(vm.hasUnsavedChanges, isFalse);
+
+          vm.setCity('Campobasso');
+          expect(vm.hasUnsavedChanges, isTrue);
+
+          final addition = vm.addAsset.execute();
+          while (pickerInvocation != 2) {
+            await Future<void>.value();
+          }
+          vm.setName('Test event');
+          secondPickerResult.complete([
+            XFile.fromData(Uint8List.fromList([4, 5, 6]), name: 'second.jpg'),
+          ]);
+          await addition;
+          expect(vm.assets, hasLength(1));
+          expect(vm.hasUnsavedChanges, isTrue);
+
+          await vm.removeAssetAt.execute(0);
+          expect(vm.assets, isEmpty);
+          expect(vm.hasUnsavedChanges, isTrue);
         },
       );
 

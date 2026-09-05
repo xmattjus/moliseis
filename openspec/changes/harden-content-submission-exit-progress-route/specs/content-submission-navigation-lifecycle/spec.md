@@ -5,7 +5,7 @@ Define recoverable, single-flight navigation and lifecycle boundaries for the ap
 ## ADDED Requirements
 
 ### Requirement: Removing a dirty form route requires one explicit exit decision
-The system SHALL guard an attempt to remove the Content Submission form route whenever the current form snapshot differs from its last durable checkpoint. A clean form route SHALL exit without confirmation. A dirty exit SHALL present exactly the choices `Salva ed esci`, `Esci senza salvare`, and `Annulla`. Exactly one route-removal invocation SHALL own an active dirty-exit decision; any overlapping invocation SHALL be denied or deferred without receiving a second affirmative completion from the owner's decision. The same policy SHALL govern AppBar back, operating-system back, supported interactive back gestures, and programmatic navigation that removes the form route. Removing only the child progress route while retaining the form route SHALL NOT itself be treated as a form-route exit.
+The system SHALL guard an attempt to remove the Content Submission form route whenever the current `ContentSubmissionDraft` field snapshot differs from its last durable checkpoint. A clean form route SHALL exit without confirmation. A dirty exit SHALL present exactly the choices `Salva ed esci`, `Esci senza salvare`, and `Annulla`. Exactly one route-removal invocation SHALL own an active dirty-exit decision; any overlapping invocation SHALL be denied or deferred without receiving a second affirmative completion from the owner's decision. The same policy SHALL govern AppBar back, operating-system back, supported interactive back gestures, and programmatic navigation that removes the form route. Removing only the child progress route while retaining the form route SHALL NOT itself be treated as a form-route exit.
 
 #### Scenario: Clean form exits directly
 - **WHEN** navigation attempts to remove the form route while its current snapshot equals its checkpoint
@@ -30,7 +30,7 @@ The system SHALL guard an attempt to remove the Content Submission form route wh
 #### Scenario: Exit without saving preserves durable session state
 - **GIVEN** the current session has an existing persisted draft and may own already-durable staged assets
 - **WHEN** `Esci senza salvare` succeeds
-- **THEN** the persisted draft is not deleted, its client submission identity is not rotated, and its durable staged assets are neither deleted nor represented as reversible form-field edits
+- **THEN** the persisted draft is not deleted, its client submission identity is not rotated, and its current durable staged-asset membership is neither changed nor represented as reversible form-field edits
 
 #### Scenario: Exit without saving failure stays on the form
 - **WHEN** no trustworthy checkpoint can be restored or checkpoint restoration otherwise returns an error
@@ -61,20 +61,39 @@ The system SHALL guard an attempt to remove the Content Submission form route wh
 - **WHEN** an owning exit decision is cancelled, fails, or completes and a later independent form route subsequently requests removal
 - **THEN** the stale decision no longer blocks or authorizes the later attempt, which evaluates normally against its current route and form state
 
-#### Scenario: Dirty iOS edge swipe is prevented before it starts
-- **WHEN** the form is dirty on iOS and the user attempts the native left-edge interactive back gesture
+#### Scenario: Dirty or boundary-pending iOS edge swipe is prevented before it starts
+- **WHEN** the form is dirty on iOS, or a form-owned transition boundary remains pending, and the user attempts the native left-edge interactive back gesture
 - **THEN** the gesture does not start, the form remains fully visible and interactive, Explore is not partially exposed, and no exit dialog is shown from that gesture
 
-#### Scenario: Clean iOS edge swipe remains native
-- **WHEN** the form is clean on iOS and the user completes the native left-edge interactive back gesture
+#### Scenario: Clean idle iOS edge swipe remains native
+- **WHEN** the form is clean on iOS, no form-owned transition boundary is pending, and the user completes the native left-edge interactive back gesture
 - **THEN** the form exits without confirmation through the normal native transition
 
 #### Scenario: Dirty AppBar Back retains the route exit policy
 - **WHEN** the form is dirty and the user activates the unchanged AppBar Back control
-- **THEN** the existing three-choice route-exit policy owns the attempt, and `Annulla` leaves the form dirty, interactive, and fully visible
+- **THEN** a one-shot native-pop allowance initiates exactly that programmatic attempt, the existing three-choice route-exit policy owns it, and `Annulla` leaves the form dirty, interactive, fully visible, and again prevents native edge-swipe initiation
+
+#### Scenario: Explicit AppBar allowance does not outlive its initiation
+- **WHEN** dirty AppBar Back starts its programmatic pop on iOS
+- **THEN** its native-pop allowance is revoked immediately after initiation rather than when the asynchronous route decision later completes; cancellation, checkpoint failure, or checkpoint-restore failure leaves native edge swipe prevented while a later independent AppBar Back can start a fresh attempt
+
+### Requirement: Dirty state excludes durable staged assets
+`ContentSubmissionViewModel.hasUnsavedChanges` SHALL represent only whether the current `ContentSubmissionDraft` field state differs from `_checkpointedDraft`. Successfully adding, removing, or reconciling an immediately durable staged asset SHALL NOT make the form dirty or alter that comparison. Consequently, staged-asset membership alone SHALL NOT trigger the form exit confirmation or affect clean-state native iOS swipe eligibility. `Esci senza salvare` SHALL restore only `_checkpointedDraft`; it SHALL NOT undo additions, resurrect removals, restore historical asset membership, clear staged assets, or otherwise implement asset undo/history.
+
+#### Scenario: Durable staged-asset mutations keep a clean draft clean
+- **WHEN** a clean form successfully adds, removes, or reconciles durable staged assets without changing a draft field
+- **THEN** `hasUnsavedChanges` remains false and a later form exit proceeds without the dirty confirmation
+
+#### Scenario: Durable staged-asset mutations do not erase field dirtiness
+- **WHEN** an uncheckpointed draft-field edit exists and a staged asset is successfully added or removed
+- **THEN** `hasUnsavedChanges` remains true because of the field edit alone
+
+#### Scenario: Discard preserves current durable staged-asset membership
+- **WHEN** dirty draft fields and durable staged-asset mutations both exist and `Esci senza salvare` succeeds
+- **THEN** only draft fields return to `_checkpointedDraft` and the current durable staged-asset membership remains unchanged
 
 ### Requirement: Dirty state is visible without changing AppBar geometry
-The Content Submission AppBar SHALL derive its state directly from `ContentSubmissionViewModel.hasUnsavedChanges`. While dirty, it SHALL show the visible status text `Modifiche non salvate` directly below `Suggerimento` with a decorative circular dot that does not create a separate semantic announcement. The status SHALL be absent while clean. Both states SHALL retain the existing standard Material 3 AppBar dimensions, unchanged Back control visuals and semantics, and stable surrounding content geometry.
+The Content Submission AppBar SHALL derive its state directly from `ContentSubmissionViewModel.hasUnsavedChanges`. While dirty, it SHALL show the visible status text `Modifiche non salvate` directly below `Suggerimento` with a decorative circular dot that does not create a separate semantic announcement. The status SHALL be absent while clean, including after a successful staged-asset addition, removal, or reconciliation with no uncheckpointed draft-field edit. Both states SHALL retain the existing standard Material 3 AppBar dimensions, unchanged Back control visuals and semantics, and stable surrounding content geometry.
 
 #### Scenario: Dirty indicator follows checkpoint state
 - **WHEN** a dirty form checkpoints successfully without leaving the form

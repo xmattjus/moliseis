@@ -1,4 +1,4 @@
-import 'dart:async' show Completer;
+import 'dart:async' show Completer, unawaited;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +8,8 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:moliseis/config/dependencies.dart';
+import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
@@ -19,7 +21,9 @@ import 'package:moliseis/ui/content_submission/widgets/content_submission_descri
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:provider/provider.dart';
 
+import '../../../support/fake_external_url_service.dart';
 import '../../../support/fake_image_picker.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
@@ -74,23 +78,47 @@ void main() {
 
   Future<void> scrollToAndTap(WidgetTester tester, Finder finder) async {
     await tester.scrollUntilVisible(finder, 200, scrollable: mainScrollable);
+    await tester.ensureVisible(finder);
+    await tester.pump();
     await tester.tap(finder);
     await tester.pump();
   }
 
-  Widget buildApp(ContentSubmissionViewModel viewModel) {
+  Future<void> tapLegalLink(WidgetTester tester, String label) =>
+      scrollToAndTap(tester, find.text(label));
+
+  Finder formBoundaryAbsorber() => find
+      .ancestor(
+        of: find.byKey(const ValueKey('content_submission_scroll')),
+        matching: find.byType(AbsorbPointer),
+      )
+      .first;
+
+  Widget buildApp(
+    ContentSubmissionViewModel viewModel, {
+    UrlLaunchService? urlLaunchService,
+    Object? Function()? acquireTransition,
+    void Function(Object token)? releaseTransition,
+    String initialLocation = '/submission',
+    void Function(GoRouter router)? onRouterCreated,
+  }) {
     Object? transitionOwner;
-    Object? acquireTransition() {
+    Object? defaultAcquireTransition() {
       if (transitionOwner != null) return null;
       return transitionOwner = Object();
     }
 
-    void releaseTransition(Object token) {
+    void defaultReleaseTransition(Object token) {
       if (identical(transitionOwner, token)) transitionOwner = null;
     }
 
+    final resolvedAcquireTransition =
+        acquireTransition ?? defaultAcquireTransition;
+    final resolvedReleaseTransition =
+        releaseTransition ?? defaultReleaseTransition;
+
     final router = GoRouter(
-      initialLocation: '/submission',
+      initialLocation: initialLocation,
       routes: <RouteBase>[
         GoRoute(
           path: '/home',
@@ -102,8 +130,8 @@ void main() {
           name: RouteNames.contentSubmission,
           builder: (_, _) => ContentSubmissionScreen(
             viewModel: viewModel,
-            acquireTransition: acquireTransition,
-            releaseTransition: releaseTransition,
+            acquireTransition: resolvedAcquireTransition,
+            releaseTransition: resolvedReleaseTransition,
           ),
           routes: <RouteBase>[
             GoRoute(
@@ -116,15 +144,20 @@ void main() {
         ),
       ],
     );
-    return MaterialApp.router(
-      routerConfig: router,
-      localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-        FlutterQuillLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ],
-      supportedLocales: const [Locale('en'), Locale('it')],
+    onRouterCreated?.call(router);
+    return Provider<UrlLaunchService>.value(
+      value: urlLaunchService ?? UrlLaunchService(logger: MockLogger()),
+      child: MaterialApp.router(
+        scaffoldMessengerKey: $scaffoldMessengerKey,
+        routerConfig: router,
+        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+          FlutterQuillLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('en'), Locale('it')],
+      ),
     );
   }
 
@@ -275,6 +308,294 @@ void main() {
       expect(find.text('Riprova'), findsOneWidget);
       expect(find.text('Nuovo suggerimento'), findsNothing);
     });
+
+    testWidgets(
+      'unmounting during a submit checkpoint releases without continuing',
+      (tester) async {
+        final checkpoint = Completer<Result<void>>();
+        final draftRepository = FakeContentSubmissionDraftRepository()
+          ..pendingSaveDraft = checkpoint;
+        final repository = ControllableSubmissionRepository();
+        final viewModel = buildViewModel(
+          submissionRepository: repository,
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        final token = Object();
+        final released = <Object>[];
+
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            acquireTransition: () => token,
+            releaseTransition: released.add,
+          ),
+        );
+        await fillValidForm(tester);
+        await scrollToAndTap(
+          tester,
+          find.widgetWithText(FilledButton, 'Invia'),
+        );
+        expect(draftRepository.saveDraftCallCount, 1);
+
+        await tester.pumpWidget(const SizedBox());
+        checkpoint.complete(const Result.success(null));
+        await tester.pumpAndSettle();
+
+        expect(released, [token]);
+        expect(repository.uploadCallCount, 0);
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('invalid first form acquires no submit transition work', (
+      tester,
+    ) async {
+      final draftRepository = FakeContentSubmissionDraftRepository();
+      final repository = ControllableSubmissionRepository();
+      final viewModel = buildViewModel(
+        submissionRepository: repository,
+        draftRepository: draftRepository,
+      );
+      await viewModel.initialize();
+      var acquisitions = 0;
+
+      await tester.pumpWidget(
+        buildApp(
+          viewModel,
+          acquireTransition: () {
+            acquisitions++;
+            return Object();
+          },
+        ),
+      );
+      await scrollToAndTap(
+        tester,
+        find.widgetWithText(FilledButton, 'Invia'),
+      );
+
+      expect(acquisitions, 0);
+      expect(draftRepository.saveDraftCallCount, 0);
+      expect(repository.uploadCallCount, 0);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+    });
+
+    testWidgets('invalid second form acquires no submit transition work', (
+      tester,
+    ) async {
+      final draftRepository = FakeContentSubmissionDraftRepository();
+      final repository = ControllableSubmissionRepository();
+      final viewModel = buildViewModel(
+        submissionRepository: repository,
+        draftRepository: draftRepository,
+      );
+      await viewModel.initialize();
+      var acquisitions = 0;
+
+      await tester.pumpWidget(
+        buildApp(
+          viewModel,
+          acquireTransition: () {
+            acquisitions++;
+            return Object();
+          },
+        ),
+      );
+      await fillValidForm(tester);
+      final termsCheckbox = find.descendant(
+        of: find.byType(CheckboxFormField),
+        matching: find.byType(Checkbox),
+      );
+      await scrollToAndTap(tester, termsCheckbox);
+      await scrollToAndTap(
+        tester,
+        find.widgetWithText(FilledButton, 'Invia'),
+      );
+
+      expect(acquisitions, 0);
+      expect(draftRepository.saveDraftCallCount, 0);
+      expect(repository.uploadCallCount, 0);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+    });
+
+    testWidgets('invalid event time acquires no submit transition work', (
+      tester,
+    ) async {
+      final draftRepository = FakeContentSubmissionDraftRepository();
+      final repository = ControllableSubmissionRepository();
+      final viewModel = buildViewModel(
+        submissionRepository: repository,
+        draftRepository: draftRepository,
+      );
+      await viewModel.initialize();
+      var acquisitions = 0;
+
+      await tester.pumpWidget(
+        buildApp(
+          viewModel,
+          acquireTransition: () {
+            acquisitions++;
+            return Object();
+          },
+        ),
+      );
+      await fillValidForm(tester);
+      viewModel.setEventEnabled(true);
+      await tester.pump();
+      await scrollToAndTap(
+        tester,
+        find.widgetWithText(FilledButton, 'Invia'),
+      );
+
+      expect(acquisitions, 0);
+      expect(draftRepository.saveDraftCallCount, 0);
+      expect(repository.uploadCallCount, 0);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+    });
+
+    testWidgets('denied submit ownership starts no lifecycle work', (
+      tester,
+    ) async {
+      final draftRepository = FakeContentSubmissionDraftRepository();
+      final repository = ControllableSubmissionRepository();
+      final viewModel = buildViewModel(
+        submissionRepository: repository,
+        draftRepository: draftRepository,
+      );
+      await viewModel.initialize();
+
+      await tester.pumpWidget(
+        buildApp(viewModel, acquireTransition: () => null),
+      );
+      await fillValidForm(tester);
+      await scrollToAndTap(
+        tester,
+        find.widgetWithText(FilledButton, 'Invia'),
+      );
+
+      expect(draftRepository.saveDraftCallCount, 0);
+      expect(repository.uploadCallCount, 0);
+      expect(viewModel.submit.result, isNull);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+    });
+
+    testWidgets(
+      'submit checkpoint is single-flight through the synchronous push handoff',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 3000));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final checkpoint = Completer<Result<void>>();
+        final draftRepository = FakeContentSubmissionDraftRepository()
+          ..pendingSaveDraft = checkpoint;
+        final repository = ControllableSubmissionRepository();
+        addTearDown(() => repository.completeUpload(Result.error(Exception())));
+        final viewModel = buildViewModel(
+          submissionRepository: repository,
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        var acquisitions = 0;
+        final token = Object();
+        final released = <Object>[];
+        bool? absorbedWhenReleased;
+
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            acquireTransition: () => ++acquisitions == 1 ? token : null,
+            releaseTransition: (releasedToken) {
+              absorbedWhenReleased = tester
+                  .widget<AbsorbPointer>(formBoundaryAbsorber())
+                  .absorbing;
+              released.add(releasedToken);
+            },
+          ),
+        );
+        await fillValidForm(tester);
+        final submit = find.widgetWithText(FilledButton, 'Invia');
+        await tester.tap(submit);
+        await tester.pump();
+
+        expect(acquisitions, 1);
+        expect(draftRepository.saveDraftCallCount, 1);
+        expect(repository.uploadCallCount, 0);
+        expect(
+          tester.widget<AbsorbPointer>(formBoundaryAbsorber()).absorbing,
+          isTrue,
+        );
+
+        final city = find.widgetWithText(TextFormField, 'Campobasso');
+        await tester.tap(city, warnIfMissed: false);
+        tester.testTextInput.enterText('Isernia');
+        await tester.tap(submit, warnIfMissed: false);
+        await tester.pump();
+
+        expect(viewModel.state.city, 'Campobasso');
+        expect(acquisitions, 1);
+        expect(draftRepository.saveDraftCallCount, 1);
+
+        checkpoint.complete(const Result.success(null));
+        await tester.pump();
+        await tester.pump();
+
+        expect(repository.uploadCallCount, 1);
+        expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+        expect(released, [token]);
+        expect(absorbedWhenReleased, isTrue);
+        expect(
+          tester.widget<AbsorbPointer>(formBoundaryAbsorber()).absorbing,
+          isFalse,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('submit checkpoint failure preserves editable work', (
+      tester,
+    ) async {
+      final draftRepository = FakeContentSubmissionDraftRepository(
+        saveDraftResult: Result.error(Exception('checkpoint failed')),
+      );
+      final repository = ControllableSubmissionRepository();
+      final viewModel = buildViewModel(
+        submissionRepository: repository,
+        draftRepository: draftRepository,
+      );
+      await viewModel.initialize();
+      final token = Object();
+      final released = <Object>[];
+
+      await tester.pumpWidget(
+        buildApp(
+          viewModel,
+          acquireTransition: () => token,
+          releaseTransition: released.add,
+        ),
+      );
+      await fillValidForm(tester);
+      await scrollToAndTap(
+        tester,
+        find.widgetWithText(FilledButton, 'Invia'),
+      );
+      await tester.pump();
+
+      expect(draftRepository.saveDraftCallCount, 1);
+      expect(repository.uploadCallCount, 0);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+      expect(released, [token]);
+      expect(
+        find.text('Si è verificato un errore, riprova più tardi'),
+        findsOneWidget,
+      );
+
+      await enterLabeledField(tester, 'Città', 'Isernia');
+      expect(viewModel.state.city, 'Isernia');
+      expect(
+        tester.widget<AbsorbPointer>(formBoundaryAbsorber()).absorbing,
+        isFalse,
+      );
+    });
   });
 
   group('ContentSubmissionScreen dirty iOS gesture guard', () {
@@ -313,6 +634,20 @@ void main() {
       await tester.pump();
 
       expect(find.text('Modifiche non salvate'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.label == 'Modifiche non salvate',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.label == '●',
+        ),
+        findsNothing,
+      );
       expect(
         tester
             .widget<PopScope<dynamic>>(
@@ -359,6 +694,609 @@ void main() {
         cleanExtent,
       );
       debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets(
+      'blocks native pop while a checkpointed external boundary is pending',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final draftRepository = FakeContentSubmissionDraftRepository();
+        final launchGate = Completer<Result<void>>();
+        final externalUrlService = FakeExternalUrlService(logger: MockLogger())
+          ..pendingLaunch = launchGate;
+        final viewModel = buildViewModel(
+          submissionRepository: ControllableSubmissionRepository(),
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        viewModel.setCity('Campobasso');
+
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            urlLaunchService: UrlLaunchService(
+              logger: MockLogger(),
+              externalUrlService: externalUrlService,
+            ),
+          ),
+        );
+        await tester.scrollUntilVisible(
+          find.text('Termini di Servizio'),
+          200,
+          scrollable: mainScrollable,
+        );
+        final terms = find.text('Termini di Servizio');
+        await tester.ensureVisible(terms);
+        await tester.tap(terms);
+        await tester.pump();
+
+        expect(viewModel.hasUnsavedChanges, isFalse);
+        expect(externalUrlService.launchedUrls, hasLength(1));
+        expect(
+          tester
+              .widget<PopScope<dynamic>>(
+                find.byWidgetPredicate(
+                  (widget) => widget is PopScope,
+                  skipOffstage: false,
+                ),
+              )
+              .canPop,
+          isFalse,
+        );
+
+        launchGate.complete(const Result.success(null));
+        await tester.pumpAndSettle();
+
+        expect(
+          tester
+              .widget<PopScope<dynamic>>(
+                find.byWidgetPredicate(
+                  (widget) => widget is PopScope,
+                  skipOffstage: false,
+                ),
+              )
+              .canPop,
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+  });
+
+  group('ContentSubmissionScreen external boundaries', () {
+    const legalLinks = <String>[
+      'Termini di Servizio',
+      'Informativa sulla privacy',
+    ];
+
+    for (final label in legalLinks) {
+      testWidgets(
+        '$label checkpoints dirty work before launching and releases ownership',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(800, 1600));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final checkpoint = Completer<Result<void>>();
+          final draftRepository = FakeContentSubmissionDraftRepository()
+            ..pendingSaveDraft = checkpoint;
+          final externalUrlService = FakeExternalUrlService(
+            logger: MockLogger(),
+          );
+          final viewModel = buildViewModel(
+            submissionRepository: ControllableSubmissionRepository(),
+            draftRepository: draftRepository,
+          );
+          await viewModel.initialize();
+          viewModel.setCity('Campobasso');
+          Object? owner;
+          final released = <Object>[];
+
+          await tester.pumpWidget(
+            buildApp(
+              viewModel,
+              acquireTransition: () {
+                if (owner != null) return null;
+                return owner = Object();
+              },
+              releaseTransition: (token) {
+                released.add(token);
+                if (identical(owner, token)) owner = null;
+              },
+              urlLaunchService: UrlLaunchService(
+                logger: MockLogger(),
+                externalUrlService: externalUrlService,
+              ),
+            ),
+          );
+
+          await tapLegalLink(tester, label);
+
+          expect(draftRepository.saveDraftCallCount, 1);
+          expect(externalUrlService.launchedUrls, isEmpty);
+          expect(owner, isNotNull);
+
+          checkpoint.complete(const Result.success(null));
+          await tester.pumpAndSettle();
+
+          expect(externalUrlService.launchedUrls, hasLength(1));
+          expect(viewModel.hasUnsavedChanges, isFalse);
+          expect(released, hasLength(1));
+          expect(owner, isNull);
+        },
+      );
+
+      testWidgets(
+        '$label checkpoint failure preserves work and blocks launch',
+        (
+          tester,
+        ) async {
+          await tester.binding.setSurfaceSize(const Size(800, 1600));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final draftRepository = FakeContentSubmissionDraftRepository(
+            saveDraftResult: Result.error(Exception('checkpoint failed')),
+          );
+          final externalUrlService = FakeExternalUrlService(
+            logger: MockLogger(),
+          );
+          final viewModel = buildViewModel(
+            submissionRepository: ControllableSubmissionRepository(),
+            draftRepository: draftRepository,
+          );
+          await viewModel.initialize();
+          viewModel.setCity('Campobasso');
+          Object? owner;
+          final released = <Object>[];
+
+          await tester.pumpWidget(
+            buildApp(
+              viewModel,
+              acquireTransition: () {
+                if (owner != null) return null;
+                return owner = Object();
+              },
+              releaseTransition: (token) {
+                released.add(token);
+                if (identical(owner, token)) owner = null;
+              },
+              urlLaunchService: UrlLaunchService(
+                logger: MockLogger(),
+                externalUrlService: externalUrlService,
+              ),
+            ),
+          );
+
+          await tapLegalLink(tester, label);
+          await tester.pump();
+
+          expect(draftRepository.saveDraftCallCount, 1);
+          expect(externalUrlService.launchedUrls, isEmpty);
+          expect(viewModel.hasUnsavedChanges, isTrue);
+          expect(released, hasLength(1));
+          expect(owner, isNull);
+          expect(
+            find.text('Si è verificato un errore, riprova più tardi'),
+            findsOneWidget,
+          );
+        },
+      );
+
+      testWidgets(
+        '$label launcher failure releases ownership and shows feedback',
+        (
+          tester,
+        ) async {
+          await tester.binding.setSurfaceSize(const Size(800, 1600));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final draftRepository = FakeContentSubmissionDraftRepository();
+          final externalUrlService = FakeExternalUrlService(
+            logger: MockLogger(),
+          )..result = Result.error(Exception('launcher failed'));
+          final viewModel = buildViewModel(
+            submissionRepository: ControllableSubmissionRepository(),
+            draftRepository: draftRepository,
+          );
+          await viewModel.initialize();
+          viewModel.setCity('Campobasso');
+          Object? owner;
+          final released = <Object>[];
+
+          await tester.pumpWidget(
+            buildApp(
+              viewModel,
+              acquireTransition: () {
+                if (owner != null) return null;
+                return owner = Object();
+              },
+              releaseTransition: (token) {
+                released.add(token);
+                if (identical(owner, token)) owner = null;
+              },
+              urlLaunchService: UrlLaunchService(
+                logger: MockLogger(),
+                externalUrlService: externalUrlService,
+              ),
+            ),
+          );
+
+          await tapLegalLink(tester, label);
+          await tester.pump();
+
+          expect(draftRepository.saveDraftCallCount, 1);
+          expect(externalUrlService.launchedUrls, hasLength(1));
+          expect(released, hasLength(1));
+          expect(owner, isNull);
+          expect(
+            find.text('Si è verificato un errore, riprova più tardi'),
+            findsOneWidget,
+          );
+        },
+      );
+    }
+
+    for (final label in legalLinks) {
+      testWidgets('$label clean launch avoids an empty draft checkpoint', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final draftRepository = FakeContentSubmissionDraftRepository();
+        final externalUrlService = FakeExternalUrlService(logger: MockLogger());
+        final viewModel = buildViewModel(
+          submissionRepository: ControllableSubmissionRepository(),
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            urlLaunchService: UrlLaunchService(
+              logger: MockLogger(),
+              externalUrlService: externalUrlService,
+            ),
+          ),
+        );
+
+        await tapLegalLink(tester, label);
+        await tester.pumpAndSettle();
+
+        expect(draftRepository.saveDraftCallCount, 0);
+        expect(externalUrlService.launchedUrls, hasLength(1));
+      });
+
+      testWidgets('$label denied ownership starts no checkpoint or launch', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final draftRepository = FakeContentSubmissionDraftRepository();
+        final externalUrlService = FakeExternalUrlService(logger: MockLogger());
+        final viewModel = buildViewModel(
+          submissionRepository: ControllableSubmissionRepository(),
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        viewModel.setCity('Campobasso');
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            acquireTransition: () => null,
+            urlLaunchService: UrlLaunchService(
+              logger: MockLogger(),
+              externalUrlService: externalUrlService,
+            ),
+          ),
+        );
+
+        await tapLegalLink(tester, label);
+
+        expect(draftRepository.saveDraftCallCount, 0);
+        expect(externalUrlService.launchedUrls, isEmpty);
+        expect(viewModel.hasUnsavedChanges, isTrue);
+      });
+    }
+
+    testWidgets(
+      'rapid repeated legal-link taps are single-flight while gated',
+      (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final checkpoint = Completer<Result<void>>();
+        final draftRepository = FakeContentSubmissionDraftRepository()
+          ..pendingSaveDraft = checkpoint;
+        final externalUrlService = FakeExternalUrlService(logger: MockLogger());
+        final viewModel = buildViewModel(
+          submissionRepository: ControllableSubmissionRepository(),
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        viewModel.setCity('Campobasso');
+        var acquireCount = 0;
+        final token = Object();
+
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            acquireTransition: () => ++acquireCount == 1 ? token : null,
+            urlLaunchService: UrlLaunchService(
+              logger: MockLogger(),
+              externalUrlService: externalUrlService,
+            ),
+          ),
+        );
+
+        await tapLegalLink(tester, 'Termini di Servizio');
+        await tester.tap(
+          find.text('Termini di Servizio'),
+          warnIfMissed: false,
+        );
+        await tester.pump();
+
+        expect(acquireCount, 1);
+        expect(draftRepository.saveDraftCallCount, 1);
+        expect(externalUrlService.launchedUrls, isEmpty);
+
+        checkpoint.complete(const Result.success(null));
+        await tester.pumpAndSettle();
+
+        expect(externalUrlService.launchedUrls, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'gated boundary absorbs form, asset, and AppBar pointer input',
+      (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final checkpoint = Completer<Result<void>>();
+        final draftRepository = FakeContentSubmissionDraftRepository()
+          ..pendingSaveDraft = checkpoint;
+        final imagePicker = FakeImagePicker();
+        final viewModel = buildViewModel(
+          submissionRepository: ControllableSubmissionRepository(),
+          draftRepository: draftRepository,
+          imagePicker: imagePicker,
+        );
+        await viewModel.initialize();
+        viewModel.setCity('Campobasso');
+
+        GoRouter? router;
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            initialLocation: '/home',
+            onRouterCreated: (value) => router = value,
+          ),
+        );
+        unawaited(router!.pushNamed<void>(RouteNames.contentSubmission));
+        await tester.pumpAndSettle();
+        await tapLegalLink(tester, 'Termini di Servizio');
+
+        final cityField = find.widgetWithText(TextFormField, 'Campobasso');
+        await tester.scrollUntilVisible(
+          cityField,
+          200,
+          scrollable: mainScrollable,
+        );
+        await tester.tap(cityField, warnIfMissed: false);
+        tester.testTextInput.enterText('Isernia');
+        await tester.pump();
+        expect(viewModel.state.city, 'Campobasso');
+
+        final addAsset = find.byKey(
+          const ValueKey('content-submission-asset-list-add-button'),
+        );
+        await tester.scrollUntilVisible(
+          addAsset,
+          200,
+          scrollable: mainScrollable,
+        );
+        await tester.tap(addAsset, warnIfMissed: false);
+        await tester.pump();
+        expect(imagePicker.pickMultipleMediaLimits, isEmpty);
+
+        expect(find.byType(BackButton), findsOneWidget);
+        await tester.tap(find.byType(BackButton), warnIfMissed: false);
+        await tester.pump();
+        expect(draftRepository.saveDraftCallCount, 1);
+        expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+
+        checkpoint.complete(const Result.success(null));
+        await tester.pumpAndSettle();
+      },
+    );
+
+    testWidgets(
+      'rapid repeated Privacy taps are single-flight while gated',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final checkpoint = Completer<Result<void>>();
+        final draftRepository = FakeContentSubmissionDraftRepository()
+          ..pendingSaveDraft = checkpoint;
+        final externalUrlService = FakeExternalUrlService(logger: MockLogger());
+        final viewModel = buildViewModel(
+          submissionRepository: ControllableSubmissionRepository(),
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        viewModel.setCity('Campobasso');
+        var acquireCount = 0;
+        final token = Object();
+
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            acquireTransition: () => ++acquireCount == 1 ? token : null,
+            urlLaunchService: UrlLaunchService(
+              logger: MockLogger(),
+              externalUrlService: externalUrlService,
+            ),
+          ),
+        );
+
+        await tapLegalLink(tester, 'Informativa sulla privacy');
+        await tester.tap(
+          find.text('Informativa sulla privacy'),
+          warnIfMissed: false,
+        );
+        await tester.pump();
+
+        expect(acquireCount, 1);
+        expect(draftRepository.saveDraftCallCount, 1);
+        expect(externalUrlService.launchedUrls, isEmpty);
+
+        checkpoint.complete(const Result.success(null));
+        await tester.pumpAndSettle();
+
+        expect(externalUrlService.launchedUrls, hasLength(1));
+      },
+    );
+
+    testWidgets(
+      'unmounting during a checkpoint releases without a late launch',
+      (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final checkpoint = Completer<Result<void>>();
+        final draftRepository = FakeContentSubmissionDraftRepository()
+          ..pendingSaveDraft = checkpoint;
+        final externalUrlService = FakeExternalUrlService(logger: MockLogger());
+        final viewModel = buildViewModel(
+          submissionRepository: ControllableSubmissionRepository(),
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        viewModel.setCity('Campobasso');
+        final token = Object();
+        final released = <Object>[];
+
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            acquireTransition: () => token,
+            releaseTransition: released.add,
+            urlLaunchService: UrlLaunchService(
+              logger: MockLogger(),
+              externalUrlService: externalUrlService,
+            ),
+          ),
+        );
+        await tapLegalLink(tester, 'Termini di Servizio');
+
+        await tester.pumpWidget(const SizedBox());
+        checkpoint.complete(const Result.success(null));
+        await tester.pumpAndSettle();
+
+        expect(released, [token]);
+        expect(externalUrlService.launchedUrls, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'unmounting during a Privacy checkpoint releases without a late launch',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final checkpoint = Completer<Result<void>>();
+        final draftRepository = FakeContentSubmissionDraftRepository()
+          ..pendingSaveDraft = checkpoint;
+        final externalUrlService = FakeExternalUrlService(logger: MockLogger());
+        final viewModel = buildViewModel(
+          submissionRepository: ControllableSubmissionRepository(),
+          draftRepository: draftRepository,
+        );
+        await viewModel.initialize();
+        viewModel.setCity('Campobasso');
+        final token = Object();
+        final released = <Object>[];
+
+        await tester.pumpWidget(
+          buildApp(
+            viewModel,
+            acquireTransition: () => token,
+            releaseTransition: released.add,
+            urlLaunchService: UrlLaunchService(
+              logger: MockLogger(),
+              externalUrlService: externalUrlService,
+            ),
+          ),
+        );
+        await tapLegalLink(tester, 'Informativa sulla privacy');
+
+        await tester.pumpWidget(const SizedBox());
+        checkpoint.complete(const Result.success(null));
+        await tester.pumpAndSettle();
+
+        expect(released, [token]);
+        expect(externalUrlService.launchedUrls, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  });
+
+  group('ContentSubmissionScreen asset picker boundary', () {
+    testWidgets('actual add-asset action uses only the ViewModel checkpoint', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final checkpoint = Completer<Result<void>>();
+      final draftRepository = FakeContentSubmissionDraftRepository()
+        ..pendingSaveDraft = checkpoint;
+      final imagePicker = FakeImagePicker();
+      final viewModel = buildViewModel(
+        submissionRepository: ControllableSubmissionRepository(),
+        draftRepository: draftRepository,
+        imagePicker: imagePicker,
+      );
+      await viewModel.initialize();
+      viewModel.setCity('Campobasso');
+      var routeTokenAcquisitions = 0;
+
+      await tester.pumpWidget(
+        buildApp(
+          viewModel,
+          acquireTransition: () {
+            routeTokenAcquisitions++;
+            return Object();
+          },
+        ),
+      );
+
+      final addAsset = find.byKey(
+        const ValueKey('content-submission-asset-list-add-button'),
+      );
+      await tester.scrollUntilVisible(
+        addAsset,
+        200,
+        scrollable: mainScrollable,
+      );
+      await tester.tap(addAsset);
+      await tester.pump();
+
+      expect(
+        draftRepository.saveDraftCallCount,
+        1,
+        reason: 'the existing ViewModel flow owns the pre-picker checkpoint',
+      );
+      expect(imagePicker.pickMultipleMediaLimits, isEmpty);
+      expect(routeTokenAcquisitions, 0);
+
+      checkpoint.complete(const Result.success(null));
+      await tester.pumpAndSettle();
+
+      expect(imagePicker.pickMultipleMediaLimits, hasLength(1));
+      expect(viewModel.assets, isEmpty);
+      expect(routeTokenAcquisitions, 0);
     });
   });
 
@@ -510,7 +1448,9 @@ void main() {
         await tester.pump();
 
         repo.completeUpload(const Result.success(null));
-        await tester.pump();
+        while (draftRepo.clearDraftCallCount == 0) {
+          await tester.pump();
+        }
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         final previousState = vm.state;
         final previousIdentity = vm.state.clientSubmissionId;
@@ -519,7 +1459,6 @@ void main() {
 
         expect(await tester.binding.handlePopRoute(), isTrue);
         await tester.pump();
-        await tester.pump(const Duration(seconds: 1));
 
         expect(vm.clear.running, isTrue);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
