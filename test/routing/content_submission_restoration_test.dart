@@ -44,7 +44,7 @@ void main() {
         // Keep the old request pending through process death. The new fixture
         // receives a fresh view model, exactly as production does.
         addTearDown(
-          () => before.submissionRepository.completeUpload(
+          () => before.submissionRepository.completeSubmission(
             const Result.success(null),
           ),
         );
@@ -67,13 +67,13 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(find.byType(BackButton), findsOneWidget);
         expect(find.text('Torna al modulo'), findsOneWidget);
-        expect(after.submissionRepository.uploadCallCount, 0);
+        expect(after.submissionRepository.submitCallCount, 0);
 
         expect(await tester.binding.handlePopRoute(), isTrue);
         await tester.pumpAndSettle();
 
         expect(holder.draftRepository.clearDraftCalled, isFalse);
-        expect(after.submissionRepository.uploadCallCount, 0);
+        expect(after.submissionRepository.submitCallCount, 0);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(find.byType(_FormMarker), findsOneWidget);
 
@@ -85,7 +85,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(holder.draftRepository.clearDraftCalled, isFalse);
-        expect(after.submissionRepository.uploadCallCount, 0);
+        expect(after.submissionRepository.submitCallCount, 0);
         expect(
           after.viewModel.state.clientSubmissionId,
           _FixtureHolder.persistedClientSubmissionId,

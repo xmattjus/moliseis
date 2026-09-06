@@ -582,7 +582,7 @@ void main() {
         expect(vm.addAsset.error, isTrue);
         expect(vm.submit.error, isTrue);
         expect(pickerCalled, isFalse);
-        expect(submissionRepository.uploadCalled, isFalse);
+        expect(submissionRepository.submitCalled, isFalse);
         expect(submissionRepository.uploadedImages, isEmpty);
       },
     );
@@ -659,7 +659,7 @@ void main() {
         expect(pickerCalled, isFalse);
         expect(vm.submit.error, isTrue);
         expect(submissionRepository.uploadedImages, isEmpty);
-        expect(submissionRepository.uploadCalled, isFalse);
+        expect(submissionRepository.submitCalled, isFalse);
         expect(
           (await staged.reconcileAndLoad(identity)).getOrNull(),
           hasLength(6),
@@ -735,7 +735,7 @@ void main() {
         expect(vm.submit.error, isTrue);
         expect(vm.assets, isEmpty);
         expect(submissionRepository.uploadedImages, isEmpty);
-        expect(submissionRepository.uploadCalled, isFalse);
+        expect(submissionRepository.submitCalled, isFalse);
         expect(
           (await staged.reconcileAndLoad(identity)).getOrNull(),
           hasLength(1),
@@ -816,7 +816,7 @@ void main() {
         expect(vm.submit.error, isTrue);
         expect(vm.assets, isEmpty);
         expect(submissionRepository.uploadedImages, isEmpty);
-        expect(submissionRepository.uploadCalled, isFalse);
+        expect(submissionRepository.submitCalled, isFalse);
         expect(
           (await staged.reconcileAndLoad(identity)).getOrNull(),
           hasLength(1),
@@ -2106,7 +2106,7 @@ void main() {
         expect(picker.pickMultipleMediaLimits, isEmpty);
         expect(retrieveLostDataCalled, isFalse);
         expect(submissions.uploadedImages, isEmpty);
-        expect(submissions.uploadCalled, isFalse);
+        expect(submissions.submitCalled, isFalse);
       });
 
       test(
@@ -3234,6 +3234,7 @@ void main() {
         pendingSave.complete(const Result.success(null));
 
         expect(await checkpoint, isA<Success<void>>());
+        expect(repository.saveDraftCallCount, 1);
         expect(repository.lastSavedState?.city, 'Rome');
         expect(vm.state.city, 'Isernia');
         expect(vm.hasUnsavedChanges, isTrue);
@@ -3390,7 +3391,7 @@ void main() {
           await vm.submit.execute();
 
           expect(vm.submit.error, isTrue);
-          expect(submissionRepository.uploadCalled, isFalse);
+          expect(submissionRepository.submitCalled, isFalse);
           expect(submissionRepository.uploadedImages, isEmpty);
         },
       );
@@ -3442,7 +3443,7 @@ void main() {
         await vm.submit.execute();
 
         expect(vm.eventTimeIssue, EventTimeIssue.nonexistentLocalTime);
-        expect(submissionRepository.uploadCalled, isFalse);
+        expect(submissionRepository.submitCalled, isFalse);
         expect(submissionRepository.uploadedImages, isEmpty);
       });
 
@@ -3458,7 +3459,7 @@ void main() {
 
           expect(vm.submit.completed, isFalse);
           expect(vm.submit.error, isTrue);
-          expect(submissionRepository.uploadCalled, isFalse);
+          expect(submissionRepository.submitCalled, isFalse);
 
           final result = vm.submit.result;
           expect(result, isA<Error<void>>());
@@ -3486,7 +3487,7 @@ void main() {
           await vm.submit.execute();
 
           expect(vm.submit.error, isTrue);
-          expect(submissionRepository.uploadCalled, isFalse);
+          expect(submissionRepository.submitCalled, isFalse);
 
           final error = (vm.submit.result! as Error<void>).error;
           expect(error.toString(), contains('userName'));
@@ -3519,16 +3520,174 @@ void main() {
 
         expect(vm.submit.completed, isTrue);
         expect(vm.submit.error, isFalse);
-        expect(submissionRepository.uploadCalled, isTrue);
+        expect(submissionRepository.submitCalled, isTrue);
         expect(
-          submissionRepository.lastUploadedSubmission?.description,
+          submissionRepository.submittedContentSubmissions.last.description,
           'Ancient arena',
         );
         expect(
-          submissionRepository.lastUploadedSubmission?.descriptionDelta,
+          submissionRepository
+              .submittedContentSubmissions
+              .last
+              .descriptionDelta,
           descriptionDelta,
         );
       });
+
+      test(
+        'submits the captured checkpoint snapshot when live fields change',
+        () async {
+          final pendingSave = Completer<Result<void>>();
+          final drafts = FakeContentSubmissionDraftRepository()
+            ..pendingSaveDraft = pendingSave;
+          final submissions = FakeContentSubmissionRepository(
+            submitResult: Result.error(Exception('remote failure')),
+          );
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: submissions,
+                  draftRepository: drafts,
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane');
+          final identity = vm.state.clientSubmissionId;
+
+          final submit = vm.submit.execute();
+          while (drafts.saveDraftCallCount == 0) {
+            await Future<void>.value();
+          }
+          vm
+            ..setCity('Isernia')
+            ..setName('Castello')
+            ..setUserEmail('other@example.com')
+            ..setUserName('Other');
+          pendingSave.complete(const Result.success(null));
+          await submit;
+
+          expect(drafts.lastSavedState?.city, 'Rome');
+          expect(drafts.saveDraftCallCount, 1);
+          expect(submissions.submittedClientSubmissionIds, [identity]);
+          expect(submissions.submittedContentSubmissions.single.city, 'Rome');
+          expect(
+            submissions.submittedContentSubmissions.single.name,
+            'Colosseum',
+          );
+          expect(
+            submissions.submittedContentSubmissions.single.userEmail,
+            'jane@example.com',
+          );
+          expect(vm.state.city, 'Isernia');
+          expect(vm.state.clientSubmissionId, identity);
+          expect(vm.hasUnsavedChanges, isTrue);
+        },
+      );
+
+      test(
+        'uses captured ordered assets and payload after a Cloudinary gap',
+        () async {
+          final uploadTask = FakeImageUploadTask.pending();
+          final submissions = FakeContentSubmissionRepository(
+            submitResult: Result.error(Exception('remote failure')),
+            uploadImageTaskResult: uploadTask,
+          );
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: submissions,
+                  imagePicker: FakeImagePicker(
+                    onPickMultipleMedia: () async => <XFile>[
+                      XFile.fromData(
+                        Uint8List.fromList(<int>[1, 2, 3]),
+                        name: 'captured.jpg',
+                      ),
+                    ],
+                  ),
+                )
+                ..setCategory(ContentCategory.history)
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setDescription(
+                  description: 'Captured description',
+                  descriptionDelta: const <Map<String, dynamic>>[
+                    <String, dynamic>{'insert': 'Captured description\n'},
+                  ],
+                )
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane');
+          await vm.addAsset.execute();
+          final identity = vm.state.clientSubmissionId;
+
+          final submit = vm.submit.execute();
+          while (submissions.uploadedImages.isEmpty) {
+            await Future<void>.value();
+          }
+          vm
+            ..setCity('Isernia')
+            ..setName('Castello')
+            ..setUserEmail('other@example.com')
+            ..setUserName('Other');
+          await vm.removeAssetAt.execute(0);
+          uploadTask.complete(
+            const Result.success(
+              SubmissionAsset(
+                secureUrl: 'https://assets.example/captured.jpg',
+                width: 1,
+                height: 1,
+              ),
+            ),
+          );
+          await submit;
+
+          expect(submissions.submittedClientSubmissionIds, [identity]);
+          final captured = submissions.submittedContentSubmissions.single;
+          expect(captured.category, ContentCategory.history);
+          expect(captured.city, 'Rome');
+          expect(captured.name, 'Colosseum');
+          expect(captured.description, 'Captured description');
+          expect(
+            captured.descriptionDelta,
+            const <Map<String, dynamic>>[
+              <String, dynamic>{'insert': 'Captured description\n'},
+            ],
+          );
+          expect(captured.userEmail, 'jane@example.com');
+          expect(captured.userName, 'Jane');
+          expect(
+            submissions.submittedSubmissionAssets.single.single.secureUrl,
+            'https://assets.example/captured.jpg',
+          );
+          expect(vm.assets, isEmpty);
+          expect(vm.state.city, 'Isernia');
+          expect(vm.state.clientSubmissionId, identity);
+          expect(vm.hasUnsavedChanges, isTrue);
+        },
+      );
+
+      test(
+        'does not save an already-durable snapshot before remote work',
+        () async {
+          final drafts = FakeContentSubmissionDraftRepository();
+          final submissions = FakeContentSubmissionRepository(
+            submitResult: Result.error(Exception('remote failure')),
+          );
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: submissions,
+                  draftRepository: drafts,
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane');
+
+          await vm.checkpointDraft();
+          await vm.submit.execute();
+
+          expect(drafts.saveDraftCallCount, 1);
+          expect(submissions.submitCallCount, 1);
+        },
+      );
 
       test(
         'keeps submit running through local finalization and retires once',
@@ -3557,7 +3716,7 @@ void main() {
 
           expect(vm.submit.running, isTrue);
           expect(vm.submissionFinalizationPending, isTrue);
-          expect(repository.uploadCallCount, 1);
+          expect(repository.submitCallCount, 1);
           expect(vm.state.clientSubmissionId, identity);
           pendingClear.complete(const Result.success(null));
           await submission;
@@ -3596,12 +3755,16 @@ void main() {
           expect(vm.submissionFinalizationPending, isTrue);
           expect(vm.state, state);
           expect(vm.state.clientSubmissionId, identity);
-          expect(repository.uploadCallCount, 1);
+          expect(repository.submitCallCount, 1);
+          expect(repository.uploadedImages, isEmpty);
+          expect(drafts.saveDraftCallCount, 1);
           expect(drafts.clearDraftCallCount, 1);
 
           await vm.submit.execute();
           expect(vm.submit.error, isTrue);
-          expect(repository.uploadCallCount, 1);
+          expect(repository.submitCallCount, 1);
+          expect(repository.uploadedImages, isEmpty);
+          expect(drafts.saveDraftCallCount, 1);
           expect(drafts.clearDraftCallCount, 2);
 
           drafts.clearDraftResult = const Result.success(null);
@@ -3609,7 +3772,9 @@ void main() {
 
           expect(vm.submit.completed, isTrue);
           expect(vm.submissionFinalizationPending, isFalse);
-          expect(repository.uploadCallCount, 1);
+          expect(repository.submitCallCount, 1);
+          expect(repository.uploadedImages, isEmpty);
+          expect(drafts.saveDraftCallCount, 1);
           expect(drafts.clearDraftCallCount, 3);
           expect(vm.state.clientSubmissionId, isNot(identity));
         },
@@ -3679,7 +3844,7 @@ void main() {
             '${temporaryDirectory.path}/second-picker-source.jpg',
           )..writeAsBytesSync(secondBytes);
           final submissionRepository = FakeContentSubmissionRepository(
-            uploadResult: Result.error(Exception('submission failed')),
+            submitResult: Result.error(Exception('submission failed')),
             uploadImageTaskResults: [
               FakeImageUploadTask.completed(
                 Result.error(Exception('first cloudinary failure')),
@@ -3753,7 +3918,8 @@ void main() {
 
           await vm.submit.execute();
           expect(vm.submit.error, isTrue);
-          expect(submissionRepository.uploadCalled, isFalse);
+          expect(submissionRepository.submitCalled, isFalse);
+          expect(vm.state.clientSubmissionId, submittedIdentity);
           expect(
             submissionRepository.uploadedImages.map((file) => file.path),
             [stagedPaths.first],
@@ -3771,7 +3937,8 @@ void main() {
 
           await vm.submit.execute();
           expect(vm.submit.error, isTrue);
-          expect(submissionRepository.uploadCalled, isFalse);
+          expect(submissionRepository.submitCalled, isFalse);
+          expect(vm.state.clientSubmissionId, submittedIdentity);
           expect(vm.assets.map((asset) => asset.file.path), stagedPaths);
           expect(
             await Future.wait(
@@ -3783,14 +3950,30 @@ void main() {
 
           await vm.submit.execute();
           expect(vm.submit.error, isTrue);
-          expect(submissionRepository.uploadCalled, isTrue);
+          expect(submissionRepository.submitCalled, isTrue);
+          expect(submissionRepository.submitCallCount, 1);
+          expect(
+            submissionRepository.submittedClientSubmissionIds,
+            [submittedIdentity],
+          );
           expect(vm.assets.map((asset) => asset.file.path), stagedPaths);
           expect(stagedRepository.clearedSessions, isEmpty);
 
-          submissionRepository.uploadResult = const Result.success(null);
+          submissionRepository.submitResult = const Result.success(null);
           await vm.submit.execute();
 
           expect(vm.submit.completed, isTrue);
+          expect(submissionRepository.submitCallCount, 2);
+          expect(
+            submissionRepository.submittedClientSubmissionIds,
+            [submittedIdentity, submittedIdentity],
+          );
+          expect(
+            submissionRepository.submittedSubmissionAssets.last.map(
+              (asset) => asset.secureUrl,
+            ),
+            ['first', 'second'],
+          );
           expect(
             submissionRepository.uploadedImages.map((file) => file.path),
             [
@@ -3808,7 +3991,7 @@ void main() {
         'retains description projections after a failed submission',
         () async {
           final submissionRepository = FakeContentSubmissionRepository(
-            uploadResult: Result.error(Exception('upload failed')),
+            submitResult: Result.error(Exception('upload failed')),
           );
           final vm = buildViewModel(
             contentSubmissionRepository: submissionRepository,
@@ -3972,7 +4155,7 @@ void main() {
 
           expect(vm.eventTimeIssue, isNull);
           expect(vm.submit.completed, isTrue);
-          expect(submissionRepository.uploadCalled, isTrue);
+          expect(submissionRepository.submitCalled, isTrue);
         },
       );
 

@@ -77,6 +77,15 @@ Deno.test("normalizes omitted and null categories to null", () => {
   }
 });
 
+Deno.test("accepts a forward-compatible client submission identity", () => {
+  const result = parseContentSubmission({
+    ...validSubmission(),
+    client_submission_id: "00000000-0000-4000-8000-000000000001",
+  });
+
+  assert(result.ok);
+});
+
 Deno.test("rejects the non-null representation of an empty Quill document", () => {
   expectInvalid(
     {

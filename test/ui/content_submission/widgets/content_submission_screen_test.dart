@@ -191,7 +191,7 @@ void main() {
         find.widgetWithText(FilledButton, 'Invia'),
       );
 
-      expect(repo.uploadCallCount, 0);
+      expect(repo.submitCallCount, 0);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
       expect(find.byType(ContentSubmissionScreen), findsOneWidget);
       expect(vm.submit.running, isFalse);
@@ -219,12 +219,12 @@ void main() {
         isTrue,
         reason: 'submit.execute() must run before navigation',
       );
-      expect(repo.uploadCallCount, 1);
+      expect(repo.submitCallCount, 1);
       expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
       expect(find.text('Invio in corso...'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-      addTearDown(() => repo.completeUpload(const Result.success(null)));
+      addTearDown(() => repo.completeSubmission(const Result.success(null)));
     });
 
     testWidgets(
@@ -259,7 +259,7 @@ void main() {
 
         expect(find.text('Seleziona una data di inizio.'), findsOneWidget);
         expect(vm.eventTimeIssue, EventTimeIssue.missingStartDate);
-        expect(repo.uploadCallCount, 0);
+        expect(repo.submitCallCount, 0);
         expect(vm.submit.result, isNull);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
       },
@@ -279,8 +279,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(repo.uploadCallCount, 1);
-      repo.completeUpload(const Result.success(null));
+      expect(repo.submitCallCount, 1);
+      repo.completeSubmission(const Result.success(null));
       await tester.pumpAndSettle();
 
       expect(vm.submit.completed, isTrue);
@@ -301,7 +301,7 @@ void main() {
       );
       await tester.pump();
 
-      repo.completeUpload(Result.error(Exception('boom')));
+      repo.completeSubmission(Result.error(Exception('boom')));
       await tester.pumpAndSettle();
 
       expect(vm.submit.error, isTrue);
@@ -343,7 +343,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(released, [token]);
-        expect(repository.uploadCallCount, 0);
+        expect(repository.submitCallCount, 0);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(tester.takeException(), isNull);
       },
@@ -377,7 +377,7 @@ void main() {
 
       expect(acquisitions, 0);
       expect(draftRepository.saveDraftCallCount, 0);
-      expect(repository.uploadCallCount, 0);
+      expect(repository.submitCallCount, 0);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
     });
 
@@ -415,7 +415,7 @@ void main() {
 
       expect(acquisitions, 0);
       expect(draftRepository.saveDraftCallCount, 0);
-      expect(repository.uploadCallCount, 0);
+      expect(repository.submitCallCount, 0);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
     });
 
@@ -450,7 +450,7 @@ void main() {
 
       expect(acquisitions, 0);
       expect(draftRepository.saveDraftCallCount, 0);
-      expect(repository.uploadCallCount, 0);
+      expect(repository.submitCallCount, 0);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
     });
 
@@ -475,7 +475,7 @@ void main() {
       );
 
       expect(draftRepository.saveDraftCallCount, 0);
-      expect(repository.uploadCallCount, 0);
+      expect(repository.submitCallCount, 0);
       expect(viewModel.submit.result, isNull);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
     });
@@ -489,7 +489,9 @@ void main() {
         final draftRepository = FakeContentSubmissionDraftRepository()
           ..pendingSaveDraft = checkpoint;
         final repository = ControllableSubmissionRepository();
-        addTearDown(() => repository.completeUpload(Result.error(Exception())));
+        addTearDown(
+          () => repository.completeSubmission(Result.error(Exception())),
+        );
         final viewModel = buildViewModel(
           submissionRepository: repository,
           draftRepository: draftRepository,
@@ -519,7 +521,7 @@ void main() {
 
         expect(acquisitions, 1);
         expect(draftRepository.saveDraftCallCount, 1);
-        expect(repository.uploadCallCount, 0);
+        expect(repository.submitCallCount, 0);
         expect(
           tester.widget<AbsorbPointer>(formBoundaryAbsorber()).absorbing,
           isTrue,
@@ -539,7 +541,7 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        expect(repository.uploadCallCount, 1);
+        expect(repository.submitCallCount, 1);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         expect(released, [token]);
         expect(absorbedWhenReleased, isTrue);
@@ -581,7 +583,7 @@ void main() {
       await tester.pump();
 
       expect(draftRepository.saveDraftCallCount, 1);
-      expect(repository.uploadCallCount, 0);
+      expect(repository.submitCallCount, 0);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
       expect(released, [token]);
       expect(
@@ -1349,7 +1351,7 @@ void main() {
         await tester.tap(find.widgetWithText(FilledButton, 'Invia'));
         await tester.pump();
 
-        repo.completeUpload(const Result.success(null));
+        repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
 
@@ -1447,7 +1449,7 @@ void main() {
         );
         await tester.pump();
 
-        repo.completeUpload(const Result.success(null));
+        repo.completeSubmission(const Result.success(null));
         while (draftRepo.clearDraftCallCount == 0) {
           await tester.pump();
         }
@@ -1496,7 +1498,7 @@ void main() {
       );
       await tester.pump();
 
-      repo.completeUpload(Result.error(Exception('boom')));
+      repo.completeSubmission(Result.error(Exception('boom')));
       await tester.pumpAndSettle();
       expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
 

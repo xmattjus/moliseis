@@ -168,10 +168,10 @@ void main() {
       expect(find.text('Riprova'), findsNothing);
       expect(find.byType(BackButton), findsNothing);
       expect(vm.submit.running, isTrue);
-      expect(repo.uploadCallCount, 1);
+      expect(repo.submitCallCount, 1);
       expect(draftRepository.clearDraftCallCount, 0);
 
-      addTearDown(() => repo.completeUpload(const Result.success(null)));
+      addTearDown(() => repo.completeSubmission(const Result.success(null)));
     });
 
     testWidgets('completed: shows success text and Nuovo suggerimento', (
@@ -185,7 +185,7 @@ void main() {
       unawaited(vm.submit.execute());
       await tester.pump();
 
-      repo.completeUpload(const Result.success(null));
+      repo.completeSubmission(const Result.success(null));
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Symbols.check_circle), findsOneWidget);
@@ -212,7 +212,7 @@ void main() {
       await tester.pumpWidget(buildProgressFirstApp(vm));
       unawaited(vm.submit.execute());
       await tester.pump();
-      repository.completeUpload(const Result.success(null));
+      repository.completeSubmission(const Result.success(null));
       await tester.pump();
       await tester.pump();
 
@@ -241,7 +241,7 @@ void main() {
       unawaited(vm.submit.execute());
       await tester.pump();
 
-      repo.completeUpload(Result.error(Exception('upload failed')));
+      repo.completeSubmission(Result.error(Exception('upload failed')));
       await tester.pumpAndSettle();
 
       expect(
@@ -299,7 +299,7 @@ void main() {
         expect(find.byType(BackButton), findsNothing);
         expect(find.text('Torna alla home'), findsNothing);
         expect(find.text('Nuovo suggerimento'), findsNothing);
-        expect(repository.uploadCallCount, 1);
+        expect(repository.submitCallCount, 1);
         expect(repository.uploadedImages, hasLength(1));
         expect(draftRepository.clearDraftCallCount, 1);
         expect(await tester.binding.handlePopRoute(), isTrue);
@@ -319,7 +319,7 @@ void main() {
         await tester.tap(find.text('Riprova'));
         await tester.pumpAndSettle();
 
-        expect(repository.uploadCallCount, 1);
+        expect(repository.submitCallCount, 1);
         expect(repository.uploadedImages, hasLength(1));
         expect(draftRepository.clearDraftCallCount, 2);
         expect(viewModel.submissionFinalizationPending, isTrue);
@@ -331,7 +331,7 @@ void main() {
         await tester.tap(find.text('Riprova'));
         await tester.pumpAndSettle();
 
-        expect(repository.uploadCallCount, 1);
+        expect(repository.submitCallCount, 1);
         expect(repository.uploadedImages, hasLength(1));
         expect(draftRepository.clearDraftCallCount, 3);
         expect(viewModel.submit.completed, isTrue);
@@ -390,7 +390,7 @@ void main() {
         );
         unawaited(vm.submit.execute());
         await tester.pump();
-        repo.completeUpload(const Result.success(null));
+        repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
         final finalizedIdentity = vm.state.clientSubmissionId;
@@ -455,7 +455,7 @@ void main() {
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());
         await tester.pump();
-        repo.completeUpload(Result.error(Exception('boom')));
+        repo.completeSubmission(Result.error(Exception('boom')));
         await tester.pumpAndSettle();
 
         await tester.tap(find.byType(BackButton));
@@ -493,7 +493,7 @@ void main() {
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());
         await tester.pump();
-        repo.completeUpload(const Result.success(null));
+        repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
         final finalizedIdentity = vm.state.clientSubmissionId;
@@ -537,7 +537,7 @@ void main() {
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());
         await tester.pump();
-        repo.completeUpload(const Result.success(null));
+        repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
         final finalizedIdentity = vm.state.clientSubmissionId;
@@ -579,7 +579,7 @@ void main() {
       await pushProgress(tester, router);
       unawaited(vm.submit.execute());
       await tester.pump();
-      repo.completeUpload(Result.error(Exception('boom')));
+      repo.completeSubmission(Result.error(Exception('boom')));
       await tester.pumpAndSettle();
 
       final handled = await tester.binding.handlePopRoute();
@@ -613,7 +613,7 @@ void main() {
 
         expect(draftRepo.clearDraftCalled, isFalse);
         expect(stagedRepo.clearedSessions, isEmpty);
-        expect(repo.uploadCallCount, 0);
+        expect(repo.submitCallCount, 0);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
@@ -638,7 +638,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(draftRepo.clearDraftCalled, isFalse);
-        expect(repo.uploadCallCount, 0);
+        expect(repo.submitCallCount, 0);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
@@ -666,7 +666,7 @@ void main() {
 
         expect(handled, isTrue);
         expect(draftRepo.clearDraftCalled, isFalse);
-        expect(repo.uploadCallCount, 0);
+        expect(repo.submitCallCount, 0);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
@@ -694,7 +694,7 @@ void main() {
       expect(find.byType(_FormMarker), findsNothing);
       expect(vm.submit.running, isTrue);
 
-      addTearDown(() => repo.completeUpload(const Result.success(null)));
+      addTearDown(() => repo.completeSubmission(const Result.success(null)));
     });
 
     testWidgets(
@@ -719,7 +719,7 @@ void main() {
           await commitPredictiveBack(tester);
 
           expect(draftRepo.clearDraftCalled, isFalse);
-          expect(repo.uploadCallCount, 0);
+          expect(repo.submitCallCount, 0);
           expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
           expect(find.byType(_FormMarker), findsOneWidget);
           expect(find.byType(_HomeMarker), findsNothing);
@@ -754,7 +754,9 @@ void main() {
           expect(find.byType(_FormMarker), findsNothing);
           expect(vm.submit.running, isTrue);
 
-          addTearDown(() => repo.completeUpload(const Result.success(null)));
+          addTearDown(
+            () => repo.completeSubmission(const Result.success(null)),
+          );
         } finally {
           debugDefaultTargetPlatformOverride = null;
         }
@@ -774,9 +776,9 @@ void main() {
       await tester.pumpWidget(buildProgressFirstApp(vm));
       unawaited(vm.submit.execute());
       await tester.pump();
-      repo.completeUpload(Result.error(Exception('first')));
+      repo.completeSubmission(Result.error(Exception('first')));
       await tester.pumpAndSettle();
-      expect(repo.uploadCallCount, 1);
+      expect(repo.submitCallCount, 1);
       final failedIdentity = vm.state.clientSubmissionId;
       final failedState = vm.state;
 
@@ -789,11 +791,11 @@ void main() {
 
       expect(draftRepo.clearDraftCalled, isFalse);
       expect(vm.submit.running, isTrue);
-      expect(repo.uploadCallCount, 2);
+      expect(repo.submitCallCount, 2);
       expect(vm.state, failedState);
       expect(vm.state.clientSubmissionId, failedIdentity);
 
-      addTearDown(() => repo.completeUpload(const Result.success(null)));
+      addTearDown(() => repo.completeSubmission(const Result.success(null)));
     });
 
     testWidgets('Torna alla home navigates without another finalization', (
@@ -812,7 +814,7 @@ void main() {
       await tester.pumpWidget(buildProgressFirstApp(vm));
       unawaited(vm.submit.execute());
       await tester.pump();
-      repo.completeUpload(const Result.success(null));
+      repo.completeSubmission(const Result.success(null));
       await tester.pumpAndSettle();
 
       final finalizedIdentity = vm.state.clientSubmissionId;
@@ -845,7 +847,7 @@ void main() {
         await tester.pumpWidget(buildProgressFirstApp(vm));
         unawaited(vm.submit.execute());
         await tester.pump();
-        repo.completeUpload(const Result.success(null));
+        repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
         final finalizedIdentity = vm.state.clientSubmissionId;
@@ -879,7 +881,7 @@ void main() {
         await pushProgress(tester, router);
         unawaited(vm.submit.execute());
         await tester.pump();
-        repo.completeUpload(const Result.success(null));
+        repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
         final firstFinalizedIdentity = vm.state.clientSubmissionId;
@@ -903,9 +905,9 @@ void main() {
         await tester.pump();
 
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
-        expect(repo.uploadCallCount, 2);
+        expect(repo.submitCallCount, 2);
 
-        repo.completeUpload(const Result.success(null));
+        repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
         final secondFinalizedIdentity = vm.state.clientSubmissionId;

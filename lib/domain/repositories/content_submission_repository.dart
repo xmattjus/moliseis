@@ -6,10 +6,11 @@ import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/result.dart';
 
 abstract interface class ContentSubmissionRepository {
-  Future<Result<void>> upload(
-    ContentSubmission contentSubmission,
-    List<SubmissionAsset> submissionAssets,
-  );
+  Future<Result<void>> submit({
+    required String clientSubmissionId,
+    required ContentSubmission contentSubmission,
+    required List<SubmissionAsset> submissionAssets,
+  });
 
   ImageUploadTask uploadImageTask(File image);
 

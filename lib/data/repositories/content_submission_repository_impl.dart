@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:moliseis/data/mappers/mappers.dart';
+import 'package:moliseis/data/repositories/content_submission_api_exception.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
 import 'package:moliseis/domain/models/image_upload_task.dart';
@@ -15,22 +16,23 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
   ContentSubmissionRepositoryImpl({
     required Logger logger,
-    required Supabase supabase,
+    required SupabaseClient supabaseClient,
     required CloudinaryUploadClient cloudinaryUploadClient,
   }) : _logger = logger,
-       _supabase = supabase,
+       _supabaseClient = supabaseClient,
        _cloudinaryUploadClient = cloudinaryUploadClient;
 
   final Logger _logger;
 
-  final Supabase _supabase;
+  final SupabaseClient _supabaseClient;
   final CloudinaryUploadClient _cloudinaryUploadClient;
 
   @override
-  Future<Result<void>> upload(
-    ContentSubmission contentSubmission,
-    List<SubmissionAsset> submissionAssets,
-  ) async {
+  Future<Result<void>> submit({
+    required String clientSubmissionId,
+    required ContentSubmission contentSubmission,
+    required List<SubmissionAsset> submissionAssets,
+  }) async {
     final transaction = Sentry.startTransaction(
       'content-submission',
       'upload',
@@ -42,35 +44,32 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
     _logger.log(const ContentSubmissionUploadStarted());
 
     try {
-      final userId = _supabase.client.auth.currentUser?.id;
-
-      if (userId == null) {
-        final exception = Exception(const UserIdFetchFailed());
-        _logger.log(
-          const ContentSubmissionUploadFailed(),
-          error: exception,
-        );
-        spanStatus = const SpanStatus.internalError();
-        return Result.error(exception);
-      }
-
-      final submission = contentSubmission.toDto(userId: userId).toMap();
-
-      final assets = submissionAssets
-          .map((asset) => asset.toDto().toMap())
-          .toList();
-
-      final payload = {
-        ...submission,
-        'assets': assets,
-      };
-
-      await _supabase.client.functions.invoke(
+      final response = await _supabaseClient.functions.invoke(
         'submit-content',
-        body: payload,
+        body: contentSubmissionToWireMap(
+          clientSubmissionId: clientSubmissionId,
+          contentSubmission: contentSubmission,
+          submissionAssets: submissionAssets,
+        ),
       );
+      final data = response.data;
+      if (data is! Map || data['submission_id'] is! int) {
+        throw const FormatException('submit-content response is invalid.');
+      }
+      if ((data['submission_id'] as int) <= 0) {
+        throw const FormatException('submit-content response is invalid.');
+      }
       spanStatus = const SpanStatus.ok();
       return const Result.success(null);
+    } on FunctionException catch (exception, stackTrace) {
+      final normalized = _normalizeFunctionException(exception);
+      _logger.log(
+        const ContentSubmissionUploadFailed(),
+        error: normalized,
+        stackTrace: stackTrace,
+      );
+      spanStatus = const SpanStatus.internalError();
+      return Result.error(normalized);
     } on Exception catch (exception, stackTrace) {
       _logger.log(
         const ContentSubmissionUploadFailed(),
@@ -82,6 +81,33 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
     } finally {
       unawaited(transaction.finish(status: spanStatus));
     }
+  }
+
+  ContentSubmissionApiException _normalizeFunctionException(
+    FunctionException exception,
+  ) {
+    final details = exception.details;
+    final mapDetails = details is Map ? details : null;
+    final code = _nonEmptyString(mapDetails?['code']);
+    final message =
+        _nonEmptyString(mapDetails?['message']) ??
+        (details is String ? _nonEmptyString(details) : null) ??
+        _nonEmptyString(exception.reasonPhrase) ??
+        'Content Submission request failed.';
+
+    return ContentSubmissionApiException(
+      statusCode: exception.status,
+      code: code,
+      message: message,
+    );
+  }
+
+  String? _nonEmptyString(Object? value) {
+    if (value is String) {
+      final trimmed = value.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+    return null;
   }
 
   @override

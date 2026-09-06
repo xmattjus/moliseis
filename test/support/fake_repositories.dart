@@ -740,10 +740,11 @@ final class FakeSettingsRepository implements SettingsRepository {
 final class FakeContentSubmissionRepository
     implements ContentSubmissionRepository {
   FakeContentSubmissionRepository({
-    this.uploadResult = const Result.success(null),
+    Result<void>? submitResult,
     ImageUploadTask? uploadImageTaskResult,
     List<ImageUploadTask>? uploadImageTaskResults,
-  }) : uploadImageTaskResult =
+  }) : submitResult = submitResult ?? const Result.success(null),
+       uploadImageTaskResult =
            uploadImageTaskResult ??
            FakeImageUploadTask.completed(
              const Result.success(
@@ -756,26 +757,30 @@ final class FakeContentSubmissionRepository
            ),
        uploadImageTaskResults = uploadImageTaskResults ?? <ImageUploadTask>[];
 
-  Result<void> uploadResult;
+  Result<void> submitResult;
   ImageUploadTask uploadImageTaskResult;
   final List<ImageUploadTask> uploadImageTaskResults;
 
-  bool uploadCalled = false;
-  int uploadCallCount = 0;
+  bool submitCalled = false;
+  int submitCallCount = 0;
   final uploadedImages = <File>[];
 
-  /// Content submission received by the latest [upload] call.
-  ContentSubmission? lastUploadedSubmission;
+  final submittedClientSubmissionIds = <String>[];
+  final submittedContentSubmissions = <ContentSubmission>[];
+  final submittedSubmissionAssets = <List<SubmissionAsset>>[];
 
   @override
-  Future<Result<void>> upload(
-    ContentSubmission contentSubmission,
-    List<SubmissionAsset> submissionAssets,
-  ) async {
-    uploadCalled = true;
-    uploadCallCount++;
-    lastUploadedSubmission = contentSubmission;
-    return uploadResult;
+  Future<Result<void>> submit({
+    required String clientSubmissionId,
+    required ContentSubmission contentSubmission,
+    required List<SubmissionAsset> submissionAssets,
+  }) async {
+    submitCalled = true;
+    submitCallCount++;
+    submittedClientSubmissionIds.add(clientSubmissionId);
+    submittedContentSubmissions.add(contentSubmission);
+    submittedSubmissionAssets.add(List.unmodifiable(submissionAssets));
+    return submitResult;
   }
 
   @override
@@ -826,7 +831,7 @@ final class FakeImageUploadTask implements ImageUploadTask {
 // ControllableSubmissionRepository
 // ---------------------------------------------------------------------------
 
-/// A [ContentSubmissionRepository] fake whose [upload] result is gated by a
+/// A [ContentSubmissionRepository] fake whose [submit] result is gated by a
 /// fresh [Completer] per call. Used by widget tests that need to hold the
 /// submit [Command] in the running state until the test resolves it to
 /// success or error.
@@ -853,21 +858,28 @@ final class ControllableSubmissionRepository
   final String uploadImageTaskThrowMessage;
 
   Completer<Result<void>>? _pending;
-  int uploadCallCount = 0;
+  int submitCallCount = 0;
+  final submittedClientSubmissionIds = <String>[];
+  final submittedContentSubmissions = <ContentSubmission>[];
+  final submittedSubmissionAssets = <List<SubmissionAsset>>[];
 
   @override
-  Future<Result<void>> upload(
-    ContentSubmission contentSubmission,
-    List<SubmissionAsset> submissionAssets,
-  ) async {
-    uploadCallCount++;
+  Future<Result<void>> submit({
+    required String clientSubmissionId,
+    required ContentSubmission contentSubmission,
+    required List<SubmissionAsset> submissionAssets,
+  }) async {
+    submitCallCount++;
+    submittedClientSubmissionIds.add(clientSubmissionId);
+    submittedContentSubmissions.add(contentSubmission);
+    submittedSubmissionAssets.add(List.unmodifiable(submissionAssets));
     _pending = Completer<Result<void>>();
     return _pending!.future;
   }
 
-  /// Resolves the in-flight [upload] call (if any) with [result]. Safe to
-  /// call when no upload is pending: it is a no-op in that case.
-  void completeUpload(Result<void> result) {
+  /// Resolves the in-flight [submit] call (if any) with [result]. Safe to
+  /// call when no submission is pending: it is a no-op in that case.
+  void completeSubmission(Result<void> result) {
     final pending = _pending;
     _pending = null;
     pending?.complete(result);

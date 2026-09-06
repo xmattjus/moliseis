@@ -175,7 +175,7 @@ List<SingleChildWidget> providers(
 
       return ContentSubmissionRepositoryImpl(
             logger: context.read(),
-            supabase: supabase,
+            supabaseClient: supabase.client,
             cloudinaryUploadClient: cloudinaryUploadClient,
           )
           as ContentSubmissionRepository;

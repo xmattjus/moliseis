@@ -25,6 +25,11 @@ import 'package:moliseis/utils/string_validator.dart';
 /// deduplication.
 typedef Asset = ({XFile file, String digest});
 
+typedef _SubmissionAttempt = ({
+  ContentSubmissionDraft draft,
+  List<Asset> assets,
+});
+
 /// Outcome of an `addAsset` selection session.
 ///
 /// [rejectedNames] lists file names that were skipped because they exceeded
@@ -558,6 +563,12 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _checkpointDraftInsideBoundary() async {
+    return _checkpointDraftSnapshotInsideBoundary(_state);
+  }
+
+  Future<Result<void>> _checkpointDraftSnapshotInsideBoundary(
+    ContentSubmissionDraft snapshot,
+  ) async {
     if (_persistedDraftState == _PersistedDraftState.unknown) {
       return Result.error(
         _draftLoadError ??
@@ -566,7 +577,6 @@ class ContentSubmissionViewModel extends ChangeNotifier {
             ),
       );
     }
-    final snapshot = _state;
     if (_persistedDraftState == _PersistedDraftState.restored &&
         snapshot == _checkpointedDraft) {
       return const Result.success(null);
@@ -734,104 +744,99 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     await initialize();
     if (_disposed) return const Result.success(null);
     if (_submissionFinalizationPending) return _finalizeSubmittedSession();
-    if (!_stagedStateAvailable) {
-      return Result.error(
-        Exception('Cannot submit: staged assets unavailable.'),
-      );
+    final prepared = await _prepareSubmissionAttempt();
+    if (prepared case Error<_SubmissionAttempt>(:final error)) {
+      return Result.error(error);
     }
-    if (_assets.length > maximumAssetCount) {
-      return Result.error(Exception('Cannot submit: too many assets.'));
-    }
-    if (!validateEventTimeForSubmission()) {
-      return Result.error(Exception('Cannot submit: invalid event time.'));
-    }
-    final city = _state.city;
-    final name = _state.name;
-    final userEmail = _state.userEmail;
-    final userName = _state.userName;
-    final missing = <String>[
-      if (city == null) 'city',
-      if (name == null) 'name',
-      if (userEmail == null) 'userEmail',
-      if (userName == null) 'userName',
-    ];
+    final attempt = (prepared as Success<_SubmissionAttempt>).value;
+    final draft = attempt.draft;
+    final city = draft.city!;
+    final name = draft.name!;
+    final userEmail = draft.userEmail!;
+    final userName = draft.userName!;
+    final submissionAssets = <SubmissionAsset>[];
 
-    if (missing.isNotEmpty) {
-      return Result.error(
-        Exception(
-          'Cannot submit: required field${missing.length == 1 ? '' : 's'} '
-          '${missing.join(', ')} '
-          '${missing.length == 1 ? 'is' : 'are'} missing.',
-        ),
-      );
+    for (final entry in attempt.assets) {
+      final result = await _contentSubmissionRepository
+          .uploadImageTask(File(entry.file.path))
+          .result;
+
+      switch (result) {
+        case Success<SubmissionAsset>():
+          submissionAssets.add(result.value);
+        case Error<SubmissionAsset>():
+          return Result.error(result.error);
+      }
     }
 
-    // Dart 3 pattern: a record of null-check (`?`) subpatterns matches only
-    // when every field is non-null and promotes each binding to its
-    // non-nullable type — no `!` needed below. The guard is guaranteed to
-    // succeed because the `missing` check above returned early when any of
-    // these was null.
-    if ((city, name, userEmail, userName) case (
-      final c?,
-      final n?,
-      final ue?,
-      final un?,
-    )) {
-      final submissionAssets = <SubmissionAsset>[];
+    final contentSubmission = ContentSubmission(
+      category: draft.category,
+      city: city,
+      name: name,
+      description: draft.description,
+      descriptionDelta: draft.descriptionDelta,
+      startDate: draft.eventDates.startInstantUtc,
+      endDate: draft.eventDates.endInstantUtc,
+      userEmail: userEmail,
+      userName: userName,
+    );
 
-      // TODO(xmattjus): On partial failure within this loop, assets
-      //  uploaded before the failing one remain in Cloudinary with no
-      //  rollback or cancellation of completed uploads. The SHA-256
-      //  duplicate-skip path in `CloudinaryUploadClientImpl.uploadImageTask`
-      //  makes retries idempotent at the asset level (already-uploaded media
-      //  is not re-transferred), but it does not delete the orphaned assets
-      //  themselves. Fix this by either:
-      //  - tracking completed uploads and cancelling/deleting them on
-      //  failure,
-      //  - or uploading all assets in parallel with `Future.wait` and
-      //  cancelling remaining tasks on the first failure (each
-      //  `ImageUploadTask` already exposes a `cancel()` token).
-      for (final entry in _assets) {
-        final result = await _contentSubmissionRepository
-            .uploadImageTask(File(entry.file.path))
-            .result;
+    final result = await _contentSubmissionRepository.submit(
+      clientSubmissionId: draft.clientSubmissionId,
+      contentSubmission: contentSubmission,
+      submissionAssets: submissionAssets,
+    );
 
-        switch (result) {
-          case Success<SubmissionAsset>():
-            submissionAssets.add(result.value);
-          case Error<SubmissionAsset>():
-            return Result.error(result.error);
-        }
+    if (result is Error<void>) return result;
+
+    _submissionFinalizationPending = true;
+    return _finalizeSubmittedSession();
+  }
+
+  Future<Result<_SubmissionAttempt>> _prepareSubmissionAttempt() {
+    return _serialize(() async {
+      if (!_stagedStateAvailable) {
+        return Result.error(
+          Exception('Cannot submit: staged assets unavailable.'),
+        );
+      }
+      if (_assets.length > maximumAssetCount) {
+        return Result.error(Exception('Cannot submit: too many assets.'));
       }
 
-      final contentSubmission = ContentSubmission(
-        category: _state.category,
-        city: c,
-        name: n,
-        description: _state.description,
-        descriptionDelta: _state.descriptionDelta,
-        startDate: _state.eventDates.startInstantUtc,
-        endDate: _state.eventDates.endInstantUtc,
-        userEmail: ue,
-        userName: un,
-      );
+      final draft = _state;
+      final issue =
+          _eventTimeIssue ??
+          _eventTimePolicy.validateForPersistence(draft.eventDates);
+      if (issue != null) {
+        if (_eventTimeIssue != issue) {
+          _eventTimeIssue = issue;
+          if (!_disposed) notifyListeners();
+        }
+        return Result.error(Exception('Cannot submit: invalid event time.'));
+      }
 
-      final result = await _contentSubmissionRepository.upload(
-        contentSubmission,
-        submissionAssets,
-      );
+      final missing = <String>[
+        if (draft.city == null) 'city',
+        if (draft.name == null) 'name',
+        if (draft.userEmail == null) 'userEmail',
+        if (draft.userName == null) 'userName',
+      ];
+      if (missing.isNotEmpty) {
+        return Result.error(
+          Exception(
+            'Cannot submit: required field${missing.length == 1 ? '' : 's'} '
+            '${missing.join(', ')} '
+            '${missing.length == 1 ? 'is' : 'are'} missing.',
+          ),
+        );
+      }
 
-      if (result is Error<void>) return result;
-
-      _submissionFinalizationPending = true;
-      return _finalizeSubmittedSession();
-    }
-
-    // Unreachable: the `missing` guard above guarantees every required field
-    // is non-null, so the if-case branch above always returns.
-    return Result.error(
-      Exception('Cannot submit: unknown validation failure.'),
-    );
+      final assets = List<Asset>.unmodifiable(_assets);
+      final checkpoint = await _checkpointDraftSnapshotInsideBoundary(draft);
+      if (checkpoint case Error<void>(:final error)) return Result.error(error);
+      return Result.success((draft: draft, assets: assets));
+    });
   }
 
   Future<Result<void>> _finalizeSubmittedSession() async {

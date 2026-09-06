@@ -639,7 +639,9 @@ void main() {
         final draftRepository = FakeContentSubmissionDraftRepository()
           ..pendingSaveDraft = checkpoint;
         final repository = ControllableSubmissionRepository();
-        addTearDown(() => repository.completeUpload(Result.error(Exception())));
+        addTearDown(
+          () => repository.completeSubmission(Result.error(Exception())),
+        );
         final harness = createHarness(
           draftRepository: draftRepository,
           submissionRepository: repository,
@@ -653,7 +655,7 @@ void main() {
         );
 
         expect(draftRepository.saveDraftCallCount, 1);
-        expect(repository.uploadCallCount, 0);
+        expect(repository.submitCallCount, 0);
         final systemBack = tester.binding.handlePopRoute();
         await tester.pump();
         await systemBack;
@@ -674,9 +676,11 @@ void main() {
         await tester.pump();
         await tester.pump();
 
-        expect(repository.uploadCallCount, 1);
+        expect(repository.submitCallCount, 1);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
-        repository.completeUpload(Result.error(Exception('remote failure')));
+        repository.completeSubmission(
+          Result.error(Exception('remote failure')),
+        );
         await tester.pump();
         await tester.pump();
         expect(await tester.binding.handlePopRoute(), isTrue);
@@ -818,7 +822,7 @@ void main() {
         await tester.pump();
 
         expect(draftRepository.saveDraftCallCount, 0);
-        expect(repository.uploadCallCount, 0);
+        expect(repository.submitCallCount, 0);
         expect(harness.externalUrlService.launchedUrls, isEmpty);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
 
@@ -831,7 +835,7 @@ void main() {
         await tester.pump();
 
         expect(draftRepository.saveDraftCallCount, 1);
-        expect(repository.uploadCallCount, 0);
+        expect(repository.submitCallCount, 0);
         expect(harness.externalUrlService.launchedUrls, isEmpty);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
 
@@ -843,7 +847,7 @@ void main() {
           harness.router.routeInformationProvider.value.uri.path,
           RoutePaths.gallery,
         );
-        expect(repository.uploadCallCount, 0);
+        expect(repository.submitCallCount, 0);
         expect(harness.externalUrlService.launchedUrls, isEmpty);
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(tester.takeException(), isNull);
@@ -891,7 +895,9 @@ void main() {
         saveDraftResult: Result.error(Exception('exit checkpoint failed')),
       );
       final repository = ControllableSubmissionRepository();
-      addTearDown(() => repository.completeUpload(Result.error(Exception())));
+      addTearDown(
+        () => repository.completeSubmission(Result.error(Exception())),
+      );
       final harness = createHarness(
         draftRepository: draftRepository,
         submissionRepository: repository,
@@ -915,7 +921,7 @@ void main() {
       await tester.pump();
 
       expect(draftRepository.saveDraftCallCount, 2);
-      expect(repository.uploadCallCount, 1);
+      expect(repository.submitCallCount, 1);
       expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -941,7 +947,9 @@ void main() {
         await tester.pump();
         await tester.pump();
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
-        repository.completeUpload(Result.error(Exception('remote failure')));
+        repository.completeSubmission(
+          Result.error(Exception('remote failure')),
+        );
         await tester.pump();
         await tester.pump();
 
@@ -953,7 +961,7 @@ void main() {
 
         expect(find.text('Salva ed esci'), findsOneWidget);
         expect(draftRepository.clearDraftCallCount, 0);
-        expect(repository.uploadCallCount, 1);
+        expect(repository.submitCallCount, 1);
 
         await tester.tap(find.text('Esci senza salvare'));
         await tester.pumpAndSettle();
