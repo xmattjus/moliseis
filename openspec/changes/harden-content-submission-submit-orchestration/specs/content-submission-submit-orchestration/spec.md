@@ -89,7 +89,7 @@ Every remote operation for a submission attempt SHALL use only its captured draf
 
 #### Scenario: Draft changes while checkpoint is pending
 - **WHEN** draft A is captured and its save remains pending, live draft B replaces it, persistence of A succeeds, and the later remote attempt fails
-- **THEN** remote work uses A and A's client identity while B remains current and dirty relative to durable baseline A
+- **THEN** remote work uses A and A's client identity while B remains current and dirty relative to durable baseline A and the failed attempt relinquishes ownership of that logical session
 
 #### Scenario: Draft changes during Cloudinary upload
 - **WHEN** an asset upload for a prepared attempt remains pending and the live form is edited
@@ -107,20 +107,60 @@ Every remote operation for a submission attempt SHALL use only its captured draf
 - **WHEN** every asset upload succeeds but final submission returns an error
 - **THEN** local finalization does not begin, staged sources and live session remain available, and a later attempt uses the same client identity
 
+### Requirement: Submission attempt owns its session
+Once an exact captured session has been durably checkpointed and authorized for remote work, that submission attempt SHALL exclusively own the logical session until either an unconfirmed remote outcome releases ownership or valid acknowledgement is followed by successful local retirement. While ownership exists, an external explicit clear or discard SHALL fail before clearing persisted draft state, deleting staged-session state, rotating identity, or creating a replacement session; the same rule SHALL apply when the clear request was already waiting behind successful attempt preparation. Every returned failure, malformed acknowledgement, transport failure, or unexpected exception before valid acknowledgement SHALL release ownership while preserving the same logical session for edit, retry, or later explicit discard. Valid acknowledgement SHALL retain ownership through local finalization. Later mutations carrying the owned identity SHALL remain part of that same logical session: they SHALL survive and remain dirty if remote work fails, but SHALL be intentionally retired without cloning or transfer when the captured attempt succeeds.
+
+#### Scenario: Clear is rejected during asset upload
+- **WHEN** an external clear or discard is requested while an owned submission attempt is waiting for an asset-upload outcome
+- **THEN** the request reports failure before draft clear, staged-session cleanup, identity rotation, or replacement-session creation and the owned identity remains current
+
+#### Scenario: Clear is rejected during final request
+- **WHEN** an external clear or discard is requested while an owned submission attempt is waiting for final backend acknowledgement
+- **THEN** the request reports failure before draft clear, staged-session cleanup, identity rotation, or replacement-session creation and the owned identity remains current
+
+#### Scenario: Queued clear cannot overtake claimed ownership
+- **WHEN** a clear request waits behind preparation and that preparation successfully checkpoints and claims the session before releasing local arbitration
+- **THEN** the clear request fails without retiring or rotating the session and remote work proceeds for the captured attempt
+
+#### Scenario: Unconfirmed failure releases ownership
+- **WHEN** an owned attempt receives an asset-upload error, final-submission error, transport failure, malformed acknowledgement, or other failure before valid acknowledgement
+- **THEN** ownership is released, the same logical session and identity remain available, and a later explicit clear or discard is allowed through the normal persistence-first policy
+
+#### Scenario: Unexpected pre-acknowledgement failure cannot strand ownership
+- **WHEN** an unexpected exception interrupts an owned attempt before valid acknowledgement
+- **THEN** submission reports an error and relinquishes ownership so the unchanged logical session is not permanently blocked from retry or explicit discard
+
+#### Scenario: Late same-session mutation survives failure
+- **WHEN** captured draft A owns the attempt, live draft B is created with the same client identity, and the attempt fails before valid acknowledgement
+- **THEN** B remains current and dirty relative to checkpoint A, ownership is released, and no replacement identity is synthesized
+
+#### Scenario: Late same-session mutation retires after success
+- **WHEN** captured draft A owns the attempt, live draft B is created with the same client identity, and A receives valid acknowledgement followed by successful local retirement
+- **THEN** A is the submitted payload, B is intentionally retired with that completed logical session, and one fresh empty session with a different identity is created without cloning B or transferring it to another session
+
 ### Requirement: Finalization-only retry after success
-After valid final acknowledgement, the system SHALL record confirmed remote success before attempting the existing persistence-first local retirement. A failed local retirement SHALL keep the completed session's identity current and its finalization recoverable. Every later retry for that confirmed submission SHALL perform only local finalization: it SHALL perform no new attempt preparation, draft checkpoint, asset upload, or final backend request. One successful finalization SHALL retire the old session and create exactly one different valid fresh client identity.
+After valid final acknowledgement, the system SHALL record confirmed remote success and retain ownership of the acknowledged client identity before attempting persistence-first local retirement. Successful finalization SHALL verify that both the submission owner and the current logical session still match that acknowledged identity before any destructive work; an identity mismatch SHALL fail closed without draft clear, staged cleanup, replacement-session mutation, or additional identity rotation. A failed local retirement SHALL keep the completed session's identity owned and current and its finalization recoverable, and external clear or discard SHALL remain forbidden. Every later retry for that confirmed submission SHALL target only the same acknowledged session and perform only local finalization: it SHALL perform no new attempt preparation, draft checkpoint, asset upload, or final backend request. One successful finalization SHALL retire that matching session exactly once, create exactly one different valid fresh client identity, clear pending finalization, and release ownership.
 
 #### Scenario: Local finalization failure does not resend
 - **WHEN** final submission succeeds and one or more local clear attempts fail
-- **THEN** exactly one final backend request has been sent, finalization remains recoverable, and the old client identity remains current
+- **THEN** exactly one final backend request has been sent, finalization remains recoverable, the acknowledged identity remains owned and current, and external clear or discard remains blocked
 
 #### Scenario: Finalization-only retry rotates once
 - **WHEN** a later finalization-only retry succeeds
-- **THEN** no remote work is repeated, the old persisted/staged session is retired through the existing clear policy, and exactly one fresh identity becomes current
+- **THEN** no remote work is repeated, only the matching acknowledged persisted/staged session is retired through the existing policy, exactly one fresh identity becomes current, and submission ownership is released
 
 #### Scenario: Final request failure does not enter finalization
 - **WHEN** final submission returns an error or malformed acknowledgement
-- **THEN** successful local session retirement does not start and the same logical session remains retryable
+- **THEN** successful local session retirement does not start, submission ownership is released, and the same logical session remains retryable or explicitly discardable
+
+#### Scenario: Identity mismatch fails closed
+- **GIVEN** valid acknowledgement belongs to client identity A
+- **WHEN** successful finalization observes that either the submission owner or current logical session no longer represents A
+- **THEN** finalization reports failure before draft clear or staged cleanup, leaves the different current session untouched, performs no identity rotation, and does not mark acknowledged-session finalization complete
+
+#### Scenario: Concurrent clear cannot cause a second rotation
+- **WHEN** external clear is rejected while attempt A owns the session and A later completes remote acknowledgement and local finalization successfully
+- **THEN** the acknowledged A session is retired once and exactly one fresh identity is created without an intermediate or second rotation
 
 ### Requirement: Client identity is not idempotency
 The deployed `submit-content` boundary SHALL continue to accept an otherwise valid request carrying a UUID-v4-compatible `client_submission_id`. This change SHALL NOT require the backend to persist or act on that field, and sending it SHALL NOT be represented as server-side deduplication, definitive acknowledgement recovery, or idempotency.

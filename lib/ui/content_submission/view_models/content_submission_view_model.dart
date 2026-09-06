@@ -136,6 +136,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   Exception? _stagedReconciliationError;
   String? _recoveryEligibleClientSubmissionId;
   bool _submissionFinalizationPending = false;
+  String? _activeSubmissionClientSubmissionId;
   ContentSubmissionDraftLoadState _loadState =
       ContentSubmissionDraftLoadState.loading;
   final EventTimePolicy _eventTimePolicy = EventTimePolicy();
@@ -750,47 +751,55 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     }
     final attempt = (prepared as Success<_SubmissionAttempt>).value;
     final draft = attempt.draft;
-    final city = draft.city!;
-    final name = draft.name!;
-    final userEmail = draft.userEmail!;
-    final userName = draft.userName!;
-    final submissionAssets = <SubmissionAsset>[];
+    var acknowledged = false;
+    try {
+      final city = draft.city!;
+      final name = draft.name!;
+      final userEmail = draft.userEmail!;
+      final userName = draft.userName!;
+      final submissionAssets = <SubmissionAsset>[];
 
-    for (final entry in attempt.assets) {
-      final result = await _contentSubmissionRepository
-          .uploadImageTask(File(entry.file.path))
-          .result;
+      for (final entry in attempt.assets) {
+        final result = await _contentSubmissionRepository
+            .uploadImageTask(File(entry.file.path))
+            .result;
 
-      switch (result) {
-        case Success<SubmissionAsset>():
-          submissionAssets.add(result.value);
-        case Error<SubmissionAsset>():
-          return Result.error(result.error);
+        switch (result) {
+          case Success<SubmissionAsset>():
+            submissionAssets.add(result.value);
+          case Error<SubmissionAsset>():
+            return Result.error(result.error);
+        }
+      }
+
+      final contentSubmission = ContentSubmission(
+        category: draft.category,
+        city: city,
+        name: name,
+        description: draft.description,
+        descriptionDelta: draft.descriptionDelta,
+        startDate: draft.eventDates.startInstantUtc,
+        endDate: draft.eventDates.endInstantUtc,
+        userEmail: userEmail,
+        userName: userName,
+      );
+
+      final result = await _contentSubmissionRepository.submit(
+        clientSubmissionId: draft.clientSubmissionId,
+        contentSubmission: contentSubmission,
+        submissionAssets: submissionAssets,
+      );
+
+      if (result is Error<void>) return result;
+
+      _submissionFinalizationPending = true;
+      acknowledged = true;
+      return _finalizeSubmittedSession(draft.clientSubmissionId);
+    } finally {
+      if (!acknowledged) {
+        await _releaseSubmissionOwnership(draft.clientSubmissionId);
       }
     }
-
-    final contentSubmission = ContentSubmission(
-      category: draft.category,
-      city: city,
-      name: name,
-      description: draft.description,
-      descriptionDelta: draft.descriptionDelta,
-      startDate: draft.eventDates.startInstantUtc,
-      endDate: draft.eventDates.endInstantUtc,
-      userEmail: userEmail,
-      userName: userName,
-    );
-
-    final result = await _contentSubmissionRepository.submit(
-      clientSubmissionId: draft.clientSubmissionId,
-      contentSubmission: contentSubmission,
-      submissionAssets: submissionAssets,
-    );
-
-    if (result is Error<void>) return result;
-
-    _submissionFinalizationPending = true;
-    return _finalizeSubmittedSession();
   }
 
   Future<Result<_SubmissionAttempt>> _prepareSubmissionAttempt() {
@@ -835,24 +844,55 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       final assets = List<Asset>.unmodifiable(_assets);
       final checkpoint = await _checkpointDraftSnapshotInsideBoundary(draft);
       if (checkpoint case Error<void>(:final error)) return Result.error(error);
-      return Result.success((draft: draft, assets: assets));
+      if (_activeSubmissionClientSubmissionId != null) {
+        return Result.error(Exception('Another submission session is active.'));
+      }
+      final attempt = (draft: draft, assets: assets);
+      _activeSubmissionClientSubmissionId = draft.clientSubmissionId;
+      return Result.success(attempt);
     });
   }
 
-  Future<Result<void>> _finalizeSubmittedSession() async {
-    await clear.execute();
-    return switch (clear.result) {
-      Success<void>() => _completeSubmissionFinalization(),
-      Error<void>(:final error) => Result.error(error),
-      null => Result.error(
-        Exception('Submission finalization did not complete.'),
-      ),
-    };
+  Future<void> _releaseSubmissionOwnership(String clientSubmissionId) async {
+    await _serialize<void>(() async {
+      if (_activeSubmissionClientSubmissionId == clientSubmissionId) {
+        _activeSubmissionClientSubmissionId = null;
+      }
+      return const Result.success(null);
+    });
   }
 
-  Result<void> _completeSubmissionFinalization() {
-    _submissionFinalizationPending = false;
-    return const Result.success(null);
+  Future<Result<void>> _finalizeSubmittedSession([
+    String? acknowledgedClientSubmissionId,
+  ]) async {
+    final expectedClientSubmissionId =
+        acknowledgedClientSubmissionId ?? _activeSubmissionClientSubmissionId;
+    _logger.log(const ContentSubmissionStateClearStarted());
+    final result = await _serialize<void>(() async {
+      if (!_submissionFinalizationPending ||
+          expectedClientSubmissionId == null ||
+          _activeSubmissionClientSubmissionId != expectedClientSubmissionId ||
+          _state.clientSubmissionId != expectedClientSubmissionId) {
+        return Result.error(
+          Exception('Cannot finalize a submission for a different session.'),
+        );
+      }
+      final retired = await _retireCurrentSessionInsideBoundary();
+      if (retired case Error<void>(:final error)) return Result.error(error);
+      _submissionFinalizationPending = false;
+      _activeSubmissionClientSubmissionId = null;
+      return const Result.success(null);
+    });
+    if (result case Error<void>(:final error)) {
+      _logger.log(
+        const ContentSubmissionStateClearFailed(),
+        error: error,
+      );
+      return result;
+    }
+    if (!_disposed) notifyListeners();
+    _logger.log(const ContentSubmissionStateClearSuccess());
+    return result;
   }
 
   Future<Result<void>> _clear() async {
@@ -861,28 +901,12 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     if (_disposed) return const Result.success(null);
     _logger.log(const ContentSubmissionStateClearStarted());
     final result = await _serialize<void>(() async {
-      final persistedStateBeforeClear = _persistedDraftState;
-      final oldClientSubmissionId = _state.clientSubmissionId;
-      final cleared = await _draftRepository.clearDraft();
-      if (cleared is Error<void>) return cleared;
-      if (persistedStateBeforeClear == _PersistedDraftState.unknown) {
-        // A successful persistence-first clear authoritatively establishes that
-        // no draft owns the quarantined staged state, so clean it as orphans
-        // rather than targeting this fresh in-memory identity.
-        await _stagedAssetRepository.reconcileAndLoad(null);
-      } else {
-        await _stagedAssetRepository.clearSession(oldClientSubmissionId);
+      if (_activeSubmissionClientSubmissionId != null) {
+        return Result.error(
+          Exception('Cannot clear while a submission session is active.'),
+        );
       }
-      if (_disposed) return const Result.success(null);
-      _persistedDraftState = _PersistedDraftState.absent;
-      _draftLoadError = null;
-      _assets.clear();
-      _eventTimeIssue = null;
-      _state = ContentSubmissionDraft();
-      _checkpointedDraft = _state;
-      _stagedStateAvailable = true;
-      _recoveryEligibleClientSubmissionId = null;
-      return const Result.success(null);
+      return _retireCurrentSessionInsideBoundary();
     });
     if (result is Error<void>) {
       _logger.log(
@@ -897,6 +921,31 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     }
     _logger.log(const ContentSubmissionStateClearSuccess());
     return result;
+  }
+
+  Future<Result<void>> _retireCurrentSessionInsideBoundary() async {
+    final persistedStateBeforeClear = _persistedDraftState;
+    final oldClientSubmissionId = _state.clientSubmissionId;
+    final cleared = await _draftRepository.clearDraft();
+    if (cleared is Error<void>) return cleared;
+    if (persistedStateBeforeClear == _PersistedDraftState.unknown) {
+      // A successful persistence-first clear authoritatively establishes that
+      // no draft owns the quarantined staged state, so clean it as orphans
+      // rather than targeting this fresh in-memory identity.
+      await _stagedAssetRepository.reconcileAndLoad(null);
+    } else {
+      await _stagedAssetRepository.clearSession(oldClientSubmissionId);
+    }
+    if (_disposed) return const Result.success(null);
+    _persistedDraftState = _PersistedDraftState.absent;
+    _draftLoadError = null;
+    _assets.clear();
+    _eventTimeIssue = null;
+    _state = ContentSubmissionDraft();
+    _checkpointedDraft = _state;
+    _stagedStateAvailable = true;
+    _recoveryEligibleClientSubmissionId = null;
+    return const Result.success(null);
   }
 
   void _handleRetrieveLostMediaErrors(Object error, StackTrace? stackTrace) {

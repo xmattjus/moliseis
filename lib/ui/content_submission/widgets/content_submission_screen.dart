@@ -46,30 +46,35 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
   final _form1Key = GlobalKey<FormState>();
   final _form2Key = GlobalKey<FormState>();
   var _clearEpoch = 0;
+  late String _sessionIdentity;
   var _boundaryPending = false;
   var _allowIosExplicitPop = false;
 
   @override
   void initState() {
     super.initState();
-    widget.viewModel.clear.addListener(_handleClearCompleted);
+    _sessionIdentity = widget.viewModel.state.clientSubmissionId;
+    widget.viewModel.addListener(_handleSessionRetired);
     unawaited(widget.viewModel.retrieveLostAssets.execute());
   }
 
   @override
   void dispose() {
-    widget.viewModel.clear.removeListener(_handleClearCompleted);
+    widget.viewModel.removeListener(_handleSessionRetired);
     super.dispose();
   }
 
-  /// Rebuilds the shared form with cleared state after a successful clear.
+  /// Rebuilds the shared form after the ViewModel retires its current session.
   ///
   /// While the clear command runs, the form is replaced by a loading state so
   /// stale submitted values cannot be edited. Incrementing [_clearEpoch]
   /// replaces the shared form before a post-frame `FormState.reset()` reapplies
   /// the cleared values.
-  void _handleClearCompleted() {
-    if (!mounted || !widget.viewModel.clear.completed) return;
+  void _handleSessionRetired() {
+    if (!mounted) return;
+    final nextIdentity = widget.viewModel.state.clientSubmissionId;
+    if (_sessionIdentity == nextIdentity) return;
+    _sessionIdentity = nextIdentity;
     setState(() => _clearEpoch++);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;

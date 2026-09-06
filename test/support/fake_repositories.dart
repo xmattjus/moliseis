@@ -741,6 +741,7 @@ final class FakeContentSubmissionRepository
     implements ContentSubmissionRepository {
   FakeContentSubmissionRepository({
     Result<void>? submitResult,
+    this.submitThrownError,
     ImageUploadTask? uploadImageTaskResult,
     List<ImageUploadTask>? uploadImageTaskResults,
   }) : submitResult = submitResult ?? const Result.success(null),
@@ -758,6 +759,7 @@ final class FakeContentSubmissionRepository
        uploadImageTaskResults = uploadImageTaskResults ?? <ImageUploadTask>[];
 
   Result<void> submitResult;
+  Object? submitThrownError;
   ImageUploadTask uploadImageTaskResult;
   final List<ImageUploadTask> uploadImageTaskResults;
 
@@ -780,6 +782,10 @@ final class FakeContentSubmissionRepository
     submittedClientSubmissionIds.add(clientSubmissionId);
     submittedContentSubmissions.add(contentSubmission);
     submittedSubmissionAssets.add(List.unmodifiable(submissionAssets));
+    final thrownError = submitThrownError;
+    // Intentionally exercises Command's non-Exception boundary.
+    // ignore: only_throw_errors
+    if (thrownError != null) throw thrownError;
     return submitResult;
   }
 
@@ -799,14 +805,22 @@ final class FakeContentSubmissionRepository
 final class FakeImageUploadTask implements ImageUploadTask {
   FakeImageUploadTask.completed(Result<SubmissionAsset> result)
     : _result = Future.value(result),
-      _pendingResult = null;
+      _pendingResult = null,
+      _thrownError = null;
 
   FakeImageUploadTask.pending()
     : _result = null,
-      _pendingResult = Completer<Result<SubmissionAsset>>();
+      _pendingResult = Completer<Result<SubmissionAsset>>(),
+      _thrownError = null;
+
+  FakeImageUploadTask.throwing(Object error)
+    : _result = null,
+      _pendingResult = null,
+      _thrownError = error;
 
   final Future<Result<SubmissionAsset>>? _result;
   final Completer<Result<SubmissionAsset>>? _pendingResult;
+  final Object? _thrownError;
   int cancelCallCount = 0;
 
   /// Completes a task created with [FakeImageUploadTask.pending].
@@ -815,8 +829,9 @@ final class FakeImageUploadTask implements ImageUploadTask {
   }
 
   @override
-  Future<Result<SubmissionAsset>> get result =>
-      _result ?? _pendingResult!.future;
+  Future<Result<SubmissionAsset>> get result => _thrownError == null
+      ? _result ?? _pendingResult!.future
+      : Future<Result<SubmissionAsset>>.error(_thrownError);
 
   @override
   Stream<double> get progress => Stream<double>.value(1);

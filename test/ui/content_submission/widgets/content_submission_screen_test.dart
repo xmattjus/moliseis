@@ -1462,7 +1462,8 @@ void main() {
         expect(await tester.binding.handlePopRoute(), isTrue);
         await tester.pump();
 
-        expect(vm.clear.running, isTrue);
+        expect(vm.submit.running, isTrue);
+        expect(vm.clear.idle, isTrue);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         expect(vm.state, previousState);
         expect(vm.state.clientSubmissionId, previousIdentity);
@@ -1472,7 +1473,7 @@ void main() {
         clearGate.complete(const Result.success(null));
         await tester.pumpAndSettle();
 
-        expect(vm.clear.completed, isTrue);
+        expect(vm.submit.completed, isTrue);
         await tester.tap(find.byType(BackButton));
         await tester.pumpAndSettle();
         expect(find.byType(ContentSubmissionScreen), findsOneWidget);
