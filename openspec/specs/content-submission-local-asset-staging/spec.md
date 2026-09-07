@@ -444,20 +444,27 @@ Cloudinary upload failure, partial sequential upload failure, and final remote C
 - **THEN** this capability SHALL NOT invoke Cloudinary deletion or redesign existing remote rollback behavior
 
 ### Requirement: Subplan completion is not release readiness
-Completion of local asset staging SHALL be assessed as Content Submission Hardening Subplan 2 only. The per-session cleanup seam SHALL support explicit clear/discard. Because the current progress route already invokes that same clear operation after completed submission, this existing retirement path SHALL also clean staged state without adding a new submit-success hook; any redesign of definitive finalization remains deferred. The system SHALL NOT be declared release-ready or release-proof until all Content Submission Hardening subplans and their cross-subplan behavior have been implemented and verified.
+Completion of local asset staging SHALL be assessed as Content Submission Hardening Subplan 2 only. The per-session cleanup seam SHALL continue to support explicit clear/discard when no active submission attempt owns the logical session. After valid remote acknowledgement, the ViewModel-owned successful-finalization path SHALL reuse the same persistence-first draft/session retirement and per-session staged cleanup primitive; finalization-only retries SHALL remain owned by that path. The progress route SHALL NOT independently clear or rotate the session, and its success actions SHALL only navigate after local finalization succeeds. No eager cleanup before valid acknowledgement, Cloudinary rollback or deletion, duplicate cleanup implementation, or speculative finalization abstraction SHALL be introduced. The system SHALL NOT be declared release-ready or release-proof until all Content Submission Hardening subplans and their cross-subplan behavior have been implemented and verified.
 
 #### Scenario: Existing post-success clear reuses staged cleanup
-- **GIVEN** per-session cleanup is implemented through the existing clear operation
-- **AND** the existing progress route invokes clear after a completed submit when retiring the form session
-- **WHEN** that clear runs
+- **GIVEN** per-session cleanup is implemented through the existing persistence-first retirement operation
+- **AND** the backend has returned a valid successful acknowledgement for the owned logical session
+- **WHEN** ViewModel-owned local finalization retires that completed session
 - **THEN** it SHALL clean the completed session's staged state through the same tested primitive
-- **AND** `_submit()` itself SHALL gain no eager cleanup, rollback, or new finalization callback
+- **AND** no eager cleanup, Cloudinary rollback, or duplicate cleanup path SHALL run before acknowledgement
 
 #### Scenario: Later finalization redesign remains deferred
-- **GIVEN** a later hardening subplan may refine definitive successful-submit retirement
-- **WHEN** Subplan 2 is completed
-- **THEN** the tested per-session cleanup primitive SHALL remain available for that future caller
-- **AND** no speculative finalization abstraction SHALL be introduced here
+- **GIVEN** Subplan 2 exposed the tested per-session cleanup primitive while deferring definitive successful-submission ownership
+- **WHEN** the later ViewModel-owned finalization or finalization-only retry retires an acknowledged session
+- **THEN** it SHALL reuse that primitive rather than creating a parallel staged cleanup or finalization abstraction
+
+#### Scenario: Explicit discard remains available without an owner
+- **WHEN** no active or acknowledged submission attempt owns the current logical session and explicit clear/discard is requested
+- **THEN** the existing persistence-first retirement and per-session staged cleanup behavior remains available
+
+#### Scenario: Progress actions do not own cleanup
+- **WHEN** local successful-submission finalization is pending or has completed
+- **THEN** the progress route does not clear or rotate the session and its success actions navigate only after ViewModel-owned finalization succeeds
 
 #### Scenario: Subplan verification does not claim whole-feature readiness
 - **WHEN** every requirement in this capability passes
