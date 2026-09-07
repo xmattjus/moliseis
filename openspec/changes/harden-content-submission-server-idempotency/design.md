@@ -2,7 +2,9 @@
 
 See `proposal.md` for motivation and the four delta specs for required behavior. The implementation baseline is exactly `366bda6f294ee219a88106a700208b4708e21f48`, which contains completed Subplans 1–4 and synchronized main specs. The current Flutter repository already sends a canonical UUID-v4-compatible `client_submission_id`, validates only a positive `submission_id`, and intentionally keeps `Result<void>`; the current Edge parser ignores the identity and performs quota read/update, submission insert, and asset RPC as separate transactions. The database has no client identity column or submit RPC, RLS denies direct public writes, and privileged Edge code uses a service-role client.
 
-The verified in-repository public caller always sends the identity. This design therefore makes it required at `submit-content`. Before apply, the executor must confirm that no still-supported deployed client predating Subplan 4 calls this endpoint. If such a client exists, implementation must stop and the specs must be revised to define an explicit temporary optional-key rollout; silently retaining an untested non-idempotent legacy branch is not allowed.
+The implementation/apply gate is repository-local: every in-repository production caller targeted by this change must send the canonical identity, and the current Flutter repository contract must accept both HTTP 201 created and HTTP 200 replay acknowledgements while preserving `Result<void>`. The verified caller satisfies those conditions, so this design makes the identity required at `submit-content`; if either repository contract is no longer true when implementation begins, implementation must stop and the OpenSpec must be reconciled.
+
+Released-client compatibility is a separate production deployment gate. Before deploying a strict Edge Function that requires the field, release/support policy must confirm that every still-supported deployed client able to call the endpoint sends it. An incompatible historical client blocks only that Edge deployment, not local implementation, additive database/RPC work, or verification. Prefer releasing a compatible Flutter build and making it the minimum supported production version before strict Edge rollout. If simultaneous support for pre-Subplan-4 clients later proves necessary, define its temporary backward-compatibility semantics and tests in a separately reviewed OpenSpec rollout change; do not add a speculative optional-key or legacy non-idempotent branch here.
 
 ## Goals / Non-Goals
 
@@ -73,7 +75,7 @@ After `supabase db reset --local`, regenerate `_shared/database.types.ts` from s
 
 ## Risks / Trade-offs
 
-- **Supported older clients may omit the key** → Confirm minimum supported client before apply; if any remain, revise the OpenSpec before implementation rather than silently weakening the guarantee.
+- **Supported released clients may omit the key** → Treat this as a strict Edge deployment blocker, not an implementation blocker. Wait until a compatible build is the minimum supported production version, or create a separately reviewed rollout change if temporary coexistence is proven necessary; do not silently weaken this design with an optional-key path.
 - **First-write-wins can discard edits made after a lost acknowledgement** → This is consistent with Subplan 4's late same-session success semantics; make it explicit in tests and do not overwrite the committed row.
 - **A long database call holds one user's quota-row lock** → Keep the RPC database-only, perform no network work inside it, and lock only after Edge authentication/validation and Cloudinary upload have completed.
 - **Unexpected RPC outcomes could be mistaken for success** → Accept only one known row with a positive safe integer ID; map everything else to a stable failure and leave local state retryable.
@@ -82,10 +84,10 @@ After `supabase db reset --local`, regenerate `_shared/database.types.ts` from s
 
 ## Migration Plan
 
-1. Verify the exact baseline, clean/understood worktree, existing four strict OpenSpec validations, focused Flutter tests, and current Deno validation tests. Confirm no supported pre-Subplan-4 client calls `submit-content`.
-2. Add the forward-only migration and database integration suite; reset/start local Supabase, regenerate types, and prove sequential/concurrent/rollback/quota behavior before touching the Edge handler.
+1. Verify the exact baseline, clean/understood worktree, existing four strict OpenSpec validations, focused Flutter tests, and current Deno validation tests. Confirm every targeted in-repository production caller sends canonical `client_submission_id` and the current Flutter repository contract accepts both created and replay acknowledgements; stop implementation only if that repository contract is false.
+2. Add the forward-only migration and database integration suite; reset/start local Supabase, regenerate types, and prove sequential/concurrent/rollback/quota behavior before touching the Edge handler. This additive database/RPC work can be implemented and tested independently of released-client rollout state.
 3. Add parser/store/handler changes and unit tests while retaining the response envelope consumed by Flutter.
 4. Run Deno formatting/tests, database tests, focused Flutter tests, complete Flutter tests/analyze, strict OpenSpec validation, and final diff/scope review.
-5. Deploy the database migration/RPC first, then deploy the Edge Function. No Flutter deployment is required for the current client at `366bda6` or later.
+5. Treat production rollout separately from implementation completion. The additive database migration/RPC may be deployed first, but do not deploy the strict Edge Function until every still-supported released client that can call it sends the canonical field. No additional Flutter production implementation is required for builds from the current Subplan-4-compatible repository; if published store builds predate that contract, release a compatible build and make it the minimum supported production version before strict Edge rollout, or create a separately reviewed rollout change if temporary backward compatibility is actually required.
 
 Rollback is Edge-first: restore the previous handler while leaving the additive column, uniqueness, and RPC in place. Dropping the database additions is a separate reviewed migration only after confirming no keyed rows or deployed callers depend on them.
