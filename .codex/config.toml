@@ -1,0 +1,22 @@
+# Molise Is — Codex project configuration
+# Balanced for code quality, token efficiency, and single-developer maintainability.
+
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
+plan_mode_reasoning_effort = "high"
+
+model_verbosity = "medium"
+model_reasoning_summary = "auto"
+
+[agents]
+enabled = true
+
+# Enough parallelism for exploration + tests + review without creating
+# an unnecessarily expensive swarm.
+max_concurrent_threads_per_session = 3
+
+# Economical default for spawned agents.
+default_subagent_model = "gpt-5.6-terra"
+default_subagent_reasoning_effort = "medium"
+
+interrupt_message = true

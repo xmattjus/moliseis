@@ -22,8 +22,50 @@ planning artifacts, and repository reality before affected execution starts or
 resumes. An executor must stop and report a material contradiction rather than
 silently redesigning the task.
 
-OpenCode/plugin orchestration details belong in the relevant agent/workflow
-configuration rather than this repository-wide policy.
+## Delegation and Subagents
+
+When the active harness supports the project-scoped agents configured under
+`.codex/agents/`, use delegation selectively to keep exploration, verification,
+and noisy intermediate work out of the main reasoning context.
+
+The main agent always owns:
+- interpretation of the user's request;
+- scope and requirement decisions;
+- reconciliation of conflicting evidence;
+- integration across delegated results;
+- final architectural and readiness judgments.
+
+Use the configured roles as follows:
+- `explorer`: read-only repository mapping, execution-path tracing, dependency
+  discovery, and evidence gathering for non-trivial work.
+- `implementer`: bounded implementation after the intended behavior and scope are
+  sufficiently defined.
+- `test_debugger`: focused test execution, regression analysis, and failure
+  diagnosis.
+- `reviewer`: independent adversarial review of meaningful implementation changes.
+- `architect`: escalation only for genuine architectural, ownership, concurrency,
+  security, persistence, or cross-boundary ambiguity that cannot be resolved from
+  existing repository conventions.
+
+Delegation rules:
+- Do not delegate trivial work whose delegation overhead exceeds the work itself.
+- Prefer parallel delegation for independent read-heavy work such as exploration,
+  testing, evidence gathering, and review.
+- Avoid concurrent code-writing agents over the same production surface.
+- Normally give one agent clear ownership of a bounded implementation.
+- Every delegated task must have an explicit scope, expected result, and relevant
+  constraints or evidence requirements.
+- Do not use additional agents merely to obtain more opinions after sufficient
+  evidence already exists.
+- Treat delegated output as evidence, not authority. The main agent must verify and
+  reconcile material conclusions before acting on them.
+- A subagent must not broaden the current OpenSpec change or implementation scope
+  unless a confirmed contradiction makes the requested work unsafe or impossible.
+
+Harness-specific implementation details, model selection, sandbox configuration,
+and agent prompts belong in the relevant agent/workflow configuration rather than
+this repository-wide policy. Repository-level delegation boundaries and ownership
+rules may be defined here when they are durable across tasks.
 
 ## Engineering Principles
 
