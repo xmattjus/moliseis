@@ -66,6 +66,7 @@ export type Database = {
           address: string | null;
           category: Database["public"]["Enums"]["content_category"];
           city: string;
+          client_submission_id: string | null;
           created_at: string;
           description: string | null;
           description_delta: Json | null;
@@ -97,6 +98,7 @@ export type Database = {
           address?: string | null;
           category?: Database["public"]["Enums"]["content_category"];
           city: string;
+          client_submission_id?: string | null;
           created_at?: string;
           description?: string | null;
           description_delta?: Json | null;
@@ -128,6 +130,7 @@ export type Database = {
           address?: string | null;
           category?: Database["public"]["Enums"]["content_category"];
           city?: string;
+          client_submission_id?: string | null;
           created_at?: string;
           description?: string | null;
           description_delta?: Json | null;
@@ -426,6 +429,29 @@ export type Database = {
           entity_id: number;
           outcome: string;
           target_type: string;
+        }[];
+      };
+      submit_content: {
+        Args: {
+          p_address: string;
+          p_assets: Json;
+          p_category: Database["public"]["Enums"]["content_category"];
+          p_city: string;
+          p_client_submission_id: string;
+          p_description: string;
+          p_description_delta: Json;
+          p_end_date: string;
+          p_latitude: number;
+          p_longitude: number;
+          p_name: string;
+          p_start_date: string;
+          p_user_email: string;
+          p_user_id: string;
+          p_user_name: string;
+        };
+        Returns: {
+          outcome: string;
+          submission_id: number;
         }[];
       };
     };

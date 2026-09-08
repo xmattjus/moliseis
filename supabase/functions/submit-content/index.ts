@@ -1,42 +1,41 @@
 /**
  * Sole authenticated write path for community content submissions.
  *
- * The parser deliberately treats every request field as untrusted. It keeps
- * authored description whitespace unchanged while normalizing contact and
- * location fields used for moderation.
+ * Request parsing is complete before the privileged store is constructed. The
+ * store's single RPC call owns quota, idempotency, content, and asset writes.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createClient,
   type SupabaseClient,
+  type User,
 } from "npm:@supabase/supabase-js@2.112.3";
 import { corsHeaders } from "npm:@supabase/supabase-js@2.112.3/cors";
 
 import type { Database } from "../_shared/database.types.ts";
 import {
-  deltaAsJson,
   parseContentSubmission,
   readJsonBodyWithLimit,
   RequestBodyTooLargeError,
 } from "./submission_validation.ts";
+import {
+  createSubmissionStore,
+  type SubmissionStore,
+  type SubmissionStoreResult,
+} from "./submission_store.ts";
 
-const RATE_LIMIT_WINDOW_HOURS = 24;
-const RATE_LIMIT_MAX_SUBMISSIONS = 5;
+const JSON_HEADERS = { ...corsHeaders, "Content-Type": "application/json" };
 
-function createUserClient(authHeader: string): SupabaseClient<Database> {
-  return createClient<Database>(
-    requiredEnv("SUPABASE_URL"),
-    requiredEnv("SUPABASE_ANON_KEY"),
-    { global: { headers: { Authorization: authHeader } } },
-  );
-}
+type FailureLog = (
+  operation: "submit_content",
+  outcome: "persistence_failed" | "invalid_outcome",
+) => void;
 
-function createAdminClient(): SupabaseClient<Database> {
-  return createClient<Database>(
-    requiredEnv("SUPABASE_URL"),
-    requiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
-  );
-}
+export type HandlerDependencies = {
+  authenticate: (authorizationHeader: string) => Promise<User | null>;
+  createStore: () => SubmissionStore;
+  logFailure: FailureLog;
+};
 
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
@@ -44,19 +43,64 @@ function requiredEnv(name: string): string {
   return value;
 }
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+}
+
 function errorResponse(code: string, message: string, status = 400): Response {
-  return new Response(JSON.stringify({ code, message }), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return jsonResponse({ code, message }, status);
 }
 
 export function validationErrorResponse(message: string): Response {
   return errorResponse("VALIDATION_ERROR", message, 400);
 }
 
-export async function handleRequest(request: Request): Promise<Response> {
+function persistenceFailure(
+  dependencies: HandlerDependencies,
+  outcome: "persistence_failed" | "invalid_outcome",
+): Response {
   try {
+    dependencies.logFailure("submit_content", outcome);
+  } catch {
+    // Logging must not change the stable failure response.
+  }
+  return errorResponse(
+    "INTERNAL_ERROR",
+    "Unable to save submission",
+    500,
+  );
+}
+
+function responseForResult(
+  result: SubmissionStoreResult,
+  dependencies: HandlerDependencies,
+): Response {
+  switch (result.outcome) {
+    case "created":
+      return jsonResponse(
+        { submission_id: result.submissionId, replayed: false },
+        201,
+      );
+    case "replayed":
+      return jsonResponse(
+        { submission_id: result.submissionId, replayed: true },
+        200,
+      );
+    case "rate_limited":
+      return errorResponse(
+        "RATE_LIMIT_EXCEEDED",
+        "Maximum 5 submissions per 24 hours exceeded",
+        429,
+      );
+    default:
+      return persistenceFailure(dependencies, "invalid_outcome");
+  }
+}
+
+export function createHandler(
+  dependencies: HandlerDependencies,
+): (request: Request) => Promise<Response> {
+  return async (request) => {
     if (request.method === "OPTIONS") {
       return Response.json({ ok: true }, { headers: corsHeaders });
     }
@@ -68,17 +112,20 @@ export async function handleRequest(request: Request): Promise<Response> {
       );
     }
 
-    const authHeader = request.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
+    const bearerMatch = /^Bearer ([^\s,]+)$/.exec(
+      request.headers.get("Authorization") ?? "",
+    );
+    if (!bearerMatch) {
       return errorResponse("UNAUTHORIZED", "Missing bearer token", 401);
     }
 
-    const userClient = createUserClient(authHeader);
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser();
-    if (userError || !user) {
+    let user: User | null;
+    try {
+      user = await dependencies.authenticate(bearerMatch[0]);
+    } catch {
+      return errorResponse("UNAUTHORIZED", "Invalid user token", 401);
+    }
+    if (!user) {
       return errorResponse("UNAUTHORIZED", "Invalid user token", 401);
     }
 
@@ -91,124 +138,58 @@ export async function handleRequest(request: Request): Promise<Response> {
       }
       return validationErrorResponse("Request body must be valid JSON");
     }
-
     const parsedSubmission = parseContentSubmission(rawBody);
     if (!parsedSubmission.ok) {
       return validationErrorResponse(parsedSubmission.message);
     }
-    const body = parsedSubmission.value;
-    const adminClient = createAdminClient();
 
-    const now = new Date();
-    const windowCutoff = new Date(
-      now.getTime() - RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000,
-    );
-    const { data: rateLimitRow, error: rateLimitReadError } = await adminClient
-      .from("submission_rate_limits")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (rateLimitReadError) {
-      console.error(rateLimitReadError);
-      return errorResponse(
-        "RATE_LIMIT_READ_FAILED",
-        "Unable to check submission quota",
-        500,
-      );
-    }
-
-    let nextCount = 1;
-    let nextWindowStart = now;
-    if (rateLimitRow) {
-      const currentWindowStart = new Date(rateLimitRow.window_started_at);
-      if (currentWindowStart > windowCutoff) {
-        if (rateLimitRow.submission_count >= RATE_LIMIT_MAX_SUBMISSIONS) {
-          return errorResponse(
-            "RATE_LIMIT_EXCEEDED",
-            `Maximum ${RATE_LIMIT_MAX_SUBMISSIONS} submissions per ${RATE_LIMIT_WINDOW_HOURS} hours exceeded`,
-            429,
-          );
-        }
-        nextCount = rateLimitRow.submission_count + 1;
-        nextWindowStart = currentWindowStart;
-      }
-    }
-
-    const { error: rateLimitUpsertError } = await adminClient
-      .from("submission_rate_limits")
-      .upsert({
-        user_id: user.id,
-        submission_count: nextCount,
-        window_started_at: nextWindowStart.toISOString(),
+    try {
+      const result = await dependencies.createStore().submit({
+        userId: user.id,
+        submission: parsedSubmission.value,
       });
-    if (rateLimitUpsertError) {
-      console.error(rateLimitUpsertError);
-      return errorResponse(
-        "RATE_LIMIT_UPDATE_FAILED",
-        "Unable to update submission quota",
-        500,
+      return responseForResult(result, dependencies);
+    } catch {
+      return persistenceFailure(dependencies, "persistence_failed");
+    }
+  };
+}
+
+export function createProductionDependencies(): HandlerDependencies {
+  const supabaseUrl = requiredEnv("SUPABASE_URL");
+  const anonKey = requiredEnv("SUPABASE_ANON_KEY");
+  const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+  return {
+    authenticate: async (authorizationHeader) => {
+      const userClient: SupabaseClient<Database> = createClient<Database>(
+        supabaseUrl,
+        anonKey,
+        {
+          global: { headers: { Authorization: authorizationHeader } },
+          auth: { autoRefreshToken: false, persistSession: false },
+        },
       );
-    }
-
-    const { data: submission, error: submissionInsertError } = await adminClient
-      .from("content_submissions")
-      .insert({
-        user_id: user.id,
-        city: body.city,
-        name: body.name,
-        description: body.description,
-        description_delta: deltaAsJson(body.description_delta),
-        latitude: body.latitude,
-        longitude: body.longitude,
-        address: body.address,
-        start_date: body.start_date,
-        end_date: body.end_date,
-        ...(body.category === null ? {} : { category: body.category }),
-        user_email: body.user_email,
-        user_name: body.user_name,
-      })
-      .select("id")
-      .single();
-    if (submissionInsertError) {
-      console.error(submissionInsertError);
-      return errorResponse(
-        "SUBMISSION_INSERT_FAILED",
-        "Unable to create submission",
-        500,
+      const { data, error } = await userClient.auth.getUser();
+      return error ? null : data.user;
+    },
+    createStore: () => {
+      const privilegedClient = createClient<Database>(
+        supabaseUrl,
+        serviceRoleKey,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        },
       );
-    }
-
-    if (body.assets.length > 0) {
-      const { data: assetInsertResults, error: assetsInsertError } =
-        await adminClient
-          .rpc("add_submission_assets", {
-            p_submission_id: submission.id,
-            p_assets: body.assets,
-          });
-      if (
-        assetsInsertError ||
-        assetInsertResults?.length !== body.assets.length ||
-        assetInsertResults.some((result) => result.outcome !== "created")
-      ) {
-        console.error(assetsInsertError ?? assetInsertResults);
-        return errorResponse(
-          "ASSET_INSERT_FAILED",
-          "Unable to save submission assets",
-          500,
-        );
-      }
-    }
-
-    return new Response(JSON.stringify({ submission_id: submission.id }), {
-      status: 201,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error(error);
-    return errorResponse("INTERNAL_ERROR", "Unexpected server error", 500);
-  }
+      return createSubmissionStore(privilegedClient);
+    },
+    logFailure: (operation, outcome) => console.error(operation, outcome),
+  };
 }
 
 if (import.meta.main) {
-  Deno.serve(handleRequest);
+  Deno.serve(createHandler(createProductionDependencies()));
 }

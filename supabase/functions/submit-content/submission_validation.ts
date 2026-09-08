@@ -17,6 +17,8 @@ const ALLOWED_CONTENT_CATEGORIES = [
 ] as const satisfies readonly Database["public"]["Enums"]["content_category"][];
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CLIENT_SUBMISSION_ID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export type ValidatedQuillAttributes = {
   bold?: true;
@@ -32,6 +34,7 @@ export type ValidatedQuillOperation = {
 };
 
 export type ValidatedContentSubmission = {
+  client_submission_id: string;
   city: string;
   name: string;
   description: string | null;
@@ -340,6 +343,7 @@ export function parseContentSubmission(
   if (!isRecord(value)) return invalid("Request body must be a JSON object");
 
   const {
+    client_submission_id,
     city,
     name,
     description,
@@ -355,6 +359,15 @@ export function parseContentSubmission(
     assets,
   } = value;
 
+  if (client_submission_id === undefined) {
+    return invalid("client_submission_id is required");
+  }
+  if (
+    typeof client_submission_id !== "string" ||
+    !CLIENT_SUBMISSION_ID_REGEX.test(client_submission_id)
+  ) {
+    return invalid("client_submission_id must be a canonical UUID v4");
+  }
   if (typeof city !== "string" || !city.trim()) {
     return invalid("city is required");
   }
@@ -435,6 +448,7 @@ export function parseContentSubmission(
   if (!parsedAssets.ok) return parsedAssets;
 
   return valid({
+    client_submission_id,
     city: city.trim(),
     name: name.trim(),
     description: description ?? null,

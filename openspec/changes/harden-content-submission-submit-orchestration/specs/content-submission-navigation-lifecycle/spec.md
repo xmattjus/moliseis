@@ -7,6 +7,10 @@ This capability SHALL reuse the explicit draft checkpoint, checkpoint baseline, 
 - **WHEN** guarded exits, external launches, submission transitions, retries, or finalization need persistence behavior
 - **THEN** they invoke or extend the existing checkpoint, serialized lifecycle, staged-session, Command, and clear primitives rather than creating parallel draft or asset infrastructure
 
+#### Scenario: Backend hardening is isolated from navigation
+- **WHEN** Subplan 5 persists and deduplicates by `client_submission_id`
+- **THEN** it changes no route ownership, progress state, external-link checkpoint, form-exit, or local retirement behavior
+
 #### Scenario: Backend remains unchanged
 - **WHEN** the Subplan 4 client request envelope adds `client_submission_id`
 - **THEN** Supabase schemas, migrations, RLS, RPCs, production Edge Function implementation, server-side persistence and rate-limit behavior, and Cloudinary behavior and retry semantics remain unchanged
@@ -14,6 +18,10 @@ This capability SHALL reuse the explicit draft checkpoint, checkpoint baseline, 
 #### Scenario: Client identity remains a compatibility field
 - **WHEN** the production submission boundary tolerates the additional `client_submission_id` field
 - **THEN** the client does not claim that the backend stores, validates, enforces, or deduplicates by that field or that final submission is server-side idempotent
+
+#### Scenario: Created and replayed responses use one finalization path
+- **WHEN** final submission returns either a newly created or idempotently replayed positive acknowledgement
+- **THEN** the ViewModel uses the same existing identity-bound successful local-finalization path before success navigation is enabled
 
 #### Scenario: Completion is reported as Subplan 3 only
 - **WHEN** every requirement in this capability is verified

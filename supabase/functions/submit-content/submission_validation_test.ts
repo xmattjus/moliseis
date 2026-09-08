@@ -11,6 +11,7 @@ import {
 } from "./submission_validation.ts";
 
 const validSubmission = () => ({
+  client_submission_id: "00000000-0000-4000-8000-000000000001",
   city: " Campobasso ",
   name: " Teatro ",
   user_email: " author@example.com ",
@@ -77,13 +78,53 @@ Deno.test("normalizes omitted and null categories to null", () => {
   }
 });
 
-Deno.test("accepts a forward-compatible client submission identity", () => {
+Deno.test("preserves a canonical client submission identity", () => {
   const result = parseContentSubmission({
     ...validSubmission(),
     client_submission_id: "00000000-0000-4000-8000-000000000001",
   });
 
   assert(result.ok);
+  assertEquals(
+    result.value.client_submission_id,
+    "00000000-0000-4000-8000-000000000001",
+  );
+});
+
+Deno.test("rejects missing and non-canonical client submission identities", () => {
+  const invalidIdentities: Array<[unknown, string]> = [
+    [undefined, "client_submission_id is required"],
+    [null, "client_submission_id must be a canonical UUID v4"],
+    [
+      "00000000-0000-4000-8000-00000000000A",
+      "client_submission_id must be a canonical UUID v4",
+    ],
+    [
+      "00000000-0000-5000-8000-000000000001",
+      "client_submission_id must be a canonical UUID v4",
+    ],
+    [
+      "00000000-0000-4000-7000-000000000001",
+      "client_submission_id must be a canonical UUID v4",
+    ],
+    ["not-a-uuid", "client_submission_id must be a canonical UUID v4"],
+    [
+      "key:00000000-0000-4000-8000-000000000001",
+      "client_submission_id must be a canonical UUID v4",
+    ],
+  ];
+
+  for (const [client_submission_id, message] of invalidIdentities) {
+    const submission = validSubmission();
+    if (client_submission_id === undefined) {
+      delete (submission as { client_submission_id?: unknown })
+        .client_submission_id;
+    } else {
+      (submission as { client_submission_id: unknown }).client_submission_id =
+        client_submission_id;
+    }
+    expectInvalid(submission, message);
+  }
 });
 
 Deno.test("rejects the non-null representation of an empty Quill document", () => {
@@ -294,7 +335,7 @@ Deno.test("rejects non-canonical and mismatched Delta projections", () => {
 });
 
 Deno.test("rejects non-string submission and asset fields before normalization", () => {
-  expectInvalid({ city: 1 }, "city is required");
+  expectInvalid({ ...validSubmission(), city: 1 }, "city is required");
   expectInvalid(
     { ...validSubmission(), description: "x", latitude: "1" },
     "latitude is not valid",

@@ -34,3 +34,7 @@ The local draft-session lifecycle SHALL give every fresh logical Content Submiss
 #### Scenario: Client identity does not yet guarantee backend deduplication
 - **WHEN** the current backend accepts a request carrying `client_submission_id`
 - **THEN** the client does not infer that the field was persisted or that duplicate final submissions are prevented
+
+#### Scenario: Client identity prevents duplicate backend submissions
+- **WHEN** Subplan 5 is deployed and the same authenticated user retries a final request carrying an identity that has already committed
+- **THEN** the backend returns the original submission identifier without creating another submission, asset set, or quota charge

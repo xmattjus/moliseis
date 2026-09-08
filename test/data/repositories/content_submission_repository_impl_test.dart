@@ -98,6 +98,25 @@ void main() {
     },
   );
 
+  test('accepts a replay acknowledgement without retrying', () async {
+    httpClient.queueJson(<String, dynamic>{
+      'submission_id': 1,
+      'replayed': true,
+    });
+
+    final result = await submit();
+
+    expect(result, isA<Success<void>>());
+    expect(httpClient.requests, hasLength(1));
+    expect(
+      httpClient.requests.single.body,
+      containsPair(
+        'client_submission_id',
+        '00000000-0000-4000-8000-000000000001',
+      ),
+    );
+  });
+
   for (final invalid in <Object?>[
     null,
     <String, dynamic>{},
