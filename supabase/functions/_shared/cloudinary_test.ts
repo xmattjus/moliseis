@@ -4,6 +4,7 @@ import {
   CloudinaryLookupError,
   cloudinarySignature,
   lookupCloudinaryImage,
+  parseCloudinaryDeliveryUrl,
   prepareCloudinaryUploadFields,
   uploadRemoteImage,
 } from "./cloudinary.ts";
@@ -13,6 +14,32 @@ const config = {
   apiKey: "test-key",
   apiSecret: "test-secret",
 };
+const digest = "a".repeat(64);
+const publicId = `content_submissions/${digest}`;
+const deliveryUrl =
+  `https://res.cloudinary.com/test-cloud/image/upload/v1/${publicId}.png`;
+
+Deno.test("parses only the generic configured Cloudinary delivery identity", () => {
+  assertEquals(
+    parseCloudinaryDeliveryUrl(deliveryUrl, "test-cloud")?.href,
+    deliveryUrl,
+  );
+  assertEquals(parseCloudinaryDeliveryUrl(deliveryUrl, "wrong-cloud"), null);
+  assertEquals(
+    parseCloudinaryDeliveryUrl(
+      "http://res.cloudinary.com/test-cloud/image/upload/x",
+      "test-cloud",
+    ),
+    null,
+  );
+  assertEquals(
+    parseCloudinaryDeliveryUrl(
+      "https://example.test/test-cloud/image/upload/x",
+      "test-cloud",
+    ),
+    null,
+  );
+});
 
 Deno.test("Cloudinary signature sorts signed parameters before hashing", async () => {
   assertEquals(
@@ -147,19 +174,18 @@ Deno.test("omits transformation only when both client dimensions are absent", as
 Deno.test("looks up a valid duplicate with server-only Basic authentication", async () => {
   let authorization: string | null = null;
   const result = await lookupCloudinaryImage({
-    publicId: "content_submissions/abc",
+    publicId,
     config,
     fetchImpl: (input, init) => {
       assertEquals(
         String(input),
-        "https://api.cloudinary.com/v1_1/test-cloud/resources/image/upload/content_submissions/abc",
+        `https://api.cloudinary.com/v1_1/test-cloud/resources/image/upload/${publicId}`,
       );
       authorization = new Headers(init?.headers).get("Authorization");
       return Promise.resolve(
         new Response(JSON.stringify({
-          public_id: "content_submissions/abc",
-          secure_url:
-            "https://res.cloudinary.com/test-cloud/image/upload/v1/abc.png",
+          public_id: publicId,
+          secure_url: deliveryUrl,
           width: 1200,
           height: 800,
           format: "png",
@@ -169,7 +195,7 @@ Deno.test("looks up a valid duplicate with server-only Basic authentication", as
   });
 
   assertEquals(result, {
-    secureUrl: "https://res.cloudinary.com/test-cloud/image/upload/v1/abc.png",
+    secureUrl: deliveryUrl,
     width: 1200,
     height: 800,
     mimeType: "image/png",
@@ -180,7 +206,7 @@ Deno.test("looks up a valid duplicate with server-only Basic authentication", as
 
 Deno.test("maps a missing Cloudinary duplicate to null", async () => {
   const result = await lookupCloudinaryImage({
-    publicId: "content_submissions/abc",
+    publicId,
     config,
     fetchImpl: () => Promise.resolve(new Response(null, { status: 404 })),
   });

@@ -3,12 +3,20 @@ import { assert, assertEquals } from "jsr:@std/assert@1";
 import {
   MAX_REQUEST_BODY_BYTES,
   MAX_SUBMISSION_ASSETS,
-  parseContentSubmission,
+  parseContentSubmission as parseContentSubmissionWithCloud,
   parseSubmissionAsset,
   readJsonBodyWithLimit,
   RequestBodyTooLargeError,
   type ValidatedQuillOperation,
 } from "./submission_validation.ts";
+
+const cloudName = "test-cloud";
+const firstDigest = "a".repeat(64);
+const secondDigest = "b".repeat(64);
+const canonicalAssetUrl = (digest = firstDigest) =>
+  `https://res.cloudinary.com/${cloudName}/image/upload/v1/content_submissions/${digest}.jpg`;
+const parseContentSubmission = (value: unknown) =>
+  parseContentSubmissionWithCloud(value, cloudName);
 
 const validSubmission = () => ({
   client_submission_id: "00000000-0000-4000-8000-000000000001",
@@ -25,13 +33,20 @@ const validDelta = () => [
 ];
 
 const validAsset = (overrides: Record<string, unknown> = {}) => ({
-  url: "https://res.cloudinary.com/demo/image/upload/v1/example.jpg",
+  url: canonicalAssetUrl(),
   width: 1600,
   height: 1200,
   mime_type: "image/jpeg",
   duration_seconds: null,
   ...overrides,
 });
+
+function submissionWithCoordinates(latitude: unknown, longitude: unknown) {
+  const submission: Record<string, unknown> = { ...validSubmission() };
+  if (latitude !== undefined) submission.latitude = latitude;
+  if (longitude !== undefined) submission.longitude = longitude;
+  return submission;
+}
 
 function expectInvalid(value: unknown, message: string): void {
   const result = parseContentSubmission(value);
@@ -76,6 +91,157 @@ Deno.test("normalizes omitted and null categories to null", () => {
     assert(result.ok);
     assertEquals(result.value.category, null);
   }
+});
+
+Deno.test("coordinates are a nullable finite geographic pair preserved exactly", () => {
+  for (
+    const [latitude, longitude] of [
+      [undefined, undefined],
+      [null, null],
+      [undefined, null],
+      [null, undefined],
+      [0, 0],
+      [41.561, 14.667],
+      [-90, -180],
+      [90, 180],
+    ] as const
+  ) {
+    const result = parseContentSubmission(
+      submissionWithCoordinates(latitude, longitude),
+    );
+    assert(result.ok);
+    assertEquals(result.value.latitude, latitude ?? null);
+    assertEquals(result.value.longitude, longitude ?? null);
+  }
+
+  for (
+    const submission of [
+      { ...validSubmission(), latitude: undefined, longitude: undefined },
+      { ...validSubmission(), latitude: undefined, longitude: null },
+      { ...validSubmission(), latitude: null, longitude: undefined },
+      { ...validSubmission(), latitude: null, longitude: null },
+    ]
+  ) {
+    const result = parseContentSubmission(submission);
+    assert(result.ok);
+    assertEquals(result.value.latitude, null);
+    assertEquals(result.value.longitude, null);
+  }
+
+  for (
+    const [latitude, longitude, message] of [
+      [1, undefined, "latitude and longitude must be provided together"],
+      [1, null, "latitude and longitude must be provided together"],
+      [undefined, 1, "latitude and longitude must be provided together"],
+      [null, 1, "latitude and longitude must be provided together"],
+      [undefined, 1, "latitude and longitude must be provided together"],
+      [-90.000001, 0, "latitude is not valid"],
+      [90.000001, 0, "latitude is not valid"],
+      [0, -180.000001, "longitude is not valid"],
+      [0, 180.000001, "longitude is not valid"],
+      ["1", 0, "latitude is not valid"],
+      [true, 0, "latitude is not valid"],
+      [{}, 0, "latitude is not valid"],
+      [[], 0, "latitude is not valid"],
+      [0, [], "longitude is not valid"],
+      [0, false, "longitude is not valid"],
+      [0, {}, "longitude is not valid"],
+      [0, "1", "longitude is not valid"],
+      [Number.NaN, 0, "latitude is not valid"],
+      [0, Number.POSITIVE_INFINITY, "longitude is not valid"],
+      [Number.NEGATIVE_INFINITY, 0, "latitude is not valid"],
+      [0, Number.NEGATIVE_INFINITY, "longitude is not valid"],
+    ] as const
+  ) {
+    expectInvalid(submissionWithCoordinates(latitude, longitude), message);
+  }
+});
+
+Deno.test("public submission assets require the exact canonical Cloudinary delivery URL", () => {
+  for (
+    const url of [
+      canonicalAssetUrl(),
+      canonicalAssetUrl(secondDigest).replace("v1", "v2").replace(
+        ".jpg",
+        ".webp",
+      ),
+    ]
+  ) {
+    const result = parseContentSubmission({
+      ...validSubmission(),
+      assets: [validAsset({ url })],
+    });
+    assert(result.ok);
+    assertEquals(result.value.assets[0].url, url);
+  }
+
+  for (
+    const url of [
+      canonicalAssetUrl().replace("https:", "http:"),
+      canonicalAssetUrl().replace("res.cloudinary.com", "example.test"),
+      canonicalAssetUrl().replace(cloudName, "wrong-cloud"),
+      canonicalAssetUrl().replace("image/upload", "video/upload"),
+      canonicalAssetUrl().replace("image/upload", "image/fetch"),
+      canonicalAssetUrl().replace("content_submissions", "other"),
+      canonicalAssetUrl().replace("v1/", ""),
+      canonicalAssetUrl().replace(".jpg", ""),
+      canonicalAssetUrl().replace(".jpg", ".JPG"),
+      canonicalAssetUrl().replace("v1/", "v1/w_100/"),
+      canonicalAssetUrl().replace("v1/", "v1/v2/"),
+      canonicalAssetUrl().replace("upload/v1", "upload/./v1"),
+      canonicalAssetUrl().replace(
+        "content_submissions/",
+        "content%5fsubmissions/",
+      ),
+      canonicalAssetUrl().replace("v1/", "v1/%2e%2e/"),
+      canonicalAssetUrl().replace("v1", "v0"),
+      canonicalAssetUrl().replace("v1", "v00"),
+      canonicalAssetUrl().replace("v1", "v-1"),
+      canonicalAssetUrl().replace("v1", "vabc"),
+      canonicalAssetUrl().replace(firstDigest, firstDigest.toUpperCase()),
+      canonicalAssetUrl().replace(firstDigest, "a".repeat(63)),
+      canonicalAssetUrl().replace(firstDigest, `${"a".repeat(63)}g`),
+      canonicalAssetUrl().replace(
+        "content_submissions/",
+        "content_submissions/content_submissions/",
+      ),
+      canonicalAssetUrl().replace(".jpg", ".j-p-g"),
+      `${canonicalAssetUrl()}?x=1`,
+      `${canonicalAssetUrl()}#fragment`,
+      canonicalAssetUrl().replace("https://", "https://user@"),
+      canonicalAssetUrl().replace(
+        "res.cloudinary.com",
+        "res.cloudinary.com:443",
+      ),
+      canonicalAssetUrl().replace(
+        "res.cloudinary.com",
+        "res.cloudinary.com:8443",
+      ),
+    ]
+  ) {
+    expectInvalid(
+      { ...validSubmission(), assets: [validAsset({ url })] },
+      "asset url is not valid",
+    );
+  }
+});
+
+Deno.test("public submission assets reject duplicate public IDs after the maximum size gate", () => {
+  const first = validAsset();
+  const second = validAsset({ url: canonicalAssetUrl(secondDigest) });
+  for (const assets of [[first], [first, second]]) {
+    const result = parseContentSubmission({ ...validSubmission(), assets });
+    assert(result.ok);
+    assertEquals(result.value.assets, assets);
+  }
+  expectInvalid(
+    { ...validSubmission(), assets: [first, first] },
+    "assets must not contain duplicates",
+  );
+  expectInvalid(
+    { ...validSubmission(), assets: Array.from({ length: 6 }, () => first) },
+    "assets length is not valid",
+  );
 });
 
 Deno.test("preserves a canonical client submission identity", () => {
@@ -448,8 +614,7 @@ Deno.test("accepts five assets and rejects a sixth", () => {
       { length: MAX_SUBMISSION_ASSETS },
       (_, index) =>
         validAsset({
-          url:
-            `https://res.cloudinary.com/demo/image/upload/v1/example-${index}.jpg`,
+          url: canonicalAssetUrl(`${index}`.padStart(64, "0")),
         }),
     ),
   });
@@ -463,8 +628,7 @@ Deno.test("accepts five assets and rejects a sixth", () => {
         { length: MAX_SUBMISSION_ASSETS + 1 },
         (_, index) =>
           validAsset({
-            url:
-              `https://res.cloudinary.com/demo/image/upload/v1/example-${index}.jpg`,
+            url: canonicalAssetUrl(`${index}`.padStart(64, "0")),
           }),
       ),
     },

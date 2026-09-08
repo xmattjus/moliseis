@@ -33,6 +33,7 @@ type FailureLog = (
 
 export type HandlerDependencies = {
   authenticate: (authorizationHeader: string) => Promise<User | null>;
+  cloudName: string;
   createStore: () => SubmissionStore;
   logFailure: FailureLog;
 };
@@ -138,7 +139,10 @@ export function createHandler(
       }
       return validationErrorResponse("Request body must be valid JSON");
     }
-    const parsedSubmission = parseContentSubmission(rawBody);
+    const parsedSubmission = parseContentSubmission(
+      rawBody,
+      dependencies.cloudName,
+    );
     if (!parsedSubmission.ok) {
       return validationErrorResponse(parsedSubmission.message);
     }
@@ -159,7 +163,9 @@ export function createProductionDependencies(): HandlerDependencies {
   const supabaseUrl = requiredEnv("SUPABASE_URL");
   const anonKey = requiredEnv("SUPABASE_ANON_KEY");
   const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const cloudName = requiredEnv("CLOUDINARY_CLOUD_NAME");
   return {
+    cloudName,
     authenticate: async (authorizationHeader) => {
       const userClient: SupabaseClient<Database> = createClient<Database>(
         supabaseUrl,

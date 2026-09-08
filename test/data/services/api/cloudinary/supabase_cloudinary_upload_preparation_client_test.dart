@@ -12,6 +12,8 @@ void main() {
   const digest =
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const publicId = 'content_submissions/$digest';
+  const secureUrl =
+      'https://res.cloudinary.com/test-cloud/image/upload/v1/$publicId.jpg';
   late RecordingSupabaseFunctionsHttpClient httpClient;
   late SupabaseClient supabase;
   late SupabaseCloudinaryUploadPreparationClient client;
@@ -68,7 +70,7 @@ void main() {
     httpClient.queueJson(<String, Object?>{
       'outcome': 'duplicate',
       'asset': <String, Object?>{
-        'secure_url': 'https://example.com/image.jpg',
+        'secure_url': secureUrl,
         'width': 100,
         'height': 200,
         'mime_type': 'image/jpeg',
@@ -104,7 +106,7 @@ void main() {
           <String, Object?>{
             'outcome': 'duplicate',
             'asset': <String, Object?>{
-              'secure_url': 'https://example.com/image.jpg',
+              'secure_url': secureUrl,
               'width': 100,
               'height': 200,
               'mime_type': 'image/jpeg',

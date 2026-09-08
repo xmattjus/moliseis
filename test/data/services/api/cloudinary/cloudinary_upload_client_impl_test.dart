@@ -49,21 +49,22 @@ void main() {
     test(
       'successful jpg upload returns MIME metadata and reaches progress 1.0',
       () async {
-        const secureUrl =
-            'https://res.cloudinary.com/test_cloud/image/upload/v1/test';
+        final tempDir = await Directory.systemTemp.createTemp('upload_test_');
+        final file = File('${tempDir.path}/image.jpg')
+          ..writeAsBytesSync([1, 2, 3, 4, 5]);
+        addTearDown(() => tempDir.delete(recursive: true));
+        final publicId = await CloudinaryPublicIdGenerator().generate(file);
+        final secureUrl =
+            'https://res.cloudinary.com/test_cloud/image/upload/v1/$publicId.jpg';
         server.setUploadResponse(
           status: 200,
-          body: const {
+          body: {
             'secure_url': secureUrl,
             'width': 100,
             'height': 100,
             'format': 'jpg',
           },
         );
-        final tempDir = await Directory.systemTemp.createTemp('upload_test_');
-        final file = File('${tempDir.path}/image.jpg')
-          ..writeAsBytesSync([1, 2, 3, 4, 5]);
-        addTearDown(() => tempDir.delete(recursive: true));
 
         final task = client.uploadImageTask(file);
         final progressValues = <double>[];
@@ -158,19 +159,20 @@ void main() {
     test(
       'successful upload without a format keeps MIME metadata nullable',
       () async {
-        server.setUploadResponse(
-          status: 200,
-          body: const {
-            'secure_url':
-                'https://res.cloudinary.com/test_cloud/image/upload/v1/no-format',
-            'width': 100,
-            'height': 100,
-          },
-        );
         final tempDir = await Directory.systemTemp.createTemp('upload_test_');
         final file = File('${tempDir.path}/image.jpg')
           ..writeAsBytesSync([1, 2, 3, 4, 5]);
         addTearDown(() => tempDir.delete(recursive: true));
+        final publicId = await CloudinaryPublicIdGenerator().generate(file);
+        server.setUploadResponse(
+          status: 200,
+          body: {
+            'secure_url':
+                'https://res.cloudinary.com/test_cloud/image/upload/v2/$publicId.webp',
+            'width': 100,
+            'height': 100,
+          },
+        );
 
         final result = await client.uploadImageTask(file).result;
 
@@ -189,10 +191,11 @@ void main() {
           ..writeAsBytesSync([1, 2, 3]);
         addTearDown(() => tempDir.delete(recursive: true));
 
-        const existingUrl =
-            'https://res.cloudinary.com/test_cloud/existing.jpg';
+        final publicId = await CloudinaryPublicIdGenerator().generate(file);
+        final existingUrl =
+            'https://res.cloudinary.com/test_cloud/image/upload/v2/$publicId.webp';
         preparationClient.enqueue(
-          const Result.success(
+          Result.success(
             CloudinaryDuplicateUploadPreparation(
               SubmissionAsset(
                 secureUrl: existingUrl,

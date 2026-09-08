@@ -1,4 +1,5 @@
 import type { Database, Json } from "../_shared/database.types.ts";
+import { parseCloudinaryDeliveryUrl } from "../_shared/cloudinary.ts";
 import { validateSubmissionDates } from "../_shared/submission_dates.ts";
 
 export const MAX_REQUEST_BODY_BYTES = 128 * 1024;
@@ -319,8 +320,67 @@ export function parseSubmissionAsset(
   });
 }
 
+function parseCoordinates(
+  latitude: unknown,
+  longitude: unknown,
+): ValidationResult<{ latitude: number | null; longitude: number | null }> {
+  const isAbsent = (value: unknown) => value === undefined || value === null;
+  if (
+    !isAbsent(latitude) &&
+    (typeof latitude !== "number" || !Number.isFinite(latitude))
+  ) {
+    return invalid("latitude is not valid");
+  }
+  if (
+    !isAbsent(longitude) &&
+    (typeof longitude !== "number" || !Number.isFinite(longitude))
+  ) {
+    return invalid("longitude is not valid");
+  }
+  if (isAbsent(latitude) && isAbsent(longitude)) {
+    return valid({ latitude: null, longitude: null });
+  }
+  if (isAbsent(latitude) || isAbsent(longitude)) {
+    return invalid("latitude and longitude must be provided together");
+  }
+  if (latitude < -90 || latitude > 90) {
+    return invalid("latitude is not valid");
+  }
+  if (longitude < -180 || longitude > 180) {
+    return invalid("longitude is not valid");
+  }
+  return valid({ latitude, longitude });
+}
+
+function parsePublicSubmissionAsset(
+  value: unknown,
+  cloudName: string,
+): ValidationResult<{ asset: ValidatedSubmissionAsset; publicId: string }> {
+  const parsedAsset = parseSubmissionAsset(value);
+  if (!parsedAsset.ok) return parsedAsset;
+  if (!parseCloudinaryDeliveryUrl(parsedAsset.value.url, cloudName)) {
+    return invalid("asset url is not valid");
+  }
+  const urlPattern = new RegExp(
+    `^https://res\\.cloudinary\\.com/${
+      escapeRegExp(cloudName)
+    }/image/upload/v[1-9][0-9]*/content_submissions/([0-9a-f]{64})\\.[a-z0-9]+$`,
+  );
+  const match = urlPattern.exec(parsedAsset.value.url);
+  if (!match) return invalid("asset url is not valid");
+  return valid({
+    asset: parsedAsset.value,
+    publicId: `content_submissions/${match[1]}`,
+  });
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function parseAssets(
   value: unknown,
+  cloudName: string,
 ): ValidationResult<ValidatedSubmissionAsset[]> {
   if (value === undefined || value === null) return valid([]);
   if (!Array.isArray(value) || value.length > MAX_SUBMISSION_ASSETS) {
@@ -328,10 +388,15 @@ function parseAssets(
   }
 
   const assets: ValidatedSubmissionAsset[] = [];
+  const publicIds = new Set<string>();
   for (const rawAsset of value) {
-    const parsedAsset = parseSubmissionAsset(rawAsset);
+    const parsedAsset = parsePublicSubmissionAsset(rawAsset, cloudName);
     if (!parsedAsset.ok) return parsedAsset;
-    assets.push(parsedAsset.value);
+    if (publicIds.has(parsedAsset.value.publicId)) {
+      return invalid("assets must not contain duplicates");
+    }
+    publicIds.add(parsedAsset.value.publicId);
+    assets.push(parsedAsset.value.asset);
   }
 
   return valid(assets);
@@ -339,6 +404,7 @@ function parseAssets(
 
 export function parseContentSubmission(
   value: unknown,
+  cloudName: string,
 ): ValidationResult<ValidatedContentSubmission> {
   if (!isRecord(value)) return invalid("Request body must be a JSON object");
 
@@ -377,12 +443,11 @@ export function parseContentSubmission(
   if (!isOptionalString(description)) {
     return invalid("description must be a string or null");
   }
-  if (!isOptionalFiniteNumber(latitude)) {
-    return invalid("latitude is not valid");
-  }
-  if (!isOptionalFiniteNumber(longitude)) {
-    return invalid("longitude is not valid");
-  }
+  const coordinates = parseCoordinates(
+    latitude,
+    longitude,
+  );
+  if (!coordinates.ok) return coordinates;
   if (!isOptionalString(address)) {
     return invalid("address must be a string or null");
   }
@@ -444,7 +509,7 @@ export function parseContentSubmission(
 
   const delta = parseQuillDelta(description_delta, description ?? null);
   if (!delta.ok) return delta;
-  const parsedAssets = parseAssets(assets);
+  const parsedAssets = parseAssets(assets, cloudName);
   if (!parsedAssets.ok) return parsedAssets;
 
   return valid({
@@ -453,8 +518,8 @@ export function parseContentSubmission(
     name: name.trim(),
     description: description ?? null,
     description_delta: delta.value,
-    latitude: latitude ?? null,
-    longitude: longitude ?? null,
+    latitude: coordinates.value.latitude,
+    longitude: coordinates.value.longitude,
     address: address?.trim() ?? null,
     start_date: parsedDates.value.start_date,
     end_date: parsedDates.value.end_date,

@@ -9,6 +9,11 @@ import type {
 } from "./submission_store.ts";
 
 const userId = "00000000-0000-4000-8000-000000000002";
+const cloudName = "test-cloud";
+const canonicalAssetUrl =
+  `https://res.cloudinary.com/${cloudName}/image/upload/v1/content_submissions/${
+    "a".repeat(64)
+  }.jpg`;
 
 const validSubmission = () => ({
   client_submission_id: "00000000-0000-4000-8000-000000000001",
@@ -64,6 +69,7 @@ function createHarness(overrides: Partial<HandlerDependencies> = {}) {
   const store = new FakeStore();
   const calls = { authenticate: 0, stores: 0, logs: [] as string[] };
   const dependencies: HandlerDependencies = {
+    cloudName,
     authenticate: async () => {
       calls.authenticate += 1;
       return user();
@@ -173,6 +179,70 @@ Deno.test("malformed, oversized, and invalid bodies return before store construc
     message: "city is required",
   });
   assertEquals(invalid.calls.stores, 0);
+});
+
+Deno.test("boundary validation rejects invalid coordinates and public assets before store construction", async () => {
+  const invalidRequests: Array<[Record<string, unknown>, string]> = [
+    [
+      { ...validSubmission(), latitude: 41.5 },
+      "latitude and longitude must be provided together",
+    ],
+    [
+      { ...validSubmission(), latitude: 91, longitude: 0 },
+      "latitude is not valid",
+    ],
+    [{
+      ...validSubmission(),
+      assets: [{
+        url:
+          `https://res.cloudinary.com/wrong-cloud/image/upload/v1/content_submissions/${
+            "a".repeat(64)
+          }.jpg`,
+        width: 1,
+        height: 1,
+        mime_type: null,
+        duration_seconds: null,
+      }],
+    }, "asset url is not valid"],
+    [{
+      ...validSubmission(),
+      assets: Array.from(
+        { length: 2 },
+        () => ({
+          url: canonicalAssetUrl,
+          width: 1,
+          height: 1,
+          mime_type: null,
+          duration_seconds: null,
+        }),
+      ),
+    }, "assets must not contain duplicates"],
+  ];
+  for (const [body, message] of invalidRequests) {
+    const harness = createHarness();
+    const response = await harness.handler(request(body));
+    assertEquals(response.status, 400);
+    assertEquals(await responseJson(response), {
+      code: "VALIDATION_ERROR",
+      message,
+    });
+    assertEquals(harness.calls.stores, 0);
+    assertEquals(harness.store.calls, []);
+  }
+
+  const replay = createHarness();
+  replay.store.result = { outcome: "replayed", submissionId: 7 };
+  const replayResponse = await replay.handler(request({
+    ...validSubmission(),
+    latitude: 41.5,
+  }));
+  assertEquals(replayResponse.status, 400);
+  assertEquals(await responseJson(replayResponse), {
+    code: "VALIDATION_ERROR",
+    message: "latitude and longitude must be provided together",
+  });
+  assertEquals(replay.calls.stores, 0);
+  assertEquals(replay.store.calls, []);
 });
 
 Deno.test("created and replayed acknowledgements make exactly one store call", async () => {

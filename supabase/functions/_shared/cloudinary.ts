@@ -192,14 +192,20 @@ async function withCloudinaryTimeout<T>(
   }
 }
 
-function isValidDeliveryUrl(url: string, cloudName: string): boolean {
+/** Parses only the generic Cloudinary delivery identity shared by consumers. */
+export function parseCloudinaryDeliveryUrl(
+  value: string,
+  cloudName: string,
+): URL | null {
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(value);
     return parsed.protocol === "https:" &&
-      parsed.hostname === "res.cloudinary.com" &&
-      parsed.pathname.split("/")[1] === cloudName;
+        parsed.hostname === "res.cloudinary.com" &&
+        parsed.pathname.split("/")[1] === cloudName
+      ? parsed
+      : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -250,7 +256,7 @@ export async function lookupCloudinaryImage(params: {
       if (
         body.public_id !== params.publicId ||
         typeof secureUrl !== "string" ||
-        !isValidDeliveryUrl(secureUrl, params.config.cloudName) ||
+        !parseCloudinaryDeliveryUrl(secureUrl, params.config.cloudName) ||
         typeof width !== "number" || !Number.isSafeInteger(width) ||
         width <= 0 ||
         typeof height !== "number" || !Number.isSafeInteger(height) ||

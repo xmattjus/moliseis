@@ -33,7 +33,7 @@ function submission(): ValidatedContentSubmission {
     name: "Teatro",
     description: null,
     description_delta: null,
-    latitude: null,
+    latitude: 41.56,
     longitude: 14.66,
     address: null,
     start_date: "2026-08-21T10:00:00.000Z",
@@ -43,14 +43,20 @@ function submission(): ValidatedContentSubmission {
     user_name: "Contributor",
     assets: [
       {
-        url: "https://res.cloudinary.com/demo/image/upload/v1/first.jpg",
+        url:
+          `https://res.cloudinary.com/test-cloud/image/upload/v1/content_submissions/${
+            "a".repeat(64)
+          }.jpg`,
         width: 1600,
         height: 1200,
         mime_type: "image/jpeg",
         duration_seconds: null,
       },
       {
-        url: "https://res.cloudinary.com/demo/image/upload/v1/second.jpg",
+        url:
+          `https://res.cloudinary.com/test-cloud/image/upload/v2/content_submissions/${
+            "b".repeat(64)
+          }.webp`,
         width: 800,
         height: 600,
         mime_type: null,
@@ -87,7 +93,7 @@ Deno.test("submission store forwards the exact submit_content argument allowlist
       p_name: "Teatro",
       p_description: null,
       p_description_delta: null,
-      p_latitude: null,
+      p_latitude: 41.56,
       p_longitude: 14.66,
       p_address: null,
       p_start_date: "2026-08-21T10:00:00.000Z",

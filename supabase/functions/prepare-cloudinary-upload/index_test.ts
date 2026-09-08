@@ -218,7 +218,8 @@ Deno.test("allows anonymous and permanent users to receive exact authorized fiel
 
 Deno.test("returns duplicate asset without preparing signed fields", async () => {
   const duplicate: CloudinaryDuplicateAsset = {
-    secureUrl: "https://res.cloudinary.com/test-cloud/image/upload/v1/test.png",
+    secureUrl:
+      `https://res.cloudinary.com/test-cloud/image/upload/v1/${publicId}.png`,
     width: 100,
     height: 200,
     mimeType: "image/png",
