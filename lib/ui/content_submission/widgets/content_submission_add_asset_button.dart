@@ -11,31 +11,35 @@ class ContentSubmissionAddAssetButton extends StatelessWidget {
   /// Creates the add-asset button.
   ///
   /// `onPressed` is invoked when the button is tapped.
-  const ContentSubmissionAddAssetButton({super.key, required this.onPressed});
+  const ContentSubmissionAddAssetButton({required this.onPressed, super.key});
 
   /// Called when the user taps the button.
   final void Function() onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints.tight(
-        contentSubmissionAssetSize,
+    return IconButton(
+      onPressed: onPressed,
+      constraints: BoxConstraints.tight(contentSubmissionAssetSize),
+      style: ButtonStyle(
+        backgroundColor: WidgetStatePropertyAll(
+          context.colorScheme.primaryFixed,
+        ),
+        shape: WidgetStateOutlinedBorder.resolveWith((states) {
+          if (states.contains(WidgetState.pressed)) {
+            return RoundedRectangleBorder(
+              borderRadius: context.appShapes.circular.cornerLargeIncreased,
+            );
+          }
+
+          return null;
+        }),
       ),
-      child: Material(
-        color: context.colorScheme.primaryFixed,
-        shape: RoundedRectangleBorder(
-          borderRadius: context.appShapes.circular.cornerFull,
-        ),
-        clipBehavior: Clip.hardEdge,
-        child: InkWell(
-          onTap: onPressed,
-          child: Icon(
-            Symbols.add_a_photo,
-            size: 24,
-            color: context.colorScheme.onPrimaryFixed,
-          ),
-        ),
+      tooltip: 'Inserisci una foto',
+      icon: Icon(
+        Symbols.add_a_photo,
+        size: 24,
+        color: context.colorScheme.onPrimaryFixed,
       ),
     );
   }

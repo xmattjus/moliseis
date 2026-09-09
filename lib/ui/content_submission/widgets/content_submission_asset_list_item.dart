@@ -14,9 +14,9 @@ class ContentSubmissionAssetListItem extends StatelessWidget {
   /// [onPressed] is called when the user taps the remove icon to delete this
   /// specific asset.
   const ContentSubmissionAssetListItem({
-    super.key,
-    this.onPressed,
     required this.image,
+    this.onPressed,
+    super.key,
   });
 
   /// Callback triggered when the remove icon is pressed.
@@ -31,10 +31,8 @@ class ContentSubmissionAssetListItem extends StatelessWidget {
       key: key,
       clipBehavior: Clip.none,
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: context.appShapes.circular.cornerMedium,
-          ),
+        ClipRRect(
+          borderRadius: context.appShapes.circular.cornerMedium,
           child: image,
         ),
         Positioned(
