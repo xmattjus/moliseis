@@ -1,143 +1,121 @@
 ## Context
 
-See `proposal.md` for motivation and the two capability deltas for normative behavior. This design was audited against repository HEAD `792b095254d742093783a4d9671235b3ee3a4c94` with a clean working tree before the change was scaffolded.
+See `proposal.md` for motivation and the two capability deltas for normative behavior. This correction was audited at repository HEAD `3e74ce81b7ebdc2eb1b77e2321cb170b596b7315` with a clean working tree.
 
-The form validates fields and event time, checkpoints the draft, starts `ContentSubmissionViewModel.submit`, and then pushes the child progress route. A form-validation or first checkpoint failure therefore stays on the form and does not normally enter `submit.result`. Once the Command starts, it clears its prior result, captures unexpected thrown `Object`s as `Result.error(Exception)`, and notifies listeners at running and terminal transitions. The progress screen observes that Command plus `submissionFinalizationPending`; today every ordinary error renders `Riprova`, while finalization failure is already a distinct local-only retry state.
+Repository source and production rollout state are deliberately different. The checkout contains the hardened `submit-content` implementation and idempotency migration, but the planned deployment sequence is client first:
 
-The failure surface that can affect this flow is:
+1. release the updated Flutter client to Android and iOS;
+2. let that client coexist with the currently deployed legacy `submit-content` function;
+3. deploy the hardened idempotent function only after sufficient client adoption;
+4. validate the complete new-client/new-server system afterward.
 
-| Source | Current concrete form | Reaches `submit.result` / progress |
-| --- | --- | --- |
-| Form validation or the form-owned pre-submit checkpoint | Validation remains in the form; checkpoint is `Result.error` from the draft repository | No in the production transition; the progress route is not pushed |
-| Command-side preparation/eligibility | Plain `Exception` for unavailable staged state, too many assets, invalid event time, missing required fields, or competing ownership; draft checkpoint errors are propagated unchanged | Yes when the Command is invoked, including direct callers and state failures after handoff |
-| Staged-asset acquisition/reconciliation before submission | Repository `Result.error`, often an infrastructure exception; picker/lost-media work uses separate Commands and best-effort recovery | Not ordinarily; unavailable staged state can later produce the preparation error above |
-| Captured staged file and Cloudinary preparation/upload | `FileSystemException`, `FormatException`, `TimeoutException`, `SocketException`/other transport error, Cloudinary validation/cancellation exceptions, a preparation `FunctionException` currently reduced to a generic `Exception`, or a private direct-upload HTTP-status failure; first `Error<SubmissionAsset>` is returned unchanged | Yes; final `submit-content` is not called after the first upload error |
-| `submit-content` HTTP failure | `ContentSubmissionApiException(statusCode, code, message)` for `FunctionException` | Yes |
-| `submit-content` transport failure | Non-Function exception such as `http.ClientException`, currently returned unchanged | Yes |
-| Malformed positive acknowledgement | `FormatException` | Yes |
-| Valid remote acknowledgement followed by local retirement failure | Draft clear `Result.error` (or identity-guard `Exception`) while `submissionFinalizationPending == true`; staged cleanup remains under the existing retirement policy | Yes, with confirmed remote success recorded |
-| Unexpected throw from upload/final submit/orchestration | Existing exception, or an `Exception` wrapper when the Command catches a non-Exception `Object` | Yes; pre-acknowledgement ownership is released by the existing `finally` path |
+The legacy handler is the implementation immediately before hardening commit `fe8a7e2` (repository commit `738d01504afa5e39fbcc653a53eb92d032d883f8`). It accepts and ignores the additional `client_submission_id`, reads and updates quota separately, inserts `content_submissions` directly, then associates assets in another RPC. It neither persists the client identity nor uses it for replay. Quota can therefore be updated before submission insertion, and the content row can commit before asset association reports a failure. Its structured failures include `VALIDATION_ERROR`/400, `UNAUTHORIZED`/401, `METHOD_NOT_ALLOWED`/405, `RATE_LIMIT_EXCEEDED`/429, plus `RATE_LIMIT_READ_FAILED`, `RATE_LIMIT_UPDATE_FAILED`, `SUBMISSION_INSERT_FAILED`, `ASSET_INSERT_FAILED`, and catch-all `INTERNAL_ERROR`, all with HTTP 500 where applicable.
 
-The deployed `submit-content` handler and tests expose exactly `VALIDATION_ERROR`/400, `UNAUTHORIZED`/401, `METHOD_NOT_ALLOWED`/405, `RATE_LIMIT_EXCEEDED`/429, and `INTERNAL_ERROR`/500. Created and replayed acknowledgements are successful 201/200 responses. No 409 is emitted or normalized. The current 429 response has no `Retry-After` contract.
+The current hardened handler authenticates and validates before one service-role-only `submit_content` RPC. Migration `20260908065810_harden_content_submission_server_idempotency.sql` makes quota, content, and asset persistence atomic and deduplicates `(user_id, client_submission_id)`. Its public failure taxonomy is exactly `VALIDATION_ERROR`/400, `UNAUTHORIZED`/401, `METHOD_NOT_ALLOWED`/405, `RATE_LIMIT_EXCEEDED`/429, and `INTERNAL_ERROR`/500; created and replayed acknowledgements are HTTP 201/200. It emits no 409. Crucially, `INTERNAL_ERROR`/500 exists in both generations and neither the request nor failure response provides a version/capability discriminator. A final 500 therefore does not prove which persistence contract handled the request or whether the legacy path already committed.
 
-The separate, already-existing `prepare-cloudinary-upload` boundary can also fail before a binary upload. Its current structured outcomes are `VALIDATION_ERROR`/400, `UNAUTHORIZED`/401, `METHOD_NOT_ALLOWED`/405, `REQUEST_TOO_LARGE`/413, `CLOUDINARY_CONFIGURATION_ERROR`/500, and `CLOUDINARY_PREPARATION_ERROR`/502. Only the exact preparation 502 is evidence of a temporary preparation-side failure; configuration 500 is not an immediate user-retry condition. This mini-change does not alter that Edge Function. The direct Cloudinary client already performs its own bounded internal retry for upload HTTP 5xx and streaming/body timeouts; this design only classifies the terminal error that remains after that behavior.
+`pubspec.lock` pins `functions_client` 2.6.4. Its `FunctionsClient.invoke()` returns a `FunctionResponse` for 2xx, throws `FunctionException(status, details, reasonPhrase)` for non-2xx, and lets exceptions from request transmission or response consumption propagate. It has no automatic retry or commit-status signal. `ContentSubmissionRepositoryImpl` converts only `FunctionException` into `ContentSubmissionApiException(statusCode, code, message)`, returns other exceptions unchanged, rejects malformed positive acknowledgements with `FormatException`, and performs one invocation. A final timeout, `ClientException`, `SocketException`, or equivalent can occur before receipt, during processing, or after remote commit but before acknowledgement; probable transience does not make replay proven safe against the legacy server.
+
+The form-owned validation/checkpoint normally fails before the progress route is pushed. Once the Command starts, local eligibility/checkpoint/staged-state failures, Cloudinary preparation/direct-upload errors, final-submit errors, malformed acknowledgements, finalization errors, and unexpected exceptions can reach `submit.result`. The first upload error prevents `submit-content`; final-submit failure releases attempt ownership while preserving the session; confirmed submit success sets `submissionFinalizationPending` before local retirement.
+
+`prepare-cloudinary-upload` exposes `VALIDATION_ERROR`/400, `UNAUTHORIZED`/401, `METHOD_NOT_ALLOWED`/405, `REQUEST_TOO_LARGE`/413, `CLOUDINARY_CONFIGURATION_ERROR`/500, and `CLOUDINARY_PREPARATION_ERROR`/502. The same preparation 502 is returned for an unexpected lookup failure, a thrown field builder, and deterministic rejection of invalid or configuration-mismatched prepared fields. It is therefore an ambiguous bucket, not positive transient evidence. Its Flutter client currently reduces `FunctionException` to a generic `Exception`; since every preparation failure maps to false for this immediate action, preserving additional fields or adding a preparation wrapper would have no behavior in this release.
+
+The shared direct Cloudinary client internally retries only direct-upload HTTP 5xx and streaming/body `TimeoutException`, up to its existing bound. Connect-phase socket/other exceptions are terminal. After internal exhaustion, the public `ImageUploadTask` exposes only `Result<SubmissionAsset>`, progress, and cancellation; the direct HTTP status exception remains private to shared infrastructure. Content-addressed public IDs and preparation reuse protect existing asset behavior, but distinguishing every terminal direct-upload cause at the Content Submission boundary would require a feature-specific task wrapper or leakage of a feature domain contract into shared Cloudinary code used by Admin.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Derive immediate manual retry from structured failure evidence across the existing repository/upload boundaries.
-- Give UI/ViewModel one domain-facing semantic without exposing `ContentSubmissionApiException` or another data type.
-- Keep retry availability synchronized with the existing Command result and finalization state by construction.
-- Preserve every existing identity, idempotency, staging, captured-attempt, clear, and finalization invariant.
-- Make every currently relevant failure source's retry outcome explicit, including fail-closed local and unknown cases.
+- Define `canRetry` as proven safe immediate execution of the current manual action, separately from technical transience or eventual recoverability.
+- Keep the released client safe against both legacy non-idempotent and hardened idempotent final-submit servers.
+- Remove blind ordinary-error retry while preserving the current session and its safe route recovery.
+- Keep finalization failure immediately retryable through the existing local-only path.
+- Use the smallest implementation surface: one derived ViewModel semantic and one progress-action decision.
 
 **Non-Goals:**
 
-- Automatic retries, exponential backoff, retry scheduling, or `Retry-After` support.
-- Authentication refresh or recovery redesign, general error UX redesign, or new user-facing error taxonomy copy.
-- Edge Function, SQL, RPC, migration, RLS, server-idempotency, quota, or acknowledgement changes.
-- Cloudinary architecture, upload ordering, existing internal retry, deletion/rollback, reuse/deduplication, or staged-asset ownership changes.
-- New packages, a service layer, retry manager, exception hierarchy, or speculative generic failure framework.
-- Global `Command` or `Result` refactoring, unrelated Content Submission ViewModel cleanup, unrelated deduplication, or Admin behavior redesign.
-- Visual hierarchy, colors, typography, spacing, icons, general layout, unrelated wording, or graphical changes.
-- App Store or Play Store release operations.
+- Backend, Edge Function, SQL, RPC, migration, RLS, server-idempotency, or deployment-version-negotiation changes.
+- Feature flags, response capability headers, minimum-server checks, or automatic transition of policy after deployment.
+- Automatic retry, exponential backoff, scheduling, timers, cooldown UX, or `Retry-After` support.
+- Authentication refresh/recovery redesign or general error UX redesign.
+- Cloudinary architecture, preparation taxonomy, direct-upload retry algorithm, deletion/rollback, content addressing, reuse/deduplication, progress, or cancellation changes.
+- New packages, a service layer, retry manager, domain exception hierarchy, global `Command`/`Result` refactoring, or Admin behavior changes.
+- Unrelated ViewModel cleanup, deduplication, wording, visual hierarchy, colors, typography, spacing, icons, layout, or graphical changes.
+- Android/iOS store publication or hardened backend deployment operations.
 
 ## Decisions
 
-### 1. Add one Content Submission-specific domain retry semantic, not a data exception dependency
+### 1. `canRetry` means safe immediate manual action, not transient cause
 
-Introduce a tiny immutable domain contract, conceptually `ContentSubmissionRetrySemantic { bool get canRetry; }`, under the existing Content Submission domain surface. Structured data/infrastructure exceptions implement that contract; an unclassified exception implements nothing and is therefore non-retryable. The contract contains no HTTP, Supabase, Cloudinary, UI, scheduling, or localized-message concept.
+Use the explicit presentation name `canRetrySubmissionImmediately`. Its normative meaning is: the user may safely execute the current `Riprova` action now without violating submission identity, duplicate-commit, staging, upload, or finalization invariants. A failure can be transient yet return false when replay safety is uncertain, recovery requires delay or another action, or the observable boundary lacks enough provenance.
 
-`ContentSubmissionApiException` remains the normalized data-layer API exception and keeps its existing `statusCode`, optional `code`, and `message`. It implements the domain semantic with an exact structured mapping: only `statusCode == 500 && code == 'INTERNAL_ERROR'` returns true. The four verified permanent/immediate-ineligible pairs return false, and every missing, unknown, or mismatched pair returns false. Classification never falls back to status alone or message text, so a proxy/custom 500 without the verified code remains fail-closed.
+A structured error is immediately retryable only when the observable contract proves both that repeating the operation is appropriate and that it is safe under every server generation supported by the released client. Classification never parses `message`, `reasonPhrase`, `toString()`, raw response bodies, or localized UI text.
 
-The existing repository boundary normalizes a terminal `TimeoutException` into a small Content Submission transport failure that implements the same semantic, retains the original exception as its cause for diagnostics, and reports `canRetry == true`. The current repository does not expose a discriminator proving that a generic `http.ClientException` or `SocketException` is transient; the Cloudinary client specifically documents that its connect-phase socket error can also reflect a misconfigured URL. Those broad types and arbitrary `Exception`s therefore remain unclassified and fail closed. No hidden request retry is added.
+### 2. Fail closed for every ordinary failure in the client-first release
 
-`SupabaseCloudinaryUploadPreparationClient` currently discards `FunctionException.status` and structured details. Preserve those fields in a focused data-layer preparation exception implementing the domain semantic: only exact `CLOUDINARY_PREPARATION_ERROR`/502 is retryable; validation/authentication/method/body-size/configuration failures and missing, unknown, or mismatched outcomes are false. This is error normalization at the existing client boundary, not a new upload service or change to the preparation API.
+The normative matrix is:
 
-For binary upload, keep `ImageUploadTask`, progress, and cancellation unchanged. Decorate only its terminal `Result` at the existing `ContentSubmissionRepositoryImpl.uploadImageTask` boundary: preserve already-classified failures, wrap terminal `TimeoutException`, and leave generic client/socket, validation, cancellation, format, filesystem, and unknown errors unclassified. The Cloudinary client's existing private HTTP-status error may implement the domain semantic directly so terminal 5xx is true and non-5xx is false without parsing its string; this does not change its request/retry algorithm or expose the private type. The shared repository is also used by the Admin asset editor, so the wrapper must preserve the task's progress/cancel behavior and original cause, and focused Admin smoke coverage must confirm its generic error behavior is unchanged.
+| Failure at the progress flow | Immediate `Riprova` | Reason |
+| --- | --- | --- |
+| Confirmed remote success plus failed local finalization | Yes, finalization-only | Remote success is known and `_submit()` enters local finalization before any preparation/upload/submit work |
+| `VALIDATION_ERROR` / 400 | No | Repeating the unchanged request is inappropriate |
+| `UNAUTHORIZED` / 401 | No | Requires authentication recovery, not blind replay |
+| `METHOD_NOT_ALLOWED` / 405 | No | Client/server contract failure |
+| `RATE_LIMIT_EXCEEDED` / 429 | No | May recover later, but the current action is immediate and has no cooldown or `Retry-After` contract |
+| Hardened `INTERNAL_ERROR` / 500 while legacy remains supported | No | Same observable pair can come from the legacy path; safe replay is not proven |
+| Legacy `RATE_LIMIT_READ_FAILED`, `RATE_LIMIT_UPDATE_FAILED`, `SUBMISSION_INSERT_FAILED`, `ASSET_INSERT_FAILED`, or `INTERNAL_ERROR` / 500 | No | Legacy effects are separate and can be partially committed; there is no replay key |
+| Final-submit timeout, `ClientException`, `SocketException`, or equivalent transport failure | No | Remote commit is ambiguous under the legacy server even when the cause may be transient |
+| Missing, unknown, or mismatched final-submit status/code | No | Observable contract does not prove appropriateness and replay safety |
+| Malformed positive acknowledgement | No | A successful status with an invalid envelope does not prove a safe new request |
+| Any `prepare-cloudinary-upload` failure, including `CLOUDINARY_PREPARATION_ERROR` / 502 | No | Current taxonomy does not distinguish transient from deterministic preparation failure |
+| Any terminal direct Cloudinary upload failure after existing internal handling | No | Public task contract lacks a simple feature-owned safe-retry discriminator; this plan avoids wrapping shared infrastructure |
+| Local eligibility, staged-state, checkpoint, filesystem, format, cancellation, or unknown failure | No | No explicit safe-immediate-retry contract exists |
 
-Alternatives rejected:
+The absence of ordinary immediate retry is intentional. Returning to the form is safe because it performs no remote operation and preserves the current session; it is not a claim that a later user-initiated submission against the legacy server can reconstruct an ambiguous prior commit.
 
-- Importing `ContentSubmissionApiException` into the ViewModel or progress widget would invert the `domain`/`data` dependency.
-- Moving HTTP status/code/message wholesale into a new domain exception would expose infrastructure details beyond what presentation needs.
-- A broad application-wide retry interface would exceed this one feature's demonstrated use cases.
-- Parsing `message`, `reasonPhrase`, `toString()`, or localized copy is unstable and violates the structured-taxonomy requirement.
-- Treating every upload, checkpoint, or unknown error as retryable would recreate the blind retry bug under a new name.
+### 3. Derive the result without a new failure hierarchy or wrapper
 
-### 2. Fail closed for every current failure without positive transient evidence
+Do not add the previously proposed `ContentSubmissionRetrySemantic`, final-submit timeout wrapper, Cloudinary preparation exception, `_UploadHttpException` integration, or `ImageUploadTask` decorator. Every ordinary failure is false under the current rollout/public-contract evidence, so those types would distinguish cases without changing the release behavior.
 
-The implementation matrix is:
-
-| Failure classification | Immediate `Riprova` |
-| --- | --- |
-| `VALIDATION_ERROR` / 400 | No |
-| `UNAUTHORIZED` / 401 | No |
-| `METHOD_NOT_ALLOWED` / 405 | No |
-| `RATE_LIMIT_EXCEEDED` / 429 | No |
-| `INTERNAL_ERROR` / 500 | Yes |
-| Terminal `TimeoutException` positively identified by the submission/upload boundary | Yes |
-| Undifferentiated `http.ClientException`, `SocketException`, or other transport/client exception | No |
-| Exact `CLOUDINARY_PREPARATION_ERROR` / 502 from `prepare-cloudinary-upload` | Yes |
-| Other verified preparation pairs, including `CLOUDINARY_CONFIGURATION_ERROR` / 500 | No |
-| Terminal direct-Cloudinary timeout or HTTP 5xx after its existing internal handling | Yes |
-| Direct Cloudinary 4xx, file/asset validation, cancellation, malformed response, filesystem, preparation-contract, or unknown failure | No |
-| Command-side local eligibility/preparation or staged-state failure | No |
-| Draft checkpoint/persistence failure without a structured transient semantic | No |
-| Malformed positive `submit-content` acknowledgement | No |
-| Missing/unknown/mismatched API code/status, hypothetical 409, arbitrary exception, or unexpected Command wrapper | No |
-| Confirmed remote success plus local finalization failure | Yes, finalization-only |
-
-The form-owned checkpoint failure remains handled on the form and is not reinterpreted as a progress retry state. A direct Command-side checkpoint error can reach `submit.result`, but the current local repositories expose no trustworthy transient taxonomy; it therefore fails closed. This is intentional and keeps the plan evidence-based rather than guessing from disk-error text.
-
-### 3. Derive `canRetrySubmission` from Command result plus finalization ownership
-
-Add a read-only ViewModel getter, conceptually `canRetrySubmission`, with this invariant:
+Add one read-only ViewModel getter with the following invariant:
 
 1. if `submit.running`, return false;
-2. if `submit.result` is not `Error<void>`, return false (covering idle and success);
-3. if `submissionFinalizationPending`, return true;
-4. otherwise return the error's domain retry semantic when present, and false when absent.
+2. if `submit.result` is not `Error<void>`, return false, covering idle and success;
+3. return `submissionFinalizationPending`.
 
-No field, setter, reset call, listener, or second state machine is added. `Command._execute` already clears the previous result before notifying the running transition, so a retry cannot retain stale `true`. The Command's terminal notification also rebuilds the progress UI after finalization succeeds or fails. `submissionFinalizationPending` remains the authoritative proof that remote success occurred; the local finalization exception itself is not made generically retryable.
+This derives the decision from the authoritative Command terminal state and confirmed-success ownership state. It adds no field, setter, reset, listener, or second state machine. The ViewModel and widget import no data, Supabase, HTTP, or Cloudinary exception type. The existing `ContentSubmissionApiException` remains unchanged and keeps the structured fields already required by the main specification.
 
-Alternatives rejected:
+### 4. Gate the current action without changing navigation ownership
 
-- A mutable `bool canRetry` can drift when Command execution clears or replaces its result.
-- Putting the getter on generic `Command` or `Result` would broaden shared infrastructure for one feature and still lack finalization context.
-- Deriving from `submit.error` alone reproduces the current bug.
+`ContentSubmissionProgressScreen` reads `canRetrySubmissionImmediately`. A stopped error with true retains the existing primary `Riprova` action, which executes the existing submit Command. Under this release matrix that is exactly the finalization-pending branch. A stopped ordinary error is false: Home remains available, `Riprova` is absent, and the primary action is `Torna al modulo`, which pops only the progress child route.
 
-### 4. Make only the ordinary failure action conditional
+The action neither clears nor restores anything. AppBar/system/predictive Back for ordinary failures continues to pop only progress. Running and finalization-pending navigation blocking, restored idle behavior, successful actions, parent form-exit policy, and route restoration remain unchanged. No layout/style change is required.
 
-`ContentSubmissionProgressScreen` continues listening to the existing submit Command. Preserve the current running, idle/restored, success, Back, Home, and finalization-error branches. For an ordinary error:
+### 5. Preserve local finalization and session ownership exactly
 
-- when `canRetrySubmission` is true, keep the existing Home plus primary `Riprova` actions, with `Riprova` executing `submit.execute()` exactly once under the Command's existing running guard;
-- when false, keep Home, replace the primary retry affordance with `Torna al modulo`, and pop only the progress child route.
+When `submissionFinalizationPending` is true, `_submit()` already calls `_finalizeSubmittedSession()` before preparation. This ordering remains authoritative. Every finalization retry uses the acknowledged/current identity, performs no checkpoint, asset upload, or `submit-content` invocation, preserves the draft and staged assets after another local failure, and rotates `client_submission_id` only once after successful matching-session retirement.
 
-The non-retryable action neither clears nor restores anything. The existing parent form and route-exit policy remain responsible for later edits, save/discard decisions, and Home navigation. AppBar/system/predictive Back stays enabled for ordinary failures and likewise pops only the progress route. No copy or layout change beyond selecting the already-established `Torna al modulo` action is required.
+For every ordinary failure, classification and return-to-form perform no clear, staged cleanup, identity rotation, or remote call. The existing pre-acknowledgement ownership release and later explicit edit/discard policy remain unchanged.
 
-### 5. Retry changes no submission side-effect boundary
+### 6. Future relaxation requires a separately verified serving-contract change
 
-A retryable pre-acknowledgement error continues through the existing `_submit()` preparation path. The unchanged draft/session retains its `clientSubmissionId`; durable staged paths remain present; Cloudinary content-addressed preparation/reuse remains active; and server replay semantics deduplicate an ambiguous committed request.
-
-When `submissionFinalizationPending` is true, `_submit()` continues to branch to `_finalizeSubmittedSession()` before attempt preparation. The design must not reorder that guard. Tests must assert that repeated failed local finalization and its later successful retry perform no checkpoint, upload, or final submit; keep the same identity until success; clear only the acknowledged matching session; and rotate exactly once after success.
+After the hardened idempotent `submit-content` implementation is guaranteed to serve every supported client, the project may separately re-evaluate `INTERNAL_ERROR`/500 and ambiguous final-submit timeouts/transport failures. Reusing the same `client_submission_id` may then make replay provably safe. This OpenSpec does not schedule that change and adds no flag, server capability check, version negotiation, or automatic policy transition.
 
 ## Risks / Trade-offs
 
-- [A future server code is introduced without client mapping] → Unknown structured outcomes intentionally fail closed; adding a new retryable outcome requires an explicit taxonomy/test update.
-- [HTTP status and code disagree because of a proxy or unexpected backend] → Require the verified pair for `INTERNAL_ERROR`; do not assume status-only transience.
-- [429 users cannot retry immediately even after the window expires] → This action is intentionally immediate-only; delayed retry and `Retry-After` remain separate future work.
-- [A real local or network transient is not recognized] → Fail closed and return to the preserved form/session; do not expand classification until the boundary exposes reliable structure.
-- [Task decoration changes Admin upload error objects] → Retain the cause and task lifecycle, keep Admin generic UX unchanged, and run its focused add-asset failure tests.
-- [Finalization error is accidentally treated as an ordinary remote error] → Give `submissionFinalizationPending` precedence after running/error checks and retain direct tests for zero repeated uploads/submits.
-- [Previous hardening artifacts drift during this isolated change] → Limit all planning edits to this new change directory and verify the final diff contains no predecessor or main-spec modifications.
+- [A genuinely transient ordinary failure has no immediate retry] → Preserve the full form/session and offer safe return; prefer a conservative false negative over a possible duplicate legacy submission.
+- [Users can later choose to submit again from the form] → Returning performs no remote side effect and preserves identity, but this plan does not misrepresent later legacy replay as proven deduplication.
+- [The hardened server is deployed during client rollout] → Keep the same fail-closed client policy until hardened serving is guaranteed; mixed-server observability cannot support per-request relaxation.
+- [Cloudinary terminal timeout may be safely repeatable] → Existing internal retries remain; terminal progress retry stays false because provenance-safe exposure would add disproportionate shared/task coupling.
+- [Future taxonomy expands] → Unknown and mismatched outcomes remain fail-closed until an explicit, cross-version-safe mapping is separately specified and tested.
+- [Finalization error is confused with an ordinary error] → Give finalization state precedence through the derived getter and retain zero-remote-work regression tests.
+- [Previous hardening artifacts drift] → Restrict every documentation edit to this change directory and inspect the final diff for predecessor/main-spec changes.
 
 ## Migration Plan
 
-1. Add the domain retry semantic and focused semantic tests/fakes without changing UI behavior.
-2. Make the existing API exception, transport normalization, and terminal upload failures publish the semantic; preserve structured fields, causes, and current request counts.
-3. Add the derived ViewModel getter and orchestration invariants, including fail-closed and finalization-only cases.
-4. Gate only the progress-screen ordinary failure action and add focused widget/routing/restoration coverage.
-5. Run formatting, targeted analysis, focused Flutter/Admin tests, and unchanged Edge taxonomy tests; perform no database, Edge deployment, package, or store operation.
+1. Implement and verify the client-only derived getter and progress-action change without modifying data, Cloudinary, backend, or persisted contracts.
+2. Release the compatible Flutter client through the separately owned Android/iOS process while the legacy function remains deployed; this release operation is not a task in this OpenSpec.
+3. Allow the fail-closed client to coexist with the legacy function during adoption.
+4. Deploy the already-planned hardened idempotent backend only through its separate release process after sufficient compatible-client adoption.
+5. Validate the combined new-client/new-server system without automatically relaxing this client's retry policy.
 
-Rollback removes the progress gating, derived getter, and new semantic/normalization together. There is no persisted state, schema, wire, server, or migration compatibility step.
+Rollback of this client change restores the prior ordinary-error action selection and removes the derived getter. There is no data, schema, wire, server, or migration rollback in this mini-change.
