@@ -150,6 +150,16 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// Whether remote submission succeeded but local session retirement failed.
   bool get submissionFinalizationPending => _submissionFinalizationPending;
 
+  /// Whether executing the current immediate manual retry action is safe.
+  ///
+  /// Retry is available only after confirmed remote success when local session
+  /// finalization has stopped with an error. Ordinary submission failures,
+  /// idle, running, and successful states fail closed.
+  bool get canRetrySubmissionImmediately =>
+      !submit.running &&
+      submit.result is Error<void> &&
+      submissionFinalizationPending;
+
   UnmodifiableListView<Asset> get assets => UnmodifiableListView(_assets);
 
   ContentSubmissionDraftLoadState get loadState => _loadState;

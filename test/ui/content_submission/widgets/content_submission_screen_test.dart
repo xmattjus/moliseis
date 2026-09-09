@@ -305,7 +305,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(vm.submit.error, isTrue);
-      expect(find.text('Riprova'), findsOneWidget);
+      expect(find.text('Riprova'), findsNothing);
+      expect(find.text('Torna al modulo'), findsOneWidget);
       expect(find.text('Nuovo suggerimento'), findsNothing);
     });
 

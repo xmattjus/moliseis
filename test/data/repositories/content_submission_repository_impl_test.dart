@@ -1,3 +1,6 @@
+import 'dart:async' show TimeoutException;
+import 'dart:io' show SocketException;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/data/repositories/content_submission_api_exception.dart';
@@ -152,6 +155,142 @@ void main() {
     expect(httpClient.requests, hasLength(1));
     expect(logger.eventsOfType<ContentSubmissionUploadFailed>(), hasLength(1));
   });
+
+  for (final failure
+      in <({String name, int status, String code, String message})>[
+        (
+          name: 'validation',
+          status: 400,
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid submission',
+        ),
+        (
+          name: 'authentication',
+          status: 401,
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        ),
+        (
+          name: 'method',
+          status: 405,
+          code: 'METHOD_NOT_ALLOWED',
+          message: 'Method not allowed',
+        ),
+        (
+          name: 'rate limit',
+          status: 429,
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Rate limit exceeded',
+        ),
+        (
+          name: 'current and legacy internal',
+          status: 500,
+          code: 'INTERNAL_ERROR',
+          message: 'Internal error',
+        ),
+        (
+          name: 'legacy rate-limit read',
+          status: 500,
+          code: 'RATE_LIMIT_READ_FAILED',
+          message: 'Rate-limit read failed',
+        ),
+        (
+          name: 'legacy rate-limit update',
+          status: 500,
+          code: 'RATE_LIMIT_UPDATE_FAILED',
+          message: 'Rate-limit update failed',
+        ),
+        (
+          name: 'legacy submission insert',
+          status: 500,
+          code: 'SUBMISSION_INSERT_FAILED',
+          message: 'Submission insert failed',
+        ),
+        (
+          name: 'legacy asset insert',
+          status: 500,
+          code: 'ASSET_INSERT_FAILED',
+          message: 'Asset insert failed',
+        ),
+      ]) {
+    test('preserves ${failure.name} Function failure fields', () async {
+      httpClient.queueJson(
+        <String, dynamic>{
+          'code': failure.code,
+          'message': failure.message,
+        },
+        status: failure.status,
+      );
+
+      final result = await submit();
+
+      expect(result, isA<Error<void>>());
+      final error =
+          (result as Error<void>).error as ContentSubmissionApiException;
+      expect(error.statusCode, failure.status);
+      expect(error.code, failure.code);
+      expect(error.message, failure.message);
+      expect(httpClient.requests, hasLength(1));
+    });
+  }
+
+  for (final failure
+      in <({String name, int status, Object? details, String? code})>[
+        (name: 'missing details', status: 500, details: null, code: null),
+        (
+          name: 'unknown code',
+          status: 418,
+          details: <String, Object?>{
+            'code': 'UNKNOWN_FAILURE',
+            'message': 'Unknown',
+          },
+          code: 'UNKNOWN_FAILURE',
+        ),
+        (
+          name: 'mismatched status and code',
+          status: 500,
+          details: <String, Object?>{
+            'code': 'VALIDATION_ERROR',
+            'message': 'Mismatched',
+          },
+          code: 'VALIDATION_ERROR',
+        ),
+      ]) {
+    test('preserves ${failure.name} as an error', () async {
+      httpClient.queueJson(failure.details, status: failure.status);
+
+      final result = await submit();
+
+      expect(result, isA<Error<void>>());
+      final error =
+          (result as Error<void>).error as ContentSubmissionApiException;
+      expect(error.statusCode, failure.status);
+      expect(error.code, failure.code);
+      expect(httpClient.requests, hasLength(1));
+    });
+  }
+
+  for (final failure in <({String name, Exception error})>[
+    (
+      name: 'timeout',
+      error: TimeoutException('submit-content timed out'),
+    ),
+    (name: 'client', error: http.ClientException('transport failed')),
+    (name: 'socket', error: const SocketException('network unavailable')),
+  ]) {
+    test(
+      'returns ${failure.name} transport failure after one request',
+      () async {
+        httpClient.error = failure.error;
+
+        final result = await submit();
+
+        expect(result, isA<Error<void>>());
+        expect((result as Error<void>).error, same(failure.error));
+        expect(httpClient.requests, hasLength(1));
+      },
+    );
+  }
 
   test('normalizes string Function failures and transport failures', () async {
     httpClient.queueText('Bad request', status: 400);

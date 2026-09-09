@@ -22,7 +22,7 @@ final class RecordingSupabaseFunctionsHttpClient extends http.BaseClient {
     })
   >
   _responses = [];
-  http.ClientException? error;
+  Exception? error;
 
   void queueJson(Object? body, {int status = 200, String? reasonPhrase}) {
     _responses.add((

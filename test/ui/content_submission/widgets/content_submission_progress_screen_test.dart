@@ -1,4 +1,4 @@
-import 'dart:async' show Completer, unawaited;
+import 'dart:async' show Completer, TimeoutException, unawaited;
 import 'dart:typed_data' show Uint8List;
 
 import 'package:flutter/foundation.dart'
@@ -232,28 +232,61 @@ void main() {
       expect(find.text('Nuovo suggerimento'), findsOneWidget);
     });
 
-    testWidgets('error: shows error text and Riprova', (tester) async {
-      final repo = ControllableSubmissionRepository();
-      final vm = buildViewModel(submissionRepository: repo);
+    for (final failure in <({String name, Exception error})>[
+      (name: 'validation', error: TestException('VALIDATION_ERROR')),
+      (name: 'authentication', error: TestException('UNAUTHORIZED')),
+      (name: 'method', error: TestException('METHOD_NOT_ALLOWED')),
+      (name: 'rate limit', error: TestException('RATE_LIMIT_EXCEEDED')),
+      (name: 'internal 500', error: TestException('INTERNAL_ERROR')),
+      (
+        name: 'final-submit transport',
+        error: TimeoutException('submit-content timed out'),
+      ),
+      (
+        name: 'malformed acknowledgement',
+        error: const FormatException('invalid acknowledgement'),
+      ),
+      (name: 'unknown final-submit', error: TestException('UNKNOWN_CODE')),
+      (
+        name: 'preparation 502',
+        error: TestException('CLOUDINARY_PREPARATION_ERROR'),
+      ),
+      (
+        name: 'direct-upload terminal',
+        error: TestException('direct upload exhausted'),
+      ),
+      (name: 'local', error: TestException('checkpoint failed')),
+      (name: 'unknown', error: TestException('unknown failure')),
+    ]) {
+      testWidgets('${failure.name} error has safe recovery and no retry', (
+        tester,
+      ) async {
+        final repository = FakeContentSubmissionRepository(
+          submitResult: Result.error(failure.error),
+        );
+        final viewModel = buildViewModel(
+          submissionRepository: repository,
+        );
 
-      await tester.pumpWidget(buildProgressFirstApp(vm));
+        await tester.pumpWidget(buildProgressFirstApp(viewModel));
+        await viewModel.submit.execute();
+        await tester.pumpAndSettle();
 
-      unawaited(vm.submit.execute());
-      await tester.pump();
-
-      repo.completeSubmission(Result.error(Exception('upload failed')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byIcon(Symbols.error_circle_rounded_rounded),
-        findsOneWidget,
-      );
-      expect(find.textContaining('problema durante'), findsOneWidget);
-      expect(find.text('Riprova'), findsOneWidget);
-      expect(find.text('Nuovo suggerimento'), findsNothing);
-      expect(find.text('Torna alla home'), findsOneWidget);
-      expect(vm.submit.error, isTrue);
-    });
+        expect(
+          find.byIcon(Symbols.error_circle_rounded_rounded),
+          findsOneWidget,
+        );
+        expect(find.textContaining('problema durante'), findsOneWidget);
+        expect(find.text('Riprova'), findsNothing);
+        expect(find.text('Nuovo suggerimento'), findsNothing);
+        expect(find.text('Torna alla home'), findsOneWidget);
+        expect(find.text('Torna al modulo'), findsOneWidget);
+        expect(find.byType(BackButton), findsOneWidget);
+        expect(viewModel.submit.error, isTrue);
+        expect(viewModel.canRetrySubmissionImmediately, isFalse);
+        expect(repository.submitCallCount, 1);
+      });
+    }
 
     testWidgets(
       'finalization failure retries local retirement until it succeeds',
@@ -286,12 +319,14 @@ void main() {
         );
         await viewModel.addAsset.execute();
         final pendingIdentity = viewModel.state.clientSubmissionId;
+        final pendingState = viewModel.state;
         await tester.pumpWidget(buildProgressFirstApp(viewModel));
 
         unawaited(viewModel.submit.execute());
         await tester.pumpAndSettle();
 
         expect(viewModel.submissionFinalizationPending, isTrue);
+        expect(viewModel.canRetrySubmissionImmediately, isTrue);
         expect(find.textContaining('senza inviare di nuovo'), findsOneWidget);
         expect(find.text('Riprova'), findsOneWidget);
         expect(find.byType(OutlinedButton), findsOneWidget);
@@ -302,6 +337,9 @@ void main() {
         expect(repository.submitCallCount, 1);
         expect(repository.uploadedImages, hasLength(1));
         expect(draftRepository.clearDraftCallCount, 1);
+        expect(viewModel.state, pendingState);
+        expect(viewModel.assets, hasLength(1));
+        expect(stagedRepository.clearedSessions, isEmpty);
         expect(await tester.binding.handlePopRoute(), isTrue);
         await tester.pump();
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
@@ -316,14 +354,31 @@ void main() {
         draftRepository.clearDraftResult = Result.error(
           Exception('second local clear failed'),
         );
+        final retryClear = Completer<Result<void>>();
+        draftRepository.pendingClearDraft = retryClear;
         await tester.tap(find.text('Riprova'));
+        await tester.pump();
+
+        expect(viewModel.submit.running, isTrue);
+        expect(viewModel.canRetrySubmissionImmediately, isFalse);
+        expect(find.text('Riprova'), findsNothing);
+        expect(find.text('Torna alla home'), findsNothing);
+        expect(find.byType(BackButton), findsNothing);
+        expect(viewModel.state, pendingState);
+        expect(viewModel.state.clientSubmissionId, pendingIdentity);
+        expect(viewModel.assets, hasLength(1));
+
+        retryClear.complete(draftRepository.clearDraftResult);
         await tester.pumpAndSettle();
 
         expect(repository.submitCallCount, 1);
         expect(repository.uploadedImages, hasLength(1));
         expect(draftRepository.clearDraftCallCount, 2);
         expect(viewModel.submissionFinalizationPending, isTrue);
+        expect(viewModel.canRetrySubmissionImmediately, isTrue);
+        expect(viewModel.state, pendingState);
         expect(viewModel.state.clientSubmissionId, pendingIdentity);
+        expect(viewModel.assets, hasLength(1));
         expect(find.text('Riprova'), findsOneWidget);
         expect(stagedRepository.clearedSessions, isEmpty);
 
@@ -336,7 +391,9 @@ void main() {
         expect(draftRepository.clearDraftCallCount, 3);
         expect(viewModel.submit.completed, isTrue);
         expect(viewModel.submissionFinalizationPending, isFalse);
+        expect(viewModel.canRetrySubmissionImmediately, isFalse);
         expect(viewModel.state.clientSubmissionId, isNot(pendingIdentity));
+        expect(viewModel.assets, isEmpty);
         expect(stagedRepository.clearedSessions, <String>[pendingIdentity]);
         expect(find.text('Nuovo suggerimento'), findsOneWidget);
       },
@@ -763,40 +820,69 @@ void main() {
       },
     );
 
-    testWidgets('Riprova when error does not call clear and retries submit', (
-      tester,
-    ) async {
-      final repo = ControllableSubmissionRepository();
-      final draftRepo = FakeContentSubmissionDraftRepository();
-      final vm = buildViewModel(
-        submissionRepository: repo,
-        draftRepository: draftRepo,
-      );
+    testWidgets(
+      'Torna al modulo after error pops once and performs no lifecycle work',
+      (tester) async {
+        final repo = FakeContentSubmissionRepository(
+          submitResult: Result.error(TestException('ordinary failure')),
+          uploadImageTaskResult: FakeImageUploadTask.completed(
+            const Result.success(
+              SubmissionAsset(
+                secureUrl: 'https://assets.example/a.jpg',
+                width: 1,
+                height: 1,
+              ),
+            ),
+          ),
+        );
+        final draftRepo = FakeContentSubmissionDraftRepository();
+        final stagedRepo = FakeContentSubmissionStagedAssetRepository();
+        final vm = buildViewModel(
+          submissionRepository: repo,
+          draftRepository: draftRepo,
+          stagedAssetRepository: stagedRepo,
+          imagePicker: FakeImagePicker(
+            onPickMultipleMedia: () async => <XFile>[
+              XFile.fromData(
+                Uint8List.fromList(<int>[1, 2, 3]),
+                name: 'a.jpg',
+              ),
+            ],
+          ),
+        );
+        await vm.addAsset.execute();
 
-      await tester.pumpWidget(buildProgressFirstApp(vm));
-      unawaited(vm.submit.execute());
-      await tester.pump();
-      repo.completeSubmission(Result.error(Exception('first')));
-      await tester.pumpAndSettle();
-      expect(repo.submitCallCount, 1);
-      final failedIdentity = vm.state.clientSubmissionId;
-      final failedState = vm.state;
+        final (router, app) = buildHomeFirstApp(vm);
+        await tester.pumpWidget(app);
+        await pushProgress(tester, router);
+        await vm.submit.execute();
+        await tester.pumpAndSettle();
 
-      final retry = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'Riprova'),
-      );
-      retry.onPressed!();
-      retry.onPressed!();
-      await tester.pump();
+        expect(repo.submitCallCount, 1);
+        expect(repo.uploadedImages, hasLength(1));
+        final failedIdentity = vm.state.clientSubmissionId;
+        final failedState = vm.state;
+        final saveCount = draftRepo.saveDraftCallCount;
+        expect(vm.assets, hasLength(1));
+        expect(find.text('Riprova'), findsNothing);
+        expect(find.text('Torna al modulo'), findsOneWidget);
 
-      expect(draftRepo.clearDraftCalled, isFalse);
-      expect(vm.submit.running, isTrue);
-      expect(repo.submitCallCount, 2);
-      expect(vm.state, failedState);
-      expect(vm.state.clientSubmissionId, failedIdentity);
+        await tester.tap(find.text('Torna al modulo'));
+        await tester.pumpAndSettle();
 
-      addTearDown(() => repo.completeSubmission(const Result.success(null)));
-    });
+        expect(draftRepo.clearDraftCalled, isFalse);
+        expect(draftRepo.saveDraftCallCount, saveCount);
+        expect(stagedRepo.clearedSessions, isEmpty);
+        expect(repo.submitCallCount, 1);
+        expect(repo.uploadedImages, hasLength(1));
+        expect(vm.state, failedState);
+        expect(vm.state.clientSubmissionId, failedIdentity);
+        expect(vm.assets, hasLength(1));
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.byType(_FormMarker), findsOneWidget);
+        expect(find.byType(_HomeMarker), findsNothing);
+      },
+    );
 
     testWidgets('Torna alla home navigates without another finalization', (
       tester,

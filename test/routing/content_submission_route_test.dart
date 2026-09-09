@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
+import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
@@ -624,6 +625,100 @@ void main() {
         expect(find.text('Suggerimento'), findsOneWidget);
         expect(find.text('Salva ed esci'), findsNothing);
         expect(harness.viewModel.hasUnsavedChanges, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'ordinary-error Back and return-to-form each pop one progress route',
+      (tester) async {
+        final draftRepository = FakeContentSubmissionDraftRepository();
+        final stagedRepository = FakeContentSubmissionStagedAssetRepository();
+        final submissionRepository = ControllableSubmissionRepository(
+          uploadImageTaskResult: FakeImageUploadTask.completed(
+            const Result.success(
+              SubmissionAsset(
+                secureUrl: 'https://assets.example/a.jpg',
+                width: 1,
+                height: 1,
+              ),
+            ),
+          ),
+        );
+        final harness = createHarness(
+          draftRepository: draftRepository,
+          stagedAssetRepository: stagedRepository,
+          submissionRepository: submissionRepository,
+          imagePicker: FakeImagePicker(
+            onPickMultipleMedia: () async => <XFile>[
+              XFile.fromData(
+                Uint8List.fromList(<int>[1, 2, 3]),
+                name: 'a.jpg',
+              ),
+            ],
+          ),
+        );
+        addTearDown(harness.dispose);
+        await harness.pumpForm(tester);
+        await fillValidForm(tester);
+        await harness.viewModel.addAsset.execute();
+        await tester.pump();
+
+        await scrollToAndTap(
+          tester,
+          find.widgetWithText(FilledButton, 'Invia'),
+        );
+        await tester.pump();
+        expect(submissionRepository.submitCallCount, 1);
+        submissionRepository.completeSubmission(
+          Result.error(Exception('ordinary failure')),
+        );
+        await tester.pumpAndSettle();
+
+        final failedState = harness.viewModel.state;
+        final failedIdentity = failedState.clientSubmissionId;
+        final saveCount = draftRepository.saveDraftCallCount;
+        expect(harness.viewModel.assets, hasLength(1));
+        expect(find.text('Riprova'), findsNothing);
+        expect(find.text('Torna al modulo'), findsOneWidget);
+
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+        expect(harness.viewModel.state, failedState);
+        expect(harness.viewModel.state.clientSubmissionId, failedIdentity);
+        expect(harness.viewModel.assets, hasLength(1));
+        expect(submissionRepository.submitCallCount, 1);
+        expect(draftRepository.saveDraftCallCount, saveCount);
+        expect(draftRepository.clearDraftCallCount, 0);
+        expect(stagedRepository.clearedSessions, isEmpty);
+
+        unawaited(
+          harness.router.pushNamed(
+            RouteNames.contentSubmissionUploadProgress,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+        expect(
+          find.byType(ContentSubmissionScreen, skipOffstage: false),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text('Torna al modulo'));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+        expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+        expect(harness.viewModel.state, failedState);
+        expect(harness.viewModel.state.clientSubmissionId, failedIdentity);
+        expect(harness.viewModel.assets, hasLength(1));
+        expect(submissionRepository.submitCallCount, 1);
+        expect(draftRepository.saveDraftCallCount, saveCount);
+        expect(draftRepository.clearDraftCallCount, 0);
+        expect(stagedRepository.clearedSessions, isEmpty);
         expect(tester.takeException(), isNull);
       },
     );

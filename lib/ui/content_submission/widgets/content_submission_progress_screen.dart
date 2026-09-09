@@ -50,7 +50,7 @@ class _ContentSubmissionProgressScreenState
       builder: (context, child) {
         final submit = _viewModel.submit;
         final finalizationPending = _viewModel.submissionFinalizationPending;
-        final finalizationError = submit.error && finalizationPending;
+        final canRetryImmediately = _viewModel.canRetrySubmissionImmediately;
         final color = _buildColor(colorScheme, submit);
         final canPop = !submit.running && !finalizationPending;
 
@@ -94,7 +94,7 @@ class _ContentSubmissionProgressScreenState
                             onPressed: () => context.pop(),
                             child: const Text('Torna al modulo'),
                           )
-                        : finalizationError
+                        : canRetryImmediately
                         ? _primaryActionButton(
                             colorScheme: colorScheme,
                             onPressed: () => unawaited(submit.execute()),
@@ -118,10 +118,8 @@ class _ContentSubmissionProgressScreenState
                               else
                                 _primaryActionButton(
                                   colorScheme: colorScheme,
-                                  onPressed: () {
-                                    unawaited(submit.execute());
-                                  },
-                                  child: const Text('Riprova'),
+                                  onPressed: () => context.pop(),
+                                  child: const Text('Torna al modulo'),
                                 ),
                             ],
                           ),

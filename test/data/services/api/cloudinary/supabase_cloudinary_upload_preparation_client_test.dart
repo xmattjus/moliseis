@@ -1,3 +1,6 @@
+import 'dart:async' show TimeoutException;
+import 'dart:io' show SocketException;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_options.dart';
@@ -143,6 +146,128 @@ void main() {
     expect(second, isA<Error<CloudinaryUploadPreparation>>());
     expect(third, isA<Error<CloudinaryUploadPreparation>>());
   });
+
+  for (final failure
+      in <
+        ({
+          String name,
+          int status,
+          String code,
+          String message,
+          String reasonPhrase,
+        })
+      >[
+        (
+          name: 'validation',
+          status: 400,
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid preparation request',
+          reasonPhrase: 'Bad Request',
+        ),
+        (
+          name: 'authentication',
+          status: 401,
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+          reasonPhrase: 'Unauthorized',
+        ),
+        (
+          name: 'method',
+          status: 405,
+          code: 'METHOD_NOT_ALLOWED',
+          message: 'Method not allowed',
+          reasonPhrase: 'Method Not Allowed',
+        ),
+        (
+          name: 'request size',
+          status: 413,
+          code: 'REQUEST_TOO_LARGE',
+          message: 'Request too large',
+          reasonPhrase: 'Content Too Large',
+        ),
+        (
+          name: 'configuration',
+          status: 500,
+          code: 'CLOUDINARY_CONFIGURATION_ERROR',
+          message: 'Configuration mismatch',
+          reasonPhrase: 'Internal Server Error',
+        ),
+        (
+          name: 'ambiguous preparation',
+          status: 502,
+          code: 'CLOUDINARY_PREPARATION_ERROR',
+          message: 'Temporary-looking preparation failure',
+          reasonPhrase: 'Bad Gateway',
+        ),
+        (
+          name: 'unknown',
+          status: 418,
+          code: 'UNKNOWN_FAILURE',
+          message: 'Unknown temporary-looking failure',
+          reasonPhrase: 'Unknown Failure',
+        ),
+        (
+          name: 'mismatched',
+          status: 500,
+          code: 'VALIDATION_ERROR',
+          message: 'Mismatched failure',
+          reasonPhrase: 'Internal Server Error',
+        ),
+      ]) {
+    test(
+      '${failure.name} Function response remains an ordinary error',
+      () async {
+        httpClient.queueJson(
+          <String, Object?>{
+            'code': failure.code,
+            'message': failure.message,
+          },
+          status: failure.status,
+          reasonPhrase: failure.reasonPhrase,
+        );
+
+        final result = await client.prepare(
+          publicId: publicId,
+          options: const CloudinaryUploadOptions(),
+        );
+
+        expect(result, isA<Error<CloudinaryUploadPreparation>>());
+        expect(
+          (result as Error<CloudinaryUploadPreparation>).error,
+          isA<Exception>(),
+        );
+        expect(httpClient.requests, hasLength(1));
+      },
+    );
+  }
+
+  for (final failure in <({String name, Exception error})>[
+    (
+      name: 'timeout',
+      error: TimeoutException('preparation timed out'),
+    ),
+    (name: 'client', error: http.ClientException('offline')),
+    (name: 'socket', error: const SocketException('network unavailable')),
+  ]) {
+    test(
+      '${failure.name} transport failure remains an ordinary error',
+      () async {
+        httpClient.error = failure.error;
+
+        final result = await client.prepare(
+          publicId: publicId,
+          options: const CloudinaryUploadOptions(),
+        );
+
+        expect(result, isA<Error<CloudinaryUploadPreparation>>());
+        expect(
+          (result as Error<CloudinaryUploadPreparation>).error,
+          same(failure.error),
+        );
+        expect(httpClient.requests, hasLength(1));
+      },
+    );
+  }
 
   test('rejects every malformed map shape as a FormatException', () {
     final validFields = <String, Object?>{

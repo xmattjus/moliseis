@@ -14,6 +14,7 @@ import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/domain/models/content_submission_staged_asset.dart';
+import 'package:moliseis/domain/models/image_upload_task.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
@@ -3375,6 +3376,164 @@ void main() {
 
     group('submit', () {
       test(
+        'derives immediate retry as false for idle, running, and success',
+        () async {
+          final repository = ControllableSubmissionRepository();
+          final vm = buildViewModel(contentSubmissionRepository: repository)
+            ..setCity('Rome')
+            ..setName('Colosseum')
+            ..setUserEmail('jane@example.com')
+            ..setUserName('Jane');
+
+          expect(vm.canRetrySubmissionImmediately, isFalse);
+
+          final submission = vm.submit.execute();
+          while (repository.submitCallCount == 0) {
+            await Future<void>.value();
+          }
+
+          expect(vm.submit.running, isTrue);
+          expect(vm.canRetrySubmissionImmediately, isFalse);
+
+          repository.completeSubmission(const Result.success(null));
+          await submission;
+
+          expect(vm.submit.completed, isTrue);
+          expect(vm.canRetrySubmissionImmediately, isFalse);
+        },
+      );
+
+      test(
+        'derives immediate retry as false for local submit failures',
+        () async {
+          final eligibility = buildViewModel();
+
+          await eligibility.submit.execute();
+
+          expect(eligibility.submit.error, isTrue);
+          expect(eligibility.canRetrySubmissionImmediately, isFalse);
+
+          final staged =
+              buildViewModel(
+                  stagedAssetRepository:
+                      FakeContentSubmissionStagedAssetRepository(
+                        reconcileResult: Result.error(
+                          TestException('staged state unavailable'),
+                        ),
+                      ),
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane');
+          await staged.submit.execute();
+
+          expect(staged.submit.error, isTrue);
+          expect(staged.canRetrySubmissionImmediately, isFalse);
+
+          final checkpoint =
+              buildViewModel(
+                  draftRepository: FakeContentSubmissionDraftRepository(
+                    saveDraftResult: Result.error(
+                      TestException('checkpoint failed'),
+                    ),
+                  ),
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane');
+          await checkpoint.submit.execute();
+
+          expect(checkpoint.submit.error, isTrue);
+          expect(checkpoint.canRetrySubmissionImmediately, isFalse);
+        },
+      );
+
+      test(
+        'derives immediate retry as false for upload terminal failures',
+        () async {
+          final repository = FakeContentSubmissionRepository(
+            uploadImageTaskResults: <ImageUploadTask>[
+              FakeImageUploadTask.completed(
+                Result.error(TestException('preparation failed')),
+              ),
+              FakeImageUploadTask.completed(
+                Result.error(TestException('direct upload failed')),
+              ),
+            ],
+          );
+          final vm =
+              buildViewModel(
+                  contentSubmissionRepository: repository,
+                  imagePicker: FakeImagePicker(
+                    onPickMultipleMedia: () async => <XFile>[
+                      XFile.fromData(
+                        Uint8List.fromList(<int>[1]),
+                        name: 'a.jpg',
+                      ),
+                    ],
+                  ),
+                )
+                ..setCity('Rome')
+                ..setName('Colosseum')
+                ..setUserEmail('jane@example.com')
+                ..setUserName('Jane');
+          await vm.addAsset.execute();
+
+          await vm.submit.execute();
+
+          expect(vm.submit.error, isTrue);
+          expect(vm.canRetrySubmissionImmediately, isFalse);
+
+          await vm.submit.execute();
+
+          expect(vm.submit.error, isTrue);
+          expect(vm.canRetrySubmissionImmediately, isFalse);
+          expect(repository.submitCallCount, 0);
+        },
+      );
+
+      for (final failure in <({String name, Exception error})>[
+        (name: 'final submit error', error: TestException('submit failed')),
+        (
+          name: 'malformed acknowledgement',
+          error: const FormatException('malformed acknowledgement'),
+        ),
+        (
+          name: 'final submit timeout',
+          error: TimeoutException('final submit timed out'),
+        ),
+        (
+          name: 'final submit socket error',
+          error: const SocketException('final submit transport failed'),
+        ),
+        (name: 'unknown error', error: TestException('unknown failure')),
+      ]) {
+        test(
+          'derives immediate retry as false for ${failure.name}',
+          () async {
+            final vm =
+                buildViewModel(
+                    contentSubmissionRepository:
+                        FakeContentSubmissionRepository(
+                          submitResult: Result.error(failure.error),
+                        ),
+                  )
+                  ..setCity('Rome')
+                  ..setName('Colosseum')
+                  ..setUserEmail('jane@example.com')
+                  ..setUserName('Jane');
+
+            await vm.submit.execute();
+
+            expect(vm.submit.error, isTrue);
+            expect(vm.canRetrySubmissionImmediately, isFalse);
+          },
+        );
+      }
+
+      test(
         'blocks enabled incomplete events before any upload begins',
         () async {
           final submissionRepository = FakeContentSubmissionRepository();
@@ -3741,16 +3900,27 @@ void main() {
           final drafts = FakeContentSubmissionDraftRepository(
             clearDraftResult: Result.error(finalizationError),
           );
+          final staged = FakeContentSubmissionStagedAssetRepository();
           final repository = FakeContentSubmissionRepository();
           final vm =
               buildViewModel(
                   contentSubmissionRepository: repository,
                   draftRepository: drafts,
+                  stagedAssetRepository: staged,
+                  imagePicker: FakeImagePicker(
+                    onPickMultipleMedia: () async => <XFile>[
+                      XFile.fromData(
+                        Uint8List.fromList(<int>[1, 2, 3]),
+                        name: 'staged.jpg',
+                      ),
+                    ],
+                  ),
                 )
                 ..setCity('Rome')
                 ..setName('Colosseum')
                 ..setUserEmail('jane@example.com')
                 ..setUserName('Jane');
+          await vm.addAsset.execute();
           final identity = vm.state.clientSubmissionId;
           final state = vm.state;
 
@@ -3758,33 +3928,61 @@ void main() {
 
           expect(vm.submit.error, isTrue);
           expect(vm.submissionFinalizationPending, isTrue);
+          expect(vm.canRetrySubmissionImmediately, isTrue);
           expect(vm.state, state);
           expect(vm.state.clientSubmissionId, identity);
+          expect(vm.assets, hasLength(1));
           expect(repository.submitCallCount, 1);
-          expect(repository.uploadedImages, isEmpty);
+          expect(repository.uploadedImages, hasLength(1));
           expect(drafts.saveDraftCallCount, 1);
           expect(drafts.clearDraftCallCount, 1);
+          expect(staged.clearedSessions, isEmpty);
 
           await vm.clear.execute();
           expect(vm.clear.error, isTrue);
           expect(drafts.clearDraftCallCount, 1);
 
-          await vm.submit.execute();
+          final pendingRetry = Completer<Result<void>>();
+          drafts.pendingClearDraft = pendingRetry;
+          final retry = vm.submit.execute();
+          while (drafts.clearDraftCallCount < 2) {
+            await Future<void>.value();
+          }
+
+          expect(vm.submit.running, isTrue);
+          expect(vm.submit.result, isNull);
+          expect(vm.canRetrySubmissionImmediately, isFalse);
+          expect(vm.state, state);
+          expect(vm.state.clientSubmissionId, identity);
+          expect(vm.assets, hasLength(1));
+          expect(staged.clearedSessions, isEmpty);
+
+          pendingRetry.complete(Result.error(finalizationError));
+          await retry;
+
           expect(vm.submit.error, isTrue);
+          expect(vm.canRetrySubmissionImmediately, isTrue);
           expect(repository.submitCallCount, 1);
-          expect(repository.uploadedImages, isEmpty);
+          expect(repository.uploadedImages, hasLength(1));
           expect(drafts.saveDraftCallCount, 1);
           expect(drafts.clearDraftCallCount, 2);
+          expect(vm.state, state);
+          expect(vm.state.clientSubmissionId, identity);
+          expect(vm.assets, hasLength(1));
+          expect(staged.clearedSessions, isEmpty);
 
           drafts.clearDraftResult = const Result.success(null);
           await vm.submit.execute();
 
           expect(vm.submit.completed, isTrue);
           expect(vm.submissionFinalizationPending, isFalse);
+          expect(vm.canRetrySubmissionImmediately, isFalse);
           expect(repository.submitCallCount, 1);
-          expect(repository.uploadedImages, isEmpty);
+          expect(repository.uploadedImages, hasLength(1));
           expect(drafts.saveDraftCallCount, 1);
           expect(drafts.clearDraftCallCount, 3);
+          expect(staged.clearedSessions, [identity]);
+          expect(vm.assets, isEmpty);
           expect(vm.state.clientSubmissionId, isNot(identity));
         },
       );
