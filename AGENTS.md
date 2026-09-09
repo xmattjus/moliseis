@@ -105,6 +105,13 @@ Operationally:
 
 - Inspect the current implementation, relevant tests, and backend definitions
   before proposing or making changes.
+- In technical reviews, implementation plans, and architectural decisions, 
+  prioritize identifying failure modes, regressions, unverified assumptions, 
+  unjustified complexity, and violations of KISS, YAGNI, SRP, and 
+  Separation of Concerns over confirming the proposed solution.
+- Do not declare an implementation ready merely because it conforms to the plan or 
+  specification; verify that the plan or specification itself is sound against 
+  repository reality, requirements, and applicable engineering principles.
 - Prefer existing project patterns and reusable components over theoretically
   superior replacements.
 - Prefer incremental, maintainable changes that fit naturally into the codebase.

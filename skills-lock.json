@@ -1,12 +1,6 @@
 {
   "version": 1,
   "skills": {
-    "conventional-commit": {
-      "source": "github/awesome-copilot",
-      "sourceType": "github",
-      "skillPath": "skills/conventional-commit/SKILL.md",
-      "computedHash": "f29c9486cede6c7b2df0cfb0a2e4aa67446552b991bcf17d1b309e903171f03d"
-    },
     "dart-add-unit-test": {
       "source": "dart-lang/skills",
       "sourceType": "github",
@@ -151,18 +145,6 @@
       "skillPath": "skills/security-and-hardening/SKILL.md",
       "computedHash": "47d027526d7e0be784a19a034f18cba328009b3c8fe483f16e4b12530cf82183"
     },
-    "sentry-android-sdk": {
-      "source": "getsentry/sentry-for-ai",
-      "sourceType": "github",
-      "skillPath": "skills-legacy/sentry-android-sdk/SKILL.md",
-      "computedHash": "6c8e7dee5327bf86b06a38c402f436dd1162abcca034fb26d1f19428a9cffdd4"
-    },
-    "sentry-cocoa-sdk": {
-      "source": "getsentry/sentry-for-ai",
-      "sourceType": "github",
-      "skillPath": "skills-legacy/sentry-cocoa-sdk/SKILL.md",
-      "computedHash": "d184d414ba63299176f9c58d6b916d7b9714d0adafc380ad2b4c462cf402c8e4"
-    },
     "sentry-create-alert": {
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
@@ -197,13 +179,13 @@
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-get-started/SKILL.md",
-      "computedHash": "5f6057ca2ceff60c2d99ec740d872a0d311436424975ff42dd2b4eda6d6b9c66"
+      "computedHash": "5f23e1a6932bac26b0ba2773176d3b425eff1d9133c54ea957c2028ac2705f3d"
     },
     "sentry-instrument": {
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-instrument/SKILL.md",
-      "computedHash": "673fba74f95f66dc9ecba6fbd1967b5589b998609735422087ebc5b7b3c82697"
+      "computedHash": "da7c916895d081746619a13ec7d47d105fce07a8704e20b6b3b5ca5e2c16cf1e"
     },
     "sentry-instrument-logging": {
       "source": "getsentry/sentry-for-ai",
@@ -228,12 +210,6 @@
       "sourceType": "github",
       "skillPath": "src/skills/sentry-setup-releases/SKILL.md",
       "computedHash": "6e0f3d08baec1642429aa6625480b57575036ba05d6bd875ccd2a42058e751ef"
-    },
-    "sentry-snapshots-cocoa": {
-      "source": "getsentry/sentry-for-ai",
-      "sourceType": "github",
-      "skillPath": "src/skills/sentry-snapshots-cocoa/SKILL.md",
-      "computedHash": "f4258d31d8eccbad531fe2bc4cdfcd3a8253d1d8e566f712372e93027c05654d"
     },
     "supabase": {
       "source": "supabase/agent-skills",
