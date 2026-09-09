@@ -26,7 +26,7 @@ The shared direct Cloudinary client internally retries only direct-upload HTTP 5
 **Goals:**
 
 - Define `canRetry` as proven safe immediate execution of the current manual action, separately from technical transience or eventual recoverability.
-- Keep the released client safe against both legacy non-idempotent and hardened idempotent final-submit servers.
+- Keep the released client's immediate-retry policy safe across both legacy non-idempotent and hardened idempotent final-submit servers.
 - Remove blind ordinary-error retry while preserving the current session and its safe route recovery.
 - Keep finalization failure immediately retryable through the existing local-only path.
 - Use the smallest implementation surface: one derived ViewModel semantic and one progress-action decision.
