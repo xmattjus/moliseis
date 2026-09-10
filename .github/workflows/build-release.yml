@@ -1,0 +1,404 @@
+name: Build release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-release
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.41.9"
+  IOS_TEAM_ID: "P6FY59D893"
+  IOS_BUNDLE_ID: "it.benitomatteobercini.moliseis"
+
+jobs:
+  android:
+    name: Android AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter version
+        run: flutter --version
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\+[0-9]+$ ]]; then
+            echo "Invalid pubspec version: $VERSION"
+            exit 1
+          fi
+
+          SAFE_VERSION="${VERSION/+/_}"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "safe_version=$SAFE_VERSION" >> "$GITHUB_OUTPUT"
+
+          echo "Building Molise Is $VERSION"
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          KEYSTORE_PATH="android/app/upload-keystore.jks"
+
+          echo -n "$ANDROID_KEYSTORE_BASE64" \
+            | base64 --decode \
+            > "$KEYSTORE_PATH"
+
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_STORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+          test -s "$KEYSTORE_PATH"
+          test -s android/key.properties
+
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
+
+      - name: Verify Android artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          compgen -G "build/app/outputs/bundle/release/*.aab" > /dev/null
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: molise-is-android-${{ steps.version.outputs.safe_version }}
+          path: build/app/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 7
+
+  ios:
+    name: iOS IPA
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Select Xcode 26.6
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo xcode-select \
+            -s /Applications/Xcode_26.6.app/Contents/Developer
+
+          xcodebuild -version
+
+          XCODE_VERSION="$(xcodebuild -version | sed -n '1p')"
+          XCODE_BUILD="$(xcodebuild -version | sed -n '2p')"
+
+          test "$XCODE_VERSION" = "Xcode 26.6"
+          test "$XCODE_BUILD" = "Build version 17F113"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter version
+        run: flutter --version
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+\+[0-9]+$ ]]; then
+            echo "Invalid pubspec version: $VERSION"
+            exit 1
+          fi
+
+          SAFE_VERSION="${VERSION/+/_}"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "safe_version=$SAFE_VERSION" >> "$GITHUB_OUTPUT"
+
+          echo "Building Molise Is $VERSION"
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Install Apple certificate and provisioning profile
+        env:
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CERTIFICATE_PATH="$RUNNER_TEMP/distribution.p12"
+          PROFILE_PATH="$RUNNER_TEMP/app-store.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo -n "$IOS_DISTRIBUTION_CERTIFICATE_BASE64" \
+            | base64 --decode \
+            > "$CERTIFICATE_PATH"
+
+          echo -n "$IOS_PROVISIONING_PROFILE_BASE64" \
+            | base64 --decode \
+            > "$PROFILE_PATH"
+
+          security create-keychain \
+            -p "$IOS_KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security set-keychain-settings \
+            -lut 21600 \
+            "$KEYCHAIN_PATH"
+
+          security unlock-keychain \
+            -p "$IOS_KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security import "$CERTIFICATE_PATH" \
+            -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -k "$IOS_KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security list-keychains \
+            -d user \
+            -s "$KEYCHAIN_PATH"
+
+          security cms \
+            -D \
+            -i "$PROFILE_PATH" \
+            > "$PROFILE_PLIST"
+
+          PROFILE_UUID="$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :UUID" \
+              "$PROFILE_PLIST"
+          )"
+
+          PROFILE_NAME="$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :Name" \
+              "$PROFILE_PLIST"
+          )"
+
+          PROFILE_TEAM_ID="$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :TeamIdentifier:0" \
+              "$PROFILE_PLIST"
+          )"
+
+          PROFILE_APP_IDENTIFIER="$(
+            /usr/libexec/PlistBuddy \
+              -c "Print :Entitlements:application-identifier" \
+              "$PROFILE_PLIST"
+          )"
+
+          if [[ "$PROFILE_TEAM_ID" != "$IOS_TEAM_ID" ]]; then
+            echo "Provisioning profile Team ID mismatch."
+            exit 1
+          fi
+
+          EXPECTED_APP_IDENTIFIER="$IOS_TEAM_ID.$IOS_BUNDLE_ID"
+
+          if [[ "$PROFILE_APP_IDENTIFIER" != "$EXPECTED_APP_IDENTIFIER" ]]; then
+            echo "Provisioning profile application identifier mismatch."
+            exit 1
+          fi
+
+          mkdir -p \
+            "$HOME/Library/MobileDevice/Provisioning Profiles"
+
+          cp "$PROFILE_PATH" \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          echo "IOS_PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+          echo "IOS_PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+
+          security find-identity \
+            -v \
+            -p codesigning \
+            "$KEYCHAIN_PATH"
+
+          if ! security find-identity \
+            -v \
+            -p codesigning \
+            "$KEYCHAIN_PATH" \
+            | grep -q "Apple Distribution"; then
+            echo "Apple Distribution signing identity not found."
+            exit 1
+          fi
+
+      - name: Configure iOS project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          flutter build ios \
+            --release \
+            --config-only
+
+          cd ios
+          pod install
+
+      - name: Configure manual signing for CI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IOS_TEAM_ID="$IOS_TEAM_ID" \
+          IOS_PROFILE_NAME="$IOS_PROFILE_NAME" \
+          ruby <<'RUBY'
+          require 'xcodeproj'
+
+          project =
+            Xcodeproj::Project.open(
+              'ios/Runner.xcodeproj',
+            )
+
+          target =
+            project.targets.find do |candidate|
+              candidate.name == 'Runner'
+            end
+
+          abort('Runner target not found') unless target
+
+          configuration =
+            target.build_configurations.find do |candidate|
+              candidate.name == 'Release'
+            end
+
+          abort('Runner Release configuration not found') unless configuration
+
+          configuration.build_settings['CODE_SIGN_STYLE'] = 'Manual'
+          configuration.build_settings['CODE_SIGN_IDENTITY'] =
+            'Apple Distribution'
+          configuration.build_settings[
+            'CODE_SIGN_IDENTITY[sdk=iphoneos*]'
+          ] = 'Apple Distribution'
+          configuration.build_settings['DEVELOPMENT_TEAM'] =
+            ENV.fetch('IOS_TEAM_ID')
+          configuration.build_settings[
+            'PROVISIONING_PROFILE_SPECIFIER'
+          ] = ENV.fetch('IOS_PROFILE_NAME')
+          configuration.build_settings[
+            'PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]'
+          ] = ENV.fetch('IOS_PROFILE_NAME')
+
+          project.save
+          RUBY
+
+      - name: Create iOS export options
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EXPORT_OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+
+          cat > "$EXPORT_OPTIONS" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" \
+          "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+
+            <key>destination</key>
+            <string>export</string>
+
+            <key>teamID</key>
+            <string>$IOS_TEAM_ID</string>
+
+            <key>signingStyle</key>
+            <string>manual</string>
+
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$IOS_BUNDLE_ID</key>
+              <string>$IOS_PROFILE_NAME</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+          plutil -lint "$EXPORT_OPTIONS"
+
+          echo "IOS_EXPORT_OPTIONS=$EXPORT_OPTIONS" >> "$GITHUB_ENV"
+
+      - name: Build iOS IPA
+        run: |
+          flutter build ipa \
+            --release \
+            --export-options-plist="$IOS_EXPORT_OPTIONS"
+
+      - name: Verify iOS artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          compgen -G "build/ios/ipa/*.ipa" > /dev/null
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: molise-is-ios-${{ steps.version.outputs.safe_version }}
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: error
+          retention-days: 7
