@@ -87,7 +87,7 @@ local.properties
 **/ios/Pods/
 
 Pods/
-Podfile.lock
+!Podfile.lock
 Pods.xcodeproj/
 *.xcuserdatad/
 *.xcworkspace/
