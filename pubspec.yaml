@@ -2,10 +2,11 @@ name: moliseis
 description: "La prima app multipiattaforma per il turismo in Molise."
 publish_to: none
 
-version: 2.4.0+104
+version: 2.5.0+150
 
 environment:
   sdk: ^3.11.5
+  flutter: 3.41.9
 
 dependencies:
   # A
