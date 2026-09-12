@@ -20,6 +20,8 @@ import 'package:moliseis/domain/repositories/content_submission_draft_repository
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
+import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/utils/result.dart';
@@ -211,17 +213,21 @@ void main() {
         scrollable: scrollable,
       );
       expect(find.byType(AppNetworkImage), findsOneWidget);
+      final renderedAsset = tester.widget<AppNetworkImage>(
+        find.byType(AppNetworkImage),
+      );
+      expect(renderedAsset.imageWidth, asset.width);
+      expect(renderedAsset.imageHeight, asset.height);
+      expect(
+        find.byKey(const ValueKey<String>('admin_submission_asset_2')),
+        findsOneWidget,
+      );
       expect(find.text('1 / 5'), findsOneWidget);
       expect(
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(
-          const ValueKey<String>('admin_submission_delete_asset_2'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.byTooltip('Rimuovi foto'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('anna@example.com'),
         200,
@@ -411,9 +417,7 @@ void main() {
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
 
-      final deleteAsset = find.byKey(
-        const ValueKey<String>('admin_submission_delete_asset_2'),
-      );
+      final deleteAsset = find.byTooltip('Rimuovi foto');
       await tester.tap(deleteAsset);
       await tester.pumpAndSettle();
       expect(
@@ -513,25 +517,15 @@ void main() {
         await tester.pump();
 
         expect(
-          tester
-              .widget<OutlinedButton>(
-                find.byKey(
-                  const ValueKey<String>('admin_submission_add_asset'),
-                ),
-              )
-              .onPressed,
-          isNull,
+          find.byKey(const ValueKey<String>('admin_submission_add_asset')),
+          findsNothing,
         );
-        expect(
-          tester
-              .widget<IconButton>(
-                find.byKey(
-                  const ValueKey<String>('admin_submission_delete_asset_2'),
-                ),
-              )
-              .onPressed,
-          isNull,
+        expect(find.byType(CustomCircularProgressIndicator), findsOneWidget);
+        final removeControl = find.descendant(
+          of: find.byType(ContentSubmissionAssetListItem),
+          matching: find.byType(InkWell),
         );
+        expect(tester.widget<InkWell>(removeControl).onTap, isNull);
         expect(
           tester
               .widget<FilledButton>(
@@ -1367,12 +1361,7 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsNothing,
       );
-      expect(
-        find.byKey(
-          const ValueKey<String>('admin_submission_delete_asset_2'),
-        ),
-        findsNothing,
-      );
+      expect(find.byTooltip('Rimuovi foto'), findsNothing);
       // No moderation or Save controls remain.
       expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
       expect(
@@ -1541,12 +1530,7 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsNothing,
       );
-      expect(
-        find.byKey(
-          const ValueKey<String>('admin_submission_delete_asset_2'),
-        ),
-        findsNothing,
-      );
+      expect(find.byTooltip('Rimuovi foto'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
       // The Save control is hidden entirely for read-only rows.
@@ -1597,12 +1581,7 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsNothing,
       );
-      expect(
-        find.byKey(
-          const ValueKey<String>('admin_submission_delete_asset_2'),
-        ),
-        findsNothing,
-      );
+      expect(find.byTooltip('Rimuovi foto'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
       expect(find.text('Salva modifiche'), findsNothing);

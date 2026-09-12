@@ -128,7 +128,7 @@ class _ContentSubmissionAssetListState
                   }
 
                   return ContentSubmissionAssetListItem(
-                    onPressed: () =>
+                    onRemove: () =>
                         widget.viewModel.removeAssetAt.execute(index),
                     image: Image.file(
                       File(widget.viewModel.assets[index].file.path),

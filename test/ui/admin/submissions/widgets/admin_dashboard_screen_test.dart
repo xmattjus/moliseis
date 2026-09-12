@@ -132,7 +132,7 @@ void main() {
       expect(find.textContaining('${submission.userName} ·'), findsOneWidget);
     });
 
-    testWidgets('filters loaded submissions through a status chip', (
+    testWidgets('filters loaded submissions through a status control', (
       tester,
     ) async {
       final pending = sampleAdminSubmission(
@@ -155,11 +155,24 @@ void main() {
       expect(find.text(pending.name), findsOneWidget);
       expect(find.text(accepted.name), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(FilterChip, 'Accettati'));
+      await tester.tap(find.text('Accettati'));
       await tester.pump();
 
       expect(find.text(pending.name), findsNothing);
       expect(find.text(accepted.name), findsOneWidget);
+    });
+
+    testWidgets('reflects a filter already selected by the view model', (
+      tester,
+    ) async {
+      viewModel.setFilter(AdminSubmissionStatus.accepted);
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+
+      expect(
+        tester.widget<ToggleButtons>(find.byType(ToggleButtons)).isSelected,
+        <bool>[false, false, true, false],
+      );
     });
 
     testWidgets('shows an empty state when a filter has no matches', (
@@ -172,7 +185,7 @@ void main() {
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(FilterChip, 'Accettati'));
+      await tester.tap(find.text('Accettati'));
       await tester.pump();
 
       expect(find.text(pending.name), findsNothing);
@@ -207,9 +220,64 @@ void main() {
       expect(find.text('CREATE_EDITOR_MARKER'), findsOneWidget);
     });
 
+    testWidgets('executes refresh from the compact overflow menu', (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(390, 844)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Symbols.more_vert));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Aggiorna'));
+      await tester.pumpAndSettle();
+
+      expect(repository.listCallCount, 1);
+    });
+
+    testWidgets('keeps status filters usable on a narrow screen', (
+      tester,
+    ) async {
+      tester.view
+        ..physicalSize = const Size(320, 640)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tutti'), findsOneWidget);
+      expect(find.text('Rifiutati'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('pull-to-refresh reloads a short submission list', (
+      tester,
+    ) async {
+      repository.listResult = Result.success(<AdminSubmission>[
+        sampleAdminSubmission(),
+      ]);
+      await viewModel.load.execute();
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+
+      await tester.drag(
+        find.byType(CustomScrollView),
+        const Offset(0, 300),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repository.listCallCount, 2);
+    });
+
     testWidgets('navigates home before executing logout', (tester) async {
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-      expect(find.byTooltip('Esci'), findsOneWidget);
+      expect(find.byTooltip('Esegui il logout'), findsOneWidget);
 
       await tester.tap(find.byIcon(Symbols.logout));
       await tester.pump();

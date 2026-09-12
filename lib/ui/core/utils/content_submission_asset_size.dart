@@ -4,4 +4,4 @@ import 'package:flutter/material.dart';
 ///
 /// Provides fixed pixel values used throughout the submission flow to
 /// maintain visual uniformity across different content types.
-Size get contentSubmissionAssetSize => const Size.square(72);
+Size get contentSubmissionAssetSize => const Size.square(86);

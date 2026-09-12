@@ -230,7 +230,7 @@ class _AdminSubmissionLocationEditorState
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
+      spacing: _mode == _LocationMode.mappa ? 8 : 16,
       children: <Widget>[
         SegmentedButton<_LocationMode>(
           segments: const <ButtonSegment<_LocationMode>>[
@@ -266,7 +266,7 @@ class _AdminSubmissionLocationEditorState
             offstage: _mode == _LocationMode.mappa,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 8,
+              spacing: 12,
               children: <Widget>[
                 TextFormField(
                   key: _latitudeFieldKey,

@@ -8,12 +8,16 @@ import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
+import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
+import 'package:moliseis/ui/core/utils/content_submission_asset_size.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -474,61 +478,52 @@ class _AdminSubmissionEditorScreenState
                             runSpacing: 8,
                             children: <Widget>[
                               ...viewModel.assets.map(
-                                (asset) => Stack(
-                                  key: ValueKey<String>(
-                                    'admin_submission_asset_${asset.id}',
-                                  ),
-                                  alignment: Alignment.topRight,
-                                  children: <Widget>[
-                                    AppNetworkImage(
+                                (asset) {
+                                  return ContentSubmissionAssetListItem(
+                                    key: ValueKey<String>(
+                                      'admin_submission_asset_${asset.id}',
+                                    ),
+                                    image: AppNetworkImage(
                                       url: asset.url,
                                       imageWidth: asset.width,
                                       imageHeight: asset.height,
-                                      width: 100,
-                                      height: 100,
+                                      width: contentSubmissionAssetSize.width,
+                                      height: contentSubmissionAssetSize.height,
                                     ),
-                                    if (status == AdminSubmissionStatus.pending)
-                                      IconButton(
-                                        key: ValueKey<String>(
-                                          'admin_submission_delete_asset_'
-                                          '${asset.id}',
-                                        ),
-                                        onPressed: viewModel.operationRunning
-                                            ? null
-                                            : () => unawaited(
-                                                _confirmAssetDeletion(asset.id),
-                                              ),
-                                        tooltip: 'Rimuovi foto',
-                                        icon: const Icon(Symbols.delete),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              if (status == AdminSubmissionStatus.pending &&
-                                  viewModel.assets.length <
-                                      kMaximumSubmissionAssetCount)
-                                SizedBox(
-                                  width: 100,
-                                  height: 100,
-                                  child: OutlinedButton(
-                                    key: const ValueKey<String>(
-                                      'admin_submission_add_asset',
-                                    ),
-                                    onPressed: viewModel.operationRunning
+                                    showRemoveIcon:
+                                        status == AdminSubmissionStatus.pending,
+                                    onRemove: viewModel.operationRunning
                                         ? null
-                                        : () {
-                                            _unfocus();
-                                            unawaited(
-                                              viewModel.addAsset.execute(),
-                                            );
-                                          },
-                                    child: viewModel.addAsset.running
-                                        ? const SizedBox(
-                                            width: 24,
-                                            height: 24,
-                                            child: CircularProgressIndicator(),
-                                          )
-                                        : const Icon(Symbols.add_a_photo),
+                                        : () => unawaited(
+                                            _confirmAssetDeletion(
+                                              asset.id,
+                                            ),
+                                          ),
+                                  );
+                                },
+                              ),
+                              if ((status == AdminSubmissionStatus.pending &&
+                                      viewModel.assets.length <
+                                          kMaximumSubmissionAssetCount) &&
+                                  !viewModel.operationRunning)
+                                ContentSubmissionAddAssetButton(
+                                  key: const ValueKey<String>(
+                                    'admin_submission_add_asset',
+                                  ),
+                                  onPressed: viewModel.operationRunning
+                                      ? null
+                                      : () {
+                                          _unfocus();
+                                          unawaited(
+                                            viewModel.addAsset.execute(),
+                                          );
+                                        },
+                                ),
+                              if (viewModel.operationRunning)
+                                const Padding(
+                                  padding: EdgeInsets.all(18),
+                                  child: CustomCircularProgressIndicator(
+                                    size: 36,
                                   ),
                                 ),
                             ],

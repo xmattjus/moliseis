@@ -11,10 +11,10 @@ class ContentSubmissionAddAssetButton extends StatelessWidget {
   /// Creates the add-asset button.
   ///
   /// `onPressed` is invoked when the button is tapped.
-  const ContentSubmissionAddAssetButton({required this.onPressed, super.key});
+  const ContentSubmissionAddAssetButton({this.onPressed, super.key});
 
   /// Called when the user taps the button.
-  final void Function() onPressed;
+  final void Function()? onPressed;
 
   @override
   Widget build(BuildContext context) {
