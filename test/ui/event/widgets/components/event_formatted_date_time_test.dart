@@ -8,6 +8,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
+import 'package:moliseis/utils/extensions/date_time_extensions.dart';
 
 import '../../../../support/fixtures.dart';
 
@@ -274,9 +275,8 @@ String _formatTimeOfDay(
   bool alwaysUse24HourFormat = false,
 }) {
   final context = tester.element(find.byType(EventFormattedDateTime));
-  final localizations = MaterialLocalizations.of(context);
-  return localizations.formatTimeOfDay(
-    TimeOfDay.fromDateTime(time),
+  return time.formatTime(
+    Localizations.localeOf(context),
     alwaysUse24HourFormat: alwaysUse24HourFormat,
   );
 }

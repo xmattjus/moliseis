@@ -7,6 +7,10 @@ analyzer:
     - '**.g.dart'
     - '**.init.dart'
     - '**.mapper.dart'
+    - android/**
+    - build/**
+    - ios/**
+    - macos/**
 
 linter:
   rules:

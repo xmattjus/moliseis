@@ -6,7 +6,7 @@ version: 2.5.0+150
 
 environment:
   sdk: ^3.11.5
-  flutter: 3.41.9
+  flutter: 3.47.4
 
 dependencies:
   # A
@@ -34,8 +34,8 @@ dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_localizations:
     sdk: flutter
-  flutter_map: ^8.3.0
-  flutter_quill: ^11.5.0
+  flutter_map: ^8.3.2
+  flutter_quill: ^11.5.1
   # G
   go_router: ^17.3.0
   # H
@@ -50,7 +50,7 @@ dependencies:
   # M
   markdown_widget: ^2.3.2+8
   material_color_utilities: ^0.13.0
-  material_symbols_icons: 4.2906.0
+  material_symbols_icons: 4.2960.0
   meta: ^1.17.0
   # N
   # O
@@ -132,19 +132,6 @@ dependency_overrides:
       url: https://github.com/google/flatbuffers.git
       ref: e7c6874192a643c50b10cb90f81c0ed84fd7f53a
       path: dart
-
-  # Temporary workaround for flutter_map 8.3.0/8.3.1 zero-displacement
-  # flings poisoning the camera with a NaN center.
-  # TODO(xmattjus): remove when a pub.dev release includes fleaflet/flutter_map#2220.
-  flutter_map:
-    git:
-      url: https://github.com/fleaflet/flutter_map.git
-      ref: f779faed3afe37e70dd1e57aea0dc0a14f7a8fca
-
-  # Temporary workaround to fix iOS and macOS runtime exceptions with higher 
-  # objective_c versions on Flutter 3.41.
-  # TODO(xmattjus): remove this on sdk update to >= Flutter 3.44.
-  objective_c: 9.1.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
