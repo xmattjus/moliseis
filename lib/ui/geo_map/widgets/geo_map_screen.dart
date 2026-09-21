@@ -186,22 +186,32 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     super.dispose();
   }
 
-  /// Starts resolving the content identity requested by the current location,
-  /// or abandons any in-flight resolution when the identity is absent.
+  /// Schedules resolution of the content identity requested by the current
+  /// location after the current frame, or abandons any in-flight resolution
+  /// when the identity is absent.
   void _resolveRequestedSelection() {
     final id = widget.initialContentId;
     final type = widget.initialContentType;
     final request = id != null && type != null ? (id: id, type: type) : null;
+    final viewModel = widget.viewModel;
 
     _pendingSelection = request;
     _resolutionRetries = 0;
     if (request == null) return;
 
-    unawaited(
-      request.type == ContentType.event
-          ? widget.viewModel.showEvent.execute(request.id)
-          : widget.viewModel.showPlace.execute(request.id),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !identical(widget.viewModel, viewModel) ||
+          _pendingSelection != request) {
+        return;
+      }
+
+      unawaited(
+        request.type == ContentType.event
+            ? viewModel.showEvent.execute(request.id)
+            : viewModel.showPlace.execute(request.id),
+      );
+    });
   }
 
   /// Applies the requested initial selection once the corresponding command

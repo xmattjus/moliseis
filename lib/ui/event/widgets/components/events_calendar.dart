@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' as legacy;
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:material_ui/material_ui.dart';
@@ -108,11 +109,21 @@ class _EventsCalendarState extends State<EventsCalendar> {
     required DateTime initialDate,
     required MonthBuilder monthBuilder,
     required DayBuilder dayBuilder,
-  }) => PagedVerticalCalendar(
-    minDate: minDate,
-    maxDate: maxDate,
-    initialDate: initialDate,
-    monthBuilder: monthBuilder,
-    dayBuilder: dayBuilder,
-  );
+  }) {
+    // TODO(xmattjus): Remove this compatibility subtree when
+    //  paged_vertical_calendar migrates to package:material_ui.
+    // ignore: deprecated_member_use
+    return MaterialUiCompatibilityBridge(
+      child: legacy.Material(
+        type: legacy.MaterialType.transparency,
+        child: PagedVerticalCalendar(
+          minDate: minDate,
+          maxDate: maxDate,
+          initialDate: initialDate,
+          monthBuilder: monthBuilder,
+          dayBuilder: dayBuilder,
+        ),
+      ),
+    );
+  }
 }

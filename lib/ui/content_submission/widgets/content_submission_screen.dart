@@ -55,7 +55,10 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
     super.initState();
     _sessionIdentity = widget.viewModel.state.clientSubmissionId;
     widget.viewModel.addListener(_handleSessionRetired);
-    unawaited(widget.viewModel.retrieveLostAssets.execute());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(widget.viewModel.retrieveLostAssets.execute());
+    });
   }
 
   @override

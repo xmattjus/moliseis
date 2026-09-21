@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
@@ -51,18 +53,36 @@ class _NearbyContentHorizontalListState
   @override
   void initState() {
     super.initState();
-    widget.loadNearContentCommand.execute(widget.coordinates);
+    _scheduleLoad();
   }
 
   @override
   void didUpdateWidget(covariant NearbyContentHorizontalList oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Reload data if coordinates changed
-    if (oldWidget.coordinates != widget.coordinates ||
-        widget.coordinates.isValid) {
-      widget.loadNearContentCommand.execute(widget.coordinates);
+    final commandChanged = !identical(
+      oldWidget.loadNearContentCommand,
+      widget.loadNearContentCommand,
+    );
+    if (commandChanged || oldWidget.coordinates != widget.coordinates) {
+      _scheduleLoad();
     }
+  }
+
+  void _scheduleLoad() {
+    final command = widget.loadNearContentCommand;
+    final coordinates = widget.coordinates;
+    if (!coordinates.isValid) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !identical(widget.loadNearContentCommand, command) ||
+          widget.coordinates != coordinates) {
+        return;
+      }
+
+      unawaited(command.execute(coordinates));
+    });
   }
 
   @override

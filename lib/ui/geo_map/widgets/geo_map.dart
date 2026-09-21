@@ -72,6 +72,7 @@ class _GeoMapState extends State<GeoMap> {
     /// Schedules a callback to be fired once when the build phase of this
     /// widget has ended.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       widget.onMapReady?.call(_mapController.camera.center);
     });
   }

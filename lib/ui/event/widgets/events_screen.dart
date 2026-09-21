@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:ui' show clampDouble;
 
 import 'package:intl/date_symbols.dart';
@@ -31,11 +30,6 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   void initState() {
     super.initState();
-
-    unawaited(
-      widget.viewModel.loadByDate.execute(widget.viewModel.currentCalendarDate),
-    );
-
     _draggableScrollableController = DraggableScrollableController();
     _draggableScrollableController.addListener(_draggableScrollableListener);
   }

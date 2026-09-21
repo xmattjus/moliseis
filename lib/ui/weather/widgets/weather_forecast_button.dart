@@ -28,9 +28,12 @@ class _WeatherForecastButtonState extends State<WeatherForecastButton> {
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => widget.viewModel.loadCurrentForecast.execute(widget.coordinates),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        widget.viewModel.loadCurrentForecast.execute(widget.coordinates),
+      );
+    });
   }
 
   @override

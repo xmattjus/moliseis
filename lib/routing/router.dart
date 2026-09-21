@@ -448,7 +448,17 @@ GoRouter buildAppRouter({
                 builder: (context, _) {
                   return ChangeNotifierProvider<EventViewModel>(
                     create: (context) {
-                      return EventViewModel(repository: context.read());
+                      final viewModel = EventViewModel(
+                        repository: context.read(),
+                      );
+                      // loadByDate synchronously notifies the ViewModel. Start
+                      // it before Provider attaches any framework listeners.
+                      unawaited(
+                        viewModel.loadByDate.execute(
+                          viewModel.currentCalendarDate,
+                        ),
+                      );
+                      return viewModel;
                     },
                     child: Consumer<EventViewModel>(
                       builder: (_, viewModel, _) {
