@@ -107,9 +107,7 @@ final class QuillDocumentCodec {
     return operations;
   }
 
-  static bool _hasOnlySupportedOperationKeys(
-    Map<Object?, Object?> operation,
-  ) {
+  static bool _hasOnlySupportedOperationKeys(Map<Object?, Object?> operation) {
     if (!operation.containsKey(_insertKey)) return false;
 
     return operation.keys.every(

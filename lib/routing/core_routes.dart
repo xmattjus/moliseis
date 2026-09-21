@@ -1,7 +1,7 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/use-cases/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
@@ -172,10 +172,7 @@ GoRoute categoryRoute({
       );
     },
     routes: <RouteBase>[
-      postRoute(
-        name: childName,
-        parentNavigatorKey: parentNavigatorKey,
-      ),
+      postRoute(name: childName, parentNavigatorKey: parentNavigatorKey),
     ],
   );
 }

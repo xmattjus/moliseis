@@ -1,6 +1,6 @@
 import 'dart:io' show File;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
@@ -147,12 +147,7 @@ class _ContentSubmissionAssetListState
           ),
         ),
         Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-            32,
-            2,
-            32,
-            0,
-          ),
+          padding: const EdgeInsetsDirectional.fromSTEB(32, 2, 32, 0),
           child: Builder(
             builder: (context) {
               return Text(

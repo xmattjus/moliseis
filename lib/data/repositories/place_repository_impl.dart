@@ -56,9 +56,7 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
 
   @override
   PlaceEntity markEntityDeleted(PlaceEntity existing) {
-    return existing.copyWith(
-      isDeleted: true,
-    );
+    return existing.copyWith(isDeleted: true);
   }
 
   Condition<PlaceEntity> get _isNotDeleted =>
@@ -208,11 +206,7 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
       }
     } on Exception catch (exception, stackTrace) {
       logger.log(
-        EntityLoadFailed(
-          'place',
-          method: 'getById',
-          extra: {'id': id},
-        ),
+        EntityLoadFailed('place', method: 'getById', extra: {'id': id}),
         error: exception,
         stackTrace: stackTrace,
       );

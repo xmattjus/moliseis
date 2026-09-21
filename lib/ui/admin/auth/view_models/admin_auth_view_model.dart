@@ -17,11 +17,9 @@ typedef AdminLoginCredentials = ({String email, String password});
 /// session on logout.
 class AdminAuthViewModel extends ChangeNotifier {
   /// Creates the auth state that protects staff-only application routes.
-  AdminAuthViewModel({
-    required GoTrueClient authClient,
-    required Logger logger,
-  }) : _authClient = authClient,
-       _logger = logger {
+  AdminAuthViewModel({required GoTrueClient authClient, required Logger logger})
+    : _authClient = authClient,
+      _logger = logger {
     login = Command1<void, AdminLoginCredentials>(_login);
     logout = Command0<void>(_logout);
     _currentUser = _authClient.currentUser;

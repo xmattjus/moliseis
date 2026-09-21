@@ -14,10 +14,7 @@ void main() {
       };
 
       expect(frozen, isEmpty);
-      expect(
-        () => frozen.add(<String, dynamic>{}),
-        throwsUnsupportedError,
-      );
+      expect(() => frozen.add(<String, dynamic>{}), throwsUnsupportedError);
     });
 
     test('deeply freezes Delta values and every collection level', () {

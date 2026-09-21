@@ -3,11 +3,11 @@ import 'dart:typed_data' show Uint8List;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, debugDefaultTargetPlatformOverride;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
@@ -264,9 +264,7 @@ void main() {
         final repository = FakeContentSubmissionRepository(
           submitResult: Result.error(failure.error),
         );
-        final viewModel = buildViewModel(
-          submissionRepository: repository,
-        );
+        final viewModel = buildViewModel(submissionRepository: repository);
 
         await tester.pumpWidget(buildProgressFirstApp(viewModel));
         await viewModel.submit.execute();
@@ -423,10 +421,7 @@ void main() {
           stagedAssetRepository: stagedRepo,
           imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async => <XFile>[
-              XFile.fromData(
-                Uint8List.fromList(<int>[1, 2, 3]),
-                name: 'a.jpg',
-              ),
+              XFile.fromData(Uint8List.fromList(<int>[1, 2, 3]), name: 'a.jpg'),
             ],
           ),
         );
@@ -465,10 +460,7 @@ void main() {
         expect(vm.assets, isEmpty);
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
-        expect(
-          find.byType(ContentSubmissionProgressScreen),
-          findsNothing,
-        );
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
@@ -496,10 +488,7 @@ void main() {
           stagedAssetRepository: stagedRepo,
           imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async => <XFile>[
-              XFile.fromData(
-                Uint8List.fromList(<int>[1, 2, 3]),
-                name: 'a.jpg',
-              ),
+              XFile.fromData(Uint8List.fromList(<int>[1, 2, 3]), name: 'a.jpg'),
             ],
           ),
         );
@@ -532,54 +521,48 @@ void main() {
       },
     );
 
-    testWidgets(
-      'Nuovo suggerimento reveals the already-finalized fresh form',
-      (tester) async {
-        final repo = ControllableSubmissionRepository();
-        final draftRepo = FakeContentSubmissionDraftRepository();
-        final stagedRepo = FakeContentSubmissionStagedAssetRepository();
-        final vm = buildViewModel(
-          submissionRepository: repo,
-          draftRepository: draftRepo,
-          stagedAssetRepository: stagedRepo,
-        );
-        final completedIdentity = vm.state.clientSubmissionId;
+    testWidgets('Nuovo suggerimento reveals the already-finalized fresh form', (
+      tester,
+    ) async {
+      final repo = ControllableSubmissionRepository();
+      final draftRepo = FakeContentSubmissionDraftRepository();
+      final stagedRepo = FakeContentSubmissionStagedAssetRepository();
+      final vm = buildViewModel(
+        submissionRepository: repo,
+        draftRepository: draftRepo,
+        stagedAssetRepository: stagedRepo,
+      );
+      final completedIdentity = vm.state.clientSubmissionId;
 
-        final (router, app) = buildHomeFirstApp(vm);
-        await tester.pumpWidget(app);
-        await pushProgress(tester, router);
-        unawaited(vm.submit.execute());
-        await tester.pump();
-        repo.completeSubmission(const Result.success(null));
-        await tester.pumpAndSettle();
+      final (router, app) = buildHomeFirstApp(vm);
+      await tester.pumpWidget(app);
+      await pushProgress(tester, router);
+      unawaited(vm.submit.execute());
+      await tester.pump();
+      repo.completeSubmission(const Result.success(null));
+      await tester.pumpAndSettle();
 
-        final finalizedIdentity = vm.state.clientSubmissionId;
-        expect(draftRepo.clearDraftCallCount, 1);
-        expect(stagedRepo.clearedSessions, [completedIdentity]);
+      final finalizedIdentity = vm.state.clientSubmissionId;
+      expect(draftRepo.clearDraftCallCount, 1);
+      expect(stagedRepo.clearedSessions, [completedIdentity]);
 
-        await tester.tap(find.text('Nuovo suggerimento'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.text('Nuovo suggerimento'));
+      await tester.pumpAndSettle();
 
-        expect(draftRepo.clearDraftCallCount, 1);
-        expect(stagedRepo.clearedSessions, [completedIdentity]);
-        expect(vm.state.clientSubmissionId, finalizedIdentity);
-        expect(vm.state.clientSubmissionId, isNot(completedIdentity));
-        expect(vm.state.city, isNull);
-        expect(find.byType(_FormMarker), findsOneWidget);
-        expect(find.byType(_HomeMarker), findsNothing);
-        expect(
-          find.byType(ContentSubmissionProgressScreen),
-          findsNothing,
-        );
-        expect(tester.takeException(), isNull);
-      },
-    );
+      expect(draftRepo.clearDraftCallCount, 1);
+      expect(stagedRepo.clearedSessions, [completedIdentity]);
+      expect(vm.state.clientSubmissionId, finalizedIdentity);
+      expect(vm.state.clientSubmissionId, isNot(completedIdentity));
+      expect(vm.state.city, isNull);
+      expect(find.byType(_FormMarker), findsOneWidget);
+      expect(find.byType(_HomeMarker), findsNothing);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'OS back when completed reveals the already-finalized fresh form',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
         final stagedRepo = FakeContentSubmissionStagedAssetRepository();
@@ -611,10 +594,7 @@ void main() {
         expect(vm.state.clientSubmissionId, finalizedIdentity);
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
-        expect(
-          find.byType(ContentSubmissionProgressScreen),
-          findsNothing,
-        );
+        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(tester.takeException(), isNull);
       },
     );
@@ -704,9 +684,7 @@ void main() {
 
     testWidgets(
       'OS back while idle pops to form without clearing or retrying',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
         final vm = buildViewModel(
@@ -843,10 +821,7 @@ void main() {
           stagedAssetRepository: stagedRepo,
           imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async => <XFile>[
-              XFile.fromData(
-                Uint8List.fromList(<int>[1, 2, 3]),
-                name: 'a.jpg',
-              ),
+              XFile.fromData(Uint8List.fromList(<int>[1, 2, 3]), name: 'a.jpg'),
             ],
           ),
         );
@@ -921,9 +896,7 @@ void main() {
 
     testWidgets(
       'repeated completed Home actions cannot retire the fresh session',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final repo = ControllableSubmissionRepository();
         final draftRepo = FakeContentSubmissionDraftRepository();
         final vm = buildViewModel(

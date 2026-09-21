@@ -2,8 +2,8 @@ import 'dart:async' show unawaited;
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal_overlay.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:swipe_image_gallery/widget/gallery.dart';
@@ -17,9 +17,7 @@ void main() {
       testWidgets(
         'restoration restores branch state and the serializable gallery '
         'payload',
-        (
-          tester,
-        ) async {
+        (tester) async {
           final cacheManager = FakeCacheManager();
           addTearDown(() => unawaited(cacheManager.dispose()));
           final holder = _FixtureHolder();
@@ -104,59 +102,58 @@ void main() {
     });
 
     group('multi-page gallery', () {
-      testWidgets(
-        'restorationBundle round-trips the gallery extra',
-        (tester) async {
-          final cacheManager = FakeCacheManager();
-          addTearDown(() => unawaited(cacheManager.dispose()));
-          final holder = _FixtureHolder();
+      testWidgets('restorationBundle round-trips the gallery extra', (
+        tester,
+      ) async {
+        final cacheManager = FakeCacheManager();
+        addTearDown(() => unawaited(cacheManager.dispose()));
+        final holder = _FixtureHolder();
 
-          await tester.pumpWidget(
-            _RestorableHarness(cacheManager: cacheManager, holder: holder),
-          );
-          await tester.pumpAndSettle();
-          final before = holder.fixture!;
+        await tester.pumpWidget(
+          _RestorableHarness(cacheManager: cacheManager, holder: holder),
+        );
+        await tester.pumpAndSettle();
+        final before = holder.fixture!;
 
-          before.router.go('/home/detail');
-          await tester.pumpAndSettle();
+        before.router.go('/home/detail');
+        await tester.pumpAndSettle();
 
-          await tester.tap(find.text('Open gallery on page 3'));
-          await tester.pumpAndSettle();
-          expect(find.byType(GalleryPreviewScreen), findsOneWidget);
+        await tester.tap(find.text('Open gallery on page 3'));
+        await tester.pumpAndSettle();
+        expect(find.byType(GalleryPreviewScreen), findsOneWidget);
 
-          final preRestore = tester.widget<GalleryPreviewScreen>(
-            find.byType(GalleryPreviewScreen),
-          );
-          expect(preRestore.data.initialIndex, 2);
-          expect(preRestore.data.media.length, 4);
-          expect(preRestore.data.media[2].remoteId, 3);
+        final preRestore = tester.widget<GalleryPreviewScreen>(
+          find.byType(GalleryPreviewScreen),
+        );
+        expect(preRestore.data.initialIndex, 2);
+        expect(preRestore.data.media.length, 4);
+        expect(preRestore.data.media[2].remoteId, 3);
 
-          await tester.restartAndRestore();
-          await tester.pumpAndSettle();
+        await tester.restartAndRestore();
+        await tester.pumpAndSettle();
 
-          final after = holder.fixture!;
-          expect(after, isNot(same(before)));
-          expect(after.uri.path, '/home/detail');
-          expect(after.matchedLocation, '/gallery');
+        final after = holder.fixture!;
+        expect(after, isNot(same(before)));
+        expect(after.uri.path, '/home/detail');
+        expect(after.matchedLocation, '/gallery');
 
-          final restored = tester.widget<GalleryPreviewScreen>(
-            find.byType(GalleryPreviewScreen),
-          );
-          // The immutable route payload retains its original initial index.
-          // Restoring a page selected after swiping is covered below.
-          expect(restored.data.initialIndex, 2);
-          expect(restored.data.media.length, 4);
-          expect(restored.data.media[2].remoteId, 3);
-          expect(restored.data.media[2].url, 'https://example.com/3.jpg');
-          expect(tester.takeException(), isNull);
+        final restored = tester.widget<GalleryPreviewScreen>(
+          find.byType(GalleryPreviewScreen),
+        );
+        // The immutable route payload retains its original initial index.
+        // Restoring a page selected after swiping is covered below.
+        expect(restored.data.initialIndex, 2);
+        expect(restored.data.media.length, 4);
+        expect(restored.data.media[2].remoteId, 3);
+        expect(restored.data.media[2].url, 'https://example.com/3.jpg');
+        expect(tester.takeException(), isNull);
 
-          after.router.pop();
-          await tester.pumpAndSettle();
-          expect(find.byType(GalleryPreviewScreen), findsNothing);
-          expect(find.text('Detail page'), findsOneWidget);
-          expect(after.uri.path, '/home/detail');
-        },
-      );
+        after.router.pop();
+        await tester.pumpAndSettle();
+        expect(find.byType(GalleryPreviewScreen), findsNothing);
+        expect(find.text('Detail page'), findsOneWidget);
+        expect(after.uri.path, '/home/detail');
+      });
 
       testWidgets(
         'restoration restores the selected page after a gallery page change',
@@ -242,10 +239,7 @@ class _FixtureHolder {
 /// mount, so `tester.restartAndRestore` re-creates the router from the saved
 /// restoration bucket instead of reusing the in-memory instance.
 class _RestorableHarness extends StatefulWidget {
-  const _RestorableHarness({
-    required this.cacheManager,
-    required this.holder,
-  });
+  const _RestorableHarness({required this.cacheManager, required this.holder});
 
   final CacheManager cacheManager;
   final _FixtureHolder holder;

@@ -56,9 +56,7 @@ void main() {
         );
 
         when(() => authClient.currentUser).thenReturn(null);
-        when(
-          () => authClient.signInAnonymously(),
-        ).thenThrow(exception);
+        when(() => authClient.signInAnonymously()).thenThrow(exception);
 
         await expectLater(
           ensureAnonymousSupabaseSession(
@@ -88,15 +86,10 @@ void main() {
       const exception = AuthException('Synthetic auth failure');
 
       when(() => authClient.currentUser).thenReturn(null);
-      when(
-        () => authClient.signInAnonymously(),
-      ).thenThrow(exception);
+      when(() => authClient.signInAnonymously()).thenThrow(exception);
 
       await expectLater(
-        ensureAnonymousSupabaseSession(
-          authClient: authClient,
-          logger: logger,
-        ),
+        ensureAnonymousSupabaseSession(authClient: authClient, logger: logger),
         completes,
       );
 

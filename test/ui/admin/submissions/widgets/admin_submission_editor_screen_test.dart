@@ -2,12 +2,11 @@ import 'dart:async' show Completer, unawaited;
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/core/event_time.dart';
@@ -54,9 +53,8 @@ void main() {
           ),
           GoRoute(
             path: '/editor',
-            builder: (_, _) => AdminSubmissionEditorScreen(
-              viewModel: viewModel,
-            ),
+            builder: (_, _) =>
+                AdminSubmissionEditorScreen(viewModel: viewModel),
           ),
         ],
       );
@@ -70,11 +68,9 @@ void main() {
         child: MaterialApp.router(
           routerConfig: router,
           scaffoldMessengerKey: $scaffoldMessengerKey,
-          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+          localizationsDelegates: const [
             FlutterQuillLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: const <Locale>[Locale('en'), Locale('it')],
         ),
@@ -248,9 +244,7 @@ void main() {
       viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: contentSubmissionRepository,
-        imagePicker: FakeImagePicker(
-          onPickImage: () => pendingPicker.future,
-        ),
+        imagePicker: FakeImagePicker(onPickImage: () => pendingPicker.future),
         submissionId: 1,
       );
       await viewModel.load.execute();
@@ -307,9 +301,7 @@ void main() {
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      repository.getByIdResults[1] = Result.success(
-        sampleAdminSubmission(),
-      );
+      repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
       viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: contentSubmissionRepository,
@@ -486,9 +478,7 @@ void main() {
 
     testWidgets(
       'disables asset, save, and moderation controls while deleting',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final pendingDelete = Completer<Result<void>>();
@@ -596,9 +586,7 @@ void main() {
         'separately', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      repository.getByIdResults[1] = Result.success(
-        sampleAdminSubmission(),
-      );
+      repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
       viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: contentSubmissionRepository,
@@ -693,10 +681,7 @@ void main() {
             matching: find.byType(Scrollable),
           )
           .first;
-      final publish = find.widgetWithText(
-        FilledButton,
-        'Pubblica come luogo',
-      );
+      final publish = find.widgetWithText(FilledButton, 'Pubblica come luogo');
       await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
 
       final reject = find.widgetWithText(FilledButton, 'Rifiuta');
@@ -791,9 +776,7 @@ void main() {
       );
       expect(
         tester
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Rifiuta'),
-            )
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Rifiuta'))
             .onPressed,
         isNull,
       );
@@ -801,122 +784,109 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets(
-      'does not auto-confirm publication when save completes '
-      'during confirmation',
-      (tester) async {
-        await tester.binding.setSurfaceSize(const Size(800, 1600));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        final pendingUpdate = Completer<Result<AdminSubmission>>();
-        repository
-          ..getByIdResults[1] = Result.success(sampleAdminSubmission())
-          ..pendingUpdate = pendingUpdate;
-        viewModel = AdminSubmissionEditorViewModel(
-          repository: repository,
-          contentSubmissionRepository: contentSubmissionRepository,
-          submissionId: 1,
-        );
-        await viewModel.load.execute();
-        await tester.pumpWidget(app);
-        unawaited(router.push('/editor'));
-        await tester.pumpAndSettle();
-        final scrollable = find
-            .descendant(
-              of: find.byKey(
-                const ValueKey<String>('admin_submission_editor_scroll'),
-              ),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        final publish = find.widgetWithText(
-          FilledButton,
-          'Pubblica come luogo',
-        );
-        await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+    testWidgets('does not auto-confirm publication when save completes '
+        'during confirmation', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pendingUpdate = Completer<Result<AdminSubmission>>();
+      repository
+        ..getByIdResults[1] = Result.success(sampleAdminSubmission())
+        ..pendingUpdate = pendingUpdate;
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final publish = find.widgetWithText(FilledButton, 'Pubblica come luogo');
+      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
 
-        await tester.tap(publish);
-        await tester.pump();
-        expect(
-          find.text(
-            'Confermi di voler pubblicare questo contributo come luogo?',
-          ),
-          findsOneWidget,
-        );
+      await tester.tap(publish);
+      await tester.pump();
+      expect(
+        find.text('Confermi di voler pubblicare questo contributo come luogo?'),
+        findsOneWidget,
+      );
 
-        unawaited(viewModel.save.execute());
-        await tester.pump();
-        expect(viewModel.save.running, isTrue);
-        pendingUpdate.complete(Result.success(sampleAdminSubmission()));
-        await tester.pumpAndSettle();
+      unawaited(viewModel.save.execute());
+      await tester.pump();
+      expect(viewModel.save.running, isTrue);
+      pendingUpdate.complete(Result.success(sampleAdminSubmission()));
+      await tester.pumpAndSettle();
 
-        expect(
-          find.text(
-            'Confermi di voler pubblicare questo contributo come luogo?',
-          ),
-          findsOneWidget,
-        );
-        expect(repository.promoteCalls, isEmpty);
+      expect(
+        find.text('Confermi di voler pubblicare questo contributo come luogo?'),
+        findsOneWidget,
+      );
+      expect(repository.promoteCalls, isEmpty);
 
-        await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
+      await tester.pumpAndSettle();
 
-        // The save completed while the dialog was open: closing the editor
-        // refreshes the dashboard instead of running a stale moderation.
-        expect(repository.promoteCalls, isEmpty);
-        expect(find.text('SHELL_MARKER'), findsOneWidget);
-      },
-    );
+      // The save completed while the dialog was open: closing the editor
+      // refreshes the dashboard instead of running a stale moderation.
+      expect(repository.promoteCalls, isEmpty);
+      expect(find.text('SHELL_MARKER'), findsOneWidget);
+    });
 
-    testWidgets(
-      'does not run a stale rejection when save completes '
-      'during its confirmation',
-      (tester) async {
-        await tester.binding.setSurfaceSize(const Size(800, 1600));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        final pendingUpdate = Completer<Result<AdminSubmission>>();
-        repository
-          ..getByIdResults[1] = Result.success(sampleAdminSubmission())
-          ..pendingUpdate = pendingUpdate;
-        viewModel = AdminSubmissionEditorViewModel(
-          repository: repository,
-          contentSubmissionRepository: contentSubmissionRepository,
-          submissionId: 1,
-        );
-        await viewModel.load.execute();
-        await tester.pumpWidget(app);
-        unawaited(router.push('/editor'));
-        await tester.pumpAndSettle();
-        final scrollable = find
-            .descendant(
-              of: find.byKey(
-                const ValueKey<String>('admin_submission_editor_scroll'),
-              ),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        final reject = find.widgetWithText(FilledButton, 'Rifiuta');
-        await tester.scrollUntilVisible(reject, 200, scrollable: scrollable);
+    testWidgets('does not run a stale rejection when save completes '
+        'during its confirmation', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pendingUpdate = Completer<Result<AdminSubmission>>();
+      repository
+        ..getByIdResults[1] = Result.success(sampleAdminSubmission())
+        ..pendingUpdate = pendingUpdate;
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      final scrollable = find
+          .descendant(
+            of: find.byKey(
+              const ValueKey<String>('admin_submission_editor_scroll'),
+            ),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final reject = find.widgetWithText(FilledButton, 'Rifiuta');
+      await tester.scrollUntilVisible(reject, 200, scrollable: scrollable);
 
-        await tester.tap(reject);
-        await tester.pump();
-        expect(
-          find.text('Confermi di voler rifiutare questo contributo?'),
-          findsOneWidget,
-        );
+      await tester.tap(reject);
+      await tester.pump();
+      expect(
+        find.text('Confermi di voler rifiutare questo contributo?'),
+        findsOneWidget,
+      );
 
-        unawaited(viewModel.save.execute());
-        await tester.pump();
-        expect(viewModel.save.running, isTrue);
-        pendingUpdate.complete(Result.success(sampleAdminSubmission()));
-        await tester.pumpAndSettle();
+      unawaited(viewModel.save.execute());
+      await tester.pump();
+      expect(viewModel.save.running, isTrue);
+      pendingUpdate.complete(Result.success(sampleAdminSubmission()));
+      await tester.pumpAndSettle();
 
-        await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
-        await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
+      await tester.pumpAndSettle();
 
-        expect(repository.rejectIds, isEmpty);
-        expect(find.text('SHELL_MARKER'), findsOneWidget);
-      },
-    );
+      expect(repository.rejectIds, isEmpty);
+      expect(find.text('SHELL_MARKER'), findsOneWidget);
+    });
 
     testWidgets('rechecks busy state before confirming publication', (
       tester,
@@ -928,9 +898,7 @@ void main() {
       viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: contentSubmissionRepository,
-        imagePicker: FakeImagePicker(
-          onPickImage: () => pendingPick.future,
-        ),
+        imagePicker: FakeImagePicker(onPickImage: () => pendingPick.future),
         submissionId: 1,
       );
       await viewModel.load.execute();
@@ -997,9 +965,7 @@ void main() {
 
     testWidgets(
       'keeps edited data on save failure and shows an error snackbar',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         repository
@@ -1052,9 +1018,7 @@ void main() {
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      repository.getByIdResults[1] = Result.success(
-        sampleAdminSubmission(),
-      );
+      repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
       viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: contentSubmissionRepository,
@@ -1104,9 +1068,7 @@ void main() {
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      repository.getByIdResults[1] = Result.success(
-        sampleAdminSubmission(),
-      );
+      repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
       viewModel = AdminSubmissionEditorViewModel(
         repository: repository,
         contentSubmissionRepository: contentSubmissionRepository,
@@ -1520,10 +1482,7 @@ void main() {
       expect(find.text('Accettato'), findsOneWidget);
       // Historical accepted rows carry no durable link and none is invented.
       expect(find.text('Pubblicato come evento · ID 123'), findsNothing);
-      expect(
-        find.textContaining('Pubblicato come'),
-        findsNothing,
-      );
+      expect(find.textContaining('Pubblicato come'), findsNothing);
       expect(find.text('1 / 5'), findsOneWidget);
       expect(find.byType(AppNetworkImage), findsOneWidget);
       expect(
@@ -1546,9 +1505,7 @@ void main() {
       expect(viewModel.city, 'Campobasso');
     });
 
-    testWidgets('renders rejected rows read-only without Save', (
-      tester,
-    ) async {
+    testWidgets('renders rejected rows read-only without Save', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       repository.getByIdResults[1] = Result.success(

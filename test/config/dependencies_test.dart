@@ -1,8 +1,8 @@
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
@@ -75,9 +75,7 @@ void main() {
     // A recent sync timestamp keeps SyncUseCase.isSyncRequired false, so
     // SyncViewModel does not auto-trigger a real sync (Sentry + network)
     // when the provider tree is built.
-    settingsRepository = FakeSettingsRepository(
-      lastSyncedAt: DateTime.now(),
-    );
+    settingsRepository = FakeSettingsRepository(lastSyncedAt: DateTime.now());
     cacheManager = FakeCacheManager();
     sentryLoggingFlag = SentryLoggingFlag(initialValue: false);
     httpClient = _NoopHttpClient();
@@ -146,10 +144,7 @@ void main() {
 
       // Shared services are constructed inside the tree.
       expect(resolved[UrlLaunchService], isA<UrlLaunchService>());
-      expect(
-        resolved[CachedWeatherApiClient],
-        isA<CachedWeatherApiClient>(),
-      );
+      expect(resolved[CachedWeatherApiClient], isA<CachedWeatherApiClient>());
 
       // Repositories resolve to their concrete implementations.
       expect(

@@ -7,9 +7,7 @@ import 'dart:io' show HttpException, HttpRequest, HttpServer, InternetAddress;
 /// Use [baseUri] as the `baseUrl` override for the upload client so tests do
 /// not make real Cloudinary requests.
 class FakeCloudinaryServer {
-  FakeCloudinaryServer({
-    this.cloudName = 'test_cloud',
-  });
+  FakeCloudinaryServer({this.cloudName = 'test_cloud'});
 
   final String cloudName;
 

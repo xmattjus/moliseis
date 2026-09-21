@@ -1,7 +1,7 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -131,10 +131,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
   void _showSearchResults(String query) {
     if (query.isEmpty) return;
 
-    context.goNamed(
-      RouteNames.homeSearchResult,
-      queryParameters: {'q': query},
-    );
+    context.goNamed(RouteNames.homeSearchResult, queryParameters: {'q': query});
   }
 
   void _onSearchResultPressed(BuildContext context, ContentBase content) {
@@ -144,9 +141,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
 
     GoRouter.of(context).goNamed(
       RouteNames.homeSearchResultPost,
-      pathParameters: {
-        'id': content.remoteId.toString(),
-      },
+      pathParameters: {'id': content.remoteId.toString()},
       queryParameters: {
         'q': widget.query,
         'type': RouteParameters.contentTypeSlug(

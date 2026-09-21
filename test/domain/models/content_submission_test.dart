@@ -146,18 +146,9 @@ void main() {
         final attributes = operation['attributes']! as Map<String, dynamic>;
         final tags = attributes['tags']! as List<Object?>;
 
-        expect(
-          () => delta.add(<String, dynamic>{}),
-          throwsUnsupportedError,
-        );
-        expect(
-          () => operation['insert'] = 'Changed\n',
-          throwsUnsupportedError,
-        );
-        expect(
-          () => attributes['bold'] = false,
-          throwsUnsupportedError,
-        );
+        expect(() => delta.add(<String, dynamic>{}), throwsUnsupportedError);
+        expect(() => operation['insert'] = 'Changed\n', throwsUnsupportedError);
+        expect(() => attributes['bold'] = false, throwsUnsupportedError);
         expect(() => tags.add('changed'), throwsUnsupportedError);
       });
     });

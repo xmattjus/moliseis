@@ -1,14 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' show Marker;
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 
 /// The display representation selected inside the location editor.
-enum _LocationMode {
-  mappa,
-  coordinate,
-}
+enum _LocationMode { mappa, coordinate }
 
 /// Fallback center used when the current drafts hold no valid point.
 ///
@@ -92,10 +89,7 @@ class _AdminSubmissionLocationEditorState
     // Startup rule: blank or valid drafts start in Map mode; malformed drafts
     // (half-pair, unparsable, out-of-range) open in Coordinate mode so the
     // problem is visible without interaction.
-    _mode = _classifyDrafts(
-      widget.latitudeText,
-      widget.longitudeText,
-    );
+    _mode = _classifyDrafts(widget.latitudeText, widget.longitudeText);
   }
 
   @override
@@ -179,10 +173,7 @@ class _AdminSubmissionLocationEditorState
   }
 
   bool get _hasValidDraft =>
-      _classifyDrafts(
-        _latitudeController.text,
-        _longitudeController.text,
-      ) ==
+      _classifyDrafts(_latitudeController.text, _longitudeController.text) ==
       _LocationMode.mappa;
 
   /// Map center from a range-valid draft pair, else [_fallbackCenter].
@@ -271,9 +262,7 @@ class _AdminSubmissionLocationEditorState
                 TextFormField(
                   key: _latitudeFieldKey,
                   controller: _latitudeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Latitudine',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Latitudine'),
                   keyboardType: const TextInputType.numberWithOptions(
                     signed: true,
                     decimal: true,
@@ -285,9 +274,7 @@ class _AdminSubmissionLocationEditorState
                 TextFormField(
                   key: _longitudeFieldKey,
                   controller: _longitudeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Longitudine',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Longitudine'),
                   keyboardType: const TextInputType.numberWithOptions(
                     signed: true,
                     decimal: true,

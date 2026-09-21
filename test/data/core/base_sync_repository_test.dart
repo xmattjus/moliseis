@@ -44,10 +44,7 @@ class FakeSyncEntity implements SyncEntity {
 
 class StubSyncRepository
     extends BaseSyncRepository<FakeSyncDto, FakeSyncEntity> {
-  StubSyncRepository(
-    super.logger, {
-    this.supportsSoftDelete = true,
-  });
+  StubSyncRepository(super.logger, {this.supportsSoftDelete = true});
 
   @override
   final bool supportsSoftDelete;
@@ -136,9 +133,7 @@ void main() {
     });
 
     test('returns Result.success with DTOs from fetchRemote', () async {
-      repository.remoteDtos.add(
-        FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
-      );
+      repository.remoteDtos.add(FakeSyncDto(id: 1, modifiedAt: DateTime(2026)));
 
       final result = await repository.prepareSync();
 
@@ -148,21 +143,18 @@ void main() {
       expect(dtos[0].id, equals(1));
     });
 
-    test(
-      'returns Result.error when fetchRemote throws',
-      () async {
-        final throwingRepository = _ThrowingStubSyncRepository(mockLogger);
+    test('returns Result.error when fetchRemote throws', () async {
+      final throwingRepository = _ThrowingStubSyncRepository(mockLogger);
 
-        final result = await throwingRepository.prepareSync();
+      final result = await throwingRepository.prepareSync();
 
-        expect(result, isA<Error<List<FakeSyncDto>>>());
-        expect(mockLogger.eventsOfType<RepositorySyncFailed>(), hasLength(1));
-        final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
-        expect(failedCall, isNotNull);
-        expect(failedCall!.error, isNotNull);
-        expect(failedCall.stackTrace, isNotNull);
-      },
-    );
+      expect(result, isA<Error<List<FakeSyncDto>>>());
+      expect(mockLogger.eventsOfType<RepositorySyncFailed>(), hasLength(1));
+      final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+      expect(failedCall, isNotNull);
+      expect(failedCall!.error, isNotNull);
+      expect(failedCall.stackTrace, isNotNull);
+    });
   });
 
   group('BaseSyncRepository.commitSync', () {
@@ -175,9 +167,7 @@ void main() {
     });
 
     test('inserts a new entity absent from the local store', () {
-      repository.commitSync([
-        FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
-      ]);
+      repository.commitSync([FakeSyncDto(id: 1, modifiedAt: DateTime(2026))]);
 
       expect(repository.createdEntities, hasLength(1));
       expect(repository.storedEntities[1]?.remoteId, equals(1));
@@ -190,45 +180,32 @@ void main() {
       expect(repository.putManyCallCount, equals(0));
     });
 
-    test(
-      'updates an existing entity when remote modifiedAt is newer',
-      () {
-        repository.storedEntities[1] = FakeSyncEntity(
-          remoteId: 1,
-          modifiedAt: DateTime(2025),
-        );
+    test('updates an existing entity when remote modifiedAt is newer', () {
+      repository.storedEntities[1] = FakeSyncEntity(
+        remoteId: 1,
+        modifiedAt: DateTime(2025),
+      );
 
-        repository.commitSync([
-          FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
-        ]);
+      repository.commitSync([FakeSyncDto(id: 1, modifiedAt: DateTime(2026))]);
 
-        expect(repository.mergedEntities, hasLength(1));
-        expect(
-          repository.storedEntities[1]?.modifiedAt,
-          equals(DateTime(2026)),
-        );
-        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
-      },
-    );
+      expect(repository.mergedEntities, hasLength(1));
+      expect(repository.storedEntities[1]?.modifiedAt, equals(DateTime(2026)));
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
+    });
 
-    test(
-      'skips an existing entity when remote modifiedAt is not newer',
-      () {
-        repository.storedEntities[1] = FakeSyncEntity(
-          remoteId: 1,
-          modifiedAt: DateTime(2025),
-        );
+    test('skips an existing entity when remote modifiedAt is not newer', () {
+      repository.storedEntities[1] = FakeSyncEntity(
+        remoteId: 1,
+        modifiedAt: DateTime(2025),
+      );
 
-        repository.commitSync([
-          FakeSyncDto(id: 1, modifiedAt: DateTime(2025)),
-        ]);
+      repository.commitSync([FakeSyncDto(id: 1, modifiedAt: DateTime(2025))]);
 
-        expect(repository.mergedEntities, isEmpty);
-        expect(repository.putManyCallCount, equals(0));
-        expect(mockLogger.containsEvent<EntityInsertSuccess>(), isFalse);
-        expect(mockLogger.containsEvent<EntityUpdateSuccess>(), isFalse);
-      },
-    );
+      expect(repository.mergedEntities, isEmpty);
+      expect(repository.putManyCallCount, equals(0));
+      expect(mockLogger.containsEvent<EntityInsertSuccess>(), isFalse);
+      expect(mockLogger.containsEvent<EntityUpdateSuccess>(), isFalse);
+    });
 
     test(
       'soft-deletes an existing entity when remote deletedAt is non-null',
@@ -252,22 +229,19 @@ void main() {
       },
     );
 
-    test(
-      'skips soft-delete when deleted entity has no local counterpart',
-      () {
-        repository.commitSync([
-          FakeSyncDto(
-            id: 1,
-            modifiedAt: DateTime(2026),
-            deletedAt: DateTime(2026, 2),
-          ),
-        ]);
+    test('skips soft-delete when deleted entity has no local counterpart', () {
+      repository.commitSync([
+        FakeSyncDto(
+          id: 1,
+          modifiedAt: DateTime(2026),
+          deletedAt: DateTime(2026, 2),
+        ),
+      ]);
 
-        expect(repository.deletedEntities, isEmpty);
-        expect(repository.createdEntities, isEmpty);
-        expect(repository.putManyCallCount, equals(0));
-      },
-    );
+      expect(repository.deletedEntities, isEmpty);
+      expect(repository.createdEntities, isEmpty);
+      expect(repository.putManyCallCount, equals(0));
+    });
 
     test(
       'processes insert + update + skip + soft-delete in a single batch',
@@ -317,70 +291,59 @@ void main() {
       expect(repository.putManyCalls[0], hasLength(5));
     });
 
-    test(
-      're-activates a previously soft-deleted entity when remote no longer '
-      'has deletedAt',
-      () {
-        repository.storedEntities[1] = FakeSyncEntity(
-          remoteId: 1,
-          modifiedAt: DateTime(2025),
-          isDeleted: true,
-        );
+    test('re-activates a previously soft-deleted entity when remote no longer '
+        'has deletedAt', () {
+      repository.storedEntities[1] = FakeSyncEntity(
+        remoteId: 1,
+        modifiedAt: DateTime(2025),
+        isDeleted: true,
+      );
 
-        repository.commitSync([
-          FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
-        ]);
+      repository.commitSync([FakeSyncDto(id: 1, modifiedAt: DateTime(2026))]);
 
-        expect(repository.mergedEntities, hasLength(1));
-        expect(repository.deletedEntities, isEmpty);
-        expect(repository.storedEntities[1]?.isDeleted, isFalse);
-        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
-      },
-    );
+      expect(repository.mergedEntities, hasLength(1));
+      expect(repository.deletedEntities, isEmpty);
+      expect(repository.storedEntities[1]?.isDeleted, isFalse);
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
+    });
 
-    test(
-      'handles duplicate remote IDs — second DTO updates the entity '
-      'created by the first within the same batch',
-      () {
-        repository.commitSync([
-          FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
-          FakeSyncDto(id: 1, modifiedAt: DateTime(2026, 6)),
-        ]);
+    test('handles duplicate remote IDs — second DTO updates the entity '
+        'created by the first within the same batch', () {
+      repository.commitSync([
+        FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
+        FakeSyncDto(id: 1, modifiedAt: DateTime(2026, 6)),
+      ]);
 
-        expect(repository.createdEntities, hasLength(1));
-        expect(repository.mergedEntities, hasLength(1));
-        expect(repository.putManyCalls[0], hasLength(2));
-        expect(
-          repository.storedEntities[1]?.modifiedAt,
-          equals(DateTime(2026, 6)),
-        );
-        expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
-        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
-      },
-    );
+      expect(repository.createdEntities, hasLength(1));
+      expect(repository.mergedEntities, hasLength(1));
+      expect(repository.putManyCalls[0], hasLength(2));
+      expect(
+        repository.storedEntities[1]?.modifiedAt,
+        equals(DateTime(2026, 6)),
+      );
+      expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
+    });
 
-    test(
-      'ignores deletedAt when supportsSoftDelete is false',
-      () {
-        final noSoftDeleteRepo = StubSyncRepository(
-          mockLogger,
-          supportsSoftDelete: false,
-        );
+    test('ignores deletedAt when supportsSoftDelete is false', () {
+      final noSoftDeleteRepo = StubSyncRepository(
+        mockLogger,
+        supportsSoftDelete: false,
+      );
 
-        // Test readability benefits from separate statements over cascades.
-        // ignore: cascade_invocations
-        noSoftDeleteRepo.commitSync([
-          FakeSyncDto(
-            id: 1,
-            modifiedAt: DateTime(2026),
-            deletedAt: DateTime(2026, 2),
-          ),
-        ]);
+      // Test readability benefits from separate statements over cascades.
+      // ignore: cascade_invocations
+      noSoftDeleteRepo.commitSync([
+        FakeSyncDto(
+          id: 1,
+          modifiedAt: DateTime(2026),
+          deletedAt: DateTime(2026, 2),
+        ),
+      ]);
 
-        expect(noSoftDeleteRepo.deletedEntities, isEmpty);
-        expect(noSoftDeleteRepo.createdEntities, hasLength(1));
-      },
-    );
+      expect(noSoftDeleteRepo.deletedEntities, isEmpty);
+      expect(noSoftDeleteRepo.createdEntities, hasLength(1));
+    });
 
     test(
       'returns Result.error and logs RepositorySyncFailed when putMany throws',

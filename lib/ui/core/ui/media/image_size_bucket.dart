@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Maps logical pixel dimensions to discrete physical-pixel "buckets",
 /// preventing image reloads on every window-resize tick while still avoiding

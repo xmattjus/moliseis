@@ -294,9 +294,7 @@ final class FakeAdminContentSubmissionRepository
 
 /// Create a fresh instance per test to avoid state bleed between tests.
 final class FakeCityRepository extends CityRepository {
-  FakeCityRepository({
-    this.prepareResult = const Result.success([]),
-  });
+  FakeCityRepository({this.prepareResult = const Result.success([])});
 
   Result<List<CityDto>> prepareResult;
   bool commitCalled = false;
@@ -400,9 +398,7 @@ final class FakeEventRepository extends EventRepository {
   }
 
   @override
-  Future<Result<List<Event>>> getByCoordinates(
-    List<double> coordinates,
-  ) async {
+  Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) async {
     lastCoordinates = coordinates;
     return getByCoordinatesResult;
   }
@@ -616,9 +612,7 @@ final class FakePlaceRepository extends PlaceRepository {
   }) async => getByCategoriesResult;
 
   @override
-  Future<Result<List<Place>>> getByCoordinates(
-    List<double> coordinates,
-  ) async {
+  Future<Result<List<Place>>> getByCoordinates(List<double> coordinates) async {
     lastCoordinates = coordinates;
     return getByCoordinatesResult;
   }
@@ -749,11 +743,7 @@ final class FakeContentSubmissionRepository
            uploadImageTaskResult ??
            FakeImageUploadTask.completed(
              const Result.success(
-               SubmissionAsset(
-                 secureUrl: '',
-                 width: 2048,
-                 height: 2048,
-               ),
+               SubmissionAsset(secureUrl: '', width: 2048, height: 2048),
              ),
            ),
        uploadImageTaskResults = uploadImageTaskResults ?? <ImageUploadTask>[];

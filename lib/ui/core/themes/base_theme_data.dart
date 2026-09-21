@@ -1,5 +1,5 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/themes/app_effects_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_shapes_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_sizes_theme_extension.dart';
@@ -65,12 +65,7 @@ class BaseThemeData {
       chipTheme:
           chipTheme ??
           const ChipThemeData(
-            padding: EdgeInsets.only(
-              left: 12,
-              top: 8,
-              bottom: 8,
-              right: 8,
-            ),
+            padding: EdgeInsets.only(left: 12, top: 8, bottom: 8, right: 8),
           ),
       dividerTheme: DividerThemeData(
         color: colorScheme?.brightness == Brightness.light

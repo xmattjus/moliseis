@@ -1,7 +1,7 @@
 import 'dart:async' show Completer, unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';

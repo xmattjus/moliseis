@@ -74,9 +74,7 @@ void main() {
   testWidgets(
     'visiting every branch leaves hidden branches unchanged after predictive '
     'back',
-    (
-      tester,
-    ) async {
+    (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       try {
         final cacheManager = FakeCacheManager();
@@ -123,10 +121,7 @@ void main() {
 
         fixture.router.go('/home');
         await tester.pumpAndSettle();
-        expect(
-          find.text('Count: 1', skipOffstage: false),
-          findsNWidgets(4),
-        );
+        expect(find.text('Count: 1', skipOffstage: false), findsNWidgets(4));
         for (final label in branches.values) {
           expect(find.text('$label root', skipOffstage: false), findsOneWidget);
         }

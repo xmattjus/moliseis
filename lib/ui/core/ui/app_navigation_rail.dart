@@ -1,8 +1,8 @@
 import 'dart:collection' show UnmodifiableListView;
 import 'dart:ui' as ui show lerpDouble;
 
-import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 

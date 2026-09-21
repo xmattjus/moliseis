@@ -1,7 +1,7 @@
 import 'dart:async' show unawaited;
 import 'dart:collection' show UnmodifiableListView;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';

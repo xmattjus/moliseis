@@ -47,18 +47,14 @@ class MediaDto with MediaDtoMappable implements SyncDto {
   /// Mutually exclusive with [eventId]: when assigned, [eventId] must be
   /// [Clear] — the backend rejects simultaneous assignment of both relations.
   @MappableField(
-    hook: RelationUpdateHook<int>(
-      decoder: relationUpdateDecodeInt,
-    ),
+    hook: RelationUpdateHook<int>(decoder: relationUpdateDecodeInt),
   )
   final RelationUpdate<int> placeId;
 
   /// Mutually exclusive with [placeId]: when assigned, [placeId] must be
   /// [Clear] — the backend rejects simultaneous assignment of both relations.
   @MappableField(
-    hook: RelationUpdateHook<int>(
-      decoder: relationUpdateDecodeInt,
-    ),
+    hook: RelationUpdateHook<int>(decoder: relationUpdateDecodeInt),
   )
   final RelationUpdate<int> eventId;
 

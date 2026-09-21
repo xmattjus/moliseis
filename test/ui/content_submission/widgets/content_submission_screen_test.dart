@@ -1,13 +1,12 @@
 import 'dart:async' show Completer, unawaited;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderSliver;
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/core/event_time.dart';
@@ -67,11 +66,7 @@ void main() {
     String value,
   ) async {
     final field = find.widgetWithText(TextFormField, labelText);
-    await tester.scrollUntilVisible(
-      field,
-      200,
-      scrollable: mainScrollable,
-    );
+    await tester.scrollUntilVisible(field, 200, scrollable: mainScrollable);
     await tester.enterText(field, value);
     await tester.pump();
   }
@@ -150,11 +145,9 @@ void main() {
       child: MaterialApp.router(
         scaffoldMessengerKey: $scaffoldMessengerKey,
         routerConfig: router,
-        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        localizationsDelegates: const [
           FlutterQuillLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
+          ...GlobalMaterialLocalizations.delegates,
         ],
         supportedLocales: const [Locale('en'), Locale('it')],
       ),
@@ -186,10 +179,7 @@ void main() {
 
       await tester.pumpWidget(buildApp(vm));
 
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
 
       expect(repo.submitCallCount, 0);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
@@ -208,10 +198,7 @@ void main() {
       await tester.pumpWidget(buildApp(vm));
       await fillValidForm(tester);
 
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
       await tester.pump();
 
       expect(
@@ -273,10 +260,7 @@ void main() {
       await tester.pumpWidget(buildApp(vm));
       await fillValidForm(tester);
 
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
       await tester.pump();
 
       expect(repo.submitCallCount, 1);
@@ -295,10 +279,7 @@ void main() {
       await tester.pumpWidget(buildApp(vm));
       await fillValidForm(tester);
 
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
       await tester.pump();
 
       repo.completeSubmission(Result.error(Exception('boom')));
@@ -371,10 +352,7 @@ void main() {
           },
         ),
       );
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
 
       expect(acquisitions, 0);
       expect(draftRepository.saveDraftCallCount, 0);
@@ -409,10 +387,7 @@ void main() {
         matching: find.byType(Checkbox),
       );
       await scrollToAndTap(tester, termsCheckbox);
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
 
       expect(acquisitions, 0);
       expect(draftRepository.saveDraftCallCount, 0);
@@ -444,10 +419,7 @@ void main() {
       await fillValidForm(tester);
       viewModel.setEventEnabled(true);
       await tester.pump();
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
 
       expect(acquisitions, 0);
       expect(draftRepository.saveDraftCallCount, 0);
@@ -470,10 +442,7 @@ void main() {
         buildApp(viewModel, acquireTransition: () => null),
       );
       await fillValidForm(tester);
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
 
       expect(draftRepository.saveDraftCallCount, 0);
       expect(repository.submitCallCount, 0);
@@ -577,10 +546,7 @@ void main() {
         ),
       );
       await fillValidForm(tester);
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
       await tester.pump();
 
       expect(draftRepository.saveDraftCallCount, 1);
@@ -832,9 +798,7 @@ void main() {
 
       testWidgets(
         '$label checkpoint failure preserves work and blocks launch',
-        (
-          tester,
-        ) async {
+        (tester) async {
           await tester.binding.setSurfaceSize(const Size(800, 1600));
           addTearDown(() => tester.binding.setSurfaceSize(null));
           final draftRepository = FakeContentSubmissionDraftRepository(
@@ -887,9 +851,7 @@ void main() {
 
       testWidgets(
         '$label launcher failure releases ownership and shows feedback',
-        (
-          tester,
-        ) async {
+        (tester) async {
           await tester.binding.setSurfaceSize(const Size(800, 1600));
           addTearDown(() => tester.binding.setSurfaceSize(null));
           final draftRepository = FakeContentSubmissionDraftRepository();
@@ -1002,9 +964,7 @@ void main() {
 
     testWidgets(
       'rapid repeated legal-link taps are single-flight while gated',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final checkpoint = Completer<Result<void>>();
@@ -1032,10 +992,7 @@ void main() {
         );
 
         await tapLegalLink(tester, 'Termini di Servizio');
-        await tester.tap(
-          find.text('Termini di Servizio'),
-          warnIfMissed: false,
-        );
+        await tester.tap(find.text('Termini di Servizio'), warnIfMissed: false);
         await tester.pump();
 
         expect(acquireCount, 1);
@@ -1051,9 +1008,7 @@ void main() {
 
     testWidgets(
       'gated boundary absorbs form, asset, and AppBar pointer input',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final checkpoint = Completer<Result<void>>();
@@ -1114,58 +1069,55 @@ void main() {
       },
     );
 
-    testWidgets(
-      'rapid repeated Privacy taps are single-flight while gated',
-      (tester) async {
-        await tester.binding.setSurfaceSize(const Size(800, 1600));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        final checkpoint = Completer<Result<void>>();
-        final draftRepository = FakeContentSubmissionDraftRepository()
-          ..pendingSaveDraft = checkpoint;
-        final externalUrlService = FakeExternalUrlService(logger: MockLogger());
-        final viewModel = buildViewModel(
-          submissionRepository: ControllableSubmissionRepository(),
-          draftRepository: draftRepository,
-        );
-        await viewModel.initialize();
-        viewModel.setCity('Campobasso');
-        var acquireCount = 0;
-        final token = Object();
+    testWidgets('rapid repeated Privacy taps are single-flight while gated', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final checkpoint = Completer<Result<void>>();
+      final draftRepository = FakeContentSubmissionDraftRepository()
+        ..pendingSaveDraft = checkpoint;
+      final externalUrlService = FakeExternalUrlService(logger: MockLogger());
+      final viewModel = buildViewModel(
+        submissionRepository: ControllableSubmissionRepository(),
+        draftRepository: draftRepository,
+      );
+      await viewModel.initialize();
+      viewModel.setCity('Campobasso');
+      var acquireCount = 0;
+      final token = Object();
 
-        await tester.pumpWidget(
-          buildApp(
-            viewModel,
-            acquireTransition: () => ++acquireCount == 1 ? token : null,
-            urlLaunchService: UrlLaunchService(
-              logger: MockLogger(),
-              externalUrlService: externalUrlService,
-            ),
+      await tester.pumpWidget(
+        buildApp(
+          viewModel,
+          acquireTransition: () => ++acquireCount == 1 ? token : null,
+          urlLaunchService: UrlLaunchService(
+            logger: MockLogger(),
+            externalUrlService: externalUrlService,
           ),
-        );
+        ),
+      );
 
-        await tapLegalLink(tester, 'Informativa sulla privacy');
-        await tester.tap(
-          find.text('Informativa sulla privacy'),
-          warnIfMissed: false,
-        );
-        await tester.pump();
+      await tapLegalLink(tester, 'Informativa sulla privacy');
+      await tester.tap(
+        find.text('Informativa sulla privacy'),
+        warnIfMissed: false,
+      );
+      await tester.pump();
 
-        expect(acquireCount, 1);
-        expect(draftRepository.saveDraftCallCount, 1);
-        expect(externalUrlService.launchedUrls, isEmpty);
+      expect(acquireCount, 1);
+      expect(draftRepository.saveDraftCallCount, 1);
+      expect(externalUrlService.launchedUrls, isEmpty);
 
-        checkpoint.complete(const Result.success(null));
-        await tester.pumpAndSettle();
+      checkpoint.complete(const Result.success(null));
+      await tester.pumpAndSettle();
 
-        expect(externalUrlService.launchedUrls, hasLength(1));
-      },
-    );
+      expect(externalUrlService.launchedUrls, hasLength(1));
+    });
 
     testWidgets(
       'unmounting during a checkpoint releases without a late launch',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         final checkpoint = Completer<Result<void>>();
@@ -1330,86 +1282,80 @@ void main() {
   });
 
   group('ContentSubmissionScreen back navigation', () {
-    testWidgets(
-      'completed back pops once and leaves a clean form',
-      (tester) async {
-        final repo = ControllableSubmissionRepository();
-        final vm = buildViewModel(submissionRepository: repo);
-        await vm.initialize();
+    testWidgets('completed back pops once and leaves a clean form', (
+      tester,
+    ) async {
+      final repo = ControllableSubmissionRepository();
+      final vm = buildViewModel(submissionRepository: repo);
+      await vm.initialize();
 
-        await tester.pumpWidget(buildApp(vm));
-        await fillValidForm(tester);
+      await tester.pumpWidget(buildApp(vm));
+      await fillValidForm(tester);
 
-        await tester.scrollUntilVisible(
-          find.widgetWithText(FilledButton, 'Invia'),
-          200,
-          scrollable: mainScrollable,
-        );
-        await tester.ensureVisible(
-          find.widgetWithText(FilledButton, 'Invia'),
-        );
-        await tester.pump();
-        await tester.tap(find.widgetWithText(FilledButton, 'Invia'));
-        await tester.pump();
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Invia'),
+        200,
+        scrollable: mainScrollable,
+      );
+      await tester.ensureVisible(find.widgetWithText(FilledButton, 'Invia'));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Invia'));
+      await tester.pump();
 
-        repo.completeSubmission(const Result.success(null));
-        await tester.pumpAndSettle();
-        expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+      repo.completeSubmission(const Result.success(null));
+      await tester.pumpAndSettle();
+      expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
 
-        final handled = await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
+      final handled = await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
 
-        expect(handled, isTrue);
-        expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
-        expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+      expect(handled, isTrue);
+      expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+      expect(find.byType(ContentSubmissionScreen), findsOneWidget);
 
-        // The completed pop cleared the in-memory state and reset the form.
-        expect(vm.state.city, isEmpty);
-        expect(vm.state.name, isEmpty);
-        expect(find.widgetWithText(TextFormField, 'Campobasso'), findsNothing);
-        expect(find.widgetWithText(TextFormField, 'Test Event'), findsNothing);
+      // The completed pop cleared the in-memory state and reset the form.
+      expect(vm.state.city, isEmpty);
+      expect(vm.state.name, isEmpty);
+      expect(find.widgetWithText(TextFormField, 'Campobasso'), findsNothing);
+      expect(find.widgetWithText(TextFormField, 'Test Event'), findsNothing);
 
-        // The controlled event state remains disabled after the clear.
-        final eventCheckbox = find.descendant(
-          of: find
-              .ancestor(
-                of: find.text('È un evento?'),
-                matching: find.byType(Row),
-              )
-              .first,
+      // The controlled event state remains disabled after the clear.
+      final eventCheckbox = find.descendant(
+        of: find
+            .ancestor(of: find.text('È un evento?'), matching: find.byType(Row))
+            .first,
+        matching: find.byType(Checkbox),
+      );
+      await tester.scrollUntilVisible(
+        find.text('È un evento?'),
+        -200,
+        scrollable: mainScrollable,
+      );
+      expect(tester.widget<Checkbox>(eventCheckbox).value, isFalse);
+
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextFormField, 'E-mail'),
+        200,
+        scrollable: mainScrollable,
+      );
+      expect(
+        find.widgetWithText(TextFormField, 'test@example.com'),
+        findsNothing,
+      );
+
+      await tester.scrollUntilVisible(
+        find.byType(CheckboxFormField),
+        200,
+        scrollable: mainScrollable,
+      );
+      final termsCheckbox = tester.widget<Checkbox>(
+        find.descendant(
+          of: find.byType(CheckboxFormField),
           matching: find.byType(Checkbox),
-        );
-        await tester.scrollUntilVisible(
-          find.text('È un evento?'),
-          -200,
-          scrollable: mainScrollable,
-        );
-        expect(tester.widget<Checkbox>(eventCheckbox).value, isFalse);
-
-        await tester.scrollUntilVisible(
-          find.widgetWithText(TextFormField, 'E-mail'),
-          200,
-          scrollable: mainScrollable,
-        );
-        expect(
-          find.widgetWithText(TextFormField, 'test@example.com'),
-          findsNothing,
-        );
-
-        await tester.scrollUntilVisible(
-          find.byType(CheckboxFormField),
-          200,
-          scrollable: mainScrollable,
-        );
-        final termsCheckbox = tester.widget<Checkbox>(
-          find.descendant(
-            of: find.byType(CheckboxFormField),
-            matching: find.byType(Checkbox),
-          ),
-        );
-        expect(termsCheckbox.value, isFalse);
-      },
-    );
+        ),
+      );
+      expect(termsCheckbox.value, isFalse);
+    });
 
     testWidgets(
       'completed submission blocks progress exit while local clear is pending',
@@ -1494,10 +1440,7 @@ void main() {
       await tester.pumpWidget(buildApp(vm));
       await fillValidForm(tester);
 
-      await scrollToAndTap(
-        tester,
-        find.widgetWithText(FilledButton, 'Invia'),
-      );
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
       await tester.pump();
 
       repo.completeSubmission(Result.error(Exception('boom')));
@@ -1690,10 +1633,7 @@ void main() {
 
       final eventCheckbox = find.descendant(
         of: find
-            .ancestor(
-              of: find.text('È un evento?'),
-              matching: find.byType(Row),
-            )
+            .ancestor(of: find.text('È un evento?'), matching: find.byType(Row))
             .first,
         matching: find.byType(Checkbox),
       );

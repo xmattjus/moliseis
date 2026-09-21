@@ -1,7 +1,7 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
@@ -92,10 +92,8 @@ GoRouter buildAppRouter({
     redirect: (context, state) =>
         _redirectForSync(context, syncViewModel, state) ??
         _redirectForAdminAuth(adminAuthViewModel, state),
-    errorBuilder: (_, state) => RouteErrorScreen(
-      uri: state.uri,
-      error: state.error,
-    ),
+    errorBuilder: (_, state) =>
+        RouteErrorScreen(uri: state.uri, error: state.error),
     routes: <RouteBase>[
       GoRoute(
         path: RoutePaths.sync,
@@ -228,9 +226,8 @@ GoRouter buildAppRouter({
           GoRoute(
             path: RoutePaths.adminLogin,
             name: RouteNames.adminLogin,
-            builder: (context, _) => AdminLoginScreen(
-              viewModel: context.read<AdminAuthViewModel>(),
-            ),
+            builder: (context, _) =>
+                AdminLoginScreen(viewModel: context.read<AdminAuthViewModel>()),
           ),
           GoRoute(
             path: RoutePaths.adminSubmissionsNew,
@@ -533,9 +530,7 @@ GoRouter buildAppRouter({
         },
       ),
     ],
-    observers: [
-      TalkerRouteObserver($talker),
-    ],
+    observers: [TalkerRouteObserver($talker)],
   );
 }
 
@@ -561,10 +556,7 @@ String? _redirectForSync(
 
   if (!onSync || (sync.error && syncViewModel.fatalError)) return null;
 
-  return _validatedFrom(
-        context,
-        state.uri.queryParameters['from'],
-      ) ??
+  return _validatedFrom(context, state.uri.queryParameters['from']) ??
       RoutePaths.home;
 }
 

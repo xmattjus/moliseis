@@ -5,12 +5,7 @@ import 'package:http/http.dart' as http;
 /// Queued-response client for deterministic Supabase Function tests.
 final class RecordingSupabaseFunctionsHttpClient extends http.BaseClient {
   final List<
-    ({
-      String method,
-      Uri url,
-      Map<String, String> headers,
-      Object? body,
-    })
+    ({String method, Uri url, Map<String, String> headers, Object? body})
   >
   requests = [];
   final List<

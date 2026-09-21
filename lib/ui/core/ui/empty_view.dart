@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 
 class EmptyView extends StatelessWidget {
@@ -26,12 +26,7 @@ class EmptyView extends StatelessWidget {
           children: <Widget>[
             if (icon != null)
               Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                  16,
-                  16,
-                  16,
-                  8,
-                ),
+                padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 8),
                 child: IconTheme.merge(
                   data: const IconThemeData(size: 40, opticalSize: 80),
                   child: icon!,

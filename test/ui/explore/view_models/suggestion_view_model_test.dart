@@ -63,10 +63,7 @@ void main() {
         expect(viewModel.load.error, isTrue);
         expect(viewModel.suggestions, isEmpty);
 
-        final recoveredSuggestion = makePlace(
-          remoteId: 7,
-          name: 'Museo',
-        );
+        final recoveredSuggestion = makePlace(remoteId: 7, name: 'Museo');
         repository.getSuggestedPlacesResult = Result.success([
           recoveredSuggestion,
         ]);

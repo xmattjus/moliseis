@@ -1,7 +1,7 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -69,10 +69,7 @@ void main() {
 
     expect(find.text('Categorie'), findsOneWidget);
     expect(fixture.uri.path, '/home/category/nature');
-    expect(
-      fixture.exploreNavigatorKey.currentState!.widget.pages.length,
-      1,
-    );
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
       2,
@@ -93,10 +90,7 @@ void main() {
 
     expect(find.byType(PostScreen), findsOneWidget);
     expect(fixture.uri.path, '/home/posts/1');
-    expect(
-      fixture.exploreNavigatorKey.currentState!.widget.pages.length,
-      1,
-    );
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
       2,
@@ -117,10 +111,7 @@ void main() {
 
     expect(find.text('Search molise root'), findsOneWidget);
     expect(fixture.uri.path, '/home/search_results');
-    expect(
-      fixture.exploreNavigatorKey.currentState!.widget.pages.length,
-      1,
-    );
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
       2,
@@ -145,10 +136,7 @@ void main() {
 
     expect(find.text('Home root'), findsOneWidget);
     expect(fixture.uri.path, '/home');
-    expect(
-      fixture.exploreNavigatorKey.currentState!.widget.pages.length,
-      1,
-    );
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
       1,
@@ -173,10 +161,7 @@ void main() {
 
     expect(find.text('Categorie'), findsOneWidget);
     expect(fixture.uri.path, '/home/category/nature');
-    expect(
-      fixture.exploreNavigatorKey.currentState!.widget.pages.length,
-      1,
-    );
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
       2,
@@ -256,10 +241,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(GalleryPreviewScreen), findsOneWidget);
-    expect(
-      fixture.exploreNavigatorKey.currentState!.widget.pages.length,
-      1,
-    );
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
       2,
@@ -294,9 +276,7 @@ void main() {
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
 
-      fixture.router.go(
-        '/home/search_results/posts/1?q=molise&type=event',
-      );
+      fixture.router.go('/home/search_results/posts/1?q=molise&type=event');
       await tester.pumpAndSettle();
       final firstKey = tester.widget<PostScreen>(find.byType(PostScreen)).key;
 

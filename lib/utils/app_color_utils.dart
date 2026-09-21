@@ -1,7 +1,7 @@
 import 'dart:math' show pow;
 
-import 'package:flutter/material.dart';
 import 'package:material_color_utilities/blend/blend.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AppColorUtils {
   // Private constructor to prevent class instantiation.

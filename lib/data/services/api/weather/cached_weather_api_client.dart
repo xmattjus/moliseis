@@ -122,12 +122,7 @@ class CachedWeatherApiClient {
 
     if (cachedEntry != null) {
       if (!cachedEntry.isExpired(_cacheDuration)) {
-        _logger.log(
-          CacheEntryFetched(
-            cache: 'weather',
-            key: cacheKey,
-          ),
-        );
+        _logger.log(CacheEntryFetched(cache: 'weather', key: cacheKey));
         return Result.success(cachedEntry.data);
       } else {
         // Remove stale data.
@@ -169,12 +164,7 @@ class CachedWeatherApiClient {
 
     if (cachedEntry != null) {
       if (!cachedEntry.isExpired(_cacheDuration)) {
-        _logger.log(
-          CacheEntryFetched(
-            cache: 'weather',
-            key: cacheKey,
-          ),
-        );
+        _logger.log(CacheEntryFetched(cache: 'weather', key: cacheKey));
         return Result.success(cachedEntry.data);
       } else {
         // Remove stale data.
@@ -216,12 +206,7 @@ class CachedWeatherApiClient {
 
     if (cachedEntry != null) {
       if (!cachedEntry.isExpired(_cacheDuration)) {
-        _logger.log(
-          CacheEntryFetched(
-            cache: 'weather',
-            key: cacheKey,
-          ),
-        );
+        _logger.log(CacheEntryFetched(cache: 'weather', key: cacheKey));
 
         return Result.success(cachedEntry.data);
       } else {

@@ -64,9 +64,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
 
   @override
   EventEntity markEntityDeleted(EventEntity existing) {
-    return existing.copyWith(
-      isDeleted: true,
-    );
+    return existing.copyWith(isDeleted: true);
   }
 
   Condition<EventEntity> get _isNotDeleted =>
@@ -247,9 +245,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
         EntityLoadFailed(
           'event',
           method: 'getByDate',
-          extra: {
-            'startDate': date.toString(),
-          },
+          extra: {'startDate': date.toString()},
         ),
         error: exception,
         stackTrace: stackTrace,
@@ -272,10 +268,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
         EntityLoadFailed(
           'event',
           method: 'getByDateRange',
-          extra: {
-            'startDate': start.toString(),
-            'endDate': end.toString(),
-          },
+          extra: {'startDate': start.toString(), 'endDate': end.toString()},
         ),
         error: exception,
         stackTrace: stackTrace,
@@ -307,11 +300,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
       }
     } on Exception catch (exception, stackTrace) {
       logger.log(
-        EntityLoadFailed(
-          'event',
-          method: 'getById',
-          extra: {'id': id},
-        ),
+        EntityLoadFailed('event', method: 'getById', extra: {'id': id}),
         error: exception,
         stackTrace: stackTrace,
       );

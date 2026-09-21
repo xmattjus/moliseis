@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A utility class that provides theme-aware [SystemUiOverlayStyle]
 /// configurations for different UI scenarios in the application.

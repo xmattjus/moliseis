@@ -15,12 +15,7 @@ final class GalleryPreviewRouteData {
       throw ArgumentError.value(media, 'media', 'must not be empty');
     }
     if (initialIndex < 0 || initialIndex >= media.length) {
-      throw RangeError.range(
-        initialIndex,
-        0,
-        media.length - 1,
-        'initialIndex',
-      );
+      throw RangeError.range(initialIndex, 0, media.length - 1, 'initialIndex');
     }
   }
 

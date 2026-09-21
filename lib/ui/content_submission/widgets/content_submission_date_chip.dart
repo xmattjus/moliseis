@@ -1,6 +1,6 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
@@ -100,9 +100,7 @@ class _ContentSubmissionDateChipState extends State<ContentSubmissionDateChip> {
     final requestedFirstDate =
         widget.firstDate ?? EventCalendarDate(selectedDate.year, 1, 1);
     final effectiveInitialDate =
-        _dateCarrier(selectedDate).isBefore(
-          _dateCarrier(requestedFirstDate),
-        )
+        _dateCarrier(selectedDate).isBefore(_dateCarrier(requestedFirstDate))
         ? requestedFirstDate
         : selectedDate;
     final lastDate = EventCalendarDate(effectiveInitialDate.year, 12, 31);

@@ -1,6 +1,6 @@
 import 'package:cached_network_image_ce/cached_network_image.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
@@ -35,9 +35,7 @@ void main() {
       ),
     );
 
-    final image = tester.widget<AppNetworkImage>(
-      find.byType(AppNetworkImage),
-    );
+    final image = tester.widget<AppNetworkImage>(find.byType(AppNetworkImage));
     image.onImageLoading!(false);
 
     await tester.pumpWidget(const SizedBox.shrink());

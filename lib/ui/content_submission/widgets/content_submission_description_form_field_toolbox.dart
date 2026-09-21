@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 /// Style toolbar for `ContentSubmissionDescriptionFormField`.

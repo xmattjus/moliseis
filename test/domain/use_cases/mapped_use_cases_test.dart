@@ -188,9 +188,7 @@ void main() {
       final error = TestException('places failed');
       final useCase = GeoMapUseCase(
         eventRepository: FakeEventRepository(),
-        placeRepository: FakePlaceRepository(
-          getAllResult: Result.error(error),
-        ),
+        placeRepository: FakePlaceRepository(getAllResult: Result.error(error)),
       );
 
       final result = await useCase.getAllPlaces();
@@ -202,9 +200,7 @@ void main() {
     test('maps getById methods to content models', () async {
       final useCase = GeoMapUseCase(
         eventRepository: FakeEventRepository(
-          getByIdResults: {
-            1: Result.success(makeEvent(name: 'Event 1')),
-          },
+          getByIdResults: {1: Result.success(makeEvent(name: 'Event 1'))},
         ),
         placeRepository: FakePlaceRepository(
           getByIdResults: {

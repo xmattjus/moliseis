@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class CustomInkWell extends StatelessWidget {
   /// Creates an ink well respecting the Material3 design guidelines.
@@ -24,9 +24,7 @@ class CustomInkWell extends StatelessWidget {
 
     return InkWell(
       onTap: onPressed,
-      overlayColor: WidgetStateProperty.resolveWith<Color?>((
-        states,
-      ) {
+      overlayColor: WidgetStateProperty.resolveWith<Color?>((states) {
         Color? color;
 
         if (states.contains(WidgetState.hovered)) {

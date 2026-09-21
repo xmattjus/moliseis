@@ -62,29 +62,26 @@ void main() {
       },
     );
 
-    test(
-      'throws when stream closes without emitting FileInfo',
-      () async {
-        cacheManager = FakeCacheManager(
-          streamFactory: () => Stream.fromIterable([
-            const DownloadProgress(testUrl, 1000, 100),
-            const DownloadProgress(testUrl, 1000, 500),
-            const DownloadProgress(testUrl, 1000, 1000),
-          ]),
-        );
+    test('throws when stream closes without emitting FileInfo', () async {
+      cacheManager = FakeCacheManager(
+        streamFactory: () => Stream.fromIterable([
+          const DownloadProgress(testUrl, 1000, 100),
+          const DownloadProgress(testUrl, 1000, 500),
+          const DownloadProgress(testUrl, 1000, 1000),
+        ]),
+      );
 
-        await expectLater(
-          cacheManager!.getSingleFile(testUrl),
-          throwsA(
-            isA<Exception>().having(
-              (e) => e.toString(),
-              'message',
-              contains('Failed to get file from cache'),
-            ),
+      await expectLater(
+        cacheManager!.getSingleFile(testUrl),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('Failed to get file from cache'),
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
 
     test('propagates error from stream', () async {
       cacheManager = FakeCacheManager(

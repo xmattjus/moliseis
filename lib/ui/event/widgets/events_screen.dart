@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:ui' show clampDouble;
 
-import 'package:flutter/material.dart';
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/ui/core/ui/responsive_scaffold.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';

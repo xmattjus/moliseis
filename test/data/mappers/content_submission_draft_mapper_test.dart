@@ -39,44 +39,38 @@ void main() {
       },
     );
 
-    test(
-      'preserves category through a full round-trip (regression guard for '
-      'silent category loss)',
-      () {
-        // The previous mapper dropped `category`/`categoryIndex` entirely, so
-        // a draft that set a category lost it after every save/load cycle.
-        for (final category in ContentCategory.values) {
-          final draft = ContentSubmissionDraft(category: category);
-
-          final restored = draft.toEntity().toModel()!;
-
-          expect(
-            restored.category,
-            category,
-            reason: '$category should round-trip through the entity',
-          );
-        }
-      },
-    );
-
-    test(
-      'preserves dates through a full round-trip (regression guard for '
-      'silent date loss)',
-      () {
-        final draft = ContentSubmissionDraft(
-          eventDates: EventDateDraft.exact(
-            startCalendarDate: EventCalendarDate(2026, 7, 25),
-            startInstantUtc: startDate,
-            endInstantUtc: endDate,
-          ),
-        );
+    test('preserves category through a full round-trip (regression guard for '
+        'silent category loss)', () {
+      // The previous mapper dropped `category`/`categoryIndex` entirely, so
+      // a draft that set a category lost it after every save/load cycle.
+      for (final category in ContentCategory.values) {
+        final draft = ContentSubmissionDraft(category: category);
 
         final restored = draft.toEntity().toModel()!;
 
-        expect(restored.eventDates.startInstantUtc, startDate);
-        expect(restored.eventDates.endInstantUtc, endDate);
-      },
-    );
+        expect(
+          restored.category,
+          category,
+          reason: '$category should round-trip through the entity',
+        );
+      }
+    });
+
+    test('preserves dates through a full round-trip (regression guard for '
+        'silent date loss)', () {
+      final draft = ContentSubmissionDraft(
+        eventDates: EventDateDraft.exact(
+          startCalendarDate: EventCalendarDate(2026, 7, 25),
+          startInstantUtc: startDate,
+          endInstantUtc: endDate,
+        ),
+      );
+
+      final restored = draft.toEntity().toModel()!;
+
+      expect(restored.eventDates.startInstantUtc, startDate);
+      expect(restored.eventDates.endInstantUtc, endDate);
+    });
 
     test('preserves an enabled incomplete start day through a round-trip', () {
       final draft = ContentSubmissionDraft(
@@ -94,9 +88,7 @@ void main() {
     });
 
     test('normalizes canonical persisted instants to UTC', () {
-      final instant = DateTime.fromMicrosecondsSinceEpoch(
-        123456789,
-      );
+      final instant = DateTime.fromMicrosecondsSinceEpoch(123456789);
       final startOnly = ContentSubmissionDraftEntity(
         clientSubmissionId: clientSubmissionId,
         isEvent: true,

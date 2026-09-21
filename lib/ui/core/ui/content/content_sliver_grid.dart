@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
@@ -11,11 +11,7 @@ import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ContentSliverGrid extends StatelessWidget {
-  const ContentSliverGrid(
-    this.items, {
-    required this.onPressed,
-    super.key,
-  });
+  const ContentSliverGrid(this.items, {required this.onPressed, super.key});
 
   final List<ContentBase> items;
   final void Function(ContentBase content) onPressed;

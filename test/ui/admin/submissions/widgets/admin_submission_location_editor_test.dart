@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart' show TapPosition;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 
@@ -185,10 +185,7 @@ void main() {
 
     await tester.tap(find.text('Coordinate'));
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byType(TextFormField).first,
-      '41,55',
-    );
+    await tester.enterText(find.byType(TextFormField).first, '41,55');
     await tester.pump();
 
     expect(state.emittedLatitudeChanges.last, '41,55');
@@ -250,9 +247,7 @@ void main() {
     // Reveal the hidden fields through Coordinate mode.
     await tester.tap(find.text('Coordinate'));
     await tester.pumpAndSettle();
-    final fields = tester.widgetList<TextFormField>(
-      find.byType(TextFormField),
-    );
+    final fields = tester.widgetList<TextFormField>(find.byType(TextFormField));
     expect(fields.first.controller!.text, '41.900000');
     expect(fields.last.controller!.text, '14.900000');
   });

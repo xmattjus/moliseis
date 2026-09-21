@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:collection/collection.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/utils/command.dart';

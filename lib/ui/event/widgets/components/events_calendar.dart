@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:intl/date_symbols.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
@@ -20,9 +20,7 @@ class EventsCalendar extends StatefulWidget {
 
   /// Converts an event calendar date into calendar-package date carriers.
   static ({DateTime startDate, DateTime endDate, DateTime initialDate})
-  calendarDateBounds(
-    EventCalendarDate currentDate,
-  ) => (
+  calendarDateBounds(EventCalendarDate currentDate) => (
     startDate: DateTime.utc(currentDate.year),
     endDate: DateTime.utc(currentDate.year, 12, 31),
     initialDate: DateTime.utc(
@@ -101,11 +99,8 @@ class _EventsCalendarState extends State<EventsCalendar> {
     );
   }
 
-  EventCalendarDate _calendarDate(DateTime carrier) => EventCalendarDate(
-    carrier.year,
-    carrier.month,
-    carrier.day,
-  );
+  EventCalendarDate _calendarDate(DateTime carrier) =>
+      EventCalendarDate(carrier.year, carrier.month, carrier.day);
 
   static Widget _buildCalendar({
     required DateTime minDate,

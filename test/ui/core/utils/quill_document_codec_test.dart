@@ -108,9 +108,7 @@ void main() {
 
       test('rejects operations without a string insert', () {
         expect(
-          QuillDocumentCodec.documentFromDelta(<Object?>[
-            <String, dynamic>{},
-          ]),
+          QuillDocumentCodec.documentFromDelta(<Object?>[<String, dynamic>{}]),
           isNull,
         );
         expect(
@@ -207,16 +205,10 @@ void main() {
           'not an operation list',
           <Object?>['not an operation'],
           <Object?>[
-            <String, dynamic>{
-              'insert': 'Testo\n',
-              'unexpected': true,
-            },
+            <String, dynamic>{'insert': 'Testo\n', 'unexpected': true},
           ],
           <Object?>[
-            <String, dynamic>{
-              'insert': 'Testo\n',
-              'attributes': 'not a map',
-            },
+            <String, dynamic>{'insert': 'Testo\n', 'attributes': 'not a map'},
           ],
         ];
 
@@ -341,10 +333,7 @@ void main() {
           () => firstDelta.first['insert'] = 'Modificato\n',
           throwsUnsupportedError,
         );
-        expect(
-          firstDelta.first['attributes'],
-          isA<Map<String, dynamic>>(),
-        );
+        expect(firstDelta.first['attributes'], isA<Map<String, dynamic>>());
         final firstAttributes =
             firstDelta.first['attributes']! as Map<String, dynamic>;
         expect(

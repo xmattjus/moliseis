@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart'
     show TargetPlatform, debugDefaultTargetPlatformOverride;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_get_by_id_use_case.dart';
@@ -73,9 +73,7 @@ void main() {
 
       testWidgets(
         'programmatic closeView closes the popup and keeps the route',
-        (
-          tester,
-        ) async {
+        (tester) async {
           final fixture = _compactFixture(cleanupOnClose: false);
           addTearDown(fixture.dispose);
           await fixture.pumpApp(tester);
@@ -168,9 +166,7 @@ void main() {
 
       testWidgets(
         'predictive commit closes the popup and keeps the branch route',
-        (
-          tester,
-        ) async {
+        (tester) async {
           final fixture = _ShellSearchFixture();
           addTearDown(fixture.dispose);
           await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -309,9 +305,7 @@ void main() {
           // -> unmount anchor) in production order. The anchor's own
           // SearchBar (find .first) has no onSubmitted; the view's
           // (find .last) does.
-          final viewBar = tester.widget<SearchBar>(
-            find.byType(SearchBar).last,
-          );
+          final viewBar = tester.widget<SearchBar>(find.byType(SearchBar).last);
           viewBar.onSubmitted!('molise');
 
           // Process the pop + goNamed, then run every popup exit-transition
@@ -552,10 +546,8 @@ _SearchFixture _expandedFixture({required bool cleanupOnClose}) {
 // ---------------------------------------------------------------------------
 
 final class _SearchFixture {
-  _SearchFixture({
-    required bool cleanupOnClose,
-    required Size surfaceSize,
-  }) : _surfaceSize = surfaceSize {
+  _SearchFixture({required bool cleanupOnClose, required Size surfaceSize})
+    : _surfaceSize = surfaceSize {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     controller = SearchController();
     viewModel = SearchViewModel(
@@ -566,11 +558,7 @@ final class _SearchFixture {
     router = GoRouter(
       initialLocation: '/',
       routes: <RouteBase>[
-        GoRoute(
-          path: '/',
-          name: 'home',
-          builder: (_, _) => const _HomePage(),
-        ),
+        GoRoute(path: '/', name: 'home', builder: (_, _) => const _HomePage()),
         GoRoute(
           path: '/search',
           name: 'search',

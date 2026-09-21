@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 
 class TextSectionDivider extends StatelessWidget {

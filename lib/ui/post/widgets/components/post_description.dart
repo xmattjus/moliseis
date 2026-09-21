@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:collection/collection.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:markdown_widget/markdown_widget.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
@@ -24,9 +24,7 @@ MarkdownConfig _appMarkdownConfig(BuildContext context) =>
         const H6Config(style: TextStyle(fontSize: 13, height: 1)),
         LinkConfig(
           style:
-              AppTextStyles.link(
-                context,
-              )?.copyWith(fontSize: 14, height: 1) ??
+              AppTextStyles.link(context)?.copyWith(fontSize: 14, height: 1) ??
               const TextStyle(
                 color: Color(0xff0969da),
                 decoration: TextDecoration.underline,
@@ -104,10 +102,7 @@ class _PostDescriptionState extends State<PostDescription> {
         document,
       ).descriptionDelta;
       if (_quillController != null &&
-          _deltaEquality.equals(
-            _renderedDescriptionDelta,
-            descriptionDelta,
-          )) {
+          _deltaEquality.equals(_renderedDescriptionDelta, descriptionDelta)) {
         document.close();
         return;
       }
@@ -160,9 +155,7 @@ class _PostDescriptionState extends State<PostDescription> {
       return SliverList.list(
         children: <Widget>[
           Text('Descrizione', style: AppTextStyles.section(context)),
-          const SizedBox(
-            height: 8,
-          ),
+          const SizedBox(height: 8),
           QuillEditor(
             controller: quillController,
             focusNode: _focusNode,
@@ -174,9 +167,7 @@ class _PostDescriptionState extends State<PostDescription> {
               showCursor: false,
             ),
           ),
-          const SizedBox(
-            height: 16,
-          ),
+          const SizedBox(height: 16),
         ],
       );
     }

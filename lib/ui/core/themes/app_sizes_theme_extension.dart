@@ -1,6 +1,6 @@
 import 'dart:ui' as ui show lerpDouble;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 class BorderSideTokens {
   const BorderSideTokens({

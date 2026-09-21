@@ -140,10 +140,10 @@ void main() {
   }
 
   test('normalizes map Function failures', () async {
-    httpClient.queueJson(
-      <String, dynamic>{'code': ' invalid_input ', 'message': ' Invalid '},
-      status: 400,
-    );
+    httpClient.queueJson(<String, dynamic>{
+      'code': ' invalid_input ',
+      'message': ' Invalid ',
+    }, status: 400);
 
     final result = await submit();
 
@@ -214,13 +214,10 @@ void main() {
         ),
       ]) {
     test('preserves ${failure.name} Function failure fields', () async {
-      httpClient.queueJson(
-        <String, dynamic>{
-          'code': failure.code,
-          'message': failure.message,
-        },
-        status: failure.status,
-      );
+      httpClient.queueJson(<String, dynamic>{
+        'code': failure.code,
+        'message': failure.message,
+      }, status: failure.status);
 
       final result = await submit();
 
@@ -271,10 +268,7 @@ void main() {
   }
 
   for (final failure in <({String name, Exception error})>[
-    (
-      name: 'timeout',
-      error: TimeoutException('submit-content timed out'),
-    ),
+    (name: 'timeout', error: TimeoutException('submit-content timed out')),
     (name: 'client', error: http.ClientException('transport failed')),
     (name: 'socket', error: const SocketException('network unavailable')),
   ]) {

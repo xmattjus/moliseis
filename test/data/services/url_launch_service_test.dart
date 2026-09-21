@@ -141,9 +141,7 @@ final class _FakeExternalUrlService extends ExternalUrlService {
 }
 
 final class _FakeAppInfoService extends AppInfoService {
-  _FakeAppInfoService({
-    required super.externalUrlService,
-  });
+  _FakeAppInfoService({required super.externalUrlService});
 
   int privacyPolicyCalls = 0;
 
@@ -160,9 +158,7 @@ final class _FakeAppInfoService extends AppInfoService {
 }
 
 final class _FakeMapUrlService extends MapUrlService {
-  _FakeMapUrlService({
-    required super.externalUrlService,
-  });
+  _FakeMapUrlService({required super.externalUrlService});
 
   int mapTilerCalls = 0;
 

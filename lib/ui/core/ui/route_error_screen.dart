@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/utils/logging/logging.dart';
@@ -69,9 +69,7 @@ class _RouteErrorScreenState extends State<RouteErrorScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      leading: BackButton(
-        onPressed: () => _popOrGoHome(context),
-      ),
+      leading: BackButton(onPressed: () => _popOrGoHome(context)),
       title: const Text('Pagina non trovata'),
     ),
     body: EmptyView.error(

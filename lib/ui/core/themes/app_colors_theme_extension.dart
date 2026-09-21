@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/themes/app_snack_bar_colors.dart';
 
 class AppColorsThemeExtension extends ThemeExtension<AppColorsThemeExtension> {
@@ -114,11 +114,7 @@ class AppColorsThemeExtension extends ThemeExtension<AppColorsThemeExtension> {
         t,
       )!,
       paneColor: Color.lerp(paneColor, other.paneColor, t)!,
-      infoSnackBar: AppSnackBarColors.lerp(
-        infoSnackBar,
-        other.infoSnackBar,
-        t,
-      ),
+      infoSnackBar: AppSnackBarColors.lerp(infoSnackBar, other.infoSnackBar, t),
       warningSnackBar: AppSnackBarColors.lerp(
         warningSnackBar,
         other.warningSnackBar,

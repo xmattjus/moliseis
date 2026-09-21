@@ -26,94 +26,88 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test(
-      'persists a rich Delta through ObjectBox',
-      () async {
-        final descriptionDelta = <Map<String, dynamic>>[
-          {
-            'insert': 'Prima ',
-            'attributes': <String, dynamic>{'bold': true},
-          },
-          {
-            'insert': 'sezione',
-            'attributes': <String, dynamic>{'underline': true},
-          },
-          {
-            'insert': '\n',
-            'attributes': <String, dynamic>{'list': 'bullet'},
-          },
-          {
-            'insert': 'Seconda riga\n',
-            'attributes': <String, dynamic>{'italic': true},
-          },
-        ];
-        final draft = ContentSubmissionDraft(
-          description: 'Prima sezione\nSeconda riga',
-          descriptionDelta: descriptionDelta,
-        );
+    test('persists a rich Delta through ObjectBox', () async {
+      final descriptionDelta = <Map<String, dynamic>>[
+        {
+          'insert': 'Prima ',
+          'attributes': <String, dynamic>{'bold': true},
+        },
+        {
+          'insert': 'sezione',
+          'attributes': <String, dynamic>{'underline': true},
+        },
+        {
+          'insert': '\n',
+          'attributes': <String, dynamic>{'list': 'bullet'},
+        },
+        {
+          'insert': 'Seconda riga\n',
+          'attributes': <String, dynamic>{'italic': true},
+        },
+      ];
+      final draft = ContentSubmissionDraft(
+        description: 'Prima sezione\nSeconda riga',
+        descriptionDelta: descriptionDelta,
+      );
 
-        final saveResult = await repository.saveDraft(draft);
-        final loadResult = await repository.loadDraft();
-        final loaded = loadResult.getOrNull();
+      final saveResult = await repository.saveDraft(draft);
+      final loadResult = await repository.loadDraft();
+      final loaded = loadResult.getOrNull();
 
-        expect(saveResult.isSuccess, isTrue);
-        expect(loadResult.isSuccess, isTrue);
-        expect(loaded, isNotNull);
-        expect(loaded!.description, draft.description);
-        expect(loaded.descriptionDelta, hasLength(descriptionDelta.length));
+      expect(saveResult.isSuccess, isTrue);
+      expect(loadResult.isSuccess, isTrue);
+      expect(loaded, isNotNull);
+      expect(loaded!.description, draft.description);
+      expect(loaded.descriptionDelta, hasLength(descriptionDelta.length));
 
-        for (var index = 0; index < descriptionDelta.length; index++) {
-          expect(
-            loaded.descriptionDelta![index]['insert'],
-            descriptionDelta[index]['insert'],
-          );
-          expect(
-            loaded.descriptionDelta![index]['attributes'],
-            descriptionDelta[index]['attributes'],
-          );
-        }
-
+      for (var index = 0; index < descriptionDelta.length; index++) {
         expect(
-          const DeepCollectionEquality().equals(
-            loaded.descriptionDelta,
-            descriptionDelta,
-          ),
-          isTrue,
+          loaded.descriptionDelta![index]['insert'],
+          descriptionDelta[index]['insert'],
         );
-      },
-    );
-
-    test(
-      'persists a 5,000-character unbroken rich description without '
-      'truncation',
-      () async {
-        final description = 'a' * 5000;
-        final descriptionDelta = <Map<String, dynamic>>[
-          {'insert': '$description\n'},
-        ];
-
-        final draft = ContentSubmissionDraft(
-          description: description,
-          descriptionDelta: descriptionDelta,
-        );
-        final saveResult = await repository.saveDraft(draft);
-        final loadResult = await repository.loadDraft();
-        final loaded = loadResult.getOrNull();
-
-        expect(saveResult.isSuccess, isTrue);
-        expect(loadResult.isSuccess, isTrue);
-        expect(loaded, isNotNull);
-        expect(loaded!.description, description);
-        expect(loaded.description?.length, 5000);
         expect(
-          const DeepCollectionEquality().equals(
-            loaded.descriptionDelta,
-            descriptionDelta,
-          ),
-          isTrue,
+          loaded.descriptionDelta![index]['attributes'],
+          descriptionDelta[index]['attributes'],
         );
-      },
-    );
+      }
+
+      expect(
+        const DeepCollectionEquality().equals(
+          loaded.descriptionDelta,
+          descriptionDelta,
+        ),
+        isTrue,
+      );
+    });
+
+    test('persists a 5,000-character unbroken rich description without '
+        'truncation', () async {
+      final description = 'a' * 5000;
+      final descriptionDelta = <Map<String, dynamic>>[
+        {'insert': '$description\n'},
+      ];
+
+      final draft = ContentSubmissionDraft(
+        description: description,
+        descriptionDelta: descriptionDelta,
+      );
+      final saveResult = await repository.saveDraft(draft);
+      final loadResult = await repository.loadDraft();
+      final loaded = loadResult.getOrNull();
+
+      expect(saveResult.isSuccess, isTrue);
+      expect(loadResult.isSuccess, isTrue);
+      expect(loaded, isNotNull);
+      expect(loaded!.description, description);
+      expect(loaded.description?.length, 5000);
+      expect(
+        const DeepCollectionEquality().equals(
+          loaded.descriptionDelta,
+          descriptionDelta,
+        ),
+        isTrue,
+      );
+    });
 
     test('preserves a legacy draft with a null Delta', () async {
       final draft = ContentSubmissionDraft(
@@ -141,66 +135,63 @@ void main() {
       expect(loaded?.eventDates, draft.eventDates);
     });
 
-    test(
-      'round-trips a complete session and safely projects pre-identity '
-      'records',
-      () async {
-        const identity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+    test('round-trips a complete session and safely projects pre-identity '
+        'records', () async {
+      const identity = '2a1b0c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
+      await objectBoxEnvironment.store
+          .box<ContentSubmissionDraftEntity>()
+          .putAsync(ContentSubmissionDraftEntity(city: 'Legacy Rome'));
+
+      final legacyLoad = await repository.loadDraft();
+      expect(legacyLoad.getOrNull(), isNull);
+      expect(
         await objectBoxEnvironment.store
             .box<ContentSubmissionDraftEntity>()
-            .putAsync(ContentSubmissionDraftEntity(city: 'Legacy Rome'));
+            .getAsync(1),
+        isNotNull,
+      );
 
-        final legacyLoad = await repository.loadDraft();
-        expect(legacyLoad.getOrNull(), isNull);
-        expect(
-          await objectBoxEnvironment.store
-              .box<ContentSubmissionDraftEntity>()
-              .getAsync(1),
-          isNotNull,
-        );
+      final draft = ContentSubmissionDraft(
+        clientSubmissionId: identity,
+        category: ContentCategory.history,
+        city: 'Rome',
+        name: 'Colosseum',
+        description: 'Ancient arena',
+        descriptionDelta: const [
+          {
+            'insert': 'Ancient ',
+            'attributes': {'bold': true},
+          },
+          {'insert': 'arena\n'},
+        ],
+        eventDates: EventDateDraft.exact(
+          startCalendarDate: EventCalendarDate(2026, 7, 25),
+          startInstantUtc: DateTime.utc(2026, 7, 25, 10),
+          endInstantUtc: DateTime.utc(2026, 7, 26, 18),
+        ),
+        userEmail: 'jane@example.com',
+        userName: 'Jane',
+        acceptedTerms: true,
+      );
+      expect((await repository.saveDraft(draft)).isSuccess, isTrue);
+      final loaded = (await repository.loadDraft()).getOrNull();
+      expect(loaded, draft);
+      expect(loaded?.clientSubmissionId, identity);
 
-        final draft = ContentSubmissionDraft(
-          clientSubmissionId: identity,
-          category: ContentCategory.history,
-          city: 'Rome',
-          name: 'Colosseum',
-          description: 'Ancient arena',
-          descriptionDelta: const [
-            {
-              'insert': 'Ancient ',
-              'attributes': {'bold': true},
-            },
-            {'insert': 'arena\n'},
-          ],
-          eventDates: EventDateDraft.exact(
-            startCalendarDate: EventCalendarDate(2026, 7, 25),
-            startInstantUtc: DateTime.utc(2026, 7, 25, 10),
-            endInstantUtc: DateTime.utc(2026, 7, 26, 18),
-          ),
-          userEmail: 'jane@example.com',
-          userName: 'Jane',
-          acceptedTerms: true,
-        );
-        expect((await repository.saveDraft(draft)).isSuccess, isTrue);
-        final loaded = (await repository.loadDraft()).getOrNull();
-        expect(loaded, draft);
-        expect(loaded?.clientSubmissionId, identity);
+      final updated = draft.copyWith(description: 'Restored ancient arena');
+      expect((await repository.saveDraft(updated)).isSuccess, isTrue);
+      final reloaded = (await repository.loadDraft()).getOrNull();
+      expect(reloaded, updated);
+      expect(reloaded?.clientSubmissionId, identity);
 
-        final updated = draft.copyWith(description: 'Restored ancient arena');
-        expect((await repository.saveDraft(updated)).isSuccess, isTrue);
-        final reloaded = (await repository.loadDraft()).getOrNull();
-        expect(reloaded, updated);
-        expect(reloaded?.clientSubmissionId, identity);
-
-        expect((await repository.clearDraft()).isSuccess, isTrue);
-        expect(
-          await objectBoxEnvironment.store
-              .box<ContentSubmissionDraftEntity>()
-              .getAsync(1),
-          isNull,
-        );
-        expect((await repository.loadDraft()).getOrNull(), isNull);
-      },
-    );
+      expect((await repository.clearDraft()).isSuccess, isTrue);
+      expect(
+        await objectBoxEnvironment.store
+            .box<ContentSubmissionDraftEntity>()
+            .getAsync(1),
+        isNull,
+      );
+      expect((await repository.loadDraft()).getOrNull(), isNull);
+    });
   });
 }

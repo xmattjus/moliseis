@@ -1,8 +1,8 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
@@ -24,10 +24,7 @@ import 'package:moliseis/utils/result.dart';
 /// Form screen for creating and editing a moderation submission.
 class AdminSubmissionEditorScreen extends StatefulWidget {
   /// Creates an editor backed by route-scoped [viewModel] state.
-  const AdminSubmissionEditorScreen({
-    required this.viewModel,
-    super.key,
-  });
+  const AdminSubmissionEditorScreen({required this.viewModel, super.key});
 
   /// Editor state and commands for this route visit.
   final AdminSubmissionEditorViewModel viewModel;
@@ -477,31 +474,27 @@ class _AdminSubmissionEditorScreenState
                             spacing: 8,
                             runSpacing: 8,
                             children: <Widget>[
-                              ...viewModel.assets.map(
-                                (asset) {
-                                  return ContentSubmissionAssetListItem(
-                                    key: ValueKey<String>(
-                                      'admin_submission_asset_${asset.id}',
-                                    ),
-                                    image: AppNetworkImage(
-                                      url: asset.url,
-                                      imageWidth: asset.width,
-                                      imageHeight: asset.height,
-                                      width: contentSubmissionAssetSize.width,
-                                      height: contentSubmissionAssetSize.height,
-                                    ),
-                                    showRemoveIcon:
-                                        status == AdminSubmissionStatus.pending,
-                                    onRemove: viewModel.operationRunning
-                                        ? null
-                                        : () => unawaited(
-                                            _confirmAssetDeletion(
-                                              asset.id,
-                                            ),
-                                          ),
-                                  );
-                                },
-                              ),
+                              ...viewModel.assets.map((asset) {
+                                return ContentSubmissionAssetListItem(
+                                  key: ValueKey<String>(
+                                    'admin_submission_asset_${asset.id}',
+                                  ),
+                                  image: AppNetworkImage(
+                                    url: asset.url,
+                                    imageWidth: asset.width,
+                                    imageHeight: asset.height,
+                                    width: contentSubmissionAssetSize.width,
+                                    height: contentSubmissionAssetSize.height,
+                                  ),
+                                  showRemoveIcon:
+                                      status == AdminSubmissionStatus.pending,
+                                  onRemove: viewModel.operationRunning
+                                      ? null
+                                      : () => unawaited(
+                                          _confirmAssetDeletion(asset.id),
+                                        ),
+                                );
+                              }),
                               if ((status == AdminSubmissionStatus.pending &&
                                       viewModel.assets.length <
                                           kMaximumSubmissionAssetCount) &&

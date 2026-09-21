@@ -277,9 +277,7 @@ void main() {
             },
           },
         ];
-        final draft = ContentSubmissionDraft(
-          descriptionDelta: source,
-        );
+        final draft = ContentSubmissionDraft(descriptionDelta: source);
         final delta = switch (draft.descriptionDelta) {
           final delta? => delta,
           null => throw StateError('Expected a non-null Delta.'),
@@ -288,18 +286,9 @@ void main() {
         final attributes = operation['attributes']! as Map<String, dynamic>;
         final tags = attributes['tags']! as List<Object?>;
 
-        expect(
-          () => delta.add(<String, dynamic>{}),
-          throwsUnsupportedError,
-        );
-        expect(
-          () => operation['insert'] = 'Changed\n',
-          throwsUnsupportedError,
-        );
-        expect(
-          () => attributes['bold'] = false,
-          throwsUnsupportedError,
-        );
+        expect(() => delta.add(<String, dynamic>{}), throwsUnsupportedError);
+        expect(() => operation['insert'] = 'Changed\n', throwsUnsupportedError);
+        expect(() => attributes['bold'] = false, throwsUnsupportedError);
         expect(() => tags.add('changed'), throwsUnsupportedError);
       });
     });
@@ -426,10 +415,7 @@ void main() {
           () => copiedOperation['insert'] = 'Changed\n',
           throwsUnsupportedError,
         );
-        expect(
-          () => copiedAttributes['bold'] = false,
-          throwsUnsupportedError,
-        );
+        expect(() => copiedAttributes['bold'] = false, throwsUnsupportedError);
         expect(() => copiedTags.add('changed'), throwsUnsupportedError);
         expect(state.copyWith(descriptionDelta: null).descriptionDelta, isNull);
       });
@@ -485,11 +471,7 @@ void main() {
 
       test('clears multiple fields in a single call', () {
         final state = populatedState();
-        final result = state.copyWith(
-          category: null,
-          city: null,
-          name: null,
-        );
+        final result = state.copyWith(category: null, city: null, name: null);
 
         expect(result.category, isNull);
         expect(result.city, isNull);

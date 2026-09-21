@@ -38,11 +38,6 @@ class SubmissionAsset {
   }
 
   @override
-  int get hashCode => Object.hash(
-    secureUrl,
-    width,
-    height,
-    mimeType,
-    durationSeconds,
-  );
+  int get hashCode =>
+      Object.hash(secureUrl, width, height, mimeType, durationSeconds);
 }

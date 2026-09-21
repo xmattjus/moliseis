@@ -33,9 +33,7 @@ void main() {
         () async {
           final eventRepo = FakeEventRepository();
           final placeRepo = FakePlaceRepository(
-            getByCategoriesResult: Result.error(
-              TestException('places failed'),
-            ),
+            getByCategoriesResult: Result.error(TestException('places failed')),
           );
           final vm = CategoryViewModel(
             categoryUseCase: CategoryUseCase(

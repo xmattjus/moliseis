@@ -117,9 +117,7 @@ void main() {
       addTearDown(() => outside.delete(recursive: true));
       final outsideFile = File('${outside.path}/keep.txt')
         ..writeAsStringSync('outside');
-      final featureRoot = Link(
-        '${supportDirectory.path}/content_submission',
-      );
+      final featureRoot = Link('${supportDirectory.path}/content_submission');
       await featureRoot.create(outside.path);
 
       final result = await repository.reconcileAndLoad(sessionA);
@@ -155,10 +153,7 @@ void main() {
 
         expect(result, isA<Success<ContentSubmissionStagedAsset>>());
         expect(outsideFile.readAsBytesSync(), <int>[9, 9, 9]);
-        expect(
-          File('${root.path}/$sessionA/$digest').readAsBytesSync(),
-          bytes,
-        );
+        expect(File('${root.path}/$sessionA/$digest').readAsBytesSync(), bytes);
       },
     );
 
@@ -234,44 +229,39 @@ void main() {
       },
     );
 
-    test(
-      'clearSession unlinks a linked session directory without deleting '
-      'outside',
-      () async {
-        final outside = await Directory.systemTemp.createTemp(
-          'moliseis_outside_clear_session_',
-        );
-        addTearDown(() => outside.delete(recursive: true));
-        final outsideFile = File('${outside.path}/keep.txt')
-          ..writeAsStringSync('outside');
-        final root = Directory(
-          '${supportDirectory.path}/content_submission/staged',
-        )..createSync(recursive: true);
-        final link = Link('${root.path}/$sessionA');
-        await link.create(outside.path);
+    test('clearSession unlinks a linked session directory without deleting '
+        'outside', () async {
+      final outside = await Directory.systemTemp.createTemp(
+        'moliseis_outside_clear_session_',
+      );
+      addTearDown(() => outside.delete(recursive: true));
+      final outsideFile = File('${outside.path}/keep.txt')
+        ..writeAsStringSync('outside');
+      final root = Directory(
+        '${supportDirectory.path}/content_submission/staged',
+      )..createSync(recursive: true);
+      final link = Link('${root.path}/$sessionA');
+      await link.create(outside.path);
+      objectBoxEnvironment.store.box<ContentSubmissionStagedAssetEntity>().put(
+        ContentSubmissionStagedAssetEntity(
+          clientSubmissionId: sessionA,
+          digest: sha1.convert(<int>[1]).toString(),
+          relativePath: '$sessionA/${sha1.convert(<int>[1])}',
+        ),
+      );
+
+      final result = await repository.clearSession(sessionA);
+
+      expect(result, isA<Success<void>>());
+      expect(link.existsSync(), isFalse);
+      expect(outsideFile.readAsStringSync(), 'outside');
+      expect(
         objectBoxEnvironment.store
             .box<ContentSubmissionStagedAssetEntity>()
-            .put(
-              ContentSubmissionStagedAssetEntity(
-                clientSubmissionId: sessionA,
-                digest: sha1.convert(<int>[1]).toString(),
-                relativePath: '$sessionA/${sha1.convert(<int>[1])}',
-              ),
-            );
-
-        final result = await repository.clearSession(sessionA);
-
-        expect(result, isA<Success<void>>());
-        expect(link.existsSync(), isFalse);
-        expect(outsideFile.readAsStringSync(), 'outside');
-        expect(
-          objectBoxEnvironment.store
-              .box<ContentSubmissionStagedAssetEntity>()
-              .count(),
-          0,
-        );
-      },
-    );
+            .count(),
+        0,
+      );
+    });
 
     test(
       'clearSession logs cleanup failure without its private path',
@@ -494,15 +484,15 @@ void main() {
           '${supportDirectory.path}/content_submission/staged/$sessionA',
         );
         await sessionDirectory.create(recursive: true);
-        await File('${sessionDirectory.path}/$secondDigest').writeAsBytes(
-          secondBytes,
-        );
-        await File('${sessionDirectory.path}/$firstDigest').writeAsBytes(
-          firstBytes,
-        );
-        await File('${sessionDirectory.path}/$existingDigest').writeAsBytes(
-          existingBytes,
-        );
+        await File(
+          '${sessionDirectory.path}/$secondDigest',
+        ).writeAsBytes(secondBytes);
+        await File(
+          '${sessionDirectory.path}/$firstDigest',
+        ).writeAsBytes(firstBytes);
+        await File(
+          '${sessionDirectory.path}/$existingDigest',
+        ).writeAsBytes(existingBytes);
         final box =
             objectBoxEnvironment.store.box<ContentSubmissionStagedAssetEntity>()
               ..put(
@@ -515,10 +505,9 @@ void main() {
 
         final restored = await repository.reconcileAndLoad(sessionA);
 
-        expect(
-          restored.getOrNull()!.map((asset) => asset.digest),
-          [existingDigest],
-        );
+        expect(restored.getOrNull()!.map((asset) => asset.digest), [
+          existingDigest,
+        ]);
         expect(box.count(), 1);
         expect(
           File('${sessionDirectory.path}/$firstDigest').existsSync(),
@@ -646,45 +635,40 @@ void main() {
       },
     );
 
-    test(
-      'removes a wrong relative filename row and invalid final '
-      'without reconstruction',
-      () async {
-        final validBytes = <int>[9];
-        final validDigest = sha1.convert(validBytes).toString();
-        final source = File('${supportDirectory.path}/valid-source.jpg')
-          ..writeAsBytesSync(validBytes);
-        await repository.acquire(
+    test('removes a wrong relative filename row and invalid final '
+        'without reconstruction', () async {
+      final validBytes = <int>[9];
+      final validDigest = sha1.convert(validBytes).toString();
+      final source = File('${supportDirectory.path}/valid-source.jpg')
+        ..writeAsBytesSync(validBytes);
+      await repository.acquire(
+        clientSubmissionId: sessionA,
+        digest: validDigest,
+        source: source,
+      );
+      final rowDigest = sha1.convert(<int>[1]).toString();
+      final wrongFilenameDigest = sha1.convert(<int>[2]).toString();
+      final invalidFile = File(
+        '${supportDirectory.path}/content_submission/staged/$sessionA/'
+        '$wrongFilenameDigest',
+      )..writeAsBytesSync(<int>[3]);
+      final box = objectBoxEnvironment.store
+          .box<ContentSubmissionStagedAssetEntity>();
+      final malformedRowId = box.put(
+        ContentSubmissionStagedAssetEntity(
           clientSubmissionId: sessionA,
-          digest: validDigest,
-          source: source,
-        );
-        final rowDigest = sha1.convert(<int>[1]).toString();
-        final wrongFilenameDigest = sha1.convert(<int>[2]).toString();
-        final invalidFile = File(
-          '${supportDirectory.path}/content_submission/staged/$sessionA/'
-          '$wrongFilenameDigest',
-        )..writeAsBytesSync(<int>[3]);
-        final box = objectBoxEnvironment.store
-            .box<ContentSubmissionStagedAssetEntity>();
-        final malformedRowId = box.put(
-          ContentSubmissionStagedAssetEntity(
-            clientSubmissionId: sessionA,
-            digest: rowDigest,
-            relativePath: '$sessionA/$wrongFilenameDigest',
-          ),
-        );
+          digest: rowDigest,
+          relativePath: '$sessionA/$wrongFilenameDigest',
+        ),
+      );
 
-        final restored = await repository.reconcileAndLoad(sessionA);
+      final restored = await repository.reconcileAndLoad(sessionA);
 
-        expect(restored.getOrNull()!.map((asset) => asset.digest), [
-          validDigest,
-        ]);
-        expect(box.get(malformedRowId), isNull);
-        expect(invalidFile.existsSync(), isFalse);
-        expect(box.count(), 1);
-      },
-    );
+      expect(restored.getOrNull()!.map((asset) => asset.digest), [validDigest]);
+      expect(box.get(malformedRowId), isNull);
+      expect(invalidFile.existsSync(), isFalse);
+      expect(box.count(), 1);
+    });
 
     test('retains the lowest valid descriptor ID for duplicates', () async {
       final bytes = <int>[1, 2, 3];
@@ -918,10 +902,7 @@ void main() {
       await temporary.writeAsBytes(bytes);
 
       expect(
-        await repository.remove(
-          clientSubmissionId: sessionA,
-          digest: digest,
-        ),
+        await repository.remove(clientSubmissionId: sessionA, digest: digest),
         isA<Success<void>>(),
       );
       expect(temporary.existsSync(), isFalse);
@@ -932,14 +913,8 @@ void main() {
             .count(),
         0,
       );
-      expect(
-        await repository.clearSession(sessionA),
-        isA<Success<void>>(),
-      );
-      expect(
-        await repository.clearSession(sessionA),
-        isA<Success<void>>(),
-      );
+      expect(await repository.clearSession(sessionA), isA<Success<void>>());
+      expect(await repository.clearSession(sessionA), isA<Success<void>>());
     });
 
     test('removal succeeds when its final file is already missing', () async {

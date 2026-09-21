@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Source: https://stackoverflow.com/a/79555444
 class PulsePainter extends CustomPainter {

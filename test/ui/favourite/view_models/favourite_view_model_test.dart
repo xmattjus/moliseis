@@ -127,9 +127,7 @@ void main() {
         favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
           eventRepository: FakeEventRepository(
             getFavouriteEventIdsResult: const Result.success([1]),
-            getByIdResults: {
-              1: Result.error(TestException('event not found')),
-            },
+            getByIdResults: {1: Result.error(TestException('event not found'))},
           ),
           placeRepository: FakePlaceRepository(),
         ),
@@ -410,9 +408,7 @@ void main() {
   group('FavouriteViewModel disposal', () {
     testWidgets(
       'is safe when a pending initial load completes after disposal',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final pendingPlaceIds = Completer<Result<List<int>>>();
         final viewModel = FavouriteViewModel(
           favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
@@ -438,34 +434,31 @@ void main() {
       const Result<void>.success(null),
       Result<void>.error(TestException('write failed')),
     ]) {
-      testWidgets(
-        'is safe when a pending write completes with '
-        '${persistenceResult.isSuccess ? 'success' : 'an error'}'
-        ' after disposal',
-        (tester) async {
-          final pendingWrite = Completer<Result<void>>();
-          final event = makeEvent();
-          final viewModel = FavouriteViewModel(
-            favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
-              eventRepository: FakeEventRepository(
-                setFavouriteEventHandler: (_, _) => pendingWrite.future,
-              ),
-              placeRepository: FakePlaceRepository(),
+      testWidgets('is safe when a pending write completes with '
+          '${persistenceResult.isSuccess ? 'success' : 'an error'}'
+          ' after disposal', (tester) async {
+        final pendingWrite = Completer<Result<void>>();
+        final event = makeEvent();
+        final viewModel = FavouriteViewModel(
+          favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+            eventRepository: FakeEventRepository(
+              setFavouriteEventHandler: (_, _) => pendingWrite.future,
             ),
-          );
-          await tester.pump();
+            placeRepository: FakePlaceRepository(),
+          ),
+        );
+        await tester.pump();
 
-          final write = viewModel.setFavourite(event, true);
-          expect(viewModel.isUpdating, isTrue);
-          viewModel.dispose();
-          pendingWrite.complete(persistenceResult);
+        final write = viewModel.setFavourite(event, true);
+        expect(viewModel.isUpdating, isTrue);
+        viewModel.dispose();
+        pendingWrite.complete(persistenceResult);
 
-          expect((await write).isSuccess, persistenceResult.isSuccess);
-          await tester.pump();
+        expect((await write).isSuccess, persistenceResult.isSuccess);
+        await tester.pump();
 
-          expect(tester.takeException(), isNull);
-        },
-      );
+        expect(tester.takeException(), isNull);
+      });
     }
   });
 }

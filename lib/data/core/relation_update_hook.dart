@@ -82,9 +82,7 @@ class RelationUpdateHook<T> extends MappingHook {
   /// Creates a relation update decoding hook.
   ///
   /// The [decoder] converts raw JSON values into the target type [T].
-  const RelationUpdateHook({
-    required this.decoder,
-  });
+  const RelationUpdateHook({required this.decoder});
 
   /// Converts a raw JSON value into type [T].
   final T Function(Object value) decoder;

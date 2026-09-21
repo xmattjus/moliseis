@@ -16,11 +16,12 @@ dependencies:
   collection: ^1.19.1
   cronet_http: ^1.6.0
   crypto: ^3.0.7
-  cupertino_http: ^2.4.0
+  cupertino_http: ^3.1.0
   cupertino_icons: ^1.0.9
+  cupertino_ui: any
   # D
   dart_mappable: ^4.8.0
-  device_info_plus: ^12.4.0
+  device_info_plus: ^13.2.0
   # E
   email_validator: ^3.0.0
   envied: ^1.3.5
@@ -37,7 +38,7 @@ dependencies:
   flutter_map: ^8.3.2
   flutter_quill: ^11.5.1
   # G
-  go_router: ^17.3.0
+  go_router: ^18.0.1
   # H
   http: ^1.6.0
   # I
@@ -46,11 +47,12 @@ dependencies:
   # J
   # K
   # L
-  latlong2: ^0.9.1
+  latlong2: ^0.10.1
   # M
   markdown_widget: ^2.3.2+8
   material_color_utilities: ^0.13.0
   material_symbols_icons: 4.2960.0
+  material_ui: any
   meta: ^1.17.0
   # N
   # O
@@ -64,12 +66,12 @@ dependencies:
   # Q
   # R
   # S
-  sentry: ^9.25.0
-  sentry_flutter: ^9.25.0
-  sentry_supabase: ^9.25.0
-  share_plus: ^12.0.2
-  skeletonizer: ^2.1.3
-  smooth_page_indicator: ^2.0.1
+  sentry: ^10.0.0-alpha.5
+  sentry_flutter: ^10.0.0-alpha.5
+  sentry_supabase: ^10.0.0-alpha.5
+  share_plus: ^13.3.0
+  skeletonizer: ^3.0.0
+  smooth_page_indicator: ^3.0.0
   string_validator: ^1.2.0
   supabase: ^2.12.2
   supabase_flutter: ^2.14.2
@@ -81,7 +83,7 @@ dependencies:
   # U
   url_launcher: ^6.3.2
   # V
-  very_good_analysis: ^10.2.0
+  very_good_analysis: ^11.0.0
   # W
   # X
   # Y

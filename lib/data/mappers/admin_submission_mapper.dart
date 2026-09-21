@@ -6,9 +6,7 @@ import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 
 /// Serializes the editor-owned admin submission input for the Edge Function.
-Map<String, dynamic> adminSubmissionInputToWireMap(
-  AdminSubmissionInput input,
-) {
+Map<String, dynamic> adminSubmissionInputToWireMap(AdminSubmissionInput input) {
   return <String, dynamic>{
     'category': input.category.name,
     'city': input.city,
@@ -78,10 +76,7 @@ AdminSubmissionPromotion adminSubmissionPromotionFromWire(Object? value) {
   if (entityId is! int || entityId <= 0) {
     throw const FormatException('entity_id is invalid');
   }
-  return AdminSubmissionPromotion(
-    target: target,
-    entityId: entityId,
-  );
+  return AdminSubmissionPromotion(target: target, entityId: entityId);
 }
 
 /// Whether [object] carries exactly [keys] and nothing else.

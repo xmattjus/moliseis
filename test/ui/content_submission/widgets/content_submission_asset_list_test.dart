@@ -3,10 +3,10 @@ import 'dart:io' show Directory, File;
 
 import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/domain/models/content_submission_staged_asset.dart';
@@ -132,52 +132,47 @@ void main() {
       }
     });
 
-    testWidgets(
-      'shows a warning snack bar on file size limit reached',
-      (tester) async {
-        await tester.binding.setSurfaceSize(const Size(390, 844));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        const message = 'Le foto oltre i 10 MB sono state escluse';
-        const rejectedName = 'oversized-secret.png';
-        final logger = MockLogger();
-        final vm = buildViewModel(
-          logger: logger,
-          imagePicker: FakeImagePicker(
-            onPickMultipleMedia: () async => [
-              XFile.fromData(
-                Uint8List.fromList([1]),
-                path: '/tmp/$rejectedName',
-                length: kCloudinaryMaxUploadBytes + 1,
-              ),
-            ],
-          ),
-        );
-
-        await tester.pumpWidget(buildTestApp(vm, logger: logger));
-        await tester.tap(
-          find.byKey(
-            const ValueKey('content-submission-asset-list-add-button'),
-          ),
-        );
-        await tester.pump();
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 250));
-
-        expect(find.byType(SnackBar), findsOneWidget);
-        expect(find.byIcon(Symbols.warning), findsOneWidget);
-        expect(find.text(message), findsOneWidget);
-        expect(find.text(rejectedName), findsNothing);
-        final text = tester.widget<Text>(find.text(message));
-        expect(text.maxLines, 2);
-        expect(text.overflow, TextOverflow.ellipsis);
-        expect(tester.takeException(), isNull);
-      },
-    );
-
-    testWidgets('shows a warning snack bar on assets number limit reached and '
-        'hides add photo', (
+    testWidgets('shows a warning snack bar on file size limit reached', (
       tester,
     ) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      const message = 'Le foto oltre i 10 MB sono state escluse';
+      const rejectedName = 'oversized-secret.png';
+      final logger = MockLogger();
+      final vm = buildViewModel(
+        logger: logger,
+        imagePicker: FakeImagePicker(
+          onPickMultipleMedia: () async => [
+            XFile.fromData(
+              Uint8List.fromList([1]),
+              path: '/tmp/$rejectedName',
+              length: kCloudinaryMaxUploadBytes + 1,
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(buildTestApp(vm, logger: logger));
+      await tester.tap(
+        find.byKey(const ValueKey('content-submission-asset-list-add-button')),
+      );
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.byIcon(Symbols.warning), findsOneWidget);
+      expect(find.text(message), findsOneWidget);
+      expect(find.text(rejectedName), findsNothing);
+      final text = tester.widget<Text>(find.text(message));
+      expect(text.maxLines, 2);
+      expect(text.overflow, TextOverflow.ellipsis);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('shows a warning snack bar on assets number limit reached and '
+        'hides add photo', (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       const message = 'Le foto oltre il limite di 5 sono state escluse';
@@ -387,9 +382,7 @@ void main() {
         everyElement(isTrue),
       );
       expect(
-        find.byKey(
-          const ValueKey('content-submission-asset-list-add-button'),
-        ),
+        find.byKey(const ValueKey('content-submission-asset-list-add-button')),
         findsNothing,
       );
       expect(find.byType(EmptyBox), findsOneWidget);

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
 
 enum _CardBaseType { elevated, filled, outlined }

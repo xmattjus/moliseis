@@ -1,12 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
@@ -289,9 +288,7 @@ void main() {
 
     testWidgets(
       'overlapping removals have one owner and preserve the sentinel',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final draftRepository = FakeContentSubmissionDraftRepository();
         final harness = createHarness(draftRepository: draftRepository);
         addTearDown(harness.dispose);
@@ -427,9 +424,7 @@ void main() {
 
     testWidgets(
       'discard restores the durable draft without retiring its assets',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final draftRepository = FakeContentSubmissionDraftRepository();
         final stagedRepository = FakeContentSubmissionStagedAssetRepository();
         final harness = createHarness(
@@ -605,9 +600,7 @@ void main() {
 
     testWidgets(
       'popping progress does not invoke the dirty parent exit policy',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final harness = createHarness();
         addTearDown(harness.dispose);
         await harness.pumpForm(tester);
@@ -651,10 +644,7 @@ void main() {
           submissionRepository: submissionRepository,
           imagePicker: FakeImagePicker(
             onPickMultipleMedia: () async => <XFile>[
-              XFile.fromData(
-                Uint8List.fromList(<int>[1, 2, 3]),
-                name: 'a.jpg',
-              ),
+              XFile.fromData(Uint8List.fromList(<int>[1, 2, 3]), name: 'a.jpg'),
             ],
           ),
         );
@@ -696,9 +686,7 @@ void main() {
         expect(stagedRepository.clearedSessions, isEmpty);
 
         unawaited(
-          harness.router.pushNamed(
-            RouteNames.contentSubmissionUploadProgress,
-          ),
+          harness.router.pushNamed(RouteNames.contentSubmissionUploadProgress),
         );
         await tester.pumpAndSettle();
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
@@ -1153,9 +1141,7 @@ final class _ContentSubmissionRouteHarness {
           routerConfig: router,
           localizationsDelegates: const [
             FlutterQuillLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: const [Locale('en'), Locale('it')],
         ),

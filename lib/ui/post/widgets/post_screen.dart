@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
@@ -126,9 +126,7 @@ class _PostScreenState extends State<PostScreen> {
                       nearContent: widget.viewModel.nearContent,
                     ),
                     SliverPadding(
-                      padding: EdgeInsets.only(
-                        bottom: context.bottomPadding,
-                      ),
+                      padding: EdgeInsets.only(bottom: context.bottomPadding),
                     ),
                   ],
                 ),
@@ -136,9 +134,7 @@ class _PostScreenState extends State<PostScreen> {
             }
 
             return const Center(
-              child: EmptyView.loading(
-                text: Text('Caricamento in corso...'),
-              ),
+              child: EmptyView.loading(text: Text('Caricamento in corso...')),
             );
           },
         ),
@@ -158,9 +154,7 @@ class _PostScreenState extends State<PostScreen> {
 
     GoRouter.of(context).goNamed(
       nextRouteName,
-      pathParameters: {
-        'categorySlug': RouteParameters.categorySlug(category),
-      },
+      pathParameters: {'categorySlug': RouteParameters.categorySlug(category)},
     );
   }
 

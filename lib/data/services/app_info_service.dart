@@ -4,9 +4,8 @@ import 'package:moliseis/utils/result.dart';
 /// Service responsible for handling app-specific information URLs
 /// such as privacy policy, terms of service, and legal information.
 class AppInfoService {
-  AppInfoService({
-    required ExternalUrlService externalUrlService,
-  }) : _externalUrlService = externalUrlService;
+  AppInfoService({required ExternalUrlService externalUrlService})
+    : _externalUrlService = externalUrlService;
 
   final ExternalUrlService _externalUrlService;
 

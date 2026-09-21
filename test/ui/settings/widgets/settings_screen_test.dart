@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -101,10 +101,7 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
-      expect(
-        router.routerDelegate.state.uri.path,
-        RoutePaths.settings,
-      );
+      expect(router.routerDelegate.state.uri.path, RoutePaths.settings);
       expect(find.byType(SettingsScreen), findsOneWidget);
     });
 
@@ -118,10 +115,7 @@ void main() {
       await tester.tap(find.text('Area redazione'));
       await tester.pumpAndSettle();
 
-      expect(
-        router.routerDelegate.state.uri.path,
-        RoutePaths.admin,
-      );
+      expect(router.routerDelegate.state.uri.path, RoutePaths.admin);
       expect(find.text('ADMIN_MARKER'), findsOneWidget);
     });
   });

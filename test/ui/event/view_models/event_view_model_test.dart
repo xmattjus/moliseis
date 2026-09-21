@@ -15,9 +15,7 @@ void main() {
       test('populates all events on success', () async {
         final event1 = makeEvent(name: 'Festival');
         final vm = await buildLoaded(
-          FakeEventRepository(
-            getByCurrentYearResult: Result.success([event1]),
-          ),
+          FakeEventRepository(getByCurrentYearResult: Result.success([event1])),
         );
 
         expect(vm.loadAll.completed, isTrue);
@@ -39,38 +37,35 @@ void main() {
         expect(vm.all, isEmpty);
       });
 
-      test(
-        'replaces a date-first empty fallback when the initial yearly load '
-        'completes',
-        () async {
-          final date = EventCalendarDate(2026, 4, 2);
-          final yearly = Completer<Result<List<Event>>>();
-          final fallback = Completer<Result<List<Event>>>();
-          final repository = FakeEventRepository()
-            ..pendingGetByCurrentYear = yearly
-            ..pendingGetByDate = fallback;
-          final vm = EventViewModel(
-            repository: repository,
-            nowUtc: () => DateTime.utc(2026, 4, 2),
-          );
+      test('replaces a date-first empty fallback when the initial yearly load '
+          'completes', () async {
+        final date = EventCalendarDate(2026, 4, 2);
+        final yearly = Completer<Result<List<Event>>>();
+        final fallback = Completer<Result<List<Event>>>();
+        final repository = FakeEventRepository()
+          ..pendingGetByCurrentYear = yearly
+          ..pendingGetByDate = fallback;
+        final vm = EventViewModel(
+          repository: repository,
+          nowUtc: () => DateTime.utc(2026, 4, 2),
+        );
 
-          await pumpEventQueue();
-          final dateLoad = vm.loadByDate.execute(date);
-          await pumpEventQueue();
-          fallback.complete(const Result.success([]));
-          await dateLoad;
+        await pumpEventQueue();
+        final dateLoad = vm.loadByDate.execute(date);
+        await pumpEventQueue();
+        fallback.complete(const Result.success([]));
+        await dateLoad;
 
-          yearly.complete(
-            Result.success([
-              makeEvent(remoteId: 22, startDate: DateTime.utc(2026, 4, 2, 10)),
-            ]),
-          );
-          await pumpEventQueue(times: 10);
+        yearly.complete(
+          Result.success([
+            makeEvent(remoteId: 22, startDate: DateTime.utc(2026, 4, 2, 10)),
+          ]),
+        );
+        await pumpEventQueue(times: 10);
 
-          expect(vm.byMonth.map((event) => event.remoteId), [22]);
-          expect(repository.getByDateCallCount, 1);
-        },
-      );
+        expect(vm.byMonth.map((event) => event.remoteId), [22]);
+        expect(repository.getByDateCallCount, 1);
+      });
 
       test(
         'does not let a stale date fallback overwrite newer yearly data',

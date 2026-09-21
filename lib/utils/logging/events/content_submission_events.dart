@@ -191,9 +191,7 @@ class ContentSubmissionDraftClearSuccess extends LogEvent {
 
 /// Fired when a content submission draft save starts.
 class ContentSubmissionDraftSaveStarted extends LogEvent {
-  const ContentSubmissionDraftSaveStarted({
-    required this.draft,
-  });
+  const ContentSubmissionDraftSaveStarted({required this.draft});
 
   final String draft;
 
@@ -223,9 +221,7 @@ class ContentSubmissionDraftSaveFailed extends LogEvent {
 
 /// Fired when a content submission draft save finishes successfully.
 class ContentSubmissionDraftSaveSuccess extends LogEvent {
-  const ContentSubmissionDraftSaveSuccess({
-    required this.draft,
-  });
+  const ContentSubmissionDraftSaveSuccess({required this.draft});
 
   final String draft;
 

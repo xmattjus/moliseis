@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/blurred_box.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
@@ -81,11 +81,7 @@ class FavouriteButton extends StatelessWidget {
                     onPressed: isUpdating
                         ? null
                         : () => unawaited(
-                            _handlePressed(
-                              context,
-                              content,
-                              viewModel,
-                            ),
+                            _handlePressed(context, content, viewModel),
                           ),
                     focusColor: feedbackColor.withValues(alpha: 0.08),
                     hoverColor: feedbackColor.withValues(alpha: 0.08),
@@ -108,13 +104,8 @@ class FavouriteButton extends StatelessWidget {
             return OutlinedButton.icon(
               onPressed: isUpdating
                   ? null
-                  : () => unawaited(
-                      _handlePressed(
-                        context,
-                        content,
-                        viewModel,
-                      ),
-                    ),
+                  : () =>
+                        unawaited(_handlePressed(context, content, viewModel)),
               style: ButtonStyle(
                 side: WidgetStateProperty.resolveWith((states) {
                   if (isSaved && !states.contains(WidgetState.pressed)) {
@@ -180,9 +171,8 @@ class FavouriteButton extends StatelessWidget {
         textContent: 'Aggiunto ai preferiti',
         action: SnackBarAction(
           label: 'Annulla',
-          onPressed: () => unawaited(
-            _handleUndo(context, content, wasFavourite, viewModel),
-          ),
+          onPressed: () =>
+              unawaited(_handleUndo(context, content, wasFavourite, viewModel)),
         ),
         replaceCurrent: true,
       );

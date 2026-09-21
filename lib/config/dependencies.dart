@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_repository_impl.dart';
@@ -88,9 +88,7 @@ List<SingleChildWidget> providers(
   Provider<CacheManager>.value(value: cacheManager),
   Provider<Logger>.value(value: logger),
   Provider<UrlLaunchService>(
-    create: (context) => UrlLaunchService(
-      logger: context.read(),
-    ),
+    create: (context) => UrlLaunchService(logger: context.read()),
   ),
   Provider<CachedWeatherApiClient>(
     create: (context) => CachedWeatherApiClient(

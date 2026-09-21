@@ -1,7 +1,4 @@
 PODS:
-  - cupertino_http (0.0.1):
-    - Flutter
-    - FlutterMacOS
   - Flutter (1.0.0)
   - ObjectBox (5.3.0)
   - objectbox_flutter_libs (0.0.1):
@@ -9,7 +6,6 @@ PODS:
     - ObjectBox (= 5.3.0)
 
 DEPENDENCIES:
-  - cupertino_http (from `.symlinks/plugins/cupertino_http/darwin`)
   - Flutter (from `Flutter`)
   - objectbox_flutter_libs (from `.symlinks/plugins/objectbox_flutter_libs/ios`)
 
@@ -18,15 +14,12 @@ SPEC REPOS:
     - ObjectBox
 
 EXTERNAL SOURCES:
-  cupertino_http:
-    :path: ".symlinks/plugins/cupertino_http/darwin"
   Flutter:
     :path: Flutter
   objectbox_flutter_libs:
     :path: ".symlinks/plugins/objectbox_flutter_libs/ios"
 
 SPEC CHECKSUMS:
-  cupertino_http: 94ac07f5ff090b8effa6c5e2c47871d48ab7c86c
   Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   ObjectBox: 2aae8ad350012cb53c6e7848064307cf68617f73
   objectbox_flutter_libs: 42b57158b8c4869b731487f220e07d6edc6616e0

@@ -417,9 +417,7 @@ void main() {
 
     test('prepareSync returns Error when Supabase query fails', () async {
       supabaseEnv.stubSelectError(
-        const PostgrestException(
-          message: 'relation "media" does not exist',
-        ),
+        const PostgrestException(message: 'relation "media" does not exist'),
       );
 
       final result = await repository.prepareSync();

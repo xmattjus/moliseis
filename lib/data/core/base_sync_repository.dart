@@ -77,9 +77,7 @@ abstract class BaseSyncRepository<
             pendingPuts.add(deleted);
             pendingById[dto.id] = deleted;
 
-            logger.log(
-              EntityDeleteSuccess(entityName, dto.id),
-            );
+            logger.log(EntityDeleteSuccess(entityName, dto.id));
           }
           continue;
         }
@@ -89,9 +87,7 @@ abstract class BaseSyncRepository<
           pendingPuts.add(created);
           pendingById[dto.id] = created;
 
-          logger.log(
-            EntityInsertSuccess(entityName, dto.id),
-          );
+          logger.log(EntityInsertSuccess(entityName, dto.id));
           continue;
         }
 
@@ -100,9 +96,7 @@ abstract class BaseSyncRepository<
           pendingPuts.add(merged);
           pendingById[dto.id] = merged;
 
-          logger.log(
-            EntityUpdateSuccess(entityName, dto.id),
-          );
+          logger.log(EntityUpdateSuccess(entityName, dto.id));
         }
       }
 

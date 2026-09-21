@@ -295,28 +295,25 @@ void main() {
         },
       );
 
-      test(
-        'excludes single-day event from a future year linked to a matching '
-        'city',
-        () async {
-          final city = makeCityEntity(remoteId: 31, name: 'Larino');
-          cityBox.put(city);
+      test('excludes single-day event from a future year linked to a matching '
+          'city', () async {
+        final city = makeCityEntity(remoteId: 31, name: 'Larino');
+        cityBox.put(city);
 
-          final event = makeEventEntity(
-            remoteId: 203,
-            name: 'Futura giornata',
-            startDate: DateTime(2099, 5, 15),
-            cityId: city.remoteId,
-          );
-          eventBox.put(event);
+        final event = makeEventEntity(
+          remoteId: 203,
+          name: 'Futura giornata',
+          startDate: DateTime(2099, 5, 15),
+          cityId: city.remoteId,
+        );
+        eventBox.put(event);
 
-          final result = await repository.getEventIdsByQuery('Larino');
+        final result = await repository.getEventIdsByQuery('Larino');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
-          expect(ids, isNot(contains(203)));
-        },
-      );
+        expect(result, isA<Success<List<int>>>());
+        final ids = (result as Success<List<int>>).value;
+        expect(ids, isNot(contains(203)));
+      });
     });
 
     // -------------------------------------------------------------------------
@@ -389,51 +386,45 @@ void main() {
         },
       );
 
-      test(
-        'excludes event with non-matching category when querying by '
-        'category label',
-        () async {
-          final now = fixedNowUtc;
-          eventBox.put(
-            makeEventEntity(
-              remoteId: 101,
-              name: 'Mostra storica',
-              startDate: DateTime.utc(now.year, 6),
-              endDate: DateTime.utc(now.year, 6, 10),
-              contentCategoryIndex: 2, // ContentCategory.history
-            ),
-          );
+      test('excludes event with non-matching category when querying by '
+          'category label', () async {
+        final now = fixedNowUtc;
+        eventBox.put(
+          makeEventEntity(
+            remoteId: 101,
+            name: 'Mostra storica',
+            startDate: DateTime.utc(now.year, 6),
+            endDate: DateTime.utc(now.year, 6, 10),
+            contentCategoryIndex: 2, // ContentCategory.history
+          ),
+        );
 
-          final result = await repository.getEventIdsByQuery('natura');
+        final result = await repository.getEventIdsByQuery('natura');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
-          expect(ids, isNot(contains(101)));
-        },
-      );
+        expect(result, isA<Success<List<int>>>());
+        final ids = (result as Success<List<int>>).value;
+        expect(ids, isNot(contains(101)));
+      });
 
-      test(
-        'includes current-year event with food category when querying '
-        '"cibo"',
-        () async {
-          final now = fixedNowUtc;
-          eventBox.put(
-            makeEventEntity(
-              remoteId: 102,
-              name: 'Degustazione vini',
-              startDate: DateTime.utc(now.year, 9),
-              endDate: DateTime.utc(now.year, 9, 5),
-              contentCategoryIndex: 4, // ContentCategory.food
-            ),
-          );
+      test('includes current-year event with food category when querying '
+          '"cibo"', () async {
+        final now = fixedNowUtc;
+        eventBox.put(
+          makeEventEntity(
+            remoteId: 102,
+            name: 'Degustazione vini',
+            startDate: DateTime.utc(now.year, 9),
+            endDate: DateTime.utc(now.year, 9, 5),
+            contentCategoryIndex: 4, // ContentCategory.food
+          ),
+        );
 
-          final result = await repository.getEventIdsByQuery('cibo');
+        final result = await repository.getEventIdsByQuery('cibo');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
-          expect(ids, contains(102));
-        },
-      );
+        expect(result, isA<Success<List<int>>>());
+        final ids = (result as Success<List<int>>).value;
+        expect(ids, contains(102));
+      });
     });
   });
 
@@ -478,42 +469,33 @@ void main() {
       },
     );
 
-    test(
-      'includes place whose name matches query',
-      () async {
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 201,
-            name: 'Castello di Campobasso',
-          ),
-        );
+    test('includes place whose name matches query', () async {
+      placeBox.put(
+        makePlaceEntity(remoteId: 201, name: 'Castello di Campobasso'),
+      );
 
-        final result = await repository.getPlaceIdsByQuery('Castello');
+      final result = await repository.getPlaceIdsByQuery('Castello');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
-        expect(ids, contains(201));
-      },
-    );
+      expect(result, isA<Success<List<int>>>());
+      final ids = (result as Success<List<int>>).value;
+      expect(ids, contains(201));
+    });
 
-    test(
-      'deduplicates place when both name and category match',
-      () async {
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 202,
-            name: 'Cibo di strada',
-            contentCategoryIndex: 4, // ContentCategory.food
-          ),
-        );
+    test('deduplicates place when both name and category match', () async {
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 202,
+          name: 'Cibo di strada',
+          contentCategoryIndex: 4, // ContentCategory.food
+        ),
+      );
 
-        final result = await repository.getPlaceIdsByQuery('cibo');
+      final result = await repository.getPlaceIdsByQuery('cibo');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
-        expect(ids.where((id) => id == 202), hasLength(1));
-      },
-    );
+      expect(result, isA<Success<List<int>>>());
+      final ids = (result as Success<List<int>>).value;
+      expect(ids.where((id) => id == 202), hasLength(1));
+    });
 
     test('returns empty list when store is empty', () async {
       final result = await repository.getPlaceIdsByQuery('anything');
@@ -545,59 +527,53 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test(
-      'returns places with the most frequent non-zero category '
-      'from the previous search',
-      () async {
-        // Two places share the same category (nature).
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 300,
-            name: 'Unique name alpha',
-            contentCategoryIndex: 1, // ContentCategory.nature
-          ),
-        );
+    test('returns places with the most frequent non-zero category '
+        'from the previous search', () async {
+      // Two places share the same category (nature).
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 300,
+          name: 'Unique name alpha',
+          contentCategoryIndex: 1, // ContentCategory.nature
+        ),
+      );
 
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 301,
-            name: 'Natura viva',
-            contentCategoryIndex: 1, // ContentCategory.nature
-          ),
-        );
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 301,
+          name: 'Natura viva',
+          contentCategoryIndex: 1, // ContentCategory.nature
+        ),
+      );
 
-        // A third place with a different category.
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 302,
-            name: 'Museo storico',
-            contentCategoryIndex: 2, // ContentCategory.history
-          ),
-        );
+      // A third place with a different category.
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 302,
+          name: 'Museo storico',
+          contentCategoryIndex: 2, // ContentCategory.history
+        ),
+      );
 
-        // Search by name (not category) so `_categorySearched` is false,
-        // and only one nature place is returned.
-        final searchResult = await repository.getPlaceIdsByQuery(
-          'Unique name alpha',
-        );
-        expect(searchResult, isA<Success<List<int>>>());
-        expect(
-          (searchResult as Success<List<int>>).value,
-          contains(300),
-        );
+      // Search by name (not category) so `_categorySearched` is false,
+      // and only one nature place is returned.
+      final searchResult = await repository.getPlaceIdsByQuery(
+        'Unique name alpha',
+      );
+      expect(searchResult, isA<Success<List<int>>>());
+      expect((searchResult as Success<List<int>>).value, contains(300));
 
-        // The related results should return the other nature place (301)
-        // that was not in the original search but shares the most frequent
-        // category (nature).
-        final result = await repository.getRelatedResults('anything');
+      // The related results should return the other nature place (301)
+      // that was not in the original search but shares the most frequent
+      // category (nature).
+      final result = await repository.getRelatedResults('anything');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
-        expect(ids, contains(301));
-        expect(ids, isNot(contains(300)));
-        expect(ids, isNot(contains(302)));
-      },
-    );
+      expect(result, isA<Success<List<int>>>());
+      final ids = (result as Success<List<int>>).value;
+      expect(ids, contains(301));
+      expect(ids, isNot(contains(300)));
+      expect(ids, isNot(contains(302)));
+    });
 
     test(
       'returns empty list when the previous search was category-based',

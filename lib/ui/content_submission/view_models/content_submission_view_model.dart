@@ -4,8 +4,8 @@ import 'dart:io' show File;
 
 import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
-import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
@@ -67,20 +67,13 @@ final class AssetSelectionOutcome {
   bool get hasRejections => hasOversizedRejections || hasAssetLimitRejections;
 }
 
-enum ContentSubmissionDraftLoadState {
-  loading,
-  ready,
-}
+enum ContentSubmissionDraftLoadState { loading, ready }
 
 /// Whether initialization authoritatively determined persisted draft state.
 ///
 /// A failed read is deliberately distinct from a successfully absent draft: it
 /// must not authorize orphan cleanup or a fresh draft write.
-enum _PersistedDraftState {
-  unknown,
-  absent,
-  restored,
-}
+enum _PersistedDraftState { unknown, absent, restored }
 
 enum _AssetCandidateDisposition {
   added,
@@ -606,9 +599,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     return result;
   }
 
-  Future<Result<T>> _serialize<T>(
-    Future<Result<T>> Function() action,
-  ) async {
+  Future<Result<T>> _serialize<T>(Future<Result<T>> Function() action) async {
     final previous = _lifecycleTail;
     final release = Completer<void>();
     _lifecycleTail = release.future;
@@ -668,12 +659,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// Updates the selected semantic start calendar day.
   void setStartCalendarDate(EventCalendarDate date) {
     final draft = _eventTimePolicy.enable(_state.eventDates);
-    _applyEventEdit(
-      _eventTimePolicy.changeStartCalendarDate(
-        draft,
-        date,
-      ),
-    );
+    _applyEventEdit(_eventTimePolicy.changeStartCalendarDate(draft, date));
   }
 
   /// Updates the selected semantic inclusive end calendar day.
@@ -689,12 +675,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   /// Updates the selected semantic start clock time.
   void setStartClockTime(EventClockTime time) {
     final draft = _eventTimePolicy.enable(_state.eventDates);
-    _applyEventEdit(
-      _eventTimePolicy.changeStartClockTime(
-        draft,
-        time,
-      ),
-    );
+    _applyEventEdit(_eventTimePolicy.changeStartClockTime(draft, time));
   }
 
   void _applyEventEdit(EventTimeEditResult result) {
@@ -894,10 +875,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       return const Result.success(null);
     });
     if (result case Error<void>(:final error)) {
-      _logger.log(
-        const ContentSubmissionStateClearFailed(),
-        error: error,
-      );
+      _logger.log(const ContentSubmissionStateClearFailed(), error: error);
       return result;
     }
     if (!_disposed) notifyListeners();

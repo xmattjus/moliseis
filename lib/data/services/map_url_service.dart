@@ -4,9 +4,8 @@ import 'package:moliseis/utils/result.dart';
 /// Service responsible for handling map-related external URL launches,
 /// including attribution pages and location searches.
 class MapUrlService {
-  MapUrlService({
-    required ExternalUrlService externalUrlService,
-  }) : _externalUrlService = externalUrlService;
+  MapUrlService({required ExternalUrlService externalUrlService})
+    : _externalUrlService = externalUrlService;
 
   final ExternalUrlService _externalUrlService;
 

@@ -1,10 +1,9 @@
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
@@ -262,19 +261,13 @@ void main() {
           password: 'password-sicura',
         ),
       ).called(1);
-      expect(
-        harness.router.routerDelegate.state.uri.path,
-        RoutePaths.admin,
-      );
+      expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
       expect(harness.repository.listCallCount, 1);
 
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routerDelegate.state.uri.path,
-        RoutePaths.settings,
-      );
+      expect(harness.router.routerDelegate.state.uri.path, RoutePaths.settings);
       expect(find.byType(SettingsScreen), findsOneWidget);
     });
 
@@ -353,9 +346,7 @@ final class _AdminRouteHarness {
 
     return MultiProvider(
       providers: <SingleChildWidget>[
-        ChangeNotifierProvider<AdminAuthViewModel>.value(
-          value: auth.viewModel,
-        ),
+        ChangeNotifierProvider<AdminAuthViewModel>.value(value: auth.viewModel),
         Provider<AdminContentSubmissionRepository>.value(value: repository),
         Provider<ContentSubmissionRepository>.value(
           value: FakeContentSubmissionRepository(),
@@ -368,9 +359,8 @@ final class _AdminRouteHarness {
             create: (_) => UrlLaunchService(logger: logger),
           ),
           ChangeNotifierProvider<ThemeViewModel>(
-            create: (_) => ThemeViewModel(
-              settingsRepository: settingsRepository,
-            ),
+            create: (_) =>
+                ThemeViewModel(settingsRepository: settingsRepository),
           ),
           ChangeNotifierProvider<SettingsViewModel>(
             create: (_) => SettingsViewModel(
@@ -382,11 +372,9 @@ final class _AdminRouteHarness {
       ],
       child: MaterialApp.router(
         routerConfig: router,
-        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+        localizationsDelegates: const [
           FlutterQuillLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
+          ...GlobalMaterialLocalizations.delegates,
         ],
         supportedLocales: const <Locale>[Locale('en'), Locale('it')],
       ),

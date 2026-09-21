@@ -218,10 +218,7 @@ void main() {
       '${failure.name} Function response remains an ordinary error',
       () async {
         httpClient.queueJson(
-          <String, Object?>{
-            'code': failure.code,
-            'message': failure.message,
-          },
+          <String, Object?>{'code': failure.code, 'message': failure.message},
           status: failure.status,
           reasonPhrase: failure.reasonPhrase,
         );
@@ -242,10 +239,7 @@ void main() {
   }
 
   for (final failure in <({String name, Exception error})>[
-    (
-      name: 'timeout',
-      error: TimeoutException('preparation timed out'),
-    ),
+    (name: 'timeout', error: TimeoutException('preparation timed out')),
     (name: 'client', error: http.ClientException('offline')),
     (name: 'socket', error: const SocketException('network unavailable')),
   ]) {

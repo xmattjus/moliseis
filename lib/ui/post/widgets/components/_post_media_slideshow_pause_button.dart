@@ -33,9 +33,7 @@ class _PostMediaSlideshowPauseButtonState
   late final Animation<double> _opacityAnimation;
 
   /// Animates the button width (expand/shrink) to accommodate the text length.
-  Animation<double> _widthAnimation = const AlwaysStoppedAnimation<double>(
-    40,
-  );
+  Animation<double> _widthAnimation = const AlwaysStoppedAnimation<double>(40);
 
   late final Animation<double> _paddingAnimation;
 

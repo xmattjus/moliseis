@@ -11,62 +11,46 @@ import 'package:moliseis/domain/models/content_category.dart';
 
 void main() {
   group('RelationUpdateHook.beforeDecode', () {
-    const hook = RelationUpdateHook<int>(
-      decoder: relationUpdateDecodeInt,
-    );
+    const hook = RelationUpdateHook<int>(decoder: relationUpdateDecodeInt);
 
-    test(
-      'returns Clear when backend explicitly sends null',
-      () {
-        final result = hook.beforeDecode(null);
+    test('returns Clear when backend explicitly sends null', () {
+      final result = hook.beforeDecode(null);
 
-        expect(result, isA<Clear<int>>());
-      },
-    );
+      expect(result, isA<Clear<int>>());
+    });
 
-    test(
-      'returns Assign when backend sends a concrete value',
-      () {
-        final result = hook.beforeDecode(42);
+    test('returns Assign when backend sends a concrete value', () {
+      final result = hook.beforeDecode(42);
 
-        expect(result, isA<Assign<int>>());
+      expect(result, isA<Assign<int>>());
 
-        final assign = result! as Assign<int>;
+      final assign = result! as Assign<int>;
 
-        expect(assign.value, 42);
-      },
-    );
+      expect(assign.value, 42);
+    });
 
-    test(
-      'uses the provided decoder function',
-      () {
-        const stringHook = RelationUpdateHook<int>(
-          decoder: _parseInt,
-        );
+    test('uses the provided decoder function', () {
+      const stringHook = RelationUpdateHook<int>(decoder: _parseInt);
 
-        final result = stringHook.beforeDecode('42');
+      final result = stringHook.beforeDecode('42');
 
-        expect(result, isA<Assign<int>>());
+      expect(result, isA<Assign<int>>());
 
-        final assign = result! as Assign<int>;
+      final assign = result! as Assign<int>;
 
-        expect(assign.value, 42);
-      },
-    );
+      expect(assign.value, 42);
+    });
 
-    test(
-      'does not create Keep because omitted fields bypass the hook',
-      () {
-        final eventDto = _eventDtoFromMap();
-        final mediaDto = _mediaDtoFromMap();
-        final placeDto = _placeDtoFromMap();
+    test('does not create Keep because omitted fields bypass the hook', () {
+      final eventDto = _eventDtoFromMap();
+      final mediaDto = _mediaDtoFromMap();
+      final placeDto = _placeDtoFromMap();
 
-        expect(eventDto.cityId, isA<Keep<int>>());
-        expect(mediaDto.eventId, isA<Keep<int>>());
-        expect(mediaDto.placeId, isA<Keep<int>>());
-        expect(placeDto.cityId, isA<Keep<int>>());
-      },
-    );
+      expect(eventDto.cityId, isA<Keep<int>>());
+      expect(mediaDto.eventId, isA<Keep<int>>());
+      expect(mediaDto.placeId, isA<Keep<int>>());
+      expect(placeDto.cityId, isA<Keep<int>>());
+    });
   });
 
   group('EventDtoPatchEncoding.toPatchJson', () {
@@ -82,18 +66,13 @@ void main() {
       },
     );
 
-    test(
-      'encodes EventDto cityId as null when relation should be cleared',
-      () {
-        final dto = _eventDto(cityId: const Clear<int>());
+    test('encodes EventDto cityId as null when relation should be cleared', () {
+      final dto = _eventDto(cityId: const Clear<int>());
 
-        final json = dto.toPatchJson();
+      final json = dto.toPatchJson();
 
-        expect(json, {
-          'city_id': null,
-        });
-      },
-    );
+      expect(json, {'city_id': null});
+    });
 
     test(
       'encodes EventDto cityId primitive value when relation should be updated',
@@ -102,41 +81,23 @@ void main() {
 
         final json = dto.toPatchJson();
 
-        expect(json, {
-          'city_id': 96,
-        });
+        expect(json, {'city_id': 96});
       },
     );
 
-    test(
-      'preserves EventDto PATCH semantics across all relation states',
-      () {
-        final keepDto = _eventDto(cityId: const Keep<int>());
+    test('preserves EventDto PATCH semantics across all relation states', () {
+      final keepDto = _eventDto(cityId: const Keep<int>());
 
-        final clearDto = _eventDto(cityId: const Clear<int>());
+      final clearDto = _eventDto(cityId: const Clear<int>());
 
-        final assignDto = _eventDto(cityId: const Assign<int>(99));
+      final assignDto = _eventDto(cityId: const Assign<int>(99));
 
-        expect(
-          keepDto.toPatchJson(),
-          isEmpty,
-        );
+      expect(keepDto.toPatchJson(), isEmpty);
 
-        expect(
-          clearDto.toPatchJson(),
-          {
-            'city_id': null,
-          },
-        );
+      expect(clearDto.toPatchJson(), {'city_id': null});
 
-        expect(
-          assignDto.toPatchJson(),
-          {
-            'city_id': 99,
-          },
-        );
-      },
-    );
+      expect(assignDto.toPatchJson(), {'city_id': 99});
+    });
   });
 
   group('MediaDtoPatchEncoding.toPatchJson', () {
@@ -157,142 +118,100 @@ void main() {
       },
     );
 
-    test(
-      'rejects clearing both MediaDto parent relations',
-      () {
-        final dto = _mediaDto(
-          eventId: const Clear<int>(),
-          placeId: const Clear<int>(),
-        );
+    test('rejects clearing both MediaDto parent relations', () {
+      final dto = _mediaDto(
+        eventId: const Clear<int>(),
+        placeId: const Clear<int>(),
+      );
 
-        var json = const <String, Object?>{};
+      var json = const <String, Object?>{};
 
-        expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
-        expect(json, isEmpty);
-      },
-    );
+      expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
+      expect(json, isEmpty);
+    });
 
-    test(
-      'encodes MediaDto eventId primitive value when relation should be '
-      'updated and place_id should be cleared',
-      () {
-        final dto = _mediaDto(
-          eventId: const Assign<int>(42),
-          placeId: const Clear<int>(),
-        );
+    test('encodes MediaDto eventId primitive value when relation should be '
+        'updated and place_id should be cleared', () {
+      final dto = _mediaDto(
+        eventId: const Assign<int>(42),
+        placeId: const Clear<int>(),
+      );
 
-        final json = dto.toPatchJson();
+      final json = dto.toPatchJson();
 
-        expect(json, {
-          'event_id': 42,
-          'place_id': null,
-        });
-      },
-    );
+      expect(json, {'event_id': 42, 'place_id': null});
+    });
 
-    test(
-      'encodes MediaDto placeId primitive value when relation should be '
-      'updated and event_id should be cleared',
-      () {
-        final dto = _mediaDto(
-          eventId: const Clear<int>(),
-          placeId: const Assign<int>(42),
-        );
+    test('encodes MediaDto placeId primitive value when relation should be '
+        'updated and event_id should be cleared', () {
+      final dto = _mediaDto(
+        eventId: const Clear<int>(),
+        placeId: const Assign<int>(42),
+      );
 
-        final json = dto.toPatchJson();
+      final json = dto.toPatchJson();
 
-        expect(json, {
-          'event_id': null,
-          'place_id': 42,
-        });
-      },
-    );
+      expect(json, {'event_id': null, 'place_id': 42});
+    });
 
-    test(
-      'throws when both MediaDto eventId and placeId are assigned',
-      () {
-        final dto = _mediaDto(
-          eventId: const Assign<int>(42),
-          placeId: const Assign<int>(96),
-        );
+    test('throws when both MediaDto eventId and placeId are assigned', () {
+      final dto = _mediaDto(
+        eventId: const Assign<int>(42),
+        placeId: const Assign<int>(96),
+      );
 
-        var json = const <String, Object?>{};
+      var json = const <String, Object?>{};
 
-        expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
-        expect(json, isEmpty);
-      },
-    );
+      expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
+      expect(json, isEmpty);
+    });
 
-    test(
-      'throws when MediaDto eventId is assigned and placeId is kept',
-      () {
-        final dto = _mediaDto(
-          eventId: const Assign<int>(42),
-          placeId: const Keep<int>(),
-        );
+    test('throws when MediaDto eventId is assigned and placeId is kept', () {
+      final dto = _mediaDto(
+        eventId: const Assign<int>(42),
+        placeId: const Keep<int>(),
+      );
 
-        var json = const <String, Object?>{};
+      var json = const <String, Object?>{};
 
-        expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
-        expect(json, isEmpty);
-      },
-    );
+      expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
+      expect(json, isEmpty);
+    });
 
-    test(
-      'throws when MediaDto eventId is kept and placeId is assigned',
-      () {
-        final dto = _mediaDto(
-          eventId: const Keep<int>(),
-          placeId: const Assign<int>(96),
-        );
+    test('throws when MediaDto eventId is kept and placeId is assigned', () {
+      final dto = _mediaDto(
+        eventId: const Keep<int>(),
+        placeId: const Assign<int>(96),
+      );
 
-        var json = const <String, Object?>{};
+      var json = const <String, Object?>{};
 
-        expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
-        expect(json, isEmpty);
-      },
-    );
+      expect(() => json = dto.toPatchJson(), throwsA(isA<ArgumentError>()));
+      expect(json, isEmpty);
+    });
 
-    test(
-      'preserves MediaDto PATCH semantics across all relation states',
-      () {
-        final keepDto = _mediaDto(
-          eventId: const Keep<int>(),
-          placeId: const Keep<int>(),
-        );
+    test('preserves MediaDto PATCH semantics across all relation states', () {
+      final keepDto = _mediaDto(
+        eventId: const Keep<int>(),
+        placeId: const Keep<int>(),
+      );
 
-        final assignDto1 = _mediaDto(
-          eventId: const Assign<int>(99),
-          placeId: const Clear<int>(),
-        );
+      final assignDto1 = _mediaDto(
+        eventId: const Assign<int>(99),
+        placeId: const Clear<int>(),
+      );
 
-        final assignDto2 = _mediaDto(
-          eventId: const Clear<int>(),
-          placeId: const Assign<int>(99),
-        );
+      final assignDto2 = _mediaDto(
+        eventId: const Clear<int>(),
+        placeId: const Assign<int>(99),
+      );
 
-        expect(
-          keepDto.toPatchJson(),
-          isEmpty,
-        );
+      expect(keepDto.toPatchJson(), isEmpty);
 
-        expect(
-          assignDto1.toPatchJson(),
-          {
-            'event_id': 99,
-            'place_id': null,
-          },
-        );
+      expect(assignDto1.toPatchJson(), {'event_id': 99, 'place_id': null});
 
-        expect(
-          assignDto2.toPatchJson(),
-          {
-            'event_id': null,
-            'place_id': 99,
-          },
-        );
-      },
-    );
+      expect(assignDto2.toPatchJson(), {'event_id': null, 'place_id': 99});
+    });
   });
 
   group('PlaceDtoPatchEncoding.toPatchJson', () {
@@ -308,18 +227,13 @@ void main() {
       },
     );
 
-    test(
-      'encodes PlaceDto cityId as null when relation should be cleared',
-      () {
-        final dto = _placeDto(cityId: const Clear<int>());
+    test('encodes PlaceDto cityId as null when relation should be cleared', () {
+      final dto = _placeDto(cityId: const Clear<int>());
 
-        final json = dto.toPatchJson();
+      final json = dto.toPatchJson();
 
-        expect(json, {
-          'city_id': null,
-        });
-      },
-    );
+      expect(json, {'city_id': null});
+    });
 
     test(
       'encodes PlaceDto cityId primitive value when relation should be updated',
@@ -328,143 +242,98 @@ void main() {
 
         final json = dto.toPatchJson();
 
-        expect(json, {
-          'city_id': 42,
-        });
+        expect(json, {'city_id': 42});
       },
     );
 
-    test(
-      'preserves PlaceDto PATCH semantics across all relation states',
-      () {
-        final keepDto = _placeDto(cityId: const Keep<int>());
+    test('preserves PlaceDto PATCH semantics across all relation states', () {
+      final keepDto = _placeDto(cityId: const Keep<int>());
 
-        final clearDto = _placeDto(cityId: const Clear<int>());
+      final clearDto = _placeDto(cityId: const Clear<int>());
 
-        final assignDto = _placeDto(cityId: const Assign<int>(99));
+      final assignDto = _placeDto(cityId: const Assign<int>(99));
 
-        expect(
-          keepDto.toPatchJson(),
-          isEmpty,
-        );
+      expect(keepDto.toPatchJson(), isEmpty);
 
-        expect(
-          clearDto.toPatchJson(),
-          {
-            'city_id': null,
-          },
-        );
+      expect(clearDto.toPatchJson(), {'city_id': null});
 
-        expect(
-          assignDto.toPatchJson(),
-          {
-            'city_id': 99,
-          },
-        );
-      },
-    );
+      expect(assignDto.toPatchJson(), {'city_id': 99});
+    });
   });
 
   group('EventDto decoding integration', () {
-    test(
-      'decodes omitted relation field as Keep',
-      () {
-        final dto = _eventDtoFromMap();
+    test('decodes omitted relation field as Keep', () {
+      final dto = _eventDtoFromMap();
 
-        expect(dto.cityId, isA<Keep<int>>());
-      },
-    );
+      expect(dto.cityId, isA<Keep<int>>());
+    });
 
-    test(
-      'decodes explicit null relation field as Clear',
-      () {
-        final dto = _eventDtoFromMap(() => null);
+    test('decodes explicit null relation field as Clear', () {
+      final dto = _eventDtoFromMap(() => null);
 
-        expect(dto.cityId, isA<Clear<int>>());
-      },
-    );
+      expect(dto.cityId, isA<Clear<int>>());
+    });
 
-    test(
-      'decodes explicit relation value as Assign',
-      () {
-        final dto = _eventDtoFromMap(() => 42);
+    test('decodes explicit relation value as Assign', () {
+      final dto = _eventDtoFromMap(() => 42);
 
-        expect(dto.cityId, isA<Assign<int>>());
+      expect(dto.cityId, isA<Assign<int>>());
 
-        final relation = dto.cityId as Assign<int>;
+      final relation = dto.cityId as Assign<int>;
 
-        expect(relation.value, 42);
-      },
-    );
+      expect(relation.value, 42);
+    });
   });
 
   group('MediaDto decoding integration', () {
-    test(
-      'decodes omitted relation field as Keep',
-      () {
-        final dto = _mediaDtoFromMap();
+    test('decodes omitted relation field as Keep', () {
+      final dto = _mediaDtoFromMap();
 
-        expect(dto.eventId, isA<Keep<int>>());
-        expect(dto.placeId, isA<Keep<int>>());
-      },
-    );
+      expect(dto.eventId, isA<Keep<int>>());
+      expect(dto.placeId, isA<Keep<int>>());
+    });
 
-    test(
-      'decodes explicit null relation field as Clear',
-      () {
-        final dto = _mediaDtoFromMap(eventId: () => null);
+    test('decodes explicit null relation field as Clear', () {
+      final dto = _mediaDtoFromMap(eventId: () => null);
 
-        expect(dto.eventId, isA<Clear<int>>());
-        expect(dto.placeId, isA<Keep<int>>());
-      },
-    );
+      expect(dto.eventId, isA<Clear<int>>());
+      expect(dto.placeId, isA<Keep<int>>());
+    });
 
-    test(
-      'decodes explicit relation value as Assign',
-      () {
-        final dto = _mediaDtoFromMap(placeId: () => 42);
+    test('decodes explicit relation value as Assign', () {
+      final dto = _mediaDtoFromMap(placeId: () => 42);
 
-        expect(dto.eventId, isA<Keep<int>>());
-        expect(dto.placeId, isA<Assign<int>>());
+      expect(dto.eventId, isA<Keep<int>>());
+      expect(dto.placeId, isA<Assign<int>>());
 
-        final relation = dto.placeId as Assign<int>;
+      final relation = dto.placeId as Assign<int>;
 
-        expect(relation.value, 42);
-      },
-    );
+      expect(relation.value, 42);
+    });
   });
 
   group('PlaceDto decoding integration', () {
-    test(
-      'decodes omitted relation field as Keep',
-      () {
-        final dto = _placeDtoFromMap();
+    test('decodes omitted relation field as Keep', () {
+      final dto = _placeDtoFromMap();
 
-        expect(dto.cityId, isA<Keep<int>>());
-      },
-    );
+      expect(dto.cityId, isA<Keep<int>>());
+    });
 
-    test(
-      'decodes explicit null relation field as Clear',
-      () {
-        final dto = _placeDtoFromMap(() => null);
+    test('decodes explicit null relation field as Clear', () {
+      final dto = _placeDtoFromMap(() => null);
 
-        expect(dto.cityId, isA<Clear<int>>());
-      },
-    );
+      expect(dto.cityId, isA<Clear<int>>());
+    });
 
-    test(
-      'decodes explicit relation value as Assign',
-      () {
-        final dto = _placeDtoFromMap(() => 42);
+    test('decodes explicit relation value as Assign', () {
+      final dto = _placeDtoFromMap(() => 42);
 
-        expect(dto.cityId, isA<Assign<int>>());
+      expect(dto.cityId, isA<Assign<int>>());
 
-        final relation = dto.cityId as Assign<int>;
+      final relation = dto.cityId as Assign<int>;
 
-        expect(relation.value, 42);
-      },
-    );
+      expect(relation.value, 42);
+    });
   });
 }
 

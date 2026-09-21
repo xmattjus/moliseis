@@ -1,8 +1,8 @@
 import 'dart:collection' show UnmodifiableListView;
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';

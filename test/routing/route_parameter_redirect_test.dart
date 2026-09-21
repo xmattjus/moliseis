@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
@@ -237,9 +237,7 @@ void main() {
 
     testWidgets(
       'legacy search path value is authoritative over an existing q',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final fixture = RouteOwnershipFixture();
         addTearDown(fixture.dispose);
         await tester.pumpWidget(fixture.app);
@@ -286,9 +284,7 @@ void main() {
         await tester.pumpWidget(fixture.app);
         await tester.pumpAndSettle();
 
-        fixture.router.go(
-          '/home/search_results/${Uri.encodeComponent(text)}',
-        );
+        fixture.router.go('/home/search_results/${Uri.encodeComponent(text)}');
         await tester.pumpAndSettle();
 
         expect(fixture.uri.path, '/home/search_results');

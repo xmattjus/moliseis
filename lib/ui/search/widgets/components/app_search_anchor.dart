@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:collection' show UnmodifiableListView;
 
-import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/category/widgets/category_content_wrap.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
@@ -198,9 +198,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
               );
             }
 
-            final options = (await _debouncedSearch(
-              controller.text,
-            ))?.toList();
+            final options = (await _debouncedSearch(controller.text))?.toList();
 
             // Guard again after the debounce await — the anchor may have
             // been unmounted while the timer was pending.
@@ -228,9 +226,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                       suggestions: viewModel.suggestions,
                       onSuggestionPressed: (content) {
                         unawaited(
-                          viewModel.addToPastSearches.execute(
-                            content.name,
-                          ),
+                          viewModel.addToPastSearches.execute(content.name),
                         );
 
                         onSuggestionPressed(content);

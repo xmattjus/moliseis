@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field.dart';
 import 'package:moliseis/ui/core/utils/quill_document_codec.dart';
 
@@ -306,10 +305,7 @@ void main() {
                   initialDescription: description,
                   initialDescriptionDelta: descriptionDelta,
                   onChanged:
-                      ({
-                        required description,
-                        required descriptionDelta,
-                      }) {
+                      ({required description, required descriptionDelta}) {
                         emissions++;
                       },
                 ),
@@ -339,10 +335,7 @@ void main() {
       expect(emissions, 0);
       expect(form.validate(), isTrue);
       await tester.pumpAndSettle();
-      expect(
-        find.text('La descrizione inserita è troppo lunga'),
-        findsNothing,
-      );
+      expect(find.text('La descrizione inserita è troppo lunga'), findsNothing);
     });
 
     testWidgets('parent reflection preserves the editor controller', (
@@ -363,10 +356,7 @@ void main() {
                   initialDescription: currentDescription,
                   initialDescriptionDelta: currentDescriptionDelta,
                   onChanged:
-                      ({
-                        required description,
-                        required descriptionDelta,
-                      }) {
+                      ({required description, required descriptionDelta}) {
                         setHostState(() {
                           currentDescription = description;
                           currentDescriptionDelta = descriptionDelta;
@@ -379,12 +369,7 @@ void main() {
         ),
       );
       final controller = controllerOf(tester)
-        ..replaceText(
-          0,
-          0,
-          'Testo',
-          const TextSelection.collapsed(offset: 5),
-        );
+        ..replaceText(0, 0, 'Testo', const TextSelection.collapsed(offset: 5));
       await tester.pump();
 
       expect(identical(controllerOf(tester), controller), isTrue);
@@ -430,11 +415,9 @@ Widget _buildShell({
   return MaterialApp(
     locale: locale,
     theme: theme,
-    localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+    localizationsDelegates: const [
       FlutterQuillLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
+      ...GlobalMaterialLocalizations.delegates,
     ],
     supportedLocales: const [Locale('en'), Locale('it')],
     home: Scaffold(

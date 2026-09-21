@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -168,9 +168,7 @@ class _CarouselViewItem extends StatelessWidget {
         children: <Widget>[
           if (content.media.isNotEmpty)
             DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.black.withAlpha(40),
-              ),
+              decoration: BoxDecoration(color: Colors.black.withAlpha(40)),
               position: DecorationPosition.foreground,
               child: AppNetworkImage(
                 url: content.media.first.url,

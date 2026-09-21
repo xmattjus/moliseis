@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
@@ -38,9 +38,7 @@ import '../../../support/mock_logger.dart';
 void main() {
   testWidgets(
     'content resolution is safe while the sheet controller attaches',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await tester.binding.setSurfaceSize(const Size(1280, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -113,9 +111,7 @@ void main() {
 
   testWidgets(
     'selecting a suggestion while a post is selected shows search results',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await tester.binding.setSurfaceSize(const Size(1280, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -182,10 +178,7 @@ void main() {
     },
   );
 
-  for (final content in <ContentBase>[
-    makeEvent(),
-    makePlace(remoteId: 2),
-  ]) {
+  for (final content in <ContentBase>[makeEvent(), makePlace(remoteId: 2)]) {
     final contentType = content is Event ? 'event' : 'place';
     testWidgets(
       'renders supplied $contentType content without resolving it again',
@@ -475,9 +468,7 @@ void main() {
 
   testWidgets(
     'failed deep-link resolution replaces the skeleton with feedback',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await tester.binding.setSurfaceSize(const Size(1280, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -522,9 +513,7 @@ void main() {
 
   testWidgets(
     'mismatched repository response terminates after the retry limit',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await tester.binding.setSurfaceSize(const Size(1280, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -576,9 +565,7 @@ void main() {
 
   testWidgets(
     'rapid navigation to a new id resolves the new id through the retry path',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await tester.binding.setSurfaceSize(const Size(1280, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -593,9 +580,10 @@ void main() {
       );
       final weatherViewModel = _buildWeatherViewModel();
       final favouriteViewModel = _buildFavouriteViewModel();
-      final contentIdentity = ValueNotifier<({int id, ContentType type})?>(
-        (id: 1, type: ContentType.event),
-      );
+      final contentIdentity = ValueNotifier<({int id, ContentType type})?>((
+        id: 1,
+        type: ContentType.event,
+      ));
       addTearDown(contentIdentity.dispose);
 
       await tester.pumpWidget(
@@ -652,9 +640,7 @@ void main() {
 
   testWidgets(
     'route removal and disposal produce no controller or setState errors',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await tester.binding.setSurfaceSize(const Size(1280, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -710,9 +696,7 @@ Widget _buildApp({
   required Widget child,
 }) {
   final router = GoRouter(
-    routes: <RouteBase>[
-      GoRoute(path: '/', builder: (_, _) => child),
-    ],
+    routes: <RouteBase>[GoRoute(path: '/', builder: (_, _) => child)],
   );
   addTearDown(router.dispose);
   return ChangeNotifierProvider<FavouriteViewModel>.value(
@@ -731,9 +715,7 @@ Widget _buildBottomSheetApp({
   return ChangeNotifierProvider<FavouriteViewModel>.value(
     value: favouriteViewModel,
     child: MaterialApp(
-      home: Scaffold(
-        body: SizedBox(height: 800, child: child),
-      ),
+      home: Scaffold(body: SizedBox(height: 800, child: child)),
     ),
   );
 }
@@ -779,23 +761,17 @@ WeatherViewModel _buildWeatherViewModel() {
         LruCache<
           String,
           WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-        >(
-          maxSize: 8,
-        ),
+        >(maxSize: 8),
     hourlyWeatherCache:
         LruCache<
           String,
           WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
-        >(
-          maxSize: 8,
-        ),
+        >(maxSize: 8),
     dailyWeatherCache:
         LruCache<
           String,
           WeatherForecastDataCacheEntry<DailyWeatherForecastData>
-        >(
-          maxSize: 8,
-        ),
+        >(maxSize: 8),
     logger: MockLogger(),
   );
 

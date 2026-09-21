@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
@@ -62,12 +62,7 @@ class ContentBaseListItem extends StatelessWidget {
               ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                  16,
-                  8,
-                  8,
-                  8,
-                ),
+                padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,

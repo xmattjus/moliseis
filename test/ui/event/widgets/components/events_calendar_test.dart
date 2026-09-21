@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_calendar.dart';
@@ -12,30 +12,27 @@ import '../../../../support/fixtures.dart';
 
 void main() {
   group('EventViewModel.loadByDate', () {
-    test(
-      'includes multi-day event on middle day when repository getByDate is '
-      'empty',
-      () async {
-        final event = makeEvent(
-          remoteId: 42,
-          startDate: DateTime(2026, 3, 10, 10, 30),
-          endDate: DateTime(2026, 3, 12, 22, 45),
-        );
+    test('includes multi-day event on middle day when repository getByDate is '
+        'empty', () async {
+      final event = makeEvent(
+        remoteId: 42,
+        startDate: DateTime(2026, 3, 10, 10, 30),
+        endDate: DateTime(2026, 3, 12, 22, 45),
+      );
 
-        final repository = FakeEventRepository(
-          getByCurrentYearResult: Result.success([event]),
-        );
-        final viewModel = EventViewModel(repository: repository);
+      final repository = FakeEventRepository(
+        getByCurrentYearResult: Result.success([event]),
+      );
+      final viewModel = EventViewModel(repository: repository);
 
-        await _waitForCommand(viewModel.loadAll);
-        await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
-        await _waitForCommand(viewModel.loadByDate);
+      await _waitForCommand(viewModel.loadAll);
+      await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
+      await _waitForCommand(viewModel.loadByDate);
 
-        expect(viewModel.byMonth, hasLength(1));
-        expect(viewModel.byMonth.first.remoteId, 42);
-        expect(repository.getByDateCallCount, 0);
-      },
-    );
+      expect(viewModel.byMonth, hasLength(1));
+      expect(viewModel.byMonth.first.remoteId, 42);
+      expect(repository.getByDateCallCount, 0);
+    });
 
     test('uses semantic Rome calendar dates for repository fetches', () async {
       final repository = FakeEventRepository();
@@ -51,10 +48,7 @@ void main() {
     });
 
     test('returns cached events on same day without repository call', () async {
-      final event = makeEvent(
-        remoteId: 7,
-        startDate: DateTime(2026, 3, 11, 8),
-      );
+      final event = makeEvent(remoteId: 7, startDate: DateTime(2026, 3, 11, 8));
       final repository = FakeEventRepository(
         getByCurrentYearResult: Result.success([event]),
       );
@@ -138,14 +132,8 @@ void main() {
           home: Scaffold(
             body: EventsVerticalCalendarDayMarkers(
               events: [
-                makeEvent(
-                  remoteId: 5,
-                  startDate: DateTime(2026, 3, 11, 8),
-                ),
-                makeEvent(
-                  remoteId: 13,
-                  startDate: DateTime(2026, 3, 11, 9),
-                ),
+                makeEvent(remoteId: 5, startDate: DateTime(2026, 3, 11, 8)),
+                makeEvent(remoteId: 13, startDate: DateTime(2026, 3, 11, 9)),
               ],
             ),
           ),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 /// A `FormField` that wraps a `Checkbox` with an optional label and error
@@ -47,12 +47,7 @@ class CheckboxFormField extends FormField<bool> {
                ),
                if (state.hasError)
                  Padding(
-                   padding: const EdgeInsetsDirectional.fromSTEB(
-                     16,
-                     2,
-                     16,
-                     0,
-                   ),
+                   padding: const EdgeInsetsDirectional.fromSTEB(16, 2, 16, 0),
                    child: Builder(
                      builder: (context) {
                        return Text(

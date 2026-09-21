@@ -54,9 +54,7 @@ class MediaRepositoryImpl extends BaseSyncRepository<MediaDto, MediaEntity>
 
   @override
   MediaEntity markEntityDeleted(MediaEntity existing) {
-    return existing.copyWith(
-      isDeleted: true,
-    );
+    return existing.copyWith(isDeleted: true);
   }
 
   Condition<MediaEntity> get _isNotDeleted =>

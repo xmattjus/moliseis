@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:collection' show UnmodifiableListView;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
@@ -175,10 +175,7 @@ class FavouriteViewModel extends ChangeNotifier {
     });
   }
 
-  Future<Result<void>> _persistFavourite(
-    ContentBase content,
-    bool save,
-  ) async {
+  Future<Result<void>> _persistFavourite(ContentBase content, bool save) async {
     try {
       final result = switch (content) {
         Event(:final remoteId) => _favouriteGetIdsUseCase.setFavouriteEvent(
@@ -243,9 +240,8 @@ class FavouriteViewModel extends ChangeNotifier {
   Future<Place?> _getPlaceFromRepository(int id) async =>
       (await _favouriteGetIdsUseCase.getPlaceById(id)).getOrNull();
 
-  Exception _unsupportedContentException(ContentBase content) => Exception(
-    'Unsupported favourite content type: ${content.runtimeType}.',
-  );
+  Exception _unsupportedContentException(ContentBase content) =>
+      Exception('Unsupported favourite content type: ${content.runtimeType}.');
 
   Exception _updateUnavailableException() => Exception(
     'Cannot update favourites while another update is in progress.',

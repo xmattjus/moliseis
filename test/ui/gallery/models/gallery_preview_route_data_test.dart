@@ -247,12 +247,10 @@ void main() {
         }
 
         expect(
-          () => GalleryPreviewRouteData.tryParse(
-            <String, Object?>{
-              'initialIndex': random.nextInt(3),
-              'media': media,
-            },
-          ),
+          () => GalleryPreviewRouteData.tryParse(<String, Object?>{
+            'initialIndex': random.nextInt(3),
+            'media': media,
+          }),
           returnsNormally,
           reason: 'iteration $i',
         );
@@ -299,10 +297,7 @@ void main() {
 
       test('re-encoding the parsed payload is stable', () {
         final data = GalleryPreviewRouteData(
-          media: <Media>[
-            _buildMediaWith(id: 1),
-            _buildMediaWith(id: 2),
-          ],
+          media: <Media>[_buildMediaWith(id: 1), _buildMediaWith(id: 2)],
           initialIndex: 1,
         );
 

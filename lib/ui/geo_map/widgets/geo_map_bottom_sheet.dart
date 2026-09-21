@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet.dart';
@@ -120,10 +120,7 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
               to: colorScheme.surfaceContainerLow,
             ),
             child: SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 18,
-                horizontal: 16,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
               sliver: SliverList.list(
                 children: <Widget>[
                   Text(

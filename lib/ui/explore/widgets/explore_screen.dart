@@ -1,9 +1,9 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
@@ -121,9 +121,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
               const SliverToBoxAdapter(child: TextSectionDivider('Categorie')),
               SliverPadding(
-                padding: const EdgeInsetsDirectional.symmetric(
-                  horizontal: 16,
-                ),
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 16),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final type = widget.exploreViewModel.types[index];

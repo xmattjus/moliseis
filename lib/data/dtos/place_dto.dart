@@ -41,9 +41,7 @@ class PlaceDto with PlaceDtoMappable implements SyncDto {
   final double longitude;
   final ContentCategory category;
   @MappableField(
-    hook: RelationUpdateHook<int>(
-      decoder: relationUpdateDecodeInt,
-    ),
+    hook: RelationUpdateHook<int>(decoder: relationUpdateDecodeInt),
   )
   final RelationUpdate<int> cityId;
   final DateTime createdAt;

@@ -1,6 +1,6 @@
 import 'package:cached_network_image_ce/cached_network_image.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
@@ -76,10 +76,8 @@ final class RouteOwnershipFixture {
     router = GoRouter(
       navigatorKey: rootNavigatorKey,
       initialLocation: RoutePaths.home,
-      errorBuilder: (_, state) => RouteErrorScreen(
-        uri: state.uri,
-        error: state.error,
-      ),
+      errorBuilder: (_, state) =>
+          RouteErrorScreen(uri: state.uri, error: state.error),
       routes: <RouteBase>[
         GoRoute(
           path: RoutePaths.gallery,
@@ -290,10 +288,7 @@ class _StubScreenState extends State<_StubScreen> {
           children: <Widget>[
             Text('${widget.label} root'),
             Text('Count: $_count'),
-            FilledButton(
-              onPressed: _increment,
-              child: const Text('Increment'),
-            ),
+            FilledButton(onPressed: _increment, child: const Text('Increment')),
           ],
         ),
       ),

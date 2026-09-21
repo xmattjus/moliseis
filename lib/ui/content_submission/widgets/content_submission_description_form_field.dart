@@ -1,8 +1,8 @@
 import 'dart:async' show StreamSubscription, unawaited;
 
 import 'package:collection/collection.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field_toolbox.dart';
 import 'package:moliseis/ui/core/ui/description_delta_styles.dart';
 import 'package:moliseis/ui/core/utils/quill_document_codec.dart';
@@ -220,12 +220,7 @@ class _ContentSubmissionDescriptionFormFieldState
                 child: Column(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        16,
-                        16,
-                        16,
-                        4,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                       child: ContentSubmissionDescriptionFormFieldToolbox(
                         controller: _controller,
                       ),

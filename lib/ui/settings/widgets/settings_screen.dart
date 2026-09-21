@@ -1,8 +1,8 @@
 import 'dart:async' show unawaited;
 import 'dart:collection' show UnmodifiableListView;
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/routing/route_paths.dart';

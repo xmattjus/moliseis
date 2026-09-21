@@ -27,9 +27,7 @@ Object? _freezeDescriptionDeltaValue(Object? value) {
   }
 
   if (value is List<dynamic>) {
-    return List<Object?>.unmodifiable(
-      value.map(_freezeDescriptionDeltaValue),
-    );
+    return List<Object?>.unmodifiable(value.map(_freezeDescriptionDeltaValue));
   }
 
   return value;

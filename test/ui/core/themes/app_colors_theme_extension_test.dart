@@ -1,21 +1,15 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/themes/app_colors_theme_extension.dart';
 import 'package:moliseis/ui/core/themes/app_snack_bar_colors.dart';
 
 void main() {
   AppColorsThemeExtension buildLight() => AppColorsThemeExtension.light(
-    ColorScheme.fromSeed(
-      seedColor: Colors.blue,
-      brightness: Brightness.light,
-    ),
+    ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
   );
 
   AppColorsThemeExtension buildDark() => AppColorsThemeExtension.dark(
-    ColorScheme.fromSeed(
-      seedColor: Colors.blue,
-      brightness: Brightness.dark,
-    ),
+    ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark),
   );
 
   group('AppColorsThemeExtension.copyWith', () {
@@ -128,9 +122,7 @@ void main() {
         actionForeground: Colors.amber,
       );
       final copy =
-          original.copyWith(
-                infoSnackBar: replacement,
-              )
+          original.copyWith(infoSnackBar: replacement)
               as AppColorsThemeExtension;
 
       expect(copy.infoSnackBar.background, equals(Colors.pink));

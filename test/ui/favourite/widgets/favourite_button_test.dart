@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
@@ -57,9 +57,7 @@ void main() {
 
   testWidgets(
     'a failed forward action rolls back and shows only generic error',
-    (
-      tester,
-    ) async {
+    (tester) async {
       final event = makeEvent();
       final viewModel = FavouriteViewModel(
         favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
@@ -203,11 +201,7 @@ void main() {
     expect(viewModel.isFavourite(secondEvent), isFalse);
     expect(
       eventRepository.setFavouriteEventCalls,
-      equals([
-        (id: 1, save: true),
-        (id: 2, save: true),
-        (id: 2, save: false),
-      ]),
+      equals([(id: 1, save: true), (id: 2, save: true), (id: 2, save: false)]),
     );
   });
 

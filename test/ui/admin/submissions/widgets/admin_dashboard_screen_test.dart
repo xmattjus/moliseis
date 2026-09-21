@@ -1,9 +1,9 @@
 import 'dart:async' show Completer, unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
@@ -135,9 +135,7 @@ void main() {
     testWidgets('filters loaded submissions through a status control', (
       tester,
     ) async {
-      final pending = sampleAdminSubmission(
-        name: 'Contributo da revisionare',
-      );
+      final pending = sampleAdminSubmission(name: 'Contributo da revisionare');
       final accepted = sampleAdminSubmission(
         id: 2,
         name: 'Contributo accettato',
@@ -266,10 +264,7 @@ void main() {
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       await tester.pumpAndSettle();
 
-      await tester.drag(
-        find.byType(CustomScrollView),
-        const Offset(0, 300),
-      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, 300));
       await tester.pumpAndSettle();
 
       expect(repository.listCallCount, 2);

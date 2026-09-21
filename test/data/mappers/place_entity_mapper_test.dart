@@ -110,32 +110,32 @@ void main() {
 
   group('PlaceDtoExtensions', () {
     test('copyWith preserves an omitted city scalar relation id', () {
-      final copy = makePlaceEntity(remoteId: 5, cityId: 7).copyWith(
-        isSaved: true,
-      );
+      final copy = makePlaceEntity(
+        remoteId: 5,
+        cityId: 7,
+      ).copyWith(isSaved: true);
 
       expect(copy.cityToOneId, 7);
       expect(copy.city.targetId, 7);
     });
 
     test('copyWith clears a city scalar relation id explicitly', () {
-      final copy = makePlaceEntity(remoteId: 5, cityId: 7).copyWith(
-        cityToOneId: null,
-      );
+      final copy = makePlaceEntity(
+        remoteId: 5,
+        cityId: 7,
+      ).copyWith(cityToOneId: null);
 
       expect(copy.cityToOneId, isNull);
     });
 
     test('merge keeps, clears, and assigns city scalar and target ids', () {
-      final kept = dto().mergeInto(
-        makePlaceEntity(remoteId: 5, cityId: 7),
-      );
-      final cleared = dto(cityId: const Clear<int>()).mergeInto(
-        makePlaceEntity(remoteId: 5, cityId: 7),
-      );
-      final assigned = dto(cityId: const Assign<int>(99)).mergeInto(
-        makePlaceEntity(remoteId: 5, cityId: 7),
-      );
+      final kept = dto().mergeInto(makePlaceEntity(remoteId: 5, cityId: 7));
+      final cleared = dto(
+        cityId: const Clear<int>(),
+      ).mergeInto(makePlaceEntity(remoteId: 5, cityId: 7));
+      final assigned = dto(
+        cityId: const Assign<int>(99),
+      ).mergeInto(makePlaceEntity(remoteId: 5, cityId: 7));
 
       expect(kept.cityToOneId, 7);
       expect(kept.city.targetId, 7);

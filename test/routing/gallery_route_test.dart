@@ -2,9 +2,9 @@ import 'dart:async' show unawaited;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, debugDefaultTargetPlatformOverride;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 
 import '../support/fake_cache_manager.dart';
@@ -220,9 +220,7 @@ void main() {
 
     testWidgets(
       'predictive update drives the transition without route mutation',
-      (
-        tester,
-      ) async {
+      (tester) async {
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
         try {
           final fixture = _buildFixture();

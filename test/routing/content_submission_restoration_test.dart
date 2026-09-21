@@ -1,9 +1,9 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -166,10 +166,8 @@ final class _RestorationFixture {
   late final ContentSubmissionViewModel viewModel;
   late final GoRouter router;
 
-  Widget get app => MaterialApp.router(
-    restorationScopeId: 'app',
-    routerConfig: router,
-  );
+  Widget get app =>
+      MaterialApp.router(restorationScopeId: 'app', routerConfig: router);
 
   void dispose() {
     router.dispose();

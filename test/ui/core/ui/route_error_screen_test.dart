@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
@@ -51,92 +51,91 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets(
-      'logs once per distinct displayed failure on the same state',
-      (tester) async {
-        final logger = MockLogger();
-        final screenKey = GlobalKey<State<RouteErrorScreen>>();
-        const sharedReason = 'Unmatched route';
+    testWidgets('logs once per distinct displayed failure on the same state', (
+      tester,
+    ) async {
+      final logger = MockLogger();
+      final screenKey = GlobalKey<State<RouteErrorScreen>>();
+      const sharedReason = 'Unmatched route';
 
-        final firstError = GoException(sharedReason);
-        await tester.pumpWidget(
-          _buildApp(
-            logger: logger,
-            screenKey: screenKey,
-            uri: Uri.parse('/invalid-one'),
-            error: firstError,
-          ),
-        );
+      final firstError = GoException(sharedReason);
+      await tester.pumpWidget(
+        _buildApp(
+          logger: logger,
+          screenKey: screenKey,
+          uri: Uri.parse('/invalid-one'),
+          error: firstError,
+        ),
+      );
 
-        final initialState = screenKey.currentState;
-        expect(initialState, isNotNull);
-        expect(logger.calls, hasLength(1));
-        expect(
-          (logger.calls.first.event as RouteErrorScreenShown).uri,
-          '/invalid-one',
-        );
-        expect(logger.calls.first.error, same(firstError));
-        expect(logger.calls.first.stackTrace, isNull);
+      final initialState = screenKey.currentState;
+      expect(initialState, isNotNull);
+      expect(logger.calls, hasLength(1));
+      expect(
+        (logger.calls.first.event as RouteErrorScreenShown).uri,
+        '/invalid-one',
+      );
+      expect(logger.calls.first.error, same(firstError));
+      expect(logger.calls.first.stackTrace, isNull);
 
-        await tester.pumpWidget(
-          _buildApp(
-            logger: logger,
-            screenKey: screenKey,
-            uri: Uri.parse('/invalid-one'),
-            error: GoException(sharedReason),
-          ),
-        );
+      await tester.pumpWidget(
+        _buildApp(
+          logger: logger,
+          screenKey: screenKey,
+          uri: Uri.parse('/invalid-one'),
+          error: GoException(sharedReason),
+        ),
+      );
 
-        expect(screenKey.currentState, same(initialState));
-        expect(logger.calls, hasLength(1));
+      expect(screenKey.currentState, same(initialState));
+      expect(logger.calls, hasLength(1));
 
-        final uriChangedError = GoException(sharedReason);
-        await tester.pumpWidget(
-          _buildApp(
-            logger: logger,
-            screenKey: screenKey,
-            uri: Uri.parse('/invalid-two'),
-            error: uriChangedError,
-          ),
-        );
+      final uriChangedError = GoException(sharedReason);
+      await tester.pumpWidget(
+        _buildApp(
+          logger: logger,
+          screenKey: screenKey,
+          uri: Uri.parse('/invalid-two'),
+          error: uriChangedError,
+        ),
+      );
 
-        expect(screenKey.currentState, same(initialState));
-        expect(logger.calls, hasLength(2));
-        expect(
-          (logger.calls[1].event as RouteErrorScreenShown).uri,
-          '/invalid-two',
-        );
-        expect(
-          (logger.calls[1].event as RouteErrorScreenShown).reason,
-          uriChangedError.toString(),
-        );
-        expect(logger.calls[1].error, same(uriChangedError));
-        expect(logger.calls[1].stackTrace, isNull);
+      expect(screenKey.currentState, same(initialState));
+      expect(logger.calls, hasLength(2));
+      expect(
+        (logger.calls[1].event as RouteErrorScreenShown).uri,
+        '/invalid-two',
+      );
+      expect(
+        (logger.calls[1].event as RouteErrorScreenShown).reason,
+        uriChangedError.toString(),
+      );
+      expect(logger.calls[1].error, same(uriChangedError));
+      expect(logger.calls[1].stackTrace, isNull);
 
-        final reasonChangedError = GoException('Malformed content id');
-        await tester.pumpWidget(
-          _buildApp(
-            logger: logger,
-            screenKey: screenKey,
-            uri: Uri.parse('/invalid-two'),
-            error: reasonChangedError,
-          ),
-        );
+      final reasonChangedError = GoException('Malformed content id');
+      await tester.pumpWidget(
+        _buildApp(
+          logger: logger,
+          screenKey: screenKey,
+          uri: Uri.parse('/invalid-two'),
+          error: reasonChangedError,
+        ),
+      );
 
-        expect(screenKey.currentState, same(initialState));
-        expect(logger.calls, hasLength(3));
-        expect(
-          (logger.calls[2].event as RouteErrorScreenShown).uri,
-          '/invalid-two',
-        );
-        expect(
-          (logger.calls[2].event as RouteErrorScreenShown).reason,
-          reasonChangedError.toString(),
-        );
-        expect(logger.calls[2].error, same(reasonChangedError));
-        expect(logger.calls[2].stackTrace, isNull);
-      },
-    );
+      expect(screenKey.currentState, same(initialState));
+      expect(logger.calls, hasLength(3));
+      expect(
+        (logger.calls[2].event as RouteErrorScreenShown).uri,
+        '/invalid-two',
+      );
+      expect(
+        (logger.calls[2].event as RouteErrorScreenShown).reason,
+        reasonChangedError.toString(),
+      );
+      expect(logger.calls[2].error, same(reasonChangedError));
+      expect(logger.calls[2].stackTrace, isNull);
+    });
 
     testWidgets(
       'does not throw on update when the nullable logger value is null',
@@ -220,11 +219,7 @@ Widget _buildApp({
 }) => Provider<Logger?>.value(
   value: logger,
   child: MaterialApp(
-    home: RouteErrorScreen(
-      key: screenKey,
-      uri: uri,
-      error: error,
-    ),
+    home: RouteErrorScreen(key: screenKey, uri: uri, error: error),
   ),
 );
 

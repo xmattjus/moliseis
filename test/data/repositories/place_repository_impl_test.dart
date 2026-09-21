@@ -76,11 +76,7 @@ void main() {
 
     test('sorts by modifiedAt descending when sort is byDate', () async {
       placeBox.put(
-        makePlaceEntity(
-          remoteId: 1,
-          name: 'Older',
-          modifiedAt: DateTime(2025),
-        ),
+        makePlaceEntity(remoteId: 1, name: 'Older', modifiedAt: DateTime(2025)),
       );
       placeBox.put(
         makePlaceEntity(
@@ -99,42 +95,35 @@ void main() {
       expect(names.first, equals('Newer'));
     });
 
-    test(
-      'consecutive calls with different sorts return independently sorted '
-      'results on the same repository instance',
-      () async {
-        // Zeta is newer; Alpha is older.
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 1,
-            name: 'Zeta',
-            modifiedAt: DateTime(2026, 6),
-          ),
-        );
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 2,
-            name: 'Alpha',
-            modifiedAt: DateTime(2025),
-          ),
-        );
+    test('consecutive calls with different sorts return independently sorted '
+        'results on the same repository instance', () async {
+      // Zeta is newer; Alpha is older.
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 1,
+          name: 'Zeta',
+          modifiedAt: DateTime(2026, 6),
+        ),
+      );
+      placeBox.put(
+        makePlaceEntity(remoteId: 2, name: 'Alpha', modifiedAt: DateTime(2025)),
+      );
 
-        // First call sorts by name — expects [Alpha, Zeta].
-        final byNameResult = await repository.getAll();
-        expect(
-          (byNameResult as Success<List<Place>>).value.map((p) => p.name),
-          equals(['Alpha', 'Zeta']),
-        );
+      // First call sorts by name — expects [Alpha, Zeta].
+      final byNameResult = await repository.getAll();
+      expect(
+        (byNameResult as Success<List<Place>>).value.map((p) => p.name),
+        equals(['Alpha', 'Zeta']),
+      );
 
-        // Second call on the same instance sorts by date — must not be
-        // contaminated by the first call's sort. Expects [Zeta, Alpha].
-        final byDateResult = await repository.getAll(sort: ContentSort.byDate);
-        expect(
-          (byDateResult as Success<List<Place>>).value.map((p) => p.name).first,
-          equals('Zeta'),
-        );
-      },
-    );
+      // Second call on the same instance sorts by date — must not be
+      // contaminated by the first call's sort. Expects [Zeta, Alpha].
+      final byDateResult = await repository.getAll(sort: ContentSort.byDate);
+      expect(
+        (byDateResult as Success<List<Place>>).value.map((p) => p.name).first,
+        equals('Zeta'),
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -192,36 +181,29 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test(
-      'returns places matching the requested ContentCategory',
-      () async {
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 1,
-            name: 'A',
-            contentCategoryIndex: ContentCategory.nature.index,
-          ),
-        );
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 2,
-            name: 'B',
-            contentCategoryIndex: ContentCategory.history.index,
-          ),
-        );
+    test('returns places matching the requested ContentCategory', () async {
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 1,
+          name: 'A',
+          contentCategoryIndex: ContentCategory.nature.index,
+        ),
+      );
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 2,
+          name: 'B',
+          contentCategoryIndex: ContentCategory.history.index,
+        ),
+      );
 
-        final result = await repository.getByCategories({
-          ContentCategory.nature,
-        });
+      final result = await repository.getByCategories({ContentCategory.nature});
 
-        expect(result, isA<Success<List<Place>>>());
-        final ids = (result as Success<List<Place>>).value.map(
-          (p) => p.remoteId,
-        );
-        expect(ids, contains(1));
-        expect(ids, isNot(contains(2)));
-      },
-    );
+      expect(result, isA<Success<List<Place>>>());
+      final ids = (result as Success<List<Place>>).value.map((p) => p.remoteId);
+      expect(ids, contains(1));
+      expect(ids, isNot(contains(2)));
+    });
 
     test(
       'returns places matching any of multiple requested categories',
@@ -303,9 +285,7 @@ void main() {
         ),
       );
 
-      final result = await repository.getByCategories(
-        {ContentCategory.nature},
-      );
+      final result = await repository.getByCategories({ContentCategory.nature});
 
       expect(result, isA<Success<List<Place>>>());
       final names = (result as Success<List<Place>>).value
@@ -340,10 +320,9 @@ void main() {
         ),
       );
 
-      final result = await repository.getByCategories(
-        {ContentCategory.nature},
-        sort: ContentSort.byDate,
-      );
+      final result = await repository.getByCategories({
+        ContentCategory.nature,
+      }, sort: ContentSort.byDate);
 
       expect(result, isA<Success<List<Place>>>());
       final names = (result as Success<List<Place>>).value
@@ -499,38 +478,31 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test(
-      'returns a unique capped subset of non-deleted places',
-      () async {
-        final eligibleIds = <int>{};
+    test('returns a unique capped subset of non-deleted places', () async {
+      final eligibleIds = <int>{};
 
-        for (var i = 1; i <= 8; i++) {
-          eligibleIds.add(i);
-          placeBox.put(makePlaceEntity(remoteId: i, name: 'Place $i'));
-        }
+      for (var i = 1; i <= 8; i++) {
+        eligibleIds.add(i);
+        placeBox.put(makePlaceEntity(remoteId: i, name: 'Place $i'));
+      }
 
-        placeBox.put(
-          makePlaceEntity(
-            remoteId: 99,
-            name: 'Deleted place',
-            isDeleted: true,
-          ),
-        );
+      placeBox.put(
+        makePlaceEntity(remoteId: 99, name: 'Deleted place', isDeleted: true),
+      );
 
-        final result = await repository.getSuggestions();
+      final result = await repository.getSuggestions();
 
-        expect(result, isA<Success<List<Place>>>());
-        final places = (result as Success<List<Place>>).value;
-        final ids = places.map((place) => place.remoteId).toList();
+      expect(result, isA<Success<List<Place>>>());
+      final places = (result as Success<List<Place>>).value;
+      final ids = places.map((place) => place.remoteId).toList();
 
-        // Suggestions are intentionally shuffled, so assert their contract
-        // rather than a particular order or membership of the five-item sample.
-        expect(places, hasLength(5));
-        expect(ids.toSet(), hasLength(ids.length));
-        expect(ids, everyElement(isIn(eligibleIds)));
-        expect(ids, isNot(contains(99)));
-      },
-    );
+      // Suggestions are intentionally shuffled, so assert their contract
+      // rather than a particular order or membership of the five-item sample.
+      expect(places, hasLength(5));
+      expect(ids.toSet(), hasLength(ids.length));
+      expect(ids, everyElement(isIn(eligibleIds)));
+      expect(ids, isNot(contains(99)));
+    });
 
     test(
       'returns every eligible place when fewer than five are available',
@@ -552,11 +524,7 @@ void main() {
     test('excludes soft-deleted places', () async {
       placeBox.put(makePlaceEntity(remoteId: 1, name: 'Visible'));
       placeBox.put(
-        makePlaceEntity(
-          remoteId: 2,
-          name: 'Deleted',
-          isDeleted: true,
-        ),
+        makePlaceEntity(remoteId: 2, name: 'Deleted', isDeleted: true),
       );
 
       final result = await repository.getSuggestions();
@@ -917,9 +885,7 @@ void main() {
 
     test('prepareSync returns Error when Supabase query fails', () async {
       supabaseEnv.stubSelectError(
-        const PostgrestException(
-          message: 'relation places does not exist',
-        ),
+        const PostgrestException(message: 'relation places does not exist'),
       );
 
       final result = await repository.prepareSync();
@@ -982,11 +948,7 @@ void main() {
 
     test('preserves city relations through soft deletion and a Keep merge', () {
       placeBox.put(
-        makePlaceEntity(
-          remoteId: 1,
-          cityId: 7,
-          modifiedAt: DateTime.utc(2024),
-        ),
+        makePlaceEntity(remoteId: 1, cityId: 7, modifiedAt: DateTime.utc(2024)),
       );
 
       final deleteResult = repository.commitSync([

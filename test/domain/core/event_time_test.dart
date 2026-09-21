@@ -21,10 +21,7 @@ void main() {
         policy.clockTimeForUtc(DateTime.utc(2026, 7)),
         EventClockTime(2, 0),
       );
-      expect(
-        policy.clockTimeForUtc(DateTime.utc(2026)),
-        EventClockTime(1, 0),
-      );
+      expect(policy.clockTimeForUtc(DateTime.utc(2026)), EventClockTime(1, 0));
       expect(
         policy.currentCalendarDate(DateTime.utc(2026, 7, 1, 22, 30)),
         EventCalendarDate(2026, 7, 2),

@@ -45,14 +45,12 @@ void main() {
     sentryFlag = SentryLoggingFlag(initialValue: false);
     fakeTransport = FakeTransport();
 
-    await Sentry.init(
-      (options) {
-        options
-          ..dsn = 'https://abc@def.ingest.sentry.io/1234'
-          ..automatedTestMode = true
-          ..transport = fakeTransport;
-      },
-    );
+    await Sentry.init((options) {
+      options
+        ..dsn = 'https://abc@def.ingest.sentry.io/1234'
+        ..automatedTestMode = true
+        ..transport = fakeTransport;
+    });
   });
 
   tearDown(() async {
@@ -146,10 +144,7 @@ void main() {
       });
 
       test('default minLevel is debug (logs everything)', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(const SentryLoggingEnabled());
 
@@ -166,10 +161,7 @@ void main() {
 
     group('Talker output', () {
       test('passes mapped log level to Talker', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(const ImageLoadFailed(url: ''));
 
@@ -184,10 +176,7 @@ void main() {
       });
 
       test('passes error and stackTrace to Talker', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
         final error = Exception('test error');
         final stackTrace = StackTrace.current;
 
@@ -208,10 +197,7 @@ void main() {
       });
 
       test('passes event name and merged data as message set', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(const RepositorySyncStarted('cities'));
 
@@ -234,10 +220,7 @@ void main() {
 
     group('data merging', () {
       test('forwards only event data when extra is null', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(const RepositorySyncStarted('places'));
 
@@ -256,10 +239,7 @@ void main() {
       });
 
       test('merges extra data into event data', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(
           const RepositorySyncStarted('places'),
@@ -281,10 +261,7 @@ void main() {
       });
 
       test('extra overrides event data on key collision', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(
           const RepositorySyncStarted('places'),
@@ -309,10 +286,7 @@ void main() {
     group('Sentry integration', () {
       test('does not add breadcrumb when flag is disabled', () async {
         sentryFlag.enabled = false;
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(const ImageLoadFailed(url: ''));
 
@@ -323,33 +297,24 @@ void main() {
         expect(breadcrumbs, isEmpty);
       });
 
-      test(
-        'does not capture exception when flag is disabled',
-        () async {
-          sentryFlag.enabled = false;
-          final logger = AppLogger(
-            mockTalker,
-            sentryFlag: sentryFlag,
-          );
+      test('does not capture exception when flag is disabled', () async {
+        sentryFlag.enabled = false;
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
-          logger.log(
-            const ImageLoadFailed(url: ''),
-            error: Exception('should not be captured'),
-          );
+        logger.log(
+          const ImageLoadFailed(url: ''),
+          error: Exception('should not be captured'),
+        );
 
-          // Allow microtask queue to flush.
-          await Future<void>.delayed(Duration.zero);
+        // Allow microtask queue to flush.
+        await Future<void>.delayed(Duration.zero);
 
-          expect(fakeTransport.envelopes, isEmpty);
-        },
-      );
+        expect(fakeTransport.envelopes, isEmpty);
+      });
 
       test('does not add breadcrumb for debug-level events', () async {
         sentryFlag.enabled = true;
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(const SentryLoggingEnabled());
 
@@ -362,10 +327,7 @@ void main() {
 
       test('adds breadcrumb for info-level events', () async {
         sentryFlag.enabled = true;
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(const RepositorySyncStarted('cities'));
 
@@ -385,10 +347,7 @@ void main() {
 
       test('adds breadcrumb for warning-level events', () async {
         sentryFlag.enabled = true;
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(const NetworkRequestTimeout());
 
@@ -400,35 +359,26 @@ void main() {
         expect(breadcrumbs.first.level, SentryLevel.warning);
       });
 
-      test(
-        'captures exception for error-level with non-null error',
-        () async {
-          sentryFlag.enabled = true;
-          final logger = AppLogger(
-            mockTalker,
-            sentryFlag: sentryFlag,
-          );
+      test('captures exception for error-level with non-null error', () async {
+        sentryFlag.enabled = true;
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
-          logger.log(
-            const ImageLoadFailed(url: ''),
-            error: Exception('captured'),
-          );
+        logger.log(
+          const ImageLoadFailed(url: ''),
+          error: Exception('captured'),
+        );
 
-          // Allow microtask queue to flush.
-          await Future<void>.delayed(Duration.zero);
+        // Allow microtask queue to flush.
+        await Future<void>.delayed(Duration.zero);
 
-          expect(fakeTransport.envelopes, hasLength(1));
-        },
-      );
+        expect(fakeTransport.envelopes, hasLength(1));
+      });
 
       test(
         'captures exception for critical-level with non-null error',
         () async {
           sentryFlag.enabled = true;
-          final logger = AppLogger(
-            mockTalker,
-            sentryFlag: sentryFlag,
-          );
+          final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
           logger.log(
             const LocalPersistenceInitFailed(),
@@ -446,10 +396,7 @@ void main() {
         'does not capture exception for error-level with null error',
         () async {
           sentryFlag.enabled = true;
-          final logger = AppLogger(
-            mockTalker,
-            sentryFlag: sentryFlag,
-          );
+          final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
           logger.log(const ImageLoadFailed(url: ''));
 
@@ -464,10 +411,7 @@ void main() {
         'does not capture exception for warning-level even with error',
         () async {
           sentryFlag.enabled = true;
-          final logger = AppLogger(
-            mockTalker,
-            sentryFlag: sentryFlag,
-          );
+          final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
           logger.log(
             const NetworkRequestTimeout(),
@@ -483,10 +427,7 @@ void main() {
 
       test('breadcrumb includes merged extra data', () async {
         sentryFlag.enabled = true;
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         logger.log(
           const RepositorySyncStarted('events'),
@@ -498,29 +439,23 @@ void main() {
 
         final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
         expect(breadcrumbs, hasLength(1));
-        expect(
-          breadcrumbs.first.data,
-          {'repositoryName': 'events', 'retries': 2},
-        );
+        expect(breadcrumbs.first.data, {
+          'repositoryName': 'events',
+          'retries': 2,
+        });
       });
     });
 
     group('event name assertion', () {
       test('valid three-segment name passes assertion', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         // Should not throw.
         logger.log(const ImageLoadFailed(url: ''));
       });
 
       test('valid multi-segment name passes assertion', () {
-        final logger = AppLogger(
-          mockTalker,
-          sentryFlag: sentryFlag,
-        );
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
         // 'content_submission_asset_removal_failed' has 5 segments.
         logger.log(const ContentSubmissionAssetRemovalFailed());

@@ -233,10 +233,7 @@ class ContentSubmissionStagedAssetRepositoryImpl
       );
       if (activeDirectory == null) return Result.success(restored);
       await for (final entry in activeDirectory.list(followLinks: false)) {
-        final type = FileSystemEntity.typeSync(
-          entry.path,
-          followLinks: false,
-        );
+        final type = FileSystemEntity.typeSync(entry.path, followLinks: false);
         if (type == FileSystemEntityType.link) {
           await _deleteEntryIfPresent(entry);
           continue;
@@ -418,10 +415,7 @@ class ContentSubmissionStagedAssetRepositoryImpl
   }
 
   Future<void> _ensureDirectory(Directory directory) async {
-    final type = FileSystemEntity.typeSync(
-      directory.path,
-      followLinks: false,
-    );
+    final type = FileSystemEntity.typeSync(directory.path, followLinks: false);
     if (type == FileSystemEntityType.link) {
       await Link(directory.path).delete();
     } else if (type == FileSystemEntityType.file) {
@@ -464,9 +458,8 @@ class ContentSubmissionStagedAssetRepositoryImpl
     return _hasDigest(file, expectedDigest);
   }
 
-  bool _isTemporaryName(String value) => RegExp(
-    r'^\.[0-9a-f]{40}\.[0-9a-f]+\.tmp$',
-  ).hasMatch(value);
+  bool _isTemporaryName(String value) =>
+      RegExp(r'^\.[0-9a-f]{40}\.[0-9a-f]+\.tmp$').hasMatch(value);
 
   bool _isValidIdentity(String value) =>
       ContentSubmissionDraft.isValidClientSubmissionId(value);

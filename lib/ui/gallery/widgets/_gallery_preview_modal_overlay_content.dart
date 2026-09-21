@@ -89,12 +89,7 @@ class _GalleryPreviewModalOverlayContent extends StatelessWidget {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                16,
-                16,
-                0,
-                16,
-              ),
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 0, 16),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.start,

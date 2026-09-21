@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/ui/admin/auth/widgets/admin_login_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -35,10 +35,7 @@ void main() {
       await tester.tap(find.text('Accedi'));
       await tester.pump();
 
-      expect(
-        find.text('Inserisci un indirizzo e-mail valido'),
-        findsOneWidget,
-      );
+      expect(find.text('Inserisci un indirizzo e-mail valido'), findsOneWidget);
       expect(find.text('Inserisci la password'), findsOneWidget);
       verifyNever(
         () => auth.client.signInWithPassword(
@@ -108,9 +105,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(
-          'Accesso non riuscito. Verifica le credenziali e riprova.',
-        ),
+        find.text('Accesso non riuscito. Verifica le credenziali e riprova.'),
         findsOneWidget,
       );
     });

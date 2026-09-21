@@ -174,9 +174,7 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
       );
 
       final baseUri = Uri.parse(_baseUrl ?? 'https://api.cloudinary.com');
-      final uri = baseUri.replace(
-        path: '/v1_1/$_cloudName/image/upload',
-      );
+      final uri = baseUri.replace(path: '/v1_1/$_cloudName/image/upload');
 
       return await _uploadWithRetries(
         uri: uri,
@@ -280,9 +278,7 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
             : 'http_${(error as _UploadHttpException).statusCode}';
 
         _logger.log(
-          CloudinaryRequestFailed(
-            detail: '${exception}_attempt_$attempt',
-          ),
+          CloudinaryRequestFailed(detail: '${exception}_attempt_$attempt'),
         );
       }
 
@@ -335,10 +331,7 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
       HttpHeaders.contentTypeHeader,
       multipartWriter.contentType,
     );
-    request.headers.set(
-      HttpHeaders.contentLengthHeader,
-      totalLength,
-    );
+    request.headers.set(HttpHeaders.contentLengthHeader, totalLength);
 
     // Per-attempt timeout: abort the underlying request so its socket is
     // closed and the retry does not compete with a zombie upload for the

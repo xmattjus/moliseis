@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/logging/logging.dart';
@@ -28,9 +28,7 @@ enum SnackBarDuration { extrashort, short, medium, long }
 /// Convenience wrapper around [showSnackBar] for failures whose specific
 /// cause should not be shown to the user; the message is a fixed Italian
 /// string ("Si è verificato un errore, riprova più tardi").
-void showSnackBarGenericError({
-  required BuildContext context,
-}) => showSnackBar(
+void showSnackBarGenericError({required BuildContext context}) => showSnackBar(
   context: context,
   textContent: 'Si è verificato un errore, riprova più tardi',
   type: SnackBarType.error,
@@ -185,10 +183,7 @@ SnackBar _buildSnackBar(
           onPressed: action.onPressed,
         );
 
-  final textSpan = TextSpan(
-    text: textContent,
-    style: contentStyle,
-  );
+  final textSpan = TextSpan(text: textContent, style: contentStyle);
   final snackBarContentWidth = width - (horizontalMargin * 2);
 
   final textPainter = TextPainter(
@@ -204,11 +199,7 @@ SnackBar _buildSnackBar(
   final usesFullWidthText =
       contentLinesSpan > 1 || textContent.length > fullWidthTextLength;
 
-  final leadingIcon = Icon(
-    icon,
-    color: foreground,
-    size: leadingIconSize,
-  );
+  final leadingIcon = Icon(icon, color: foreground, size: leadingIconSize);
 
   final contentText = Text(
     textContent,
@@ -221,9 +212,7 @@ SnackBar _buildSnackBar(
     spacing: contentSpacing,
     children: [
       leadingIcon,
-      Expanded(
-        child: contentText,
-      ),
+      Expanded(child: contentText),
       if (!usesFullWidthText && contentLinesSpan == 1) ?recoloredAction,
     ],
   );

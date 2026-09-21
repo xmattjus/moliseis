@@ -66,10 +66,7 @@ void main() {
         final result = await repository.list();
 
         expect(result, isA<Success<List<AdminSubmission>>>());
-        expect(
-          (result as Success<List<AdminSubmission>>).value.single.id,
-          7,
-        );
+        expect((result as Success<List<AdminSubmission>>).value.single.id, 7);
         expect(httpClient.requests, hasLength(1));
         final request = httpClient.requests.single;
         expect(request.method, 'POST');
@@ -148,31 +145,28 @@ void main() {
       expect(httpClient.requests, hasLength(1));
     });
 
-    test(
-      'create and update include populated coordinates when set',
-      () async {
-        httpClient
-          ..queueJson(<String, dynamic>{'submission': submission})
-          ..queueJson(<String, dynamic>{'submission': submission});
-        final input = AdminSubmissionInput(
-          category: ContentCategory.history,
-          city: 'Isernia',
-          name: 'Palazzo storico',
-          latitude: 41.5575078,
-          longitude: 14.6485406,
-        );
+    test('create and update include populated coordinates when set', () async {
+      httpClient
+        ..queueJson(<String, dynamic>{'submission': submission})
+        ..queueJson(<String, dynamic>{'submission': submission});
+      final input = AdminSubmissionInput(
+        category: ContentCategory.history,
+        city: 'Isernia',
+        name: 'Palazzo storico',
+        latitude: 41.5575078,
+        longitude: 14.6485406,
+      );
 
-        await repository.create(input);
-        await repository.update(7, input);
+      await repository.create(input);
+      await repository.update(7, input);
 
-        for (final request in httpClient.requests) {
-          final body = request.body! as Map<String, dynamic>;
-          final payload = body['input'] as Map<String, dynamic>;
-          expect(payload['latitude'], 41.5575078);
-          expect(payload['longitude'], 14.6485406);
-        }
-      },
-    );
+      for (final request in httpClient.requests) {
+        final body = request.body! as Map<String, dynamic>;
+        final payload = body['input'] as Map<String, dynamic>;
+        expect(payload['latitude'], 41.5575078);
+        expect(payload['longitude'], 14.6485406);
+      }
+    });
 
     test('update maps its response without a follow-up request', () async {
       httpClient.queueJson(<String, dynamic>{'submission': submission});
@@ -205,47 +199,37 @@ void main() {
       expect(httpClient.requests, hasLength(1));
     });
 
-    test(
-      'maps response coordinates from JSON numbers to doubles',
-      () async {
-        httpClient.queueJson(
-          <String, dynamic>{
-            'submission': <String, dynamic>{
-              ...submission,
-              'latitude': 41,
-              'longitude': 14.5,
-            },
-          },
-        );
+    test('maps response coordinates from JSON numbers to doubles', () async {
+      httpClient.queueJson(<String, dynamic>{
+        'submission': <String, dynamic>{
+          ...submission,
+          'latitude': 41,
+          'longitude': 14.5,
+        },
+      });
 
-        final result = await repository.getById(7);
+      final result = await repository.getById(7);
 
-        expect((result as Success<AdminSubmission>).value.latitude, 41.0);
-        expect(result.value.longitude, 14.5);
-        expect(httpClient.requests, hasLength(1));
-      },
-    );
+      expect((result as Success<AdminSubmission>).value.latitude, 41.0);
+      expect(result.value.longitude, 14.5);
+      expect(httpClient.requests, hasLength(1));
+    });
 
-    test(
-      'invalid response coordinate types fail once without retry',
-      () async {
-        httpClient.queueJson(
-          <String, dynamic>{
-            'submission': <String, dynamic>{...submission, 'latitude': '41'},
-          },
-        );
+    test('invalid response coordinate types fail once without retry', () async {
+      httpClient.queueJson(<String, dynamic>{
+        'submission': <String, dynamic>{...submission, 'latitude': '41'},
+      });
 
-        final result = await repository.getById(7);
+      final result = await repository.getById(7);
 
-        expect(result, isA<Error<AdminSubmission>>());
-        expect(httpClient.requests, hasLength(1));
-        final failedCalls = logger.calls
-            .where((call) => call.event is AdminBackendRequestFailed)
-            .toList();
-        expect(failedCalls, hasLength(1));
-        expect(failedCalls.single.error, isA<FormatException>());
-      },
-    );
+      expect(result, isA<Error<AdminSubmission>>());
+      expect(httpClient.requests, hasLength(1));
+      final failedCalls = logger.calls
+          .where((call) => call.event is AdminBackendRequestFailed)
+          .toList();
+      expect(failedCalls, hasLength(1));
+      expect(failedCalls.single.error, isA<FormatException>());
+    });
 
     test('reject sends the exact reject-only request body', () async {
       httpClient.queueJson(<String, dynamic>{'ok': true, 'status': 'rejected'});
@@ -284,30 +268,27 @@ void main() {
       }
     });
 
-    test(
-      'list responses preserve durable promotion linkage',
-      () async {
-        httpClient.queueJson(<String, dynamic>{
-          'submissions': <Object?>[
-            <String, dynamic>{
-              ...submission,
-              'promoted_place_id': null,
-              'promoted_event_id': 43,
-            },
-          ],
-        });
+    test('list responses preserve durable promotion linkage', () async {
+      httpClient.queueJson(<String, dynamic>{
+        'submissions': <Object?>[
+          <String, dynamic>{
+            ...submission,
+            'promoted_place_id': null,
+            'promoted_event_id': 43,
+          },
+        ],
+      });
 
-        final result = await repository.list();
+      final result = await repository.list();
 
-        expect(
-          (result as Success<List<AdminSubmission>>).value.single.promotion,
-          const AdminSubmissionPromotion(
-            target: AdminPromotionTarget.event,
-            entityId: 43,
-          ),
-        );
-      },
-    );
+      expect(
+        (result as Success<List<AdminSubmission>>).value.single.promotion,
+        const AdminSubmissionPromotion(
+          target: AdminPromotionTarget.event,
+          entityId: 43,
+        ),
+      );
+    });
 
     test('addAsset serializes metadata and maps the confirmed asset', () async {
       httpClient.queueJson(<String, dynamic>{
@@ -373,11 +354,9 @@ void main() {
               'entity_id': 1,
             },
           })
-          ..queueJson(
-            <String, dynamic>{
-              'promotion': <String, dynamic>{'target_type': 'place'},
-            },
-          );
+          ..queueJson(<String, dynamic>{
+            'promotion': <String, dynamic>{'target_type': 'place'},
+          });
 
         final list = await repository.list();
         final detail = await repository.getById(7);
@@ -449,27 +428,18 @@ void main() {
       'preserves custom Function API errors and safe gateway errors',
       () async {
         httpClient
-          ..queueJson(
-            <String, dynamic>{
-              'code': 'NOT_FOUND',
-              'message': 'Submission not found.',
-            },
-            status: 404,
-          )
-          ..queueJson(
-            <String, dynamic>{
-              'code': 'ADMIN_PROFILE_INCOMPLETE',
-              'message': 'Profile is incomplete.',
-            },
-            status: 422,
-          )
-          ..queueJson(
-            <String, dynamic>{
-              'code': 'INVALID_STATUS_TRANSITION',
-              'message': 'Already moderated.',
-            },
-            status: 409,
-          )
+          ..queueJson(<String, dynamic>{
+            'code': 'NOT_FOUND',
+            'message': 'Submission not found.',
+          }, status: 404)
+          ..queueJson(<String, dynamic>{
+            'code': 'ADMIN_PROFILE_INCOMPLETE',
+            'message': 'Profile is incomplete.',
+          }, status: 422)
+          ..queueJson(<String, dynamic>{
+            'code': 'INVALID_STATUS_TRANSITION',
+            'message': 'Already moderated.',
+          }, status: 409)
           ..queueText('Invalid JWT', status: 401);
 
         final missing = await repository.getById(7);
@@ -497,11 +467,7 @@ void main() {
             (gateway as Error).error as AdminContentSubmissionApiException;
         expect(
           (missingError.statusCode, missingError.code, missingError.message),
-          (
-            404,
-            'NOT_FOUND',
-            'Submission not found.',
-          ),
+          (404, 'NOT_FOUND', 'Submission not found.'),
         );
         expect(
           (
@@ -521,11 +487,7 @@ void main() {
         );
         expect(
           (gatewayError.statusCode, gatewayError.code, gatewayError.message),
-          (
-            401,
-            null,
-            'Invalid JWT',
-          ),
+          (401, null, 'Invalid JWT'),
         );
         expect(httpClient.requests, hasLength(4));
         expect(logger.eventsOfType<AdminBackendRequestFailed>(), hasLength(4));
@@ -533,13 +495,10 @@ void main() {
     );
 
     test('normalizes addAsset API errors and logs the operation', () async {
-      httpClient.queueJson(
-        <String, dynamic>{
-          'code': 'ASSET_LIMIT_REACHED',
-          'message': 'A submission can have at most five assets.',
-        },
-        status: 409,
-      );
+      httpClient.queueJson(<String, dynamic>{
+        'code': 'ASSET_LIMIT_REACHED',
+        'message': 'A submission can have at most five assets.',
+      }, status: 409);
 
       final result = await repository.addAsset(
         7,
@@ -553,10 +512,7 @@ void main() {
 
       final error =
           (result as Error).error as AdminContentSubmissionApiException;
-      expect(
-        (error.statusCode, error.code),
-        (409, 'ASSET_LIMIT_REACHED'),
-      );
+      expect((error.statusCode, error.code), (409, 'ASSET_LIMIT_REACHED'));
       expect(
         logger.firstCallOfType<AdminBackendRequestFailed>()?.event.data,
         <String, Object?>{'operation': 'addAsset'},

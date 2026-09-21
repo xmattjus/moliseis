@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_date_chip.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
@@ -19,11 +18,9 @@ void main() {
     ValueChanged<EventCalendarDate?>? onEndDateChanged,
   }) => MaterialApp(
     locale: const Locale('it'),
-    localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+    localizationsDelegates: const [
       FlutterQuillLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
+      ...GlobalMaterialLocalizations.delegates,
     ],
     supportedLocales: const <Locale>[Locale('en'), Locale('it')],
     home: Scaffold(
@@ -122,10 +119,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        buildFields(
-          isEvent: true,
-          issue: EventTimeIssue.nonexistentLocalTime,
-        ),
+        buildFields(isEvent: true, issue: EventTimeIssue.nonexistentLocalTime),
       );
 
       expect(find.textContaining('non esiste in Italia'), findsOneWidget);

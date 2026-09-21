@@ -1,7 +1,7 @@
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
@@ -149,10 +149,7 @@ final class TargetTopologyFixture {
     final cacheManager = _cacheManager;
     return cacheManager == null
         ? routerApp
-        : Provider<CacheManager>.value(
-            value: cacheManager,
-            child: routerApp,
-          );
+        : Provider<CacheManager>.value(value: cacheManager, child: routerApp);
   }
 
   /// Disposes the router.

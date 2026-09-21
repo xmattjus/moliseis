@@ -1,9 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
@@ -68,9 +67,7 @@ void main() {
             descriptionDelta: <Map<String, dynamic>>[
               {
                 'insert': 'Unsafe link',
-                'attributes': <String, dynamic>{
-                  'link': 'javascript:alert(1)',
-                },
+                'attributes': <String, dynamic>{'link': 'javascript:alert(1)'},
               },
               {'insert': '\n'},
             ],
@@ -107,9 +104,7 @@ void main() {
 
     testWidgets(
       'configures a selectable read-only Quill editor without toolbar',
-      (
-        tester,
-      ) async {
+      (tester) async {
         await _pumpDescription(
           tester,
           makePlace(
@@ -202,9 +197,7 @@ void main() {
       ).called(1);
     });
 
-    testWidgets('does not show an error after disposal', (
-      tester,
-    ) async {
+    testWidgets('does not show an error after disposal', (tester) async {
       final urlLaunchService = _MockUrlLaunchService();
       final launchCompleter = Completer<bool>();
       when(
@@ -310,11 +303,9 @@ Future<void> _pumpDescription(
   final app = MaterialApp(
     scaffoldMessengerKey: $scaffoldMessengerKey,
     locale: locale,
-    localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+    localizationsDelegates: const [
       FlutterQuillLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
+      ...GlobalMaterialLocalizations.delegates,
     ],
     supportedLocales: const <Locale>[Locale('en'), Locale('it')],
     home: Scaffold(
@@ -327,10 +318,7 @@ Future<void> _pumpDescription(
   await tester.pumpWidget(
     urlLaunchService == null
         ? app
-        : Provider<UrlLaunchService>.value(
-            value: urlLaunchService,
-            child: app,
-          ),
+        : Provider<UrlLaunchService>.value(value: urlLaunchService, child: app),
   );
   await tester.pump();
 }

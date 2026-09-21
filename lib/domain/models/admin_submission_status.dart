@@ -4,8 +4,7 @@
 enum AdminSubmissionStatus {
   pending('Da revisionare'),
   accepted('Accettato'),
-  rejected('Rifiutato')
-  ;
+  rejected('Rifiutato');
 
   const AdminSubmissionStatus(this.label);
 

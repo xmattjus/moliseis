@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
@@ -83,12 +83,7 @@ class ContentBaseCardGridItem extends StatelessWidget {
           ),
         ),
         if (trailing != null)
-          Positioned(
-            top: 8,
-            right: 8,
-            width: width,
-            child: trailing!,
-          ),
+          Positioned(top: 8, right: 8, width: width, child: trailing!),
       ],
     );
   }

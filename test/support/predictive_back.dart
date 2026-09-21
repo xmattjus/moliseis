@@ -32,10 +32,7 @@ Future<void> startPredictiveBack(WidgetTester tester) async {
 ///
 /// [progress] must be between 0.0 and 1.0 and moves the route transition
 /// towards the revealed source page without mutating the route stack.
-Future<void> updatePredictiveBack(
-  WidgetTester tester,
-  double progress,
-) async {
+Future<void> updatePredictiveBack(WidgetTester tester, double progress) async {
   final messenger = tester.binding.defaultBinaryMessenger;
   await messenger.handlePlatformMessage(
     'flutter/backgesture',

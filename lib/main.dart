@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/data-sources/settings_local_data_source.dart';
@@ -30,10 +29,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 final _sentryLoggingFlag = SentryLoggingFlag(initialValue: false);
 
-final AppLogger _logger = AppLogger(
-  $talker,
-  sentryFlag: _sentryLoggingFlag,
-);
+final AppLogger _logger = AppLogger($talker, sentryFlag: _sentryLoggingFlag);
 
 /// Logs settings initialization failures while preserving startup fallback.
 @visibleForTesting
@@ -63,12 +59,10 @@ Future<void> _main() async {
       ..dsn = Env.sentryUrl
       ..environment = kDebugMode ? 'debug' : 'production'
       ..tracesSampleRate = kDebugMode ? 0 : 0.4
-      ..profilesSampleRate = kDebugMode ? 0 : 0.7
       ..replay.sessionSampleRate = kDebugMode ? 0 : 0.4
       ..replay.onErrorSampleRate = kDebugMode ? 0 : 1.0
       ..sendDefaultPii = false
       ..httpClient = httpClient
-      ..enableLogs = false
       ..privacy.maskAllText = false
       ..privacy.maskAllImages = false
       ..beforeBreadcrumb = (breadcrumb, hint) {
@@ -198,11 +192,9 @@ class _MoliseIsAppState extends State<MoliseIsApp> {
           routerConfig: router,
           builder: (_, child) => child!,
           title: 'Molise Is',
-          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+          localizationsDelegates: const [
             FlutterQuillLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: const [
             Locale.fromSubtags(languageCode: 'en'),

@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
@@ -21,10 +21,7 @@ class ContentSubmissionProgressScreen extends StatefulWidget {
   ///
   /// [viewModel] owns the submission command and submit state. The screen
   /// observes it live and never starts a new upload itself.
-  const ContentSubmissionProgressScreen({
-    super.key,
-    required this.viewModel,
-  });
+  const ContentSubmissionProgressScreen({super.key, required this.viewModel});
 
   /// ViewModel providing the current submission command state.
   final ContentSubmissionViewModel viewModel;
@@ -68,9 +65,7 @@ class _ContentSubmissionProgressScreenState
             ),
             body: Center(
               child: DefaultTextStyle.merge(
-                style: textStyle.copyWith(
-                  color: color,
-                ),
+                style: textStyle.copyWith(color: color),
                 child: IconTheme.merge(
                   data: IconThemeData(
                     size: fontSize == null ? null : fontSize * 2,

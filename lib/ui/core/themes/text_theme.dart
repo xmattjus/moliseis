@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Source: https://github.com/rydmike/flex_color_scheme/discussions/160#discussioncomment-5999257
 const TextTheme appTextTheme = TextTheme(

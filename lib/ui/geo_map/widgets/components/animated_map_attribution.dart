@@ -1,6 +1,6 @@
 import 'dart:ui' show clampDouble;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/map_attribution.dart';
 
 class AnimatedMapAttribution extends StatefulWidget {

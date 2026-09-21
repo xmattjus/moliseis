@@ -52,8 +52,6 @@ class CityRepositoryImpl extends BaseSyncRepository<CityDto, CityEntity>
 
   @override
   CityEntity markEntityDeleted(CityEntity existing) {
-    return existing.copyWith(
-      isDeleted: true,
-    );
+    return existing.copyWith(isDeleted: true);
   }
 }

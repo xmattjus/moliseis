@@ -1,11 +1,10 @@
 // Test readability benefits from redundant argument values.
 // ignore_for_file: avoid_redundant_argument_values
 
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart' as intl;
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
 import 'package:moliseis/utils/extensions/date_time_extensions.dart';
@@ -46,9 +45,7 @@ void main() {
     testWidgets('renders single-day event with one date and one time', (
       tester,
     ) async {
-      final event = makeEvent(
-        startDate: DateTime(2026, 4, 10, 10, 15),
-      );
+      final event = makeEvent(startDate: DateTime(2026, 4, 10, 10, 15));
 
       await pumpDateTime(tester, event);
 
@@ -70,9 +67,7 @@ void main() {
       expect(find.text('00:30'), findsOneWidget);
     });
 
-    testWidgets('renders same-day event range with start time', (
-      tester,
-    ) async {
+    testWidgets('renders same-day event range with start time', (tester) async {
       final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
         endDate: DateTime(2026, 4, 10, 12, 45),
@@ -121,15 +116,11 @@ void main() {
       expect(find.text(startTime), findsOneWidget);
     });
 
-    testWidgets('applies custom icon and text colors', (
-      tester,
-    ) async {
+    testWidgets('applies custom icon and text colors', (tester) async {
       const iconColor = Color(0xFF123456);
       const textColor = Color(0xFF654321);
 
-      final event = makeEvent(
-        startDate: DateTime(2026, 4, 10, 10, 15),
-      );
+      final event = makeEvent(startDate: DateTime(2026, 4, 10, 10, 15));
 
       await tester.pumpWidget(
         MaterialApp(
@@ -165,12 +156,8 @@ void main() {
       expect(timeText.style?.color, textColor);
     });
 
-    testWidgets('updates month labels when the locale changes', (
-      tester,
-    ) async {
-      final event = makeEvent(
-        startDate: DateTime(2026, 4, 10, 10, 15),
-      );
+    testWidgets('updates month labels when the locale changes', (tester) async {
+      final event = makeEvent(startDate: DateTime(2026, 4, 10, 10, 15));
 
       await pumpDateTime(tester, event, locale: const Locale('en'));
 
@@ -183,9 +170,7 @@ void main() {
       expect(find.text('${event.startDate.day} $italianMonth'), findsOneWidget);
     });
 
-    testWidgets('renders multi-day event in same month', (
-      tester,
-    ) async {
+    testWidgets('renders multi-day event in same month', (tester) async {
       final event = makeEvent(
         startDate: DateTime(2026, 4, 10, 10, 15),
         endDate: DateTime(2026, 4, 12, 12, 45),
@@ -247,9 +232,7 @@ void main() {
       );
     });
 
-    testWidgets('normalizes inverted start and end dates', (
-      tester,
-    ) async {
+    testWidgets('normalizes inverted start and end dates', (tester) async {
       final event = makeEvent(
         startDate: DateTime(2026, 4, 12, 18, 0),
         endDate: DateTime(2026, 4, 10, 9, 30),

@@ -98,10 +98,7 @@ void main() {
 
         expect(logger.containsEvent<CloudinaryRequestFailed>(), isFalse);
 
-        doneCompleter.completeError(
-          Exception('genuine TLS failure'),
-          stack,
-        );
+        doneCompleter.completeError(Exception('genuine TLS failure'), stack);
 
         // Give the catchError listener a chance to run.
         await Future<void>.delayed(Duration.zero);
@@ -177,33 +174,30 @@ void main() {
         expect(token.isCancelled, isFalse);
       });
 
-      test(
-        'silences the request.done error log so a timeout-induced abort is '
-        'not reported as a genuine server error',
-        () async {
-          final logger = MockLogger();
-          final token = CloudinaryUploadCancellationToken(logger: logger);
-          final doneCompleter = Completer<HttpClientResponse>();
-          final request = _FakeHttpClientRequest(
-            doneFuture: doneCompleter.future,
-          );
+      test('silences the request.done error log so a timeout-induced abort is '
+          'not reported as a genuine server error', () async {
+        final logger = MockLogger();
+        final token = CloudinaryUploadCancellationToken(logger: logger);
+        final doneCompleter = Completer<HttpClientResponse>();
+        final request = _FakeHttpClientRequest(
+          doneFuture: doneCompleter.future,
+        );
 
-          token
-            ..attach(request)
-            ..abortCurrentRequest();
+        token
+          ..attach(request)
+          ..abortCurrentRequest();
 
-          // The abort-induced `request.done` error lands on the passive
-          // listener while `_abortedForRetry` is true — it must NOT be
-          // logged as `request_done_error`.
-          doneCompleter.completeError(
-            Exception('timeout-induced connection abort'),
-          );
-          await Future<void>.delayed(Duration.zero);
+        // The abort-induced `request.done` error lands on the passive
+        // listener while `_abortedForRetry` is true — it must NOT be
+        // logged as `request_done_error`.
+        doneCompleter.completeError(
+          Exception('timeout-induced connection abort'),
+        );
+        await Future<void>.delayed(Duration.zero);
 
-          expect(logger.containsEvent<CloudinaryRequestFailed>(), isFalse);
-          expect(token.isCancelled, isFalse);
-        },
-      );
+        expect(logger.containsEvent<CloudinaryRequestFailed>(), isFalse);
+        expect(token.isCancelled, isFalse);
+      });
 
       test(
         'does not log a delayed timeout-aborted request after a retry attaches',
@@ -235,9 +229,7 @@ void main() {
 
           // A genuine error from the currently attached retry remains
           // observable and must not inherit the prior attempt's suppression.
-          secondDone.completeError(
-            Exception('genuine TLS failure'),
-          );
+          secondDone.completeError(Exception('genuine TLS failure'));
           await Future<void>.delayed(Duration.zero);
 
           final failedEvents = logger.eventsOfType<CloudinaryRequestFailed>();

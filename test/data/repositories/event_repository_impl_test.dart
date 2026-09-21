@@ -60,10 +60,7 @@ void main() {
           final rangeStart = EventCalendarDate(2026, 3, 10);
           final rangeEnd = EventCalendarDate(2026, 3, 20);
 
-          final event = makeEventEntity(
-            remoteId: 1,
-            startDate: now,
-          );
+          final event = makeEventEntity(remoteId: 1, startDate: now);
 
           seedEvents([event]);
 
@@ -386,19 +383,13 @@ void main() {
           final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>();
           expect(failedCall, isNotNull);
           final failedEvent = failedCall!.event as EntityLoadFailed;
-          expect(
-            failedEvent.entityType,
-            'event',
-          );
+          expect(failedEvent.entityType, 'event');
           expect(failedEvent.method, 'getByDate');
-          expect(
-            failedEvent.data,
-            {
-              'entityType': 'event',
-              'method': 'getByDate',
-              'startDate': date.toString(),
-            },
-          );
+          expect(failedEvent.data, {
+            'entityType': 'event',
+            'method': 'getByDate',
+            'startDate': date.toString(),
+          });
           expect(failedCall.error, isNotNull);
           expect(failedCall.stackTrace, isNotNull);
         },
@@ -416,20 +407,14 @@ void main() {
           final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>();
           expect(failedCall, isNotNull);
           final failedEvent = failedCall!.event as EntityLoadFailed;
-          expect(
-            failedEvent.entityType,
-            'event',
-          );
+          expect(failedEvent.entityType, 'event');
           expect(failedEvent.method, 'getByDateRange');
-          expect(
-            failedEvent.data,
-            {
-              'entityType': 'event',
-              'method': 'getByDateRange',
-              'startDate': start.toString(),
-              'endDate': end.toString(),
-            },
-          );
+          expect(failedEvent.data, {
+            'entityType': 'event',
+            'method': 'getByDateRange',
+            'startDate': start.toString(),
+            'endDate': end.toString(),
+          });
           expect(failedCall.error, isNotNull);
           expect(failedCall.stackTrace, isNotNull);
         },
@@ -637,29 +622,26 @@ void main() {
       },
     );
 
-    test(
-      'includes current-year single-day event (null endDate) matching the '
-      'requested category',
-      () async {
-        final now = fixedNowUtc;
-        final event = makeEventEntity(
-          remoteId: 2,
-          startDate: DateTime.utc(now.year, 9, 10),
-          contentCategoryIndex: ContentCategory.folklore.index,
-        );
-        eventBox.put(event);
+    test('includes current-year single-day event (null endDate) matching the '
+        'requested category', () async {
+      final now = fixedNowUtc;
+      final event = makeEventEntity(
+        remoteId: 2,
+        startDate: DateTime.utc(now.year, 9, 10),
+        contentCategoryIndex: ContentCategory.folklore.index,
+      );
+      eventBox.put(event);
 
-        final result = await repository.getByCategories({
-          ContentCategory.folklore,
-        });
+      final result = await repository.getByCategories({
+        ContentCategory.folklore,
+      });
 
-        expect(result, isA<Success<List<Event>>>());
-        expect(
-          (result as Success<List<Event>>).value.map((e) => e.remoteId),
-          contains(2),
-        );
-      },
-    );
+      expect(result, isA<Success<List<Event>>>());
+      expect(
+        (result as Success<List<Event>>).value.map((e) => e.remoteId),
+        contains(2),
+      );
+    });
 
     test('excludes past-year event even when category matches', () async {
       final event = makeEventEntity(
@@ -727,9 +709,9 @@ void main() {
         ),
       );
 
-      final result = await repository.getByCategories(
-        {ContentCategory.folklore},
-      );
+      final result = await repository.getByCategories({
+        ContentCategory.folklore,
+      });
 
       expect(result, isA<Success<List<Event>>>());
       final names = (result as Success<List<Event>>).value
@@ -768,10 +750,9 @@ void main() {
         ),
       );
 
-      final result = await repository.getByCategories(
-        {ContentCategory.food},
-        sort: ContentSort.byDate,
-      );
+      final result = await repository.getByCategories({
+        ContentCategory.food,
+      }, sort: ContentSort.byDate);
 
       expect(result, isA<Success<List<Event>>>());
       final names = (result as Success<List<Event>>).value
@@ -827,10 +808,7 @@ void main() {
         // Populate the cache via getByCurrentYear().
         final firstCall = await repository.getByCurrentYear();
         expect(firstCall, isA<Success<List<Event>>>());
-        expect(
-          (firstCall as Success<List<Event>>).value,
-          hasLength(1),
-        );
+        expect((firstCall as Success<List<Event>>).value, hasLength(1));
 
         // Sync adds a new event from remote.
         supabaseEnv.stubSelectResponse([
@@ -854,10 +832,7 @@ void main() {
         // Cache was invalidated; getByCurrentYear() must reflect the new event.
         final secondCall = await repository.getByCurrentYear();
         expect(secondCall, isA<Success<List<Event>>>());
-        expect(
-          (secondCall as Success<List<Event>>).value,
-          hasLength(2),
-        );
+        expect((secondCall as Success<List<Event>>).value, hasLength(2));
       },
     );
   });
@@ -1041,11 +1016,7 @@ void main() {
 
     test('preserves city relations through soft deletion and a Keep merge', () {
       eventBox.put(
-        makeEventEntity(
-          remoteId: 1,
-          cityId: 7,
-          modifiedAt: DateTime.utc(2024),
-        ),
+        makeEventEntity(remoteId: 1, cityId: 7, modifiedAt: DateTime.utc(2024)),
       );
 
       final deleteResult = repository.commitSync([

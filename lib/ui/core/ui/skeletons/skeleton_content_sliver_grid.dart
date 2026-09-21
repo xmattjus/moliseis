@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/ui/skeletons/app_pulse_effect.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid_item.dart';
 import 'package:moliseis/utils/constants.dart';

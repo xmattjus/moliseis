@@ -65,10 +65,7 @@ void main() {
     });
 
     test('rejects a new entity without a parent', () {
-      expect(
-        () => dto().toEntity(),
-        throwsA(isA<FormatException>()),
-      );
+      expect(() => dto().toEntity(), throwsA(isA<FormatException>()));
       expect(
         () => dto(
           eventId: const Clear<int>(),
@@ -89,9 +86,7 @@ void main() {
     });
 
     test('preserves valid parent relations for Keep updates', () {
-      final merged = dto().mergeInto(
-        makeMediaEntity(remoteId: 3, eventId: 7),
-      );
+      final merged = dto().mergeInto(makeMediaEntity(remoteId: 3, eventId: 7));
 
       expectRelations(merged, eventId: 7, placeId: null);
     });

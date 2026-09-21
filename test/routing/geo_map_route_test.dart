@@ -1,8 +1,8 @@
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
@@ -92,9 +92,7 @@ void main() {
       final router = _buildTestRouterApp(
         harness,
         eventRepository: FakeEventRepository(
-          getByIdResults: <int, Result<Event>>{
-            1: Result.success(event),
-          },
+          getByIdResults: <int, Result<Event>>{1: Result.success(event)},
         ),
       );
 
@@ -103,10 +101,7 @@ void main() {
 
       router.router.goNamed(
         RouteNames.geoMap,
-        queryParameters: <String, String>{
-          'contentId': '1',
-          'type': 'event',
-        },
+        queryParameters: <String, String>{'contentId': '1', 'type': 'event'},
       );
       await tester.pumpAndSettle();
 
@@ -142,9 +137,7 @@ void main() {
       final router = _buildTestRouterApp(
         harness,
         placeRepository: FakePlaceRepository(
-          getByIdResults: <int, Result<Place>>{
-            3: Result.success(place),
-          },
+          getByIdResults: <int, Result<Place>>{3: Result.success(place)},
         ),
       );
 
@@ -153,10 +146,7 @@ void main() {
 
       router.router.goNamed(
         RouteNames.geoMap,
-        queryParameters: <String, String>{
-          'contentId': '3',
-          'type': 'place',
-        },
+        queryParameters: <String, String>{'contentId': '3', 'type': 'place'},
       );
       await tester.pumpAndSettle();
 
@@ -176,9 +166,7 @@ void main() {
     ]) {
       testWidgets(
         'malformed or missing parameters ($label) render the default map',
-        (
-          tester,
-        ) async {
+        (tester) async {
           final harness = _MapHarness();
           final router = _buildTestRouterApp(harness);
 
@@ -201,9 +189,7 @@ void main() {
 
     testWidgets(
       'missing repository item keeps the default map and shows feedback',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final harness = _MapHarness();
         final router = _buildTestRouterApp(harness);
 
@@ -227,9 +213,7 @@ void main() {
 
     testWidgets(
       'repeated navigation to different content ids updates URI and screen',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final first = makeEvent(name: 'Evento 1');
         final second = makeEvent(remoteId: 2, name: 'Evento 2');
         final harness = _MapHarness();
@@ -248,10 +232,7 @@ void main() {
 
         router.router.goNamed(
           RouteNames.geoMap,
-          queryParameters: <String, String>{
-            'contentId': '1',
-            'type': 'event',
-          },
+          queryParameters: <String, String>{'contentId': '1', 'type': 'event'},
         );
         await tester.pumpAndSettle();
         expect(
@@ -264,10 +245,7 @@ void main() {
 
         router.router.goNamed(
           RouteNames.geoMap,
-          queryParameters: <String, String>{
-            'contentId': '2',
-            'type': 'event',
-          },
+          queryParameters: <String, String>{'contentId': '2', 'type': 'event'},
         );
         await tester.pumpAndSettle();
 
@@ -287,17 +265,13 @@ void main() {
 
     testWidgets(
       'returning to /map clears selection and restores sheet extent',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final event = makeEvent(name: 'Evento 1');
         final harness = _MapHarness();
         final router = _buildTestRouterApp(
           harness,
           eventRepository: FakeEventRepository(
-            getByIdResults: <int, Result<Event>>{
-              1: Result.success(event),
-            },
+            getByIdResults: <int, Result<Event>>{1: Result.success(event)},
           ),
         );
 
@@ -329,17 +303,13 @@ void main() {
 
     testWidgets(
       'reparsing the selected location retains the selected identity',
-      (
-        tester,
-      ) async {
+      (tester) async {
         final event = makeEvent(name: 'Evento 1');
         final harness = _MapHarness();
         final router = _buildTestRouterApp(
           harness,
           eventRepository: FakeEventRepository(
-            getByIdResults: <int, Result<Event>>{
-              1: Result.success(event),
-            },
+            getByIdResults: <int, Result<Event>>{1: Result.success(event)},
           ),
         );
 
@@ -348,10 +318,7 @@ void main() {
 
         router.router.goNamed(
           RouteNames.geoMap,
-          queryParameters: <String, String>{
-            'contentId': '1',
-            'type': 'event',
-          },
+          queryParameters: <String, String>{'contentId': '1', 'type': 'event'},
         );
         await tester.pumpAndSettle();
         expect(
@@ -367,10 +334,7 @@ void main() {
 
         router.router.goNamed(
           RouteNames.geoMap,
-          queryParameters: <String, String>{
-            'contentId': '1',
-            'type': 'event',
-          },
+          queryParameters: <String, String>{'contentId': '1', 'type': 'event'},
         );
         await tester.pumpAndSettle();
 
@@ -477,9 +441,7 @@ List<SingleChildWidget> _buildProviders(
     Provider<CachedWeatherApiClient>.value(value: weatherApiClient),
     Provider<CacheManager>.value(value: FakeCacheManager()),
     Provider<Logger>.value(value: logger),
-    Provider<UrlLaunchService>(
-      create: (_) => UrlLaunchService(logger: logger),
-    ),
+    Provider<UrlLaunchService>(create: (_) => UrlLaunchService(logger: logger)),
     ChangeNotifierProvider<FavouriteViewModel>(
       create: (_) => FavouriteViewModel(
         favouriteGetIdsUseCase: FavouriteGetIdsUseCase(

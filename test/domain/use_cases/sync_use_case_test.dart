@@ -181,73 +181,64 @@ void main() {
       },
     );
 
-    test(
-      'wraps all commitSync calls inside runInWriteTransaction',
-      () async {
-        final cityDtos = [_cityDto(1)];
-        final placeDtos = [_placeDto(2)];
-        final eventDtos = [_eventDto(3)];
-        final mediaDtos = [_mediaDto(4)];
+    test('wraps all commitSync calls inside runInWriteTransaction', () async {
+      final cityDtos = [_cityDto(1)];
+      final placeDtos = [_placeDto(2)];
+      final eventDtos = [_eventDto(3)];
+      final mediaDtos = [_mediaDto(4)];
 
-        final settings = FakeSettingsRepository();
-        final wrappedCalls = <VoidCall>[];
-        final coordinator = _WrappingTransactionCoordinator(wrappedCalls);
+      final settings = FakeSettingsRepository();
+      final wrappedCalls = <VoidCall>[];
+      final coordinator = _WrappingTransactionCoordinator(wrappedCalls);
 
-        final deps = buildUseCase(
-          settings: settings,
-          cityResult: Result.success(cityDtos),
-          placeResult: Result.success(placeDtos),
-          eventResult: Result.success(eventDtos),
-          mediaResult: Result.success(mediaDtos),
-          transactionCoordinator: coordinator,
-        );
+      final deps = buildUseCase(
+        settings: settings,
+        cityResult: Result.success(cityDtos),
+        placeResult: Result.success(placeDtos),
+        eventResult: Result.success(eventDtos),
+        mediaResult: Result.success(mediaDtos),
+        transactionCoordinator: coordinator,
+      );
 
-        await deps.useCase.sync();
+      await deps.useCase.sync();
 
-        expect(wrappedCalls, hasLength(1));
-        expect(deps.settings.setModifiedAtCalled, isTrue);
-        expect(deps.cityRepo.commitCalled, isTrue);
-        expect(deps.cityRepo.committedDtos, equals(cityDtos));
-        expect(deps.placeRepo.commitCalled, isTrue);
-        expect(deps.placeRepo.committedDtos, equals(placeDtos));
-        expect(deps.eventRepo.commitCalled, isTrue);
-        expect(deps.eventRepo.committedDtos, equals(eventDtos));
-        expect(deps.mediaRepo.commitCalled, isTrue);
-        expect(deps.mediaRepo.committedDtos, equals(mediaDtos));
-      },
-    );
+      expect(wrappedCalls, hasLength(1));
+      expect(deps.settings.setModifiedAtCalled, isTrue);
+      expect(deps.cityRepo.commitCalled, isTrue);
+      expect(deps.cityRepo.committedDtos, equals(cityDtos));
+      expect(deps.placeRepo.commitCalled, isTrue);
+      expect(deps.placeRepo.committedDtos, equals(placeDtos));
+      expect(deps.eventRepo.commitCalled, isTrue);
+      expect(deps.eventRepo.committedDtos, equals(eventDtos));
+      expect(deps.mediaRepo.commitCalled, isTrue);
+      expect(deps.mediaRepo.committedDtos, equals(mediaDtos));
+    });
 
-    test(
-      'does not call setModifiedAt when any prepareSync fails',
-      () async {
-        final error = TestException('sync failed');
-        final settings = FakeSettingsRepository();
-        final deps = buildUseCase(
-          cityResult: Result.error(error),
-          settings: settings,
-        );
+    test('does not call setModifiedAt when any prepareSync fails', () async {
+      final error = TestException('sync failed');
+      final settings = FakeSettingsRepository();
+      final deps = buildUseCase(
+        cityResult: Result.error(error),
+        settings: settings,
+      );
 
-        await deps.useCase.sync();
+      await deps.useCase.sync();
 
-        expect(deps.settings.setModifiedAtCalled, isFalse);
-      },
-    );
+      expect(deps.settings.setModifiedAtCalled, isFalse);
+    });
 
-    test(
-      'does not call setModifiedAt when commitSync returns error',
-      () async {
-        final settings = FakeSettingsRepository();
-        final deps = buildUseCase(
-          settings: settings,
-          transactionCoordinator: _ThrowingTransactionCoordinator(),
-        );
+    test('does not call setModifiedAt when commitSync returns error', () async {
+      final settings = FakeSettingsRepository();
+      final deps = buildUseCase(
+        settings: settings,
+        transactionCoordinator: _ThrowingTransactionCoordinator(),
+      );
 
-        final result = await deps.useCase.sync();
+      final result = await deps.useCase.sync();
 
-        expect(result.isError, isTrue);
-        expect(deps.settings.setModifiedAtCalled, isFalse);
-      },
-    );
+      expect(result.isError, isTrue);
+      expect(deps.settings.setModifiedAtCalled, isFalse);
+    });
   });
 
   group('SyncUseCase.isSyncRequired', () {

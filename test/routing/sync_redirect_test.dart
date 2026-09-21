@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -52,9 +52,7 @@ import '../support/mock_logger.dart';
 
 void main() {
   group('buildAppRouter sync redirect', () {
-    testWidgets('unknown route renders the route error screen', (
-      tester,
-    ) async {
+    testWidgets('unknown route renders the route error screen', (tester) async {
       final harness = _SyncHarness();
       final router = _buildTestRouterApp(harness);
 
@@ -71,9 +69,7 @@ void main() {
       );
     });
 
-    testWidgets('cold start without a due sync stays on /home', (
-      tester,
-    ) async {
+    testWidgets('cold start without a due sync stays on /home', (tester) async {
       final harness = _SyncHarness();
       final router = _buildTestRouterApp(harness);
 
@@ -175,9 +171,7 @@ void main() {
       expect(uri.queryParameters['type'], 'event');
     });
 
-    testWidgets('non-fatal error returns to the preserved URI', (
-      tester,
-    ) async {
+    testWidgets('non-fatal error returns to the preserved URI', (tester) async {
       final harness = _SyncHarness(
         cityResult: Result.error(TestException('sync failed')),
       );
@@ -237,9 +231,7 @@ void main() {
     for (final from in _invalidFromValues) {
       testWidgets(
         'rejects invalid from value "$from" and falls back to /home',
-        (
-          tester,
-        ) async {
+        (tester) async {
           final harness = _SyncHarness();
           final router = _buildTestRouterApp(harness);
 
@@ -270,33 +262,32 @@ void main() {
       );
     }
 
-    testWidgets(
-      'sync restores an admin user to /admin after completing',
-      (tester) async {
-        final auth = ControllableAdminAuth(
-          initialUser: makeAuthUser(isAdmin: true),
-        );
-        final harness = _SyncHarness();
-        final router = _buildTestRouterApp(harness, auth: auth);
+    testWidgets('sync restores an admin user to /admin after completing', (
+      tester,
+    ) async {
+      final auth = ControllableAdminAuth(
+        initialUser: makeAuthUser(isAdmin: true),
+      );
+      final harness = _SyncHarness();
+      final router = _buildTestRouterApp(harness, auth: auth);
 
-        router.router.go(RoutePaths.admin);
-        unawaited(harness.viewModel.sync.execute(true));
-        await tester.pumpWidget(router.app);
-        await _pumpRedirects(tester);
+      router.router.go(RoutePaths.admin);
+      unawaited(harness.viewModel.sync.execute(true));
+      await tester.pumpWidget(router.app);
+      await _pumpRedirects(tester);
 
-        final syncUri = router.router.routeInformationProvider.value.uri;
-        expect(syncUri.path, RoutePaths.sync);
-        expect(syncUri.queryParameters['from'], RoutePaths.admin);
+      final syncUri = router.router.routeInformationProvider.value.uri;
+      expect(syncUri.path, RoutePaths.sync);
+      expect(syncUri.queryParameters['from'], RoutePaths.admin);
 
-        harness.release();
-        await _pumpRedirects(tester);
+      harness.release();
+      await _pumpRedirects(tester);
 
-        expect(
-          router.router.routeInformationProvider.value.uri.path,
-          RoutePaths.admin,
-        );
-      },
-    );
+      expect(
+        router.router.routeInformationProvider.value.uri.path,
+        RoutePaths.admin,
+      );
+    });
 
     testWidgets(
       'sync restores an anonymous user to /admin/login after completing',
@@ -326,116 +317,107 @@ void main() {
   });
 
   group('buildAppRouter sync restoration', () {
-    testWidgets(
-      'restored idle /sync returns to the preserved settings URI',
-      (tester) async {
-        // Persist a recent timestamp so the fresh view model skips auto-sync.
-        final settings = FakeSettingsRepository(lastSyncedAt: DateTime.now());
-        final holder = _SyncRestorationHolder(
-          settingsFactory: () => settings,
-        );
+    testWidgets('restored idle /sync returns to the preserved settings URI', (
+      tester,
+    ) async {
+      // Persist a recent timestamp so the fresh view model skips auto-sync.
+      final settings = FakeSettingsRepository(lastSyncedAt: DateTime.now());
+      final holder = _SyncRestorationHolder(settingsFactory: () => settings);
 
-        await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
-        await _pumpRedirects(tester);
-        final before = holder.fixture!;
+      await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
+      await _pumpRedirects(tester);
+      final before = holder.fixture!;
 
-        before.router.go(RoutePaths.settings);
-        await _pumpRedirects(tester);
-        expect(
-          before.router.routeInformationProvider.value.uri.path,
-          RoutePaths.settings,
-        );
+      before.router.go(RoutePaths.settings);
+      await _pumpRedirects(tester);
+      expect(
+        before.router.routeInformationProvider.value.uri.path,
+        RoutePaths.settings,
+      );
 
-        unawaited(before.harness.viewModel.sync.execute(true));
-        await _pumpRedirects(tester);
-        expect(
-          before.router.routeInformationProvider.value.uri.path,
-          RoutePaths.sync,
-        );
-        expect(
-          before
-              .router
-              .routeInformationProvider
-              .value
-              .uri
-              .queryParameters['from'],
-          RoutePaths.settings,
-        );
+      unawaited(before.harness.viewModel.sync.execute(true));
+      await _pumpRedirects(tester);
+      expect(
+        before.router.routeInformationProvider.value.uri.path,
+        RoutePaths.sync,
+      );
+      expect(
+        before
+            .router
+            .routeInformationProvider
+            .value
+            .uri
+            .queryParameters['from'],
+        RoutePaths.settings,
+      );
 
-        await tester.restartAndRestore();
-        await _pumpRedirects(tester);
+      await tester.restartAndRestore();
+      await _pumpRedirects(tester);
 
-        final after = holder.fixture!;
-        expect(after, isNot(same(before)));
-        expect(after.harness.viewModel, isNot(same(before.harness.viewModel)));
-        expect(after.harness.viewModel.sync.idle, isTrue);
-        expect(
-          after.router.routeInformationProvider.value.uri.path,
-          RoutePaths.settings,
-        );
-        expect(find.byType(SyncScreen), findsNothing);
-        expect(find.byType(SettingsScreen), findsOneWidget);
-      },
-    );
+      final after = holder.fixture!;
+      expect(after, isNot(same(before)));
+      expect(after.harness.viewModel, isNot(same(before.harness.viewModel)));
+      expect(after.harness.viewModel.sync.idle, isTrue);
+      expect(
+        after.router.routeInformationProvider.value.uri.path,
+        RoutePaths.settings,
+      );
+      expect(find.byType(SyncScreen), findsNothing);
+      expect(find.byType(SettingsScreen), findsOneWidget);
+    });
 
-    testWidgets(
-      'restored due sync remains on /sync until it completes',
-      (tester) async {
-        final holder = _SyncRestorationHolder(
-          // Each fixture needs its own settings so completing the old gated
-          // sync cannot make the fresh view model think it is up to date.
-          settingsFactory: FakeSettingsRepository.new,
-        );
+    testWidgets('restored due sync remains on /sync until it completes', (
+      tester,
+    ) async {
+      final holder = _SyncRestorationHolder(
+        // Each fixture needs its own settings so completing the old gated
+        // sync cannot make the fresh view model think it is up to date.
+        settingsFactory: FakeSettingsRepository.new,
+      );
 
-        await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
-        await _pumpRedirects(tester);
-        final before = holder.fixture!;
-        expect(before.harness.viewModel.sync.running, isTrue);
-        expect(
-          before.router.routeInformationProvider.value.uri.path,
-          RoutePaths.sync,
-        );
-        expect(
-          before
-              .router
-              .routeInformationProvider
-              .value
-              .uri
-              .queryParameters['from'],
-          RoutePaths.home,
-        );
+      await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
+      await _pumpRedirects(tester);
+      final before = holder.fixture!;
+      expect(before.harness.viewModel.sync.running, isTrue);
+      expect(
+        before.router.routeInformationProvider.value.uri.path,
+        RoutePaths.sync,
+      );
+      expect(
+        before
+            .router
+            .routeInformationProvider
+            .value
+            .uri
+            .queryParameters['from'],
+        RoutePaths.home,
+      );
 
-        await tester.restartAndRestore();
-        await _pumpRedirects(tester);
+      await tester.restartAndRestore();
+      await _pumpRedirects(tester);
 
-        final after = holder.fixture!;
-        expect(after, isNot(same(before)));
-        expect(after.harness.viewModel.sync.running, isTrue);
-        expect(
-          after.router.routeInformationProvider.value.uri.path,
-          RoutePaths.sync,
-        );
-        expect(
-          after
-              .router
-              .routeInformationProvider
-              .value
-              .uri
-              .queryParameters['from'],
-          RoutePaths.home,
-        );
-        expect(find.byType(SyncScreen), findsOneWidget);
+      final after = holder.fixture!;
+      expect(after, isNot(same(before)));
+      expect(after.harness.viewModel.sync.running, isTrue);
+      expect(
+        after.router.routeInformationProvider.value.uri.path,
+        RoutePaths.sync,
+      );
+      expect(
+        after.router.routeInformationProvider.value.uri.queryParameters['from'],
+        RoutePaths.home,
+      );
+      expect(find.byType(SyncScreen), findsOneWidget);
 
-        after.harness.release();
-        await tester.pumpAndSettle();
+      after.harness.release();
+      await tester.pumpAndSettle();
 
-        expect(
-          after.router.routeInformationProvider.value.uri.path,
-          RoutePaths.home,
-        );
-        expect(find.byType(SyncScreen), findsNothing);
-      },
-    );
+      expect(
+        after.router.routeInformationProvider.value.uri.path,
+        RoutePaths.home,
+      );
+      expect(find.byType(SyncScreen), findsNothing);
+    });
   });
 
   group('MoliseIsApp router lifecycle', () {
@@ -714,23 +696,17 @@ List<SingleChildWidget> _buildProviders(
         LruCache<
           String,
           WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-        >(
-          maxSize: 8,
-        ),
+        >(maxSize: 8),
     hourlyWeatherCache:
         LruCache<
           String,
           WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
-        >(
-          maxSize: 8,
-        ),
+        >(maxSize: 8),
     dailyWeatherCache:
         LruCache<
           String,
           WeatherForecastDataCacheEntry<DailyWeatherForecastData>
-        >(
-          maxSize: 8,
-        ),
+        >(maxSize: 8),
     logger: logger,
   );
   final settingsRepository = FakeSettingsRepository();
@@ -749,9 +725,7 @@ List<SingleChildWidget> _buildProviders(
     Provider<CachedWeatherApiClient>.value(value: weatherApiClient),
     Provider<CacheManager>.value(value: FakeCacheManager()),
     Provider<Logger>.value(value: logger),
-    Provider<UrlLaunchService>(
-      create: (_) => UrlLaunchService(logger: logger),
-    ),
+    Provider<UrlLaunchService>(create: (_) => UrlLaunchService(logger: logger)),
     ChangeNotifierProvider<FavouriteViewModel>(
       create: (_) => FavouriteViewModel(
         favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
@@ -770,8 +744,6 @@ List<SingleChildWidget> _buildProviders(
       ),
     ),
     ChangeNotifierProvider<SyncViewModel>.value(value: harness.viewModel),
-    ChangeNotifierProvider<AdminAuthViewModel>.value(
-      value: auth.viewModel,
-    ),
+    ChangeNotifierProvider<AdminAuthViewModel>.value(value: auth.viewModel),
   ];
 }

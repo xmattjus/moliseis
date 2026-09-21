@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 const double _defaultScrollControlDisabledMaxHeightRatio = 9.0 / 16.0;
@@ -38,10 +38,7 @@ Future<T?> appShowModalBottomSheet<T>({
     'and its on-tap hint.',
   );
 
-  final navigator = Navigator.of(
-    context,
-    rootNavigator: useRootNavigator,
-  );
+  final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
   final localizations = MaterialLocalizations.of(context);
   return navigator.push(
     ModalBottomSheetRoute<T>(

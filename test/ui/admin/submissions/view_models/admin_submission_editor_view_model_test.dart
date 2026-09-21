@@ -533,10 +533,7 @@ void main() {
 
           expect(viewModel.startDate, DateTime.utc(2026, 8, 20, 22));
           expect(viewModel.startDate!.isUtc, isTrue);
-          expect(
-            viewModel.endDate,
-            DateTime.utc(2026, 8, 20, 23),
-          );
+          expect(viewModel.endDate, DateTime.utc(2026, 8, 20, 23));
           expect(viewModel.endDate!.isUtc, isTrue);
         },
       );
@@ -899,10 +896,7 @@ void main() {
           repository: repository,
           submissionId: 1,
         );
-        final unset = createViewModel(
-          repository: repository,
-          submissionId: 2,
-        );
+        final unset = createViewModel(repository: repository, submissionId: 2);
         addTearDown(unknown.dispose);
         addTearDown(unset.dispose);
 
@@ -984,33 +978,27 @@ void main() {
       },
     );
 
-    test(
-      'blocks event promotion without dates after moderation eligibility '
-      'passes',
-      () async {
-        final repository = FakeAdminContentSubmissionRepository(
-          getByIdResults: <int, Result<AdminSubmission>>{
-            6: Result.success(sampleAdminSubmission(id: 6)),
-          },
-        );
-        final viewModel = createViewModel(
-          repository: repository,
-          submissionId: 6,
-        );
-        addTearDown(viewModel.dispose);
+    test('blocks event promotion without dates after moderation eligibility '
+        'passes', () async {
+      final repository = FakeAdminContentSubmissionRepository(
+        getByIdResults: <int, Result<AdminSubmission>>{
+          6: Result.success(sampleAdminSubmission(id: 6)),
+        },
+      );
+      final viewModel = createViewModel(
+        repository: repository,
+        submissionId: 6,
+      );
+      addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
-        await viewModel.promote.execute(AdminPromotionTarget.event);
+      await viewModel.load.execute();
+      await viewModel.promote.execute(AdminPromotionTarget.event);
 
-        expect(viewModel.promote.error, isTrue);
-        expect(
-          viewModel.promote.result,
-          isA<Error<AdminSubmissionPromotion>>(),
-        );
-        expect(viewModel.eventTimeIssue, EventTimeIssue.missingStartDate);
-        expect(repository.promoteCalls, isEmpty);
-      },
-    );
+      expect(viewModel.promote.error, isTrue);
+      expect(viewModel.promote.result, isA<Error<AdminSubmissionPromotion>>());
+      expect(viewModel.eventTimeIssue, EventTimeIssue.missingStartDate);
+      expect(repository.promoteCalls, isEmpty);
+    });
 
     test(
       'applies moderation eligibility before event-target validation',
@@ -1060,105 +1048,96 @@ void main() {
         await viewModel.load.execute();
         await viewModel.promote.execute(AdminPromotionTarget.place);
         expect(viewModel.status, AdminSubmissionStatus.accepted);
-        expect(
-          viewModel.promotion?.entityId,
-          42,
-        );
+        expect(viewModel.promotion?.entityId, 42);
       },
     );
 
-    test(
-      'does not moderate accepted or rejected submissions',
-      () async {
-        final repository = FakeAdminContentSubmissionRepository(
-          getByIdResults: <int, Result<AdminSubmission>>{
-            1: Result.success(
-              sampleAdminSubmission(status: AdminSubmissionStatus.accepted),
+    test('does not moderate accepted or rejected submissions', () async {
+      final repository = FakeAdminContentSubmissionRepository(
+        getByIdResults: <int, Result<AdminSubmission>>{
+          1: Result.success(
+            sampleAdminSubmission(status: AdminSubmissionStatus.accepted),
+          ),
+          2: Result.success(
+            sampleAdminSubmission(
+              id: 2,
+              status: AdminSubmissionStatus.rejected,
             ),
-            2: Result.success(
-              sampleAdminSubmission(
-                id: 2,
-                status: AdminSubmissionStatus.rejected,
-              ),
-            ),
-          },
-        );
-        final accepted = AdminSubmissionEditorViewModel(
-          repository: repository,
-          contentSubmissionRepository: FakeContentSubmissionRepository(),
-          submissionId: 1,
-        );
-        final rejected = AdminSubmissionEditorViewModel(
-          repository: repository,
-          contentSubmissionRepository: FakeContentSubmissionRepository(),
-          submissionId: 2,
-        );
-        addTearDown(accepted.dispose);
-        addTearDown(rejected.dispose);
+          ),
+        },
+      );
+      final accepted = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: FakeContentSubmissionRepository(),
+        submissionId: 1,
+      );
+      final rejected = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: FakeContentSubmissionRepository(),
+        submissionId: 2,
+      );
+      addTearDown(accepted.dispose);
+      addTearDown(rejected.dispose);
 
-        await accepted.load.execute();
-        await rejected.load.execute();
-        await accepted.promote.execute(AdminPromotionTarget.place);
-        await accepted.reject.execute();
-        await rejected.promote.execute(AdminPromotionTarget.place);
-        await rejected.reject.execute();
+      await accepted.load.execute();
+      await rejected.load.execute();
+      await accepted.promote.execute(AdminPromotionTarget.place);
+      await accepted.reject.execute();
+      await rejected.promote.execute(AdminPromotionTarget.place);
+      await rejected.reject.execute();
 
-        expect(accepted.promote.error, isTrue);
-        expect(accepted.reject.error, isTrue);
-        expect(rejected.promote.error, isTrue);
-        expect(rejected.reject.error, isTrue);
-        expect(repository.promoteCalls, isEmpty);
-        expect(repository.rejectIds, isEmpty);
-      },
-    );
+      expect(accepted.promote.error, isTrue);
+      expect(accepted.reject.error, isTrue);
+      expect(rejected.promote.error, isTrue);
+      expect(rejected.reject.error, isTrue);
+      expect(repository.promoteCalls, isEmpty);
+      expect(repository.rejectIds, isEmpty);
+    });
 
-    test(
-      'blocks moderation when dirty, unloaded, or in create mode',
-      () async {
-        final repository = FakeAdminContentSubmissionRepository(
-          getByIdResults: <int, Result<AdminSubmission>>{
-            1: Result.success(sampleAdminSubmission()),
-          },
-        );
+    test('blocks moderation when dirty, unloaded, or in create mode', () async {
+      final repository = FakeAdminContentSubmissionRepository(
+        getByIdResults: <int, Result<AdminSubmission>>{
+          1: Result.success(sampleAdminSubmission()),
+        },
+      );
 
-        // Create mode has no persisted ID.
-        final createMode = createViewModel(repository: repository);
-        addTearDown(createMode.dispose);
-        await createMode.promote.execute(AdminPromotionTarget.place);
-        await createMode.reject.execute();
-        expect(createMode.promote.error, isTrue);
-        expect(createMode.reject.error, isTrue);
+      // Create mode has no persisted ID.
+      final createMode = createViewModel(repository: repository);
+      addTearDown(createMode.dispose);
+      await createMode.promote.execute(AdminPromotionTarget.place);
+      await createMode.reject.execute();
+      expect(createMode.promote.error, isTrue);
+      expect(createMode.reject.error, isTrue);
 
-        // Detail not loaded yet.
-        final unloaded = AdminSubmissionEditorViewModel(
-          repository: repository,
-          contentSubmissionRepository: FakeContentSubmissionRepository(),
-          submissionId: 1,
-        );
-        addTearDown(unloaded.dispose);
-        await unloaded.promote.execute(AdminPromotionTarget.place);
-        await unloaded.reject.execute();
-        expect(unloaded.promote.error, isTrue);
-        expect(unloaded.reject.error, isTrue);
+      // Detail not loaded yet.
+      final unloaded = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: FakeContentSubmissionRepository(),
+        submissionId: 1,
+      );
+      addTearDown(unloaded.dispose);
+      await unloaded.promote.execute(AdminPromotionTarget.place);
+      await unloaded.reject.execute();
+      expect(unloaded.promote.error, isTrue);
+      expect(unloaded.reject.error, isTrue);
 
-        // Dirty editor.
-        final dirty = AdminSubmissionEditorViewModel(
-          repository: repository,
-          contentSubmissionRepository: FakeContentSubmissionRepository(),
-          submissionId: 1,
-        );
-        addTearDown(dirty.dispose);
-        await dirty.load.execute();
-        dirty.setCity('Isernia');
-        await dirty.promote.execute(AdminPromotionTarget.place);
-        await dirty.reject.execute();
-        expect(dirty.promote.error, isTrue);
-        expect(dirty.reject.error, isTrue);
+      // Dirty editor.
+      final dirty = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: FakeContentSubmissionRepository(),
+        submissionId: 1,
+      );
+      addTearDown(dirty.dispose);
+      await dirty.load.execute();
+      dirty.setCity('Isernia');
+      await dirty.promote.execute(AdminPromotionTarget.place);
+      await dirty.reject.execute();
+      expect(dirty.promote.error, isTrue);
+      expect(dirty.reject.error, isTrue);
 
-        expect(repository.promoteCalls, isEmpty);
-        expect(repository.rejectIds, isEmpty);
-      },
-    );
+      expect(repository.promoteCalls, isEmpty);
+      expect(repository.rejectIds, isEmpty);
+    });
 
     test('cannot save accepted or rejected content', () async {
       final repository = FakeAdminContentSubmissionRepository(
@@ -1439,10 +1418,9 @@ void main() {
       await backendFailureViewModel.addAsset.execute();
 
       expect(backendFailureViewModel.addAsset.error, isTrue);
-      expect(
-        backendFailureViewModel.assets,
-        const <AdminSubmissionAsset>[initialAsset],
-      );
+      expect(backendFailureViewModel.assets, const <AdminSubmissionAsset>[
+        initialAsset,
+      ]);
     });
 
     test('blocks adding at the limit and for final statuses', () async {
