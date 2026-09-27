@@ -2,6 +2,7 @@ import 'package:meta/meta.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_options.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_preparation.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_preparation_client.dart';
+import 'package:moliseis/data/services/api/supabase_functions_fetch_error.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -43,6 +44,8 @@ final class SupabaseCloudinaryUploadPreparationClient
         },
       );
       return Result.success(parseResponseForTesting(response.data, publicId));
+    } on FunctionsFetchException catch (error) {
+      return Result.error(recoverSupabaseFunctionsFetchError(error));
     } on FunctionException catch (error) {
       return Result.error(
         Exception(error.reasonPhrase ?? 'Upload preparation failed'),

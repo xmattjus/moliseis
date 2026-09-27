@@ -17,13 +17,18 @@ final class RecordingSupabaseFunctionsHttpClient extends http.BaseClient {
     })
   >
   _responses = [];
-  Exception? error;
+  Object? error;
 
-  void queueJson(Object? body, {int status = 200, String? reasonPhrase}) {
+  void queueJson(
+    Object? body, {
+    int status = 200,
+    String? reasonPhrase,
+    Map<String, String> headers = const {},
+  }) {
     _responses.add((
       status: status,
       body: jsonEncode(body),
-      headers: const {'content-type': 'application/json; charset=utf-8'},
+      headers: {'content-type': 'application/json; charset=utf-8', ...headers},
       reasonPhrase: reasonPhrase,
     ));
   }
@@ -50,7 +55,10 @@ final class RecordingSupabaseFunctionsHttpClient extends http.BaseClient {
       ),
       body: requestBody.isEmpty ? null : jsonDecode(requestBody),
     ));
-    if (error != null) throw error!;
+    final pendingError = error;
+    if (pendingError != null) {
+      Error.throwWithStackTrace(pendingError, StackTrace.current);
+    }
     final response = _responses.removeAt(0);
     return http.StreamedResponse(
       Stream<List<int>>.value(utf8.encode(response.body)),

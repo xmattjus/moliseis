@@ -1,6 +1,7 @@
 import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
 import 'package:moliseis/data/mappers/submission_asset_mapper.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
+import 'package:moliseis/data/services/api/supabase_functions_fetch_error.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
@@ -140,6 +141,10 @@ final class AdminContentSubmissionRepositoryImpl
         body: body,
       );
       return Result.success(parse(response.data));
+    } on FunctionsFetchException catch (error, stackTrace) {
+      final transportError = recoverSupabaseFunctionsFetchError(error);
+      _logFailure(operation, transportError, stackTrace);
+      return Result.error(transportError);
     } on FunctionException catch (error, stackTrace) {
       final normalized = _normalizeFunctionException(error);
       _logFailure(operation, normalized, stackTrace);

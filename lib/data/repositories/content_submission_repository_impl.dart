@@ -4,6 +4,7 @@ import 'dart:io' show File;
 import 'package:moliseis/data/mappers/mappers.dart';
 import 'package:moliseis/data/repositories/content_submission_api_exception.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client.dart';
+import 'package:moliseis/data/services/api/supabase_functions_fetch_error.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
 import 'package:moliseis/domain/models/image_upload_task.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
@@ -61,6 +62,15 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
       }
       spanStatus = const SpanStatus.ok();
       return const Result.success(null);
+    } on FunctionsFetchException catch (exception, stackTrace) {
+      final transportError = recoverSupabaseFunctionsFetchError(exception);
+      _logger.log(
+        const ContentSubmissionUploadFailed(),
+        error: transportError,
+        stackTrace: stackTrace,
+      );
+      spanStatus = const SpanStatus.internalError();
+      return Result.error(transportError);
     } on FunctionException catch (exception, stackTrace) {
       final normalized = _normalizeFunctionException(exception);
       _logger.log(

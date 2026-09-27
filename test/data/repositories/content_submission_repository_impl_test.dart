@@ -156,6 +156,23 @@ void main() {
     expect(logger.eventsOfType<ContentSubmissionUploadFailed>(), hasLength(1));
   });
 
+  test('keeps a relay response on the Function error path', () async {
+    httpClient.queueJson(
+      <String, dynamic>{'code': 'RELAY_ERROR', 'message': 'Relay unavailable'},
+      status: 502,
+      headers: const {'x-relay-error': 'true'},
+    );
+
+    final result = await submit();
+
+    final error =
+        (result as Error<void>).error as ContentSubmissionApiException;
+    expect(error.statusCode, 502);
+    expect(error.code, 'RELAY_ERROR');
+    expect(error.message, 'Relay unavailable');
+    expect(httpClient.requests, hasLength(1));
+  });
+
   for (final failure
       in <({String name, int status, String code, String message})>[
         (
@@ -285,6 +302,19 @@ void main() {
       },
     );
   }
+
+  test('retains a fetch wrapper with non-Exception details', () async {
+    const originalError = 'transport diagnostic';
+    httpClient.error = originalError;
+
+    final result = await submit();
+
+    final error = (result as Error<void>).error as FunctionsFetchException;
+    expect(error.details, same(originalError));
+    expect(error.status, 0);
+    expect(httpClient.requests, hasLength(1));
+    expect(logger.eventsOfType<ContentSubmissionUploadFailed>(), hasLength(1));
+  });
 
   test('normalizes string Function failures and transport failures', () async {
     httpClient.queueText('Bad request', status: 400);
