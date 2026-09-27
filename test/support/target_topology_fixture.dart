@@ -11,15 +11,14 @@ import 'package:provider/provider.dart';
 
 /// Test-only router that mirrors the production route ownership and shell.
 ///
-/// The Explore, Favourites, Events, and Map branches each own exactly one root
-/// page through [StatefulShellRoute.indexedStack]. The detail page is a nested
-/// route under the Explore root whose page is placed on the root Navigator
-/// through `parentNavigatorKey`, and the gallery is a root-owned top-level
+/// The Explore, Favourites, Events, and Map branches each own a root
+/// page through [StatefulShellRoute.indexedStack]. The detail page belongs to
+/// Explore's Navigator, and the gallery is a root-owned top-level
 /// route whose builder mirrors the production gallery route. The shell is the
 /// production [ScaffoldShell], so tab selection and active-tab reset behave
 /// exactly as shipped. The fixture intentionally uses no application back
-/// state: no `GalleryPreviewScreen.isOpen`, no branch `PopScope`, no
-/// `LocalHistoryEntry`, and no direct platform back-ownership call.
+/// state: no `GalleryPreviewScreen.isOpen`, `LocalHistoryEntry`, or direct
+/// platform back-ownership call.
 ///
 /// Predictive-back gesture channel messages are only handled by the Android
 /// page-transitions builder, so tests that use the predictive helpers must pin
@@ -54,9 +53,12 @@ final class TargetTopologyFixture {
         ),
         StatefulShellRoute.indexedStack(
           restorationScopeId: 'appShell',
-          pageBuilder: (_, _, navigationShell) => MaterialPage<void>(
+          pageBuilder: (_, state, navigationShell) => MaterialPage<void>(
             restorationId: 'appShellPage',
-            child: ScaffoldShell(navigationShell: navigationShell),
+            child: ScaffoldShell(
+              navigationShell: navigationShell,
+              showNavigation: state.topRoute?.path.startsWith('/') ?? false,
+            ),
           ),
           branches: <StatefulShellBranch>[
             _branch(
@@ -67,7 +69,7 @@ final class TargetTopologyFixture {
               nestedRoutes: <RouteBase>[
                 GoRoute(
                   path: 'detail',
-                  parentNavigatorKey: rootNavigatorKey,
+                  parentNavigatorKey: exploreNavigatorKey,
                   builder: (_, _) => const _DetailPage(),
                 ),
               ],
@@ -178,39 +180,42 @@ StatefulShellBranch _branch({
   ],
 );
 
-/// Root-owned detail page that opens the root-owned gallery.
+/// Branch-owned detail page that opens the root-owned gallery.
 class _DetailPage extends StatelessWidget {
   const _DetailPage();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('Detail page'),
-            FilledButton(
-              onPressed: () async {
-                await GalleryPreviewScreen.show(
-                  context: context,
-                  media: [_buildMedia()],
-                  initialIndex: 0,
-                );
-              },
-              child: const Text('Open gallery'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                await GalleryPreviewScreen.show(
-                  context: context,
-                  media: _buildMultiMedia(),
-                  initialIndex: 2,
-                );
-              },
-              child: const Text('Open gallery on page 3'),
-            ),
-          ],
+    return BranchDetailPopScope(
+      branchIndex: 0,
+      child: Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              const Text('Detail page'),
+              FilledButton(
+                onPressed: () async {
+                  await GalleryPreviewScreen.show(
+                    context: context,
+                    media: [_buildMedia()],
+                    initialIndex: 0,
+                  );
+                },
+                child: const Text('Open gallery'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  await GalleryPreviewScreen.show(
+                    context: context,
+                    media: _buildMultiMedia(),
+                    initialIndex: 2,
+                  );
+                },
+                child: const Text('Open gallery on page 3'),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -108,8 +108,9 @@ void main() {
         await startPredictiveBack(tester);
         await updatePredictiveBack(tester, 0.5);
         for (final key in fixture.branchNavigatorKeys) {
-          expect(key.currentState!.canPop(), isFalse);
-          expect(key.currentState!.widget.pages.length, 1);
+          final isExplore = identical(key, fixture.exploreNavigatorKey);
+          expect(key.currentState!.canPop(), isExplore);
+          expect(key.currentState!.widget.pages.length, isExplore ? 2 : 1);
         }
 
         await commitPredictiveBack(tester);
@@ -169,6 +170,34 @@ void main() {
       expect(find.text('Explore root'), findsOneWidget);
       expect(fixture.uri.path, '/home');
       expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('predictive back on map cannot pop a hidden post branch', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final fixture = TargetTopologyFixture();
+      addTearDown(fixture.dispose);
+      await tester.pumpWidget(fixture.app);
+      fixture.router.go('/home/detail');
+      await tester.pumpAndSettle();
+      fixture.router.go('/map');
+      await tester.pumpAndSettle();
+
+      expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 2);
+      await startPredictiveBack(tester);
+      await commitPredictiveBack(tester);
+      expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 2);
+      expect(fixture.uri.path, '/map');
+
+      await tester.tap(find.text('Esplora'));
+      await tester.pumpAndSettle();
+      expect(fixture.uri.path, '/home/detail');
+      expect(find.text('Detail page'), findsOneWidget);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

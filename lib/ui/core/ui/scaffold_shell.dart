@@ -13,39 +13,47 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class ScaffoldShell extends StatelessWidget {
   const ScaffoldShell({
     required StatefulNavigationShell navigationShell,
+    required this.showNavigation,
     Key? key,
   }) : _navigationShell = navigationShell,
        super(key: key ?? const ValueKey('ScaffoldShell'));
 
   final StatefulNavigationShell _navigationShell;
+  final bool showNavigation;
 
   @override
   Widget build(BuildContext context) {
     final windowSizeClass = context.windowSizeClass;
     final destinations = _buildDestinations;
-    return AnnotatedRegion(
-      value: SystemUiOverlayStyles(context).scaffoldShell,
-      child: Scaffold(
-        body: Row(
-          children: <Widget>[
-            if (windowSizeClass.isAtLeast(WindowSizeClass.expanded))
-              AppNavigationRail(
-                selectedIndex: _navigationShell.currentIndex,
-                onDestinationSelected: _onDestinationSelected,
-                destinations: destinations,
-              ),
-            Expanded(child: _navigationShell),
-          ],
+    return ShellRouteVisibility(
+      isCurrent: ModalRoute.isCurrentOf(context) ?? true,
+      activeBranchIndex: _navigationShell.currentIndex,
+      child: AnnotatedRegion(
+        value: SystemUiOverlayStyles(context).scaffoldShell,
+        child: Scaffold(
+          body: Row(
+            children: <Widget>[
+              if (showNavigation &&
+                  windowSizeClass.isAtLeast(WindowSizeClass.expanded))
+                AppNavigationRail(
+                  selectedIndex: _navigationShell.currentIndex,
+                  onDestinationSelected: _onDestinationSelected,
+                  destinations: destinations,
+                ),
+              Expanded(child: _navigationShell),
+            ],
+          ),
+          bottomNavigationBar:
+              showNavigation && windowSizeClass.isAtMost(WindowSizeClass.medium)
+              ? ResponsiveNavigationBar(
+                  selectedIndex: _navigationShell.currentIndex,
+                  onDestinationSelected: _onDestinationSelected,
+                  destinations: destinations,
+                )
+              : null,
+          resizeToAvoidBottomInset: false,
+          extendBody: true,
         ),
-        bottomNavigationBar: windowSizeClass.isAtMost(WindowSizeClass.medium)
-            ? ResponsiveNavigationBar(
-                selectedIndex: _navigationShell.currentIndex,
-                onDestinationSelected: _onDestinationSelected,
-                destinations: destinations,
-              )
-            : null,
-        resizeToAvoidBottomInset: false,
-        extendBody: true,
       ),
     );
   }
@@ -83,4 +91,51 @@ class ScaffoldShell extends StatelessWidget {
       initialLocation: index == _navigationShell.currentIndex,
     );
   }
+}
+
+/// Whether the root shell page is the current route on its Navigator.
+///
+/// Branch details remain current on their own Navigators while another branch
+/// is active or a root page covers the shell. Descendants use this to keep
+/// hidden details out of predictive-back gestures.
+class ShellRouteVisibility extends InheritedWidget {
+  const ShellRouteVisibility({
+    required this.isCurrent,
+    required this.activeBranchIndex,
+    required super.child,
+    super.key,
+  });
+
+  final bool isCurrent;
+  final int activeBranchIndex;
+
+  static bool canPopBranchDetail(BuildContext context, int branchIndex) {
+    final visibility = context
+        .dependOnInheritedWidgetOfExactType<ShellRouteVisibility>();
+    return visibility == null ||
+        (visibility.isCurrent && visibility.activeBranchIndex == branchIndex);
+  }
+
+  @override
+  bool updateShouldNotify(ShellRouteVisibility oldWidget) =>
+      isCurrent != oldWidget.isCurrent ||
+      activeBranchIndex != oldWidget.activeBranchIndex;
+}
+
+/// Prevents inactive or covered branch pages from handling predictive back.
+class BranchDetailPopScope extends StatelessWidget {
+  const BranchDetailPopScope({
+    required this.branchIndex,
+    required this.child,
+    super.key,
+  });
+
+  final int branchIndex;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: ShellRouteVisibility.canPopBranchDetail(context, branchIndex),
+    child: child,
+  );
 }

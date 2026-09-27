@@ -354,59 +354,65 @@ GoRouter buildAppRouter({
                 },
                 routes: <RouteBase>[
                   GoRoute(
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _exploreShellNavigatorKey,
                     path: RoutePaths.homeSearchResults,
                     name: RouteNames.homeSearchResult,
                     builder: (_, state) {
                       final query = state.uri.queryParameters['q'] ?? '';
 
-                      return ChangeNotifierProvider(
-                        key: ValueKey(query),
-                        create: (context) {
-                          final viewModel = SearchViewModel(
-                            eventRepository: context.read(),
-                            exploreGetByIdUseCase: ExploreUseCase(
+                      return BranchDetailPopScope(
+                        branchIndex: 0,
+                        child: ChangeNotifierProvider(
+                          key: ValueKey(query),
+                          create: (context) {
+                            final viewModel = SearchViewModel(
                               eventRepository: context.read(),
-                              placeRepository: context.read(),
-                            ),
-                            searchRepository: context.read(),
-                          );
+                              exploreGetByIdUseCase: ExploreUseCase(
+                                eventRepository: context.read(),
+                                placeRepository: context.read(),
+                              ),
+                              searchRepository: context.read(),
+                            );
 
-                          unawaited(viewModel.loadResults.execute(query));
+                            unawaited(viewModel.loadResults.execute(query));
 
-                          return viewModel;
-                        },
-                        builder: (context, _) => SearchResultScreen(
-                          query: query,
-                          viewModel: context.read(),
+                            return viewModel;
+                          },
+                          builder: (context, _) => SearchResultScreen(
+                            query: query,
+                            viewModel: context.read(),
+                          ),
                         ),
                       );
                     },
                     routes: <RouteBase>[
                       postRoute(
                         name: RouteNames.homeSearchResultPost,
-                        parentNavigatorKey: _rootNavigatorKey,
+                        parentNavigatorKey: _exploreShellNavigatorKey,
+                        branchIndex: 0,
                       ),
                     ],
                   ),
                   GoRoute(
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _exploreShellNavigatorKey,
                     path: RoutePaths.homeSearchResultsLegacy,
                     redirect: redirectLegacySearchResults,
                   ),
                   GoRoute(
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _exploreShellNavigatorKey,
                     path: RoutePaths.homeSearchResultsLegacyPost,
                     redirect: redirectLegacySearchResults,
                   ),
                   postRoute(
                     name: RouteNames.homePost,
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _exploreShellNavigatorKey,
+                    branchIndex: 0,
                   ),
                   categoryRoute(
                     name: RouteNames.homeCategory,
                     childName: RouteNames.homeCategoryPost,
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _exploreShellNavigatorKey,
+                    branchIndex: 0,
                   ),
                 ],
               ),
@@ -427,12 +433,14 @@ GoRouter buildAppRouter({
                 routes: <RouteBase>[
                   postRoute(
                     name: RouteNames.favouritesPost,
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _favouritesShellNavigatorKey,
+                    branchIndex: 1,
                   ),
                   categoryRoute(
                     name: RouteNames.favouritesCategory,
                     childName: RouteNames.favouritesCategoryPost,
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _favouritesShellNavigatorKey,
+                    branchIndex: 1,
                   ),
                 ],
               ),
@@ -470,12 +478,14 @@ GoRouter buildAppRouter({
                 routes: <RouteBase>[
                   postRoute(
                     name: RouteNames.eventsPost,
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _eventsShellNavigatorKey,
+                    branchIndex: 2,
                   ),
                   categoryRoute(
                     name: RouteNames.eventsCategory,
                     childName: RouteNames.eventsCategoryPost,
-                    parentNavigatorKey: _rootNavigatorKey,
+                    parentNavigatorKey: _eventsShellNavigatorKey,
+                    branchIndex: 2,
                   ),
                 ],
               ),
@@ -532,10 +542,19 @@ GoRouter buildAppRouter({
             ],
           ),
         ],
-        pageBuilder: (_, _, navigationShell) {
+        pageBuilder: (_, state, navigationShell) {
+          final showNavigation = <String>{
+            RouteNames.home,
+            RouteNames.favourites,
+            RouteNames.events,
+            RouteNames.geoMap,
+          }.contains(state.topRoute?.name);
           return MaterialPage<void>(
             restorationId: 'appShellPage',
-            child: ScaffoldShell(navigationShell: navigationShell),
+            child: ScaffoldShell(
+              navigationShell: navigationShell,
+              showNavigation: showNavigation,
+            ),
           );
         },
       ),

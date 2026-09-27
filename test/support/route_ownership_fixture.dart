@@ -17,6 +17,7 @@ import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
+import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
@@ -102,37 +103,44 @@ final class RouteOwnershipFixture {
                   builder: (_, _) => const _StubScreen(label: 'Home'),
                   routes: <RouteBase>[
                     GoRoute(
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: exploreNavigatorKey,
                       path: RoutePaths.homeSearchResults,
                       name: RouteNames.homeSearchResult,
-                      builder: (_, state) => _StubScreen(
-                        label: 'Search ${state.uri.queryParameters['q'] ?? ''}',
+                      builder: (_, state) => BranchDetailPopScope(
+                        branchIndex: 0,
+                        child: _StubScreen(
+                          label:
+                              'Search ${state.uri.queryParameters['q'] ?? ''}',
+                        ),
                       ),
                       routes: <RouteBase>[
                         postRoute(
                           name: RouteNames.homeSearchResultPost,
-                          parentNavigatorKey: rootNavigatorKey,
+                          parentNavigatorKey: exploreNavigatorKey,
+                          branchIndex: 0,
                         ),
                       ],
                     ),
                     GoRoute(
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: exploreNavigatorKey,
                       path: RoutePaths.homeSearchResultsLegacy,
                       redirect: redirectLegacySearchResults,
                     ),
                     GoRoute(
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: exploreNavigatorKey,
                       path: RoutePaths.homeSearchResultsLegacyPost,
                       redirect: redirectLegacySearchResults,
                     ),
                     postRoute(
                       name: RouteNames.homePost,
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: exploreNavigatorKey,
+                      branchIndex: 0,
                     ),
                     categoryRoute(
                       name: RouteNames.homeCategory,
                       childName: RouteNames.homeCategoryPost,
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: exploreNavigatorKey,
+                      branchIndex: 0,
                     ),
                   ],
                 ),
@@ -148,12 +156,14 @@ final class RouteOwnershipFixture {
                   routes: <RouteBase>[
                     postRoute(
                       name: RouteNames.favouritesPost,
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: favouritesNavigatorKey,
+                      branchIndex: 1,
                     ),
                     categoryRoute(
                       name: RouteNames.favouritesCategory,
                       childName: RouteNames.favouritesCategoryPost,
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: favouritesNavigatorKey,
+                      branchIndex: 1,
                     ),
                   ],
                 ),
@@ -169,12 +179,14 @@ final class RouteOwnershipFixture {
                   routes: <RouteBase>[
                     postRoute(
                       name: RouteNames.eventsPost,
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: eventsNavigatorKey,
+                      branchIndex: 2,
                     ),
                     categoryRoute(
                       name: RouteNames.eventsCategory,
                       childName: RouteNames.eventsCategoryPost,
-                      parentNavigatorKey: rootNavigatorKey,
+                      parentNavigatorKey: eventsNavigatorKey,
+                      branchIndex: 2,
                     ),
                   ],
                 ),
@@ -191,7 +203,15 @@ final class RouteOwnershipFixture {
               ],
             ),
           ],
-          builder: (_, _, navigationShell) => navigationShell,
+          builder: (_, state, navigationShell) => ScaffoldShell(
+            navigationShell: navigationShell,
+            showNavigation: <String>{
+              RouteNames.home,
+              RouteNames.favourites,
+              RouteNames.events,
+              RouteNames.geoMap,
+            }.contains(state.topRoute?.name),
+          ),
         ),
       ],
     );

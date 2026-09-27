@@ -1,5 +1,7 @@
 import 'dart:async' show unawaited;
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
@@ -7,10 +9,13 @@ import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
+import 'package:moliseis/ui/post/widgets/components/post_section_map_preview.dart';
 import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
 
 import '../support/fixtures.dart';
+import '../support/predictive_back.dart';
 import '../support/route_ownership_fixture.dart';
 
 void main() {
@@ -56,9 +61,7 @@ void main() {
     }
   });
 
-  testWidgets('category page is root-owned while branch keeps its root', (
-    tester,
-  ) async {
+  testWidgets('category page belongs to its branch', (tester) async {
     final fixture = RouteOwnershipFixture();
     addTearDown(fixture.dispose);
     await tester.pumpWidget(fixture.app);
@@ -69,17 +72,15 @@ void main() {
 
     expect(find.text('Categorie'), findsOneWidget);
     expect(fixture.uri.path, '/home/category/nature');
-    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 2);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
-      2,
-      reason: 'root Navigator must own the shell and the category page',
+      1,
+      reason: 'root Navigator must own only the shell',
     );
   });
 
-  testWidgets('post page is root-owned while branch keeps its root', (
-    tester,
-  ) async {
+  testWidgets('post page belongs to its branch', (tester) async {
     final fixture = RouteOwnershipFixture();
     addTearDown(fixture.dispose);
     await tester.pumpWidget(fixture.app);
@@ -90,17 +91,15 @@ void main() {
 
     expect(find.byType(PostScreen), findsOneWidget);
     expect(fixture.uri.path, '/home/posts/1');
-    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 2);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
-      2,
-      reason: 'root Navigator must own the shell and the post page',
+      1,
+      reason: 'root Navigator must own only the shell',
     );
   });
 
-  testWidgets('search results page is root-owned while branch keeps its root', (
-    tester,
-  ) async {
+  testWidgets('search results page belongs to its branch', (tester) async {
     final fixture = RouteOwnershipFixture();
     addTearDown(fixture.dispose);
     await tester.pumpWidget(fixture.app);
@@ -111,15 +110,15 @@ void main() {
 
     expect(find.text('Search molise root'), findsOneWidget);
     expect(fixture.uri.path, '/home/search_results');
-    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 2);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
-      2,
-      reason: 'root Navigator must own the shell and the search-results page',
+      1,
+      reason: 'root Navigator must own only the shell',
     );
   });
 
-  testWidgets('back from a root-owned post returns to its declarative parent', (
+  testWidgets('back from a branch post returns to its declarative parent', (
     tester,
   ) async {
     final fixture = RouteOwnershipFixture();
@@ -161,15 +160,15 @@ void main() {
 
     expect(find.text('Categorie'), findsOneWidget);
     expect(fixture.uri.path, '/home/category/nature');
-    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 2);
     expect(
       fixture.rootNavigatorKey.currentState!.widget.pages.length,
-      2,
-      reason: 'root Navigator must keep the shell and the category page',
+      1,
+      reason: 'root Navigator must keep the shell',
     );
   });
 
-  testWidgets('hidden branch Navigators hold no poppable detail route', (
+  testWidgets('the active branch owns the poppable detail route', (
     tester,
   ) async {
     final fixture = RouteOwnershipFixture();
@@ -191,10 +190,11 @@ void main() {
     expect(find.byType(PostScreen), findsOneWidget);
 
     for (final key in fixture.branchNavigatorKeys) {
-      expect(key.currentState!.widget.pages.length, 1);
-      expect(key.currentState!.canPop(), isFalse);
+      final isExplore = identical(key, fixture.exploreNavigatorKey);
+      expect(key.currentState!.widget.pages.length, isExplore ? 2 : 1);
+      expect(key.currentState!.canPop(), isExplore);
     }
-    expect(fixture.rootNavigatorKey.currentState!.canPop(), isTrue);
+    expect(fixture.rootNavigatorKey.currentState!.canPop(), isFalse);
   });
 
   testWidgets('gallery location is root-owned, replacing the shell', (
@@ -221,7 +221,7 @@ void main() {
     );
   });
 
-  testWidgets('pushed gallery is root-owned while branch keeps its root', (
+  testWidgets('pushed gallery is root-owned while branch keeps its route', (
     tester,
   ) async {
     final fixture = RouteOwnershipFixture();
@@ -249,6 +249,59 @@ void main() {
     );
   });
 
+  testWidgets('gallery push keeps the post ViewModel and map mounted', (
+    tester,
+  ) async {
+    final fixture = RouteOwnershipFixture();
+    addTearDown(fixture.dispose);
+    await tester.pumpWidget(fixture.app);
+    fixture.router.go('/home/posts/1?type=event');
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byType(PostSectionMapPreview),
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(PostScreen),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    final postBefore = tester.widget<PostScreen>(find.byType(PostScreen));
+    final postStateBefore = tester.state(find.byType(PostScreen));
+    final mapStateBefore = tester.state(find.byType(GeoMap));
+
+    unawaited(
+      fixture.router.pushNamed(
+        RouteNames.gallery,
+        extra: GalleryPreviewRouteData(
+          media: [_buildMedia()],
+          initialIndex: 0,
+        ).toExtra(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(GalleryPreviewScreen), findsOneWidget);
+    expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 2);
+    expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 2);
+    expect(
+      tester.state(find.byType(GeoMap, skipOffstage: false)),
+      same(mapStateBefore),
+    );
+
+    fixture.router.pop();
+    await tester.pumpAndSettle();
+    expect(tester.state(find.byType(PostScreen)), same(postStateBefore));
+    expect(tester.state(find.byType(GeoMap)), same(mapStateBefore));
+    expect(
+      tester.widget<PostScreen>(find.byType(PostScreen)).viewModel,
+      same(postBefore.viewModel),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('branch root state persists across tab switches', (tester) async {
     final fixture = RouteOwnershipFixture();
     addTearDown(fixture.dispose);
@@ -266,6 +319,96 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Count: 1'), findsOneWidget);
     expect(find.text('Home root'), findsOneWidget);
+  });
+
+  for (final (source, tabLabel) in <(String, String)>[
+    ('/home/posts/1?type=event', 'Esplora'),
+    ('/favourites/posts/1?type=event', 'Preferiti'),
+    ('/events/posts/1?type=event', 'Eventi'),
+    ('/home/category/nature/posts/1?type=event', 'Esplora'),
+    ('/home/search_results/posts/1?q=molise&type=event', 'Esplora'),
+  ]) {
+    testWidgets('Apri mappa preserves $source in its branch', (tester) async {
+      final fixture = RouteOwnershipFixture();
+      addTearDown(fixture.dispose);
+      await tester.pumpWidget(fixture.app);
+      fixture.router.go(source);
+      await tester.pumpAndSettle();
+
+      final postBefore = tester.widget<PostScreen>(find.byType(PostScreen));
+      final postStateBefore = tester.state(find.byType(PostScreen));
+      final sourceUri = fixture.uri;
+
+      await tester.scrollUntilVisible(
+        find.byType(PostSectionMapPreview),
+        250,
+        scrollable: find
+            .descendant(
+              of: find.byType(PostScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(find.text('Apri mappa'));
+      await tester.pumpAndSettle();
+
+      expect(fixture.uri.path, RoutePaths.geoMap);
+      expect(fixture.uri.queryParameters['contentId'], '1');
+      expect(fixture.uri.queryParameters['type'], 'event');
+      expect(find.text('Map root'), findsOneWidget);
+
+      await tester.tap(find.text(tabLabel));
+      await tester.pumpAndSettle();
+
+      expect(fixture.uri, sourceUri);
+      expect(find.byType(PostScreen), findsOneWidget);
+      expect(tester.state(find.byType(PostScreen)), same(postStateBefore));
+      expect(
+        tester.widget<PostScreen>(find.byType(PostScreen)).viewModel,
+        same(postBefore.viewModel),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('map predictive back preserves the hidden post route', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      final fixture = RouteOwnershipFixture();
+      addTearDown(fixture.dispose);
+      await tester.pumpWidget(fixture.app);
+      fixture.router.go('/home/posts/1?type=event');
+      await tester.pumpAndSettle();
+      final postState = tester.state(find.byType(PostScreen));
+
+      await tester.scrollUntilVisible(
+        find.byType(PostSectionMapPreview),
+        250,
+        scrollable: find
+            .descendant(
+              of: find.byType(PostScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(find.text('Apri mappa'));
+      await tester.pumpAndSettle();
+
+      await startPredictiveBack(tester);
+      await commitPredictiveBack(tester);
+      expect(fixture.uri.path, RoutePaths.geoMap);
+      expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 2);
+
+      await tester.tap(find.text('Esplora'));
+      await tester.pumpAndSettle();
+      expect(fixture.uri.path, '/home/posts/1');
+      expect(tester.state(find.byType(PostScreen)), same(postState));
+      expect(tester.takeException(), isNull);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets(

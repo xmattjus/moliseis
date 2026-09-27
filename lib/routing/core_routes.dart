@@ -11,6 +11,7 @@ import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/category/view_models/category_view_model.dart';
 import 'package:moliseis/ui/category/widgets/category_screen.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
+import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/post/view_models/post_view_model.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
@@ -127,6 +128,7 @@ GoRoute categoryRoute({
   required String name,
   required String childName,
   required GlobalKey<NavigatorState> parentNavigatorKey,
+  required int branchIndex,
 }) {
   return GoRoute(
     parentNavigatorKey: parentNavigatorKey,
@@ -139,40 +141,50 @@ GoRoute categoryRoute({
       final allCategories = ContentCategory.values.minusUnknown;
 
       if (category == null && slug != RouteParameters.allCategorySlug) {
-        return RouteErrorScreen(
-          uri: state.uri,
-          error: GoException('Unknown category "$slug"'),
+        return BranchDetailPopScope(
+          branchIndex: branchIndex,
+          child: RouteErrorScreen(
+            uri: state.uri,
+            error: GoException('Unknown category "$slug"'),
+          ),
         );
       }
 
-      return ChangeNotifierProvider<CategoryViewModel>(
-        key: ValueKey(slug),
-        create: (context) {
-          final viewModel = CategoryViewModel(
-            categoryUseCase: CategoryUseCase(
-              eventRepository: context.read(),
-              placeRepository: context.read(),
-            ),
-            exploreGetByIdUseCase: ExploreUseCase(
-              eventRepository: context.read(),
-              placeRepository: context.read(),
-            ),
-            settingsRepository: context.read(),
-          );
+      return BranchDetailPopScope(
+        branchIndex: branchIndex,
+        child: ChangeNotifierProvider<CategoryViewModel>(
+          key: ValueKey(slug),
+          create: (context) {
+            final viewModel = CategoryViewModel(
+              categoryUseCase: CategoryUseCase(
+                eventRepository: context.read(),
+                placeRepository: context.read(),
+              ),
+              exploreGetByIdUseCase: ExploreUseCase(
+                eventRepository: context.read(),
+                placeRepository: context.read(),
+              ),
+              settingsRepository: context.read(),
+            );
 
-          unawaited(
-            viewModel.setSelectedCategories.execute(
-              category == null ? {...allCategories} : {category},
-            ),
-          );
+            unawaited(
+              viewModel.setSelectedCategories.execute(
+                category == null ? {...allCategories} : {category},
+              ),
+            );
 
-          return viewModel;
-        },
-        builder: (context, _) => CategoryScreen(viewModel: context.read()),
+            return viewModel;
+          },
+          builder: (context, _) => CategoryScreen(viewModel: context.read()),
+        ),
       );
     },
     routes: <RouteBase>[
-      postRoute(name: childName, parentNavigatorKey: parentNavigatorKey),
+      postRoute(
+        name: childName,
+        parentNavigatorKey: parentNavigatorKey,
+        branchIndex: branchIndex,
+      ),
     ],
   );
 }
@@ -180,6 +192,7 @@ GoRoute categoryRoute({
 GoRoute postRoute({
   required String name,
   required GlobalKey<NavigatorState> parentNavigatorKey,
+  required int branchIndex,
 }) {
   return GoRoute(
     parentNavigatorKey: parentNavigatorKey,
@@ -191,9 +204,12 @@ GoRoute postRoute({
       final id = RouteParameters.contentId(rawId);
 
       if (id == null) {
-        return RouteErrorScreen(
-          uri: state.uri,
-          error: GoException('Invalid content id "$rawId"'),
+        return BranchDetailPopScope(
+          branchIndex: branchIndex,
+          child: RouteErrorScreen(
+            uri: state.uri,
+            error: GoException('Invalid content id "$rawId"'),
+          ),
         );
       }
 
@@ -201,38 +217,49 @@ GoRoute postRoute({
       final type = RouteParameters.contentType(rawType);
 
       if (type == null) {
-        return RouteErrorScreen(
-          uri: state.uri,
-          error: GoException('Missing or invalid content type "$rawType"'),
+        return BranchDetailPopScope(
+          branchIndex: branchIndex,
+          child: RouteErrorScreen(
+            uri: state.uri,
+            error: GoException('Missing or invalid content type "$rawType"'),
+          ),
         );
       }
 
-      final postUseCase = PostUseCase(
-        eventRepository: context.read(),
-        placeRepository: context.read(),
-      );
-
-      final viewModel = PostViewModel(postUseCase: postUseCase);
-
-      final weatherViewModel = WeatherViewModel(
-        weatherApiClient: context.read(),
-        weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
-        weatherCodeIconMapper: const WmoWeatherIconMapper(),
-      );
-
       final isEvent = RouteParameters.isEvent(type);
 
-      if (isEvent) {
-        unawaited(viewModel.loadEvent.execute(id));
-      } else {
-        unawaited(viewModel.loadPlace.execute(id));
-      }
-
-      return PostScreen(
+      return ChangeNotifierProvider<PostViewModel>(
         key: ValueKey((id, type)),
-        isEvent: isEvent,
-        viewModel: viewModel,
-        weatherViewModel: weatherViewModel,
+        create: (context) {
+          final viewModel = PostViewModel(
+            postUseCase: PostUseCase(
+              eventRepository: context.read(),
+              placeRepository: context.read(),
+            ),
+          );
+          if (isEvent) {
+            unawaited(viewModel.loadEvent.execute(id));
+          } else {
+            unawaited(viewModel.loadPlace.execute(id));
+          }
+          return viewModel;
+        },
+        child: ChangeNotifierProvider<WeatherViewModel>(
+          create: (context) => WeatherViewModel(
+            weatherApiClient: context.read(),
+            weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
+            weatherCodeIconMapper: const WmoWeatherIconMapper(),
+          ),
+          builder: (context, _) => BranchDetailPopScope(
+            branchIndex: branchIndex,
+            child: PostScreen(
+              key: ValueKey((id, type)),
+              isEvent: isEvent,
+              viewModel: context.read<PostViewModel>(),
+              weatherViewModel: context.read<WeatherViewModel>(),
+            ),
+          ),
+        ),
       );
     },
   );
