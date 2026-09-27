@@ -12,7 +12,7 @@ dependencies:
   # A
   # B
   # C
-  cached_network_image_ce: ^4.8.0
+  cached_network_image_ce: ^4.13.0
   collection: ^1.19.1
   cronet_http: ^1.6.0
   crypto: ^3.0.7
@@ -66,9 +66,9 @@ dependencies:
   # Q
   # R
   # S
-  sentry: ^10.0.0-alpha.5
-  sentry_flutter: ^10.0.0-alpha.5
-  sentry_supabase: ^10.0.0-alpha.5
+  sentry: ^10.0.0-rc.0
+  sentry_flutter: ^10.0.0-rc.0
+  sentry_supabase: ^10.0.0-rc.0
   share_plus: ^13.3.0
   skeletonizer: ^3.0.0
   smooth_page_indicator: ^3.0.0
@@ -92,7 +92,7 @@ dependencies:
 dev_dependencies:
   # A
   # B
-  build_runner: ^2.15.0
+  build_runner: ^2.15.1
   # C
   # D
   # E
