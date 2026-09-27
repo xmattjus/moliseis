@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  FLUTTER_VERSION: "3.41.9"
+  FLUTTER_VERSION: "3.47.4"
   IOS_TEAM_ID: "P6FY59D893"
   IOS_BUNDLE_ID: "it.benitomatteobercini.moliseis"
 
