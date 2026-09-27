@@ -3,7 +3,6 @@ import 'package:material_ui/material_ui.dart';
 class CustomRichText extends StatelessWidget {
   const CustomRichText(
     this.label, {
-    super.key,
     this.labelTextStyle,
     this.icon,
     this.iconColor,
@@ -11,6 +10,7 @@ class CustomRichText extends StatelessWidget {
     this.contentTextStyle,
     this.overflow,
     this.maxLines,
+    super.key,
   });
 
   ///

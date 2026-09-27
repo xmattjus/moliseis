@@ -5,10 +5,10 @@ import 'package:material_ui/material_ui.dart';
 
 class CustomBackButton extends StatelessWidget {
   const CustomBackButton({
-    super.key,
     this.padding,
     this.onPressed,
     this.backgroundColor,
+    super.key,
   });
 
   final EdgeInsetsGeometry? padding;

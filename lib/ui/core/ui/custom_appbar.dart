@@ -6,13 +6,13 @@ enum CustomAppBarType { standard, hidden }
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar({
-    super.key,
     this.title,
     this.leading,
     this.actions,
     this.systemOverlayStyle,
     this.showBackButton = false,
     this.backButtonBgColor,
+    super.key,
   }) : _type = CustomAppBarType.standard,
        assert(
          showBackButton && leading == null ||
@@ -26,7 +26,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   ///
   /// Useful when an app bar is not needed but there is no need to manage
   /// manually the status bar icons color (e.g. with a brightness change).
-  const CustomAppBar.hidden({super.key, this.systemOverlayStyle})
+  const CustomAppBar.hidden({this.systemOverlayStyle, super.key})
     : _type = CustomAppBarType.hidden,
       title = null,
       leading = null,

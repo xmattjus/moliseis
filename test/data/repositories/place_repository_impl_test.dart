@@ -986,8 +986,8 @@ PlaceRepositoryImpl _makeRepository(TestObjectBoxEnvironment env) =>
     );
 
 PlaceDto _relationTestPlaceDto({
-  RelationUpdate<int> cityId = const Keep<int>(),
   required DateTime modifiedAt,
+  RelationUpdate<int> cityId = const Keep<int>(),
   DateTime? deletedAt,
 }) => PlaceDto(
   id: 1,

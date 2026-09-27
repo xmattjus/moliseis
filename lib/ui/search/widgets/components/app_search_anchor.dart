@@ -15,7 +15,6 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 
 class AppSearchAnchor extends StatefulWidget {
   const AppSearchAnchor({
-    super.key,
     this.controller,
     this.hintText = 'Cerca per luogo, evento o categoria',
     this.leading,
@@ -24,6 +23,7 @@ class AppSearchAnchor extends StatefulWidget {
     this.elevation,
     required this.onSuggestionPressed,
     required this.viewModel,
+    super.key,
   });
 
   /// An optional controller that allows to interact with the search bar from

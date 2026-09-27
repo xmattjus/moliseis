@@ -21,7 +21,7 @@ class ContentSubmissionProgressScreen extends StatefulWidget {
   ///
   /// [viewModel] owns the submission command and submit state. The screen
   /// observes it live and never starts a new upload itself.
-  const ContentSubmissionProgressScreen({super.key, required this.viewModel});
+  const ContentSubmissionProgressScreen({required this.viewModel, super.key});
 
   /// ViewModel providing the current submission command state.
   final ContentSubmissionViewModel viewModel;

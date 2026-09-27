@@ -766,11 +766,11 @@ class _StubBranchPage extends StatelessWidget {
 
 class _SearchHostPage extends StatelessWidget {
   const _SearchHostPage({
-    super.key,
     required this.controller,
     required this.viewModel,
     this.onBackPressed,
     this.navigateOnSubmit = false,
+    super.key,
   });
 
   final SearchController controller;

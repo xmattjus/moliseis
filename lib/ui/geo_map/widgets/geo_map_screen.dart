@@ -39,12 +39,12 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 /// transient state.
 class GeoMapScreen extends StatefulWidget {
   const GeoMapScreen({
-    super.key,
     required this.initialContentId,
     required this.initialContentType,
     required this.viewModel,
     required this.searchViewModel,
     required this.weatherViewModel,
+    super.key,
   });
 
   /// The content id selected by the current location, or null for the
@@ -435,10 +435,10 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
                 _scrimOpacity.value = 0.32;
               }
             },
-            searchQuery: _searchQuery,
             viewModel: widget.viewModel,
             searchViewModel: widget.searchViewModel,
             weatherViewModel: widget.weatherViewModel,
+            searchQuery: _searchQuery,
           ),
         ),
       ),

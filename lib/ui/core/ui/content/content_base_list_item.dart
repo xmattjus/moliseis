@@ -8,10 +8,10 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class ContentBaseListItem extends StatelessWidget {
   const ContentBaseListItem(
     this.content, {
-    super.key,
     this.onPressed,
     this.verticalTrailing,
     this.horizontalTrailing,
+    super.key,
   });
 
   final ContentBase content;

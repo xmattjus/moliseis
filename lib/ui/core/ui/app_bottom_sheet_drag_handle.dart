@@ -6,7 +6,7 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 /// This helps users quickly understand that the sheet can be swiped,
 /// improving discoverability without adding extra interaction hints.
 class AppBottomSheetDragHandle extends StatelessWidget {
-  const AppBottomSheetDragHandle({super.key, this.color});
+  const AppBottomSheetDragHandle({this.color, super.key});
 
   final Color? color;
 

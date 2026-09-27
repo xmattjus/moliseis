@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 
 class AppNetworkImage extends StatefulWidget {
   const AppNetworkImage({
-    super.key,
     required this.url,
     required this.imageWidth,
     required this.imageHeight,
@@ -16,15 +15,16 @@ class AppNetworkImage extends StatefulWidget {
     required this.height,
     this.fit = BoxFit.cover,
     this.onImageLoading,
+    super.key,
   }) : _fullResolution = false;
 
   const AppNetworkImage.fullResolution({
-    super.key,
     required this.url,
     required this.imageWidth,
     required this.imageHeight,
     this.fit = BoxFit.cover,
     this.onImageLoading,
+    super.key,
   }) : width = 0,
        height = 0,
        _fullResolution = true;

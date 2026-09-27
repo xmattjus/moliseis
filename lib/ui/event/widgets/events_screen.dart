@@ -12,7 +12,7 @@ import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class EventsScreen extends StatefulWidget {
-  const EventsScreen({super.key, required this.viewModel});
+  const EventsScreen({required this.viewModel, super.key});
 
   final EventViewModel viewModel;
 

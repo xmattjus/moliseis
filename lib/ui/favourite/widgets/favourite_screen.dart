@@ -11,7 +11,7 @@ import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart'
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 
 class FavouriteScreen extends StatelessWidget {
-  const FavouriteScreen({super.key, required this.viewModel});
+  const FavouriteScreen({required this.viewModel, super.key});
 
   final FavouriteViewModel viewModel;
 

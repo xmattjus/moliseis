@@ -20,13 +20,13 @@ const double _mediaSlideshowHeight = 450;
 /// context, including a modal close affordance and weather details.
 class GeoMapModalPost extends StatefulWidget {
   const GeoMapModalPost({
-    super.key,
     required this.content,
     required this.onCloseButtonPressed,
     required this.onContentPressed,
     required this.viewModel,
     required this.weatherViewModel,
     required this.scrollController,
+    super.key,
   });
 
   final ContentBase content;

@@ -5,7 +5,7 @@ import 'package:moliseis/ui/core/themes/app_snack_bar_colors.dart';
 
 void main() {
   AppColorsThemeExtension buildLight() => AppColorsThemeExtension.light(
-    ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
+    ColorScheme.fromSeed(seedColor: Colors.blue),
   );
 
   AppColorsThemeExtension buildDark() => AppColorsThemeExtension.dark(

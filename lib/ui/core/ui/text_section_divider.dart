@@ -4,8 +4,8 @@ import 'package:moliseis/ui/core/themes/text_styles.dart';
 class TextSectionDivider extends StatelessWidget {
   const TextSectionDivider(
     this.data, {
-    super.key,
     this.padding = const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 8),
+    super.key,
   });
 
   final String data;

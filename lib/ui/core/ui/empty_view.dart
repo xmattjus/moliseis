@@ -3,12 +3,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 
 class EmptyView extends StatelessWidget {
-  const EmptyView({super.key, this.icon, required this.text, this.action});
+  const EmptyView({required this.text, this.icon, this.action, super.key});
 
-  const EmptyView.error({super.key, required this.text, this.action})
+  const EmptyView.error({required this.text, this.action, super.key})
     : icon = const Icon(Symbols.cancel, color: Colors.redAccent);
 
-  const EmptyView.loading({super.key, this.text})
+  const EmptyView.loading({this.text, super.key})
     : icon = const CustomCircularProgressIndicator(),
       action = null;
 

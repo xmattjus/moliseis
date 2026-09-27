@@ -12,6 +12,7 @@ class GeoMapModalSearchResults extends StatefulWidget {
     required this.onResultPressed,
     required this.onBackPressed,
     required this.viewModel,
+    super.key,
   });
 
   final String query;

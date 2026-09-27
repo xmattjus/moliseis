@@ -5,7 +5,6 @@ import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 
 class AnimatedGeoMapSearchBar extends StatelessWidget {
   const AnimatedGeoMapSearchBar({
-    super.key,
     required this.searchController,
     required this.animation,
     this.onSubmitted,
@@ -13,6 +12,7 @@ class AnimatedGeoMapSearchBar extends StatelessWidget {
     required this.onSuggestionPressed,
     this.trailing = const <Widget>[],
     required this.viewModel,
+    super.key,
   });
 
   final SearchController searchController;

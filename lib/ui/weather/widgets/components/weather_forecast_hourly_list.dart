@@ -8,11 +8,11 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 
 class WeatherForecastHourlyList extends StatefulWidget {
   const WeatherForecastHourlyList({
-    super.key,
     required this.borderColor,
     required this.backgroundColor,
     required this.viewModel,
     this.currentHourOverride,
+    super.key,
   });
 
   final Color borderColor;

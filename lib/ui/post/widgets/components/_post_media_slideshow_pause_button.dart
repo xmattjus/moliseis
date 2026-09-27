@@ -112,9 +112,11 @@ class _PostMediaSlideshowPauseButtonState
 
     if (widget.expanded != oldWidget.expanded) {
       /// Animates the button to its expanded or shrunk state.
-      widget.expanded
-          ? unawaited(_animationController.forward())
-          : unawaited(_animationController.reverse());
+      unawaited(
+        widget.expanded
+            ? _animationController.forward()
+            : _animationController.reverse(),
+      );
     }
   }
 

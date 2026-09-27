@@ -5,11 +5,11 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 
 class EventsVerticalCalendarDay extends StatelessWidget {
   const EventsVerticalCalendarDay({
-    super.key,
     required this.date,
-    this.events = const [],
     required this.onPressed,
+    this.events = const [],
     this.isSelected = false,
+    super.key,
   });
 
   final DateTime date;

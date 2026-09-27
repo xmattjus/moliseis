@@ -17,7 +17,6 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 class GeoMapBottomSheet extends StatefulWidget {
   const GeoMapBottomSheet({
-    super.key,
     required this.content,
     required this.isResolvingRequestedSelection,
     required this.controller,
@@ -25,10 +24,11 @@ class GeoMapBottomSheet extends StatefulWidget {
     required this.onCloseButtonPressed,
     required this.onContentPressed,
     required this.onVerticalDragUpdate,
-    this.searchQuery = '',
     required this.viewModel,
     required this.searchViewModel,
     required this.weatherViewModel,
+    this.searchQuery = '',
+    super.key,
   });
 
   /// Fully resolved content to display, or null when the sheet should show

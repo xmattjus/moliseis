@@ -4,7 +4,7 @@ class CustomInkWell extends StatelessWidget {
   /// Creates an ink well respecting the Material3 design guidelines.
   ///
   /// Must have an ancestor Material widget in which to cause ink reactions.
-  const CustomInkWell({super.key, required this.onPressed, this.shape});
+  const CustomInkWell({required this.onPressed, this.shape, super.key});
 
   final void Function() onPressed;
 

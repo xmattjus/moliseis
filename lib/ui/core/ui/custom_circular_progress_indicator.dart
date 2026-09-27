@@ -3,16 +3,16 @@ import 'package:moliseis/ui/core/ui/empty_box.dart';
 
 class CustomCircularProgressIndicator extends StatelessWidget {
   /// Creates a [CircularProgressIndicator] immediately.
-  const CustomCircularProgressIndicator({super.key, this.size}) : _delay = null;
+  const CustomCircularProgressIndicator({this.size, super.key}) : _delay = null;
 
   /// Creates a [CircularProgressIndicator] after the requested [delay] has
   /// passed.
   ///
   /// Defaults to 330 ms of delay.
   const CustomCircularProgressIndicator.withDelay({
-    super.key,
     Duration delay = Durations.medium2,
     this.size,
+    super.key,
   }) : _delay = delay;
 
   /// The delay after which the [CircularProgressIndicator] will be shown.

@@ -10,12 +10,12 @@ import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
 /// autoplay behavior.
 class PostSectionSlideshow extends StatelessWidget {
   const PostSectionSlideshow({
-    super.key,
     required this.height,
     required this.media,
     required this.visibilityNotifier,
     this.overlayBuilder,
     this.chromeColor,
+    super.key,
   });
 
   final double height;

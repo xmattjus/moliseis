@@ -1162,8 +1162,8 @@ Matcher containsEventId(int remoteId) =>
     contains(predicate<Event>((e) => e.remoteId == remoteId));
 
 EventDto _relationTestEventDto({
-  RelationUpdate<int> cityId = const Keep<int>(),
   required DateTime modifiedAt,
+  RelationUpdate<int> cityId = const Keep<int>(),
   DateTime? deletedAt,
 }) => EventDto(
   id: 1,

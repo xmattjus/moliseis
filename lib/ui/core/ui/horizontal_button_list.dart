@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/utils/constants.dart';
 
 class HorizontalButtonList extends StatelessWidget {
-  const HorizontalButtonList({super.key, this.padding, required this.items});
+  const HorizontalButtonList({required this.items, this.padding, super.key});
 
   final EdgeInsetsGeometry? padding;
 

@@ -7,10 +7,10 @@ import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 
 class SearchResultSliverList extends StatelessWidget {
   const SearchResultSliverList({
-    super.key,
-    this.onRetrySearchPressed,
     required this.onResultPressed,
     required this.viewModel,
+    this.onRetrySearchPressed,
+    super.key,
   });
 
   final void Function()? onRetrySearchPressed;

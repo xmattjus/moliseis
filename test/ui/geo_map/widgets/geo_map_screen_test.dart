@@ -194,7 +194,6 @@ void main() {
             child: GeoMapBottomSheet(
               content: content,
               isResolvingRequestedSelection: false,
-              searchQuery: content.name,
               controller: sheetController,
               currentCenter: content.coordinates,
               onCloseButtonPressed: () {},
@@ -203,6 +202,7 @@ void main() {
               viewModel: geoMapViewModel,
               searchViewModel: _buildSearchViewModel(),
               weatherViewModel: _buildWeatherViewModel(),
+              searchQuery: content.name,
             ),
           ),
         );

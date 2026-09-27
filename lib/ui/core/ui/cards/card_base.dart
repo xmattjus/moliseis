@@ -6,35 +6,35 @@ enum _CardBaseType { elevated, filled, outlined }
 class CardBase extends StatelessWidget {
   const CardBase({
     required this.child,
-    super.key,
     this.width,
     this.height,
     this.color,
     this.elevation,
     this.shape,
     this.onPressed,
+    super.key,
   }) : _variant = _CardBaseType.elevated;
 
   const CardBase.filled({
     required this.child,
-    super.key,
     this.width,
     this.height,
     this.color,
     this.elevation,
     this.shape,
     this.onPressed,
+    super.key,
   }) : _variant = _CardBaseType.filled;
 
   const CardBase.outlined({
     required this.child,
-    super.key,
     this.width,
     this.height,
     this.color,
     this.elevation,
     this.shape,
     this.onPressed,
+    super.key,
   }) : _variant = _CardBaseType.outlined;
 
   /// If non-null, requires the child to have exactly this width.

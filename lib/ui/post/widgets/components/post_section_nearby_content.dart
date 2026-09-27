@@ -11,11 +11,11 @@ import 'package:moliseis/utils/command.dart';
 /// command and list parameters.
 class PostSectionNearbyContent extends StatelessWidget {
   const PostSectionNearbyContent({
-    super.key,
     required this.coordinates,
     required this.onContentPressed,
     required this.loadNearContentCommand,
     required this.nearContent,
+    super.key,
   });
 
   final LatLng coordinates;

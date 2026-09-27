@@ -538,9 +538,9 @@ void main() {
 }
 
 MediaDto _relationTestMediaDto({
+  required DateTime modifiedAt,
   RelationUpdate<int> eventId = const Keep<int>(),
   RelationUpdate<int> placeId = const Keep<int>(),
-  required DateTime modifiedAt,
   DateTime? deletedAt,
 }) => MediaDto(
   id: 1,

@@ -11,9 +11,9 @@ import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 
 class SearchResultRelatedSliverList extends StatelessWidget {
   const SearchResultRelatedSliverList({
-    super.key,
     required this.onResultPressed,
     required this.viewModel,
+    super.key,
   });
 
   final void Function(ContentBase content) onResultPressed;

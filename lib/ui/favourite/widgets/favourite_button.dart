@@ -18,18 +18,18 @@ class FavouriteButton extends StatelessWidget {
   ///
   /// Defaults to [IconButton].
   const FavouriteButton({
-    super.key,
-    this.color,
     required this.content,
+    this.color,
     this.borderRadius,
+    super.key,
   }) : _type = FavouriteButtonType.small;
 
   /// Creates an actionable [OutlinedButton.icon] to set the saved state of the
   /// content.
   const FavouriteButton.wide({
-    super.key,
     required this.content,
     this.borderRadius,
+    super.key,
   }) : color = null,
        _type = FavouriteButtonType.wide;
 

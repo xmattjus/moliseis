@@ -3,10 +3,10 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 
 class SkeletonContentGridItem extends StatelessWidget {
   const SkeletonContentGridItem({
-    super.key,
     required this.width,
     required this.height,
     this.elevation,
+    super.key,
   });
 
   final double width;

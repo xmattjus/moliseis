@@ -8,12 +8,12 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class ContentBaseCardGridItem extends StatelessWidget {
   const ContentBaseCardGridItem(
     this.content, {
-    super.key,
     this.width,
     this.color,
     this.onPressed,
     this.supportingText,
     this.trailing,
+    super.key,
   });
 
   final ContentBase content;

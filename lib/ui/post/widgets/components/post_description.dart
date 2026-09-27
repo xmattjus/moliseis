@@ -38,7 +38,7 @@ MarkdownConfig _appMarkdownConfig(BuildContext context) =>
 /// A valid, non-empty Delta takes precedence so new content retains its
 /// formatting while existing Markdown descriptions continue to render as-is.
 class PostDescription extends StatefulWidget {
-  const PostDescription({super.key, required this.content});
+  const PostDescription({required this.content, super.key});
 
   final ContentBase content;
 

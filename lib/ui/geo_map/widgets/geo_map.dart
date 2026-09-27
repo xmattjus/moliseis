@@ -7,9 +7,8 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class GeoMap extends StatefulWidget {
   /// Creates an interactive geographical map with flutter_map.
   const GeoMap({
-    super.key,
-    this.mapController,
     required this.initialCenter,
+    this.mapController,
     this.initialZoom,
     this.markers = const <Marker>[],
     this.children = const <Widget>[],
@@ -17,6 +16,7 @@ class GeoMap extends StatefulWidget {
     this.onPositionChangeStart,
     this.onPositionChangeEnd,
     this.onMapReady,
+    super.key,
   });
 
   /// An optional controller that allows to interact with the map from other

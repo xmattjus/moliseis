@@ -15,9 +15,9 @@ import 'package:provider/provider.dart';
 /// allowing contexts (e.g., modals) to hide category navigation functionality.
 class PostSectionActionButtons extends StatelessWidget {
   const PostSectionActionButtons({
-    super.key,
     required this.content,
     this.onCategoryPressed,
+    super.key,
   });
 
   final ContentBase content;

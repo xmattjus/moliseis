@@ -7,13 +7,13 @@ class ContentNameAndCity extends StatelessWidget {
   /// Creates a vertical array composed of two [CustomRichText]s, one for [name]
   /// and one for [cityName].
   const ContentNameAndCity({
-    super.key,
     required this.name,
     this.cityName,
     this.nameStyle,
     this.cityNameStyle,
     this.color,
     this.overflow,
+    super.key,
   }) : assert(
          color == null || nameStyle == null && cityNameStyle == null,
          'Either specify `color` or `nameStyle`/`cityNameStyle`, not both: '

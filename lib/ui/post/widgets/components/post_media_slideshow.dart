@@ -14,11 +14,11 @@ part '_post_media_slideshow_pause_button.dart';
 
 class PostMediaSlideshow extends StatefulWidget {
   const PostMediaSlideshow({
-    super.key,
     required this.height,
     required this.media,
     required this.visibilityNotifier,
     this.chromeColor,
+    super.key,
   });
 
   final double height;

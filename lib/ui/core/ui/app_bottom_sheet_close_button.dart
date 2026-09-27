@@ -5,10 +5,10 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 
 class AppBottomSheetCloseButton extends StatelessWidget {
   const AppBottomSheetCloseButton({
-    super.key,
     this.tooltipMessage = 'Chiudi',
     this.icon = Symbols.close,
     this.onClose,
+    super.key,
   });
 
   final String? tooltipMessage;
