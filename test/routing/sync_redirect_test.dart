@@ -4,6 +4,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/dtos/city_dto.dart';
@@ -49,6 +50,7 @@ import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
 import '../support/mock_gotrue_client.dart';
 import '../support/mock_logger.dart';
+import '../support/recording_tile_http_client.dart';
 
 void main() {
   group('buildAppRouter sync redirect', () {
@@ -724,6 +726,7 @@ List<SingleChildWidget> _buildProviders(
     Provider<SettingsRepository>.value(value: settingsRepository),
     Provider<CachedWeatherApiClient>.value(value: weatherApiClient),
     Provider<CacheManager>.value(value: FakeCacheManager()),
+    Provider<http.Client>.value(value: RecordingTileHttpClient()),
     Provider<Logger>.value(value: logger),
     Provider<UrlLaunchService>(create: (_) => UrlLaunchService(logger: logger)),
     ChangeNotifierProvider<FavouriteViewModel>(

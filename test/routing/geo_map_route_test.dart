@@ -2,6 +2,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -42,6 +43,7 @@ import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
 import '../support/mock_gotrue_client.dart';
 import '../support/mock_logger.dart';
+import '../support/recording_tile_http_client.dart';
 
 void main() {
   group('buildAppRouter geoMap selection', () {
@@ -434,6 +436,7 @@ List<SingleChildWidget> _buildProviders(
   final settingsRepository = FakeSettingsRepository();
 
   return <SingleChildWidget>[
+    Provider<http.Client>.value(value: RecordingTileHttpClient()),
     Provider<EventRepository>.value(value: eventRepo),
     Provider<PlaceRepository>.value(value: placeRepo),
     Provider<SearchRepository>.value(value: _FakeSearchRepository()),

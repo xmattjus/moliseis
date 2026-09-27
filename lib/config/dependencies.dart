@@ -86,6 +86,7 @@ List<SingleChildWidget> providers(
 ) => <SingleChildWidget>[
   //#region Shared
   Provider<CacheManager>.value(value: cacheManager),
+  Provider<http.Client>.value(value: httpClient),
   Provider<Logger>.value(value: logger),
   Provider<UrlLaunchService>(
     create: (context) => UrlLaunchService(logger: context.read()),

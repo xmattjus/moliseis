@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -25,6 +26,7 @@ import 'package:provider/provider.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
 import '../../../support/mock_logger.dart';
+import '../../../support/recording_tile_http_client.dart';
 
 void main() {
   setUpAll(() async {
@@ -113,6 +115,7 @@ Widget _buildTestApp(Widget child, FavouriteViewModel favouriteViewModel) {
       ChangeNotifierProvider<FavouriteViewModel>.value(
         value: favouriteViewModel,
       ),
+      Provider<http.Client>.value(value: RecordingTileHttpClient()),
     ],
     child: MaterialApp.router(routerConfig: router),
   );

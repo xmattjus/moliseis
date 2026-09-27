@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -34,6 +35,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
 import '../../../support/mock_logger.dart';
+import '../../../support/recording_tile_http_client.dart';
 
 void main() {
   testWidgets(
@@ -90,9 +92,12 @@ void main() {
       addTearDown(router.dispose);
 
       await tester.pumpWidget(
-        ChangeNotifierProvider<FavouriteViewModel>.value(
-          value: favouriteViewModel,
-          child: MaterialApp.router(routerConfig: router),
+        Provider<http.Client>.value(
+          value: RecordingTileHttpClient(),
+          child: ChangeNotifierProvider<FavouriteViewModel>.value(
+            value: favouriteViewModel,
+            child: MaterialApp.router(routerConfig: router),
+          ),
         ),
       );
       await tester.pump();
@@ -155,9 +160,12 @@ void main() {
       addTearDown(router.dispose);
 
       await tester.pumpWidget(
-        ChangeNotifierProvider<FavouriteViewModel>.value(
-          value: favouriteViewModel,
-          child: MaterialApp.router(routerConfig: router),
+        Provider<http.Client>.value(
+          value: RecordingTileHttpClient(),
+          child: ChangeNotifierProvider<FavouriteViewModel>.value(
+            value: favouriteViewModel,
+            child: MaterialApp.router(routerConfig: router),
+          ),
         ),
       );
       await tester.pump();
@@ -699,11 +707,14 @@ Widget _buildApp({
     routes: <RouteBase>[GoRoute(path: '/', builder: (_, _) => child)],
   );
   addTearDown(router.dispose);
-  return ChangeNotifierProvider<FavouriteViewModel>.value(
-    value: favouriteViewModel,
-    child: MaterialApp.router(
-      scaffoldMessengerKey: $scaffoldMessengerKey,
-      routerConfig: router,
+  return Provider<http.Client>.value(
+    value: RecordingTileHttpClient(),
+    child: ChangeNotifierProvider<FavouriteViewModel>.value(
+      value: favouriteViewModel,
+      child: MaterialApp.router(
+        scaffoldMessengerKey: $scaffoldMessengerKey,
+        routerConfig: router,
+      ),
     ),
   );
 }

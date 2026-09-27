@@ -1,9 +1,13 @@
 import 'package:flutter_map/flutter_map.dart' show TapPosition;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
+import 'package:provider/provider.dart';
+
+import '../../../../support/recording_tile_http_client.dart';
 
 /// Minimal parent that owns the coordinate drafts like the editor ViewModel,
 /// so map-driven prop changes can be replayed through the widget-update
@@ -63,14 +67,17 @@ Future<(_HarnessState, GlobalKey<FormState>)> _pumpEditor(
   final formKey = GlobalKey<FormState>();
   final harnessKey = GlobalKey<_HarnessState>();
   await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(
-          child: _Harness(
-            key: harnessKey,
-            formKey: formKey,
-            initialLatitude: latitude,
-            initialLongitude: longitude,
+    Provider<http.Client>.value(
+      value: RecordingTileHttpClient(),
+      child: MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: _Harness(
+              key: harnessKey,
+              formKey: formKey,
+              initialLatitude: latitude,
+              initialLongitude: longitude,
+            ),
           ),
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart'
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
@@ -30,6 +31,7 @@ import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/mock_gotrue_client.dart';
 import '../support/mock_logger.dart';
+import '../support/recording_tile_http_client.dart';
 
 void main() {
   group('buildAppRouter admin auth guard', () {
@@ -352,6 +354,7 @@ final class _AdminRouteHarness {
           value: FakeContentSubmissionRepository(),
         ),
         Provider<CacheManager>.value(value: FakeCacheManager()),
+        Provider<http.Client>.value(value: RecordingTileHttpClient()),
         if (withSettingsProviders) ...<SingleChildWidget>[
           Provider<SettingsRepository>.value(value: settingsRepository),
           Provider<Logger>.value(value: logger),

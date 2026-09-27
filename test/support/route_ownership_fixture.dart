@@ -1,5 +1,6 @@
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
@@ -28,6 +29,7 @@ import 'fake_cache_manager.dart';
 import 'fake_repositories.dart';
 import 'fixtures.dart';
 import 'mock_logger.dart';
+import 'recording_tile_http_client.dart';
 
 /// Test router that mirrors the production route tree while exercising the
 /// real [postRoute] and [categoryRoute] factories.
@@ -253,6 +255,7 @@ final class RouteOwnershipFixture {
         ),
       ),
       Provider<CacheManager>.value(value: cacheManager),
+      Provider<http.Client>.value(value: RecordingTileHttpClient()),
     ],
     child: MaterialApp.router(routerConfig: router),
   );

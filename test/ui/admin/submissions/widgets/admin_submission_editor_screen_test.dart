@@ -5,6 +5,7 @@ import 'package:cached_network_image_ce/cached_network_image.dart'
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
@@ -30,6 +31,7 @@ import 'package:provider/single_child_widget.dart';
 import '../../../../support/fake_cache_manager.dart';
 import '../../../../support/fake_image_picker.dart';
 import '../../../../support/fake_repositories.dart';
+import '../../../../support/recording_tile_http_client.dart';
 
 void main() {
   group('AdminSubmissionEditorScreen', () {
@@ -61,6 +63,7 @@ void main() {
       app = MultiProvider(
         providers: <SingleChildWidget>[
           Provider<CacheManager>.value(value: FakeCacheManager()),
+          Provider<http.Client>.value(value: RecordingTileHttpClient()),
           Provider<ContentSubmissionDraftRepository>.value(
             value: draftRepository,
           ),

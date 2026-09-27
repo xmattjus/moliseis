@@ -108,6 +108,7 @@ void main() {
             child: Builder(
               builder: (context) {
                 resolved[CacheManager] = context.read<CacheManager>();
+                resolved[http.Client] = context.read<http.Client>();
                 resolved[Logger] = context.read<Logger>();
                 resolved[UrlLaunchService] = context.read<UrlLaunchService>();
                 resolved[CachedWeatherApiClient] = context
@@ -139,6 +140,7 @@ void main() {
 
       // Value-provided dependencies are forwarded by identity.
       expect(resolved[CacheManager], same(cacheManager));
+      expect(resolved[http.Client], same(httpClient));
       expect(resolved[Logger], same(logger));
       expect(resolved[SettingsRepository], same(settingsRepository));
 
