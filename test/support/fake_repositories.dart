@@ -339,6 +339,7 @@ final class FakeEventRepository extends EventRepository {
   Result<List<Event>> getByDateRangeResult;
   Result<List<Event>> getByCategoriesResult;
   Result<List<Event>> getByCoordinatesResult;
+  Completer<Result<List<Event>>>? pendingGetByCoordinates;
   Result<List<int>> getNextEventIdsResult;
   Result<List<int>> getFavouriteEventIdsResult;
   Result<Iterable<Event>> getFavouritesResult;
@@ -347,6 +348,7 @@ final class FakeEventRepository extends EventRepository {
   Completer<Result<List<Event>>>? pendingGetByDate;
   Future<Result<void>> Function(int id, bool save)? setFavouriteEventHandler;
   Map<int, Result<Event>> getByIdResults;
+  final pendingGetById = <int, Completer<Result<Event>>>{};
 
   // Sync tracking
   bool commitCalled = false;
@@ -355,6 +357,7 @@ final class FakeEventRepository extends EventRepository {
   // Call counters (only where existing tests query them)
   int getByDateCallCount = 0;
   int getByCategoriesCallCount = 0;
+  int getByCoordinatesCallCount = 0;
 
   // Argument captures (only where existing tests inspect them)
   List<double>? lastCoordinates;
@@ -398,15 +401,20 @@ final class FakeEventRepository extends EventRepository {
   }
 
   @override
-  Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) async {
+  Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) {
+    getByCoordinatesCallCount++;
     lastCoordinates = coordinates;
-    return getByCoordinatesResult;
+    return pendingGetByCoordinates?.future ??
+        Future.value(getByCoordinatesResult);
   }
 
   @override
-  Future<Result<Event>> getById(int id) async =>
-      getByIdResults[id] ??
-      Result.error(TestException('Event $id not configured'));
+  Future<Result<Event>> getById(int id) =>
+      pendingGetById[id]?.future ??
+      Future.value(
+        getByIdResults[id] ??
+            Result.error(TestException('Event $id not configured')),
+      );
 
   @override
   Future<Result<List<int>>> getNextEventIds() async => getNextEventIdsResult;
@@ -565,6 +573,9 @@ final class FakePlaceRepository extends PlaceRepository {
   Result<List<Place>> getAllResult;
   Result<List<Place>> getByCategoriesResult;
   Result<List<Place>> getByCoordinatesResult;
+  Completer<Result<List<Place>>>? pendingGetByCoordinates;
+  Completer<void>? getByCoordinatesCalled;
+  int getByCoordinatesCallCount = 0;
   Result<List<int>> getFavouritePlaceIdsResult;
   Future<Result<List<int>>> Function()? getFavouritePlaceIdsHandler;
   Result<Iterable<Place>> getFavouritesResult;
@@ -576,6 +587,7 @@ final class FakePlaceRepository extends PlaceRepository {
   Result<void> setFavouritePlaceResult;
   Future<Result<void>> Function(int id, bool save)? setFavouritePlaceHandler;
   Map<int, Result<Place>> getByIdResults;
+  final pendingGetById = <int, Completer<Result<Place>>>{};
 
   bool commitCalled = false;
   List<PlaceDto>? committedDtos;
@@ -612,15 +624,22 @@ final class FakePlaceRepository extends PlaceRepository {
   }) async => getByCategoriesResult;
 
   @override
-  Future<Result<List<Place>>> getByCoordinates(List<double> coordinates) async {
+  Future<Result<List<Place>>> getByCoordinates(List<double> coordinates) {
+    getByCoordinatesCallCount++;
     lastCoordinates = coordinates;
-    return getByCoordinatesResult;
+    final called = getByCoordinatesCalled;
+    if (called != null && !called.isCompleted) called.complete();
+    return pendingGetByCoordinates?.future ??
+        Future.value(getByCoordinatesResult);
   }
 
   @override
-  Future<Result<Place>> getById(int id) async =>
-      getByIdResults[id] ??
-      Result.error(TestException('Place $id not configured'));
+  Future<Result<Place>> getById(int id) =>
+      pendingGetById[id]?.future ??
+      Future.value(
+        getByIdResults[id] ??
+            Result.error(TestException('Place $id not configured')),
+      );
 
   @override
   Future<Result<List<int>>> getFavouritePlaceIds() async =>

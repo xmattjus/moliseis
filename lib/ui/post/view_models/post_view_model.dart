@@ -16,6 +16,7 @@ class PostViewModel extends ChangeNotifier {
   }
 
   final PostUseCase _postUseCase;
+  bool _disposed = false;
 
   late Command1<void, int> loadEvent;
   late Command1<void, LatLng> loadNearContent;
@@ -29,19 +30,27 @@ class PostViewModel extends ChangeNotifier {
       UnmodifiableListView(_nearContent);
 
   Future<Result<void>> _loadEvent(int id) async {
-    return (await _postUseCase.getEventById(id)).map((content) {
+    if (_disposed) return const Result.success(null);
+
+    final result = await _postUseCase.getEventById(id);
+    return result.map((content) {
+      if (_disposed) return;
       _content = content;
       notifyListeners();
     });
   }
 
   Future<Result<void>> _loadNearContent(LatLng coordinates) async {
+    if (_disposed) return const Result.success(null);
     _nearContent.clear();
 
     final eventsResult = await _postUseCase.getNearEventsByCoords(
       coordinates.latitude,
       coordinates.longitude,
     );
+    // Do not start the places request after disposal; preserve an events error.
+    if (_disposed) return eventsResult.map((_) {});
+
     final events = eventsResult.getOrNull();
     if (events != null) _nearContent.addAll(events);
 
@@ -49,10 +58,11 @@ class PostViewModel extends ChangeNotifier {
       coordinates.latitude,
       coordinates.longitude,
     );
-    final places = placesResult.getOrNull();
-    if (places != null) _nearContent.addAll(places);
-
-    notifyListeners();
+    if (!_disposed) {
+      final places = placesResult.getOrNull();
+      if (places != null) _nearContent.addAll(places);
+      notifyListeners();
+    }
 
     // Return the first error encountered, or the places result.
     if (eventsResult.isError) return eventsResult;
@@ -60,9 +70,19 @@ class PostViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _loadPlace(int id) async {
-    return (await _postUseCase.getPlaceById(id)).map((content) {
+    if (_disposed) return const Result.success(null);
+
+    final result = await _postUseCase.getPlaceById(id);
+    return result.map((content) {
+      if (_disposed) return;
       _content = content;
       notifyListeners();
     });
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

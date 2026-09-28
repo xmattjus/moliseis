@@ -1,9 +1,10 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Completer, unawaited;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -13,12 +14,60 @@ import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/post/widgets/components/post_section_map_preview.dart';
 import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
+import 'package:moliseis/utils/result.dart';
 
 import '../support/fixtures.dart';
 import '../support/predictive_back.dart';
 import '../support/route_ownership_fixture.dart';
 
 void main() {
+  testWidgets('NAV-07 Post A completion cannot affect replacement Post B', (
+    tester,
+  ) async {
+    final fixture = RouteOwnershipFixture();
+    addTearDown(fixture.dispose);
+    final pendingA = Completer<Result<Event>>();
+    fixture.eventRepository.pendingGetById[1] = pendingA;
+    fixture.eventRepository.getByIdResults[2] = Result.success(
+      makeEvent(remoteId: 2, name: 'Post B'),
+    );
+    await tester.pumpWidget(fixture.app);
+    await tester.pumpAndSettle();
+
+    fixture.router.go('/home/posts/1?type=event');
+    await tester.pump();
+    await tester.pump();
+    final oldViewModel = tester
+        .widget<PostScreen>(find.byType(PostScreen))
+        .viewModel;
+    expect(oldViewModel.loadEvent.running, isTrue);
+
+    fixture.router.go('/home/posts/2?type=event');
+    await tester.pumpAndSettle();
+    final currentViewModel = tester
+        .widget<PostScreen>(find.byType(PostScreen))
+        .viewModel;
+    expect(currentViewModel, isNot(same(oldViewModel)));
+    expect(currentViewModel.content.remoteId, 2);
+    expect(currentViewModel.loadEvent.completed, isTrue);
+    expect(find.text('Post B'), findsOneWidget);
+
+    pendingA.complete(Result.success(makeEvent(name: 'Post A')));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(fixture.uri.path, '/home/posts/2');
+    expect(
+      tester.widget<PostScreen>(find.byType(PostScreen)).viewModel,
+      same(currentViewModel),
+    );
+    expect(currentViewModel.content.remoteId, 2);
+    expect(currentViewModel.loadEvent.completed, isTrue);
+    expect(oldViewModel.loadEvent.completed, isTrue);
+    expect(find.text('Post B'), findsOneWidget);
+    expect(find.text('Post A'), findsNothing);
+  });
+
   testWidgets('each tab root stays on its branch Navigator with one page', (
     tester,
   ) async {
