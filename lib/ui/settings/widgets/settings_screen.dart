@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
+import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
@@ -38,7 +39,15 @@ class SettingsScreen extends StatelessWidget {
       value: SystemUiOverlayStyles(context).surface,
       child: Scaffold(
         appBar: AppBar(
-          leading: const CustomBackButton(),
+          leading: CustomBackButton(
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.goNamed(RouteNames.home);
+              }
+            },
+          ),
           title: const Text('Impostazioni'),
           forceMaterialTransparency: true,
         ),

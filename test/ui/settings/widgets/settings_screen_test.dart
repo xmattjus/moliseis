@@ -1,8 +1,11 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
+import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
@@ -33,6 +36,7 @@ void main() {
         routes: <RouteBase>[
           GoRoute(
             path: RoutePaths.home,
+            name: RouteNames.home,
             builder: (_, _) => const Scaffold(body: SizedBox.shrink()),
           ),
           GoRoute(
@@ -83,6 +87,40 @@ void main() {
         find.text('Rivedi e cura i contributi della community'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('NAV-04 pushed Settings Back returns to Home', (tester) async {
+      router.go(RoutePaths.home);
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      unawaited(router.push<void>(RoutePaths.settings));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      await tester.tap(find.byTooltip('Indietro'));
+      await tester.pumpAndSettle();
+
+      expect(router.routeInformationProvider.value.uri.path, RoutePaths.home);
+      expect(find.byType(SettingsScreen), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('NAV-04 direct Settings Back uses a safe Home fallback', (
+      tester,
+    ) async {
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      expect(
+        router.routeInformationProvider.value.uri.path,
+        RoutePaths.settings,
+      );
+
+      await tester.tap(find.byTooltip('Indietro'));
+      await tester.pumpAndSettle();
+
+      expect(router.routeInformationProvider.value.uri.path, RoutePaths.home);
+      expect(find.byType(SettingsScreen), findsNothing);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('pushes anonymous users to login and preserves settings', (

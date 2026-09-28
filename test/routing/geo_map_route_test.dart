@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
 import 'package:flutter_test/flutter_test.dart';
@@ -13,6 +15,7 @@ import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_c
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
@@ -23,11 +26,17 @@ import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/routing/router.dart';
+import 'package:moliseis/ui/core/ui/app_navigation_rail.dart';
+import 'package:moliseis/ui/core/ui/responsive_navigation_bar.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
+import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
+import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
+import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_post.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_screen.dart';
+import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
@@ -46,6 +55,173 @@ import '../support/mock_logger.dart';
 import '../support/recording_tile_http_client.dart';
 
 void main() {
+  testWidgets(
+    'NAV-01 [upstream #188018] inactive Post branch must not consume '
+    'Map root Back',
+    (tester) async {
+      final event = makeEvent();
+      final harness = _MapHarness();
+      final router = _buildTestRouterApp(
+        harness,
+        eventRepository: FakeEventRepository(
+          getByIdResults: <int, Result<Event>>{1: Result.success(event)},
+        ),
+      );
+      addTearDown(router.router.dispose);
+
+      await tester.pumpWidget(router.app);
+      router.router.go('/home/posts/1?type=event');
+      await tester.pumpAndSettle();
+      final postFinder = find.byType(PostScreen, skipOffstage: false);
+      final postState = tester.state(postFinder);
+      final postNavigator = Navigator.of(tester.element(postFinder));
+      expect(postNavigator.widget.pages.length, 2);
+
+      router.router.go(RoutePaths.geoMap);
+      await tester.pumpAndSettle();
+      final mapContext = tester.element(find.byType(GeoMapScreen));
+      expect(StatefulNavigationShell.of(mapContext).currentIndex, 3);
+      expect(Navigator.of(mapContext).widget.pages.length, 1);
+      expect(postState.mounted, isTrue);
+      expect(tester.state(postFinder), same(postState));
+
+      // A root branch has no previous page: the Back event must bubble out.
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      await tester.pumpAndSettle();
+      expect(
+        router.router.routeInformationProvider.value.uri.path,
+        RoutePaths.geoMap,
+      );
+      expect(postNavigator.widget.pages.length, 2);
+      expect(tester.state(postFinder), same(postState));
+    },
+    // go_router 18.0.1 consumes Map-root Back with an inactive stacked branch.
+    // https://github.com/flutter/flutter/issues/188018
+    // https://github.com/flutter/packages/pull/11910
+    // Both are open. Unskip after a released fix makes handlePopRoute false
+    // while preserving the inactive Post State and stack.
+    skip: true,
+  );
+
+  for (final size in <Size>[const Size(390, 844), const Size(1300, 900)]) {
+    testWidgets('NAV-02 Map shell chrome stays stable under Gallery at $size', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = _MapHarness();
+      final router = _buildTestRouterApp(harness);
+      addTearDown(router.router.dispose);
+
+      await tester.pumpWidget(router.app);
+      router.router.go(RoutePaths.geoMap);
+      await tester.pumpAndSettle();
+      final shellFinder = find.byType(ScaffoldShell, skipOffstage: false);
+      final mapFinder = find.byType(GeoMapScreen, skipOffstage: false);
+      final chromeFinder = find.byType(
+        size.width == 390 ? ResponsiveNavigationBar : AppNavigationRail,
+        skipOffstage: false,
+      );
+      final mapState = tester.state(mapFinder);
+      final mapViewModel = tester.widget<GeoMapScreen>(mapFinder).viewModel;
+      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isTrue);
+      expect(chromeFinder, findsOneWidget);
+
+      final media = Media(
+        remoteId: 1,
+        url: 'https://example.com/gallery.jpg',
+        width: 800,
+        height: 600,
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026),
+        areaName: 'Molise',
+        cityName: 'Campobasso',
+      );
+      unawaited(
+        router.router.pushNamed<void>(
+          RouteNames.gallery,
+          extra: GalleryPreviewRouteData(
+            media: <Media>[media],
+            initialIndex: 0,
+          ).toExtra(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(GalleryPreviewScreen), findsOneWidget);
+      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isTrue);
+      expect(chromeFinder, findsOneWidget);
+      expect(tester.state(mapFinder), same(mapState));
+      expect(
+        tester.widget<GeoMapScreen>(mapFinder).viewModel,
+        same(mapViewModel),
+      );
+
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(find.byType(GalleryPreviewScreen), findsNothing);
+      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isTrue);
+      expect(chromeFinder, findsOneWidget);
+      expect(tester.state(mapFinder), same(mapState));
+      expect(
+        tester.widget<GeoMapScreen>(mapFinder).viewModel,
+        same(mapViewModel),
+      );
+    });
+  }
+
+  testWidgets('NAV-02 Explore detail chrome stays hidden under Gallery', (
+    tester,
+  ) async {
+    final harness = _MapHarness();
+    final router = _buildTestRouterApp(
+      harness,
+      eventRepository: FakeEventRepository(
+        getByIdResults: <int, Result<Event>>{1: Result.success(makeEvent())},
+      ),
+    );
+    addTearDown(router.router.dispose);
+    await tester.pumpWidget(router.app);
+
+    final media = Media(
+      remoteId: 1,
+      url: 'https://example.com/gallery.jpg',
+      width: 800,
+      height: 600,
+      createdAt: DateTime.utc(2026),
+      modifiedAt: DateTime.utc(2026),
+      areaName: 'Molise',
+      cityName: 'Campobasso',
+    );
+    final shellFinder = find.byType(ScaffoldShell, skipOffstage: false);
+    for (final location in <String>[
+      '/home/search_results?q=molise',
+      '/home/category/nature',
+      '/home/posts/1?type=event',
+    ]) {
+      router.router.go(location);
+      await tester.pumpAndSettle();
+      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isFalse);
+
+      unawaited(
+        router.router.pushNamed<void>(
+          RouteNames.gallery,
+          extra: GalleryPreviewRouteData(
+            media: <Media>[media],
+            initialIndex: 0,
+          ).toExtra(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(GalleryPreviewScreen), findsOneWidget);
+      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isFalse);
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await tester.pumpAndSettle();
+      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isFalse);
+    }
+  });
+
   group('buildAppRouter geoMap selection', () {
     testWidgets('direct /map renders the default map without selection', (
       tester,

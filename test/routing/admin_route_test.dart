@@ -35,6 +35,31 @@ import '../support/recording_tile_http_client.dart';
 
 void main() {
   group('buildAppRouter admin auth guard', () {
+    testWidgets('NAV-03 direct anonymous login Back cannot expose dashboard', (
+      tester,
+    ) async {
+      final harness = _AdminRouteHarness();
+      addTearDown(harness.router.dispose);
+      addTearDown(harness.auth.dispose);
+
+      harness.router.go(RoutePaths.adminLoginLocation);
+      await tester.pumpWidget(harness.app());
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminLoginScreen), findsOneWidget);
+      expect(find.byType(AdminDashboardScreen), findsNothing);
+      expect(harness.repository.listCallCount, 0);
+
+      expect(await tester.binding.handlePopRoute(), isFalse);
+      await tester.pumpAndSettle();
+      expect(
+        harness.router.routeInformationProvider.value.uri.path,
+        RoutePaths.adminLoginLocation,
+      );
+      expect(find.byType(AdminLoginScreen), findsOneWidget);
+      expect(find.byType(AdminDashboardScreen), findsNothing);
+      expect(harness.repository.listCallCount, 0);
+    });
+
     testWidgets('redirects an anonymous user from /admin to the login', (
       tester,
     ) async {

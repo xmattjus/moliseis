@@ -201,13 +201,15 @@ GoRouter buildAppRouter({
         },
       ),
       GoRoute(
+        path: RoutePaths.adminLoginLocation,
+        name: RouteNames.adminLogin,
+        builder: (context, _) =>
+            AdminLoginScreen(viewModel: context.read<AdminAuthViewModel>()),
+      ),
+      GoRoute(
         path: RoutePaths.admin,
         name: RouteNames.adminDashboard,
-        builder: (context, state) {
-          if (state.uri.path == RoutePaths.adminLoginLocation) {
-            return const SizedBox.shrink();
-          }
-
+        builder: (context, _) {
           return ChangeNotifierProvider<AdminSubmissionsViewModel>(
             create: (context) {
               final viewModel = AdminSubmissionsViewModel(
@@ -223,12 +225,6 @@ GoRouter buildAppRouter({
           );
         },
         routes: <RouteBase>[
-          GoRoute(
-            path: RoutePaths.adminLogin,
-            name: RouteNames.adminLogin,
-            builder: (context, _) =>
-                AdminLoginScreen(viewModel: context.read<AdminAuthViewModel>()),
-          ),
           GoRoute(
             path: RoutePaths.adminSubmissionsNew,
             name: RouteNames.adminSubmissionNew,
@@ -544,11 +540,11 @@ GoRouter buildAppRouter({
         ],
         pageBuilder: (_, state, navigationShell) {
           final showNavigation = <String>{
-            RouteNames.home,
-            RouteNames.favourites,
-            RouteNames.events,
-            RouteNames.geoMap,
-          }.contains(state.topRoute?.name);
+            RoutePaths.home,
+            RoutePaths.favourites,
+            RoutePaths.events,
+            RoutePaths.geoMap,
+          }.contains(state.uri.path);
           return MaterialPage<void>(
             restorationId: 'appShellPage',
             child: ScaffoldShell(
