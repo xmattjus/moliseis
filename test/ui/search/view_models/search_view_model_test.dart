@@ -1,8 +1,11 @@
+import 'dart:async' show Completer;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/use-cases/explore_get_by_id_use_case.dart';
+import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -11,6 +14,133 @@ import '../../../support/fixtures.dart';
 
 void main() {
   group('SearchViewModel', () {
+    test('late history failure does not roll back after disposal', () async {
+      final repository = FakeSearchRepository();
+      final vm = SearchViewModel(
+        eventRepository: FakeEventRepository(),
+        exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
+        searchRepository: repository,
+      );
+      await pumpEventQueue();
+      expect(vm.loadPastSearches.completed, isTrue);
+
+      final pendingAdd = Completer<Result<void>>();
+      repository.pendingAddToPastSearches = pendingAdd;
+      final add = vm.addToPastSearches.execute('campobasso');
+      expect(vm.pastSearches, ['campobasso']);
+      vm.dispose();
+      pendingAdd.complete(Result.error(TestException('db error')));
+      await add;
+
+      expect(vm.pastSearches, ['campobasso']);
+      expect(vm.addToPastSearches.error, isTrue);
+    });
+
+    test(
+      'late remove failure does not restore history after disposal',
+      () async {
+        final repository = FakeSearchRepository();
+        final vm = SearchViewModel(
+          eventRepository: FakeEventRepository(),
+          exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
+          searchRepository: repository,
+        );
+        await pumpEventQueue();
+        await vm.addToPastSearches.execute('campobasso');
+        expect(vm.pastSearches, ['campobasso']);
+
+        final pendingRemove = Completer<Result<void>>();
+        repository.pendingRemoveFromPastSearches = pendingRemove;
+        final remove = vm.removeFromPastSearches.execute('campobasso');
+        expect(vm.pastSearches, isEmpty);
+        vm.dispose();
+        pendingRemove.complete(Result.error(TestException('db error')));
+        await remove;
+
+        expect(vm.pastSearches, isEmpty);
+        expect(vm.removeFromPastSearches.error, isTrue);
+      },
+    );
+
+    test('late search result skips the next repository request', () async {
+      final repository = FakeSearchRepository();
+      final vm = SearchViewModel(
+        eventRepository: FakeEventRepository(),
+        exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
+        searchRepository: repository,
+      );
+      await pumpEventQueue();
+      expect(vm.loadPastSearches.completed, isTrue);
+
+      final pendingPlaceIds = Completer<Result<List<int>>>();
+      repository.pendingGetPlaceIdsByQuery = pendingPlaceIds;
+      final search = vm.loadResults.execute('molise');
+      vm.dispose();
+      pendingPlaceIds.complete(const Result.success(<int>[1]));
+      await search;
+
+      expect(repository.getEventIdsByQueryCallCount, 0);
+      expect(vm.results, isEmpty);
+      expect(vm.loadResults.completed, isTrue);
+    });
+
+    test('late related IDs do not start the child command', () async {
+      final repository = FakeSearchRepository();
+      final vm = SearchViewModel(
+        eventRepository: FakeEventRepository(),
+        exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
+        searchRepository: repository,
+      );
+      await pumpEventQueue();
+      expect(vm.loadPastSearches.completed, isTrue);
+
+      final pendingIds = Completer<Result<List<int>>>();
+      repository.pendingGetRelatedResults = pendingIds;
+      final related = vm.loadRelatedResultsIds.execute('molise');
+      vm.dispose();
+      pendingIds.complete(const Result.success(<int>[1]));
+      await related;
+
+      expect(vm.relatedResultIds, isEmpty);
+      expect(vm.loadRelatedResults.idle, isTrue);
+      expect(vm.loadRelatedResultsIds.completed, isTrue);
+    });
+
+    test(
+      'late related Place does not publish results after disposal',
+      () async {
+        final repository = FakeSearchRepository();
+        final places = FakePlaceRepository();
+        final pendingRelatedIds = Completer<Result<List<int>>>()
+          ..complete(const Result.success(<int>[1]));
+        final pendingPlace = Completer<Result<Place>>();
+        repository.pendingGetRelatedResults = pendingRelatedIds;
+        places.pendingGetById[1] = pendingPlace;
+        final events = FakeEventRepository();
+        final vm = SearchViewModel(
+          eventRepository: events,
+          exploreGetByIdUseCase: ExploreUseCase(
+            eventRepository: events,
+            placeRepository: places,
+          ),
+          searchRepository: repository,
+        );
+        await pumpEventQueue();
+
+        final related = vm.loadRelatedResultsIds.execute('molise');
+        await pumpEventQueue();
+        expect(vm.loadRelatedResults.running, isTrue);
+        vm.dispose();
+        pendingPlace.complete(Result.success(makePlace()));
+        await related;
+
+        expect(vm.relatedResultIds, [1]);
+        expect(vm.relatedResults, isEmpty);
+        expect(vm.loadRelatedResults.completed, isTrue);
+        expect(vm.loadRelatedResultsIds.completed, isTrue);
+      },
+    );
+
     group('loadPastSearches', () {
       test('populates pastSearches on success', () async {
         final vm = _buildVm(

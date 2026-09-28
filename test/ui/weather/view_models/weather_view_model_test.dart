@@ -1,3 +1,5 @@
+import 'dart:async' show Completer;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -97,6 +99,31 @@ void main() {
   }
 
   group('WeatherViewModel', () {
+    test(
+      'in-flight forecasts do not update disposed ViewModel state',
+      () async {
+        final pending = Completer<Result<CombinedWeatherForecastResponse>>();
+        final fakeClient = FakeWeatherApiClient()
+          ..pendingCombinedForecast = pending;
+        final viewModel = buildViewModel(fakeClient);
+        final current = viewModel.loadCurrentForecast.execute(testCoordinates);
+        final hourly = viewModel.loadHourlyForecast.execute(testCoordinates);
+        final daily = viewModel.loadDailyForecast.execute(testCoordinates);
+        expect(fakeClient.getCombinedWeatherForecastCallCount, 3);
+
+        viewModel.dispose();
+        pending.complete(Result.success(testCombinedResponse));
+        await Future.wait([current, hourly, daily]);
+
+        expect(viewModel.currentTemperatureCelsius, '--.-');
+        expect(viewModel.getHourlyForecastData, isNull);
+        expect(viewModel.getDailyForecastData, isNull);
+        expect(viewModel.loadCurrentForecast.completed, isTrue);
+        expect(viewModel.loadHourlyForecast.completed, isTrue);
+        expect(viewModel.loadDailyForecast.completed, isTrue);
+      },
+    );
+
     group('loadCurrentForecast', () {
       test('sets current conditions state on success', () async {
         final viewModel = buildViewModel(

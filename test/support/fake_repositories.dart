@@ -340,6 +340,7 @@ final class FakeEventRepository extends EventRepository {
   Result<List<Event>> getByCategoriesResult;
   Result<List<Event>> getByCoordinatesResult;
   Completer<Result<List<Event>>>? pendingGetByCoordinates;
+  Completer<void>? getByCoordinatesCalled;
   Result<List<int>> getNextEventIdsResult;
   Result<List<int>> getFavouriteEventIdsResult;
   Result<Iterable<Event>> getFavouritesResult;
@@ -356,6 +357,7 @@ final class FakeEventRepository extends EventRepository {
 
   // Call counters (only where existing tests query them)
   int getByDateCallCount = 0;
+  int getByCurrentYearCallCount = 0;
   int getByCategoriesCallCount = 0;
   int getByCoordinatesCallCount = 0;
 
@@ -375,8 +377,10 @@ final class FakeEventRepository extends EventRepository {
   }
 
   @override
-  Future<Result<List<Event>>> getByCurrentYear() async =>
-      pendingGetByCurrentYear?.future ?? getByCurrentYearResult;
+  Future<Result<List<Event>>> getByCurrentYear() async {
+    getByCurrentYearCallCount++;
+    return pendingGetByCurrentYear?.future ?? getByCurrentYearResult;
+  }
 
   @override
   Future<Result<List<Event>>> getByDate(EventCalendarDate date) async {
@@ -404,6 +408,8 @@ final class FakeEventRepository extends EventRepository {
   Future<Result<List<Event>>> getByCoordinates(List<double> coordinates) {
     getByCoordinatesCallCount++;
     lastCoordinates = coordinates;
+    final called = getByCoordinatesCalled;
+    if (called != null && !called.isCompleted) called.complete();
     return pendingGetByCoordinates?.future ??
         Future.value(getByCoordinatesResult);
   }
@@ -571,6 +577,7 @@ final class FakePlaceRepository extends PlaceRepository {
 
   Result<List<PlaceDto>> prepareResult;
   Result<List<Place>> getAllResult;
+  Completer<Result<List<Place>>>? pendingGetAll;
   Result<List<Place>> getByCategoriesResult;
   Result<List<Place>> getByCoordinatesResult;
   Completer<Result<List<Place>>>? pendingGetByCoordinates;
@@ -598,6 +605,7 @@ final class FakePlaceRepository extends PlaceRepository {
   final setFavouritePlaceCalls = <({int id, bool save})>[];
 
   int getSuggestionsCallCount = 0;
+  int getAllCallCount = 0;
 
   @override
   Future<Result<List<PlaceDto>>> prepareSync() async => prepareResult;
@@ -613,8 +621,9 @@ final class FakePlaceRepository extends PlaceRepository {
   Future<Result<List<Place>>> getAll({
     ContentSort sort = ContentSort.byName,
   }) async {
+    getAllCallCount++;
     lastGetAllSort = sort;
-    return getAllResult;
+    return pendingGetAll?.future ?? getAllResult;
   }
 
   @override
@@ -1093,29 +1102,46 @@ final class FakeContentSubmissionDraftRepository
 
 /// A [SearchRepository] fake that never exposes persisted search data.
 final class FakeSearchRepository implements SearchRepository {
-  @override
-  Future<Result<void>> addToPastSearches(String text) async =>
-      const Result.success(null);
+  int getPastSearchesCallCount = 0;
+  Completer<Result<List<String>>>? pendingGetPastSearches;
+  Completer<Result<void>>? pendingAddToPastSearches;
+  Completer<Result<void>>? pendingRemoveFromPastSearches;
+  Completer<Result<List<int>>>? pendingGetPlaceIdsByQuery;
+  Completer<Result<List<int>>>? pendingGetRelatedResults;
+  int getEventIdsByQueryCallCount = 0;
 
   @override
-  Future<Result<List<int>>> getEventIdsByQuery(String text) async =>
-      const Result.success(<int>[]);
+  Future<Result<void>> addToPastSearches(String text) async =>
+      pendingAddToPastSearches?.future ?? const Result.success(null);
+
+  @override
+  Future<Result<List<int>>> getEventIdsByQuery(String text) async {
+    getEventIdsByQueryCallCount++;
+    return const Result.success(<int>[]);
+  }
 
   @override
   Future<Result<List<int>>> getPlaceIdsByQuery(String text) async =>
-      const Result.success(<int>[]);
+      pendingGetPlaceIdsByQuery?.future ?? const Result.success(<int>[]);
 
   @override
   Future<Result<List<int>>> getRelatedResults(String text) async =>
-      const Result.success(<int>[]);
+      pendingGetRelatedResults?.future ?? const Result.success(<int>[]);
 
   @override
-  Future<Result<List<String>>> getPastSearches() async =>
-      const Result.success(<String>[]);
+  Future<Result<List<String>>> getPastSearches() async {
+    getPastSearchesCallCount++;
+    final result =
+        await (pendingGetPastSearches?.future ??
+            Future<Result<List<String>>>.value(
+              const Result.success(<String>[]),
+            ));
+    return result.map(List.of);
+  }
 
   @override
   Future<Result<void>> removeFromPastSearches(String text) async =>
-      const Result.success(null);
+      pendingRemoveFromPastSearches?.future ?? const Result.success(null);
 }
 
 // ---------------------------------------------------------------------------
@@ -1131,12 +1157,20 @@ final class FakeWeatherApiClient extends WeatherApiClient {
   /// When `null`, returns an error indicating the weather API is not needed
   /// in the current test — matching the `post_screen_test` variant.
   Result<CombinedWeatherForecastResponse>? result;
+  Completer<Result<CombinedWeatherForecastResponse>>? pendingCombinedForecast;
+  int getCombinedWeatherForecastCallCount = 0;
+  final combinedForecastCoordinates = <(double, double)>[];
 
   @override
   Future<Result<CombinedWeatherForecastResponse>> getCombinedWeatherForecast(
     double latitude,
     double longitude, {
     String timezone = 'Europe/Rome',
-  }) async =>
-      result ?? Result.error(Exception('Weather not configured for this test'));
+  }) async {
+    getCombinedWeatherForecastCallCount++;
+    combinedForecastCoordinates.add((latitude, longitude));
+    return pendingCombinedForecast?.future ??
+        result ??
+        Result.error(Exception('Weather not configured for this test'));
+  }
 }

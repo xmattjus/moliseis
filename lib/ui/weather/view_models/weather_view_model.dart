@@ -26,6 +26,13 @@ class WeatherViewModel extends ChangeNotifier {
   final CachedWeatherApiClient _weatherApiClient;
   final WmoWeatherDescriptionMapper _weatherDescriptionMapper;
   final WmoWeatherIconMapper _weatherCodeIconMapper;
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   late Command1<CurrentWeatherForecastData, LatLng> loadCurrentForecast;
   late Command1<HourlyWeatherForecastData, LatLng> loadHourlyForecast;
@@ -61,6 +68,7 @@ class WeatherViewModel extends ChangeNotifier {
       coordinates.latitude,
       coordinates.longitude,
     );
+    if (_disposed) return result;
 
     final data = result.getOrNull();
     if (data != null) {
@@ -88,6 +96,7 @@ class WeatherViewModel extends ChangeNotifier {
       coordinates.latitude,
       coordinates.longitude,
     );
+    if (_disposed) return result;
 
     final data = result.getOrNull();
     if (data != null) _hourlyForecastData = data;
@@ -105,6 +114,7 @@ class WeatherViewModel extends ChangeNotifier {
       coordinates.latitude,
       coordinates.longitude,
     );
+    if (_disposed) return result;
 
     final data = result.getOrNull();
     if (data != null) _dailyForecastData = data;

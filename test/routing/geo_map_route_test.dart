@@ -1,13 +1,15 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Completer, unawaited;
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
+import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
@@ -223,6 +225,404 @@ void main() {
   });
 
   group('buildAppRouter geoMap selection', () {
+    testWidgets(
+      'NAV-06 each selected content owns its pending weather request',
+      (tester) async {
+        const firstCoordinates = LatLng(41.56, 14.66);
+        const secondCoordinates = LatLng(41.57, 14.67);
+        final events = FakeEventRepository(
+          getByIdResults: {
+            1: Result.success(makeEvent()),
+            2: Result.success(
+              makeEvent(remoteId: 2, coordinates: secondCoordinates),
+            ),
+          },
+        );
+        final weather = FakeWeatherApiClient();
+        final pending = Completer<Result<CombinedWeatherForecastResponse>>();
+        weather.pendingCombinedForecast = pending;
+        final router = _buildTestRouterApp(
+          _MapHarness(),
+          eventRepository: events,
+          weatherApiClient: weather,
+        );
+        addTearDown(router.router.dispose);
+        await tester.pumpWidget(router.app);
+        await tester.pumpAndSettle();
+
+        router.router.go('/map?contentId=1&type=event');
+        await tester.pump();
+        await tester.pump();
+        final firstWeather = tester
+            .widget<GeoMapScreen>(find.byType(GeoMapScreen))
+            .weatherViewModel;
+        expect(weather.combinedForecastCoordinates, [
+          (firstCoordinates.latitude, firstCoordinates.longitude),
+        ]);
+        weather.pendingCombinedForecast = null;
+        router.router.go('/map?contentId=2&type=event');
+        await tester.pump();
+        await tester.pump();
+        final secondWeather = tester
+            .widget<GeoMapScreen>(find.byType(GeoMapScreen))
+            .weatherViewModel;
+        expect(secondWeather, isNot(same(firstWeather)));
+        expect(() => firstWeather.addListener(() {}), throwsFlutterError);
+        expect(weather.getCombinedWeatherForecastCallCount, 2);
+        expect(weather.combinedForecastCoordinates.last, (
+          secondCoordinates.latitude,
+          secondCoordinates.longitude,
+        ));
+
+        pending.complete(Result.error(TestException('weather unavailable')));
+        await tester.pump();
+        await tester.pump();
+        expect(secondWeather.currentTemperatureCelsius, '--.-');
+        expect(weather.getCombinedWeatherForecastCallCount, 2);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    for (final type in <String>['event', 'place']) {
+      for (final firstFails in <bool>[false, true]) {
+        testWidgets('NAV-06 rapid $type A to B resolves B when A '
+            '${firstFails ? 'fails' : 'succeeds'}', (tester) async {
+          final events = FakeEventRepository();
+          final places = FakePlaceRepository();
+          final firstEvent = Completer<Result<Event>>();
+          final secondEvent = Completer<Result<Event>>();
+          final firstPlace = Completer<Result<Place>>();
+          final secondPlace = Completer<Result<Place>>();
+          if (type == 'event') {
+            events.pendingGetById[1] = firstEvent;
+            events.pendingGetById[2] = secondEvent;
+          } else {
+            places.pendingGetById[1] = firstPlace;
+            places.pendingGetById[2] = secondPlace;
+          }
+          final router = _buildTestRouterApp(
+            _MapHarness(),
+            eventRepository: events,
+            placeRepository: places,
+          );
+          addTearDown(router.router.dispose);
+          await tester.pumpWidget(router.app);
+          await tester.pumpAndSettle();
+          router.router.go('/map?contentId=1&type=$type');
+          await tester.pump();
+          final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
+          router.router.go('/map?contentId=2&type=$type');
+          await tester.pump();
+          expect(
+            tester.widget<GeoMapScreen>(find.byType(GeoMapScreen)).viewModel,
+            same(map.viewModel),
+          );
+
+          if (type == 'event') {
+            firstEvent.complete(
+              firstFails
+                  ? Result.error(TestException('A unavailable'))
+                  : Result.success(makeEvent()),
+            );
+          } else {
+            firstPlace.complete(
+              firstFails
+                  ? Result.error(TestException('A unavailable'))
+                  : Result.success(makePlace()),
+            );
+          }
+          await tester.pump();
+          await tester.pump();
+          expect(find.byType(GeoMapModalPost), findsNothing);
+          if (type == 'event') {
+            secondEvent.complete(Result.success(makeEvent(remoteId: 2)));
+          } else {
+            secondPlace.complete(Result.success(makePlace(remoteId: 2)));
+          }
+          await tester.pump();
+          await tester.pumpAndSettle();
+          expect(
+            tester
+                .widget<GeoMapModalPost>(find.byType(GeoMapModalPost))
+                .content
+                .remoteId,
+            2,
+          );
+          expect(map.viewModel.selectedContent?.remoteId, 2);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets('NAV-06 a late event cannot replace a newer place selection', (
+      tester,
+    ) async {
+      final events = FakeEventRepository();
+      final places = FakePlaceRepository();
+      final pendingEvent = Completer<Result<Event>>();
+      final pendingPlace = Completer<Result<Place>>();
+      events.pendingGetById[1] = pendingEvent;
+      places.pendingGetById[2] = pendingPlace;
+      final router = _buildTestRouterApp(
+        _MapHarness(),
+        eventRepository: events,
+        placeRepository: places,
+      );
+      addTearDown(router.router.dispose);
+      await tester.pumpWidget(router.app);
+      await tester.pumpAndSettle();
+      router.router.go('/map?contentId=1&type=event');
+      await tester.pump();
+      final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
+      expect(map.viewModel.showEvent.running, isTrue);
+
+      router.router.go('/map?contentId=2&type=place');
+      await tester.pump();
+      expect(map.viewModel.showPlace.running, isTrue);
+      pendingPlace.complete(Result.success(makePlace(remoteId: 2)));
+      await tester.pump();
+      await tester.pump();
+      expect(
+        tester
+            .widget<GeoMapModalPost>(find.byType(GeoMapModalPost))
+            .content
+            .remoteId,
+        2,
+      );
+
+      pendingEvent.complete(Result.success(makeEvent()));
+      await tester.pump();
+      await tester.pump();
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<GeoMapModalPost>(find.byType(GeoMapModalPost))
+            .content
+            .remoteId,
+        2,
+      );
+      expect(map.viewModel.selectedContent?.remoteId, 2);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('NAV-06 map root invalidates an in-flight selection', (
+      tester,
+    ) async {
+      final events = FakeEventRepository();
+      final pendingEvent = Completer<Result<Event>>();
+      events.pendingGetById[1] = pendingEvent;
+      final router = _buildTestRouterApp(
+        _MapHarness(),
+        eventRepository: events,
+      );
+      addTearDown(router.router.dispose);
+      await tester.pumpWidget(router.app);
+      await tester.pumpAndSettle();
+      router.router.go('/map?contentId=1&type=event');
+      await tester.pump();
+      final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
+      router.router.go(RoutePaths.geoMap);
+      await tester.pump();
+      pendingEvent.complete(Result.success(makeEvent()));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(GeoMapModalPost), findsNothing);
+      expect(map.viewModel.selectedContent, isNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'NAV-06 route destruction disposes owned VMs with loads pending',
+      (tester) async {
+        final events = FakeEventRepository();
+        final places = FakePlaceRepository();
+        final searches = FakeSearchRepository();
+        final router = _buildTestRouterApp(
+          _MapHarness(),
+          eventRepository: events,
+          placeRepository: places,
+          searchRepository: searches,
+        );
+        addTearDown(router.router.dispose);
+        await tester.pumpWidget(router.app);
+        await tester.pumpAndSettle();
+
+        final pendingEvents = Completer<Result<List<Event>>>();
+        final pendingPlaces = Completer<Result<List<Place>>>();
+        final pendingSearches = Completer<Result<List<String>>>();
+        events.pendingGetByCurrentYear = pendingEvents;
+        places.pendingGetAll = pendingPlaces;
+        searches.pendingGetPastSearches = pendingSearches;
+        router.router.go(RoutePaths.geoMap);
+        await tester.pump();
+
+        final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
+        expect(map.viewModel.loadEvents.running, isTrue);
+        expect(map.viewModel.loadPlaces.running, isTrue);
+        expect(map.searchViewModel.loadPastSearches.running, isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+        expect(() => map.viewModel.addListener(() {}), throwsFlutterError);
+        expect(
+          () => map.searchViewModel.addListener(() {}),
+          throwsFlutterError,
+        );
+        expect(
+          () => map.weatherViewModel.addListener(() {}),
+          throwsFlutterError,
+        );
+
+        pendingEvents.complete(Result.success(<Event>[makeEvent()]));
+        pendingPlaces.complete(Result.success(<Place>[makePlace()]));
+        pendingSearches.complete(const Result.success(<String>['molise']));
+        await tester.pump();
+        await tester.pump();
+        expect(map.viewModel.allEvents, isEmpty);
+        expect(map.viewModel.allPlaces, isEmpty);
+        expect(map.searchViewModel.pastSearches, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'NAV-06 Map retains GeoMap/Search VMs and replaces content Weather VM',
+      (tester) async {
+        final events = FakeEventRepository(
+          getByIdResults: <int, Result<Event>>{
+            1: Result.success(makeEvent()),
+            2: Result.success(makeEvent(remoteId: 2)),
+          },
+        );
+        final places = FakePlaceRepository(
+          getByIdResults: <int, Result<Place>>{1: Result.success(makePlace())},
+        );
+        final searches = FakeSearchRepository();
+        final weather = FakeWeatherApiClient();
+        final router = _buildTestRouterApp(
+          _MapHarness(),
+          eventRepository: events,
+          placeRepository: places,
+          searchRepository: searches,
+          weatherApiClient: weather,
+        );
+        addTearDown(router.router.dispose);
+        await tester.pumpWidget(router.app);
+        await tester.pumpAndSettle();
+        final beforeMapLoads = (
+          events.getByCurrentYearCallCount,
+          places.getAllCallCount,
+          searches.getPastSearchesCallCount,
+        );
+        router.router.go(RoutePaths.geoMap);
+        await tester.pumpAndSettle();
+
+        final finder = find.byType(GeoMapScreen, skipOffstage: false);
+        final initialState = tester.state(finder);
+        final initial = tester.widget<GeoMapScreen>(finder);
+        final initialLoads = (
+          events.getByCurrentYearCallCount,
+          places.getAllCallCount,
+          searches.getPastSearchesCallCount,
+        );
+        expect(initialLoads, (
+          beforeMapLoads.$1 + 1,
+          beforeMapLoads.$2 + 1,
+          beforeMapLoads.$3 + 1,
+        ));
+        expect(weather.getCombinedWeatherForecastCallCount, 0);
+        var priorWeatherViewModel = initial.weatherViewModel;
+
+        for (final (location, selectedId, selectedType)
+            in <(String, int?, Type?)>[
+              ('/map?contentId=1&type=event', 1, Event),
+              ('/map?contentId=2&type=event', 2, Event),
+              ('/map?contentId=1&type=place', 1, Place),
+              (RoutePaths.geoMap, null, null),
+            ]) {
+          router.router.go(location);
+          await tester.pumpAndSettle();
+          final current = tester.widget<GeoMapScreen>(finder);
+          expect(tester.state(finder), same(initialState));
+          expect(current.viewModel, same(initial.viewModel));
+          expect(current.searchViewModel, same(initial.searchViewModel));
+          expect(current.weatherViewModel, isNot(same(priorWeatherViewModel)));
+          expect(
+            () => priorWeatherViewModel.addListener(() {}),
+            throwsFlutterError,
+          );
+          priorWeatherViewModel = current.weatherViewModel;
+          expect((
+            events.getByCurrentYearCallCount,
+            places.getAllCallCount,
+            searches.getPastSearchesCallCount,
+          ), initialLoads);
+          if (selectedId == null) {
+            expect(find.byType(GeoMapModalPost), findsNothing);
+            expect(current.viewModel.selectedContent, isNull);
+            expect(
+              tester
+                  .widget<GeoMapBottomSheet>(find.byType(GeoMapBottomSheet))
+                  .searchQuery,
+              isEmpty,
+            );
+          } else {
+            final content = tester
+                .widget<GeoMapModalPost>(find.byType(GeoMapModalPost))
+                .content;
+            expect(content.remoteId, selectedId);
+            expect(content.runtimeType, selectedType);
+          }
+        }
+
+        final media = Media(
+          remoteId: 1,
+          url: 'https://example.com/gallery.jpg',
+          width: 800,
+          height: 600,
+          createdAt: DateTime.utc(2026),
+          modifiedAt: DateTime.utc(2026),
+          areaName: 'Molise',
+          cityName: 'Campobasso',
+        );
+        unawaited(
+          router.router.pushNamed<void>(
+            RouteNames.gallery,
+            extra: GalleryPreviewRouteData(
+              media: <Media>[media],
+              initialIndex: 0,
+            ).toExtra(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final underGallery = tester.widget<GeoMapScreen>(finder);
+        expect(tester.state(finder), same(initialState));
+        expect(underGallery.viewModel, same(initial.viewModel));
+        expect(underGallery.searchViewModel, same(initial.searchViewModel));
+        expect(underGallery.weatherViewModel, same(priorWeatherViewModel));
+        expect(await tester.binding.handlePopRoute(), isTrue);
+        await tester.pumpAndSettle();
+
+        router.router.go(RoutePaths.home);
+        await tester.pumpAndSettle();
+        router.router.go(RoutePaths.geoMap);
+        await tester.pumpAndSettle();
+        final afterBranch = tester.widget<GeoMapScreen>(finder);
+        expect(tester.takeException(), isNull);
+        expect(tester.state(finder), same(initialState));
+        expect(afterBranch.viewModel, same(initial.viewModel));
+        expect(afterBranch.searchViewModel, same(initial.searchViewModel));
+        expect(afterBranch.weatherViewModel, same(priorWeatherViewModel));
+        // One weather request per selected content; Map/Gallery/branch changes
+        // do not add another request when no content is selected.
+        expect(weather.getCombinedWeatherForecastCallCount, 3);
+        expect((
+          events.getByCurrentYearCallCount,
+          places.getAllCallCount,
+          searches.getPastSearchesCallCount,
+        ), initialLoads);
+      },
+    );
+
     testWidgets('direct /map renders the default map without selection', (
       tester,
     ) async {
@@ -558,6 +958,8 @@ final class _MapHarness {
   _MapHarness harness, {
   FakeEventRepository? eventRepository,
   FakePlaceRepository? placeRepository,
+  SearchRepository? searchRepository,
+  FakeWeatherApiClient? weatherApiClient,
 }) {
   final auth = ControllableAdminAuth();
   addTearDown(auth.dispose);
@@ -571,6 +973,8 @@ final class _MapHarness {
       harness,
       eventRepository: eventRepository,
       placeRepository: placeRepository,
+      searchRepository: searchRepository,
+      weatherApiClient: weatherApiClient,
     ),
     child: MaterialApp.router(
       scaffoldMessengerKey: $scaffoldMessengerKey,
@@ -586,12 +990,14 @@ List<SingleChildWidget> _buildProviders(
   _MapHarness harness, {
   FakeEventRepository? eventRepository,
   FakePlaceRepository? placeRepository,
+  SearchRepository? searchRepository,
+  FakeWeatherApiClient? weatherApiClient,
 }) {
   final eventRepo = eventRepository ?? FakeEventRepository();
   final placeRepo = placeRepository ?? FakePlaceRepository();
   final logger = MockLogger();
-  final weatherApiClient = CachedWeatherApiClient(
-    weatherApiClient: FakeWeatherApiClient(),
+  final cachedWeatherApiClient = CachedWeatherApiClient(
+    weatherApiClient: weatherApiClient ?? FakeWeatherApiClient(),
     currentWeatherCache:
         LruCache<
           String,
@@ -615,9 +1021,11 @@ List<SingleChildWidget> _buildProviders(
     Provider<http.Client>.value(value: RecordingTileHttpClient()),
     Provider<EventRepository>.value(value: eventRepo),
     Provider<PlaceRepository>.value(value: placeRepo),
-    Provider<SearchRepository>.value(value: _FakeSearchRepository()),
+    Provider<SearchRepository>.value(
+      value: searchRepository ?? _FakeSearchRepository(),
+    ),
     Provider<SettingsRepository>.value(value: settingsRepository),
-    Provider<CachedWeatherApiClient>.value(value: weatherApiClient),
+    Provider<CachedWeatherApiClient>.value(value: cachedWeatherApiClient),
     Provider<CacheManager>.value(value: FakeCacheManager()),
     Provider<Logger>.value(value: logger),
     Provider<UrlLaunchService>(create: (_) => UrlLaunchService(logger: logger)),

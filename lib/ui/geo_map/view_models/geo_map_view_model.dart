@@ -24,6 +24,13 @@ class GeoMapViewModel extends ChangeNotifier {
   }
 
   final GeoMapUseCase _geoMapUseCase;
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   late Command0<void> loadEvents;
   late Command1<void, LatLng> loadNearContent;
@@ -42,6 +49,7 @@ class GeoMapViewModel extends ChangeNotifier {
     ContentCategory.values.minusUnknown,
   );
   ContentBase? _selectedContent;
+  int _selectionGeneration = 0;
   var _selectedTypes = Set<ContentType>.from(ContentType.values);
 
   UnmodifiableListView<ContentBase> get allEvents =>
@@ -53,11 +61,20 @@ class GeoMapViewModel extends ChangeNotifier {
   UnmodifiableSetView<ContentCategory> get selectedCategories =>
       UnmodifiableSetView(_selectedCategories);
   ContentBase? get selectedContent => _selectedContent;
+
+  /// Invalidates an older lookup when the Map URI requests a new selection
+  /// or returns to the default map.
+  void invalidateRequestedSelection() {
+    _selectionGeneration++;
+    _selectedContent = null;
+  }
+
   UnmodifiableSetView<ContentType> get selectedTypes =>
       UnmodifiableSetView(_selectedTypes);
 
   Future<Result<void>> _loadEvents() async {
     final result = await _geoMapUseCase.getAllEvents();
+    if (_disposed) return result;
 
     final events = result.getOrNull();
     if (events != null) {
@@ -72,6 +89,7 @@ class GeoMapViewModel extends ChangeNotifier {
 
   Future<Result<void>> _loadPlaces() async {
     final result = await _geoMapUseCase.getAllPlaces();
+    if (_disposed) return result;
 
     final places = result.getOrNull();
     if (places != null) {
@@ -91,6 +109,7 @@ class GeoMapViewModel extends ChangeNotifier {
       coordinates.latitude,
       coordinates.longitude,
     );
+    if (_disposed) return placesResult;
     final places = placesResult.getOrNull();
     if (places != null) _nearContent.addAll(places);
 
@@ -98,6 +117,7 @@ class GeoMapViewModel extends ChangeNotifier {
       coordinates.latitude,
       coordinates.longitude,
     );
+    if (_disposed) return placesResult.isError ? placesResult : eventsResult;
     final events = eventsResult.getOrNull();
     if (events != null) _nearContent.addAll(events);
 
@@ -118,6 +138,7 @@ class GeoMapViewModel extends ChangeNotifier {
     _selectedCategories = categories;
 
     await _load();
+    if (_disposed) return const Result.success(null);
 
     notifyListeners();
 
@@ -132,6 +153,7 @@ class GeoMapViewModel extends ChangeNotifier {
     _selectedTypes = types;
 
     await _load();
+    if (_disposed) return const Result.success(null);
 
     notifyListeners();
 
@@ -144,6 +166,7 @@ class GeoMapViewModel extends ChangeNotifier {
 
     if (_selectedTypes.containsAll({ContentType.place, ContentType.event})) {
       await loadEvents.execute();
+      if (_disposed) return const Result.success(null);
       await loadPlaces.execute();
     } else if (_selectedTypes.contains(ContentType.event)) {
       await loadEvents.execute();
@@ -155,7 +178,9 @@ class GeoMapViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _showEvent(int id) async {
+    final generation = ++_selectionGeneration;
     final result = await _geoMapUseCase.getEventById(id);
+    if (_disposed || generation != _selectionGeneration) return result;
     final content = result.getOrNull();
     if (content != null) {
       _selectedContent = content;
@@ -165,7 +190,9 @@ class GeoMapViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _showPlace(int id) async {
+    final generation = ++_selectionGeneration;
     final result = await _geoMapUseCase.getPlaceById(id);
+    if (_disposed || generation != _selectionGeneration) return result;
     final content = result.getOrNull();
     if (content != null) {
       _selectedContent = content;

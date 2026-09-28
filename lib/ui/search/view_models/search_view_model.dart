@@ -36,6 +36,13 @@ class SearchViewModel extends ChangeNotifier {
   final EventRepository _eventRepository;
   final ExploreGetByIdUseCase _exploreGetByIdUseCase;
   final SearchRepository _searchRepository;
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   /// Adds a query string to the persistent search history.
   ///
@@ -131,6 +138,7 @@ class SearchViewModel extends ChangeNotifier {
     notifyListeners();
 
     final result = await _searchRepository.addToPastSearches(query);
+    if (_disposed) return result;
 
     return result.mapError((error) {
       // Removes again the query from past searches on errors.
@@ -142,6 +150,7 @@ class SearchViewModel extends ChangeNotifier {
 
   Future<Result<void>> _loadPastSearches() async {
     final result = await _searchRepository.getPastSearches();
+    if (_disposed) return result.map((_) {});
 
     return result.map((pastSearches) {
       _pastSearches = pastSearches;
@@ -156,6 +165,7 @@ class SearchViewModel extends ChangeNotifier {
 
     for (final id in _relatedResultsIds) {
       final result = await _exploreGetByIdUseCase.getById(id);
+      if (_disposed) return const Result.success(null);
 
       result.map(relatedResults.add);
     }
@@ -172,6 +182,7 @@ class SearchViewModel extends ChangeNotifier {
     }
 
     final result = await _searchRepository.getRelatedResults(query);
+    if (_disposed) return result.map((_) {});
 
     return result.asyncMap((relatedResultsIds) async {
       _relatedResultsIds = relatedResultsIds;
@@ -186,6 +197,7 @@ class SearchViewModel extends ChangeNotifier {
     notifyListeners();
 
     final result = await _searchRepository.removeFromPastSearches(query);
+    if (_disposed) return result;
 
     return result.mapError((error) {
       // Adds again the query to past searches on error.
@@ -205,15 +217,20 @@ class SearchViewModel extends ChangeNotifier {
 
     return Result.zip2(
       () => _searchRepository.getPlaceIdsByQuery(query),
-      () => _searchRepository.getEventIdsByQuery(query),
+      () => _disposed
+          ? Future.value(const Result.success(<int>[]))
+          : _searchRepository.getEventIdsByQuery(query),
       (placeIds, eventIds) async {
+        if (_disposed) return const Result.success(null);
         for (final id in placeIds) {
           final getPlace = await _exploreGetByIdUseCase.getById(id);
+          if (_disposed) return const Result.success(null);
           getPlace.map((place) => list.add(place));
         }
 
         for (final id in eventIds) {
           final getEvent = await _eventRepository.getById(id);
+          if (_disposed) return const Result.success(null);
           getEvent.map((event) => list.add(event));
         }
 

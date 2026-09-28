@@ -57,6 +57,9 @@ class GeoMapScreen extends StatefulWidget {
 
   final GeoMapViewModel viewModel;
   final SearchViewModel searchViewModel;
+
+  /// Owned by this screen; the route supplies a fresh instance for each Map
+  /// URI so a prior content's weather commands cannot block a new selection.
   final WeatherViewModel weatherViewModel;
 
   @override
@@ -121,6 +124,11 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   /// a terminal state (match, error, or retry budget exhausted).
   int _resolutionRetries = 0;
 
+  /// A newer URI request was dropped because the command for the previous
+  /// identity was still running. Its completion (including an error) must
+  /// trigger a lookup for the newer identity.
+  bool _retryAfterPriorCommand = false;
+
   @override
   void initState() {
     super.initState();
@@ -139,8 +147,8 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   void didUpdateWidget(covariant GeoMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // The route builder creates a fresh view model on every navigation, so
-    // the resolution listeners must follow the current widget's commands.
+    // Standalone screen owners may still replace the view model even though
+    // the Map route retains its instance across URI changes.
     if (!identical(oldWidget.viewModel, widget.viewModel)) {
       oldWidget.viewModel.showEvent.removeListener(
         _onSelectionResolutionChanged,
@@ -151,6 +159,9 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       widget.viewModel.showEvent.addListener(_onSelectionResolutionChanged);
       widget.viewModel.showPlace.addListener(_onSelectionResolutionChanged);
     }
+    if (!identical(oldWidget.weatherViewModel, widget.weatherViewModel)) {
+      oldWidget.weatherViewModel.dispose();
+    }
 
     if (widget.initialContentId != null && widget.initialContentType != null) {
       _resolveRequestedSelection();
@@ -158,8 +169,10 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       // A location without content identity is the default map: abandon any
       // in-flight resolution and drop the previous selection. The sheet
       // falls back to the explore modal instead of a stale post skeleton.
+      widget.viewModel.invalidateRequestedSelection();
       _pendingSelection = null;
       _resolutionRetries = 0;
+      _retryAfterPriorCommand = false;
       _scheduleCallbackOnNextFrame = false;
       _selectedContent = null;
       _searchQuery = '';
@@ -180,6 +193,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   void dispose() {
     widget.viewModel.showEvent.removeListener(_onSelectionResolutionChanged);
     widget.viewModel.showPlace.removeListener(_onSelectionResolutionChanged);
+    widget.weatherViewModel.dispose();
     _sheetController.dispose();
     _mapController.dispose();
     _searchController.dispose();
@@ -193,10 +207,10 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     final id = widget.initialContentId;
     final type = widget.initialContentType;
     final request = id != null && type != null ? (id: id, type: type) : null;
-    final viewModel = widget.viewModel;
-
+    final viewModel = widget.viewModel..invalidateRequestedSelection();
     _pendingSelection = request;
     _resolutionRetries = 0;
+    _retryAfterPriorCommand = false;
     if (request == null) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -206,11 +220,11 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         return;
       }
 
-      unawaited(
-        request.type == ContentType.event
-            ? viewModel.showEvent.execute(request.id)
-            : viewModel.showPlace.execute(request.id),
-      );
+      final command = request.type == ContentType.event
+          ? viewModel.showEvent
+          : viewModel.showPlace;
+      _retryAfterPriorCommand = command.running;
+      unawaited(command.execute(request.id));
     });
   }
 
@@ -240,7 +254,9 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         : widget.viewModel.showPlace;
     if (command.running) return;
 
-    if (command.error) {
+    final retryAfterPriorCommand = _retryAfterPriorCommand;
+    _retryAfterPriorCommand = false;
+    if (command.error && !retryAfterPriorCommand) {
       _terminateResolutionWithFeedback();
       return;
     }
@@ -275,6 +291,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     setState(() {
       _pendingSelection = null;
       _resolutionRetries = 0;
+      _retryAfterPriorCommand = false;
       _selectedContent = null;
       _searchQuery = '';
       _searchController.text = '';

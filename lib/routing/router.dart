@@ -503,22 +503,9 @@ GoRouter buildAppRouter({
                     state.uri.queryParameters['type'],
                   );
 
-                  final viewModel = GeoMapViewModel(
-                    geoMapUseCase: GeoMapUseCase(
-                      eventRepository: context.read(),
-                      placeRepository: context.read(),
-                    ),
-                  );
-
-                  final searchViewModel = SearchViewModel(
-                    eventRepository: context.read(),
-                    exploreGetByIdUseCase: ExploreUseCase(
-                      eventRepository: context.read(),
-                      placeRepository: context.read(),
-                    ),
-                    searchRepository: context.read(),
-                  );
-
+                  // Weather is content-specific. Its inexpensive ViewModel is
+                  // replaced with the URI so overlapping forecasts cannot
+                  // share a Command across different selected content.
                   final weatherViewModel = WeatherViewModel(
                     weatherApiClient: context.read(),
                     weatherDescriptionMapper:
@@ -526,12 +513,36 @@ GoRouter buildAppRouter({
                     weatherCodeIconMapper: const WmoWeatherIconMapper(),
                   );
 
-                  return GeoMapScreen(
-                    initialContentId: contentId,
-                    initialContentType: contentType,
-                    viewModel: viewModel,
-                    searchViewModel: searchViewModel,
-                    weatherViewModel: weatherViewModel,
+                  return MultiProvider(
+                    providers: <SingleChildWidget>[
+                      ChangeNotifierProvider<GeoMapViewModel>(
+                        create: (context) => GeoMapViewModel(
+                          geoMapUseCase: GeoMapUseCase(
+                            eventRepository: context.read(),
+                            placeRepository: context.read(),
+                          ),
+                        ),
+                      ),
+                      ChangeNotifierProvider<SearchViewModel>(
+                        create: (context) => SearchViewModel(
+                          eventRepository: context.read(),
+                          exploreGetByIdUseCase: ExploreUseCase(
+                            eventRepository: context.read(),
+                            placeRepository: context.read(),
+                          ),
+                          searchRepository: context.read(),
+                        ),
+                      ),
+                    ],
+                    child: Builder(
+                      builder: (context) => GeoMapScreen(
+                        initialContentId: contentId,
+                        initialContentType: contentType,
+                        viewModel: context.read<GeoMapViewModel>(),
+                        searchViewModel: context.read<SearchViewModel>(),
+                        weatherViewModel: weatherViewModel,
+                      ),
+                    ),
                   );
                 },
               ),
