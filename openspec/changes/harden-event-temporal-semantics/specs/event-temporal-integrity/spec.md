@@ -1,0 +1,126 @@
+## Purpose
+
+Define structurally valid persisted event intervals and consistent Europe/Rome civil-time membership across event discovery, while preserving distinct day-range and upcoming-event contracts.
+
+## ADDED Requirements
+
+### Requirement: Content submission dates form a valid optional interval
+The database SHALL allow both submission dates to be absent or an optional end paired with a present start. It SHALL reject an end without a start and an end earlier than the start on insert or update. Equal start and end instants SHALL be valid.
+
+#### Scenario: Both dates are absent
+- **WHEN** a content submission is inserted or updated with null start and null end
+- **THEN** the date constraints accept the row
+
+#### Scenario: Start has no end
+- **WHEN** a content submission is inserted or updated with a start and null end
+- **THEN** the date constraints accept the row
+
+#### Scenario: End is present without a start
+- **WHEN** a content submission is inserted or updated with null start and a non-null end
+- **THEN** the database rejects the row
+
+#### Scenario: End equals or follows start
+- **WHEN** a content submission is inserted or updated with a start and an end equal to or later than it
+- **THEN** the date constraints accept the row, including differences at timestamp microsecond precision
+
+#### Scenario: End precedes start
+- **WHEN** a content submission is inserted or updated with an end earlier than its start, including a sub-millisecond inversion
+- **THEN** the database rejects the row
+
+### Requirement: Published event dates form a valid interval
+The database SHALL require every published event to have a start instant and SHALL reject an end earlier than that start on insert or update. A null end, an equal end, and a later end SHALL remain valid.
+
+#### Scenario: Published event has no start
+- **WHEN** an event is inserted or updated with a null start
+- **THEN** the existing required-start column rule rejects the row
+
+#### Scenario: Published event has no end
+- **WHEN** an event is inserted or updated with a start and null end
+- **THEN** the date constraints accept the row
+
+#### Scenario: Published event has an equal or later end
+- **WHEN** an event is inserted or updated with an end equal to or later than its start
+- **THEN** the date constraints accept the row
+
+#### Scenario: Published event has an inverted end
+- **WHEN** an event is inserted or updated with an end earlier than its start, including a sub-millisecond inversion
+- **THEN** the database rejects the row
+
+### Requirement: Annual event membership uses Rome-year interval overlap
+An event SHALL belong to a Europe/Rome calendar year when its temporal interval intersects any instant in that year's current inclusive civil-day range. For a non-null end, membership SHALL include exactly events whose start is at or before the year's end and whose end is at or after the year's start. For a null end, membership SHALL depend on whether its start falls within the year. Soft-deleted events SHALL be excluded.
+
+#### Scenario: Start-only event occurs in the year
+- **WHEN** a non-deleted event has a null end and its start is inside the selected Rome year
+- **THEN** annual retrieval includes it
+
+#### Scenario: Ranged event stays inside the year
+- **WHEN** a non-deleted event starts and ends inside the selected Rome year
+- **THEN** annual retrieval includes it
+
+#### Scenario: Ranged event is wholly outside the year
+- **WHEN** an event ends before the Rome year's first instant or starts after its last inclusive instant
+- **THEN** annual retrieval excludes it
+
+#### Scenario: Ranged event crosses the year start
+- **WHEN** a non-deleted event starts in the preceding Rome year and ends in the selected Rome year
+- **THEN** annual retrieval includes it
+
+#### Scenario: Ranged event crosses the year end
+- **WHEN** a non-deleted event starts in the selected Rome year and ends in the following Rome year
+- **THEN** annual retrieval includes it
+
+#### Scenario: Ranged event spans the whole year
+- **WHEN** a non-deleted event starts before and ends after the selected Rome year
+- **THEN** annual retrieval includes it
+
+#### Scenario: Boundary contact is inclusive
+- **WHEN** a non-deleted event ends exactly at the Rome year's first instant or starts exactly at its last inclusive instant
+- **THEN** annual retrieval includes it
+
+#### Scenario: Cross-year event belongs to both years
+- **WHEN** a non-deleted event runs from 31 December 2026 into 1 January 2027 in Europe/Rome
+- **THEN** annual retrieval includes it when the current Rome year is 2026 and when it is 2027
+
+#### Scenario: Deleted event overlaps the year
+- **WHEN** a soft-deleted event overlaps the current Rome year
+- **THEN** annual retrieval excludes it
+
+### Requirement: Every annual visibility consumer uses the same membership rule
+Current-year event listings, category-filtered event listings, coordinate-filtered event listings, and event search by name, category, or associated city SHALL apply the same annual overlap and soft-delete rule. Other category, coordinate, and search filters SHALL retain their existing meaning.
+
+#### Scenario: Cross-year event appears through annual listing filters
+- **WHEN** a visible cross-year event matches the requested category and coordinates
+- **THEN** current-year, category, and coordinate retrieval each include it for every Rome year it overlaps
+
+#### Scenario: Search uses one annual rule on all event paths
+- **WHEN** a visible cross-year event matches an event name, category label, or associated city search
+- **THEN** each search path includes it for every Rome year it overlaps, without returning a soft-deleted match
+
+### Requirement: Day and date-range retrieval retain interval overlap
+Retrieval for one Europe/Rome calendar day or an inclusive range of Rome calendar days SHALL continue to return non-deleted events whose interval overlaps the requested range. A null end SHALL continue to be treated as a start-only event for these queries.
+
+#### Scenario: Event overlaps a requested day or range
+- **WHEN** a non-deleted event begins before a requested Rome day or date range and ends within or after it
+- **THEN** day or date-range retrieval includes the event under the existing inclusive bounds
+
+#### Scenario: Start-only event is outside the requested range
+- **WHEN** an event has a null end and its start is outside the requested Rome day or date range
+- **THEN** day or date-range retrieval excludes it
+
+### Requirement: Upcoming events remain start-date-based
+Upcoming-event retrieval SHALL include non-deleted events whose start occurs in the configured inclusive future window derived from Europe/Rome civil days, even when that window crosses New Year. It SHALL NOT include an event merely because its interval remains active after an earlier start.
+
+#### Scenario: January start appears in a December window
+- **WHEN** the configured upcoming window begins in December and contains an event start in January
+- **THEN** upcoming-event retrieval includes the event
+
+#### Scenario: Already-started event remains active
+- **WHEN** an event started before the upcoming window but has an end inside the window
+- **THEN** upcoming-event retrieval excludes it unless its start itself falls in the window
+
+### Requirement: Civil-day query bounds remain inclusive
+Current Europe/Rome civil-day queries SHALL retain their inclusive range from the start of a calendar day through its final represented microsecond. This change SHALL NOT redefine an event end instant as the next day's exclusive start.
+
+#### Scenario: Exact next-day midnight is outside the preceding day
+- **WHEN** an event starts exactly at the first instant of the next Rome calendar day
+- **THEN** a query limited to the preceding Rome day excludes that start-only event
