@@ -514,7 +514,7 @@ class _AdminSubmissionEditorScreenState
                                 ),
                               if (viewModel.operationRunning)
                                 const Padding(
-                                  padding: EdgeInsets.all(18),
+                                  padding: EdgeInsets.all(24),
                                   child: CustomCircularProgressIndicator(
                                     size: 36,
                                   ),

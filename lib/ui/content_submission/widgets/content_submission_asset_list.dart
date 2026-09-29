@@ -94,7 +94,7 @@ class _ContentSubmissionAssetListState
                     if (widget.viewModel.addAsset.running ||
                         widget.viewModel.retrieveLostAssets.running) {
                       return const Padding(
-                        padding: EdgeInsets.all(18),
+                        padding: EdgeInsets.all(24),
                         child: CustomCircularProgressIndicator(size: 36),
                       );
                     }
