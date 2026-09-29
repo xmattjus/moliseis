@@ -100,7 +100,7 @@ jobs:
           compgen -G "build/app/outputs/bundle/release/*.aab" > /dev/null
 
       - name: Upload Android artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: molise-is-android-${{ steps.version.outputs.safe_version }}
           path: build/app/outputs/bundle/release/*.aab
@@ -396,7 +396,7 @@ jobs:
           compgen -G "build/ios/ipa/*.ipa" > /dev/null
 
       - name: Upload iOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: molise-is-ios-${{ steps.version.outputs.safe_version }}
           path: build/ios/ipa/*.ipa
