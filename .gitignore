@@ -91,6 +91,11 @@ Pods/
 Pods.xcodeproj/
 *.xcuserdatad/
 *.xcworkspace/
+!ios/Runner.xcworkspace/
+!ios/Runner.xcworkspace/contents.xcworkspacedata
+!ios/Runner.xcworkspace/xcshareddata/
+!ios/Runner.xcworkspace/xcshareddata/**
+ios/Runner.xcworkspace/xcuserdata/
 **/ios/.symlinks/
 **/ios/Flutter/Flutter.framework/
 **/ios/Flutter/App.framework/
