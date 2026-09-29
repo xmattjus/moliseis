@@ -60,6 +60,9 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
       if ((data['submission_id'] as int) <= 0) {
         throw const FormatException('submit-content response is invalid.');
       }
+      if (data['replayed'] == true) {
+        _logger.log(const ContentSubmissionReplayAcknowledged());
+      }
       spanStatus = const SpanStatus.ok();
       return const Result.success(null);
     } on FunctionsFetchException catch (exception, stackTrace) {

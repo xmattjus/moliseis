@@ -111,6 +111,12 @@ void main() {
 
     expect(result, isA<Success<void>>());
     expect(httpClient.requests, hasLength(1));
+    final replayEvents = logger
+        .eventsOfType<ContentSubmissionReplayAcknowledged>();
+    expect(replayEvents, hasLength(1));
+    expect(replayEvents.single.name, 'content_submission_replay_acknowledged');
+    expect(replayEvents.single.level, AppLogLevel.info);
+    expect(replayEvents.single.data, isEmpty);
     expect(
       httpClient.requests.single.body,
       containsPair(
@@ -118,6 +124,47 @@ void main() {
         '00000000-0000-4000-8000-000000000001',
       ),
     );
+  });
+
+  for (final acknowledgement in <({String name, Map<String, dynamic> data})>[
+    (
+      name: 'false replay metadata',
+      data: <String, dynamic>{'submission_id': 1, 'replayed': false},
+    ),
+    (
+      name: 'missing replay metadata',
+      data: <String, dynamic>{'submission_id': 1},
+    ),
+    (
+      name: 'non-boolean replay metadata',
+      data: <String, dynamic>{'submission_id': 1, 'replayed': 'true'},
+    ),
+  ]) {
+    test('accepts ${acknowledgement.name} without a replay log', () async {
+      httpClient.queueJson(acknowledgement.data);
+
+      final result = await submit();
+
+      expect(result, isA<Success<void>>());
+      expect(httpClient.requests, hasLength(1));
+      expect(
+        logger.eventsOfType<ContentSubmissionReplayAcknowledged>(),
+        isEmpty,
+      );
+    });
+  }
+
+  test('does not log replay for an invalid acknowledgement', () async {
+    httpClient.queueJson(<String, dynamic>{
+      'submission_id': 0,
+      'replayed': true,
+    });
+
+    final result = await submit();
+
+    expect(result, isA<Error<void>>());
+    expect(httpClient.requests, hasLength(1));
+    expect(logger.eventsOfType<ContentSubmissionReplayAcknowledged>(), isEmpty);
   });
 
   for (final invalid in <Object?>[

@@ -7,6 +7,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:moliseis/data/data-sources/content_submission_draft_entry.dart';
 import 'package:moliseis/data/data-sources/content_submission_staged_asset_entity.dart';
 import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_staged_asset_repository_impl.dart';
@@ -19,12 +21,14 @@ import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/logging/app_log_level.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/result.dart';
 
 import '../../../support/fake_image_picker.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
+import '../../../support/mock_objectbox.dart';
 import '../../../support/objectbox_test_store.dart';
 
 void main() {
@@ -3794,11 +3798,13 @@ void main() {
             ..pendingClearDraft = pendingClear;
           final staged = FakeContentSubmissionStagedAssetRepository();
           final repository = FakeContentSubmissionRepository();
+          final logger = MockLogger();
           final vm =
               buildViewModel(
                   contentSubmissionRepository: repository,
                   draftRepository: drafts,
                   stagedAssetRepository: staged,
+                  logger: logger,
                 )
                 ..setCity('Rome')
                 ..setName('Colosseum')
@@ -3823,6 +3829,7 @@ void main() {
           expect(vm.state.clientSubmissionId, isNot(identity));
           expect(drafts.clearDraftCallCount, 1);
           expect(staged.clearedSessions, [identity]);
+          expect(logger.calls, isEmpty);
         },
       );
 
@@ -4516,24 +4523,14 @@ void main() {
 
         await vm.addAsset.execute();
         vm.setCity('Campobasso');
+        logger.reset();
         await vm.clear.execute();
 
         expect(vm.assets, isEmpty);
         expect(vm.state.city, isNull);
         expect(vm.clear.completed, isTrue);
         expect(vm.clear.error, isFalse);
-        expect(
-          logger.eventsOfType<ContentSubmissionStateClearStarted>(),
-          hasLength(1),
-        );
-        expect(
-          logger.eventsOfType<ContentSubmissionStateClearSuccess>(),
-          hasLength(1),
-        );
-        expect(
-          logger.eventsOfType<ContentSubmissionStateClearFailed>(),
-          isEmpty,
-        );
+        expect(logger.calls, isEmpty);
       });
 
       test(
@@ -4629,51 +4626,52 @@ void main() {
         },
       );
 
-      test(
-        'logs StateClearStarted and StateClearFailed on draft clear failure',
-        () async {
-          final draftRepository = FakeContentSubmissionDraftRepository(
-            clearDraftResult: Result.error(Exception('disk dead')),
-          );
-          final logger = MockLogger();
-          final vm = buildViewModel(
-            draftRepository: draftRepository,
-            logger: logger,
-          );
+      test('surfaces a draft clear failure with one repository log', () async {
+        final logger = MockLogger();
+        final clearError = TestException('draft clear failed');
+        final box = MockEntityBox<ContentSubmissionDraftEntity>();
+        when(() => box.getAsync(1)).thenAnswer((_) async => null);
+        when(() => box.removeAsync(1)).thenThrow(clearError);
+        final drafts = ContentSubmissionDraftRepositoryImpl(
+          logger: logger,
+          objectBoxI: MockObjectBox(
+            MockObjectBoxStore<ContentSubmissionDraftEntity>(box),
+          ),
+        );
+        final vm = ContentSubmissionViewModel(
+          logger: logger,
+          contentSubmissionRepository: FakeContentSubmissionRepository(),
+          draftRepository: drafts,
+          stagedAssetRepository: FakeContentSubmissionStagedAssetRepository(),
+          imagePicker: FakeImagePicker(),
+        );
+        await vm.initialize();
+        vm.setCity('Campobasso');
+        final identity = vm.state.clientSubmissionId;
+        logger.reset();
 
-          await vm.clear.execute();
+        await vm.clear.execute();
 
-          expect(
-            logger.eventsOfType<ContentSubmissionStateClearStarted>(),
-            hasLength(1),
-          );
-          expect(
-            logger.eventsOfType<ContentSubmissionStateClearFailed>(),
-            hasLength(1),
-          );
-        },
-      );
-
-      test(
-        'does not emit StateClearSuccess when the draft clear fails',
-        () async {
-          final draftRepository = FakeContentSubmissionDraftRepository(
-            clearDraftResult: Result.error(Exception('disk dead')),
-          );
-          final logger = MockLogger();
-          final vm = buildViewModel(
-            draftRepository: draftRepository,
-            logger: logger,
-          );
-
-          await vm.clear.execute();
-
-          expect(
-            logger.containsEvent<ContentSubmissionStateClearSuccess>(),
-            isFalse,
-          );
-        },
-      );
+        expect(vm.clear.error, isTrue);
+        expect(
+          vm.clear.result,
+          isA<Error<void>>().having(
+            (result) => result.error,
+            'error',
+            same(clearError),
+          ),
+        );
+        expect(vm.state.city, 'Campobasso');
+        expect(vm.state.clientSubmissionId, identity);
+        expect(
+          logger.eventsOfType<ContentSubmissionDraftClearFailed>(),
+          hasLength(1),
+        );
+        expect(
+          logger.calls.where((call) => call.event.level == AppLogLevel.error),
+          hasLength(1),
+        );
+      });
 
       test('invokes clearDraft exactly once', () async {
         final draftRepository = FakeContentSubmissionDraftRepository();

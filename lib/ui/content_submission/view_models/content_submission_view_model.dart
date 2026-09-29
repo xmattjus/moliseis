@@ -858,7 +858,6 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   ]) async {
     final expectedClientSubmissionId =
         acknowledgedClientSubmissionId ?? _activeSubmissionClientSubmissionId;
-    _logger.log(const ContentSubmissionStateClearStarted());
     final result = await _serialize<void>(() async {
       if (!_submissionFinalizationPending ||
           expectedClientSubmissionId == null ||
@@ -874,12 +873,8 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       _activeSubmissionClientSubmissionId = null;
       return const Result.success(null);
     });
-    if (result case Error<void>(:final error)) {
-      _logger.log(const ContentSubmissionStateClearFailed(), error: error);
-      return result;
-    }
+    if (result is Error<void>) return result;
     if (!_disposed) notifyListeners();
-    _logger.log(const ContentSubmissionStateClearSuccess());
     return result;
   }
 
@@ -887,7 +882,6 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     if (_disposed) return const Result.success(null);
     await initialize();
     if (_disposed) return const Result.success(null);
-    _logger.log(const ContentSubmissionStateClearStarted());
     final result = await _serialize<void>(() async {
       if (_activeSubmissionClientSubmissionId != null) {
         return Result.error(
@@ -896,18 +890,11 @@ class ContentSubmissionViewModel extends ChangeNotifier {
       }
       return _retireCurrentSessionInsideBoundary();
     });
-    if (result is Error<void>) {
-      _logger.log(
-        const ContentSubmissionStateClearFailed(),
-        error: result.error,
-      );
-      return result;
-    }
+    if (result is Error<void>) return result;
 
     if (!_disposed) {
       notifyListeners();
     }
-    _logger.log(const ContentSubmissionStateClearSuccess());
     return result;
   }
 

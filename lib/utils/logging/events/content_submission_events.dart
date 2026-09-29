@@ -105,6 +105,20 @@ class ContentSubmissionUploadStarted extends LogEvent {
   String get name => 'content_submission_upload_started';
 }
 
+/// Fired when the backend acknowledges an already submitted session.
+class ContentSubmissionReplayAcknowledged extends LogEvent {
+  const ContentSubmissionReplayAcknowledged();
+
+  @override
+  Map<String, Object?> get data => const {};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'content_submission_replay_acknowledged';
+}
+
 /// Fired when a content submission draft loading starts.
 class ContentSubmissionDraftLoadStarted extends LogEvent {
   const ContentSubmissionDraftLoadStarted();
@@ -233,46 +247,4 @@ class ContentSubmissionDraftSaveSuccess extends LogEvent {
 
   @override
   String get name => 'content_submission_draft_save_success';
-}
-
-/// Fired when a content submission State clear starts.
-class ContentSubmissionStateClearStarted extends LogEvent {
-  const ContentSubmissionStateClearStarted();
-
-  @override
-  Map<String, Object?> get data => const {};
-
-  @override
-  AppLogLevel get level => AppLogLevel.info;
-
-  @override
-  String get name => 'content_submission_state_clear_started';
-}
-
-/// Fired when a content submission State clear finishes successfully.
-class ContentSubmissionStateClearSuccess extends LogEvent {
-  const ContentSubmissionStateClearSuccess();
-
-  @override
-  Map<String, Object?> get data => const {};
-
-  @override
-  AppLogLevel get level => AppLogLevel.info;
-
-  @override
-  String get name => 'content_submission_state_clear_success';
-}
-
-/// Fired when a content submission State clear fails.
-class ContentSubmissionStateClearFailed extends LogEvent {
-  const ContentSubmissionStateClearFailed();
-
-  @override
-  Map<String, Object?> get data => const {};
-
-  @override
-  AppLogLevel get level => AppLogLevel.error;
-
-  @override
-  String get name => 'content_submission_state_clear_failed';
 }
