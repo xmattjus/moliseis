@@ -201,9 +201,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
         .endUtc;
 
     try {
-      // Uses overlap semantics (event overlaps [startDate, endDate]),
-      // distinct from ObjectBoxConditions.visibleEventInCurrentYear which
-      // requires the event to be fully contained within the year.
+      // Uses overlap semantics (event overlaps [startDate, endDate]).
       final multiDayCondition = EventEntity_.startDate
           .lessOrEqualDate(endDate)
           .and(EventEntity_.endDate.greaterOrEqualDate(startDate));

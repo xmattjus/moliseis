@@ -342,12 +342,12 @@ class SearchRepositoryImpl implements SearchRepository {
   }
 
   /// Whether [event] is visible ([EventEntity.isDeleted] is `false`) and
-  /// happens entirely within the year bounded by [startOfYear] and
+  /// overlaps the inclusive year range bounded by [startOfYear] and
   /// [endOfYear].
   ///
-  /// Multi-day events (non-null [EventEntity.endDate]) must both start on or
-  /// after [startOfYear] and end on or before [endOfYear]. Single-day events
-  /// (null [EventEntity.endDate]) are matched when their
+  /// Multi-day events (non-null [EventEntity.endDate]) overlap when they start
+  /// on or before [endOfYear] and end on or after [startOfYear]. Single-day
+  /// events (null [EventEntity.endDate]) are matched when their
   /// [EventEntity.startDate] falls within the same range.
   bool _isVisibleEventInCurrentYear(
     EventEntity event,
@@ -366,7 +366,7 @@ class SearchRepositoryImpl implements SearchRepository {
     }
 
     return startDate != null &&
-        !startDate.isBefore(startOfYear) &&
-        !endDate.isAfter(endOfYear);
+        !startDate.isAfter(endOfYear) &&
+        !endDate.isBefore(startOfYear);
   }
 }

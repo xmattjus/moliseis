@@ -1046,7 +1046,7 @@ Deno.test("valid zero-asset place promotion succeeds", async () => {
   );
 });
 
-Deno.test("place promotion rejects stored event dates", async () => {
+Deno.test("place promotion rejects a stored start date", async () => {
   const setup = client();
   const registry = newRegistry();
 
@@ -1059,13 +1059,6 @@ Deno.test("place promotion rejects stored event dates", async () => {
         longitude: 14.6697,
         startDate: new Date("2026-09-01T10:00:00.000Z"),
       });
-      const endOnly = await createSubmission(setup, registry, {
-        city: city.name,
-        latitude: 41.5629,
-        longitude: 14.6697,
-        endDate: new Date("2026-09-03T18:00:00.000Z"),
-      });
-
       assertEquals(
         await promote(setup, withStart.submissionId, "place", handledByUser),
         {
@@ -1074,13 +1067,37 @@ Deno.test("place promotion rejects stored event dates", async () => {
           entity_id: null,
         },
       );
-      assertEquals(
-        await promote(setup, endOnly.submissionId, "place", handledByUser),
-        {
-          outcome: "place_has_event_dates",
-          target_type: null,
-          entity_id: null,
-        },
+    },
+    setup,
+    registry,
+  );
+});
+
+Deno.test("submission date constraints reject end-only and inverted rows before promotion", async () => {
+  const setup = client();
+  const registry = newRegistry();
+
+  await runFixtureScenario(
+    async () => {
+      await assertPostgresError(
+        () =>
+          createSubmission(setup, registry, {
+            endDate: new Date("2026-09-03T18:00:00.000Z"),
+          }),
+        "23514",
+      );
+
+      const fixture = await createSubmission(setup, registry, {
+        startDate: new Date("2026-09-03T18:00:00.000Z"),
+      });
+      await assertPostgresError(
+        () =>
+          setup`
+          update public.content_submissions
+          set end_date = '2026-09-03 17:59:59.999999+00'::timestamptz
+          where id = ${fixture.submissionId}
+        `,
+        "23514",
       );
     },
     setup,
@@ -1144,7 +1161,7 @@ Deno.test("valid start-only, ranged and equal-bound event promotions succeed", a
   );
 });
 
-Deno.test("event promotion rejects missing start and inverted ranges", async () => {
+Deno.test("event promotion rejects a missing start", async () => {
   const setup = client();
   const registry = newRegistry();
 
@@ -1156,14 +1173,6 @@ Deno.test("event promotion rejects missing start and inverted ranges", async () 
         latitude: 41.5629,
         longitude: 14.6697,
       });
-      const inverted = await createSubmission(setup, registry, {
-        city: city.name,
-        latitude: 41.5629,
-        longitude: 14.6697,
-        startDate: new Date("2026-09-03T18:00:00.000Z"),
-        endDate: new Date("2026-09-01T10:00:00.000Z"),
-      });
-
       assertEquals(
         await promote(setup, noStart.submissionId, "event", handledByUser),
         {
@@ -1172,54 +1181,9 @@ Deno.test("event promotion rejects missing start and inverted ranges", async () 
           entity_id: null,
         },
       );
-      assertEquals(
-        await promote(setup, inverted.submissionId, "event", handledByUser),
-        {
-          outcome: "invalid_date_range",
-          target_type: null,
-          entity_id: null,
-        },
-      );
-
       const noStartSource = await fetchSource(setup, noStart.submissionId);
       assertEquals(noStartSource.status, "pending");
       assertEquals(noStartSource.promoted_event_id, null);
-    },
-    setup,
-    registry,
-  );
-});
-
-Deno.test("event promotion rejects an inverted sub-millisecond SQL timestamp range", async () => {
-  const setup = client();
-  const registry = newRegistry();
-
-  await runFixtureScenario(
-    async () => {
-      const city = await createCity(setup, registry);
-      const fixture = await createSubmission(setup, registry, {
-        city: city.name,
-        latitude: 41.5629,
-        longitude: 14.6697,
-      });
-
-      // Keep this precision entirely in PostgreSQL: JavaScript Date and its
-      // getTime() representation cannot prove microsecond ordering.
-      await setup`
-        update public.content_submissions
-        set start_date = '2026-09-03 18:00:00.123457+00'::timestamptz,
-            end_date = '2026-09-03 18:00:00.123456+00'::timestamptz
-        where id = ${fixture.submissionId}
-      `;
-
-      assertEquals(
-        await promote(setup, fixture.submissionId, "event", handledByUser),
-        {
-          outcome: "invalid_date_range",
-          target_type: null,
-          entity_id: null,
-        },
-      );
     },
     setup,
     registry,

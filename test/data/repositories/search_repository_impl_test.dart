@@ -42,6 +42,74 @@ void main() {
     // -------------------------------------------------------------------------
 
     group('direct event name match', () {
+      test('uses annual overlap consistently for direct, category, and city '
+          'event searches in both Rome years', () async {
+        final city = makeCityEntity(remoteId: 60, name: 'Campobasso');
+        cityBox.put(city);
+        eventBox.put(
+          makeEventEntity(
+            remoteId: 60,
+            name: 'Cross-year nature festival',
+            startDate: DateTime.utc(2026, 12, 30, 23),
+            endDate: DateTime.utc(2027, 1, 1, 22, 59, 59, 999, 999),
+            cityId: city.remoteId,
+            contentCategoryIndex: 1, // ContentCategory.nature
+          ),
+        );
+        eventBox.put(
+          makeEventEntity(
+            remoteId: 61,
+            name: 'Cross-year nature hidden festival',
+            startDate: DateTime.utc(2026, 12, 30, 23),
+            endDate: DateTime.utc(2027, 1, 1, 22, 59, 59, 999, 999),
+            cityId: city.remoteId,
+            contentCategoryIndex: 1, // ContentCategory.nature
+            isDeleted: true,
+          ),
+        );
+
+        for (final nowUtc in [DateTime.utc(2026, 6), DateTime.utc(2027, 6)]) {
+          final yearlyRepository = SearchRepositoryImpl(
+            logger: MockLogger(),
+            objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+            nowUtc: () => nowUtc,
+          );
+
+          expect(
+            (await yearlyRepository.getEventIdsByQuery(
+              'Cross-year',
+            )).getOrNull(),
+            contains(60),
+          );
+          expect(
+            (await yearlyRepository.getEventIdsByQuery(
+              'Cross-year',
+            )).getOrNull(),
+            isNot(contains(61)),
+          );
+          expect(
+            (await yearlyRepository.getEventIdsByQuery('natura')).getOrNull(),
+            contains(60),
+          );
+          expect(
+            (await yearlyRepository.getEventIdsByQuery('natura')).getOrNull(),
+            isNot(contains(61)),
+          );
+          expect(
+            (await yearlyRepository.getEventIdsByQuery(
+              'Campobasso',
+            )).getOrNull(),
+            contains(60),
+          );
+          expect(
+            (await yearlyRepository.getEventIdsByQuery(
+              'Campobasso',
+            )).getOrNull(),
+            isNot(contains(61)),
+          );
+        }
+      });
+
       test('uses Rome year bounds for direct and city event paths', () async {
         final city = makeCityEntity(remoteId: 50, name: 'Termoli');
         cityBox.put(city);

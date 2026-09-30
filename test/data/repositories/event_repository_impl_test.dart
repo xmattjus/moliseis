@@ -520,6 +520,89 @@ void main() {
       },
     );
 
+    test(
+      'uses inclusive annual overlap for ranged events and boundaries',
+      () async {
+        final policy = EventTimePolicy();
+        final yearStart = policy
+            .utcRangeForCalendarDate(EventCalendarDate(2026, 1, 1))
+            .startUtc;
+        final yearEnd = policy
+            .utcRangeForCalendarDate(EventCalendarDate(2026, 12, 31))
+            .endUtc;
+
+        eventBox.putMany([
+          makeEventEntity(remoteId: 10, startDate: DateTime.utc(2026, 6)),
+          makeEventEntity(
+            remoteId: 11,
+            startDate: DateTime.utc(2026, 6),
+            endDate: DateTime.utc(2026, 6, 2),
+          ),
+          makeEventEntity(
+            remoteId: 12,
+            startDate: DateTime.utc(2025, 6),
+            endDate: DateTime.utc(2025, 6, 2),
+          ),
+          makeEventEntity(
+            remoteId: 13,
+            startDate: DateTime.utc(2027, 6),
+            endDate: DateTime.utc(2027, 6, 2),
+          ),
+          makeEventEntity(
+            remoteId: 14,
+            startDate: DateTime.utc(2025, 12),
+            endDate: DateTime.utc(2026, 1, 2),
+          ),
+          makeEventEntity(
+            remoteId: 15,
+            startDate: DateTime.utc(2026, 12, 31),
+            endDate: DateTime.utc(2027, 1, 2),
+          ),
+          makeEventEntity(
+            remoteId: 16,
+            startDate: DateTime.utc(2025),
+            endDate: DateTime.utc(2027, 12, 31),
+          ),
+          makeEventEntity(
+            remoteId: 17,
+            startDate: yearStart,
+            endDate: DateTime.utc(2026, 1, 2),
+          ),
+          makeEventEntity(
+            remoteId: 18,
+            startDate: DateTime.utc(2026, 12, 30),
+            endDate: yearEnd,
+          ),
+          makeEventEntity(
+            remoteId: 19,
+            startDate: DateTime.utc(2026, 6),
+            endDate: DateTime.utc(2026, 6, 2),
+            isDeleted: true,
+          ),
+          makeEventEntity(
+            remoteId: 20,
+            startDate: DateTime.utc(2025, 12, 30),
+            endDate: yearStart,
+          ),
+          makeEventEntity(
+            remoteId: 21,
+            startDate: yearEnd,
+            endDate: DateTime.utc(2027, 1, 2),
+          ),
+        ]);
+
+        final result = await repository.getByCurrentYear();
+        final ids = (result as Success<List<Event>>).value
+            .map((event) => event.remoteId)
+            .toSet();
+
+        expect(ids, containsAll(<int>{10, 11, 14, 15, 16, 17, 18, 20, 21}));
+        expect(ids, isNot(contains(12)));
+        expect(ids, isNot(contains(13)));
+        expect(ids, isNot(contains(19)));
+      },
+    );
+
     test('excludes multi-day event from a past year', () async {
       final event = makeEventEntity(
         remoteId: 3,
@@ -1059,28 +1142,28 @@ void main() {
 
     tearDown(() => environment.dispose());
 
-    test(
-      'uses Rome year containment and upcoming-day UTC boundaries',
-      () async {
-        eventBox.putMany([
-          makeEventEntity(
-            remoteId: 1,
-            startDate: DateTime.utc(2026, 12, 31, 23),
-          ),
-          makeEventEntity(remoteId: 2, startDate: DateTime.utc(2027, 1, 1, 1)),
-          makeEventEntity(remoteId: 3, startDate: DateTime.utc(2028, 2, 1, 1)),
-        ]);
+    test('uses Rome year bounds and upcoming-day UTC boundaries', () async {
+      eventBox.putMany([
+        makeEventEntity(remoteId: 1, startDate: DateTime.utc(2026, 12, 31, 23)),
+        makeEventEntity(remoteId: 2, startDate: DateTime.utc(2027, 1, 1, 1)),
+        makeEventEntity(remoteId: 3, startDate: DateTime.utc(2028, 2, 1, 1)),
+        makeEventEntity(
+          remoteId: 4,
+          startDate: DateTime.utc(2026, 12, 31, 22),
+          endDate: DateTime.utc(2027, 1, 2),
+        ),
+      ]);
 
-        final currentYear = await repository.getByCurrentYear();
-        final upcoming = await repository.getNextEventIds();
+      final currentYear = await repository.getByCurrentYear();
+      final upcoming = await repository.getNextEventIds();
 
-        expect(
-          (currentYear as Success<List<Event>>).value.map((e) => e.remoteId),
-          [1, 2],
-        );
-        expect((upcoming as Success<List<int>>).value, [1, 2]);
-      },
-    );
+      expect(
+        (currentYear as Success<List<Event>>).value.map((e) => e.remoteId),
+        [4, 1, 2],
+      );
+      expect((upcoming as Success<List<int>>).value, [1, 2]);
+      expect(upcoming.value, isNot(contains(4)));
+    });
 
     test(
       'uses Rome summer day and inclusive upcoming-window boundaries',
@@ -1123,7 +1206,7 @@ void main() {
     );
 
     test(
-      'keeps Rome-year containment for category and coordinate queries',
+      'uses Rome-year overlap for category and coordinate queries',
       () async {
         eventBox.putMany([
           makeEventEntity(
@@ -1150,11 +1233,56 @@ void main() {
         final nearbyEvents = (nearby as Success<List<Event>>).value;
 
         expect(categoryEvents, containsEventId(20));
-        expect(categoryEvents, isNot(containsEventId(21)));
+        expect(categoryEvents, containsEventId(21));
         expect(nearbyEvents, containsEventId(20));
-        expect(nearbyEvents, isNot(containsEventId(21)));
+        expect(nearbyEvents, containsEventId(21));
       },
     );
+
+    test('includes a 31 December to 1 January event in both Rome years across '
+        'yearly, category, and coordinate queries', () async {
+      final policy = EventTimePolicy();
+      final event = makeEventEntity(
+        remoteId: 30,
+        startDate: policy
+            .utcRangeForCalendarDate(EventCalendarDate(2026, 12, 31))
+            .startUtc,
+        endDate: policy
+            .utcRangeForCalendarDate(EventCalendarDate(2027, 1, 1))
+            .endUtc,
+        coordinates: const [0.01, 0.01],
+        contentCategoryIndex: ContentCategory.nature.index,
+      );
+      eventBox.put(event);
+
+      final repositoryFor2026 = EventRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        objectBoxI: TestObjectBox(environment.store),
+        nowUtc: () => DateTime.utc(2026, 6),
+      );
+      final repositoryFor2027 = EventRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        objectBoxI: TestObjectBox(environment.store),
+        nowUtc: () => DateTime.utc(2027, 6),
+      );
+
+      for (final yearlyRepository in [repositoryFor2026, repositoryFor2027]) {
+        final currentYear = await yearlyRepository.getByCurrentYear();
+        final categories = await yearlyRepository.getByCategories({
+          ContentCategory.nature,
+        });
+        final nearby = await yearlyRepository.getByCoordinates(const [0, 0]);
+
+        expect(
+          (currentYear as Success<List<Event>>).value,
+          containsEventId(30),
+        );
+        expect((categories as Success<List<Event>>).value, containsEventId(30));
+        expect((nearby as Success<List<Event>>).value, containsEventId(30));
+      }
+    });
   });
 }
 

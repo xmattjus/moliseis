@@ -15,7 +15,8 @@ import 'package:moliseis/utils/synchronizable.dart';
 /// concrete subtypes stay in the data layer to keep serialization and
 /// ObjectBox annotations out of domain code.
 abstract class EventRepository with Synchronizable<EventDto> {
-  /// Returns all events occurring in the current calendar year.
+  /// Returns all non-deleted events that overlap the current Europe/Rome
+  /// calendar year.
   Future<Result<List<Event>>> getByCurrentYear();
 
   /// Returns all events that overlap the provided Rome calendar [date].

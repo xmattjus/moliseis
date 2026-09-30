@@ -6,15 +6,15 @@ class ObjectBoxConditions {
   // Private constructor to prevent class instantiation.
   ObjectBoxConditions._();
 
-  /// A [Condition] for events that are visible and happen entirely within the
-  /// current year.
+  /// A [Condition] for events that are visible and overlap the current
+  /// Europe/Rome calendar year.
   ///
   /// The event must be visible — [EventEntity.isDeleted] equals `false`.
   ///
-  /// Multi-day events (non-null [EventEntity_.endDate]) must both start on or
-  /// after January 1st and end on or before December 31st 23:59:59.999.
-  /// Single-day events (null [EventEntity_.endDate]) are matched when their
-  /// [EventEntity_.startDate] falls within the same range.
+  /// Multi-day events (non-null [EventEntity_.endDate]) match when their
+  /// interval overlaps the inclusive year range. Single-day events (null
+  /// [EventEntity_.endDate]) are matched when their [EventEntity_.startDate]
+  /// falls within the same range.
   static Condition<EventEntity> visibleEventInCurrentYear(
     DateTime nowUtc, {
     EventTimePolicy? policy,
@@ -29,8 +29,8 @@ class ObjectBoxConditions {
         .endUtc;
 
     final multiDay = EventEntity_.startDate
-        .greaterOrEqualDate(startOfYear)
-        .and(EventEntity_.endDate.lessOrEqualDate(endOfYear));
+        .lessOrEqualDate(endOfYear)
+        .and(EventEntity_.endDate.greaterOrEqualDate(startOfYear));
 
     // Single-day events have a null endDate; match them by startDate alone.
     final singleDay = EventEntity_.endDate.isNull().and(
