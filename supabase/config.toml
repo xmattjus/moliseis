@@ -394,6 +394,9 @@ verify_jwt = true
 [functions.notify-submission-status]
 verify_jwt = false
 
+[functions.import-external-events]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
