@@ -18,10 +18,14 @@ class Event extends ContentBase {
     required super.isSaved,
     required this.startDate,
     this.endDate,
+    this.allDay = false,
   });
 
   final DateTime startDate;
   final DateTime? endDate;
+
+  /// Whether a meaningful initial clock is unavailable.
+  final bool allDay;
 
   @override
   bool operator ==(Object other) {
@@ -30,7 +34,8 @@ class Event extends ContentBase {
     return other is Event &&
         super == other &&
         other.startDate.isAtSameMomentAs(startDate) &&
-        _bothNullOrSameMoment(other.endDate, endDate);
+        _bothNullOrSameMoment(other.endDate, endDate) &&
+        other.allDay == allDay;
   }
 
   @override
@@ -38,6 +43,7 @@ class Event extends ContentBase {
     super.hashCode,
     startDate.millisecondsSinceEpoch,
     endDate?.millisecondsSinceEpoch,
+    allDay,
   );
 
   /// Whether both [dt] and [other] are null or occur at the same moment.

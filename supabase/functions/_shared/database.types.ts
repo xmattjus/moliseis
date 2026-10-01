@@ -1,10 +1,6 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | {
+  [key: string]: Json | undefined;
+} | Json[];
 
 export type Database = {
   graphql_public: {
@@ -64,6 +60,7 @@ export type Database = {
       content_submissions: {
         Row: {
           address: string | null;
+          all_day: boolean;
           category: Database["public"]["Enums"]["content_category"];
           city: string;
           client_submission_id: string | null;
@@ -96,6 +93,7 @@ export type Database = {
         };
         Insert: {
           address?: string | null;
+          all_day?: boolean;
           category?: Database["public"]["Enums"]["content_category"];
           city: string;
           client_submission_id?: string | null;
@@ -128,6 +126,7 @@ export type Database = {
         };
         Update: {
           address?: string | null;
+          all_day?: boolean;
           category?: Database["public"]["Enums"]["content_category"];
           city?: string;
           client_submission_id?: string | null;
@@ -177,6 +176,7 @@ export type Database = {
       };
       events: {
         Row: {
+          all_day: boolean;
           category: Database["public"]["Enums"]["content_category"];
           city_id: number | null;
           created_at: string;
@@ -192,6 +192,7 @@ export type Database = {
           start_date: string;
         };
         Insert: {
+          all_day?: boolean;
           category?: Database["public"]["Enums"]["content_category"];
           city_id?: number | null;
           created_at?: string;
@@ -207,6 +208,7 @@ export type Database = {
           start_date: string;
         };
         Update: {
+          all_day?: boolean;
           category?: Database["public"]["Enums"]["content_category"];
           city_id?: number | null;
           created_at?: string;
@@ -434,6 +436,7 @@ export type Database = {
       submit_content: {
         Args: {
           p_address: string;
+          p_all_day?: boolean;
           p_assets: Json;
           p_category: Database["public"]["Enums"]["content_category"];
           p_city: string;
@@ -492,9 +495,8 @@ export type Tables<
       ]
     )
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-} ? (
+> = DefaultSchemaTableNameOrOptions extends
+  { schema: keyof DatabaseWithoutInternals } ? (
     & DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
       "Tables"
     ]
@@ -505,13 +507,11 @@ export type Tables<
     Row: infer R;
   } ? R
   : never
-  : DefaultSchemaTableNameOrOptions extends keyof (
-    & DefaultSchema["Tables"]
-    & DefaultSchema["Views"]
-  ) ? (
-      & DefaultSchema["Tables"]
-      & DefaultSchema["Views"]
-    )[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends
+    keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[
+      DefaultSchemaTableNameOrOptions
+    ] extends {
       Row: infer R;
     } ? R
     : never
@@ -527,9 +527,9 @@ export type TablesInsert<
       "Tables"
     ]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-} ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
+> = DefaultSchemaTableNameOrOptions extends
+  { schema: keyof DatabaseWithoutInternals }
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
     "Tables"
   ][TableName] extends {
     Insert: infer I;
@@ -552,9 +552,9 @@ export type TablesUpdate<
       "Tables"
     ]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-} ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
+> = DefaultSchemaTableNameOrOptions extends
+  { schema: keyof DatabaseWithoutInternals }
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
     "Tables"
   ][TableName] extends {
     Update: infer U;
@@ -577,9 +577,9 @@ export type Enums<
       "Enums"
     ]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-} ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][
+> = DefaultSchemaEnumNameOrOptions extends
+  { schema: keyof DatabaseWithoutInternals }
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][
     EnumName
   ]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
@@ -596,9 +596,9 @@ export type CompositeTypes<
       PublicCompositeTypeNameOrOptions["schema"]
     ]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals;
-} ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]][
+> = PublicCompositeTypeNameOrOptions extends
+  { schema: keyof DatabaseWithoutInternals }
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]][
     "CompositeTypes"
   ][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends

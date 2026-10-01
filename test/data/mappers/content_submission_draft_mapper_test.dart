@@ -217,4 +217,72 @@ void main() {
       expect(entity.toModel(), isNull);
     });
   });
+  test(
+    'checkpoint preserves mode/final civil date without duplicating resolved dates',
+    () {
+      final policy = EventTimePolicy();
+      for (final end in [null, EventCalendarDate(2026, 10, 14)]) {
+        final allDay = policy
+            .changeAllDay(
+              EventDateDraft.unresolvedStart(
+                EventCalendarDate(2026, 10, 12),
+                endCalendarDate: end,
+              ),
+              allDay: true,
+            )
+            .draft;
+        final snapshot = ContentSubmissionDraft(
+          clientSubmissionId: clientSubmissionId,
+          eventDates: allDay,
+        );
+        final entity = snapshot.toEntity();
+        expect(entity.allDay, isTrue);
+        expect(entity.pendingEndCalendarDate, isNull);
+        expect(entity.toModel(), snapshot);
+        final timed = snapshot.copyWith(
+          eventDates: policy.changeAllDay(allDay, allDay: false).draft,
+        );
+        final pending = timed.toEntity();
+        expect(pending.startDate, isNull);
+        expect(pending.endDate, isNull);
+        expect(pending.pendingEndCalendarDate, end?.toString());
+        expect(pending.toModel(), timed);
+        expect(pending.toModel()!.clientSubmissionId, clientSubmissionId);
+        expect(
+          policy.validateForPersistence(pending.toModel()!.eventDates),
+          EventTimeIssue.missingStartTime,
+        );
+      }
+    },
+  );
+  test(
+    'unresolved civil range remains editable but corrupt all-day range rejects',
+    () {
+      final entity = ContentSubmissionDraftEntity(
+        clientSubmissionId: clientSubmissionId,
+        isEvent: true,
+        pendingStartCalendarDate: '2026-10-15',
+        pendingEndCalendarDate: '2026-10-14',
+      );
+      final recovered = entity.toModel()!;
+      expect(
+        EventTimePolicy().validateForPersistence(recovered.eventDates),
+        EventTimeIssue.invalidRange,
+      );
+      expect(
+        recovered.eventDates.endCalendarDate,
+        EventCalendarDate(2026, 10, 14),
+      );
+      expect(
+        () => ContentSubmissionDraftEntity(
+          clientSubmissionId: clientSubmissionId,
+          isEvent: true,
+          allDay: true,
+          pendingStartCalendarDate: '2026-10-15',
+          pendingEndCalendarDate: '2026-10-14',
+        ).toModel(),
+        throwsStateError,
+      );
+    },
+  );
 }

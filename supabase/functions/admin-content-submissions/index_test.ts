@@ -25,6 +25,7 @@ const record: SubmissionRecord = {
   description_delta: [{ insert: "Description\n" }],
   start_date: null,
   end_date: null,
+  all_day: false,
   category: "history",
   user_name: "Contributor",
   user_email: "contributor@example.test",
@@ -53,11 +54,22 @@ const input = () => ({
   name: "Plan A",
   description: null,
   description_delta: null,
+  all_day: false,
+  start_calendar_date: null,
+  end_calendar_date: null,
   start_date: null,
   end_date: null,
   latitude: null,
   longitude: null,
 });
+
+function persistedInput<
+  T extends { start_calendar_date: unknown; end_calendar_date: unknown },
+>(value: T) {
+  const { start_calendar_date: _start, end_calendar_date: _end, ...values } =
+    value;
+  return values;
+}
 
 class FakeStore implements AdminSubmissionStore {
   calls: string[] = [];
@@ -303,6 +315,7 @@ Deno.test("maps list and detail DTOs without exposing internal fields", async ()
     Object.keys((listBody.submissions as Array<Record<string, unknown>>)[0])
       .sort(),
     [
+      "all_day",
       "assets",
       "category",
       "city",
@@ -378,6 +391,9 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
     name: "Plan A",
     description: null,
     description_delta: null,
+    all_day: false,
+    start_calendar_date: null,
+    end_calendar_date: null,
     start_date: null,
     end_date: null,
     latitude: 41.5575078,
@@ -391,7 +407,7 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   );
   assertEquals(createResponse.status, 200);
   assertEquals(created.store.createValues, {
-    ...createdInput,
+    ...persistedInput(createdInput),
     user_id: "00000000-0000-4000-8000-000000000001",
     user_email: "admin@example.test",
     user_name: "Plan Admin",
@@ -422,7 +438,7 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   assertEquals(updateResponse.status, 200);
   assertEquals(updated.store.updateValues, [
     7,
-    updatedInput,
+    persistedInput(updatedInput),
     "2026-08-21T11:00:00.000Z",
   ]);
   assertEquals(
@@ -439,7 +455,7 @@ Deno.test("creates with server-authoritative identity and validates the admin pr
   assertEquals(response.status, 200);
   assertEquals(success.created(), 1);
   assertEquals(success.store.createValues, {
-    ...input(),
+    ...persistedInput(input()),
     user_id: "00000000-0000-4000-8000-000000000001",
     user_email: "admin@example.test",
     user_name: "Plan Admin",
@@ -480,7 +496,7 @@ Deno.test("maps pending-guarded update outcomes without collapsing 409", async (
   assertEquals(updated.created(), 1);
   assertEquals(updated.store.updateValues, [
     7,
-    input(),
+    persistedInput(input()),
     "2026-08-21T11:00:00.000Z",
   ]);
   assertEquals(await responseJson(updatedResponse), {
@@ -823,4 +839,62 @@ Deno.test("resolves named and legacy keys without environment access", () => {
       keyName: "default",
     })
   );
+});
+
+Deno.test("Admin handler creates, reads and updates both temporal modes without civil columns", async () => {
+  for (const allDay of [false, true]) {
+    const harness = testHandler(adminUser());
+    const temporal = {
+      ...input(),
+      all_day: allDay,
+      start_calendar_date: allDay ? "2026-03-29" : null,
+      end_calendar_date: allDay ? "2026-03-29" : null,
+    };
+    const createResponse = await harness.handler(
+      request({ operation: "create", input: temporal }),
+    );
+    assertEquals(createResponse.status, 200);
+    const created = harness.store.createValues as Record<string, unknown>;
+    assertEquals(created.all_day, allDay);
+    assertEquals(
+      created.start_date,
+      allDay ? "2026-03-28T23:00:00.000Z" : null,
+    );
+    assertEquals(
+      created.end_date,
+      allDay ? "2026-03-29T21:59:59.999999Z" : null,
+    );
+    assertEquals(Object.hasOwn(created, "start_calendar_date"), false);
+    const updateResponse = await harness.handler(
+      request({ operation: "update", submission_id: 7, input: temporal }),
+    );
+    assertEquals(updateResponse.status, 200);
+    const updatedInput = (harness.store.updateValues as unknown[])[1] as Record<
+      string,
+      unknown
+    >;
+    assertEquals(updatedInput.all_day, allDay);
+    assertEquals(updatedInput.start_date, created.start_date);
+    assertEquals(updatedInput.end_date, created.end_date);
+    harness.store.getResult = {
+      submission: {
+        ...record,
+        all_day: allDay,
+        start_date: created.start_date as string | null,
+        end_date: created.end_date as string | null,
+      },
+      assets: [],
+    };
+    const readResponse = await harness.handler(
+      request({ operation: "getById", submission_id: 7 }),
+    );
+    assertEquals(readResponse.status, 200);
+    const detail = (await responseJson(readResponse)).submission as Record<
+      string,
+      unknown
+    >;
+    assertEquals(detail.all_day, allDay);
+    assertEquals(detail.start_date, created.start_date);
+    assertEquals(detail.end_date, created.end_date);
+  }
 });

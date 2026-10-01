@@ -187,7 +187,7 @@
     },
     {
       "id": "17:7285695363865824884",
-      "lastPropertyId": "15:3781919031562521160",
+      "lastPropertyId": "16:8451749802769463397",
       "name": "EventEntity",
       "properties": [
         {
@@ -267,6 +267,11 @@
           "id": "15:3781919031562521160",
           "name": "descriptionDelta",
           "type": 13
+        },
+        {
+          "id": "16:8451749802769463397",
+          "name": "allDay",
+          "type": 1
         }
       ],
       "relations": []
@@ -349,7 +354,7 @@
     },
     {
       "id": "20:8436787422671765122",
-      "lastPropertyId": "18:4578999261153036819",
+      "lastPropertyId": "20:9046656296946601217",
       "name": "ContentSubmissionDraftEntity",
       "properties": [
         {
@@ -422,6 +427,16 @@
           "id": "18:4578999261153036819",
           "name": "clientSubmissionId",
           "type": 9
+        },
+        {
+          "id": "19:3353973637497598878",
+          "name": "pendingEndCalendarDate",
+          "type": 9
+        },
+        {
+          "id": "20:9046656296946601217",
+          "name": "allDay",
+          "type": 1
         }
       ],
       "relations": []

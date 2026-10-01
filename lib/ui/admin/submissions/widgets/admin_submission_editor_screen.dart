@@ -409,6 +409,9 @@ class _AdminSubmissionEditorScreenState
                             description: viewModel.description,
                             descriptionDelta: viewModel.descriptionDelta,
                             isEvent: viewModel.isEvent,
+                            allDay: viewModel.allDay,
+                            onAllDayChanged: (allDay) =>
+                                viewModel.setAllDay(allDay: allDay),
                             startCalendarDate: viewModel.startCalendarDate,
                             startClockTime: viewModel.startClockTime,
                             endCalendarDate: viewModel.endCalendarDate,

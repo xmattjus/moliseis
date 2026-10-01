@@ -85,6 +85,46 @@ void main() {
       viewModel.dispose();
     });
 
+    testWidgets('rehydrates date-only and toggle off requests a new clock', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(
+          allDay: true,
+          startDate: DateTime.utc(2026, 3, 28, 23),
+          endDate: DateTime.utc(2026, 3, 30, 21, 59, 59, 999, 999),
+        ),
+      );
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      expect(viewModel.allDay, isTrue);
+      expect(viewModel.isDirty, isFalse);
+      expect(find.text('Senza orario'), findsOneWidget);
+      expect(find.textContaining('Inizia alle'), findsNothing);
+      final toggle = find.descendant(
+        of: find.widgetWithText(Row, 'Senza orario'),
+        matching: find.byType(Checkbox),
+      );
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(viewModel.allDay, isFalse);
+      expect(viewModel.startClockTime, isNull);
+      expect(viewModel.endCalendarDate, EventCalendarDate(2026, 3, 30));
+      expect(find.text('Seleziona ora di inizio'), findsOneWidget);
+      expect(find.textContaining('00:00'), findsNothing);
+    });
+
     testWidgets('renders the shared create fields without an asset section', (
       tester,
     ) async {

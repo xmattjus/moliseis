@@ -113,7 +113,7 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
     final force24HourFormat =
         MediaQuery.maybeAlwaysUse24HourFormatOf(context) ?? false;
 
-    final startTime = isMultipleDays
+    final startTime = widget.event.allDay || isMultipleDays
         ? null
         : startDate.formatTime(
             _currentLocale,

@@ -97,6 +97,14 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     key: r'end_date',
     opt: true,
   );
+  static bool _$allDay(EventDto v) => v.allDay;
+  static const Field<EventDto, bool> _f$allDay = Field(
+    'allDay',
+    _$allDay,
+    key: r'all_day',
+    opt: true,
+    def: false,
+  );
 
   @override
   final MappableFields<EventDto> fields = const {
@@ -113,6 +121,7 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     #cityId: _f$cityId,
     #deletedAt: _f$deletedAt,
     #endDate: _f$endDate,
+    #allDay: _f$allDay,
   };
 
   @override
@@ -132,6 +141,7 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
       cityId: data.dec(_f$cityId),
       deletedAt: data.dec(_f$deletedAt),
       endDate: data.dec(_f$endDate),
+      allDay: data.dec(_f$allDay),
     );
   }
 

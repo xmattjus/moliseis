@@ -79,77 +79,104 @@ final class EventClockTime {
 final class EventDateDraft {
   const EventDateDraft._({
     required this.enabled,
+    required this.allDay,
     required this.startCalendarDate,
+    required this.endCalendarDate,
     required this.startInstantUtc,
     required this.endInstantUtc,
   });
 
-  /// Creates a disabled event state with no temporal values.
+  /// Creates a disabled event with no temporal values.
   const EventDateDraft.disabled()
     : this._(
         enabled: false,
+        allDay: false,
         startCalendarDate: null,
+        endCalendarDate: null,
         startInstantUtc: null,
         endInstantUtc: null,
       );
 
-  /// Creates an enabled event with no selected start calendar date or time.
-  ///
-  /// This represents switching event mode on before the user selects either
-  /// temporal component. It intentionally does not invent a calendar day or
-  /// timestamp.
-  const EventDateDraft.enabledEmpty()
+  /// Enables event editing without inventing a day or clock.
+  const EventDateDraft.enabledEmpty({bool allDay = false})
     : this._(
         enabled: true,
+        allDay: allDay,
         startCalendarDate: null,
+        endCalendarDate: null,
         startInstantUtc: null,
         endInstantUtc: null,
       );
 
-  /// Creates an enabled draft with a selected day and no exact start time.
-  const EventDateDraft.unresolvedStart(EventCalendarDate startCalendarDate)
-    : this._(
-        enabled: true,
-        startCalendarDate: startCalendarDate,
-        startInstantUtc: null,
-        endInstantUtc: null,
-      );
+  /// Retains civil dates while a timed start needs a newly selected clock.
+  const EventDateDraft.unresolvedStart(
+    EventCalendarDate startCalendarDate, {
+    EventCalendarDate? endCalendarDate,
+  }) : this._(
+         enabled: true,
+         allDay: false,
+         startCalendarDate: startCalendarDate,
+         endCalendarDate: endCalendarDate,
+         startInstantUtc: null,
+         endInstantUtc: null,
+       );
 
-  /// Creates an enabled draft with its exact UTC start and optional UTC end.
+  /// Creates a resolved draft, retaining its source-owned mode and civil days.
   factory EventDateDraft.exact({
     required EventCalendarDate startCalendarDate,
     required DateTime startInstantUtc,
     DateTime? endInstantUtc,
+    bool allDay = false,
+    EventCalendarDate? endCalendarDate,
   }) => EventDateDraft._(
     enabled: true,
+    allDay: allDay,
     startCalendarDate: startCalendarDate,
+    endCalendarDate:
+        endCalendarDate ??
+        (endInstantUtc == null
+            ? null
+            : EventTimePolicy().calendarDateForUtc(endInstantUtc)),
     startInstantUtc: startInstantUtc.toUtc(),
     endInstantUtc: endInstantUtc?.toUtc(),
   );
 
-  /// Whether the event is enabled.
+  /// Whether this content is an event.
   final bool enabled;
 
-  /// Selected start day, including an unresolved date-only edit.
+  /// Whether a meaningful initial clock is unavailable.
+  final bool allDay;
+
+  /// Selected initial Rome civil day.
   final EventCalendarDate? startCalendarDate;
 
-  /// Exact UTC start, when a valid civil start date and time were resolved.
+  /// Optional final Rome civil day, retained while timed start is unresolved.
+  final EventCalendarDate? endCalendarDate;
+
+  /// Resolved UTC start or the technical Rome bound in all-day mode.
   final DateTime? startInstantUtc;
 
-  /// Exact UTC end, when present.
+  /// Resolved UTC end, when present.
   final DateTime? endInstantUtc;
 
   @override
   bool operator ==(Object other) =>
       other is EventDateDraft &&
       enabled == other.enabled &&
+      allDay == other.allDay &&
       startCalendarDate == other.startCalendarDate &&
+      endCalendarDate == other.endCalendarDate &&
       startInstantUtc == other.startInstantUtc &&
       endInstantUtc == other.endInstantUtc;
-
   @override
-  int get hashCode =>
-      Object.hash(enabled, startCalendarDate, startInstantUtc, endInstantUtc);
+  int get hashCode => Object.hash(
+    enabled,
+    allDay,
+    startCalendarDate,
+    endCalendarDate,
+    startInstantUtc,
+    endInstantUtc,
+  );
 }
 
 /// A recoverable civil-time or persistence validation issue.
@@ -346,14 +373,75 @@ final class EventTimePolicy {
   /// Disables an event and clears every temporal value.
   EventDateDraft disable(EventDateDraft _) => const EventDateDraft.disabled();
 
+  /// Changes temporal mode while preserving civil dates and discarding
+  /// the clock.
+  EventTimeEditResult changeAllDay(
+    EventDateDraft draft, {
+    required bool allDay,
+  }) {
+    if (!draft.enabled || draft.allDay == allDay) {
+      return EventTimeEditResult.success(draft);
+    }
+    final date = draft.startCalendarDate;
+    if (date == null) {
+      return EventTimeEditResult.success(
+        EventDateDraft.enabledEmpty(allDay: allDay),
+      );
+    }
+    if (allDay && _civilRangeIsInverted(date, draft.endCalendarDate)) {
+      return EventTimeEditResult.rejected(draft, EventTimeIssue.invalidRange);
+    }
+    return EventTimeEditResult.success(
+      allDay
+          ? _materializeAllDay(date, draft.endCalendarDate)
+          : EventDateDraft.unresolvedStart(
+              date,
+              endCalendarDate: draft.endCalendarDate,
+            ),
+    );
+  }
+
+  /// Whether a retained final civil day precedes the selected initial day.
+  bool _civilRangeIsInverted(EventCalendarDate start, EventCalendarDate? end) =>
+      end != null &&
+      DateTime.utc(
+        end.year,
+        end.month,
+        end.day,
+      ).isBefore(DateTime.utc(start.year, start.month, start.day));
+
+  /// Materializes technical Rome bounds from selected civil days.
+  EventDateDraft _materializeAllDay(
+    EventCalendarDate start,
+    EventCalendarDate? end,
+  ) => EventDateDraft.exact(
+    startCalendarDate: start,
+    allDay: true,
+    startInstantUtc: utcRangeForCalendarDate(start).startUtc,
+    endCalendarDate: end,
+    endInstantUtc: end == null ? null : utcRangeForCalendarDate(end).endUtc,
+  );
+
   /// Changes the start day while preserving the existing Rome clock precision.
   EventTimeEditResult changeStartCalendarDate(
     EventDateDraft draft,
     EventCalendarDate date,
   ) {
     final start = draft.startInstantUtc;
+    if (draft.allDay) {
+      var end = draft.endCalendarDate;
+      if (_civilRangeIsInverted(date, end)) {
+        end = date;
+      }
+      return EventTimeEditResult.success(_materializeAllDay(date, end));
+    }
     if (start == null) {
-      return EventTimeEditResult.success(EventDateDraft.unresolvedStart(date));
+      return EventTimeEditResult.success(
+        EventDateDraft.unresolvedStart(
+          date,
+          endCalendarDate: draft.endCalendarDate,
+        ),
+      );
     }
 
     final local = tz.TZDateTime.from(start, _romeLocation);
@@ -372,6 +460,7 @@ final class EventTimePolicy {
     EventDateDraft draft,
     EventClockTime time,
   ) {
+    if (draft.allDay) return EventTimeEditResult.success(draft);
     final date = draft.startCalendarDate;
     if (date == null) {
       return EventTimeEditResult.rejected(
@@ -425,6 +514,8 @@ final class EventTimePolicy {
       startCalendarDate: startCalendarDate,
       startInstantUtc: startInstantUtc,
       endInstantUtc: end.uniqueUtc,
+      endCalendarDate: date,
+      allDay: draft.allDay,
     );
     return end.uniqueUtc!.isBefore(startInstantUtc)
         ? EventTimeEditResult.rejected(draft, EventTimeIssue.invalidRange)
@@ -435,6 +526,12 @@ final class EventTimePolicy {
   EventTimeIssue? validateForPersistence(EventDateDraft draft) {
     if (!draft.enabled) return null;
     if (draft.startCalendarDate == null) return EventTimeIssue.missingStartDate;
+    if (_civilRangeIsInverted(
+      draft.startCalendarDate!,
+      draft.endCalendarDate,
+    )) {
+      return EventTimeIssue.invalidRange;
+    }
     if (draft.startInstantUtc == null) return EventTimeIssue.missingStartTime;
     final end = draft.endInstantUtc;
     if (end != null && end.isBefore(draft.startInstantUtc!)) {
@@ -464,7 +561,11 @@ final class EventTimePolicy {
       EventDateDraft.exact(
         startCalendarDate: date,
         startInstantUtc: resolution.uniqueUtc!,
-        endInstantUtc: draft.endInstantUtc,
+        endInstantUtc:
+            draft.endInstantUtc ??
+            (draft.endCalendarDate == null
+                ? null
+                : utcRangeForCalendarDate(draft.endCalendarDate!).endUtc),
       ),
     );
   }

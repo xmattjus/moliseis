@@ -13,6 +13,7 @@ class EventEntity implements SyncEntity {
     this.descriptionDelta,
     this.startDate,
     this.endDate,
+    this.allDay = false,
     this.coordinates = const [0, 0],
     required this.contentCategoryIndex,
     this.cityToOneId,
@@ -43,6 +44,9 @@ class EventEntity implements SyncEntity {
 
   @Property(type: PropertyType.dateNano)
   final DateTime? endDate;
+
+  /// Source-owned absence of a meaningful initial clock.
+  final bool allDay;
 
   /// Latitude x Longitude
   @HnswIndex(dimensions: 2, distanceType: VectorDistanceType.geo)
@@ -78,6 +82,7 @@ class EventEntity implements SyncEntity {
     Object? descriptionDelta = _unset,
     DateTime? startDate,
     Object? endDate = _unset,
+    bool? allDay,
     List<double>? coordinates,
     int? contentCategoryIndex,
     Object? cityToOneId = _unset,
@@ -94,6 +99,7 @@ class EventEntity implements SyncEntity {
         : descriptionDelta as List<Map<String, dynamic>>?,
     startDate: startDate ?? this.startDate,
     endDate: identical(endDate, _unset) ? this.endDate : endDate as DateTime?,
+    allDay: allDay ?? this.allDay,
     coordinates: coordinates ?? this.coordinates,
     contentCategoryIndex: contentCategoryIndex ?? this.contentCategoryIndex,
     cityToOneId: identical(cityToOneId, _unset)

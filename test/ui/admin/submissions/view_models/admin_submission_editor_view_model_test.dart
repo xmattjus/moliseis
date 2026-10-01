@@ -29,6 +29,64 @@ void main() {
       );
     }
 
+    test('all-day create captures mode and Rome bounds', () async {
+      final repository = FakeAdminContentSubmissionRepository();
+      final vm = createViewModel(repository: repository);
+      addTearDown(vm.dispose);
+      vm
+        ..setCity('Campobasso')
+        ..setName('Event')
+        ..setEventEnabled(true)
+        ..setAllDay(allDay: true)
+        ..setStartCalendarDate(EventCalendarDate(2026, 3, 29));
+      expect(vm.startClockTime, isNull);
+      await vm.save.execute();
+      expect(vm.save.completed, isTrue);
+      expect(repository.createInputs.single.allDay, isTrue);
+      expect(
+        repository.createInputs.single.startDate,
+        DateTime.utc(2026, 3, 28, 23),
+      );
+    });
+
+    for (final initiallyAllDay in [false, true]) {
+      test(
+        'update switches mode from $initiallyAllDay without old clock',
+        () async {
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: {
+              1: Result.success(
+                sampleAdminSubmission(
+                  allDay: initiallyAllDay,
+                  startDate: DateTime.utc(2026, 10, 24, 22),
+                  endDate: DateTime.utc(2026, 10, 26, 22, 59, 59, 999, 999),
+                ),
+              ),
+            },
+          );
+          final vm = createViewModel(repository: repository, submissionId: 1);
+          addTearDown(vm.dispose);
+          await vm.load.execute();
+          expect(vm.allDay, initiallyAllDay);
+          expect(vm.isDirty, isFalse);
+          vm.setAllDay(allDay: !initiallyAllDay);
+          expect(vm.isDirty, isTrue);
+          expect(vm.startClockTime, isNull);
+          expect(vm.endCalendarDate, EventCalendarDate(2026, 10, 26));
+          if (initiallyAllDay) {
+            await vm.save.execute();
+            expect(repository.updateInputs, isEmpty);
+            expect(vm.eventTimeIssue, EventTimeIssue.missingStartTime);
+            vm.setStartClockTime(EventClockTime(10, 30));
+          }
+          await vm.save.execute();
+          expect(vm.save.completed, isTrue);
+          expect(repository.updateInputs.single.allDay, !initiallyAllDay);
+          expect(vm.isDirty, isFalse);
+        },
+      );
+    }
+
     test('create mode starts with empty clean state', () {
       final viewModel = AdminSubmissionEditorViewModel(
         repository: FakeAdminContentSubmissionRepository(),

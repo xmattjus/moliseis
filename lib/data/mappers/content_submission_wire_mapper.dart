@@ -1,4 +1,5 @@
 import 'package:moliseis/data/mappers/submission_asset_mapper.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 
@@ -17,8 +18,25 @@ Map<String, dynamic> contentSubmissionToWireMap({
   'latitude': contentSubmission.latitude,
   'longitude': contentSubmission.longitude,
   'address': contentSubmission.address,
-  'start_date': contentSubmission.startDate?.toUtc().toIso8601String(),
-  'end_date': contentSubmission.endDate?.toUtc().toIso8601String(),
+  'all_day': contentSubmission.allDay,
+  'start_date': contentSubmission.allDay
+      ? null
+      : contentSubmission.startDate?.toUtc().toIso8601String(),
+  'end_date': contentSubmission.allDay
+      ? null
+      : contentSubmission.endDate?.toUtc().toIso8601String(),
+  'start_calendar_date':
+      contentSubmission.allDay && contentSubmission.startDate != null
+      ? EventTimePolicy()
+            .calendarDateForUtc(contentSubmission.startDate!)
+            .toString()
+      : null,
+  'end_calendar_date':
+      contentSubmission.allDay && contentSubmission.endDate != null
+      ? EventTimePolicy()
+            .calendarDateForUtc(contentSubmission.endDate!)
+            .toString()
+      : null,
   'user_email': contentSubmission.userEmail,
   'user_name': contentSubmission.userName,
   'assets': submissionAssets.map((asset) => asset.toDto().toMap()).toList(),

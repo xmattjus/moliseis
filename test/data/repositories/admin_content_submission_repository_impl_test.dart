@@ -107,7 +107,7 @@ void main() {
       expect(httpClient.requests, hasLength(1));
     });
 
-    test('create sends only the nine editor-owned fields', () async {
+    test('create sends only the twelve editor-owned fields', () async {
       httpClient.queueJson(<String, dynamic>{'submission': submission});
       final input = AdminSubmissionInput(
         category: ContentCategory.history,
@@ -134,6 +134,9 @@ void main() {
           'name',
           'description',
           'description_delta',
+          'all_day',
+          'start_calendar_date',
+          'end_calendar_date',
           'start_date',
           'end_date',
           'latitude',
@@ -190,6 +193,9 @@ void main() {
           'name': 'Palazzo aggiornato',
           'description': null,
           'description_delta': null,
+          'all_day': false,
+          'start_calendar_date': null,
+          'end_calendar_date': null,
           'start_date': null,
           'end_date': null,
           'latitude': null,
@@ -551,4 +557,34 @@ void main() {
       expect(call?.extra, isNull);
     });
   });
+  test(
+    'Admin all-day full input and stored response retain the mode',
+    () async {
+      httpClient.queueJson({
+        'submission': {
+          ...submission,
+          'all_day': true,
+          'start_date': '2026-10-11T22:00:00Z',
+          'end_date': null,
+        },
+      });
+      final result = await repository.create(
+        AdminSubmissionInput(
+          category: ContentCategory.history,
+          city: 'Campobasso',
+          name: 'Event',
+          allDay: true,
+          startDate: DateTime.utc(2026, 10, 11, 22),
+        ),
+      );
+      expect(result.getOrNull()!.allDay, isTrue);
+      final body = httpClient.requests.single.body! as Map<String, dynamic>;
+      final input = body['input'] as Map<String, dynamic>;
+      expect(input['all_day'], isTrue);
+      expect(input['start_date'], isNull);
+      expect(input['end_date'], isNull);
+      expect(input['start_calendar_date'], '2026-10-12');
+      expect(input['end_calendar_date'], isNull);
+    },
+  );
 }

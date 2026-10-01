@@ -168,4 +168,121 @@ void main() {
       expect(rejectedOverlap.draft, same(overlapDraft));
     });
   });
+  test(
+    'all-day bounds include DST-safe single, same-day and multi-day dates',
+    () {
+      for (final date in [
+        EventCalendarDate(2026, 3, 29),
+        EventCalendarDate(2026, 10, 25),
+      ]) {
+        final draft = policy
+            .changeAllDay(EventDateDraft.unresolvedStart(date), allDay: true)
+            .draft;
+        expect(draft.allDay, isTrue);
+        expect(policy.validateForPersistence(draft), isNull);
+        expect(
+          draft.startInstantUtc,
+          policy.utcRangeForCalendarDate(date).startUtc,
+        );
+        expect(draft.endInstantUtc, isNull);
+        final finalDay = policy.changeEndCalendarDate(draft, date).draft;
+        expect(
+          finalDay.endInstantUtc,
+          policy.utcRangeForCalendarDate(date).endUtc,
+        );
+        expect(finalDay.endCalendarDate, date);
+        expect(finalDay.endInstantUtc!.microsecond, 999);
+      }
+    },
+  );
+
+  test(
+    'toggle discards clock, retains civil days and requires a new timed clock',
+    () {
+      final original = EventDateDraft.exact(
+        startCalendarDate: EventCalendarDate(2026, 12, 31),
+        startInstantUtc: DateTime.utc(2026, 12, 31, 10, 15),
+        endInstantUtc: DateTime.utc(2027, 1, 1, 22, 59, 59, 999, 999),
+      );
+      final allDay = policy.changeAllDay(original, allDay: true).draft;
+      expect(allDay.startInstantUtc, DateTime.utc(2026, 12, 30, 23));
+      expect(allDay.endCalendarDate, EventCalendarDate(2027, 1, 1));
+      final timed = policy.changeAllDay(allDay, allDay: false).draft;
+      expect(timed.startInstantUtc, isNull);
+      expect(timed.endInstantUtc, isNull);
+      expect(timed.endCalendarDate, allDay.endCalendarDate);
+      expect(
+        policy.validateForPersistence(timed),
+        EventTimeIssue.missingStartTime,
+      );
+      final resolved = policy
+          .changeStartClockTime(timed, EventClockTime(18, 30))
+          .draft;
+      expect(resolved.startInstantUtc, DateTime.utc(2026, 12, 31, 17, 30));
+      expect(resolved.endInstantUtc, original.endInstantUtc);
+      expect(resolved.allDay, isFalse);
+      expect(policy.disable(allDay), const EventDateDraft.disabled());
+    },
+  );
+
+  test(
+    'all-day date changes rematerialize and repair an overtaken final day',
+    () {
+      final draft = policy
+          .changeAllDay(
+            EventDateDraft.unresolvedStart(
+              EventCalendarDate(2026, 3, 28),
+              endCalendarDate: EventCalendarDate(2026, 3, 29),
+            ),
+            allDay: true,
+          )
+          .draft;
+      final changed = policy
+          .changeStartCalendarDate(draft, EventCalendarDate(2026, 3, 30))
+          .draft;
+      expect(changed.endCalendarDate, EventCalendarDate(2026, 3, 30));
+      expect(policy.validateForPersistence(changed), isNull);
+      expect(
+        policy
+            .changeEndCalendarDate(changed, EventCalendarDate(2026, 3, 29))
+            .issue,
+        EventTimeIssue.invalidRange,
+      );
+    },
+  );
+
+  test('unresolved moved start cannot materialize inverted all-day range', () {
+    final unresolved = EventDateDraft.unresolvedStart(
+      EventCalendarDate(2026, 10, 12),
+      endCalendarDate: EventCalendarDate(2026, 10, 14),
+    );
+    final moved = policy
+        .changeStartCalendarDate(unresolved, EventCalendarDate(2026, 10, 15))
+        .draft;
+    expect(policy.validateForPersistence(moved), EventTimeIssue.invalidRange);
+    expect(
+      policy.changeAllDay(moved, allDay: true).issue,
+      EventTimeIssue.invalidRange,
+    );
+    final repaired = policy
+        .changeStartClockTime(moved, EventClockTime(18, 0))
+        .draft;
+    expect(repaired.endCalendarDate, EventCalendarDate(2026, 10, 15));
+    expect(policy.validateForPersistence(repaired), isNull);
+  });
+
+  test('all-day empty edit still requires a civil start', () {
+    final empty = policy
+        .changeAllDay(const EventDateDraft.enabledEmpty(), allDay: true)
+        .draft;
+    expect(empty.allDay, isTrue);
+    expect(
+      policy.validateForPersistence(empty),
+      EventTimeIssue.missingStartDate,
+    );
+    final selected = policy
+        .changeStartCalendarDate(empty, EventCalendarDate(2026, 10, 12))
+        .draft;
+    expect(policy.validateForPersistence(selected), isNull);
+  });
 }

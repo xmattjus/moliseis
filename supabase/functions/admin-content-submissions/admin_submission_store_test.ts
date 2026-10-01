@@ -18,6 +18,7 @@ const record: SubmissionRecord = {
   description_delta: [{ insert: "Description\n" }],
   start_date: null,
   end_date: null,
+  all_day: false,
   category: "history",
   user_name: "Contributor",
   user_email: "contributor@example.test",
@@ -33,6 +34,7 @@ const record: SubmissionRecord = {
 type RecordedQuery = {
   table: string;
   updateValues: Record<string, unknown> | null;
+  insertValues: Record<string, unknown> | null;
   selects: Array<string | undefined>;
   filters: Array<[column: string, value: unknown]>;
 };
@@ -70,7 +72,8 @@ class FakeQueryBuilder {
     return this;
   }
 
-  insert(): this {
+  insert(values: Record<string, unknown>): this {
+    this.#recorded.insertValues = values;
     return this;
   }
 
@@ -105,6 +108,7 @@ class FakeAdminClient {
     const recorded: RecordedQuery = {
       table,
       updateValues: null,
+      insertValues: null,
       selects: [],
       filters: [],
     };
@@ -143,6 +147,7 @@ Deno.test("update applies the pending-only guarded predicate", async () => {
     description_delta: null,
     start_date: null,
     end_date: null,
+    all_day: false,
     latitude: null,
     longitude: null,
   }, "2026-08-21T11:00:00.000Z");
@@ -173,6 +178,7 @@ Deno.test("update classifies an empty guarded result as not_found or not_pending
       description_delta: null,
       start_date: null,
       end_date: null,
+      all_day: false,
       latitude: null,
       longitude: null,
     }, "2026-08-21T11:00:00.000Z"),
@@ -200,6 +206,7 @@ Deno.test("update classifies an empty guarded result as not_found or not_pending
       description_delta: null,
       start_date: null,
       end_date: null,
+      all_day: false,
       latitude: null,
       longitude: null,
     }, "2026-08-21T11:00:00.000Z"),
@@ -224,6 +231,7 @@ Deno.test("update normalizes a failing guarded update query", async () => {
         description_delta: null,
         start_date: null,
         end_date: null,
+        all_day: false,
         latitude: null,
         longitude: null,
       }, "2026-08-21T11:00:00.000Z"),
@@ -249,6 +257,7 @@ Deno.test("update wraps a failing classification query", async () => {
         description_delta: null,
         start_date: null,
         end_date: null,
+        all_day: false,
         latitude: null,
         longitude: null,
       }, "2026-08-21T11:00:00.000Z"),
@@ -578,4 +587,53 @@ Deno.test("promote rejects unknown outcomes and RPC errors", async () => {
       }),
     AdminSubmissionStoreError,
   );
+});
+
+Deno.test("Admin create/update/read carry normalized all-day mode with the dates", async () => {
+  for (const allDay of [false, true]) {
+    const values = {
+      category: "history" as const,
+      city: "Campobasso",
+      name: "Test",
+      description: null,
+      description_delta: null,
+      all_day: allDay,
+      start_date: allDay ? "2026-10-11T22:00:00.000Z" : null,
+      end_date: allDay ? "2026-10-14T21:59:59.999999Z" : null,
+      latitude: null,
+      longitude: null,
+    };
+    const stored = { ...record, ...values };
+    const client = new FakeAdminClient();
+    const store = createAdminSubmissionStore(
+      client as unknown as SupabaseClient<Database>,
+    );
+    client.queueQuery({ data: stored, error: null });
+    assertEquals(
+      await store.create({
+        ...values,
+        user_id: "00000000-0000-4000-8000-000000000002",
+        user_email: "test@example.test",
+        user_name: "Test",
+      }),
+      stored,
+    );
+    assertEquals(client.queries[0].insertValues?.all_day, allDay);
+    assertEquals(client.queries[0].insertValues?.start_date, values.start_date);
+    assertEquals(client.queries[0].insertValues?.end_date, values.end_date);
+    client.queueQuery({ data: stored, error: null });
+    assertEquals(await store.update(7, values, "2026-10-01T12:00:00Z"), {
+      outcome: "updated",
+      submission: stored,
+    });
+    assertEquals(client.queries[1].updateValues, {
+      ...values,
+      modified_at: "2026-10-01T12:00:00Z",
+    });
+    assertEquals(client.queries[1].filters, [["id", 7], ["status", "pending"]]);
+    client.queueQuery({ data: stored, error: null });
+    client.queueQuery({ data: [], error: null });
+    assertEquals(await store.getById(7), { submission: stored, assets: [] });
+    assert(SUBMISSION_SELECT.split(",").includes("all_day"));
+  }
 });

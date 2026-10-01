@@ -8,6 +8,9 @@ const input = (overrides: Record<string, unknown> = {}) => ({
   name: " Teatro ",
   description: null,
   description_delta: null,
+  all_day: false,
+  start_calendar_date: null,
+  end_calendar_date: null,
   start_date: null,
   end_date: null,
   latitude: null,
@@ -188,7 +191,7 @@ Deno.test("rejects invalid request envelopes, IDs, and status", () => {
   }
 });
 
-Deno.test("requires the exact nine editor input fields and rejects spoofing", () => {
+Deno.test("requires the exact twelve editor input fields and rejects spoofing", () => {
   expectInvalid(
     { operation: "create", input: {} },
     "input contains unsupported or missing fields.",
@@ -583,4 +586,90 @@ Deno.test("rejects half-pairs, non-numbers, and non-finite numbers", () => {
     },
     "longitude must be a finite number.",
   );
+});
+
+Deno.test("Admin complete input shares civil normalization and mode transitions", () => {
+  for (const operation of ["create", "update"]) {
+    for (
+      const fields of [
+        {
+          all_day: true,
+          start_calendar_date: "2026-03-29",
+          end_calendar_date: "2026-03-29",
+        },
+        {
+          all_day: false,
+          start_date: "2026-03-29T10:00:00.000Z",
+          end_date: null,
+        },
+        {},
+      ]
+    ) {
+      const result = parseAdminContentSubmissionsRequest({
+        operation,
+        ...(operation === "update" ? { submission_id: 1 } : {}),
+        input: input(fields),
+      });
+      assert(
+        result.ok &&
+          (result.value.operation === "create" ||
+            result.value.operation === "update"),
+      );
+      assertEquals(result.value.input.all_day, fields.all_day ?? false);
+      if (fields.all_day) {
+        assertEquals(result.value.input.start_date, "2026-03-28T23:00:00.000Z");
+        assertEquals(
+          result.value.input.end_date,
+          "2026-03-29T21:59:59.999999Z",
+        );
+      }
+      assert(!Object.hasOwn(result.value.input, "start_calendar_date"));
+      assert(!Object.hasOwn(result.value.input, "end_calendar_date"));
+    }
+  }
+});
+
+Deno.test("Admin requires every temporal key and rejects invalid temporal representations", () => {
+  for (const key of ["all_day", "start_calendar_date", "end_calendar_date"]) {
+    const missing: Record<string, unknown> = input();
+    delete missing[key];
+    expectInvalid(
+      { operation: "create", input: missing },
+      "input contains unsupported or missing fields.",
+    );
+  }
+  for (
+    const [fields, message] of [
+      [{ all_day: null }, "all_day must be a boolean."],
+      [
+        { all_day: true },
+        "start_calendar_date must be a Gregorian YYYY-MM-DD date.",
+      ],
+      [
+        { all_day: true, start_calendar_date: "1900-02-29" },
+        "start_calendar_date must be a Gregorian YYYY-MM-DD date.",
+      ],
+      [{
+        all_day: true,
+        start_calendar_date: "2026-01-02",
+        end_calendar_date: "2026-01-01",
+      }, "end_date must not be before start_date."],
+      [{
+        all_day: true,
+        start_calendar_date: "2026-01-02",
+        end_calendar_date: "2026-02-30",
+      }, "end_calendar_date must be a Gregorian YYYY-MM-DD date or null."],
+      [{
+        all_day: true,
+        start_calendar_date: "2026-01-01",
+        start_date: "2026-01-01",
+      }, "timestamp and civil-date formats must not be mixed."],
+      [
+        { start_calendar_date: "2026-01-01" },
+        "timestamp and civil-date formats must not be mixed.",
+      ],
+    ] as const
+  ) {
+    expectInvalid({ operation: "create", input: input(fields) }, message);
+  }
 });

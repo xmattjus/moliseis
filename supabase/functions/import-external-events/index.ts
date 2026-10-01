@@ -4,6 +4,7 @@ import {
   type SupabaseClient,
 } from "npm:@supabase/supabase-js@2.112.3";
 
+import { validateSubmissionDates } from "../_shared/submission_dates.ts";
 import type { Database, Json } from "../_shared/database.types.ts";
 import {
   type CloudinaryConfig,
@@ -22,6 +23,42 @@ import {
   prepareEvent,
   zonedDateTimeToIso,
 } from "./import_logic.ts";
+
+/** Writes the prepared source interpretation through the existing importer path. */
+export function insertImportedSubmission(
+  admin: SupabaseClient<Database>,
+  event: PreparedExternalEvent,
+  importer: { id: string; email: string; name: string },
+) {
+  const temporal = event.allDay
+    ? validateSubmissionDates(
+      null,
+      null,
+      true,
+      calendarDateInRome(event.startDate),
+      event.endDate === null ? null : calendarDateInRome(event.endDate),
+    )
+    : validateSubmissionDates(event.startDate, event.endDate, false);
+  if (!temporal.ok || temporal.value.start_date === null) {
+    throw new Error("Invalid prepared importer dates");
+  }
+  return admin.from("content_submissions").insert({
+    user_id: importer.id,
+    user_email: importer.email,
+    user_name: importer.name,
+    city: event.city,
+    name: event.name,
+    description: null,
+    description_delta: null,
+    latitude: null,
+    longitude: null,
+    address: null,
+    ...temporal.value,
+    category: "unknown",
+    status: "pending",
+    internal_notes: event.internalNotes,
+  }).select("id").single();
+}
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -467,27 +504,8 @@ export async function handleRequest(request: Request): Promise<Response> {
     // this same run also protect subsequent events.
     if (existingKeys.has(event.dedupKey)) continue;
 
-    const { data: submission, error: insertError } = await admin
-      .from("content_submissions")
-      .insert({
-        user_id: importer.id,
-        user_email: importer.email,
-        user_name: importer.name,
-        city: event.city,
-        name: event.name,
-        description: null,
-        description_delta: null,
-        latitude: null,
-        longitude: null,
-        address: null,
-        start_date: event.startDate,
-        end_date: event.endDate,
-        category: "unknown",
-        status: "pending",
-        internal_notes: event.internalNotes,
-      })
-      .select("id")
-      .single();
+    const { data: submission, error: insertError } =
+      await insertImportedSubmission(admin, event, importer);
 
     if (insertError || !submission) {
       addError(errors, {

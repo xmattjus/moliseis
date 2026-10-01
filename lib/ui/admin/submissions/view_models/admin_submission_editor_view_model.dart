@@ -131,17 +131,19 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Selected Rome calendar day for the event start.
   EventCalendarDate? get startCalendarDate => _eventDates.startCalendarDate;
 
-  /// Selected Rome start clock time when an exact start exists.
+  /// Whether the event has no meaningful initial clock.
+  bool get allDay => _eventDates.allDay;
+
+  /// Selected meaningful Rome start clock time when resolved.
   EventClockTime? get startClockTime {
     final start = _eventDates.startInstantUtc;
-    return start == null ? null : _eventTimePolicy.clockTimeForUtc(start);
+    return allDay || start == null
+        ? null
+        : _eventTimePolicy.clockTimeForUtc(start);
   }
 
   /// Selected Rome calendar day for the inclusive event end.
-  EventCalendarDate? get endCalendarDate {
-    final end = _eventDates.endInstantUtc;
-    return end == null ? null : _eventTimePolicy.calendarDateForUtc(end);
-  }
+  EventCalendarDate? get endCalendarDate => _eventDates.endCalendarDate;
 
   /// Transient validation issue from an attempted temporal edit.
   EventTimeIssue? get eventTimeIssue => _eventTimeIssue;
@@ -229,6 +231,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Enables or disables event mode without inventing an instant.
+  /// Changes precision without restoring an old or technical clock.
+  void setAllDay({required bool allDay}) {
+    _applyTemporalEdit(
+      _eventTimePolicy.changeAllDay(_eventDates, allDay: allDay),
+    );
+  }
+
   void setEventEnabled(bool enabled) {
     _eventDates = enabled
         ? _eventTimePolicy.enable(_eventDates)
@@ -329,6 +338,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
           startCalendarDate: _eventTimePolicy.calendarDateForUtc(start),
           startInstantUtc: start,
           endInstantUtc: end,
+          allDay: submission.allDay,
         ),
         (null, final end?) => throw StateError(
           'Persisted submission $submissionId has an end date without a '
@@ -393,6 +403,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       name: name,
       description: _description,
       descriptionDelta: _descriptionDelta,
+      allDay: _eventDates.allDay,
       startDate: _eventDates.startInstantUtc,
       endDate: _eventDates.endInstantUtc,
       latitude: latitude,

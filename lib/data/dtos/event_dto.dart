@@ -32,6 +32,7 @@ class EventDto with EventDtoMappable implements SyncDto {
     this.cityId = const Keep<int>(),
     this.deletedAt,
     this.endDate,
+    this.allDay = false,
   });
 
   @override
@@ -41,6 +42,9 @@ class EventDto with EventDtoMappable implements SyncDto {
   final List<Map<String, dynamic>>? descriptionDelta;
   final DateTime startDate;
   final DateTime? endDate;
+
+  /// Source-owned absence of a meaningful initial clock.
+  final bool allDay;
   final double latitude;
   final double longitude;
   final ContentCategory category;

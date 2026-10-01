@@ -42,6 +42,26 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('all-day Rome date has no synthetic clock or duration', (
+      tester,
+    ) async {
+      await pumpDateTime(
+        tester,
+        makeEvent(allDay: true, startDate: DateTime.utc(2026, 3, 28, 23)),
+        alwaysUse24HourFormat: true,
+      );
+      expect(find.text('29 March'), findsOneWidget);
+      expect(find.textContaining('00:00'), findsNothing);
+      expect(find.text('24 ore'), findsNothing);
+      expect(find.text('Tutto il giorno'), findsNothing);
+      await pumpDateTime(
+        tester,
+        makeEvent(startDate: DateTime.utc(2026, 3, 28, 23)),
+        alwaysUse24HourFormat: true,
+      );
+      expect(find.text('00:00'), findsOneWidget);
+    });
+
     testWidgets('renders single-day event with one date and one time', (
       tester,
     ) async {

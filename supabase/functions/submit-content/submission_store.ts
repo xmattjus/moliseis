@@ -90,6 +90,7 @@ export function createSubmissionStore(
         p_address: submission.address,
         p_start_date: submission.start_date,
         p_end_date: submission.end_date,
+        p_all_day: submission.all_day,
         p_category: submission.category,
         p_user_email: submission.user_email,
         p_user_name: submission.user_name,

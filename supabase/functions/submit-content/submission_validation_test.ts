@@ -692,3 +692,51 @@ async function assertRejects(
   }
   throw new Error("Expected promise to reject");
 }
+
+Deno.test("public civil dates normalize without retaining transport fields", () => {
+  const result = parseContentSubmission({
+    ...validSubmission(),
+    all_day: true,
+    start_calendar_date: "2026-03-29",
+    end_calendar_date: "2026-03-29",
+  });
+  assert(result.ok);
+  assertEquals(result.value.all_day, true);
+  assertEquals(result.value.start_date, "2026-03-28T23:00:00.000Z");
+  assertEquals(result.value.end_date, "2026-03-29T21:59:59.999999Z");
+  assert(!Object.hasOwn(result.value, "start_calendar_date"));
+  assert(!Object.hasOwn(result.value, "end_calendar_date"));
+  const legacy = parseContentSubmission(validSubmission());
+  assert(legacy.ok);
+  assertEquals(legacy.value.all_day, false);
+});
+
+Deno.test("public input rejects malformed mode, calendar and mixed formats", () => {
+  for (
+    const [fields, message] of [
+      [{ all_day: null }, "all_day must be a boolean"],
+      [{ all_day: "true" }, "all_day must be a boolean"],
+      [{ all_day: true }, "start_calendar_date is not valid"],
+      [
+        { all_day: true, start_calendar_date: "2026-02-30" },
+        "start_calendar_date is not valid",
+      ],
+      [{
+        all_day: true,
+        start_calendar_date: "2026-01-01",
+        end_calendar_date: "2026-02-30",
+      }, "end_calendar_date is not valid"],
+      [{
+        all_day: true,
+        start_calendar_date: "2026-01-01",
+        start_date: "2026-01-01",
+      }, "timestamp and civil-date formats must not be mixed"],
+      [
+        { start_calendar_date: "2026-01-01" },
+        "timestamp and civil-date formats must not be mixed",
+      ],
+    ] as const
+  ) {
+    expectInvalid({ ...validSubmission(), ...fields }, message);
+  }
+});

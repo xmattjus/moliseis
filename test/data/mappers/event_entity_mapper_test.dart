@@ -310,4 +310,13 @@ void main() {
       expect(decoded.descriptionDelta, descriptionDelta);
     });
   });
+  test('cache-to-domain mapping carries mode and preserved saved state', () {
+    final cached = makeEventEntity(
+      remoteId: 71,
+      startDate: DateTime.utc(2026, 10, 11, 22),
+      allDay: true,
+    ).copyWith(isSaved: true);
+    expect(cached.toModel().allDay, isTrue);
+    expect(cached.toModel().isSaved, isTrue);
+  });
 }

@@ -8,6 +8,8 @@ import 'package:moliseis/ui/content_submission/widgets/content_submission_fields
 void main() {
   Widget buildFields({
     required bool isEvent,
+    bool allDay = false,
+    ValueChanged<bool>? onAllDayChanged,
     EventCalendarDate? startDate,
     EventClockTime? startTime,
     EventCalendarDate? endDate,
@@ -33,6 +35,8 @@ void main() {
           description: null,
           descriptionDelta: null,
           isEvent: isEvent,
+          allDay: allDay,
+          onAllDayChanged: onAllDayChanged ?? (_) {},
           startCalendarDate: startDate,
           startClockTime: startTime,
           endCalendarDate: endDate,
@@ -53,6 +57,37 @@ void main() {
   );
 
   group('ContentSubmissionFields', () {
+    testWidgets('date-only hides clock and toggle off leaves it unresolved', (
+      tester,
+    ) async {
+      final changes = <bool>[];
+      await tester.pumpWidget(
+        buildFields(
+          isEvent: true,
+          allDay: true,
+          startDate: EventCalendarDate(2026, 3, 29),
+          endDate: EventCalendarDate(2026, 3, 30),
+          onAllDayChanged: changes.add,
+        ),
+      );
+      expect(find.text('Senza orario'), findsOneWidget);
+      expect(find.byType(ContentSubmissionDateChip), findsNWidgets(2));
+      expect(find.textContaining('Inizia alle'), findsNothing);
+      await tester.ensureVisible(find.byType(Checkbox).last);
+      await tester.tap(find.byType(Checkbox).last);
+      expect(changes, [false]);
+      await tester.pumpWidget(
+        buildFields(
+          isEvent: true,
+          startDate: EventCalendarDate(2026, 3, 29),
+          endDate: EventCalendarDate(2026, 3, 30),
+          issue: EventTimeIssue.missingStartTime,
+        ),
+      );
+      expect(find.text('Seleziona ora di inizio'), findsOneWidget);
+      expect(find.textContaining('00:00'), findsNothing);
+    });
+
     testWidgets('renders the shared content sections', (tester) async {
       await tester.pumpWidget(buildFields(isEvent: false));
 
@@ -80,7 +115,7 @@ void main() {
         buildFields(isEvent: true, onEventChanged: changes.add),
       );
 
-      await tester.tap(find.byType(Checkbox));
+      await tester.tap(find.byType(Checkbox).first);
       expect(changes, <bool>[false]);
     });
 

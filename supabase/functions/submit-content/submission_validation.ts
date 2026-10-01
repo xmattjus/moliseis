@@ -43,6 +43,7 @@ export type ValidatedContentSubmission = {
   latitude: number | null;
   longitude: number | null;
   address: string | null;
+  all_day: boolean;
   start_date: string | null;
   end_date: string | null;
   category: Database["public"]["Enums"]["content_category"] | null;
@@ -419,6 +420,9 @@ export function parseContentSubmission(
     address,
     start_date,
     end_date,
+    all_day,
+    start_calendar_date,
+    end_calendar_date,
     category,
     user_email,
     user_name,
@@ -454,9 +458,20 @@ export function parseContentSubmission(
   const parsedDates = validateSubmissionDates(
     start_date ?? null,
     end_date ?? null,
+    all_day,
+    start_calendar_date,
+    end_calendar_date,
   );
   if (!parsedDates.ok) {
     switch (parsedDates.error) {
+      case "invalid_all_day":
+        return invalid("all_day must be a boolean");
+      case "mixed_temporal_formats":
+        return invalid("timestamp and civil-date formats must not be mixed");
+      case "invalid_start_calendar_date":
+        return invalid("start_calendar_date is not valid");
+      case "invalid_end_calendar_date":
+        return invalid("end_calendar_date is not valid");
       case "invalid_start_date":
         return invalid("start_date is not valid");
       case "invalid_end_date":
@@ -521,6 +536,7 @@ export function parseContentSubmission(
     latitude: coordinates.value.latitude,
     longitude: coordinates.value.longitude,
     address: address?.trim() ?? null,
+    all_day: parsedDates.value.all_day,
     start_date: parsedDates.value.start_date,
     end_date: parsedDates.value.end_date,
     category: category ?? null,

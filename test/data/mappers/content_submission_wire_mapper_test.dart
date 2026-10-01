@@ -57,6 +57,9 @@ void main() {
         'latitude',
         'longitude',
         'address',
+        'all_day',
+        'start_calendar_date',
+        'end_calendar_date',
         'start_date',
         'end_date',
         'user_email',
@@ -109,5 +112,27 @@ void main() {
     expect(wire['address'], isNull);
     expect(wire['start_date'], isNull);
     expect(wire['end_date'], isNull);
+  });
+  test('all-day wire uses Rome civil fields and explicit same-day final', () {
+    for (final end in [null, DateTime.utc(2026, 3, 29, 21, 59, 59, 999, 999)]) {
+      final wire = contentSubmissionToWireMap(
+        clientSubmissionId: '00000000-0000-4000-8000-000000000001',
+        contentSubmission: ContentSubmission(
+          city: 'Campobasso',
+          name: 'Event',
+          userEmail: 'a@example.test',
+          userName: 'A',
+          allDay: true,
+          startDate: DateTime.utc(2026, 3, 28, 23),
+          endDate: end,
+        ),
+        submissionAssets: [],
+      );
+      expect(wire['all_day'], isTrue);
+      expect(wire['start_date'], isNull);
+      expect(wire['end_date'], isNull);
+      expect(wire['start_calendar_date'], '2026-03-29');
+      expect(wire['end_calendar_date'], end == null ? null : '2026-03-29');
+    }
   });
 }

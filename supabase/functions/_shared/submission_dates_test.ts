@@ -15,12 +15,16 @@ Deno.test("accepts supported nullable ISO-like date forms unchanged", () => {
   for (const startDate of supportedStarts) {
     const result = validateSubmissionDates(startDate, null);
     assert(result.ok);
-    assertEquals(result.value, { start_date: startDate, end_date: null });
+    assertEquals(result.value, {
+      all_day: false,
+      start_date: startDate,
+      end_date: null,
+    });
   }
 
   assertEquals(validateSubmissionDates(null, null), {
     ok: true,
-    value: { start_date: null, end_date: null },
+    value: { all_day: false, start_date: null, end_date: null },
   });
 });
 
@@ -28,7 +32,7 @@ Deno.test("enforces Gregorian validity for every supported date form", () => {
   for (const date of ["2000-02-29", "2024-02-29", "2024-04-30"]) {
     assertEquals(validateSubmissionDates(date, null), {
       ok: true,
-      value: { start_date: date, end_date: null },
+      value: { all_day: false, start_date: date, end_date: null },
     });
   }
 
@@ -89,7 +93,11 @@ Deno.test("accepts equal and chronological instants including microseconds", () 
   ) {
     const result = validateSubmissionDates(startDate, endDate);
     assert(result.ok);
-    assertEquals(result.value, { start_date: startDate, end_date: endDate });
+    assertEquals(result.value, {
+      all_day: false,
+      start_date: startDate,
+      end_date: endDate,
+    });
   }
 });
 
@@ -105,4 +113,112 @@ Deno.test("rejects inverted ranges including within one millisecond", () => {
       error: "end_date_before_start_date",
     });
   }
+});
+
+Deno.test("all-day dates normalize Rome bounds with exact final microseconds", () => {
+  for (
+    const [start, end, expectedStart, expectedEnd] of [
+      ["2026-10-12", null, "2026-10-11T22:00:00.000Z", null],
+      [
+        "2026-10-12",
+        "2026-10-12",
+        "2026-10-11T22:00:00.000Z",
+        "2026-10-12T21:59:59.999999Z",
+      ],
+      [
+        "2026-10-12",
+        "2026-10-14",
+        "2026-10-11T22:00:00.000Z",
+        "2026-10-14T21:59:59.999999Z",
+      ],
+      [
+        "2026-12-31",
+        "2027-01-01",
+        "2026-12-30T23:00:00.000Z",
+        "2027-01-01T22:59:59.999999Z",
+      ],
+      [
+        "2026-03-29",
+        "2026-03-29",
+        "2026-03-28T23:00:00.000Z",
+        "2026-03-29T21:59:59.999999Z",
+      ],
+      [
+        "2026-10-25",
+        "2026-10-25",
+        "2026-10-24T22:00:00.000Z",
+        "2026-10-25T22:59:59.999999Z",
+      ],
+    ]
+  ) {
+    assertEquals(validateSubmissionDates(null, undefined, true, start, end), {
+      ok: true,
+      value: {
+        all_day: true,
+        start_date: expectedStart,
+        end_date: expectedEnd,
+      },
+    });
+  }
+});
+
+Deno.test("mode and civil grammar reject invalid or mixed temporal formats", () => {
+  for (const flag of [null, 0, "true", {}]) {
+    assertEquals(validateSubmissionDates(null, null, flag), {
+      ok: false,
+      error: "invalid_all_day",
+    });
+  }
+  for (
+    const start of [
+      undefined,
+      null,
+      1,
+      "2026-2-01",
+      "2026-02-30",
+      "1900-02-29",
+      "2026-01-01T00:00:00Z",
+    ]
+  ) {
+    assertEquals(validateSubmissionDates(null, null, true, start), {
+      ok: false,
+      error: "invalid_start_calendar_date",
+    });
+  }
+  for (
+    const end of [
+      1,
+      "2026-2-01",
+      "2026-02-30",
+      "1900-02-29",
+      "2026-01-01T00:00:00Z",
+    ]
+  ) {
+    assertEquals(validateSubmissionDates(null, null, true, "2026-01-01", end), {
+      ok: false,
+      error: "invalid_end_calendar_date",
+    });
+  }
+  assertEquals(
+    validateSubmissionDates(null, null, true, "2026-02-02", "2026-02-01"),
+    { ok: false, error: "end_date_before_start_date" },
+  );
+  for (const flag of [false, undefined]) {
+    assertEquals(validateSubmissionDates(null, null, flag, "2026-01-01"), {
+      ok: false,
+      error: "mixed_temporal_formats",
+    });
+    assertEquals(validateSubmissionDates(null, null, flag, null, null), {
+      ok: true,
+      value: { all_day: false, start_date: null, end_date: null },
+    });
+  }
+  for (const [start, end] of [["2026-01-01", null], [null, "2026-01-01"]]) {
+    assertEquals(validateSubmissionDates(start, end, true, "2026-01-01"), {
+      ok: false,
+      error: "mixed_temporal_formats",
+    });
+  }
+  assert(validateSubmissionDates(null, null, true, "2000-02-29").ok);
+  assert(validateSubmissionDates(null, null, true, "2024-04-30").ok);
 });

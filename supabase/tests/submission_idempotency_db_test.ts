@@ -17,6 +17,9 @@ type SubmissionInput = {
   city?: string;
   category?: "nature" | "history" | "unknown" | null;
   assets?: Asset[];
+  allDay?: boolean | null;
+  startDate?: string | null;
+  endDate?: string | null;
 };
 
 function localDatabaseUrl(): string {
@@ -78,12 +81,13 @@ async function submit(sql: Sql, input: SubmissionInput): Promise<Outcome> {
       ${41.5629},
       ${14.6697},
       ${"Via Roma"},
-      ${null}::timestamptz,
-      ${null}::timestamptz,
+      ${input.startDate ?? null}::text::timestamptz,
+      ${input.endDate ?? null}::text::timestamptz,
       ${input.category ?? null}::public.content_category,
       ${`idempotency-${input.userId}@example.test`},
       ${"Idempotency test user"},
       ${sql.json(input.assets ?? [])}
+      ${input.allDay === undefined ? sql`` : sql`, ${input.allDay}::boolean`}
     )
   `;
   return result;
@@ -512,9 +516,9 @@ Deno.test("keys are user-scoped and public roles cannot execute the RPC", async 
     const [privileges] = await sql<
       { anon: boolean; authenticated: boolean; service_role: boolean }[]
     >`
-      select has_function_privilege('anon', 'public.submit_content(uuid, uuid, text, text, text, jsonb, double precision, double precision, text, timestamp with time zone, timestamp with time zone, public.content_category, text, text, jsonb)', 'execute') as anon,
-             has_function_privilege('authenticated', 'public.submit_content(uuid, uuid, text, text, text, jsonb, double precision, double precision, text, timestamp with time zone, timestamp with time zone, public.content_category, text, text, jsonb)', 'execute') as authenticated,
-             has_function_privilege('service_role', 'public.submit_content(uuid, uuid, text, text, text, jsonb, double precision, double precision, text, timestamp with time zone, timestamp with time zone, public.content_category, text, text, jsonb)', 'execute') as service_role
+      select has_function_privilege('anon', 'public.submit_content(uuid, uuid, text, text, text, jsonb, double precision, double precision, text, timestamp with time zone, timestamp with time zone, public.content_category, text, text, jsonb, boolean)', 'execute') as anon,
+             has_function_privilege('authenticated', 'public.submit_content(uuid, uuid, text, text, text, jsonb, double precision, double precision, text, timestamp with time zone, timestamp with time zone, public.content_category, text, text, jsonb, boolean)', 'execute') as authenticated,
+             has_function_privilege('service_role', 'public.submit_content(uuid, uuid, text, text, text, jsonb, double precision, double precision, text, timestamp with time zone, timestamp with time zone, public.content_category, text, text, jsonb, boolean)', 'execute') as service_role
     `;
     assertEquals(privileges, {
       anon: false,
@@ -655,6 +659,94 @@ Deno.test("fixed-window boundary is strict and replay precedes an expired reset"
     for (const user of [newerUser, exactUser, olderUser, replayUser]) {
       await cleanupUser(sql, user);
     }
+    await sql.end();
+  }
+});
+
+Deno.test("all-day commits atomically and replay preserves the first mode and dates", async () => {
+  const sql = client();
+  const userId = await createUser(sql);
+  try {
+    const key = crypto.randomUUID();
+    const first = await submit(sql, {
+      userId,
+      key,
+      allDay: true,
+      startDate: "2026-10-11T22:00:00Z",
+      endDate: "2026-10-14T21:59:59.999999Z",
+    });
+    assertEquals(first.outcome, "created");
+    const replay = await submit(sql, {
+      userId,
+      key,
+      allDay: false,
+      startDate: "2026-10-20T12:00:00Z",
+      endDate: null,
+    });
+    assertEquals(replay, {
+      outcome: "replayed",
+      submission_id: first.submission_id,
+    });
+    const [stored] = await sql<
+      { all_day: boolean; expected_start: boolean; expected_end: boolean }[]
+    >`
+      select all_day, start_date = '2026-10-11T22:00:00Z'::timestamptz as expected_start,
+        end_date = '2026-10-14T21:59:59.999999Z'::timestamptz as expected_end
+      from public.content_submissions where id = ${first.submission_id!}
+    `;
+    assertEquals(stored, {
+      all_day: true,
+      expected_start: true,
+      expected_end: true,
+    });
+    const legacy = await submit(sql, { userId, key: crypto.randomUUID() });
+    const [legacyMode] = await sql<
+      { all_day: boolean }[]
+    >`select all_day from public.content_submissions where id = ${legacy
+      .submission_id!}`;
+    assertEquals(legacyMode.all_day, false);
+    const [identities] = await sql<
+      { count: number }[]
+    >`select count(*)::integer as count from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'submit_content'`;
+    assertEquals(identities.count, 1);
+  } finally {
+    await cleanupUser(sql, userId);
+    await sql.end();
+  }
+});
+
+Deno.test("all-day constraint and asset failures roll back mode, dates and quota", async () => {
+  const sql = client();
+  const userId = await createUser(sql);
+  try {
+    await assertPostgresError(() =>
+      submit(sql, { userId, key: crypto.randomUUID(), allDay: true })
+    );
+    await assertPostgresError(() =>
+      submit(sql, {
+        userId,
+        key: crypto.randomUUID(),
+        allDay: null,
+        startDate: "2026-10-11T22:00:00Z",
+      })
+    );
+    await assertPostgresError(() =>
+      submit(sql, {
+        userId,
+        key: crypto.randomUUID(),
+        allDay: true,
+        startDate: "2026-10-11T22:00:00Z",
+        assets: Array.from({ length: 6 }, (_, index) =>
+          asset(`all-day-failure-${index}`)),
+      })
+    );
+    assertEquals(await submissionCount(sql, userId), 0);
+    const [quotaRows] = await sql<
+      { count: number }[]
+    >`select count(*)::integer as count from public.submission_rate_limits where user_id = ${userId}`;
+    assertEquals(quotaRows.count, 0);
+  } finally {
+    await cleanupUser(sql, userId);
     await sql.end();
   }
 });

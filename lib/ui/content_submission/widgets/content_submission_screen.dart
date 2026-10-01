@@ -287,6 +287,9 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                               descriptionDelta:
                                   widget.viewModel.state.descriptionDelta,
                               isEvent: widget.viewModel.isEvent,
+                              allDay: widget.viewModel.allDay,
+                              onAllDayChanged: (allDay) =>
+                                  widget.viewModel.setAllDay(allDay: allDay),
                               startCalendarDate:
                                   widget.viewModel.startCalendarDate,
                               startClockTime: widget.viewModel.startClockTime,

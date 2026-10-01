@@ -21,6 +21,7 @@ class AdminSubmissionInput {
     List<Map<String, dynamic>>? descriptionDelta,
     this.startDate,
     this.endDate,
+    this.allDay = false,
     this.latitude,
     this.longitude,
   }) : descriptionDelta = freezeDescriptionDelta(descriptionDelta);
@@ -45,6 +46,9 @@ class AdminSubmissionInput {
 
   /// Event end date and time, when this is an event.
   final DateTime? endDate;
+
+  /// Whether a meaningful initial clock is unavailable.
+  final bool allDay;
 
   /// Optional geographical latitude, when both coordinates are present.
   ///

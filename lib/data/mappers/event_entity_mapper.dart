@@ -31,6 +31,7 @@ extension EventEntityExtensions on EventEntity {
                 )))
             .toUtc(),
     endDate: endDate?.toUtc(),
+    allDay: allDay,
     isSaved: isSaved,
   );
 }

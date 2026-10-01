@@ -18,7 +18,8 @@ function event(overrides: Partial<EventiMoliseEvent> = {}): EventiMoliseEvent {
     locations: ["Bagnoli del Trigno"],
     categories: ["Altro", "Cibo"],
     organizers: [],
-    url: "https://eventimolise.it/event/bagnoli-del-trigno/altro/eventi-estivi-a-bagnoli-del-trigno/",
+    url:
+      "https://eventimolise.it/event/bagnoli-del-trigno/altro/eventi-estivi-a-bagnoli-del-trigno/",
     image: "https://eventimolise.it/wp-content/uploads/2026/07/example.png",
     ...overrides,
   };
@@ -60,9 +61,12 @@ Deno.test("the two real Bagnoli source duplicates produce the same key", () => {
   const first = prepareEvent(event({ id: 18008 }));
   const second = prepareEvent(event({
     id: 18009,
-    url: "https://eventimolise.it/event/bagnoli-del-trigno/altro/eventi-estivi-a-bagnoli-del-trigno-2/",
+    url:
+      "https://eventimolise.it/event/bagnoli-del-trigno/altro/eventi-estivi-a-bagnoli-del-trigno-2/",
   }));
 
+  assertEquals(first.allDay, false);
+  assertEquals(second.allDay, false);
   assertEquals(first.dedupKey, second.dedupKey);
 });
 
@@ -85,4 +89,16 @@ Deno.test("equal start and end timestamps omit end_date", () => {
 
   assertEquals(prepared.endDate, null);
   assert(prepared.internalNotes.includes("end_date omitted"));
+});
+
+Deno.test("real midnight and incomplete final source time remain timed", () => {
+  const prepared = prepareEvent(event({
+    date: "2026-10-25",
+    time: "00:00",
+    endDate: "2026-10-26",
+    endTime: null,
+  }));
+  assertEquals(prepared.allDay, false);
+  assertEquals(prepared.startDate, "2026-10-24T22:00:00.000Z");
+  assertEquals(prepared.endDate, null);
 });

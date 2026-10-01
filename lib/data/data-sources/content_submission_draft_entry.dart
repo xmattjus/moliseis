@@ -16,6 +16,8 @@ class ContentSubmissionDraftEntity {
     this.endDate,
     this.isEvent,
     this.pendingStartCalendarDate,
+    this.pendingEndCalendarDate,
+    this.allDay = false,
     this.authorEmail,
     this.authorName,
     this.acceptedTerms,
@@ -42,6 +44,12 @@ class ContentSubmissionDraftEntity {
   final bool? isEvent;
 
   final String? pendingStartCalendarDate;
+
+  /// Final civil date only when no resolved instant can represent it.
+  final String? pendingEndCalendarDate;
+
+  /// Source-owned temporal mode; historical drafts remain timed.
+  final bool allDay;
 
   final String? authorEmail;
   final String? authorName;

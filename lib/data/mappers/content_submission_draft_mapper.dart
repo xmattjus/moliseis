@@ -35,7 +35,11 @@ extension on ContentSubmissionDraftEntity {
     final end = endDate?.toUtc();
     final pending = pendingStartCalendarDate;
     if (isEvent != true) {
-      if (start != null || end != null || pending != null) {
+      if (start != null ||
+          end != null ||
+          pending != null ||
+          pendingEndCalendarDate != null ||
+          allDay) {
         throw StateError(
           'Persisted content-submission draft has invalid dates.',
         );
@@ -48,6 +52,7 @@ extension on ContentSubmissionDraftEntity {
         startCalendarDate: EventTimePolicy().calendarDateForUtc(start),
         startInstantUtc: start,
         endInstantUtc: end,
+        allDay: allDay,
       );
     }
     if (end != null) {
@@ -57,14 +62,34 @@ extension on ContentSubmissionDraftEntity {
       );
     }
 
-    if (pending == null) return const EventDateDraft.enabledEmpty();
+    if (pending == null) {
+      if (pendingEndCalendarDate != null) {
+        throw StateError('Final civil date requires initial date.');
+      }
+      return EventDateDraft.enabledEmpty(allDay: allDay);
+    }
     final date = _parseCalendarDate(pending);
     if (date == null) {
       throw StateError(
         'Persisted content-submission draft has an invalid pending start date.',
       );
     }
-    return EventDateDraft.unresolvedStart(date);
+    final finalDate = pendingEndCalendarDate == null
+        ? null
+        : _parseCalendarDate(pendingEndCalendarDate!);
+    if (pendingEndCalendarDate != null && finalDate == null) {
+      throw StateError('Invalid pending final civil date.');
+    }
+    final draft = EventDateDraft.unresolvedStart(
+      date,
+      endCalendarDate: finalDate,
+    );
+    if (!allDay) return draft;
+    final normalized = EventTimePolicy().changeAllDay(draft, allDay: true);
+    if (!normalized.isSuccess) {
+      throw StateError('Persisted all-day draft has an invalid civil range.');
+    }
+    return normalized.draft;
   }
 
   EventCalendarDate? _parseCalendarDate(String value) {
@@ -94,6 +119,11 @@ extension ContentSubmissionDraftMapper on ContentSubmissionDraft {
     startDate: eventDates.startInstantUtc?.toUtc(),
     endDate: eventDates.endInstantUtc?.toUtc(),
     isEvent: eventDates.enabled,
+    allDay: eventDates.allDay,
+    pendingEndCalendarDate:
+        eventDates.enabled && eventDates.startInstantUtc == null
+        ? eventDates.endCalendarDate?.toString()
+        : null,
     pendingStartCalendarDate:
         eventDates.enabled && eventDates.startInstantUtc == null
         ? eventDates.startCalendarDate?.toString()

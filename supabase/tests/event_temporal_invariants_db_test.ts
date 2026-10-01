@@ -345,3 +345,95 @@ Deno.test("event date checks reject invalid inserts and updates", async () => {
     await sql.end();
   }
 });
+
+Deno.test("all-day defaults preserve real midnight and require submission start on insert/update", async () => {
+  const sql = client();
+  const userId = await createSubmissionUser(sql);
+  let eventId: DbBigint | undefined;
+  try {
+    const submissionId = await insertSubmission(sql, userId, null, null);
+    eventId = await insertEvent(sql, "2026-10-12T00:00:00Z", null);
+    const [defaults] = await sql<
+      {
+        submission_mode: boolean;
+        event_mode: boolean;
+        midnight_unchanged: boolean;
+      }[]
+    >`
+      select s.all_day as submission_mode, e.all_day as event_mode,
+        e.start_date = '2026-10-12T00:00:00Z'::timestamptz as midnight_unchanged
+      from public.content_submissions s cross join public.events e
+      where s.id = ${submissionId} and e.id = ${eventId}
+    `;
+    if (
+      defaults.submission_mode || defaults.event_mode ||
+      !defaults.midnight_unchanged
+    ) {
+      throw new Error(
+        "Default mode must be false without reinterpreting midnight",
+      );
+    }
+    await assertPostgresError(
+      () =>
+        sql`update public.content_submissions set all_day = true where id = ${submissionId}`,
+      "23514",
+    );
+    await assertPostgresError(
+      () =>
+        sql`update public.content_submissions set all_day = null where id = ${submissionId}`,
+      "23502",
+    );
+    await assertPostgresError(
+      () => sql`update public.events set all_day = null where id = ${eventId!}`,
+      "23502",
+    );
+    await assertPostgresError(() =>
+      sql`
+      insert into public.content_submissions (user_id, user_email, user_name, city, name, all_day)
+      values (${userId}, 'all-day@example.test', 'Test', 'Campobasso', 'Test', true)
+    `, "23514");
+    await assertPostgresError(() =>
+      sql`
+      insert into public.content_submissions (user_id, user_email, user_name, city, name, all_day)
+      values (${userId}, 'all-day@example.test', 'Test', 'Campobasso', 'Test', null)
+    `, "23502");
+    await sql`update public.content_submissions set all_day = true, start_date = '2026-10-11T22:00:00Z' where id = ${submissionId}`;
+    await assertPostgresError(
+      () =>
+        sql`update public.content_submissions set start_date = null where id = ${submissionId}`,
+      "23514",
+    );
+    await sql`update public.content_submissions set all_day = false, start_date = null where id = ${submissionId}`;
+  } finally {
+    await sql`delete from public.content_submissions where user_id = ${userId}`;
+    if (eventId !== undefined) {
+      await sql`delete from public.events where id = ${eventId}`;
+    }
+    await sql`delete from auth.users where id = ${userId}`;
+    await sql.end();
+  }
+});
+
+Deno.test("flag-only event update advances the existing modified_at marker", async () => {
+  const sql = client();
+  const id = await insertEvent(sql, "2026-10-11T22:00:00Z", null);
+  try {
+    const [before] = await sql<
+      { modified_at: string; start_date: string }[]
+    >`select modified_at::text, start_date::text from public.events where id = ${id}`;
+    await sql`update public.events set all_day = true where id = ${id}`;
+    const [after] = await sql<
+      { changed: boolean; all_day: boolean; start_date: string }[]
+    >`select modified_at > ${before.modified_at}::text::timestamptz as changed, all_day, start_date::text from public.events where id = ${id}`;
+    if (
+      !after.changed || !after.all_day || after.start_date !== before.start_date
+    ) {
+      throw new Error(
+        "Flag-only update must advance modified_at without changing the dates",
+      );
+    }
+  } finally {
+    await sql`delete from public.events where id = ${id}`;
+    await sql.end();
+  }
+});

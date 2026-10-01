@@ -38,6 +38,7 @@ function submission(): ValidatedContentSubmission {
     address: null,
     start_date: "2026-08-21T10:00:00.000Z",
     end_date: null,
+    all_day: false,
     category: null,
     user_email: "contributor@example.test",
     user_name: "Contributor",
@@ -98,6 +99,7 @@ Deno.test("submission store forwards the exact submit_content argument allowlist
       p_address: null,
       p_start_date: "2026-08-21T10:00:00.000Z",
       p_end_date: null,
+      p_all_day: false,
       p_category: null,
       p_user_email: "contributor@example.test",
       p_user_name: "Contributor",
@@ -205,4 +207,27 @@ Deno.test("submission store accepts a null-ID rate-limit result", async () => {
     await store.submit({ userId: "user", submission: submission() }),
     { outcome: "rate_limited" },
   );
+});
+
+Deno.test("submission store sends normalized all-day mode and bounds together", async () => {
+  const client = new FakeSubmissionClient();
+  client.queue({ data: [row("created", 7)], error: null });
+  const store = createSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  await store.submit({
+    userId: "00000000-0000-4000-8000-000000000002",
+    submission: {
+      ...submission(),
+      all_day: true,
+      start_date: "2026-10-24T22:00:00.000Z",
+      end_date: "2026-10-25T22:59:59.999999Z",
+    },
+  });
+  assertEquals(client.calls.length, 1);
+  const args = client.calls[0].args as Record<string, unknown>;
+  assertEquals(args.p_all_day, true);
+  assertEquals(args.p_start_date, "2026-10-24T22:00:00.000Z");
+  assertEquals(args.p_end_date, "2026-10-25T22:59:59.999999Z");
+  assertEquals(Object.hasOwn(args, "p_start_calendar_date"), false);
 });

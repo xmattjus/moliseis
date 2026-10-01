@@ -280,6 +280,7 @@ Deno.test("created and replayed acknowledgements make exactly one store call", a
         latitude: null,
         longitude: null,
         address: null,
+        all_day: false,
         start_date: null,
         end_date: null,
         category: null,
@@ -324,4 +325,56 @@ Deno.test("store failures and malformed outcomes are stable, safe server errors"
     message: "Unable to save submission",
   });
   assertEquals(malformed.calls.logs, ["submit_content:invalid_outcome"]);
+});
+
+Deno.test("temporal validation rejects malformed first attempts and replays before any store call", async () => {
+  for (const replayed of [false, true]) {
+    for (
+      const fields of [
+        { all_day: null },
+        { all_day: true },
+        { all_day: true, start_calendar_date: "2026-02-30" },
+        {
+          all_day: true,
+          start_calendar_date: "2026-01-01",
+          start_date: "2026-01-01",
+        },
+        { all_day: false, start_calendar_date: "2026-01-01" },
+      ]
+    ) {
+      const harness = createHarness();
+      if (replayed) {
+        harness.store.result = { outcome: "replayed", submissionId: 7 };
+      }
+      const response = await harness.handler(
+        request({ ...validSubmission(), ...fields }),
+      );
+      assertEquals(response.status, 400);
+      assertEquals(harness.calls.stores, 0);
+      assertEquals(harness.store.calls, []);
+    }
+  }
+});
+
+Deno.test("all-day first attempts and replay requests reach the store only as normalized persistence values", async () => {
+  for (const outcome of ["created", "replayed"] as const) {
+    const harness = createHarness();
+    harness.store.result = { outcome, submissionId: 7 };
+    const response = await harness.handler(
+      request({
+        ...validSubmission(),
+        all_day: true,
+        start_calendar_date: "2026-10-25",
+        end_calendar_date: "2026-10-25",
+      }),
+    );
+    assertEquals(response.status, outcome === "created" ? 201 : 200);
+    assertEquals(harness.store.calls.length, 1);
+    const submission = harness.store.calls[0].submission;
+    assertEquals(submission.all_day, true);
+    assertEquals(submission.start_date, "2026-10-24T22:00:00.000Z");
+    assertEquals(submission.end_date, "2026-10-25T22:59:59.999999Z");
+    assertEquals(Object.hasOwn(submission, "start_calendar_date"), false);
+    assertEquals(Object.hasOwn(submission, "end_calendar_date"), false);
+  }
 });

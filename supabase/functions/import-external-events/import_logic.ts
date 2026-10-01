@@ -1,3 +1,4 @@
+import { validateSubmissionDates } from "../_shared/submission_dates.ts";
 import type { EventiMoliseEvent } from "./eventimolise.ts";
 
 const TIME_ZONE = "Europe/Rome";
@@ -10,6 +11,7 @@ export type PreparedExternalEvent = {
   sourceUrl: string;
   name: string;
   city: string;
+  allDay: boolean;
   startDate: string;
   endDate: string | null;
   imageUrl: string | null;
@@ -86,7 +88,9 @@ export function calendarDateInRome(isoTimestamp: string): string {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(instant);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
   return `${values.year}-${values.month}-${values.day}`;
 }
 
@@ -116,7 +120,9 @@ function uniqueLocations(locations: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
 
-  for (const location of locations.map((value) => value.trim()).filter(Boolean)) {
+  for (
+    const location of locations.map((value) => value.trim()).filter(Boolean)
+  ) {
     const key = normalizeDedupText(location);
     if (!seen.has(key)) {
       seen.add(key);
@@ -128,7 +134,9 @@ function uniqueLocations(locations: string[]): string[] {
 }
 
 function truncate(value: string, maxLength: number): string {
-  return value.length <= maxLength ? value : value.slice(0, maxLength).trimEnd();
+  return value.length <= maxLength
+    ? value
+    : value.slice(0, maxLength).trimEnd();
 }
 
 export function prepareEvent(
@@ -141,7 +149,9 @@ export function prepareEvent(
     name = FALLBACK_VALUE;
     warnings.push("missing source title; name fallback applied");
   } else if (name.length > MAX_NAME_LENGTH) {
-    warnings.push(`source title exceeded ${MAX_NAME_LENGTH} characters and was truncated`);
+    warnings.push(
+      `source title exceeded ${MAX_NAME_LENGTH} characters and was truncated`,
+    );
     name = truncate(name, MAX_NAME_LENGTH);
   }
 
@@ -154,9 +164,15 @@ export function prepareEvent(
     if (locations.length === 0) {
       warnings.push("missing source location; city fallback applied");
     } else if (locations.length > 1) {
-      warnings.push(`multiple source locations; city fallback applied: ${locations.join(", ")}`);
+      warnings.push(
+        `multiple source locations; city fallback applied: ${
+          locations.join(", ")
+        }`,
+      );
     } else {
-      warnings.push(`source location exceeded ${MAX_CITY_LENGTH} characters; city fallback applied`);
+      warnings.push(
+        `source location exceeded ${MAX_CITY_LENGTH} characters; city fallback applied`,
+      );
     }
   }
 
@@ -169,10 +185,14 @@ export function prepareEvent(
       if (Date.parse(candidate) > Date.parse(startDate)) {
         endDate = candidate;
       } else {
-        warnings.push("source end date/time was not after start; end_date omitted");
+        warnings.push(
+          "source end date/time was not after start; end_date omitted",
+        );
       }
     } catch {
-      warnings.push("source end date/time could not be parsed; end_date omitted");
+      warnings.push(
+        "source end date/time could not be parsed; end_date omitted",
+      );
     }
   }
 
@@ -190,13 +210,19 @@ export function prepareEvent(
   }
   for (const warning of warnings) notes.push(`Warning: ${warning}`);
 
+  const temporal = validateSubmissionDates(startDate, endDate, false);
+  if (!temporal.ok || temporal.value.start_date === null) {
+    throw new Error("Invalid prepared EventiMolise dates");
+  }
+
   return {
+    allDay: false,
     sourceId: event.id,
     sourceUrl: event.url,
     name,
     city,
-    startDate,
-    endDate,
+    startDate: temporal.value.start_date,
+    endDate: temporal.value.end_date,
     imageUrl: event.image,
     internalNotes: notes.join("\n"),
     dedupKey: buildDedupKey(city, name, startDate),

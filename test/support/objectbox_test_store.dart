@@ -18,10 +18,18 @@ final class TestObjectBoxEnvironment {
   bool _closed = false;
 
   /// Opens a fresh ObjectBox store in a unique temporary directory.
-  static Future<TestObjectBoxEnvironment> create() async {
+  static Future<TestObjectBoxEnvironment> create({
+    String? previousStoreGzipPath,
+  }) async {
     final directory = await Directory.systemTemp.createTemp(
       'moliseis_objectbox_',
     );
+    if (previousStoreGzipPath != null) {
+      final bytes = gzip.decode(
+        await File(previousStoreGzipPath).readAsBytes(),
+      );
+      await File('${directory.path}/data.mdb').writeAsBytes(bytes);
+    }
     final store = await openStore(directory: directory.path);
     return TestObjectBoxEnvironment._(directory, store);
   }

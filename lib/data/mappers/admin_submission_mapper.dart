@@ -1,3 +1,4 @@
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
@@ -13,8 +14,17 @@ Map<String, dynamic> adminSubmissionInputToWireMap(AdminSubmissionInput input) {
     'name': input.name,
     'description': input.description,
     'description_delta': input.descriptionDelta,
-    'start_date': input.startDate?.toUtc().toIso8601String(),
-    'end_date': input.endDate?.toUtc().toIso8601String(),
+    'all_day': input.allDay,
+    'start_date': input.allDay
+        ? null
+        : input.startDate?.toUtc().toIso8601String(),
+    'end_date': input.allDay ? null : input.endDate?.toUtc().toIso8601String(),
+    'start_calendar_date': input.allDay && input.startDate != null
+        ? EventTimePolicy().calendarDateForUtc(input.startDate!).toString()
+        : null,
+    'end_calendar_date': input.allDay && input.endDate != null
+        ? EventTimePolicy().calendarDateForUtc(input.endDate!).toString()
+        : null,
     'latitude': input.latitude,
     'longitude': input.longitude,
   };
@@ -32,6 +42,7 @@ AdminSubmission adminSubmissionFromWire(Object? value) {
     name: _required<String>(object, 'name'),
     description: _nullableString(object['description'], 'description'),
     descriptionDelta: descriptionDelta,
+    allDay: object.containsKey('all_day') && _required<bool>(object, 'all_day'),
     startDate: _nullableDateTime(object['start_date'], 'start_date'),
     endDate: _nullableDateTime(object['end_date'], 'end_date'),
     category: adminSubmissionCategoryFromWire(object['category']),

@@ -53,6 +53,55 @@ void main() {
   }
 
   group('ContentSubmissionViewModel', () {
+    test('all-day submission captures bounds without a chosen clock', () async {
+      final repository = FakeContentSubmissionRepository();
+      final vm = buildViewModel(contentSubmissionRepository: repository);
+      addTearDown(vm.dispose);
+      vm
+        ..setCity('Campobasso')
+        ..setName('Event')
+        ..setUserName('Anna')
+        ..setUserEmail('anna@example.test')
+        ..setEventEnabled(true)
+        ..setAllDay(allDay: true)
+        ..setStartCalendarDate(EventCalendarDate(2026, 3, 29))
+        ..setEndCalendarDate(EventCalendarDate(2026, 3, 30));
+      expect(vm.startClockTime, isNull);
+      await vm.submit.execute();
+      expect(vm.submit.completed, isTrue);
+      final submitted = repository.submittedContentSubmissions.single;
+      expect(submitted.allDay, isTrue);
+      expect(submitted.startDate, DateTime.utc(2026, 3, 28, 23));
+      expect(
+        submitted.endDate,
+        DateTime.utc(2026, 3, 30, 21, 59, 59, 999, 999),
+      );
+    });
+
+    test('toggle off retains final day and requires a new clock', () async {
+      final repository = FakeContentSubmissionRepository();
+      final vm = buildViewModel(contentSubmissionRepository: repository);
+      addTearDown(vm.dispose);
+      vm
+        ..setCity('Campobasso')
+        ..setName('Event')
+        ..setUserName('Anna')
+        ..setUserEmail('anna@example.test')
+        ..setStartCalendarDate(EventCalendarDate(2026, 10, 25))
+        ..setStartClockTime(EventClockTime(1, 30))
+        ..setEndCalendarDate(EventCalendarDate(2026, 10, 26))
+        ..setAllDay(allDay: true)
+        ..setAllDay(allDay: false);
+      expect(vm.startClockTime, isNull);
+      expect(vm.endCalendarDate, EventCalendarDate(2026, 10, 26));
+      await vm.submit.execute();
+      expect(vm.eventTimeIssue, EventTimeIssue.missingStartTime);
+      expect(repository.submittedContentSubmissions, isEmpty);
+      vm.setStartClockTime(EventClockTime(10, 30));
+      await vm.submit.execute();
+      expect(repository.submittedContentSubmissions.single.allDay, isFalse);
+    });
+
     test('shares one draft load and staged reconciliation '
         'across initialization callers', () async {
       final pendingLoad = Completer<Result<ContentSubmissionDraft?>>();

@@ -84,6 +84,9 @@ void main() {
         'latitude': null,
         'longitude': null,
         'address': null,
+        'all_day': false,
+        'start_calendar_date': null,
+        'end_calendar_date': null,
         'start_date': null,
         'end_date': null,
         'user_email': 'author@example.com',
@@ -403,6 +406,37 @@ void main() {
         'Content Submission request failed.',
       );
       expect(httpClient.requests, hasLength(2));
+    },
+  );
+  test(
+    'all-day request keeps identity, civil dates and null timestamps',
+    () async {
+      httpClient.queueJson({'submission_id': 71});
+      final result = await repository.submit(
+        clientSubmissionId: '00000000-0000-4000-8000-000000000001',
+        contentSubmission: ContentSubmission(
+          city: 'Campobasso',
+          name: 'Event',
+          userEmail: 'a@example.test',
+          userName: 'A',
+          allDay: true,
+          startDate: DateTime.utc(2026, 10, 11, 22),
+          endDate: DateTime.utc(2026, 10, 14, 21, 59, 59, 999, 999),
+        ),
+        submissionAssets: [],
+      );
+      expect(result.isSuccess, isTrue);
+      expect(httpClient.requests, hasLength(1));
+      final body = httpClient.requests.single.body! as Map<String, dynamic>;
+      expect(
+        body['client_submission_id'],
+        '00000000-0000-4000-8000-000000000001',
+      );
+      expect(body['all_day'], isTrue);
+      expect(body['start_date'], isNull);
+      expect(body['end_date'], isNull);
+      expect(body['start_calendar_date'], '2026-10-12');
+      expect(body['end_calendar_date'], '2026-10-14');
     },
   );
 }

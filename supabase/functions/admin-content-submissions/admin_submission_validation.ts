@@ -19,6 +19,9 @@ export type AdminSubmissionInputWire = {
   name: string;
   description: string | null;
   description_delta: unknown | null;
+  all_day: boolean;
+  start_calendar_date: string | null;
+  end_calendar_date: string | null;
   start_date: string | null;
   end_date: string | null;
   latitude: number | null;
@@ -26,7 +29,10 @@ export type AdminSubmissionInputWire = {
 };
 
 export type ValidatedAdminSubmissionInput =
-  & Omit<AdminSubmissionInputWire, "description_delta">
+  & Omit<
+    AdminSubmissionInputWire,
+    "description_delta" | "start_calendar_date" | "end_calendar_date"
+  >
   & {
     description_delta: Json | null;
   };
@@ -73,6 +79,9 @@ const INPUT_KEYS = [
   "name",
   "description",
   "description_delta",
+  "all_day",
+  "start_calendar_date",
+  "end_calendar_date",
   "start_date",
   "end_date",
   "latitude",
@@ -145,6 +154,9 @@ function parseInput(
     description_delta,
     start_date,
     end_date,
+    all_day,
+    start_calendar_date,
+    end_calendar_date,
     latitude,
     longitude,
   } = value;
@@ -174,9 +186,30 @@ function parseInput(
     return invalid("description exceeds maximum length of 5000 characters.");
   }
 
-  const parsedDates = validateSubmissionDates(start_date, end_date);
+  if (typeof all_day !== "boolean") {
+    return invalid("all_day must be a boolean.");
+  }
+  const parsedDates = validateSubmissionDates(
+    start_date,
+    end_date,
+    all_day,
+    start_calendar_date,
+    end_calendar_date,
+  );
   if (!parsedDates.ok) {
     switch (parsedDates.error) {
+      case "invalid_all_day":
+        return invalid("all_day must be a boolean.");
+      case "mixed_temporal_formats":
+        return invalid("timestamp and civil-date formats must not be mixed.");
+      case "invalid_start_calendar_date":
+        return invalid(
+          "start_calendar_date must be a Gregorian YYYY-MM-DD date.",
+        );
+      case "invalid_end_calendar_date":
+        return invalid(
+          "end_calendar_date must be a Gregorian YYYY-MM-DD date or null.",
+        );
       case "invalid_start_date":
         return invalid(
           "start_date must be a parseable date-time string or null.",
@@ -213,6 +246,7 @@ function parseInput(
     name: normalizedName,
     description,
     description_delta: deltaAsJson(parsedDelta.value),
+    all_day: parsedDates.value.all_day,
     start_date: parsedDates.value.start_date,
     end_date: parsedDates.value.end_date,
     latitude: parsedLatitude.value,

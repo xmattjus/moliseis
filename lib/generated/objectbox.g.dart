@@ -254,7 +254,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(17, 7285695363865824884),
     name: 'EventEntity',
-    lastPropertyId: const obx_int.IdUid(15, 3781919031562521160),
+    lastPropertyId: const obx_int.IdUid(16, 8451749802769463397),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -345,6 +345,12 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(15, 3781919031562521160),
         name: 'descriptionDelta',
         type: 13,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(16, 8451749802769463397),
+        name: 'allDay',
+        type: 1,
         flags: 0,
       ),
     ],
@@ -454,7 +460,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(20, 8436787422671765122),
     name: 'ContentSubmissionDraftEntity',
-    lastPropertyId: const obx_int.IdUid(18, 4578999261153036819),
+    lastPropertyId: const obx_int.IdUid(20, 9046656296946601217),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -539,6 +545,18 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(18, 4578999261153036819),
         name: 'clientSubmissionId',
         type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(19, 3353973637497598878),
+        name: 'pendingEndCalendarDate',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(20, 9046656296946601217),
+        name: 'allDay',
+        type: 1,
         flags: 0,
       ),
     ],
@@ -1182,7 +1200,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final descriptionDeltaOffset = object.descriptionDelta == null
             ? null
             : fbb.writeListInt8(obx_int.toFlexBuffer(object.descriptionDelta!));
-        fbb.startTable(16);
+        fbb.startTable(17);
         fbb.addInt64(0, object.remoteId);
         fbb.addOffset(1, nameOffset);
         fbb.addOffset(2, descriptionOffset);
@@ -1207,6 +1225,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addBool(12, object.isDeleted);
         fbb.addInt64(13, object.contentCategoryIndex);
         fbb.addOffset(14, descriptionDeltaOffset);
+        fbb.addBool(15, object.allDay);
         fbb.finish(fbb.endTable());
         return object.remoteId;
       },
@@ -1250,6 +1269,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
             : DateTime.fromMicrosecondsSinceEpoch(
                 (endDateValue / 1000).round(),
               );
+        final allDayParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          34,
+          false,
+        );
         final coordinatesParam = const fb.ListReader<double>(
           fb.Float32Reader(),
           lazy: false,
@@ -1296,6 +1321,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           descriptionDelta: descriptionDeltaParam,
           startDate: startDateParam,
           endDate: endDateParam,
+          allDay: allDayParam,
           coordinates: coordinatesParam,
           contentCategoryIndex: contentCategoryIndexParam,
           cityToOneId: cityToOneIdParam,
@@ -1490,7 +1516,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
             final clientSubmissionIdOffset = object.clientSubmissionId == null
                 ? null
                 : fbb.writeString(object.clientSubmissionId!);
-            fbb.startTable(19);
+            final pendingEndCalendarDateOffset =
+                object.pendingEndCalendarDate == null
+                ? null
+                : fbb.writeString(object.pendingEndCalendarDate!);
+            fbb.startTable(21);
             fbb.addInt64(0, object.id);
             fbb.addOffset(1, cityOffset);
             fbb.addOffset(2, nameOffset);
@@ -1515,6 +1545,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
             fbb.addBool(15, object.isEvent);
             fbb.addOffset(16, pendingStartCalendarDateOffset);
             fbb.addOffset(17, clientSubmissionIdOffset);
+            fbb.addOffset(18, pendingEndCalendarDateOffset);
+            fbb.addBool(19, object.allDay);
             fbb.finish(fbb.endTable());
             return object.id;
           },
@@ -1571,6 +1603,15 @@ obx_int.ModelDefinition getObjectBoxModel() {
             final pendingStartCalendarDateParam = const fb.StringReader(
               asciiOptimization: true,
             ).vTableGetNullable(buffer, rootOffset, 36);
+            final pendingEndCalendarDateParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 40);
+            final allDayParam = const fb.BoolReader().vTableGet(
+              buffer,
+              rootOffset,
+              42,
+              false,
+            );
             final authorEmailParam = const fb.StringReader(
               asciiOptimization: true,
             ).vTableGetNullable(buffer, rootOffset, 28);
@@ -1593,6 +1634,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
               endDate: endDateParam,
               isEvent: isEventParam,
               pendingStartCalendarDate: pendingStartCalendarDateParam,
+              pendingEndCalendarDate: pendingEndCalendarDateParam,
+              allDay: allDayParam,
               authorEmail: authorEmailParam,
               authorName: authorNameParam,
               acceptedTerms: acceptedTermsParam,
@@ -1887,6 +1930,11 @@ class EventEntity_ {
     _entities[4].properties[12],
   );
 
+  /// See [EventEntity.allDay].
+  static final allDay = obx.QueryBooleanProperty<EventEntity>(
+    _entities[4].properties[14],
+  );
+
   /// see [EventEntity.media]
   static final media = obx.QueryBacklinkToMany<MediaEntity, EventEntity>(
     MediaEntity_.event,
@@ -2031,6 +2079,17 @@ class ContentSubmissionDraftEntity_ {
       obx.QueryStringProperty<ContentSubmissionDraftEntity>(
         _entities[6].properties[13],
       );
+
+  /// See [ContentSubmissionDraftEntity.pendingEndCalendarDate].
+  static final pendingEndCalendarDate =
+      obx.QueryStringProperty<ContentSubmissionDraftEntity>(
+        _entities[6].properties[14],
+      );
+
+  /// See [ContentSubmissionDraftEntity.allDay].
+  static final allDay = obx.QueryBooleanProperty<ContentSubmissionDraftEntity>(
+    _entities[6].properties[15],
+  );
 }
 
 /// [ContentSubmissionStagedAssetEntity] entity fields to define ObjectBox queries.

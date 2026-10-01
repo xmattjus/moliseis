@@ -27,75 +27,95 @@ void main() {
     );
   });
 
-  group('EventFormattedDateTime integrations', () {
-    testWidgets('is used by compact ContentSliverGrid for EventContent', (
-      tester,
-    ) async {
-      final event = makeEvent(startDate: DateTime(2026, 4, 10, 10, 15));
+  for (final allDay in [false, true]) {
+    group('EventFormattedDateTime integrations allDay=$allDay', () {
+      testWidgets('is used by compact ContentSliverGrid for EventContent', (
+        tester,
+      ) async {
+        final event = makeEvent(
+          allDay: allDay,
+          startDate: DateTime.utc(2026, 4, 9, 22),
+        );
 
-      await tester.pumpWidget(
-        ChangeNotifierProvider<FavouriteViewModel>.value(
-          value: favouriteViewModel,
-          child: MaterialApp(
-            locale: const Locale('en'),
-            home: MediaQuery(
-              data: const MediaQueryData(size: Size(390, 844)),
-              child: Scaffold(
-                body: CustomScrollView(
-                  slivers: <Widget>[
-                    ContentSliverGrid(<Event>[event], onPressed: (_) {}),
-                  ],
+        await tester.pumpWidget(
+          ChangeNotifierProvider<FavouriteViewModel>.value(
+            value: favouriteViewModel,
+            child: MaterialApp(
+              locale: const Locale('en'),
+              home: MediaQuery(
+                data: const MediaQueryData(size: Size(390, 844)),
+                child: Scaffold(
+                  body: CustomScrollView(
+                    slivers: <Widget>[
+                      ContentSliverGrid(<Event>[event], onPressed: (_) {}),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.byType(EventFormattedDateTime), findsOneWidget);
-    });
+        expect(find.byType(EventFormattedDateTime), findsOneWidget);
+        expect(find.textContaining('00:00'), findsNothing);
+        expect(find.text('24 ore'), findsNothing);
+        expect(find.text('Tutto il giorno'), findsNothing);
+      });
 
-    testWidgets('is used by ContentEventCardGridItem trailing content', (
-      tester,
-    ) async {
-      final event = makeEvent(startDate: DateTime(2026, 4, 10, 10, 15));
+      testWidgets('is used by ContentEventCardGridItem trailing content', (
+        tester,
+      ) async {
+        final event = makeEvent(
+          allDay: allDay,
+          startDate: DateTime.utc(2026, 4, 9, 22),
+        );
 
-      await tester.pumpWidget(
-        ChangeNotifierProvider<FavouriteViewModel>.value(
-          value: favouriteViewModel,
-          child: MaterialApp(
-            locale: const Locale('en'),
-            home: Scaffold(
-              body: ContentEventCardGridItem(event: event, onPressed: (_) {}),
-            ),
-          ),
-        ),
-      );
-
-      expect(find.byType(EventFormattedDateTime), findsOneWidget);
-    });
-
-    testWidgets('is used by SearchAnchorSuggestionList for EventContent', (
-      tester,
-    ) async {
-      final event = makeEvent(startDate: DateTime(2026, 4, 10, 10, 15));
-
-      await tester.pumpWidget(
-        ChangeNotifierProvider<FavouriteViewModel>.value(
-          value: favouriteViewModel,
-          child: MaterialApp(
-            locale: const Locale('en'),
-            home: Scaffold(
-              body: SearchAnchorSuggestionList(
-                suggestions: <Event>[event],
-                onSuggestionPressed: (_) {},
+        await tester.pumpWidget(
+          ChangeNotifierProvider<FavouriteViewModel>.value(
+            value: favouriteViewModel,
+            child: MaterialApp(
+              locale: const Locale('en'),
+              home: Scaffold(
+                body: ContentEventCardGridItem(event: event, onPressed: (_) {}),
               ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.byType(EventFormattedDateTime), findsOneWidget);
+        expect(find.byType(EventFormattedDateTime), findsOneWidget);
+        expect(find.textContaining('00:00'), findsNothing);
+        expect(find.text('24 ore'), findsNothing);
+        expect(find.text('Tutto il giorno'), findsNothing);
+      });
+
+      testWidgets('is used by SearchAnchorSuggestionList for EventContent', (
+        tester,
+      ) async {
+        final event = makeEvent(
+          allDay: allDay,
+          startDate: DateTime.utc(2026, 4, 9, 22),
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider<FavouriteViewModel>.value(
+            value: favouriteViewModel,
+            child: MaterialApp(
+              locale: const Locale('en'),
+              home: Scaffold(
+                body: SearchAnchorSuggestionList(
+                  suggestions: <Event>[event],
+                  onSuggestionPressed: (_) {},
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(EventFormattedDateTime), findsOneWidget);
+        expect(find.textContaining('00:00'), findsNothing);
+        expect(find.text('24 ore'), findsNothing);
+        expect(find.text('Tutto il giorno'), findsNothing);
+      });
     });
-  });
+  }
 }

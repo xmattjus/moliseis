@@ -19,6 +19,8 @@ class ContentSubmissionFields extends StatelessWidget {
     required this.description,
     required this.descriptionDelta,
     required this.isEvent,
+    required this.allDay,
+    required this.onAllDayChanged,
     required this.startCalendarDate,
     required this.startClockTime,
     required this.endCalendarDate,
@@ -42,6 +44,12 @@ class ContentSubmissionFields extends StatelessWidget {
   final String? description;
   final List<Map<String, dynamic>>? descriptionDelta;
   final bool isEvent;
+
+  /// Whether only civil dates are meaningful.
+  final bool allDay;
+
+  /// Changes the event temporal precision.
+  final ValueChanged<bool> onAllDayChanged;
   final EventCalendarDate? startCalendarDate;
   final EventClockTime? startClockTime;
   final EventCalendarDate? endCalendarDate;
@@ -146,6 +154,17 @@ class ContentSubmissionFields extends StatelessWidget {
           ],
         ),
         if (isEvent)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Senza orario', style: textStyle),
+              Checkbox(
+                value: allDay,
+                onChanged: (value) => onAllDayChanged(value ?? false),
+              ),
+            ],
+          ),
+        if (isEvent)
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 8,
@@ -160,7 +179,7 @@ class ContentSubmissionFields extends StatelessWidget {
                 ),
                 onDatePicked: onStartDateChanged,
               ),
-              if (startCalendarDate != null)
+              if (startCalendarDate != null && !allDay)
                 ContentSubmissionDateChip.time(
                   selectedTime: startClockTime,
                   label: Text(

@@ -1,3 +1,4 @@
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/mappers/event_dto_mapper.dart';
@@ -62,6 +63,32 @@ void main() {
       );
 
       expect(startOnlyDto.mergeInto(existing).endDate, isNull);
+    },
+  );
+  test(
+    'generated mode decoder defaults false and merge retains saved state',
+    () {
+      final row = <String, dynamic>{
+        'id': 71,
+        'name': 'Event',
+        'description': null,
+        'start_date': '2026-10-12T00:00:00Z',
+        'latitude': 41.5,
+        'longitude': 14.5,
+        'category': 'unknown',
+        'created_at': '2026-01-01T00:00:00Z',
+        'modified_at': '2026-10-01T00:00:00Z',
+      };
+      final timed = EventDtoMapper.fromMap(row);
+      expect(timed.allDay, isFalse);
+      final allDay = EventDtoMapper.fromMap({...row, 'all_day': true});
+      final entity = allDay.mergeInto(timed.toEntity().copyWith(isSaved: true));
+      expect(entity.allDay, isTrue);
+      expect(entity.isSaved, isTrue);
+      final field = EventDtoMapper.ensureInitialized().fields.values
+          .singleWhere((field) => field.key == 'all_day');
+      expect(field.encode(allDay, EncodingContext()), isTrue);
+      expect(entity.copyWith(name: 'Other').allDay, isTrue);
     },
   );
 }

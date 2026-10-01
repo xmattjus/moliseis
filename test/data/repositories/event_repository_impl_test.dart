@@ -1142,6 +1142,71 @@ void main() {
 
     tearDown(() => environment.dispose());
 
+    test(
+      'all-day membership, DST overlap, cross-year and start sorting',
+      () async {
+        final policy = EventTimePolicy();
+        eventBox.putMany([
+          makeEventEntity(
+            remoteId: 40,
+            allDay: true,
+            startDate: policy
+                .utcRangeForCalendarDate(EventCalendarDate(2026, 3, 29))
+                .startUtc,
+          ),
+          makeEventEntity(
+            remoteId: 41,
+            allDay: true,
+            startDate: policy
+                .utcRangeForCalendarDate(EventCalendarDate(2026, 3, 28))
+                .startUtc,
+            endDate: policy
+                .utcRangeForCalendarDate(EventCalendarDate(2026, 3, 30))
+                .endUtc,
+          ),
+          makeEventEntity(
+            remoteId: 42,
+            allDay: true,
+            startDate: policy
+                .utcRangeForCalendarDate(EventCalendarDate(2026, 12, 31))
+                .startUtc,
+            endDate: policy
+                .utcRangeForCalendarDate(EventCalendarDate(2027, 1, 2))
+                .endUtc,
+          ),
+          makeEventEntity(
+            remoteId: 43,
+            allDay: true,
+            startDate: policy
+                .utcRangeForCalendarDate(EventCalendarDate(2027, 1, 1))
+                .startUtc,
+          ),
+        ]);
+        final spring = (await repository.getByDate(
+          EventCalendarDate(2026, 3, 29),
+        )).getOrNull()!;
+        expect(spring.map((event) => event.remoteId), [41, 40]);
+        final nextDay = (await repository.getByDate(
+          EventCalendarDate(2026, 3, 30),
+        )).getOrNull()!;
+        expect(nextDay.map((event) => event.remoteId), [41]);
+        final crossYear = (await repository.getByDateRange(
+          EventCalendarDate(2027, 1, 1),
+          EventCalendarDate(2027, 1, 2),
+        )).getOrNull()!;
+        expect(crossYear.map((event) => event.remoteId), [42, 43]);
+        expect(
+          (await repository.getByCurrentYear()).getOrNull()!.map(
+            (event) => event.remoteId,
+          ),
+          [42, 43],
+        );
+        // Upcoming remains based on starts: the overlapping earlier event is
+        // excluded even though it is an all-day multi-day event.
+        expect((await repository.getNextEventIds()).getOrNull(), [43]);
+      },
+    );
+
     test('uses Rome year bounds and upcoming-day UTC boundaries', () async {
       eventBox.putMany([
         makeEventEntity(remoteId: 1, startDate: DateTime.utc(2026, 12, 31, 23)),
@@ -1284,6 +1349,53 @@ void main() {
       }
     });
   });
+  test(
+    'flag-only remote sync replaces mode and preserves locally saved state',
+    () async {
+      final env = await TestObjectBoxEnvironment.create();
+      addTearDown(env.dispose);
+      final remote = MockSupabaseEnvironment();
+      final repository = EventRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: remote.mockSupabase,
+        objectBoxI: TestObjectBox(env.store),
+        nowUtc: () => fixedNowUtc,
+      );
+      final eventBox = env.store.box<EventEntity>();
+      final previous = makeEventEntity(
+        remoteId: 71,
+        startDate: DateTime.utc(2026, 10, 11, 22),
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026, 10),
+      ).copyWith(isSaved: true);
+      eventBox.put(previous);
+      remote.stubSelectResponse([
+        {
+          'id': 71,
+          'name': previous.name,
+          'description': previous.description,
+          'start_date': previous.startDate!.toIso8601String(),
+          'end_date': null,
+          'all_day': true,
+          'latitude': previous.coordinates[0],
+          'longitude': previous.coordinates[1],
+          'category': 'unknown',
+          'created_at': previous.createdAt.toIso8601String(),
+          'modified_at': '2026-10-02T00:00:00.000Z',
+        },
+      ]);
+      final prepared = (await repository.prepareSync()).getOrNull()!;
+      expect(prepared.single.allDay, isTrue);
+      repository.commitSync(prepared);
+      final stored = eventBox.get(71)!;
+      expect(stored.allDay, isTrue);
+      expect(stored.isSaved, isTrue);
+      expect(stored.startDate?.toUtc(), previous.startDate?.toUtc());
+      expect(stored.modifiedAt.toUtc(), DateTime.utc(2026, 10, 2));
+      expect((await repository.getById(71)).getOrNull()!.allDay, isTrue);
+      expect((await repository.getById(71)).getOrNull()!.isSaved, isTrue);
+    },
+  );
 }
 
 Matcher containsEventId(int remoteId) =>

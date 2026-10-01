@@ -24,7 +24,7 @@ void main() {
   };
 
   group('adminSubmissionInputToWireMap', () {
-    test('serializes exactly the nine editor-owned keys', () {
+    test('serializes exactly the twelve editor-owned keys', () {
       final wire = adminSubmissionInputToWireMap(
         AdminSubmissionInput(
           category: ContentCategory.history,
@@ -42,6 +42,9 @@ void main() {
           'name',
           'description',
           'description_delta',
+          'all_day',
+          'start_calendar_date',
+          'end_calendar_date',
           'start_date',
           'end_date',
           'latitude',
@@ -388,4 +391,43 @@ void main() {
       }
     });
   });
+  test(
+    'Admin all-day wire and stored mode round-trip without inferring midnight',
+    () {
+      final wire = adminSubmissionInputToWireMap(
+        AdminSubmissionInput(
+          category: ContentCategory.history,
+          city: 'Campobasso',
+          name: 'Event',
+          allDay: true,
+          startDate: DateTime.utc(2026, 12, 30, 23),
+          endDate: DateTime.utc(2027, 1, 1, 22, 59, 59, 999, 999),
+        ),
+      );
+      expect(wire['all_day'], isTrue);
+      expect(wire['start_calendar_date'], '2026-12-31');
+      expect(wire['end_calendar_date'], '2027-01-01');
+      expect(wire['start_date'], isNull);
+      expect(wire['end_date'], isNull);
+      expect(
+        adminSubmissionFromWire({
+          ...validWire,
+          'all_day': true,
+          'start_date': '2026-10-11T22:00:00Z',
+        }).allDay,
+        isTrue,
+      );
+      expect(
+        adminSubmissionFromWire({
+          ...validWire,
+          'start_date': '2026-10-12T00:00:00Z',
+        }).allDay,
+        isFalse,
+      );
+      expect(
+        () => adminSubmissionFromWire({...validWire, 'all_day': null}),
+        throwsFormatException,
+      );
+    },
+  );
 }

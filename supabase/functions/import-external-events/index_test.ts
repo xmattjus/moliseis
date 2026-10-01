@@ -6,7 +6,18 @@ import type {
   CloudinaryUploadResult,
 } from "../_shared/cloudinary.ts";
 import type { Database } from "../_shared/database.types.ts";
-import { uploadAndPersistImportedAsset } from "./index.ts";
+import {
+  insertImportedSubmission,
+  uploadAndPersistImportedAsset,
+} from "./index.ts";
+import {
+  romeEndOfCalendarDay,
+  validateSubmissionDates,
+} from "../_shared/submission_dates.ts";
+import {
+  type PreparedExternalEvent,
+  zonedDateTimeToIso,
+} from "./import_logic.ts";
 
 const cloudinaryConfig: CloudinaryConfig = {
   cloudName: "test-cloud",
@@ -125,4 +136,149 @@ Deno.test("cleans up a Cloudinary upload when add_submission_assets returns an R
   await assertRejects(persist, Error, "database unavailable");
 
   assertEquals(destroyedPublicIds, [uploadedAsset.publicId]);
+});
+
+// Fixture adapters interpret source precision; PreparedExternalEvent keeps the
+// repository's existing normalized UTC shape rather than adding transport fields.
+type SourceFixture = {
+  startDay: string;
+  startClock?: string;
+  finalDay?: string;
+};
+
+function prepareFixtureSource(source: SourceFixture): PreparedExternalEvent {
+  const allDay = source.startClock === undefined;
+  const civil = validateSubmissionDates(
+    null,
+    null,
+    true,
+    source.startDay,
+    source.finalDay,
+  );
+  if (!civil.ok || civil.value.start_date === null) {
+    throw new Error("Invalid fixture source civil input");
+  }
+  const temporal = allDay ? civil : validateSubmissionDates(
+    zonedDateTimeToIso(source.startDay, source.startClock!),
+    source.finalDay === undefined
+      ? null
+      : romeEndOfCalendarDay(source.finalDay),
+    false,
+  );
+  if (!temporal.ok || temporal.value.start_date === null) {
+    throw new Error("Invalid fixture source temporal input");
+  }
+  return {
+    sourceId: 1,
+    sourceUrl: "https://fixture.invalid/event",
+    city: "Campobasso",
+    name: "Fixture event",
+    allDay,
+    startDate: temporal.value.start_date,
+    endDate: temporal.value.end_date,
+    imageUrl: null,
+    internalNotes: "Source-owned fixture interpretation",
+    dedupKey: "fixture",
+  };
+}
+
+class FakeImporterSubmissionClient {
+  readonly inserts: unknown[] = [];
+  from(table: string) {
+    assertEquals(table, "content_submissions");
+    return {
+      insert: (payload: unknown) => {
+        this.inserts.push(payload);
+        return {
+          select: (columns: string) => {
+            assertEquals(columns, "id");
+            return {
+              single: () => Promise.resolve({ data: { id: 17 }, error: null }),
+            };
+          },
+        };
+      },
+    };
+  }
+}
+
+for (
+  const fixture of [
+    {
+      name: "date-only single-day at spring DST",
+      source: { startDay: "2026-03-29" },
+      allDay: true,
+      start: "2026-03-28T23:00:00.000Z",
+      end: null,
+    },
+    {
+      name: "date with meaningful time",
+      source: { startDay: "2026-08-20", startClock: "18:30" },
+      allDay: false,
+      start: "2026-08-20T16:30:00.000Z",
+      end: null,
+    },
+    {
+      name: "date-only multi-day spanning autumn DST",
+      source: { startDay: "2026-10-24", finalDay: "2026-10-25" },
+      allDay: true,
+      start: "2026-10-23T22:00:00.000Z",
+      end: "2026-10-25T22:59:59.999999Z",
+    },
+    {
+      name: "timed initial clock with final civil day only",
+      source: {
+        startDay: "2026-10-24",
+        startClock: "18:30",
+        finalDay: "2026-10-25",
+      },
+      allDay: false,
+      start: "2026-10-24T16:30:00.000Z",
+      end: "2026-10-25T22:59:59.999999Z",
+    },
+    {
+      name: "real midnight remains timed",
+      source: { startDay: "2026-10-25", startClock: "00:00" },
+      allDay: false,
+      start: "2026-10-24T22:00:00.000Z",
+      end: null,
+    },
+  ]
+) {
+  Deno.test(`source adapter to actual importer payload: ${fixture.name}`, async () => {
+    const prepared = prepareFixtureSource(fixture.source);
+    assertEquals(prepared.allDay, fixture.allDay);
+    const admin = new FakeImporterSubmissionClient();
+    await insertImportedSubmission(
+      admin as unknown as SupabaseClient<Database>,
+      prepared,
+      { id: "fixture-user", email: "fixture@example.test", name: "Fixture" },
+    );
+    assertEquals(admin.inserts.length, 1);
+    const payload = admin.inserts[0] as Record<string, unknown>;
+    assertEquals(payload.all_day, fixture.allDay);
+    assertEquals(payload.start_date, fixture.start);
+    assertEquals(payload.end_date, fixture.end);
+    assertEquals(payload.category, "unknown");
+    assertEquals(payload.status, "pending");
+    assertEquals("start_calendar_date" in payload, false);
+    assertEquals("end_calendar_date" in payload, false);
+  });
+}
+
+Deno.test("invalid source civil date rejects before importer write", async () => {
+  const admin = new FakeImporterSubmissionClient();
+  await assertRejects(
+    async () => {
+      const prepared = prepareFixtureSource({ startDay: "2026-02-30" });
+      await insertImportedSubmission(
+        admin as unknown as SupabaseClient<Database>,
+        prepared,
+        { id: "fixture-user", email: "fixture@example.test", name: "Fixture" },
+      );
+    },
+    Error,
+    "Invalid fixture source civil input",
+  );
+  assertEquals(admin.inserts, []);
 });

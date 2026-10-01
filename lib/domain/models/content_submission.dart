@@ -17,6 +17,7 @@ class ContentSubmission {
     this.address,
     this.startDate,
     this.endDate,
+    this.allDay = false,
     this.category,
     required this.userEmail,
     required this.userName,
@@ -41,6 +42,9 @@ class ContentSubmission {
   final DateTime? startDate;
 
   final DateTime? endDate;
+
+  /// Whether a meaningful initial clock is unavailable.
+  final bool allDay;
 
   final ContentCategory? category;
 
@@ -67,6 +71,7 @@ class ContentSubmission {
         other.address == address &&
         other.startDate == startDate &&
         other.endDate == endDate &&
+        other.allDay == allDay &&
         other.category == category &&
         other.userEmail == userEmail &&
         other.userName == userName &&
@@ -85,6 +90,7 @@ class ContentSubmission {
     address,
     startDate,
     endDate,
+    allDay,
     category,
     userEmail,
     userName,

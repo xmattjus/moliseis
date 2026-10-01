@@ -160,15 +160,18 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   bool get isEvent => _state.eventDates.enabled;
   EventCalendarDate? get startCalendarDate =>
       _state.eventDates.startCalendarDate;
+
+  /// Whether the event has no meaningful initial clock.
+  bool get allDay => _state.eventDates.allDay;
+
   EventClockTime? get startClockTime {
     final start = _state.eventDates.startInstantUtc;
-    return start == null ? null : _eventTimePolicy.clockTimeForUtc(start);
+    return allDay || start == null
+        ? null
+        : _eventTimePolicy.clockTimeForUtc(start);
   }
 
-  EventCalendarDate? get endCalendarDate {
-    final end = _state.eventDates.endInstantUtc;
-    return end == null ? null : _eventTimePolicy.calendarDateForUtc(end);
-  }
+  EventCalendarDate? get endCalendarDate => _state.eventDates.endCalendarDate;
 
   EventTimeIssue? get eventTimeIssue => _eventTimeIssue;
 
@@ -646,6 +649,13 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     _emit();
   }
 
+  /// Changes precision without restoring an old or technical clock.
+  void setAllDay({required bool allDay}) {
+    _applyEventEdit(
+      _eventTimePolicy.changeAllDay(_state.eventDates, allDay: allDay),
+    );
+  }
+
   void setEventEnabled(bool enabled) {
     _state = _state.copyWith(
       eventDates: enabled
@@ -769,6 +779,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
         name: name,
         description: draft.description,
         descriptionDelta: draft.descriptionDelta,
+        allDay: draft.eventDates.allDay,
         startDate: draft.eventDates.startInstantUtc,
         endDate: draft.eventDates.endInstantUtc,
         userEmail: userEmail,

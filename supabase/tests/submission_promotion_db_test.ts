@@ -36,8 +36,9 @@ type SubmissionOverrides = {
   latitude?: number | null;
   longitude?: number | null;
   address?: string | null;
-  startDate?: Date | null;
-  endDate?: Date | null;
+  allDay?: boolean;
+  startDate?: Date | string | null;
+  endDate?: Date | string | null;
   category?: Category;
   createdAt?: Date;
   modifiedAt?: Date;
@@ -198,6 +199,7 @@ async function createSubmission(
       address,
       start_date,
       end_date,
+      all_day,
       category,
       status,
       created_at,
@@ -214,8 +216,17 @@ async function createSubmission(
       ${overrides.latitude ?? null},
       ${overrides.longitude ?? null},
       ${overrides.address ?? null},
-      ${overrides.startDate ?? null},
-      ${overrides.endDate ?? null},
+      ${
+    overrides.startDate instanceof Date
+      ? overrides.startDate.toISOString()
+      : overrides.startDate ?? null
+  }::text::timestamptz,
+      ${
+    overrides.endDate instanceof Date
+      ? overrides.endDate.toISOString()
+      : overrides.endDate ?? null
+  }::text::timestamptz,
+      ${overrides.allDay ?? false},
       ${overrides.category ?? "nature"}::public.content_category,
       ${overrides.status ?? "pending"}::public.submission_status,
       ${overrides.createdAt ?? new Date("2026-08-01T09:00:00.000Z")},
@@ -2580,4 +2591,72 @@ Deno.test("promotion executes only as service_role", async () => {
   } finally {
     await setup.end();
   }
+});
+
+Deno.test("promotion copies all-day and timed midnight from the locked snapshot unchanged", async () => {
+  const setup = client();
+  const registry = newRegistry();
+  await runFixtureScenario(
+    async () => {
+      const city = await createCity(setup, registry);
+      for (
+        const [allDay, startDate, endDate] of [
+          [true, "2026-10-11T22:00:00Z", null],
+          [true, "2026-10-11T22:00:00Z", "2026-10-14T21:59:59.999999Z"],
+          [false, "2026-10-12T00:00:00Z", null],
+        ] as const
+      ) {
+        const fixture = await createSubmission(setup, registry, {
+          city: city.name,
+          latitude: 41.5,
+          longitude: 14.5,
+          allDay,
+          startDate,
+          endDate,
+        });
+        const result = await promoteCreated(
+          setup,
+          registry,
+          fixture.submissionId,
+          "event",
+        );
+        const [copied] = await setup<
+          { mode_matches: boolean; dates_match: boolean }[]
+        >`
+        select e.all_day = s.all_day as mode_matches,
+          e.start_date = s.start_date and e.end_date is not distinct from s.end_date as dates_match
+        from public.content_submissions s join public.events e on e.id = s.promoted_event_id
+        where s.id = ${fixture.submissionId}
+      `;
+        assertEquals(copied, { mode_matches: true, dates_match: true });
+        assertEquals(
+          await promote(setup, fixture.submissionId, "event", handledByUser),
+          { ...result, outcome: "already_promoted" },
+        );
+      }
+      const unready = await createSubmission(setup, registry, {
+        city: city.name,
+        latitude: 41.5,
+        longitude: 14.5,
+        allDay: true,
+        startDate: "2026-10-11T22:00:00Z",
+        category: "unknown",
+      });
+      assertEquals(
+        (await promote(setup, unready.submissionId, "event", handledByUser))
+          .outcome,
+        "category_required",
+      );
+      const [preserved] = await setup<
+        { all_day: boolean; status: string; promoted_event_id: null }[]
+      >`select all_day, status, promoted_event_id from public.content_submissions where id = ${unready.submissionId}`;
+      assertEquals(preserved, {
+        all_day: true,
+        status: "pending",
+        promoted_event_id: null,
+      });
+    },
+    setup,
+    registry,
+  );
 });

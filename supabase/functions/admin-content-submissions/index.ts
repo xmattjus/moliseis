@@ -39,6 +39,7 @@ type AdminSubmissionWire = {
   name: string;
   description: string | null;
   description_delta: Json | null;
+  all_day: boolean;
   start_date: string | null;
   end_date: string | null;
   category: ContentCategoryWire;
@@ -208,6 +209,7 @@ function toSubmissionWire(
     name: submission.name,
     description: submission.description,
     description_delta: submission.description_delta,
+    all_day: submission.all_day,
     start_date: submission.start_date,
     end_date: submission.end_date,
     category: submission.category,

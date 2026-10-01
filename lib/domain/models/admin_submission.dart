@@ -22,6 +22,7 @@ class AdminSubmission {
     List<Map<String, dynamic>>? descriptionDelta,
     this.startDate,
     this.endDate,
+    this.allDay = false,
     required this.category,
     required this.userName,
     required this.userEmail,
@@ -55,6 +56,9 @@ class AdminSubmission {
 
   /// Event end date and time, when this is an event.
   final DateTime? endDate;
+
+  /// Whether a meaningful initial clock is unavailable.
+  final bool allDay;
 
   /// Non-null content category required by the backend schema.
   final ContentCategory category;
@@ -113,6 +117,7 @@ class AdminSubmission {
         ) &&
         other.startDate == startDate &&
         other.endDate == endDate &&
+        other.allDay == allDay &&
         other.category == category &&
         other.userName == userName &&
         other.userEmail == userEmail &&
@@ -134,6 +139,7 @@ class AdminSubmission {
     const DeepCollectionEquality().hash(descriptionDelta),
     startDate,
     endDate,
+    allDay,
     category,
     userName,
     userEmail,
