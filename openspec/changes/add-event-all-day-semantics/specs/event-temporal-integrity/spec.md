@@ -26,3 +26,16 @@ The database SHALL allow both submission dates to be absent when `all_day=false`
 #### Scenario: All-day mode requires a start even without an end
 - **WHEN** a content submission is inserted or updated with `all_day=true`, null start, and null end
 - **THEN** the database rejects the row
+
+## ADDED Requirements
+
+### Requirement: Persisted temporal mode is non-null and defaults to timed
+Submissions and events SHALL persist `all_day` as a non-null boolean defaulting to false. Existing rows SHALL acquire false without heuristic classification or date rewrites, including rows starting at midnight. Temporal schema enforcement SHALL retain the existing interval constraints plus the minimal all-day-start requirement above; it SHALL NOT add complex canonical-shape checks or silent corrective triggers.
+
+#### Scenario: Historical and omitted modes remain false
+- **WHEN** the additive schema is applied to historical rows or a new valid insert omits the mode
+- **THEN** the persisted value is false and existing midnight dates are not reclassified
+
+#### Scenario: Explicit null mode is rejected
+- **WHEN** an insert or update supplies a null temporal mode
+- **THEN** the database rejects that row

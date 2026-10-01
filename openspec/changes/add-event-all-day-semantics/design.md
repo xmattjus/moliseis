@@ -15,6 +15,22 @@ Observed seams:
 
 `improve-admin-submission-editor-workflow` is an existing unimplemented change affecting the same Admin editor. This change adds temporal editing only; it does not require that separate Save/navigation/asset workflow. At execution, integrate with whichever editor version is actually present and preserve the other change's scope and artifacts.
 
+Normative ownership is deliberately separated; this design may connect the whole solution without giving two capabilities the same detailed contract:
+
+| Capability | Normative owner of |
+|---|---|
+| `event-all-day-semantics` | Meaning, canonical Rome representation, cross-cutting propagation, domain transitions, source interpretation, rendering, preserved discovery, minimal decoder compatibility |
+| `event-temporal-input-validity` | Input grammar, public/Admin format rules, validation, shared normalized output |
+| `event-temporal-integrity` | Persisted boolean/default and DB interval invariants |
+| `content-submission-draft-persistence` | Checkpoint/recovery, dirty state, identity, retained final civil date during unresolved timed state |
+| `content-submission-submit-orchestration` | Exact public wire envelope and existing captured-attempt lifecycle |
+| `content-submission-server-idempotency` | Atomic first commit, omitted RPC argument, first-commit-wins replay |
+| `submission-promotion` | Atomic publication propagation from the locked submission |
+
+Cross-capability references consume these contracts rather than restating their detailed rules. Admin read-result hydration stays in the general propagation contract; Admin input grammar belongs to input validity. Database requirements removed from the general capability are retained under temporal integrity.
+
+Verification stays proportional to one developer's workflow: add coverage where the new representation crosses a boundary and retain existing regressions where mode does not alter its semantics. Test grammar and Rome boundary cases in their owning module, importer sufficiency at its persistence payload, representative discovery cases at existing query seams, and one broad E2E path in M6. Do not repeat each shape through every listing/search filter or duplicate E2E in M5.
+
 ## Goals / Non-Goals
 
 **Goals:** Extend existing authoritative write and mapping boundaries with one explicit boolean mode; centralize backend normalization in the current temporal module; retain immutable editing/checkpoint/captured-attempt guarantees; prove the whole path and future adapter sufficiency.
@@ -71,7 +87,7 @@ Change entity inputs, then run `dart run build_runner build --delete-conflicting
 
 Prove reopening an actual prior-model cache, including a previously saved event, and a prior supported draft. Historical boolean values must be false. DTO merge and entity copies must retain `isSaved`. Prove a remote flag-only change advances `modified_at` and is accepted through the existing sync replacement boundary; no new sync mechanism is introduced.
 
-Before editing the DTO, test the decoder from the currently published release with an extra remote key. HEAD alone is not evidence of the deployed release. Identify the release artifact/commit and record it; if unavailable, leave the gate incomplete. A decoder incompatibility requires the minimum proven crash-prevention accommodation before rollout, without version-routing or forced-update infrastructure. Semantic midnight display on old clients is explicitly accepted.
+Verify with a focused regression that the previously published or immediately preceding supported DTO/mapper shape tolerates an additional `all_day` field in a remote event row. If unknown remote fields are ignored as expected, technical compatibility is satisfied. Use the previous release commit/tag when immediately available; otherwise use the closest sufficiently representative preceding decoder shape and document the evidence limitation. Artifact availability alone does not block implementation or require forensic recovery. If decoding fails, prove the minimum technical accommodation before rollout. Semantic support for all-day rendering in older clients is not required, and technical midnight display is accepted. Do not introduce version routing, forced update, remote config, or full old-client startup/synchronization certification.
 
 ### 6. Extend editor and display surfaces, preserving discovery
 
@@ -79,7 +95,7 @@ Public `content_submission_view_model.dart`/`content_submission_fields.dart` and
 
 Update `lib/ui/event/widgets/components/event_formatted_date_time.dart` and audit other direct start-clock renderers so true mode uses Rome dates without a time label. Keep the current multi-day/final-date presentation and false-mode rendering. Do not introduce final-time copy.
 
-Existing `EventViewModel.isEventOnDay`, `_getByDateRange`, `ObjectBoxConditions.visibleEventInCurrentYear`, and search's in-memory annual predicate already express day/year overlap. Add all-day regression fixtures through actual repository/search consumers without rewriting these predicates. Sorting and `getNextEventIds` remain start-based. Recheck actual current-time expiration consumers during implementation; the initial scan found none, so introduce no helper unless a real consumer fails single-day membership. If found, correct it minimally in its owning layer; do not change upcoming semantics or introduce an expression index/general effective-end API.
+Existing `EventViewModel.isEventOnDay`, `_getByDateRange`, `ObjectBoxConditions.visibleEventInCurrentYear`, and search's in-memory annual predicate already express day/year overlap. Audit representative consumers and add a small set of all-day membership/overlap regressions without rewriting these predicates. Existing annual/filter/search regressions remain authoritative; no new mode-specific matrix across names, categories, cities, coordinates, or soft deletion is needed when the shared temporal conditions remain unchanged. Sorting and `getNextEventIds` remain start-based. Recheck actual current-time expiration consumers during implementation; the initial scan found none, so introduce no helper unless a real consumer fails single-day membership. If found, correct it minimally in its owning layer; do not change upcoming semantics or introduce an expression index/general effective-end API.
 
 ## Risks / Trade-offs
 
@@ -87,17 +103,17 @@ Existing `EventViewModel.isEventOnDay`, `_getByDateRange`, `ObjectBoxConditions.
 - [Backend Date serialization truncates the final bound or assumes 24-hour days] → Assert exact microsecond strings and 23/25-hour Rome DST boundaries against existing Flutter primitives.
 - [Checkpoint loses final civil date while timed start is unresolved] → Persist only the necessary pending civil-date projection and exercise toggle/checkpoint/restart/new-clock/submit.
 - [Generated model alters UIDs or flag merge resets saved state] → Inspect generated diffs, reopen a prior-schema store, and exercise real cache merge/sync with saved events.
-- [Published decoder behavior is unverified] → Gate deployment on identified-release decoder evidence; accept old semantic display limitations only after technical compatibility is proven.
+- [Previous decoder rejects an unknown field] → Run the focused preceding-shape regression and apply only an evidenced decoding accommodation; lack of a readily available published artifact is handled by documenting representative evidence, not blocking the whole feature.
 - [Adjacent Admin planning changes the editor during implementation] → Integrate the temporal seam against execution HEAD without implementing or rewriting the other change.
 - [A real expiration consumer misreads null-end all-day start] → Gate on a focused consumer audit and regression; add only an evidenced local correction.
 
 ## Migration Plan
 
-1. Implement and verify the shared temporal grammar/normalizer, preserving legacy accepted forms. Capture the actual released-decoder evidence before DTO changes.
+1. Implement and verify the shared temporal grammar/normalizer, preserving legacy accepted forms. Capture focused preceding-decoder tolerance evidence using a readily available release or representative preceding shape.
 2. Apply the additive local migration and verify database defaults/constraints, RPC compatibility/grants/cache refresh, replay, promotion, and generated database types. Update public/Admin backend contracts together with the Admin client because its full-input contract is intentionally extended.
-3. Extend Flutter models, draft storage/policy, mappings, generator inputs, editors, and rendering. Reopen prior caches and exercise full captured submission → promotion → remote fetch → ObjectBox → display behavior.
-4. Extend prepared importer persistence and prove the four adapter fixture shapes; keep live EventiMolise behavior and dedup unchanged.
-5. Complete focused/full affected verification and the technical gates in `tasks.md`. For deployment: database migration first, then compatible public/backend/Admin releases, then Flutter, then importer; later providers remain separate changes. No adoption-percentage gate is required.
+3. Extend Flutter models, draft storage/policy, mappings, generator inputs, editors, and rendering. Reopen prior caches and verify individual new representation boundaries; reserve the single broad captured-request → publication → cache → display integration path for M6.
+4. Extend prepared importer persistence and prove representative source adapter → prepared event → shared normalization → importer persistence payload fixtures, including timed real midnight and invalid civil input. Keep EventiMolise behavior/dedup unchanged; do not repeat promotion/cache/rendering in M5.
+5. Complete the representative E2E and focused/full affected verification in `tasks.md`. Run affected existing DB runners (temporal invariants, submission idempotency, promotion, and any runner concretely touched by the implementation), not unrelated database suites. For deployment: database migration first, then compatible public/backend/Admin releases, then Flutter, then importer; later providers remain separate changes. No adoption-percentage gate is required.
 6. For rollback stop producing new date-only events before reverting writers/UI. Retain additive columns and already stored mode information; do not silently rewrite new all-day records or drop constraints/data. A previous Flutter release may display midnight but must remain technically compatible under the decoder gate. Destructive schema rollback would require a separate migration and review.
 
-There are no reopened product or architecture decisions. Optional RPC dispatch, released-decoder tolerance, actual expiration-consumer behavior, and generated-model integrity are technical gates with bounded remedies specified above.
+There are no reopened product or architecture decisions. Optional RPC dispatch, preceding-decoder tolerance, actual expiration-consumer behavior, and generated-model integrity are technical gates with bounded remedies specified above.

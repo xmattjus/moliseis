@@ -38,7 +38,7 @@ For the timed/legacy input branch, the shared authoritative request validation u
 ## ADDED Requirements
 
 ### Requirement: Temporal input formats are mutually exclusive
-Public submission validation SHALL accept omitted `all_day` as false for legacy payloads and SHALL reject a present non-boolean flag, including null. With false, civil-date fields SHALL be absent or null and the existing timestamp/date lexical contract and nullable pairing rules SHALL remain valid. With true, request timestamps SHALL be absent or null, `start_calendar_date` SHALL be a required exact Gregorian `YYYY-MM-DD` string, and `end_calendar_date` SHALL be absent/null or an exact Gregorian date on or after the start. Supplying non-null values from both formats SHALL be rejected before privileged persistence. Admin full-input validation SHALL enforce the same mode rules with its explicit field set. Complete validation SHALL apply to both first attempts and replays.
+Public submission validation SHALL accept omitted `all_day` as false for legacy payloads and SHALL reject a present non-boolean flag, including null. With false, civil-date fields SHALL be absent or null and the existing timestamp/date lexical contract and nullable pairing rules SHALL remain valid. With true, request timestamps SHALL be absent or null, `start_calendar_date` SHALL be a required exact Gregorian `YYYY-MM-DD` string, and `end_calendar_date` SHALL be absent/null or an exact Gregorian date on or after the start. Supplying non-null values from both formats SHALL be rejected before privileged persistence. Admin full-input validation SHALL enforce the same mode rules with an explicit complete field set containing `all_day`, `start_date`, `end_date`, `start_calendar_date`, and `end_calendar_date`, using null for unused temporal fields. Non-event input SHALL use false with all temporal fields null; the Admin contract SHALL NOT become a generic PATCH. Complete validation SHALL apply to both first attempts and replays.
 
 #### Scenario: Legacy payload remains timed
 - **WHEN** an otherwise-valid legacy request omits the mode and civil-date fields
@@ -65,7 +65,7 @@ Public submission validation SHALL accept omitted `all_day` as false for legacy 
 - **THEN** validation rejects the range before persistence
 
 ### Requirement: Shared normalization returns only persistible temporal values
-Public, Admin, and importer temporal write boundaries SHALL use the same normalization semantics and produce only `all_day`, `start_date`, and `end_date` for persistence. All-day civil input SHALL resolve to Europe/Rome first/final instants with exact microsecond precision, independently of runtime timezone; legacy/timed values SHALL retain their established meaning and supported fractional precision. Civil input fields SHALL NOT become new database date columns.
+Public, Admin, and importer temporal write boundaries SHALL use the same normalization semantics and produce only `all_day`, `start_date`, and `end_date` for persistence. All-day civil input SHALL be normalized to the canonical persisted representation defined by `event-all-day-semantics`; legacy/timed values SHALL retain their established meaning and supported fractional precision. Civil input fields SHALL NOT become new database date columns.
 
 #### Scenario: Public and Admin normalize the same civil input identically
 - **WHEN** the same valid all-day civil range reaches public and Admin validation

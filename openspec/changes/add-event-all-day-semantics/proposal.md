@@ -9,17 +9,17 @@ Events whose date is known but whose meaningful start time is unavailable cannot
 - Accept mutually exclusive civil-date and existing timed inputs; normalize date-only events to inclusive Europe/Rome bounds through shared backend validation. Extend atomic submission persistence, first-commit-wins replay, promotion, and the existing full-input Admin boundary.
 - Propagate the flag through Flutter domain, wire mapping, DTOs, ObjectBox, synchronization, immutable drafts, and editor transitions; add “Senza orario” and suppress synthetic times in event displays.
 - Extend the existing importer contract and test date-only adapters while keeping EventiMolise timed and its deduplication unchanged. New provider integrations remain separate changes.
-- Preserve inclusive ranges, date-based retrieval, upcoming-event semantics, sorting, and technical compatibility with released clients. Residual RPC, decoder, query-consumer, and generated-model checks are implementation gates, not open architectural decisions.
+- Preserve inclusive ranges, date-based retrieval, upcoming-event semantics, sorting, and technical compatibility through a focused preceding-decoder regression with the additive remote field. No full old-client startup/synchronization certification is required. Residual RPC, decoder, query-consumer, and generated-model checks remain bounded implementation verification, not open architectural decisions.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `event-all-day-semantics`: Normative meaning, Rome normalization, persistence and propagation, draft mode transitions, Admin editing, importer behavior, rendering, and technical legacy compatibility.
+- `event-all-day-semantics`: Normative meaning, canonical Rome representation, cross-cutting propagation and domain mode transitions, source interpretation, rendering, preserved discovery behavior, and minimal decoder compatibility. Dedicated capabilities own input, DB invariants, draft lifecycle, wire, replay, and promotion details.
 
 ### Modified Capabilities
 
-- `event-temporal-integrity`: Permit an entirely absent submission interval only with false mode; retain all existing chronology, retrieval, upcoming, and inclusive-range requirements.
+- `event-temporal-integrity`: Own non-null/default-false persisted mode and permit an entirely absent submission interval only with false mode; retain all existing chronology, retrieval, upcoming, and inclusive-range requirements.
 - `event-temporal-input-validity`: Civil-date mode, Gregorian validity, temporal input mutual exclusion, and shared normalization while retaining the existing timed lexical contract.
 - `content-submission-draft-persistence`: Checkpoint/recovery of the temporal mode and final civil date, with missing `allDay` defaulting to false only for otherwise supported drafts.
 - `content-submission-server-idempotency`: Atomically persist the mode with the first commit and preserve it on replay; omitted RPC flag defaults to false.

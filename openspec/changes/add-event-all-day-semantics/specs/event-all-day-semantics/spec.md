@@ -28,26 +28,11 @@ Every all-day civil date SHALL use Europe/Rome independently of device timezone.
 
 #### Scenario: Explicit same-day final date is valid
 - **WHEN** an all-day event supplies the same initial and final civil date
-- **THEN** normalization accepts it and represents the supplied final date with that day's inclusive final microsecond
+- **THEN** its stored end represents the supplied final date with that day's inclusive final microsecond
 
 #### Scenario: DST days retain their true civil length
 - **WHEN** all-day bounds are normalized for 29 March 2026 or 25 October 2026
 - **THEN** the respective Rome civil intervals have 23 or 25 hours and retain exact inclusive final-microsecond precision
-
-### Requirement: Persisted mode is explicit and defaults to timed
-Submissions and events SHALL persist a non-null boolean `all_day` defaulting to false. Existing remote and local records SHALL acquire false without retroactive classification. A submission with `all_day=true` SHALL require a non-null start at the database boundary on both insert and update. Existing start/end chronological constraints and the published-event required-start rule SHALL remain authoritative. Supported writers SHALL normalize before persistence without silent temporal correction triggers.
-
-#### Scenario: Historical midnight does not become all-day
-- **WHEN** the additive schema is applied to an existing row whose start is midnight
-- **THEN** its mode is false and its dates are not reclassified or rewritten
-
-#### Scenario: Missing all-day start is rejected structurally
-- **WHEN** a submission is inserted or updated with `all_day=true` and null start
-- **THEN** the database rejects it even when its end is null
-
-#### Scenario: Existing interval rules remain enforced
-- **WHEN** either mode is persisted with an inverted interval or a submission has an end without a start
-- **THEN** the existing database temporal invariants reject the row
 
 ### Requirement: Temporal mode survives remote and local data boundaries
 Event and submission domain values SHALL expose a non-null boolean mode. Remote decoding, mapping, local cache persistence, repository access, and synchronization SHALL retain the mode without reinterpretation. Updating only the remote mode SHALL advance the existing remote modification marker and propagate through the existing replacement rules while preserving client-owned saved state. Cache schema evolution SHALL preserve existing identities, data, and saved state, with false for historical records.
@@ -81,21 +66,17 @@ Public and Admin submission editors SHALL offer “Senza orario” through the s
 
 #### Scenario: Non-event editor clears temporal data
 - **WHEN** event mode is disabled in a submission editor
-- **THEN** its persistible mode is false and all temporal request values are null
+- **THEN** its domain draft has false mode and no persistible temporal values
 
-### Requirement: Admin submission operations preserve the temporal mode
-The existing Admin full-input create/update contract SHALL explicitly include `all_day`, `start_date`, `end_date`, `start_calendar_date`, and `end_calendar_date`. Timed and all-day inputs SHALL obey the shared public temporal grammar and normalization; non-event input SHALL contain false and null temporal fields. Admin read/create/update results SHALL carry the stored flag so later edits do not lose it. Existing pending-only, readiness, authorization, and moderation guarantees SHALL remain intact; no new published-event editing path is required.
+### Requirement: Admin editing retains the persisted mode
+Admin read/create/update results SHALL expose the stored temporal mode so later editing preserves it. Admin temporal input SHALL follow `event-temporal-input-validity`; existing pending-only, readiness, authorization, and moderation guarantees remain in force. No new published-event editing path is introduced.
 
-#### Scenario: Admin creates a date-only event submission
-- **WHEN** Admin creates an otherwise valid input with true, civil dates, and null request timestamps
-- **THEN** it stores the canonical timestamps and true mode and returns that mode for hydration
-
-#### Scenario: Admin updates between modes
-- **WHEN** Admin saves a pending submission after a supported mode transition
-- **THEN** the existing full-input update persists normalized dates and mode together without retaining values from the other input format
+#### Scenario: Admin reload preserves the selected mode
+- **WHEN** Admin loads a saved date-only submission or receives a successful create/update result
+- **THEN** its editor retains the stored mode and dates without reinterpreting the technical start as a meaningful clock time
 
 ### Requirement: Import adapters own source interpretation
-An import adapter SHALL explicitly decide whether a source provides a meaningful start time; shared temporal normalization SHALL produce the persistible start, optional end, and mode. Existing EventiMolise imports SHALL remain timed and retain their existing end parsing and Rome-day deduplication behavior. The prepared/import persistence contract SHALL support date-only single-day, timed single-day, date-only multi-day, and timed-start/final-date-only events without another schema, domain, cache, or display change. New live providers and cross-provider deduplication are outside this change.
+An import adapter SHALL explicitly decide whether a source provides a meaningful start time; the interpreted source values SHALL cross the shared normalization contract owned by `event-temporal-input-validity`. Existing EventiMolise imports SHALL remain timed and retain their existing end parsing and Rome-day deduplication behavior. The prepared/import persistence contract SHALL support date-only single-day, timed single-day, date-only multi-day, and timed-start/final-date-only events without another schema, domain, cache, or display change. New live providers and cross-provider deduplication are outside this change.
 
 #### Scenario: Current EventiMolise input stays timed
 - **WHEN** a currently supported EventiMolise source row is prepared and persisted
@@ -103,11 +84,11 @@ An import adapter SHALL explicitly decide whether a source provides a meaningful
 
 #### Scenario: Date-only adapter fixture uses the existing pipeline
 - **WHEN** a test adapter supplies a single civil date or an initial/final civil-date pair without a meaningful start time
-- **THEN** shared normalization produces true and canonical bounds, and the existing importer write preserves them
+- **THEN** the adapter selects true and the existing prepared/import contract carries the resulting date-only event without a new provider framework
 
 #### Scenario: Timed adapter fixture has a final date without time
 - **WHEN** a test adapter supplies a meaningful start time and only a final civil date
-- **THEN** it produces false, retains the start instant, and uses the inclusive final Rome day bound
+- **THEN** the adapter selects false and retains the known start-time meaning under the mixed-precision contract
 
 ### Requirement: All-day display omits synthetic times
 Every event display that currently shows a start time SHALL suppress that time for true mode and derive the displayed civil date in Europe/Rome. It SHALL NOT synthesize “00:00”, “24 ore”, or “Tutto il giorno”. Timed rendering and current final-date visibility SHALL remain unchanged; no final-time display is introduced.
@@ -120,21 +101,20 @@ Every event display that currently shows a start time SHALL suppress that time f
 - **WHEN** the same display receives a timed event, including a real midnight start
 - **THEN** its existing date/time rendering remains in force
 
-### Requirement: Existing discovery and technical legacy behavior remain compatible
-Sorting SHALL continue to use the stored start. Existing day/date-range and annual-overlap retrieval SHALL include date-only events under their current Rome bounds and soft-delete rules. Upcoming-event semantics SHALL remain start-window-based. A real consumer of current-time expiration SHALL NOT treat an all-day single-day event as ended immediately after its technical midnight start; any necessary correction SHALL be confined to that consumer. Released clients SHALL remain able to decode new rows, synchronize, and start; their display of technical midnight is accepted. No minimum-version, forced-update, remote-config, or client-version distribution mechanism is introduced.
-
-#### Scenario: Existing day and year discovery returns all-day events
-- **WHEN** an all-day single-day or cross-year multi-day event intersects the existing requested Rome day, date range, or annual filter
-- **THEN** the existing discovery paths include it under their current filtering rules
-
-#### Scenario: Current-time expiration consumer respects logical day membership
-- **WHEN** an actual expiration consumer evaluates a start-only all-day event during its initial Rome civil day
-- **THEN** it does not mark it ended solely because its normalized midnight start is earlier than now
+### Requirement: Existing discovery behavior is preserved without speculative expiration infrastructure
+Introducing all-day mode SHALL preserve start-based sorting and the upcoming and overlap contracts owned by `event-temporal-integrity`. A focused audit SHALL identify any actual current-time expiration consumer that treats a single-day all-day event as ended at its technical midnight start; only such a demonstrated consumer SHALL receive a minimal owning-layer correction to respect logical Rome-day membership. No preventive effective-end abstraction or expression index is introduced.
 
 #### Scenario: Sorting and upcoming retain the current contract
-- **WHEN** all-day and timed events share a Rome date or an event starts before the upcoming window
-- **THEN** sorting still follows start instants and upcoming membership still depends on the start-window rule
+- **WHEN** all-day events enter existing discovery paths
+- **THEN** start ordering and the established upcoming and overlap rules remain unchanged
 
-#### Scenario: Released client receives the additive field
-- **WHEN** the currently published decoder receives a row with the added `all_day` key
-- **THEN** decoding, synchronization, and startup remain functional without requiring semantic recognition of the flag
+#### Scenario: Actual expiration consumer respects logical day membership
+- **WHEN** the audit finds a consumer that expires a start-only all-day event during its initial Rome day
+- **THEN** a focused correction prevents that demonstrated error without redesigning upcoming or adding a general effective-end API
+
+### Requirement: Previous decoder tolerates the additive remote field
+A previously published or immediately preceding supported DTO/mapper shape SHALL tolerate an additional `all_day` field in a remote event row. Ignoring unknown fields satisfies this technical compatibility requirement; older clients need not understand all-day semantics and their display of technical midnight is accepted. No forced update, minimum-version rule, remote config, version routing, or full old-client startup/synchronization certification is required.
+
+#### Scenario: Previous decoder receives an extra remote key
+- **WHEN** a representative previous decoder processes a valid remote event row with the additional `all_day` key
+- **THEN** decoding succeeds without requiring semantic recognition of the flag
