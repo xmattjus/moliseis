@@ -2,13 +2,14 @@
 
 ### Requirement: Imported event promotion respects existing canonical linkage
 
-Promotion of an imported external-event submission SHALL create a new Event only while its external record remains unlinked. Existing successful promotion retries retain their current durable-link idempotency semantics.
+Promotion of an imported external-event submission SHALL create a new Event only while its external record remains unlinked. Existing successful promotion retries retain their current durable-link idempotency semantics. Default handling SHALL account for the promoted immutable source snapshot; an explicit guarded current-source acknowledgement SHALL instead account for the current source state under the external-event-provenance-moderation contract, without publishing unreviewed Event fields.
 
 #### Scenario: Imported create proposal publishes a new Event
 
 - **GIVEN** a pending imported event submission
 - **AND** its external record has no canonical Event link
 - **AND** all existing event publication readiness checks pass
+- **AND** current-source acknowledgement is absent
 - **WHEN** it is promoted as Event
 - **THEN** exactly one Event SHALL be created
 - **AND** existing source assets SHALL be copied according to current promotion behavior
@@ -33,6 +34,19 @@ Promotion of an imported external-event submission SHALL create a new Event only
 - **WHEN** Event promotion is retried
 - **THEN** the existing `already_promoted` result SHALL be returned
 - **AND** the new source-link guard SHALL NOT replace that idempotent result
+
+#### Scenario: Promotion explicitly acknowledges the newer current source
+
+- **GIVEN** imported pending X is stale, current source is Y, and publication readiness passes
+- **WHEN** promotion handles X with explicit current-source acknowledgement and matching expected_source_hash for Y
+- **THEN** the Event SHALL be created from the reviewed moderated submission X
+- **AND** the watermark SHALL account for Y and enqueue SHALL not produce another Y pending
+
+#### Scenario: Invalid promotion acknowledgement rolls back publication
+
+- **WHEN** a new imported promotion requests current-source acknowledgement for a non-stale pending or a changed expected_source_hash
+- **THEN** it SHALL fail with source_changed
+- **AND** no Event, media, resolution, watermark or enqueue mutation SHALL occur
 
 ### Requirement: Admin publication API exposes linked-source failure
 

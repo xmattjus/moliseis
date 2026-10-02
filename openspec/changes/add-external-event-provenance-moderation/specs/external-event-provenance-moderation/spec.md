@@ -64,6 +64,7 @@ Creating a pending proposal SHALL NOT advance `proposed_*`. Successful reject, l
 #### Scenario: Handling stale X immediately exposes Y
 
 - **GIVEN** X is pending and the current source is Y
+- **AND** explicit current-source acknowledgement is absent
 - **WHEN** X is handled
 - **THEN** the watermark SHALL advance to X
 - **AND** a new pending Y SHALL be created in the same transaction when normal enqueue conditions allow it
@@ -83,6 +84,8 @@ Creating a pending proposal SHALL NOT advance `proposed_*`. Successful reject, l
 
 Every automatic imported pending SHALL be created by one private database helper, conceptually `enqueue_external_event_proposal_if_needed`, while its external record row lock is held. A partial unique index SHALL enforce at most one pending per non-null `external_event_record_id` as structural fallback. The helper SHALL mechanically project already-canonical record state without recanonicalizing or uploading media; store current normalized/hash/version as immutable submission provenance; set `client_submission_id = NULL`; and provide all required non-null contributor identity fields.
 
+For every supported normalized-v1 fixture, TypeScript canonicalizeSubmission of the persisted enqueue-created row SHALL reproduce normalized exactly before any Admin load/Save, including microseconds, temporal mode/range, coordinate string/double round-trip, nulls, category, description/delta, city and name. This SHALL be verified separately from the Admin no-op Save regression.
+
 The helper SHALL return without insertion for ignored records, linked soft-deleted Events, or equal current/proposed hash and version; SHALL return an existing pending if present; and otherwise SHALL insert exactly one current-state pending and return its ID.
 
 Ingest SHALL seed a new source workflow using configured `EXTERNAL_EVENTS_IMPORTER_USER_ID`; its service-role-only RPC SHALL resolve and validate authoritative `auth.users` email/display name through a private tightly permissioned helper. Admin request bodies SHALL NOT supply importer identity. Follow-up proposals after reject/link/apply/promotion SHALL copy `user_id`, `user_email`, and `user_name` from the imported submission just handled. Changing importer configuration SHALL NOT rewrite historical identities.
@@ -93,6 +96,13 @@ Ingest SHALL seed a new source workflow using configured `EXTERNAL_EVENTS_IMPORT
 - **WHEN** enqueue creates the newer pending
 - **THEN** it SHALL have the same required database shape as a proposal created by ingest
 - **AND** its contributor identity SHALL be inherited from the handled imported submission
+
+#### Scenario: SQL enqueue projection reproduces normalized v1 before Admin edits
+
+- **GIVEN** each supported normalized-v1 fixture covering timestamp microseconds, all_day, start/end, canonical coordinate strings → SQL double precision → canonical strings, nulls, category, description/description_delta, city and name
+- **WHEN** the private enqueue boundary creates a persisted content_submissions row and the shared TypeScript canonicalizeSubmission reads that row before any Admin load/Save
+- **THEN** canonicalizeSubmission(persisted row) SHALL equal the original normalized fixture in every field
+- **AND** this regression SHALL remain separate from the Admin no-op Save regression
 
 ### Requirement: Semantic dedup is advisory only
 
@@ -108,7 +118,7 @@ Candidate discovery SHALL distinguish selectable canonical Event candidates from
 
 ### Requirement: Existing Events may be linked without canonical mutation
 
-Linking a pending submission, human or imported, to an existing active Event SHALL accept the submission with `target_event_id` and authenticated `handled_by`, without changing Event fields or media. For imported records, an unlinked record SHALL acquire that Event link, the same existing link SHALL remain valid, and a different target SHALL fail as a relink conflict. Source relinking SHALL NOT occur implicitly. Imported link SHALL advance the watermark and enqueue newer current state atomically.
+After existing same-target already_resolved retry discovery, linking a pending submission, human or imported in either create/update mode, to an existing active Event SHALL require the locked persisted submission.start_date IS NOT NULL. A null start, including human Place-like or malformed/end-only legacy content, SHALL return not_event_submission with HTTP 422 NOT_EVENT_SUBMISSION and no acceptance, canonical link/content/media, watermark or enqueue mutation. The client start-or-end heuristic SHALL NOT determine backend eligibility. A valid new Event link SHALL accept the submission with `target_event_id` and authenticated `handled_by`, without changing Event fields or media. For imported records, an unlinked record SHALL acquire that Event link, the same existing link SHALL remain valid, and a different target SHALL fail as a relink conflict. Source relinking SHALL NOT occur implicitly. Imported link SHALL advance the watermark and enqueue newer current state atomically.
 
 #### Scenario: First provider link establishes canonical target
 
@@ -132,9 +142,41 @@ Linking a pending submission, human or imported, to an existing active Event SHA
 - **THEN** the operation SHALL fail
 - **AND** the source record SHALL remain linked to E1
 
+#### Scenario: Human Place-like submission cannot link to Event
+
+- **GIVEN** a human pending with no Event start
+- **WHEN** link to an existing Event is requested
+- **THEN** resolution SHALL return `not_event_submission` with HTTP 422 `NOT_EVENT_SUBMISSION`
+- **AND** the submission and Event SHALL remain unchanged
+
+#### Scenario: End-only legacy submission cannot link to Event
+
+- **GIVEN** a malformed legacy pending has an end but no start
+- **WHEN** link to an existing Event is requested
+- **THEN** backend resolution SHALL return `not_event_submission` regardless of the client Event heuristic
+- **AND** no resolution, Event, watermark or enqueue mutation SHALL occur
+
+#### Scenario: Valid human Event submission links successfully
+
+- **GIVEN** a human pending has a valid non-null Event start and an active target Event
+- **WHEN** the moderator links it
+- **THEN** it SHALL become accepted with target_event_id and no promoted_event_id
+- **AND** canonical Event fields and media SHALL remain unchanged
+
+### Requirement: Imported Admin editing preserves Event identity
+
+Admin update/Save SHALL inspect authoritative persisted provenance and reject an incoming persisted state with `start_date IS NULL` when `external_event_record_id IS NOT NULL`, returning domain `start_date_required` as HTTP 422 `START_DATE_REQUIRED` without content or resolution changes. Existing pending-only write guards and shared temporal validation SHALL remain in force. Human Place suggestions MAY still have both dates null. The UI SHALL prevent disabling Event mode for imported submissions, but backend validation SHALL remain authoritative for legacy/forged clients. No new content-type column or enum SHALL be introduced. Imported Place promotion SHALL continue to fail through existing `place_has_event_dates` readiness.
+
+#### Scenario: Imported pending cannot lose Event mode through Save
+
+- **GIVEN** an imported pending with a valid persisted start
+- **WHEN** Admin update/Save attempts to remove Event mode and sends null start/end
+- **THEN** the backend SHALL reject with `start_date_required` and HTTP 422 `START_DATE_REQUIRED`
+- **AND** the prior submission state SHALL remain unchanged even if UI controls are bypassed
+
 ### Requirement: Apply uses a known source base and semantic groups
 
-Apply SHALL be available only for pending imported updates whose record links to the requested active Event, with a non-null proposed source base, compatible proposed/submission normalization versions, and matching preview tokens. Human submissions and first-time provider links SHALL be link-only; incompatible versions SHALL return `normalization_mismatch`.
+Apply SHALL be available only for pending imported updates whose record links to the requested active Event, with a non-null proposed source base, compatible proposed/submission normalization versions, and matching preview tokens. Human Event-like submissions and first-time provider links SHALL be link-only; incompatible versions SHALL return `normalization_mismatch`. For every new apply, the moderated persisted schedule SHALL satisfy the existing Event temporal contract, including non-null start, even when schedule is not in groups_to_apply. Null start SHALL return start_date_required (HTTP 422 START_DATE_REQUIRED); inverted chronology SHALL return invalid_date_range (HTTP 422 INVALID_DATE_RANGE). Edge SHALL validate temporal readiness before pending-only canonicalization/merge; SQL SHALL revalidate start/chronology under lock before any group mutation without duplicating canonicalization. Existing already_resolved retry discovery SHALL retain precedence. Invalid apply SHALL mutate no Event group/media, submission resolution, watermark, or enqueue state.
 
 The closed semantic groups SHALL be `name: [name]`, `category: [category]`, `description: [description, description_delta]`, `schedule: [start_date, end_date, all_day]`, and `location: [city, latitude, longitude]`. For each group G, `base = record.proposed_normalized.G`, `source = submission.external_normalized.G`, `moderated = canonicalize(persisted submission).G`, and `event = canonicalize(current Event).G`. The authoritative TypeScript calculation SHALL use:
 
@@ -165,6 +207,13 @@ The Edge Function SHALL compute `groups_to_apply` from authoritative reads using
 - **WHEN** location is selected for apply
 - **THEN** city and coordinate pair SHALL be processed as one group
 - **AND** unresolved active city mapping SHALL fail the entire location apply
+
+#### Scenario: Imported update with invalid schedule cannot apply
+
+- **GIVEN** an imported update whose moderated persisted schedule has null start or inverted chronology
+- **WHEN** a new apply is requested, including when schedule is absent from the requested groups
+- **THEN** it SHALL fail with `start_date_required` or `invalid_date_range` respectively
+- **AND** no Event group, resolution, watermark, media or enqueue mutation SHALL occur
 
 ### Requirement: Preview warns before overwriting canonical editorial state
 
@@ -224,7 +273,9 @@ Rejecting an imported update SHALL mark that entire external revision as reviewe
 
 ### Requirement: Ignore suppresses proposals until explicitly reversed
 
-Imported rejection MAY atomically ignore the record; it SHALL reject the submission, set `ignored_at`, advance the watermark, and evaluate enqueue in that order. Un-ignore SHALL lock the record, clear ignore, resolve inherited technical identity from prior submissions ordered by `handled_at DESC NULLS LAST, id DESC`, and immediately reevaluate enqueue. Without a usable imported identity, un-ignore SHALL fail rather than manufacture one.
+Imported Reject UI and handler SHALL expose the optional ignore_source flag and explain that rejecting a revision marks that complete source revision examined/discarded: its still-present changes SHALL not be independently re-proposed until the provider changes the corresponding group again. Selecting ignore SHALL additionally explain that future revisions of the record are suppressed until explicitly un-ignored. Request bodies SHALL NOT control handled_by. Imported rejection MAY atomically ignore the record; it SHALL reject the submission, set `ignored_at`, advance the watermark, and evaluate enqueue in that order. Un-ignore SHALL lock the record, clear ignore, resolve inherited technical identity from prior submissions ordered by `handled_at DESC NULLS LAST, id DESC`, and immediately reevaluate enqueue. Without a usable imported identity, un-ignore SHALL fail rather than manufacture one, with no partial state change.
+
+The existing Admin dashboard SHALL expose a minimal “Fonti ignorate” filter/list independently of pending submissions. Authenticated Admin Edge operation listIgnoredSources SHALL return ignored record ID, provider/external identity, normalized source name, ignored_at and optional Event ID. Each row SHALL offer “Riattiva fonte”, routed by the Flutter repository and dashboard ViewModel Command to explicit Admin Edge operation unIgnoreSource with external_event_record_id. The Edge SHALL verify Admin identity, reject caller-supplied handled_by, call authoritative set_source_ignored(false), and expose its outcome plus resulting/existing pending ID when present. UI SHALL show success/failure, refresh ignored and pending lists, and offer the returned pending when present. No general source-management subsystem SHALL be introduced.
 
 #### Scenario: Reject and ignore does not recreate pending
 
@@ -239,18 +290,42 @@ Imported rejection MAY atomically ignore the record; it SHALL reject the submiss
 - **THEN** enqueue SHALL run immediately
 - **AND** no additional provider observation SHALL be required
 
+#### Scenario: Ignored source is reachable without a pending
+
+- **GIVEN** an ignored record has no pending submission
+- **WHEN** Admin selects “Fonti ignorate” and chooses “Riattiva fonte” on that row
+- **THEN** the explicit unIgnoreSource Edge path SHALL invoke the authoritative RPC without direct client table access
+- **AND** success SHALL refresh the ignored/pending lists and expose any returned proposal; failure SHALL show the RPC error without changing ignore or watermark state
+
+#### Scenario: Reject explains revision-level and source-ignore effects
+
+- **WHEN** Admin rejects an imported pending
+- **THEN** the UI SHALL explain revision-level discard and offer ignore_source
+- **AND** selecting it SHALL explain suppression until un-ignore and transmit the option through the repository/handler without a caller-controlled handled_by
+
 ### Requirement: Imported submissions do not emit contributor status email
 
-The database status trigger SHALL suppress webhook enqueue whenever `external_event_record_id IS NOT NULL`. `notify-submission-status` SHALL also skip structurally external submissions, including manual retries, and retain the configured importer-UUID check as defense in depth for legacy/pre-backfill rows. This structural filter SHALL deploy before or together with backfill/cut-over.
+The database status trigger SHALL suppress webhook enqueue whenever `external_event_record_id IS NOT NULL`. `notify-submission-status` SHALL also skip structurally external submissions, including manual retries, and retain the configured importer-UUID check as defense in depth for legacy/pre-backfill rows. This structural filter SHALL deploy in the schema/notification-compatibility stage before backfill/cut-over.
 
 #### Scenario: Imported proposal is accepted or rejected
 
 - **WHEN** an imported pending transitions to accepted or rejected
 - **THEN** the status webhook SHALL not be enqueued for that transition
 
+### Requirement: Human Event link retains accepted notification behavior
+
+A human Event-like pending accepted through link with target_event_id and no promoted_event_id SHALL retain ordinary status notification and a valid accepted-email payload using user_name, user_email, name, city and status. The notification workflow SHALL NOT require promoted IDs for this path. The existing template SHALL remain unchanged unless implementation-time evidence demonstrates a real regression. Structurally imported submissions SHALL remain suppressed, with the legacy importer-UUID check as defense in depth.
+
+#### Scenario: Human Event link produces ordinary accepted email
+
+- **GIVEN** a human pending Event submission with valid contributor and content data
+- **WHEN** link to an existing Event sets accepted status and the ordinary notification workflow processes it
+- **THEN** it SHALL produce the normal valid accepted-email payload for that user's email/name and submission name/city despite null promoted_event_id
+- **AND** canonical Event fields/media SHALL remain unchanged
+
 ### Requirement: Source image import is at-most-once per submission
 
-Automatic source-image import SHALL require a service-role-only atomic claim that locks submission then, where needed, external record. It SHALL require an imported pending, an unlinked source record, null prior claim, zero current assets, and a source image in the current observation. It SHALL persist irreversible `source_asset_import_claimed_at` before upload; only the claim winner SHALL upload. The claim SHALL remain after success or failure, and later observations SHALL NOT retry after upload failure or moderator removal.
+After ingest the Edge importer SHALL check an eligible current source image exists in the provider observation AND ingest returned an unlinked pending; only then SHALL it call the claim RPC. Without a source image it SHALL make no claim call. The service-role-only atomic RPC SHALL lock submission then external record and verify exclusively persisted state: imported provenance, pending status, record.event_id IS NULL, null prior source_asset_import_claimed_at, and zero submission assets. The RPC SHALL NOT receive or validate image_available, source image URL, or provider observation data. It SHALL atomically persist irreversible source_asset_import_claimed_at as the claim timestamp; only the claim winner SHALL use the Edge-owned URL to upload and associate the image. The claim SHALL remain after success or failure, and later observations SHALL NOT retry after upload failure or moderator removal.
 
 For migrated legacy imported pending rows, backfill SHALL initialize a non-null claim unless audit positively verifies no prior automatic image attempt. Zero current assets SHALL NOT imply fresh eligibility. A conservative backfill claim SHALL represent migration-time consumption of the attempt budget without fabricating a historical upload time.
 
@@ -260,6 +335,31 @@ Existing `add_submission_assets` SHALL remain authoritative for association. If 
 
 - **WHEN** two runs attempt the same unclaimed imported pending concurrently
 - **THEN** at most one SHALL receive the asset-import claim
+
+#### Scenario: Linked record cannot receive an asset claim
+
+- **GIVEN** the source record already links to an Event
+- **WHEN** an atomic claim is attempted directly
+- **THEN** persisted-state validation SHALL reject the claim without changing its timestamp
+
+#### Scenario: Existing submission assets block an asset claim
+
+- **GIVEN** an otherwise eligible imported pending already has assets
+- **WHEN** an atomic claim is attempted
+- **THEN** it SHALL be rejected without timestamp or asset mutation
+
+#### Scenario: Edge observation without image does not claim
+
+- **GIVEN** ingest returned an unlinked pending but the current observation has no eligible source image
+- **WHEN** Edge orchestrates source assets
+- **THEN** it SHALL call neither claim RPC nor upload
+
+#### Scenario: Edge claims before uploading an eligible image
+
+- **GIVEN** an eligible current source image and an unlinked pending returned by ingest
+- **WHEN** Edge orchestrates the import
+- **THEN** it SHALL call the persisted-state claim RPC before upload
+- **AND** only its successful winner SHALL upload using the Edge-owned URL
 
 #### Scenario: Moderator removes imported image
 
@@ -282,7 +382,7 @@ Existing `add_submission_assets` SHALL remain authoritative for association. If 
 
 ### Requirement: EventiMolise cut-over is evidence-gated
 
-Existing EventiMolise history SHALL migrate only after identity audit of known importer notes for source IDs/URLs, parse-failure and strong-identity duplicate reports, write-free shadow normalization through the production adapter/canonicalizer, explicit historical snapshot/mismatch classification, and remediation. Ambiguous pending histories and duplicate identities mapping to different Events SHALL be resolved before cut-over. Cut-over SHALL create/link records, populate verified immutable provenance, install final staged constraints/indexes, retire semantic dedup, and activate new ingest. It SHALL require zero ambiguous legacy pending rows, zero unresolved strong-identity conflicts, and zero unexplained shadow mismatches; a mismatch-rate threshold SHALL NOT substitute for these gates.
+Existing EventiMolise history SHALL migrate only after identity audit of known importer notes for source IDs/URLs, parse-failure and strong-identity duplicate reports, write-free shadow normalization through the production adapter/canonicalizer, explicit historical snapshot/mismatch classification, and remediation. Ambiguous pending histories and duplicate identities mapping to different Events SHALL be resolved before cut-over. Verified backfill SHALL create/link records, populate verified immutable provenance and install final staged constraints/indexes. Provenance cut-over SHALL then retire the legacy writer/semantic dedup, followed by new ingest activation in the normative rollout order. Cut-over SHALL require zero ambiguous legacy pending rows, zero unresolved strong-identity conflicts, and zero unexplained shadow mismatches; a mismatch-rate threshold SHALL NOT substitute for these gates.
 
 #### Scenario: Ambiguous pending blocks cut-over
 
@@ -353,7 +453,7 @@ Operations owning submission, external record, and Event SHALL lock `content_sub
 
 ### Requirement: Special current-source acknowledgement is explicitly guarded
 
-An explicit “considera valutata anche la versione corrente” selection SHALL advance proposed to current only when the handled submission is actually stale and the supplied `expected_source_hash` equals the locked current source hash. Without this selection, handling SHALL use the immutable handled snapshot and SHALL require no source-hash token.
+Imported detail/preview SHALL expose the pending external_moderation_hash, current moderation_hash and current source snapshot shown to the moderator. The editor SHALL mark the pending stale exactly when these hashes differ and SHALL offer “Considera valutata anche la versione corrente della fonte” only in that state. An explicit selection SHALL travel through Flutter repository and editor ViewModel to the authenticated Edge resolution handler as acknowledge_current_source=true and expected_source_hash exactly matching the displayed current source state; Edge SHALL pass that hash unchanged and derive handled_by from Admin JWT only. The selection SHALL advance proposed to current only when the handled submission is actually stale and the supplied `expected_source_hash` equals the locked current source hash. Without this selection, handling SHALL use the immutable handled snapshot and SHALL require no source-hash token. Non-stale acknowledgement and missing/mismatching expected_source_hash SHALL return source_changed (HTTP 409 SOURCE_CHANGED) without resolution, watermark or enqueue mutation. The UI SHALL reload/review current source state after source_changed and require explicit renewed selection; on success it SHALL show the outcome and reload resolved/follow-up pending state. Existing already_resolved retry precedence SHALL remain unchanged.
 
 #### Scenario: Current-source acknowledgement consumes the observed newer revision
 
@@ -366,6 +466,26 @@ An explicit “considera valutata anche la versione corrente” selection SHALL 
 
 - **WHEN** the special acknowledgement is requested for a non-stale submission or a source hash that no longer matches
 - **THEN** resolution SHALL return `source_changed` without advancing the watermark or persisting resolution
+
+#### Scenario: Stale acknowledgement reaches resolution with the shown hash
+
+- **GIVEN** detail/preview shows stale pending X and current source Y
+- **WHEN** Admin reviews Y, selects the acknowledgement, and handles X through reject/link/apply/promotion
+- **THEN** repository/ViewModel/Edge SHALL preserve Y's shown hash as expected_source_hash
+- **AND** matching locked state SHALL advance proposed to Y and display the successful resolution outcome
+
+#### Scenario: Source changes after the moderator observes it
+
+- **GIVEN** Admin selected acknowledgement for displayed current hash Y
+- **WHEN** source advances before the resolution RPC locks the record
+- **THEN** it SHALL return source_changed as HTTP 409 SOURCE_CHANGED without resolution/watermark/enqueue changes
+- **AND** the UI SHALL reload current state before renewed explicit acknowledgement
+
+#### Scenario: Non-stale pending has no acknowledgement action
+
+- **GIVEN** pending external_moderation_hash equals current moderation_hash
+- **WHEN** Admin renders the editor or a client submits acknowledgement anyway
+- **THEN** UI SHALL offer no acknowledgement action and backend SHALL reject the forged option with source_changed without mutation
 
 ### Requirement: External Admin mode follows current record linkage
 
@@ -438,6 +558,16 @@ A newer pending SHALL retain its own verified immutable snapshot without advanci
 - **WHEN** a migrated record has null proposed
 - **THEN** cut-over SHALL require explicit verified-unhandled evidence
 - **AND** unverifiable accepted/rejected history SHALL NOT pass that gate
+
+### Requirement: Rollout provides complete Admin moderation before provenance cut-over
+
+Deployment SHALL proceed in this order: (1) additive schema, DB guards and notification compatibility; (2) compatible Admin Edge/backend; (3) updated Admin Flutter client; (4) legacy EventiMolise freeze, quiescence and T0; (5) identity audit/shadow/classification/remediation; (6) verified backfill and final gates; (7) provenance cut-over and permanent legacy-writer retirement; (8) provenance-aware EventiMolise importer activation. The updated client with normal update-mode Link/Apply and ignore/stale paths SHALL be available before any external update-mode pending can appear in production, including via backfill. Legacy Promote conflict handling protects integrity but SHALL NOT substitute for rollout readiness. Existing same-Rome-date and irreversible legacy retirement constraints SHALL remain authoritative.
+
+#### Scenario: Updated Admin client is unavailable before backfill
+
+- **WHEN** rollout readiness is checked and the updated client is not yet available for ordinary external update moderation
+- **THEN** legacy freeze/backfill/cut-over and new ingest activation SHALL not proceed
+- **AND** serving PROMOTION_SOURCE_ALREADY_LINKED to legacy clients SHALL not satisfy the readiness gate
 
 ### Requirement: EventiMolise freeze and legacy retirement have explicit boundaries
 

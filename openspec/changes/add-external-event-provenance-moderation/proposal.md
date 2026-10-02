@@ -14,14 +14,17 @@ The change deliberately does not implement public contributor attribution or eve
 -   Link imported `content_submissions` structurally to their source record and retain an immutable canonical source snapshot on each submission.
 -   Enforce at most one pending submission per external record.
 -   Centralize automatic proposal creation in one private database primitive so ingest and moderation follow-up paths create the same database-valid submission shape.
--   Allow a pending suggestion to be linked to an existing Event. Allow source updates to be applied to an already-linked Event only when a known source baseline exists.
+-   Allow an Event-like pending suggestion with a non-null start to be linked to an existing Event. Reject imported Admin Save that removes the required start, and reject invalid moderated schedules before apply. Allow source updates to be applied to an already-linked Event only when a known source baseline exists.
 -   Compute update merge semantics only in shared TypeScript code. SQL owns row locking, concurrency-token validation, closed write-group validation, and atomic persistence; it does not reimplement canonicalization or merge logic.
 -   Protect canonical moderator edits through grouped three-way merge preview and explicit overwrite warnings.
 -   Extend promotion so a source record already linked to an Event cannot create a duplicate Event.
 -   Suppress status-email notifications structurally for imported submissions.
 -   Make imported resolution columns RPC-owned, including all status transitions and durable resolution-link mutations. Preserve same-target link/apply retries before pending-only merge calculation.
 -   Require a valid non-null Event start in normalized v1; gate EventiMolise migration on total watermark classification, a single Rome-date freeze window, and permanent retirement of the legacy writer after cut-over.
--   Make source-image import best-effort and at-most-once per imported submission through an atomic asset-import claim.
+-   Expose imported Reject + ignore, a minimal ignored-source dashboard list with explicit un-ignore, and visible stale-source acknowledgement with the displayed expected_source_hash.
+-   Require the updated Admin client before freeze/backfill/cut-over so external update proposals are normally moderable as soon as they appear.
+-   Make source-image import best-effort and at-most-once per imported submission through an atomic asset-import claim that checks persisted state only; Edge owns source-image eligibility and URL orchestration.
+-   Verify SQL enqueue projection before Admin editing, retain the separate no-op Save regression, and protect ordinary accepted notifications for human Event link.
 -   Backfill the existing EventiMolise history through an audited shadow-mode cut-over rather than heuristic blind migration.
 
 ## Capabilities

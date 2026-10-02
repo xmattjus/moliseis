@@ -1,6 +1,6 @@
 ## Context
 
-Planning is grounded in repository HEAD `6445f42f86baa54b0e55006dee240693775dd623`, revalidated against the supplied baseline `0a57b74d807aad26142e39a9b2c9b4956ad664fd`. The working tree was clean and OpenSpec CLI was 1.12.0. The runtime contracts below remain unchanged between those HEADs. Review of the existing async cron/manual invocation path also requires an operational quiescence gate before T0: disabling scheduling alone does not establish a writer freeze.
+This correction is grounded in authoritative plan baseline and current HEAD `5e047022b1a96250496b55c3d2d1cd8acc227510`; HEAD has not advanced beyond that commit. All change artifacts and affected runtime boundaries were reread. Pre-existing working-tree changes in the Flutter theme and pubspec files are unrelated and remain outside this planning change. The original runtime review used HEAD `6445f42f86baa54b0e55006dee240693775dd623`; the affected contracts below still match the current code. Review of the existing async cron/manual invocation path also requires an operational quiescence gate before T0: disabling scheduling alone does not establish a writer freeze.
 
 The all-day change has now been archived into canonical specs. `event-all-day-semantics` explicitly retains legacy EventiMolise Rome-day deduplication, so this change includes a narrow MODIFIED delta for that requirement. Its temporal semantics are preserved. The other active change is `improve-admin-submission-editor-workflow` (unimplemented tasks); coordinate shared editor boundaries at implementation time without absorbing that change.
 
@@ -26,6 +26,7 @@ Relevant current behavior:
 -   Status notification currently observes `pending -> accepted/rejected`; the notification function additionally skips the configured importer UUID.
 - `promote_content_submission` locks the submission first, retains same-target idempotent retries, creates the target/media transactionally, and then marks the source accepted.
 -   Admin backend errors preserve HTTP status, backend code, and message as `AdminContentSubmissionApiException`.
+-   Admin Save currently permits timed submissions with both dates null, and its editor can disable Event mode; provenance-aware Save needs the explicit backend guard in decision 12. Human accepted email uses contributor/name/city/status data and does not require promoted IDs.
 -   Admin `changeStatus` accepts only `rejected` and explicitly rejects `accepted`; there is no current application reopen operation. Imported legacy-client rejection must be routed through the external transactional reject RPC.
 -   EventiMolise discovery selects source start dates on or after the current Europe/Rome calendar date; the freeze/audit/cut-over window must finish within one such date.
 -   PostgreSQL major version is configured as 17, so `UNIQUE NULLS NOT DISTINCT` is available; remote version remains a pre-deploy verification gate.
@@ -266,6 +267,8 @@ It SHALL:
 
 The helper SHALL NOT upload media.
 
+A separate SQL-projection regression SHALL prove, for every supported normalized-v1 fixture, `normalized → enqueue_external_event_proposal_if_needed → persisted content_submissions → canonicalizeSubmission(persisted row) == normalized` before any Admin load/Save. It SHALL cover timestamp microseconds, all_day, start/end, canonical coordinate strings → SQL double precision → canonical strings, nulls, category, both description fields, city, and name. This tests mechanical projection, not a second SQL canonicalizer. The existing Admin no-op Save regression remains a distinct test.
+
 ### 8. Technical identity is seeded only by ingest and inherited thereafter
 
 For a new external record with no existing imported submission, `import-external-events` obtains `EXTERNAL_EVENTS_IMPORTER_USER_ID` exactly as today.
@@ -359,7 +362,11 @@ A legacy Admin client that attempts Event promotion for an update receives stabl
 
 `link` accepts a pending submission against an existing active Event without changing Event fields or media.
 
-Human submissions may use link.
+Human Event-like submissions may use link. After existing same-target `already_resolved` retry discovery, every new link to an Event SHALL check the locked persisted submission has `start_date IS NOT NULL`, for human, imported create-mode, and imported update-mode submissions alike. A null start SHALL return `not_event_submission`, including legacy malformed/end-only rows, without acceptance, Event/link changes, watermark advancement, or enqueue. No content-type column or enum is introduced.
+
+The normal Admin update/Save backend SHALL read authoritative immutable provenance and reject a validated incoming persisted state with null start when `external_event_record_id IS NOT NULL`, returning `start_date_required` before any content write. Preserve the existing pending-only conditional update and shared temporal validation; this is a provenance-aware backend check, not a blanket required-start rule for human Place suggestions. The imported Event-mode toggle SHALL be disabled in the UI as an additional affordance; backend rejection remains authoritative for old or forged requests.
+
+Use stable domain outcomes and the existing uppercase Edge-error convention: Save/apply `start_date_required` → HTTP 422 `START_DATE_REQUIRED`; link `not_event_submission` → HTTP 422 `NOT_EVENT_SUBMISSION`; apply chronology failure `invalid_date_range` → HTTP 422 `INVALID_DATE_RANGE`. Existing promotion mappings `PROMOTION_START_DATE_REQUIRED` and `PROMOTION_INVALID_DATE_RANGE` remain unchanged. Flutter retains status/code/message through the existing API exception boundary and shows actionable copy.
 
 For imported submissions:
 
@@ -384,13 +391,14 @@ enqueue newer current source state if needed
 `apply` is permitted only when:
 
 -   submission is imported and pending;
+-   its moderated schedule has a non-null start and satisfies existing Event temporal validity;
 - `record.event_id` equals the requested target Event;
 -   target Event is active;
 - `record.proposed_normalized` is non-null;
 -   proposed/submission normalization versions are compatible;
 -   submission and Event concurrency tokens still equal those from the preview.
 
-Human submissions and first-time provider links have no trustworthy source base and are link-only.
+Human Event-like submissions and first-time provider links have no trustworthy source base and are link-only. Place-like human content is not eligible for Event link.
 
 Both link and apply SHALL support authoritative same-target idempotency: an already accepted submission with `target_event_id = requested Event` returns `already_resolved`. A different target remains a conflict.
 
@@ -534,7 +542,7 @@ For `location`, the RPC resolves `submission.city` against an active exact `citi
 
 For `description`, both description fields move together.
 
-For `schedule`, all temporal fields move together.
+For `schedule`, all temporal fields move together. Before pending-only merge orchestration the Edge SHALL validate the moderated Event schedule using the shared temporal contract; the apply RPC SHALL also check locked persisted start and chronology before any group write, even if schedule is absent from groups_to_apply. Null start returns `start_date_required`; inverted chronology returns `invalid_date_range`. Invalid/malformed schedules SHALL fail without Event, media, resolution, watermark, or enqueue changes. SQL performs readiness checks only, not timestamp canonicalization or merge logic. Existing same-target `already_resolved` discovery retains precedence over these new-resolution checks.
 
 The Event row is locked before mutation. Its existing `modified_at` trigger advances the Event synchronization marker.
 
@@ -560,7 +568,7 @@ Therefore, if X was accepted, Y rejected, and Z later arrives, provider change c
 
 Partial acceptance uses normal submission editing followed by apply; Reject is not field-level moderation.
 
-The source-ignore option SHALL explain this revision-level behavior.
+Reject UI/handler SHALL offer `ignore_source` for imported pending submissions. The UI SHALL explain: “Rifiutare una revisione considera quella revisione sorgente esaminata e scartata; le modifiche ancora presenti in revisioni future non vengono riproposte finché il provider non modifica nuovamente il relativo gruppo.” If ignore is selected, it SHALL additionally explain that future source revisions are suppressed until ignore is removed. Human Reject keeps its existing behavior; request bodies cannot choose handled_by.
 
 ### 21. Ignore is reversible
 
@@ -590,9 +598,17 @@ Because `ignored_at` is already set, no replacement pending is created.
 
 No future source observation is required to resume proposals.
 
+The minimum Admin path SHALL be a “Fonti ignorate” filter/list in the existing moderation dashboard, backed by authenticated Admin Edge operation `listIgnoredSources`. It SHALL list only ignored external records, with record ID, provider/external identity, normalized source name, ignored_at, and optional canonical Event ID, without requiring a pending submission. Each row exposes “Riattiva fonte”. No general source editor, registry, relinking, or new CMS is introduced.
+
+“Riattiva fonte” SHALL call explicit Admin Edge operation `unIgnoreSource` with `external_event_record_id`; Edge verifies the Admin JWT, rejects caller-supplied handled_by, and invokes authoritative `set_source_ignored(false)`. The response exposes the RPC outcome and resulting/existing pending ID when present. Flutter repository transports it, the dashboard ViewModel executes a Command, and the UI shows success/failure, refreshes the ignored list and normal pending list, and offers the returned pending for moderation when present. Failed RPC execution leaves ignore/watermark/pending state unchanged; identity remains inherited from prior submissions.
+
 ### 22. Stale source state is enqueued immediately after handling
 
-A pending submission may become stale while open because ingest updates `record.normalized`.
+A pending submission may become stale while open because ingest updates `record.normalized`. Staleness SHALL be defined by `submission.external_moderation_hash != record.moderation_hash`. Imported Admin detail/preview SHALL expose these authoritative hashes and the current source snapshot to be shown to the moderator. The editor SHALL visibly mark stale pending revisions and show the current source state before acknowledgement.
+
+Only for a stale imported pending, the editor SHALL offer “Considera valutata anche la versione corrente della fonte” as an explicit option for reject/link/apply/promotion handling. The Flutter repository SHALL send `acknowledge_current_source = true` with `expected_source_hash` exactly matching the current source version displayed; the ViewModel retains that observation and does not silently replace its hash. With the option off/absent, normal handling retains snapshot-based semantics and requires no source hash.
+
+The Edge handler validates the optional flag/hash, passes the shown hash unchanged to the authoritative resolution RPC, and obtains handled_by only from verified Admin JWT. The RPC checks actual staleness and expected_source_hash under the established locks. Missing/mismatching hash or non-stale acknowledgement returns domain `source_changed` as HTTP 409 `SOURCE_CHANGED` without any partial mutation; the UI reloads source state and requires a new explicit selection after that error. On success, show the outcome and reload the resolved submission/follow-up pending. Already-resolved retries branch before this pending-only calculation and preserve their existing no-write behavior.
 
 When reject/link/apply/promotion handles the current pending:
 
@@ -646,11 +662,12 @@ Successful imported Event promotion additionally, in the same transaction:
 
 ```
 record.event_id = new Event id
-watermark = submission external snapshot
+watermark = submission external snapshot by default
+            or current source under the explicit guarded acknowledgement
 enqueue_if_needed(record)
 ```
 
-If source state changed while the promoted submission was pending, promotion ends with the Event created from the reviewed snapshot and a new pending for the newer source state.
+If source state changed while the promoted submission was pending, ordinary promotion ends with the Event created from the reviewed moderated submission and a new pending for the newer source state. With explicit current-source acknowledgement validated as in decision 22, the watermark instead accounts for current and no already-accounted-for follow-up is enqueued. Acknowledgement does not replace the reviewed Event fields with current provider fields; a failed acknowledgement rolls back publication/resolution too.
 
 ### 25. External submissions never send user status email
 
@@ -666,7 +683,9 @@ The DB notification trigger SHALL not enqueue the status webhook for structurall
 
 `notify-submission-status` SHALL retain the existing importer-UUID check as defense in depth for pre-backfill/legacy rows and SHALL also skip structurally external submissions, including manual retry.
 
-The structural filter SHALL deploy before or together with EventiMolise backfill/cut-over.
+The structural filter SHALL deploy in the schema/notification-compatibility stage before EventiMolise backfill/cut-over.
+
+Human pending Event-like submissions accepted through link have target_event_id and no promoted_event_id, but SHALL retain the ordinary accepted-email workflow. Add a regression through human link → accepted → ordinary status notification, proving a valid recipient and unchanged accepted-email payload based on user_name, user_email, name, city, and status without promoted IDs. Do not alter the template unless implementation-time evidence demonstrates a real regression. External structural exclusion and the legacy importer-UUID defense remain in force.
 
 ### 26. Source asset import is at-most-once per imported submission
 
@@ -674,15 +693,17 @@ The structural filter SHALL deploy before or together with EventiMolise backfill
 
 Create a service-role-only atomic asset-claim boundary.
 
-Before uploading, it SHALL lock the submission, and where required the linked external record, then require:
+After ingest, the Edge importer SHALL first check that the provider observation contains an eligible current source image and ingest returned an unlinked pending submission. Only then SHALL it call the claim RPC. Without such an image or returned pending it SHALL make no claim call. The URL and provider observation remain Edge orchestration data.
 
--   imported pending submission;
--   external record not yet linked to an Event;
-- `source_asset_import_claimed_at IS NULL`;
--   zero current submission assets;
--   a source image is available in the current observation.
+The DB claim RPC SHALL check only persisted state while locking submission then external record in the established relative order:
 
-It then sets `source_asset_import_claimed_at` and returns claimed success.
+-   submission has populated imported provenance;
+-   submission.status = pending;
+-   record.event_id IS NULL;
+-   source_asset_import_claimed_at IS NULL;
+-   submission has zero assets.
+
+The RPC SHALL NOT receive or validate image_available, a source image URL, or provider observation data. On success it atomically sets source_asset_import_claimed_at to the claim timestamp and returns claimed success. The Edge uses its source image URL only after winning the claim and uploads before associating through the existing asset RPC.
 
 Only the winner uploads.
 
@@ -712,7 +733,7 @@ The new client SHALL map this error to actionable copy rather than a generic cra
 
 Migration SHALL NOT infer provenance blindly from all historical submission rows.
 
-The rollout has five phases:
+After schema, compatible backend, and updated Admin client are available and the legacy writer has been frozen with quiescent T0, the migration audit/backfill workflow has five phases:
 
 1.  identity audit: parse EventiMolise source ID/URL from known historical importer notes; report parse failures and duplicate strong identities;
 
@@ -722,7 +743,7 @@ The rollout has five phases:
 
 4.  remediation: manually resolve duplicate source IDs mapping to different canonical Events and every pending row whose immutable historical source snapshot cannot be established;
 
-5.  cut-over: create/link external records, populate immutable submission provenance, apply final constraints/indexes where staged, disable old semantic dedup, and activate new ingest.
+5.  verified backfill and gates: create/link external records, populate immutable submission provenance, apply final constraints/indexes where staged, and verify all cut-over gates. Provenance cut-over/retirement and new ingest activation follow separately in the normative Migration Plan order below.
 
 Release gate:
 
@@ -797,10 +818,18 @@ Any future supported operation that restores a soft-deleted canonical Event SHAL
 
 ## Migration Plan
 
-1. Deploy additive schema foundation and backward-compatible notification/Admin backend, including structural email filtering and source_already_linked mapping before any RPC can emit that outcome. Preserve legacy runtime behavior until cut-over.
-2. Disable the legacy cron writer, prevent new manual legacy invocations, drain queued/in-flight requests and verify quiescence, then record T0 and its Rome date, and execute the complete decision-28 audit/shadow/classification/remediation workflow. Apply verified backfill and final constraints/indexes only when all gates pass; use a fresh attempt if the pre-cut-over date window is exceeded.
-3. Mark provenance cut-over explicitly, permanently retire legacy writes, and activate provenance-aware per-record ingest before the next Rome midnight; then release the updated Admin client.
-4. If rollback is needed after cut-over, stop new ingest while retaining additive schema and provenance. Never schedule the legacy writer again. Before cut-over an abandoned attempt may restore the unchanged legacy writer and discard its audit snapshot.
+The normative rollout SHALL follow this order:
+
+1. Deploy additive schema, DB guards, and notification compatibility. Structural external-email suppression must exist before backfill/resolution.
+2. Deploy compatible Admin Edge/backend, including Event-only Save/link/apply validation, ignore/un-ignore and stale acknowledgement, and source_already_linked → HTTP 409 PROMOTION_SOURCE_ALREADY_LINKED mapping before an RPC can emit that outcome.
+3. Make the updated Admin Flutter client available, including normal update-mode Link/Apply and the complete ignore/stale paths. Verify client/backend compatibility before the freeze; legacy Promote conflict handling protects integrity but is not an acceptable substitute for production moderation readiness.
+4. Freeze the legacy EventiMolise writer, prevent new manual legacy runs, drain queued/in-flight requests, verify quiescence, and record T0 and its Europe/Rome date.
+5. Run identity audit, write-free shadow normalization, total classification, and remediation as specified in decision 28.
+6. Apply verified backfill and final constraints/indexes and pass all cut-over gates. The updated client SHALL already be available before any production external update-mode pending can appear, including through backfill.
+7. Mark provenance cut-over explicitly and permanently retire the legacy writer.
+8. Activate the provenance-aware EventiMolise importer before the next Rome midnight.
+
+The complete freeze-through-activation window SHALL remain within one Europe/Rome calendar date. Before cut-over, a failed or expired attempt is abandoned, its audit snapshot discarded, and the unchanged legacy writer may be restored before retrying with fresh T0. After cut-over, rollback stops new ingest while retaining additive schema and provenance; the legacy writer SHALL never be scheduled or invoked again.
 
 ## Readiness
 
