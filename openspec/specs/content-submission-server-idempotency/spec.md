@@ -26,7 +26,7 @@ Every public Content Submission request SHALL carry a canonical lowercase UUID-v
 - **THEN** each user may create one independently owned submission without learning or replaying the other user's result
 
 ### Requirement: First committed submission wins
-For one authenticated user and client identity, the first transaction that commits SHALL establish the immutable remote submission, its asset set, and its positive backend identifier. Every later otherwise-valid authenticated request with that same ownership key SHALL return the original identifier without inserting, updating, or deleting submission or asset data, even when later request content differs. A replay SHALL NOT turn a pending, accepted, or rejected submission back into another state.
+For one authenticated user and client identity, the first transaction that commits SHALL establish the immutable remote submission, its asset set, and its positive backend identifier. Every later otherwise-valid authenticated request with that same ownership key SHALL return the original identifier without inserting, updating, or deleting submission or asset data, even when later request content, temporal mode, or dates differ. The original `all_day` value and dates SHALL remain unchanged. A replay SHALL NOT turn a pending, accepted, or rejected submission back into another state.
 
 #### Scenario: Sequential equivalent retry replays the acknowledgement
 - **WHEN** the same authenticated user repeats an already committed request with the same client identity
@@ -40,8 +40,12 @@ For one authenticated user and client identity, the first transaction that commi
 - **WHEN** a committed submission has since been accepted or rejected and its original client identity is retried by the same user
 - **THEN** the existing identifier is returned without changing moderation or publication state
 
+#### Scenario: Changed temporal mode replays the first commit
+- **WHEN** an otherwise-valid replay changes true to false or false to true with a valid corresponding temporal payload
+- **THEN** the first committed mode and dates remain unchanged, the original identifier is returned, and no new quota or assets are consumed
+
 ### Requirement: Submission persistence is one atomic operation
-Quota accounting, submission creation, and attachment association for a new idempotency key SHALL commit as one database transaction. Any database error or rejected persistence invariant SHALL leave all three areas unchanged. The operation SHALL reuse the existing authoritative maximum-five asset invariant, preserve the established public-field mapping including storing `unknown` when the validated category is null, and SHALL not expose a partial submission as a successful acknowledgement.
+Quota accounting, submission creation, and attachment association for a new idempotency key SHALL commit as one database transaction. Any database error or rejected persistence invariant SHALL leave all three areas unchanged. The normalized `all_day` value SHALL be part of the same first submission commit as its dates. Omission of the new optional RPC mode argument SHALL mean false. The operation SHALL reuse the existing authoritative maximum-five asset invariant, preserve the established public-field mapping including storing `unknown` when the validated category is null, and SHALL not expose a partial submission as a successful acknowledgement.
 
 #### Scenario: Asset persistence failure rolls back the submission
 - **WHEN** attachment persistence fails after submission creation has begun
@@ -58,6 +62,14 @@ Quota accounting, submission creation, and attachment association for a new idem
 #### Scenario: Null category preserves the existing database default
 - **WHEN** a valid new public request carries a null category
 - **THEN** the committed submission stores `unknown` exactly as the existing public submission path does
+
+#### Scenario: Omitted RPC flag preserves the old caller
+- **WHEN** the prior service-role RPC argument set is invoked through the actual PostgREST boundary without the new mode argument
+- **THEN** it resolves successfully and commits false under the existing atomic quota/submission/asset guarantees
+
+#### Scenario: All-day commit is atomic
+- **WHEN** a new request carries true and normalized valid dates
+- **THEN** mode, dates, submission, assets, and quota commit together or all roll back on failure
 
 ### Requirement: Idempotent replay and quota are concurrency safe
 Database arbitration SHALL serialize quota decisions for each authenticated user while allowing unrelated users to proceed independently. It SHALL preserve the existing fixed 24-hour window anchored by `window_started_at`: a window remains active only while its start is later than the transaction time minus 24 hours, and an expired window resets for the next new submission. Concurrent requests for one user and client identity SHALL create at most one submission and consume quota once. Concurrent new identities SHALL never make the committed count exceed five in the active window. Replays SHALL succeed without creating, resetting, or incrementing quota state even when the user is currently at the limit.
