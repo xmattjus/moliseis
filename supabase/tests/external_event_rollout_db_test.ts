@@ -1,4 +1,9 @@
-import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertThrows,
+} from "jsr:@std/assert@1";
 import postgres from "npm:postgres@3.4.5";
 import { prepareEvent } from "../functions/import-external-events/import_logic.ts";
 import { hashNormalizedExternalEvent } from "../functions/_shared/external_event_normalization.ts";
@@ -6,6 +11,153 @@ import { assertLegacyRestoreAllowed } from "../tools/external_event_rollout_pref
 
 const databaseUrl = Deno.env.get("SUPABASE_DB_URL") ?? "";
 assert(["localhost", "127.0.0.1"].includes(new URL(databaseUrl).hostname));
+
+const legacyJob = "import-external-events-eventimolise";
+const provenanceJob = "import-external-events-eventimolise-provenance";
+
+Deno.test("fresh full migration replay retires legacy cron and leaves provenance activation operator-managed", async () => {
+  const sql = postgres(databaseUrl, { max: 1, onnotice: () => {} });
+  try {
+    const jobs =
+      await sql`select jobname from cron.job where jobname in (${legacyJob},${provenanceJob})`;
+    assertEquals(jobs.map((job) => job.jobname), []);
+  } finally {
+    await sql.end();
+  }
+});
+
+Deno.test("legacy cron retirement is idempotent for absent/present jobs and preserves other operator-managed schedules", async () => {
+  const sql = postgres(databaseUrl, { max: 1, onnotice: () => {} });
+  const migration = await Deno.readTextFile(
+    new URL(
+      "../migrations/20261003225355_retire_legacy_external_event_cron.sql",
+      import.meta.url,
+    ),
+  );
+  try {
+    await sql`begin`;
+    const jobs = async () => {
+      const rows =
+        await sql`select to_jsonb(j) as row from cron.job j order by jobid`;
+      return rows.map((row) => row.row);
+    };
+    const baseline = await jobs();
+    await sql.unsafe(migration);
+    await sql.unsafe(migration);
+    assertEquals(await jobs(), baseline);
+
+    // Harmless commands never leave this rolled-back transaction. No Vault
+    // secrets or network requests are needed to exercise scheduler retirement.
+    const unrelatedJob = `rollout_fixture_${crypto.randomUUID()}`;
+    await sql`select cron.schedule(${unrelatedJob},'0 0 1 1 *','select 1')`;
+    await sql`select cron.schedule(${provenanceJob},'0 22,23 * * *','select 1')`;
+    const preserved = await jobs();
+    await sql`select cron.schedule(${legacyJob},'0 22,23 * * *','select 1')`;
+    const [before] =
+      await sql`select count(*)::int as count from cron.job where jobname=${legacyJob}`;
+    assertEquals(before.count, 1);
+    await sql.unsafe(migration);
+    assertEquals(await jobs(), preserved);
+    await sql.unsafe(migration);
+    assertEquals(await jobs(), preserved);
+  } finally {
+    await sql`rollback`;
+    await sql.end();
+  }
+});
+
+Deno.test("operator activation SQL is executable, idempotent and rejects overlapping legacy scheduling", async () => {
+  const runbook = await Deno.readTextFile(
+    new URL("../tools/external_event_deployment_runbook.md", import.meta.url),
+  );
+  const activation = runbook.split(
+    "## 8. Activate only the provenance-aware importer",
+  )[1]?.split("## Abandonment and rollback")[0];
+  const fenced = activation?.match(/```sql\n([\s\S]*?)```/)?.[1];
+  assert(fenced);
+  assert(/^begin;[\s\S]*commit;\s*$/.test(fenced));
+  // Keep the runbook body exact but own the transaction: scheduled HTTP commands
+  // are never committed or executed and no Vault values are read by this test.
+  const statement = fenced.replace(/^begin;\s*/, "").replace(/commit;\s*$/, "");
+  // pg_cron requires a superuser to create the other-owner regression fixture.
+  // Reuse only the already localhost-validated Supabase database connection;
+  // no role privileges are changed and all fixture work remains rolled back.
+  const localAdminUrl = new URL(databaseUrl);
+  localAdminUrl.username = "supabase_admin";
+  const sql = postgres(localAdminUrl.toString(), {
+    max: 1,
+    onnotice: () => {},
+  });
+  try {
+    await sql`begin`;
+    const jobs = async () => {
+      const rows =
+        await sql`select to_jsonb(j) as row from cron.job j order by jobid`;
+      return rows.map((row) => row.row);
+    };
+    const unrelatedJob = `activation_fixture_${crypto.randomUUID()}`;
+    await sql`select cron.schedule(${unrelatedJob},'0 0 1 1 *','select 1')`;
+    const unrelated = await jobs();
+    await sql.unsafe(statement);
+    const active = await jobs();
+    const provenance = active.filter((job) => job.jobname === provenanceJob);
+    assertEquals(provenance.length, 1);
+    const [job] = provenance;
+    assertEquals(job.schedule, "0 22,23 * * *");
+    assertEquals(job.database, "postgres");
+    assertEquals(job.active, true);
+    const [actor] = await sql`select current_user as username`;
+    assertEquals(job.username, actor.username);
+    assertEquals(
+      active.filter((entry) => entry.jobname === legacyJob).length,
+      0,
+    );
+    assertEquals(
+      active.filter((entry) => entry.jobname !== provenanceJob),
+      unrelated,
+    );
+    assert(job.command.includes("net.http_post("));
+    assert(job.command.includes("import_external_events_function_url"));
+    assert(job.command.includes("import_external_events_cron_secret"));
+    assert(job.command.includes("'x-import-secret'"));
+    assert(/'source'\s*,\s*'eventimolise'/.test(job.command));
+    assert(/'dry_run'\s*,\s*false/.test(job.command));
+    assert(/'limit'\s*,\s*20/.test(job.command));
+    assert(/'mode'\s*,\s*'scheduled'/.test(job.command));
+    assert(/timeout_milliseconds\s*:=\s*120000/.test(job.command));
+    await sql.unsafe(statement);
+    assertEquals(await jobs(), active);
+
+    await sql`select cron.schedule(${legacyJob},'0 22,23 * * *','select 1')`;
+    const overlap = await jobs();
+    await sql`savepoint rejected_activation`;
+    await assertRejects(
+      () => sql.unsafe(statement),
+      Error,
+      "Retire the legacy EventiMolise cron before provenance activation",
+    );
+    await sql`rollback to savepoint rejected_activation`;
+    assertEquals(await jobs(), overlap);
+
+    await sql`select cron.unschedule(jobid) from cron.job where jobname in (${legacyJob},${provenanceJob})`;
+    const [otherActor] =
+      await sql`select rolcanlogin from pg_roles where rolname='authenticator'`;
+    assertEquals(otherActor.rolcanlogin, true);
+    await sql`select cron.schedule_in_database(${provenanceJob},'0 22,23 * * *','select 1','postgres','authenticator',false)`;
+    const otherOwner = await jobs();
+    await sql`savepoint rejected_owner`;
+    await assertRejects(
+      () => sql.unsafe(statement),
+      Error,
+      "Use the existing provenance cron scheduling role before activation",
+    );
+    await sql`rollback to savepoint rejected_owner`;
+    assertEquals(await jobs(), otherOwner);
+  } finally {
+    await sql`rollback`;
+    await sql.end();
+  }
+});
 
 Deno.test("local route withdrawal drains queued/manual legacy writes before T0; post-cutover rollback retains provenance", async () => {
   const sql = postgres(databaseUrl, { max: 3, onnotice: () => {} });

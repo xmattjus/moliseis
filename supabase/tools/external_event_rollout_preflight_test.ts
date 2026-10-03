@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
 import {
   assertLegacyRestoreAllowed,
   assertReadyBeforeLegacyFreeze,
@@ -70,4 +70,53 @@ Deno.test("M9 same-Rome-date success and pre-cutover abandonment require fresh T
     "legacy_writer_permanently_retired",
   );
   assertEquals(restores, 1);
+});
+
+Deno.test("post-cutover runbook names the operator-managed provenance activation and stop explicitly", async () => {
+  const runbook = await Deno.readTextFile(
+    new URL("./external_event_deployment_runbook.md", import.meta.url),
+  );
+  assert(
+    /provenance cron is operator-managed and intentionally not created by schema\s+migrations/
+      .test(runbook),
+  );
+  assert(!/same named schedule|new named schedule/i.test(runbook));
+  const activation = runbook.split(
+    "## 8. Activate only the provenance-aware importer",
+  )[1]?.split("## Abandonment and rollback")[0];
+  assert(activation, "The gated activation step must remain explicit.");
+  const scheduler = activation.match(/```sql\n([\s\S]*?)```/)?.[1];
+  assert(scheduler, "Activation must include executable scheduler SQL.");
+  assert(scheduler.includes("cron.schedule_in_database("));
+  assert(
+    scheduler.includes("'import-external-events-eventimolise-provenance'"),
+  );
+  assert(scheduler.includes("'0 22,23 * * *'"));
+  assert(scheduler.includes("import_external_events_function_url"));
+  assert(scheduler.includes("import_external_events_cron_secret"));
+  assert(scheduler.includes("x-import-secret"));
+  assert(scheduler.includes("120000"));
+  for (
+    const [key, value] of [
+      ["source", "'eventimolise'"],
+      ["dry_run", "false"],
+      ["limit", "20"],
+      ["mode", "'scheduled'"],
+    ]
+  ) {
+    assert(new RegExp(`'${key}'\\s*,\\s*${value}`).test(scheduler));
+  }
+  assert(
+    !/cron\.schedule(?:_in_database)?\(\s*'import-external-events-eventimolise'/
+      .test(runbook),
+    "The runbook must never schedule the retired legacy job.",
+  );
+  const postCutover = runbook.split("**After cut-over:**")[1];
+  assert(
+    postCutover?.includes("import-external-events-eventimolise-provenance"),
+  );
+  assert(
+    postCutover?.includes("cron.unschedule"),
+    "Post-cutover stop must include explicit executable scheduler removal.",
+  );
 });

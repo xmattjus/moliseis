@@ -1,12 +1,29 @@
 # EventiMolise provenance release runbook
 
-Production execution: **NOT_EXECUTED**. This document and the local rehearsals
-prepare tasks 10.7–10.9; they do not certify a production release, the
-production 9.10 report, or production writer quiescence. Execute production
-commands only under a separately authorized release. Keep exports, source
-captures, job configuration, release manifests, and invocation evidence in
-private operator storage. Never print credentials, Vault values, HTTP
-authorization headers, or request headers/bodies to an evidence log.
+Production rollout completed on **2026-10-03**, with subsequent manual smoke/E2E
+reported in the
+[archived final production evidence](../../openspec/changes/archive/2026-10-03-add-external-event-provenance-moderation/implementation-verification.md#production-rollout--2026-10-03-and-subsequent-smokee2e).
+The earlier local rehearsals and `NOT_EXECUTED` entries are historical evidence
+from before production authorization; they do not themselves certify production
+gates. Execute production commands only under a separately authorized release.
+Keep exports, source captures, job configuration, release manifests, and
+invocation evidence in private operator storage. Never print credentials, Vault
+values, HTTP authorization headers, or request headers/bodies to an evidence
+log.
+
+The scheduler names are distinct:
+
+- **Legacy cron job:** `import-external-events-eventimolise`.
+- **Provenance cron job:** `import-external-events-eventimolise-provenance`.
+
+The provenance cron is operator-managed and intentionally not created by schema
+migrations. The post-cutover
+[forward retirement migration](../migrations/20261003225355_retire_legacy_external_event_cron.sql)
+removes the legacy job if present; complete fresh migration replay leaves **both
+names absent**. Replay therefore cannot reactivate the legacy schedule and does
+not authorize provenance activation. The staged prefixes below describe the
+original ordered rollout; the retirement follow-up does not create a scheduler
+or deploy an Edge Function.
 
 The required order is:
 
@@ -123,7 +140,9 @@ supabase functions download import-external-events --project-ref "$release_proje
 Through the authorized database operator connection, disable only the named job:
 
 ```sql
-select cron.unschedule('import-external-events-eventimolise');
+select cron.unschedule(jobid)
+from cron.job
+where jobname = 'import-external-events-eventimolise';
 ```
 
 Withdraw the public/manual invocation route as well. Unscheduling alone does not
@@ -207,8 +226,9 @@ the README's explicit invocation. The tool rechecks the original T0 date after
 its dry-run and immediately before committing the backfill transaction; a
 midnight crossing rolls back. Validate final counts, constraints, snapshots,
 conservative legacy media budgets and exactly explained proposals. Fill the
-production report from actual evidence, not the fixture report. **Its current
-status is NOT_EXECUTED.**
+production report from actual evidence, not the fixture report. A new attempt
+starts as `NOT_EXECUTED`; the completed 2026-10-03 rollout is recorded
+separately in the archived final production evidence linked above.
 
 ## 7. Declare the point of no return
 
@@ -231,34 +251,122 @@ supabase functions deploy import-external-events --project-ref "$release_project
 
 Verify env configuration through private operator tooling. The configured
 `EXTERNAL_EVENTS_IMPORTER_USER_ID` goes only to ingest; the source image URL
-stays in Edge orchestration, never the claim RPC. Recreate the same named
-schedule from its reviewed saved definition (existing `0 22,23 * * *` UTC
-schedule), pointing at the new route. The existing SQL uses Vault entries
-`import_external_events_function_url` and `import_external_events_cron_secret`,
-`x-import-secret`, source `eventimolise`, mode `scheduled`, limit 20 and
-120000ms request timeout. Do not print the resolved Vault secrets or replace
-this with an unprotected invocation. Verify the active job references the
-provenance-aware bundle and the old bundle is not scheduled anywhere. Record
-activation within T0's Rome date and the ordinary smoke-run result.
+stays in Edge orchestration, never the claim RPC. Preserve `verify_jwt = false`;
+the Edge authenticates `x-import-secret`, and all source writes go through
+`ingest_external_event`.
+
+Through the authorized database operator connection, explicitly create or update
+`import-external-events-eventimolise-provenance` with this reviewed definition.
+Execute as the privileged scheduling database role with visibility of all jobs.
+The named scheduling primitive identifies jobs by name and scheduling role;
+rerunning activation as the same role updates that job. If a provenance job
+already belongs to a different role, the guard fails closed instead of creating
+a second same-name schedule. The legacy-job precondition likewise fails closed
+instead of leaving both names active. Do not print the resolved Vault secrets or
+replace this with an unprotected invocation.
+
+```sql
+begin;
+
+do $$
+begin
+  if exists (
+    select 1 from cron.job
+    where jobname = 'import-external-events-eventimolise'
+  ) then
+    raise exception 'Retire the legacy EventiMolise cron before provenance activation';
+  end if;
+  if exists (
+    select 1 from cron.job
+    where jobname = 'import-external-events-eventimolise-provenance'
+      and username <> current_user
+  ) then
+    raise exception 'Use the existing provenance cron scheduling role before activation';
+  end if;
+end;
+$$;
+
+select cron.schedule_in_database(
+  'import-external-events-eventimolise-provenance',
+  '0 22,23 * * *',
+  $provenance_command$
+    select net.http_post(
+      url := (
+        select decrypted_secret from vault.decrypted_secrets
+        where name = 'import_external_events_function_url'
+        limit 1
+      ),
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'x-import-secret', (
+          select decrypted_secret from vault.decrypted_secrets
+          where name = 'import_external_events_cron_secret'
+          limit 1
+        )
+      ),
+      body := jsonb_build_object(
+        'source', 'eventimolise',
+        'dry_run', false,
+        'limit', 20,
+        'mode', 'scheduled'
+      ),
+      timeout_milliseconds := 120000
+    ) as request_id;
+  $provenance_command$,
+  'postgres',
+  null,
+  true
+);
+
+select jobid, jobname, schedule, active
+from cron.job
+where jobname in (
+  'import-external-events-eventimolise',
+  'import-external-events-eventimolise-provenance'
+);
+
+commit;
+```
+
+The schedule has two UTC windows to cover Europe/Rome DST. With
+`mode = scheduled`, the Edge accepts only the invocation falling at 00:xx
+Europe/Rome; the other window does not ingest. Verify exactly one active
+`import-external-events-eventimolise-provenance` job with `0 22,23 * * *`, no
+`import-external-events-eventimolise` job, and no separately scheduled legacy
+bundle. Record activation within T0's Rome date and the ordinary smoke-run
+result.
 
 ## Abandonment and rollback
 
-**Before cut-over:** if the date changes, abandon the attempt,
+**Before cut-over only (historical initial-rollout option):** this branch is no
+longer available for the completed 2026-10-03 cutover. If the date changes
+during an attempt still before its cut-over, abandon the attempt,
 invalidate/discard its audit snapshot and manifest as release inputs, and start
 a later attempt from a fresh freeze/quiescence/T0. The default is to remain
 frozen. Optionally restore only the verified unchanged legacy bundle and saved
-schedule before cut-over, after review proves the current persisted state is
-compatible. A committed backfill is not automatically undone; if it has
-committed and release stops, keep the writer disabled pending review. Do not
-invent a destructive data rollback or silently reuse expired evidence.
+legacy `import-external-events-eventimolise` schedule before cut-over only,
+after review proves the current persisted state is compatible. A committed
+backfill is not automatically undone; if it has committed and release stops,
+keep the writer disabled pending review. Do not invent a destructive data
+rollback or silently reuse expired evidence.
 
-**After cut-over:** stop the new named schedule and withdraw the new importer
-route; drain in-flight provenance-aware requests. Keep additive schema, guards,
-records, immutable source snapshots and assets. Repair/redeploy only a
-compatible provenance-aware importer after review. Do not restore the old
-bundle, reschedule the old city/name/day writer, clear provenance, reset image
-claims or drop tables. An expired activation window after cut-over leaves
-ingestion stopped and the old writer retired.
+**After cut-over:** stop explicitly
+`import-external-events-eventimolise-provenance` and withdraw the
+provenance-aware importer route; drain in-flight provenance-aware requests. The
+idempotent stop is:
+
+```sql
+select cron.unschedule(jobid)
+from cron.job
+where jobname = 'import-external-events-eventimolise-provenance';
+```
+
+Keep additive schema, guards, records, immutable source snapshots and assets.
+Repair/redeploy only a compatible provenance-aware importer after review. Do not
+restore the old bundle, recreate `import-external-events-eventimolise`,
+reschedule the old city/name/day writer, clear provenance, reset image claims or
+drop tables. An expired activation window after cut-over leaves ingestion
+stopped and the old writer retired.
 
 ## Local rehearsal evidence and limits
 
@@ -274,6 +382,8 @@ SQL writes: queued/manual invocations already entered must drain, late requests
 are rejected after route withdrawal, all legacy inserts precede quiescent T0,
 and rollback leaves actual ingestion-created provenance intact. It does not
 delete a production route, freeze a production job, prove platform cancellation
-behavior, or substitute for production invocation evidence. Production 10.8 and
-9.10 remain **NOT_EXECUTED** until the separately authorized release executes
-their gates.
+behavior, or substitute for production invocation evidence. The local rehearsal
+alone left production 10.8 and 9.10 **NOT_EXECUTED**. They were completed
+subsequently during the authorized production rollout; see the appended final
+production evidence. Future releases still require their own actual production
+gate evidence.

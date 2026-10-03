@@ -266,3 +266,135 @@ Tasks10.2–10.4 final local acceptance:212DenoPASS (/tmp/moliseis-m9-final-deno
 Final M9 local certification:10.5/10.6/10.7/10.9 complete. Independent final runbook/token/ACL review has no surviving material finding. Eight-step runbook and evidence-only prefreeze helper require client update/ignore/stale paths BEFOREfreeze; stagedprefix avoids deploying M4outcome before compatibleAdminmapping; latequeued/manual syntheticrequests drain before rawmicrosecondT0, sameRomeDate expiry abandons staleaudit, postcutoverrollback retainsprovenance and neverrestoreslegacy. Rootfreshrollout1PASS (/tmp/moliseis-m9-fresh-external_event_rollout_db_test.log), total12DBfiles166PASS, preflight2included212DenoPASS. LatestfourM9TSfmt/lint/type/bashsyntaxPASS. Scoped source review confirms onlyexternal_event_records newtable, singleTScanonicalizer/noSQLcanon, no newpackage/framework/sourceCMS/revisionledger/status/removal/relink/media-update/Eventrestore/pg_trgm; threeM0unrelatedfilespreserved. Generatedschema comparison/actualRLS/grants reviewed. Strict final output: Change 'add-external-event-provenance-moderation' is valid (exit0). git diff --check exit0/nooutput;49untrackedfiles additionalwhitespacecheck0diagnostics (initial harness mistook no-index normaldiff exit1 forfailure; correctedinterpretation rerun0diagnostics). Disposable553xxstack stopped/removed successfully, original543xxstack remainshealthy. HEAD unchanged4b661b8d0fe83a7e28c9983eb04e4b8a561f7ade; no commit/push/archive/productiondeploy/audit/freeze/backfill/cutover.
 
 Status:96/98tasks checked. 9.10 actualproduction zero-conflict audit/cutoverreport and10.8 actualproduction writerfreeze/drain/quiescence/T0 remain NOT_EXECUTED/unchecked under explicit no-production-release authorization. Tooling/localrehearsals are ready; this is not a declaration that the entire Workstream or release is complete. No open architectural decision or remaining local implementation blocker identified.
+
+
+## Production rollout — 2026-10-03 and subsequent smoke/E2E
+
+This append-only final account records production evidence supplied by the
+operator for this post-cutover remediation. The earlier `NOT_EXECUTED`, unchecked
+9.10/10.8 and 96/98 entries remain accurate historical checkpoints: implementation
+verification ended before production authorization. Tasks 9.10 and 10.8 were
+completed subsequently during the real authorized rollout, explaining their
+checked state in the archived `tasks.md`. This section is the final
+post-deployment account; the remediation itself did not query or change
+production. No missing cutover timestamp, private evidence reference or manual
+canary date is inferred.
+
+### Release boundary and permanent legacy retirement
+
+Baseline/release commit: `d24af726c6e124dff91537d0add7c011ef1209bc`.
+
+T0: `2026-10-03T20:48:51.682622+00:00`.
+
+- Cron `import-external-events-eventimolise` was unscheduled.
+- The legacy `import-external-events` Edge route was retired before migration.
+- Queued/in-flight invocations were drained and writer quiescence was verified
+  before T0.
+- Provenance cutover was subsequently executed. After that boundary,
+  `legacy_writer = PERMANENTLY_RETIRED`; the legacy writer must never be restored.
+  Its exact cutover timestamp was not supplied and is not invented here.
+
+### Legacy remediation, classification and verified backfill
+
+During authorized remediation, 32 unpromoted legacy pending submissions were
+removed. The final classified legacy population was 18: 17 accepted, one
+rejected, zero pending. All 17 accepted submissions were linked one-to-one to
+canonical Events. Classifications were 17 `editorial_baseline` and one
+`rejected_baseline`. There were zero ambiguous pending, zero identity/link
+conflicts and zero unexplained mismatches.
+
+The backfill report recorded:
+
+```text
+execution = VERIFIED_BACKFILL_APPLIED
+production_cutover = NOT_EXECUTED
+classified_records = 18
+explained_pending_proposals = 0
+```
+
+`production_cutover = NOT_EXECUTED` is the backfill report's state at that stage,
+not the final rollout state. The provenance cutover occurred subsequently.
+
+Post-backfill verification recorded:
+
+```text
+records = 18
+linked_events = 17
+invalid_current_state = 0
+null_watermarks = 0
+watermark_differences = 0
+```
+
+### Provenance-aware importer activation
+
+Production Edge Function `import-external-events` was ACTIVE, version 1 after
+delete/recreate. Deployment was observed at `2026-10-03 21:24:35 UTC`.
+`verify_jwt = false`, authentication uses `x-import-secret`, and source writes
+use `ingest_external_event`.
+
+Production cron was `import-external-events-eventimolise-provenance`, schedule
+`0 22,23 * * *`, `active = true`. This is distinct from the retired legacy job.
+The provenance cron is operator-managed and intentionally not created by schema
+migrations; its executable definition is versioned in the release runbook. The
+post-cutover retirement forward migration removes the historical legacy job on
+fresh replay without activating the provenance cron.
+
+### Subsequent manually verified production canary
+
+The operator subsequently verified this real smoke/E2E canary manually. No
+canary timestamp was supplied. Provider/source identity:
+
+```text
+provider = eventimolise
+external_id = 18871
+```
+
+Ingest produced `external_event_record_id = 191` and
+`content_submission_id = 351`, initially `pending`. Its immutable snapshot hash
+matched the current source hash. Source asset claim/upload yielded:
+
+```text
+asset_id = 278
+width = 723
+height = 1024
+mime_type = image/png
+```
+
+There were zero external event records with more than one pending submission.
+Admin correctly loaded the submission as an external Event proposal and showed
+the current source snapshot. The initial category was `unknown`; publication
+readiness was correctly blocked until category selection and Save.
+
+After a category was assigned, **Pubblica come evento** completed successfully:
+
+```text
+submission 351:
+  status = accepted
+  promoted_event_id = 43
+  target_event_id = NULL
+record 191:
+  event_id = 43
+  moderation_hash = proposed_hash
+  normalization_version = proposed_normalization_version
+follow-up pending = none
+```
+
+The verified flow was:
+
+```text
+EventiMolise
+→ provenance ingest
+→ immutable submission snapshot
+→ source asset claim/upload
+→ Admin moderation
+→ canonical Event publication
+→ source/Event linkage
+→ watermark advancement
+
+PRODUCTION E2E: PASS
+```
+
+Link to an existing Event and source-update/three-way-merge were **not** exercised
+manually in production by this canary. They remain covered by the existing
+automated tests described above; this account does not convert automated
+coverage into a manual production verification claim.
