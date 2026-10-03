@@ -1,3 +1,4 @@
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
@@ -29,9 +30,15 @@ abstract class AdminContentSubmissionRepository {
   /// Rejects the pending submission [id].
   ///
   /// Rejection is the only non-promotion moderation transition; acceptance is
-  /// reachable exclusively through [promote], so this interface cannot express
+  /// reachable through [promote], [link] or [apply], so this interface
+  /// cannot express
   /// a direct pending-to-accepted operation.
-  Future<Result<void>> reject(int id);
+  Future<Result<AdminEventResolution>> reject(
+    int id, {
+    bool? ignoreSource,
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  });
 
   /// Publishes the clean, pending submission [id] as the kind of entity named
   /// by [target].
@@ -41,8 +48,45 @@ abstract class AdminContentSubmissionRepository {
   /// like a first success.
   Future<Result<AdminSubmissionPromotion>> promote(
     int id,
-    AdminPromotionTarget target,
+    AdminPromotionTarget target, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  });
+
+  /// Returns advisory matches; pending submissions are not link targets.
+  Future<Result<AdminEventCandidates>> eventCandidates(
+    int id, {
+    String? searchName,
+    int? targetEventId,
+  });
+
+  /// Loads the backend-computed merge and its opaque concurrency tokens.
+  Future<Result<AdminEventMergePreview>> mergePreview(
+    int id,
+    int targetEventId,
   );
+
+  /// Accepts an Event-like submission against an existing Event.
+  Future<Result<AdminEventResolution>> link(
+    int id,
+    int targetEventId, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  });
+
+  /// Applies a preview using its original tokens; groups remain server-owned.
+  Future<Result<AdminEventResolution>> apply(
+    int id,
+    AdminEventMergePreview preview, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  });
+
+  /// Lists ignored sources even when they have no pending proposal.
+  Future<Result<List<AdminIgnoredSource>>> listIgnoredSources();
+
+  /// Removes ignore and immediately asks the backend to reevaluate the source.
+  Future<Result<AdminEventResolution>> unIgnoreSource(int recordId);
 
   /// Persists an uploaded [asset] association for submission [submissionId].
   Future<Result<AdminSubmissionAsset>> addAsset(

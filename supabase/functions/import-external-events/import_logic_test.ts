@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertThrows } from "jsr:@std/assert@1";
 import type { EventiMoliseEvent } from "./eventimolise.ts";
 import {
   buildDedupKey,
@@ -101,4 +101,20 @@ Deno.test("real midnight and incomplete final source time remain timed", () => {
   assertEquals(prepared.allDay, false);
   assertEquals(prepared.startDate, "2026-10-24T22:00:00.000Z");
   assertEquals(prepared.endDate, null);
+});
+
+Deno.test("different strong IDs remain distinct despite semantic listing duplicates", () => {
+  const first = prepareEvent(event({ id: 18008 }));
+  const second = prepareEvent(event({ id: 18009 }));
+  assertEquals(first.normalized, second.normalized);
+  assertEquals(first.provider, "eventimolise");
+  assertEquals(first.occurrenceKey, null);
+  assertEquals(first.externalId, "18008");
+  assertEquals(second.externalId, "18009");
+  assertEquals(Object.keys(first.normalized).length, 10);
+});
+
+Deno.test("adapter rejects invalid Gregorian start before Date can normalize it", () => {
+  assertThrows(() => prepareEvent(event({ date: "2026-02-30" })));
+  assertThrows(() => prepareEvent(event({ time: "24:30" })));
 });

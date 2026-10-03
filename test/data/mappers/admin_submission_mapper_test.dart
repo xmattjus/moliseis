@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
@@ -22,6 +23,84 @@ void main() {
     'modified_at': '2026-08-22T11:00:00+02:00',
     'assets': <Object?>[],
   };
+
+  test(
+    'external provenance is nullable and preserves current source state',
+    () {
+      expect(adminSubmissionFromWire(validWire).externalEvent, isNull);
+      final imported = adminSubmissionFromWire({
+        ...validWire,
+        'external_event_record_id': 12,
+        'external_normalization_version': 1,
+        'external_moderation_hash': 'x',
+        'external_normalized': {'name': 'X'},
+        'moderation_hash': 'y',
+        'current_source_normalized': {'name': 'Y'},
+        'external_mode': 'update',
+        'external_event_id': 42,
+        'target_event_id': null,
+      }).externalEvent!;
+      expect(imported.mode, AdminExternalEventMode.update);
+      expect(imported.eventId, 42);
+      expect(imported.currentSnapshot!['name'], 'Y');
+      expect(imported.stale, isTrue);
+      expect(
+        () => imported.snapshot['name'] = 'changed',
+        throwsUnsupportedError,
+      );
+    },
+  );
+
+  test('separately decoded provenance has value equality and hash', () {
+    final wire = {
+      ...validWire,
+      'external_event_record_id': 12,
+      'external_normalization_version': 1,
+      'external_moderation_hash': 'x',
+      'external_normalized': {'name': 'X'},
+      'moderation_hash': 'y',
+      'current_source_normalized': {'name': 'Y'},
+      'external_mode': 'update',
+      'external_event_id': 42,
+    };
+    final first = adminSubmissionFromWire(wire);
+    final second = adminSubmissionFromWire(wire);
+    expect(first, second);
+    expect(first.hashCode, second.hashCode);
+    for (final changed in [
+      {'moderation_hash': 'z'},
+      {'external_mode': 'create'},
+      {'external_event_id': 43},
+      {'target_event_id': 44},
+    ]) {
+      expect(adminSubmissionFromWire({...wire, ...changed}), isNot(first));
+    }
+  });
+
+  test('preview carries overwrite state and original opaque tokens', () {
+    final preview = adminEventMergePreviewFromWire({
+      'target_event_id': 42,
+      'submission_version_token': '2026-10-02 10:30:00.123456+02',
+      'event_version_token': '2026-10-02T08:30:00.000001Z',
+      'groups': [
+        {
+          'group': 'location',
+          'provider_changed': false,
+          'moderator_changed': true,
+          'apply': true,
+          'overwrite': true,
+          'base': {'city': 'A'},
+          'source': {'city': 'A'},
+          'moderated': {'city': 'B'},
+          'current': {'city': null},
+        },
+      ],
+    });
+    expect(preview.submissionVersionToken, '2026-10-02 10:30:00.123456+02');
+    expect(preview.eventVersionToken, '2026-10-02T08:30:00.000001Z');
+    expect(preview.groups.single.overwrite, isTrue);
+    expect(preview.groups.single.current['city'], isNull);
+  });
 
   group('adminSubmissionInputToWireMap', () {
     test('serializes exactly the twelve editor-owned keys', () {

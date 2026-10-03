@@ -68,6 +68,10 @@ export type Database = {
           description: string | null;
           description_delta: Json | null;
           end_date: string | null;
+          external_event_record_id: number | null;
+          external_moderation_hash: string | null;
+          external_normalization_version: number | null;
+          external_normalized: Json | null;
           handled_at: string | null;
           handled_by: string | null;
           id: number;
@@ -79,6 +83,7 @@ export type Database = {
           promoted_event_id: number | null;
           promoted_place_id: number | null;
           rejection_reason: string | null;
+          source_asset_import_claimed_at: string | null;
           start_date: string | null;
           status: Database["public"]["Enums"]["submission_status"];
           status_email_attempted_at: string | null;
@@ -87,6 +92,7 @@ export type Database = {
           status_email_message_id: string | null;
           status_email_sent_at: string | null;
           status_email_state: string | null;
+          target_event_id: number | null;
           user_email: string;
           user_id: string;
           user_name: string;
@@ -101,6 +107,10 @@ export type Database = {
           description?: string | null;
           description_delta?: Json | null;
           end_date?: string | null;
+          external_event_record_id?: number | null;
+          external_moderation_hash?: string | null;
+          external_normalization_version?: number | null;
+          external_normalized?: Json | null;
           handled_at?: string | null;
           handled_by?: string | null;
           id?: never;
@@ -112,6 +122,7 @@ export type Database = {
           promoted_event_id?: number | null;
           promoted_place_id?: number | null;
           rejection_reason?: string | null;
+          source_asset_import_claimed_at?: string | null;
           start_date?: string | null;
           status?: Database["public"]["Enums"]["submission_status"];
           status_email_attempted_at?: string | null;
@@ -120,6 +131,7 @@ export type Database = {
           status_email_message_id?: string | null;
           status_email_sent_at?: string | null;
           status_email_state?: string | null;
+          target_event_id?: number | null;
           user_email: string;
           user_id: string;
           user_name: string;
@@ -134,6 +146,10 @@ export type Database = {
           description?: string | null;
           description_delta?: Json | null;
           end_date?: string | null;
+          external_event_record_id?: number | null;
+          external_moderation_hash?: string | null;
+          external_normalization_version?: number | null;
+          external_normalized?: Json | null;
           handled_at?: string | null;
           handled_by?: string | null;
           id?: never;
@@ -145,6 +161,7 @@ export type Database = {
           promoted_event_id?: number | null;
           promoted_place_id?: number | null;
           rejection_reason?: string | null;
+          source_asset_import_claimed_at?: string | null;
           start_date?: string | null;
           status?: Database["public"]["Enums"]["submission_status"];
           status_email_attempted_at?: string | null;
@@ -153,11 +170,19 @@ export type Database = {
           status_email_message_id?: string | null;
           status_email_sent_at?: string | null;
           status_email_state?: string | null;
+          target_event_id?: number | null;
           user_email?: string;
           user_id?: string;
           user_name?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "content_submissions_external_event_record_id_fkey";
+            columns: ["external_event_record_id"];
+            isOneToOne: false;
+            referencedRelation: "external_event_records";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "content_submissions_promoted_event_id_fkey";
             columns: ["promoted_event_id"];
@@ -170,6 +195,13 @@ export type Database = {
             columns: ["promoted_place_id"];
             isOneToOne: true;
             referencedRelation: "places";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "content_submissions_target_event_id_fkey";
+            columns: ["target_event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
             referencedColumns: ["id"];
           },
         ];
@@ -229,6 +261,74 @@ export type Database = {
             columns: ["city_id"];
             isOneToOne: false;
             referencedRelation: "cities";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      external_event_records: {
+        Row: {
+          created_at: string;
+          event_id: number | null;
+          external_id: string;
+          id: number;
+          ignored_at: string | null;
+          metadata: NonNullable<Json>;
+          metadata_version: number;
+          moderation_hash: string;
+          modified_at: string;
+          normalization_version: number;
+          normalized: NonNullable<Json>;
+          occurrence_key: string | null;
+          proposed_hash: string | null;
+          proposed_normalization_version: number | null;
+          proposed_normalized: Json | null;
+          provider: string;
+          source_url: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          event_id?: number | null;
+          external_id: string;
+          id?: never;
+          ignored_at?: string | null;
+          metadata?: NonNullable<Json>;
+          metadata_version: number;
+          moderation_hash: string;
+          modified_at?: string;
+          normalization_version: number;
+          normalized: NonNullable<Json>;
+          occurrence_key?: string | null;
+          proposed_hash?: string | null;
+          proposed_normalization_version?: number | null;
+          proposed_normalized?: Json | null;
+          provider: string;
+          source_url?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          event_id?: number | null;
+          external_id?: string;
+          id?: never;
+          ignored_at?: string | null;
+          metadata?: NonNullable<Json>;
+          metadata_version?: number;
+          moderation_hash?: string;
+          modified_at?: string;
+          normalization_version?: number;
+          normalized?: NonNullable<Json>;
+          occurrence_key?: string | null;
+          proposed_hash?: string | null;
+          proposed_normalization_version?: number | null;
+          proposed_normalized?: Json | null;
+          provider?: string;
+          source_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "external_event_records_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
             referencedColumns: ["id"];
           },
         ];
@@ -417,12 +517,72 @@ export type Database = {
           width: number;
         }[];
       };
+      apply_external_event_submission: {
+        Args: {
+          p_acknowledge_current_source?: boolean;
+          p_event_version_token: string;
+          p_expected_source_hash?: string;
+          p_groups_to_apply: (string)[];
+          p_handled_by: string;
+          p_submission_id: number;
+          p_submission_version_token: string;
+          p_target_event_id: number;
+        };
+        Returns: {
+          event_id: number;
+          outcome: string;
+          pending_submission_id: number;
+        }[];
+      };
+      claim_external_event_source_asset: {
+        Args: { p_submission_id: number };
+        Returns: {
+          outcome: string;
+        }[];
+      };
       delete_submission_asset: {
         Args: { p_asset_id: number; p_submission_id: number };
         Returns: string;
       };
+      ingest_external_event: {
+        Args: {
+          p_external_id: string;
+          p_importer_user_id: string;
+          p_metadata: Json;
+          p_metadata_version: number;
+          p_moderation_hash: string;
+          p_normalization_version: number;
+          p_normalized: Json;
+          p_occurrence_key: string;
+          p_provider: string;
+          p_source_url: string;
+        };
+        Returns: {
+          event_id: number;
+          outcome: string;
+          pending_created: boolean;
+          pending_submission_id: number;
+          record_id: number;
+        }[];
+      };
+      link_content_submission_to_event: {
+        Args: {
+          p_acknowledge_current_source?: boolean;
+          p_expected_source_hash?: string;
+          p_handled_by: string;
+          p_submission_id: number;
+          p_target_event_id: number;
+        };
+        Returns: {
+          event_id: number;
+          outcome: string;
+          pending_submission_id: number;
+        }[];
+      };
       promote_content_submission: {
         Args: {
+          p_acknowledge_current_source?: boolean;
+          p_expected_source_hash?: string;
           p_handled_by: string;
           p_submission_id: number;
           p_target: string;
@@ -431,6 +591,26 @@ export type Database = {
           entity_id: number;
           outcome: string;
           target_type: string;
+        }[];
+      };
+      reject_external_event_submission: {
+        Args: {
+          p_acknowledge_current_source?: boolean;
+          p_expected_source_hash?: string;
+          p_handled_by: string;
+          p_ignore_source?: boolean;
+          p_submission_id: number;
+        };
+        Returns: {
+          outcome: string;
+          pending_submission_id: number;
+        }[];
+      };
+      set_source_ignored: {
+        Args: { p_external_event_record_id: number; p_ignored?: boolean };
+        Returns: {
+          outcome: string;
+          pending_submission_id: number;
         }[];
       };
       submit_content: {

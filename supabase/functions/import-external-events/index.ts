@@ -4,7 +4,11 @@ import {
   type SupabaseClient,
 } from "npm:@supabase/supabase-js@2.112.3";
 
-import { validateSubmissionDates } from "../_shared/submission_dates.ts";
+import {
+  canonicalizeExternalEvent,
+  EXTERNAL_EVENT_NORMALIZATION_VERSION,
+  hashNormalizedExternalEvent,
+} from "../_shared/external_event_normalization.ts";
 import type { Database, Json } from "../_shared/database.types.ts";
 import {
   type CloudinaryConfig,
@@ -14,50 +18,125 @@ import {
 import {
   discoverFutureStartDates,
   fetchEventsForDate,
+  isAllowedEventImageUrl,
 } from "./eventimolise.ts";
-import {
-  addDaysToCalendarDate,
-  buildDedupKey,
-  calendarDateInRome,
-  type PreparedExternalEvent,
-  prepareEvent,
-  zonedDateTimeToIso,
-} from "./import_logic.ts";
+import { type PreparedExternalEvent, prepareEvent } from "./import_logic.ts";
 
-/** Writes the prepared source interpretation through the existing importer path. */
-export function insertImportedSubmission(
+export type ExternalEventIngestResult = {
+  record_id: number;
+  event_id: number | null;
+  pending_submission_id: number | null;
+  pending_created: boolean;
+};
+
+/** One observation, one record-scoped transaction; contributor identity stays in DB. */
+export async function ingestExternalEvent(
   admin: SupabaseClient<Database>,
   event: PreparedExternalEvent,
-  importer: { id: string; email: string; name: string },
-) {
-  const temporal = event.allDay
-    ? validateSubmissionDates(
-      null,
-      null,
-      true,
-      calendarDateInRome(event.startDate),
-      event.endDate === null ? null : calendarDateInRome(event.endDate),
-    )
-    : validateSubmissionDates(event.startDate, event.endDate, false);
-  if (!temporal.ok || temporal.value.start_date === null) {
-    throw new Error("Invalid prepared importer dates");
+  importerUserId: string,
+): Promise<ExternalEventIngestResult> {
+  const normalized = canonicalizeExternalEvent(event.normalized);
+  const moderationHash = await hashNormalizedExternalEvent(normalized);
+  type IngestArgs =
+    Database["public"]["Functions"]["ingest_external_event"]["Args"];
+  const args: Omit<IngestArgs, "p_occurrence_key"> & {
+    p_occurrence_key: string | null;
+  } = {
+    p_provider: event.provider,
+    p_external_id: event.externalId,
+    p_occurrence_key: event.occurrenceKey,
+    p_source_url: event.sourceUrl,
+    p_normalized: normalized,
+    p_normalization_version: EXTERNAL_EVENT_NORMALIZATION_VERSION,
+    p_moderation_hash: moderationHash,
+    p_metadata: event.metadata,
+    p_metadata_version: 1,
+    p_importer_user_id: importerUserId,
+  };
+  // Generated PostgreSQL argument metadata omits nullable parameter semantics.
+  // The reviewed RPC explicitly accepts NULL occurrence keys (sent unchanged).
+  const { data, error } = await admin.rpc(
+    "ingest_external_event",
+    args as IngestArgs,
+  );
+  if (error) throw new Error(`External ingest failed: ${error.message}`);
+  if (data?.length !== 1 || data[0].outcome !== "ingested") {
+    throw new Error(
+      `External ingest failed: ${data?.[0]?.outcome ?? "invalid_response"}`,
+    );
   }
-  return admin.from("content_submissions").insert({
-    user_id: importer.id,
-    user_email: importer.email,
-    user_name: importer.name,
-    city: event.city,
-    name: event.name,
-    description: null,
-    description_delta: null,
-    latitude: null,
-    longitude: null,
-    address: null,
-    ...temporal.value,
-    category: "unknown",
-    status: "pending",
-    internal_notes: event.internalNotes,
-  }).select("id").single();
+  const row = data[0];
+  const validId = (value: unknown) =>
+    typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+  if (
+    !validId(row.record_id) ||
+    (row.event_id !== null && !validId(row.event_id)) ||
+    (row.pending_submission_id !== null &&
+      !validId(row.pending_submission_id)) ||
+    typeof row.pending_created !== "boolean" ||
+    (row.pending_created && row.pending_submission_id === null)
+  ) {
+    throw new Error("External ingest failed: invalid_response");
+  }
+  return {
+    record_id: row.record_id,
+    event_id: row.event_id,
+    pending_submission_id: row.pending_submission_id,
+    pending_created: row.pending_created,
+  };
+}
+
+/** Creation budget counts new proposals, never observations of existing identity. */
+export async function ingestPreparedObservations(
+  admin: SupabaseClient<Database>,
+  events: PreparedExternalEvent[],
+  importerUserId: string,
+  limit: number,
+): Promise<
+  {
+    results: Array<
+      { event: PreparedExternalEvent; observation: ExternalEventIngestResult }
+    >;
+    errors: ImportError[];
+    created: number;
+    limitReached: boolean;
+  }
+> {
+  const results: Array<
+    { event: PreparedExternalEvent; observation: ExternalEventIngestResult }
+  > = [];
+  const errors: ImportError[] = [];
+  let created = 0;
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index];
+    try {
+      const observation = await ingestExternalEvent(
+        admin,
+        event,
+        importerUserId,
+      );
+      results.push({ event, observation });
+      if (observation.pending_created) created += 1;
+      if (created >= limit) {
+        return {
+          results,
+          errors,
+          created,
+          limitReached: index + 1 < events.length,
+        };
+      }
+    } catch (error) {
+      addError(errors, {
+        stage: "ingest_event",
+        sourceId: event.sourceId,
+        sourceUrl: event.sourceUrl,
+        message: error instanceof Error
+          ? error.message
+          : "External ingest failed",
+      });
+    }
+  }
+  return { results, errors, created, limitReached: false };
 }
 
 const DEFAULT_LIMIT = 20;
@@ -80,12 +159,6 @@ type ImportError = {
   sourceId?: number;
   sourceUrl?: string;
   date?: string;
-};
-
-type ExistingSubmission = {
-  city: string;
-  name: string;
-  start_date: string | null;
 };
 
 type ImportedAssetDependencies = {
@@ -197,72 +270,6 @@ function addError(errors: ImportError[], error: ImportError): void {
   if (errors.length < MAX_ERRORS_IN_RESPONSE) errors.push(error);
 }
 
-async function loadImporterIdentity(
-  admin: SupabaseClient<Database>,
-): Promise<{ id: string; email: string; name: string }> {
-  const importerId = requiredEnv("EXTERNAL_EVENTS_IMPORTER_USER_ID");
-  const { data, error } = await admin.auth.admin.getUserById(importerId);
-
-  if (error || !data.user) {
-    throw new Error(
-      "Could not load the configured external-events importer user",
-    );
-  }
-
-  const email = data.user.email?.trim();
-  const displayName = typeof data.user.user_metadata?.display_name === "string"
-    ? data.user.user_metadata.display_name.trim()
-    : "";
-
-  if (!email || !displayName) {
-    throw new Error(
-      "External-events importer user requires email and display_name",
-    );
-  }
-
-  return { id: data.user.id, email, name: displayName };
-}
-
-async function loadExistingKeys(
-  admin: SupabaseClient<Database>,
-  events: PreparedExternalEvent[],
-): Promise<Set<string>> {
-  const keys = new Set<string>();
-  if (events.length === 0) return keys;
-
-  const sourceDates = events
-    .map((event) => calendarDateInRome(event.startDate))
-    .sort();
-  const minDate = sourceDates[0];
-  const maxDate = sourceDates.at(-1)!;
-  const lowerBound = zonedDateTimeToIso(minDate, "00:00");
-  const upperBound = zonedDateTimeToIso(
-    addDaysToCalendarDate(maxDate, 1),
-    "00:00",
-  );
-
-  const { data, error } = await admin
-    .from("content_submissions")
-    .select("city,name,start_date")
-    .gte("start_date", lowerBound)
-    .lt("start_date", upperBound);
-
-  if (error) {
-    throw new Error(`Could not load existing submissions: ${error.message}`);
-  }
-
-  for (const row of (data ?? []) as ExistingSubmission[]) {
-    if (!row.start_date) continue;
-    try {
-      keys.add(buildDedupKey(row.city, row.name, row.start_date));
-    } catch {
-      // Ignore an unexpected historic timestamp instead of blocking all imports.
-    }
-  }
-
-  return keys;
-}
-
 async function appendAssetFailureNote(
   admin: SupabaseClient<Database>,
   submissionId: number,
@@ -288,6 +295,47 @@ const defaultImportedAssetDependencies: ImportedAssetDependencies = {
   uploadRemoteImage,
   destroyCloudinaryImage,
 };
+
+/** Current image eligibility belongs to Edge; DB claims only persisted budget/state. */
+export async function importSourceAssetIfEligible(
+  admin: SupabaseClient<Database>,
+  params: {
+    event: Pick<PreparedExternalEvent, "imageUrl">;
+    observation: ExternalEventIngestResult;
+    cloudinary: CloudinaryConfig;
+  },
+  dependencies: ImportedAssetDependencies = defaultImportedAssetDependencies,
+): Promise<"uploaded" | "skipped"> {
+  const { event, observation, cloudinary } = params;
+  if (
+    !event.imageUrl || !isAllowedEventImageUrl(event.imageUrl) ||
+    observation.event_id !== null || observation.pending_submission_id === null
+  ) return "skipped";
+  const { data, error } = await admin.rpc("claim_external_event_source_asset", {
+    p_submission_id: observation.pending_submission_id,
+  });
+  if (error) throw new Error(`Source asset claim failed: ${error.message}`);
+  const outcome = data?.length === 1 ? data[0].outcome : null;
+  if (
+    [
+      "not_found",
+      "not_imported",
+      "not_pending",
+      "source_already_linked",
+      "already_claimed",
+      "assets_present",
+    ].includes(outcome ?? "")
+  ) return "skipped";
+  if (outcome !== "claimed") {
+    throw new Error("Source asset claim returned an invalid outcome");
+  }
+  await uploadAndPersistImportedAsset(admin, {
+    submissionId: observation.pending_submission_id,
+    sourceUrl: event.imageUrl,
+    cloudinary,
+  }, dependencies);
+  return "uploaded";
+}
 
 export async function uploadAndPersistImportedAsset(
   admin: SupabaseClient<Database>,
@@ -386,9 +434,9 @@ export async function handleRequest(request: Request): Promise<Response> {
   const errors: ImportError[] = [];
   const admin = createAdminClient();
 
-  let importer: { id: string; email: string; name: string };
+  let importerUserId: string;
   try {
-    importer = await loadImporterIdentity(admin);
+    importerUserId = requiredEnv("EXTERNAL_EVENTS_IMPORTER_USER_ID");
   } catch (error) {
     console.error(error);
     return jsonResponse({ code: "IMPORTER_USER_INVALID" }, 500);
@@ -443,99 +491,62 @@ export async function handleRequest(request: Request): Promise<Response> {
     left.sourceId - right.sourceId
   );
 
-  const sourceSeen = new Set<string>();
-  const sourceUnique: PreparedExternalEvent[] = [];
-  let sourceDuplicates = 0;
-
-  for (const event of prepared) {
-    if (sourceSeen.has(event.dedupKey)) {
-      sourceDuplicates += 1;
-      continue;
-    }
-    sourceSeen.add(event.dedupKey);
-    sourceUnique.push(event);
-  }
-
-  let existingKeys: Set<string>;
-  try {
-    existingKeys = await loadExistingKeys(admin, sourceUnique);
-  } catch (error) {
-    console.error(error);
-    return jsonResponse({ code: "DEDUP_READ_FAILED" }, 500);
-  }
-
-  const newEvents = sourceUnique.filter((event) =>
-    !existingKeys.has(event.dedupKey)
-  );
-  const existingDuplicates = sourceUnique.length - newEvents.length;
-  const selectedEvents = newEvents.slice(0, parsed.limit);
-  const limitReached = newEvents.length > selectedEvents.length;
-
+  // Every source observation reaches strong-identity ingest. Semantic matches
+  // and repeated listing appearances cannot suppress provenance persistence.
   const baseReport = {
     source: parsed.source,
     dry_run: parsed.dryRun,
     listing_pages: discovery.pagesFetched,
     discovered_dates: discovery.dates.length,
     discovered_events: sourceEvents.length,
-    source_duplicates: sourceDuplicates,
-    existing_duplicates: existingDuplicates,
-    eligible: newEvents.length,
+    eligible: prepared.length,
     skipped_invalid: skippedInvalid,
     limit: parsed.limit,
-    limit_reached: limitReached,
   };
 
   if (parsed.dryRun) {
     return jsonResponse({
       ...baseReport,
-      would_insert: selectedEvents.length,
+      observations_available: prepared.length,
+      would_insert_upper_bound: Math.min(prepared.length, parsed.limit),
       errors,
     });
   }
 
+  const batch = await ingestPreparedObservations(
+    admin,
+    prepared,
+    importerUserId,
+    parsed.limit,
+  );
+  for (const error of batch.errors) addError(errors, error);
   const cloudinary = cloudinaryConfig();
-  let inserted = 0;
+  const inserted = batch.created;
   let assetsUploaded = 0;
   let assetsFailed = 0;
   let withoutAsset = 0;
 
-  for (const event of selectedEvents) {
-    // Re-check the in-memory key immediately before insert so successful rows in
-    // this same run also protect subsequent events.
-    if (existingKeys.has(event.dedupKey)) continue;
-
-    const { data: submission, error: insertError } =
-      await insertImportedSubmission(admin, event, importer);
-
-    if (insertError || !submission) {
-      addError(errors, {
-        stage: "insert_submission",
-        sourceId: event.sourceId,
-        sourceUrl: event.sourceUrl,
-        message: insertError?.message ?? "Submission insert returned no row",
-      });
-      continue;
-    }
-
-    inserted += 1;
-    existingKeys.add(event.dedupKey);
-
-    if (!event.imageUrl) {
-      withoutAsset += 1;
-      continue;
-    }
-
+  for (const { event, observation } of batch.results) {
     try {
-      await uploadAndPersistImportedAsset(admin, {
-        submissionId: submission.id,
-        sourceUrl: event.imageUrl,
+      const asset = await importSourceAssetIfEligible(admin, {
+        event,
+        observation,
         cloudinary,
       });
-
+      if (asset === "skipped") {
+        withoutAsset += 1;
+        continue;
+      }
       assetsUploaded += 1;
     } catch (error) {
       assetsFailed += 1;
-      await appendAssetFailureNote(admin, submission.id, event.internalNotes);
+      if (observation.pending_submission_id !== null) {
+        await appendAssetFailureNote(
+          admin,
+          observation.pending_submission_id,
+          event.internalNotes,
+        );
+      }
       addError(errors, {
         stage: "import_asset",
         sourceId: event.sourceId,
@@ -548,6 +559,8 @@ export async function handleRequest(request: Request): Promise<Response> {
   return jsonResponse({
     ...baseReport,
     inserted,
+    observations_processed: batch.results.length + batch.errors.length,
+    limit_reached: batch.limitReached,
     assets_uploaded: assetsUploaded,
     assets_failed: assetsFailed,
     without_asset: withoutAsset,

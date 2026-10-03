@@ -1,4 +1,5 @@
 import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
@@ -64,6 +65,11 @@ AdminSubmission adminSubmissionFromWire(Object? value) {
       ),
     ),
     assets: assets,
+    externalEvent: _externalEvent(object),
+    targetEventId: _nullablePositiveInt(
+      object['target_event_id'],
+      'target_event_id',
+    ),
   );
 }
 
@@ -255,4 +261,142 @@ List<AdminSubmissionAsset> _assets(Object? value) {
     throw const FormatException('assets is invalid');
   }
   return value.map(adminSubmissionAssetFromWire).toList(growable: false);
+}
+
+AdminExternalEvent? _externalEvent(Map<String, dynamic> object) {
+  final id = _nullablePositiveInt(
+    object['external_event_record_id'],
+    'external_event_record_id',
+  );
+  if (id == null) return null;
+  return AdminExternalEvent(
+    recordId: id,
+    snapshotHash: _required<String>(object, 'external_moderation_hash'),
+    snapshotVersion: _required<int>(object, 'external_normalization_version'),
+    snapshot: _object(object['external_normalized'], 'external_normalized'),
+    mode: switch (object['external_mode']) {
+      null => null,
+      'create' => AdminExternalEventMode.create,
+      'update' => AdminExternalEventMode.update,
+      _ => throw const FormatException('external_mode is invalid'),
+    },
+    eventId: _nullablePositiveInt(
+      object['external_event_id'],
+      'external_event_id',
+    ),
+    currentHash: _nullableString(object['moderation_hash'], 'moderation_hash'),
+    currentSnapshot: object['current_source_normalized'] == null
+        ? null
+        : _object(
+            object['current_source_normalized'],
+            'current_source_normalized',
+          ),
+  );
+}
+
+/// Reads opaque preview tokens without parsing, trimming or reserializing.
+AdminEventMergePreview adminEventMergePreviewFromWire(Object? value) {
+  final object = _object(value, 'preview');
+  final groups = object['groups'];
+  if (groups is! List) throw const FormatException('groups is invalid');
+  return AdminEventMergePreview(
+    targetEventId: _required<int>(object, 'target_event_id'),
+    submissionVersionToken: _required<String>(
+      object,
+      'submission_version_token',
+    ),
+    eventVersionToken: _required<String>(object, 'event_version_token'),
+    currentSourceHash: _nullableString(
+      object['moderation_hash'],
+      'moderation_hash',
+    ),
+    currentSourceSnapshot: object['current_source_normalized'] == null
+        ? null
+        : _object(
+            object['current_source_normalized'],
+            'current_source_normalized',
+          ),
+    groups: groups.map((value) {
+      final group = _object(value, 'group');
+      final name = _required<String>(group, 'group');
+      if (!const {
+        'name',
+        'category',
+        'description',
+        'schedule',
+        'location',
+      }.contains(name)) {
+        throw const FormatException('group is invalid');
+      }
+      return AdminEventMergeGroup(
+        name: name,
+        providerChanged: _required<bool>(group, 'provider_changed'),
+        moderatorChanged: _required<bool>(group, 'moderator_changed'),
+        apply: _required<bool>(group, 'apply'),
+        overwrite: _required<bool>(group, 'overwrite'),
+        base: _object(group['base'], 'base'),
+        source: _object(group['source'], 'source'),
+        moderated: _object(group['moderated'], 'moderated'),
+        current: _object(group['current'], 'current'),
+      );
+    }).toList(),
+  );
+}
+
+/// Candidate warnings remain distinct from canonical targets.
+AdminEventCandidates adminEventCandidatesFromWire(Object? value) {
+  final object = _object(value, 'candidates');
+  List<AdminEventCandidate> read(String key) {
+    final values = object[key];
+    if (values is! List) throw FormatException('$key is invalid');
+    return values.map((value) {
+      final item = _object(value, key);
+      return AdminEventCandidate(
+        id: _required<int>(item, 'id'),
+        name: _required<String>(item, 'name'),
+        city: _nullableString(item['city'], 'city'),
+      );
+    }).toList();
+  }
+
+  return AdminEventCandidates(
+    events: read('events'),
+    pendingWarnings: read('pending_warnings'),
+  );
+}
+
+/// Parses a stable resolution outcome and the optional next revision.
+AdminEventResolution adminEventResolutionFromWire(Object? value) {
+  final object = _object(value, 'resolution');
+  final outcome = _required<String>(object, 'outcome');
+  if (!const {
+    'linked',
+    'applied',
+    'already_resolved',
+    'unignored',
+  }.contains(outcome)) {
+    throw const FormatException('resolution outcome is invalid');
+  }
+  return AdminEventResolution(
+    outcome: outcome,
+    eventId: _nullablePositiveInt(object['target_event_id'], 'target_event_id'),
+    pendingId: _nullablePositiveInt(
+      object['pending_submission_id'],
+      'pending_submission_id',
+    ),
+  );
+}
+
+/// Parses only the metadata exposed by the minimal ignored-source list.
+AdminIgnoredSource adminIgnoredSourceFromWire(Object? value) {
+  final object = _object(value, 'ignored source');
+  return AdminIgnoredSource(
+    id: _required<int>(object, 'id'),
+    provider: _required<String>(object, 'provider'),
+    externalId: _required<String>(object, 'external_id'),
+    name: _required<String>(object, 'name'),
+    ignoredAt: _required<String>(object, 'ignored_at'),
+    eventId: _nullablePositiveInt(object['event_id'], 'event_id'),
+    occurrenceKey: _nullableString(object['occurrence_key'], 'occurrence_key'),
+  );
 }

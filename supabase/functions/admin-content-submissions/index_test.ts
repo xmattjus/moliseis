@@ -13,6 +13,7 @@ import {
 } from "./admin_submission_store.ts";
 import {
   createHandler,
+  eventResolutionResponse,
   type HandlerDependencies,
   resolveNamedOrLegacyKey,
 } from "./index.ts";
@@ -36,6 +37,11 @@ const record: SubmissionRecord = {
   longitude: null,
   promoted_place_id: null,
   promoted_event_id: null,
+  external_event_record_id: null,
+  external_normalized: null,
+  external_normalization_version: null,
+  external_moderation_hash: null,
+  target_event_id: null,
 };
 
 const adminUser = (overrides: Partial<User> = {}): User => ({
@@ -73,6 +79,48 @@ function persistedInput<
 
 class FakeStore implements AdminSubmissionStore {
   calls: string[] = [];
+  applyValues: unknown;
+  applyResult: Awaited<ReturnType<AdminSubmissionStore["apply"]>> = {
+    outcome: "applied",
+    eventId: 19,
+    pendingSubmissionId: null,
+  };
+  apply(params: Parameters<AdminSubmissionStore["apply"]>[0]) {
+    this.calls.push("apply");
+    this.applyValues = params;
+    return Promise.resolve(this.applyResult);
+  }
+
+  linkValues: unknown;
+  linkResult: Awaited<ReturnType<AdminSubmissionStore["link"]>> = {
+    outcome: "linked",
+    eventId: 19,
+    pendingSubmissionId: null,
+  };
+  link(params: Parameters<AdminSubmissionStore["link"]>[0]) {
+    this.calls.push("link");
+    this.linkValues = params;
+    return Promise.resolve(this.linkResult);
+  }
+
+  ignoredSources: Awaited<
+    ReturnType<AdminSubmissionStore["listIgnoredSources"]>
+  > = [];
+  unIgnoreResult: Awaited<ReturnType<AdminSubmissionStore["unIgnoreSource"]>> =
+    { outcome: "unignored", pendingSubmissionId: 9 };
+  listIgnoredSources() {
+    this.calls.push("listIgnoredSources");
+    return this.error
+      ? Promise.reject(this.error)
+      : Promise.resolve(this.ignoredSources);
+  }
+  unIgnoreSource(id: number) {
+    this.calls.push(`unIgnoreSource:${id}`);
+    return this.error
+      ? Promise.reject(this.error)
+      : Promise.resolve(this.unIgnoreResult);
+  }
+
   createValues: unknown;
   updateValues: unknown;
   statusValues: unknown;
@@ -114,6 +162,24 @@ class FakeStore implements AdminSubmissionStore {
     return this.listResult;
   }
 
+  externalRecordResult: Awaited<
+    ReturnType<AdminSubmissionStore["getExternalRecord"]>
+  > = null;
+  eventResult: Awaited<ReturnType<AdminSubmissionStore["getEvent"]>> = null;
+  getExternalRecord(): ReturnType<AdminSubmissionStore["getExternalRecord"]> {
+    this.calls.push("getExternalRecord");
+    return Promise.resolve(this.externalRecordResult);
+  }
+  getEvent(): ReturnType<AdminSubmissionStore["getEvent"]> {
+    this.calls.push("getEvent");
+    return Promise.resolve(this.eventResult);
+  }
+  findEventCandidates(): ReturnType<
+    AdminSubmissionStore["findEventCandidates"]
+  > {
+    this.calls.push("findEventCandidates");
+    return Promise.resolve({ events: [], pending_warnings: [] });
+  }
   async getById(): ReturnType<AdminSubmissionStore["getById"]> {
     this.calls.push("getById");
     if (this.error) throw this.error;
@@ -320,18 +386,27 @@ Deno.test("maps list and detail DTOs without exposing internal fields", async ()
       "category",
       "city",
       "created_at",
+      "current_source_normalized",
       "description",
       "description_delta",
       "end_date",
+      "external_event_id",
+      "external_event_record_id",
+      "external_mode",
+      "external_moderation_hash",
+      "external_normalization_version",
+      "external_normalized",
       "id",
       "latitude",
       "longitude",
+      "moderation_hash",
       "modified_at",
       "name",
       "promoted_event_id",
       "promoted_place_id",
       "start_date",
       "status",
+      "target_event_id",
       "user_email",
       "user_name",
     ],
@@ -370,7 +445,14 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   assertEquals(listResponse.status, 200);
   assertEquals(
     (await responseJson(listResponse)).submissions,
-    [{ ...locatedRecord, assets: [] }],
+    [{
+      ...locatedRecord,
+      assets: [],
+      moderation_hash: null,
+      current_source_normalized: null,
+      external_mode: null,
+      external_event_id: null,
+    }],
   );
 
   const detailedStore = new FakeStore();
@@ -382,7 +464,16 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   assertEquals(detailResponse.status, 200);
   assertEquals(
     await responseJson(detailResponse),
-    { submission: { ...locatedRecord, assets: [] } },
+    {
+      submission: {
+        ...locatedRecord,
+        assets: [],
+        moderation_hash: null,
+        current_source_normalized: null,
+        external_mode: null,
+        external_event_id: null,
+      },
+    },
   );
 
   const createdInput = {
@@ -414,7 +505,16 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   });
   assertEquals(
     await responseJson(createResponse),
-    { submission: { ...locatedRecord, assets: [] } },
+    {
+      submission: {
+        ...locatedRecord,
+        assets: [],
+        moderation_hash: null,
+        current_source_normalized: null,
+        external_mode: null,
+        external_event_id: null,
+      },
+    },
   );
 
   const updatedInput = {
@@ -443,7 +543,16 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   ]);
   assertEquals(
     await responseJson(updateResponse),
-    { submission: { ...clearedRecord, assets: [] } },
+    {
+      submission: {
+        ...clearedRecord,
+        assets: [],
+        moderation_hash: null,
+        current_source_normalized: null,
+        external_mode: null,
+        external_event_id: null,
+      },
+    },
   );
 });
 
@@ -500,7 +609,15 @@ Deno.test("maps pending-guarded update outcomes without collapsing 409", async (
     "2026-08-21T11:00:00.000Z",
   ]);
   assertEquals(await responseJson(updatedResponse), {
-    submission: { ...record, status: "pending", assets: [] },
+    submission: {
+      ...record,
+      status: "pending",
+      assets: [],
+      moderation_hash: null,
+      current_source_normalized: null,
+      external_mode: null,
+      external_event_id: null,
+    },
   });
 
   const missing = testHandler();
@@ -897,4 +1014,660 @@ Deno.test("Admin handler creates, reads and updates both temporal modes without 
     assertEquals(detail.start_date, created.start_date);
     assertEquals(detail.end_date, created.end_date);
   }
+});
+
+Deno.test("Reject ignore reaches store with verified actor and returns follow-up pending", async () => {
+  const store = new FakeStore();
+  store.statusResults = [{ outcome: "updated", pendingSubmissionId: 9 }];
+  const handler = createHandler({
+    authenticate: () => Promise.resolve(adminUser()),
+    createStore: () => store,
+    nowIso: () => "observed-now",
+  });
+  const response = await handler(
+    new Request("http://localhost", {
+      method: "POST",
+      headers: { Authorization: "Bearer jwt" },
+      body: JSON.stringify({
+        operation: "changeStatus",
+        submission_id: 7,
+        status: "rejected",
+        ignore_source: true,
+      }),
+    }),
+  );
+  assertEquals(response.status, 200);
+  assertEquals(store.statusValues, {
+    id: 7,
+    status: "rejected",
+    handledBy: adminUser().id,
+    modifiedAt: "observed-now",
+    ignoreSource: true,
+  });
+  assertEquals(await response.json(), {
+    ok: true,
+    status: "rejected",
+    pending_submission_id: 9,
+  });
+});
+
+Deno.test("Ignored source list and un-ignore are Admin-only, reachable without pending, and expose outcome", async () => {
+  const body = { operation: "unIgnoreSource", external_event_record_id: 19 };
+  const request = (payload: unknown) =>
+    new Request("http://localhost", {
+      method: "POST",
+      headers: { Authorization: "Bearer jwt" },
+      body: JSON.stringify(payload),
+    });
+  for (const operation of ["listIgnoredSources", "unIgnoreSource"]) {
+    let constructed = false;
+    const denied = createHandler({
+      authenticate: () => Promise.resolve(adminUser({ app_metadata: {} })),
+      createStore: () => {
+        constructed = true;
+        return new FakeStore();
+      },
+      nowIso: () => "now",
+    });
+    assertEquals(
+      (await denied(
+        request(operation === "listIgnoredSources" ? { operation } : body),
+      )).status,
+      403,
+    );
+    assertEquals(constructed, false);
+  }
+  const store = new FakeStore();
+  store.getResult = null;
+  store.ignoredSources = [{
+    id: 19,
+    provider: "eventimolise",
+    external_id: "2",
+    occurrence_key: null,
+    name: "Ignored",
+    ignored_at: "now",
+    event_id: null,
+  }];
+  const handler = createHandler({
+    authenticate: () => Promise.resolve(adminUser()),
+    createStore: () => store,
+    nowIso: () => "now",
+  });
+  const listed = await handler(request({ operation: "listIgnoredSources" }));
+  assertEquals(await listed.json(), { sources: store.ignoredSources });
+  const response = await handler(request(body));
+  assertEquals(response.status, 200);
+  assertEquals(await response.json(), {
+    outcome: "unignored",
+    pending_submission_id: 9,
+  });
+  assertEquals(store.calls, ["listIgnoredSources", "unIgnoreSource:19"]);
+  store.unIgnoreResult = { outcome: "not_found" };
+  assertEquals((await handler(request(body))).status, 404);
+  store.error = new AdminSubmissionStoreError(new Error("identity missing"));
+  assertEquals((await handler(request(body))).status, 500);
+});
+
+Deno.test("Stale detail and Reject acknowledgement preserve displayed hash and map source_changed409", async () => {
+  const store = new FakeStore();
+  const shown = "a".repeat(64);
+  const newer = "b".repeat(64);
+  store.getResult = {
+    submission: {
+      ...record,
+      external_event_record_id: 19,
+      external_moderation_hash: "c".repeat(64),
+    },
+    assets: [],
+    currentSource: {
+      moderation_hash: newer,
+      normalized: { name: "Latest source" },
+    },
+  };
+  const handler = createHandler({
+    authenticate: () => Promise.resolve(adminUser()),
+    createStore: () => store,
+    nowIso: () => "now",
+  });
+  const req = (body: unknown) =>
+    new Request("http://localhost", {
+      method: "POST",
+      headers: { Authorization: "Bearer jwt" },
+      body: JSON.stringify(body),
+    });
+  const detail = await handler(req({ operation: "getById", submission_id: 7 }));
+  const { submission } = await detail.json();
+  assertEquals(submission.external_moderation_hash, "c".repeat(64));
+  assertEquals(submission.moderation_hash, newer);
+  assertEquals(submission.current_source_normalized, { name: "Latest source" });
+  for (const expected of [shown, undefined]) {
+    store.statusResults = ["source_changed"];
+    const response = await handler(
+      req({
+        operation: "changeStatus",
+        submission_id: 7,
+        status: "rejected",
+        acknowledge_current_source: true,
+        ...(expected !== undefined ? { expected_source_hash: expected } : {}),
+      }),
+    );
+    assertEquals(response.status, 409);
+    assertEquals((await response.json()).code, "SOURCE_CHANGED");
+    assertEquals(store.statusValues, {
+      id: 7,
+      status: "rejected",
+      handledBy: adminUser().id,
+      modifiedAt: "now",
+      acknowledgeCurrentSource: true,
+      ...(expected !== undefined ? { expectedSourceHash: expected } : {}),
+    });
+  }
+  store.statusResults = [{ outcome: "updated", pendingSubmissionId: null }];
+  const success = await handler(
+    req({
+      operation: "changeStatus",
+      submission_id: 7,
+      status: "rejected",
+      acknowledge_current_source: true,
+      expected_source_hash: shown,
+    }),
+  );
+  assertEquals(success.status, 200);
+  assertEquals(await success.json(), {
+    ok: true,
+    status: "rejected",
+    pending_submission_id: null,
+  });
+});
+
+Deno.test("Provenance added during human Reject returns stable resolution conflict", async () => {
+  const test = testHandler();
+  test.store.statusResults = ["external_requires_resolution"];
+  const response = await test.handler(
+    request({
+      operation: "changeStatus",
+      submission_id: 7,
+      status: "rejected",
+    }),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await response.json()).code, "EXTERNAL_REQUIRES_RESOLUTION");
+});
+
+Deno.test("Linked source promotion maps409 before success parsing", async () => {
+  const test = testHandler();
+  test.store.promoteResults = [{ outcome: "source_already_linked" }];
+  const response = await test.handler(
+    request({ operation: "promote", submission_id: 7, target: "event" }),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await response.json()).code, "PROMOTION_SOURCE_ALREADY_LINKED");
+});
+
+Deno.test("Link uses verified Admin actor and maps Event discriminator/acknowledgement failures", async () => {
+  const test = testHandler();
+  const hash = "a".repeat(64);
+  const body = {
+    operation: "link",
+    submission_id: 7,
+    target_event_id: 19,
+    acknowledge_current_source: true,
+    expected_source_hash: hash,
+  };
+  const response = await test.handler(request(body));
+  assertEquals(response.status, 200);
+  assertEquals(test.store.linkValues, {
+    id: 7,
+    targetEventId: 19,
+    handledBy: adminUser().id,
+    acknowledgeCurrentSource: true,
+    expectedSourceHash: hash,
+  });
+  assertEquals(await response.json(), {
+    resolution: {
+      outcome: "linked",
+      target_event_id: 19,
+      pending_submission_id: null,
+    },
+  });
+  for (
+    const [outcome, status, code] of [
+      ["not_event_submission", 422, "NOT_EVENT_SUBMISSION"],
+      ["source_changed", 409, "SOURCE_CHANGED"],
+      ["relink_conflict", 409, "RELINK_CONFLICT"],
+    ] as const
+  ) {
+    test.store.linkResult = { outcome };
+    const failed = await test.handler(request(body));
+    assertEquals(failed.status, status);
+    assertEquals((await failed.json()).code, code);
+  }
+  const spoof = await test.handler(request({ ...body, handled_by: "spoof" }));
+  assertEquals(spoof.status, 400);
+});
+
+Deno.test("Event resolution response maps Apply closed-group and city failures consistently", async () => {
+  for (
+    const [outcome, status, code] of [
+      ["city_not_found", 422, "CITY_NOT_FOUND"],
+      ["invalid_groups", 422, "INVALID_GROUPS"],
+      ["coordinates_required", 422, "COORDINATES_REQUIRED"],
+      ["submission_changed", 409, "SUBMISSION_CHANGED"],
+      ["event_changed", 409, "EVENT_CHANGED"],
+      ["normalization_mismatch", 409, "NORMALIZATION_MISMATCH"],
+      ["start_date_required", 422, "START_DATE_REQUIRED"],
+      ["invalid_date_range", 422, "INVALID_DATE_RANGE"],
+    ] as const
+  ) {
+    const response = eventResolutionResponse({ outcome });
+    assertEquals(response.status, status);
+    assertEquals((await response.json()).code, code);
+  }
+});
+
+Deno.test("Link lost-response retry reaches authoritative RPC before pending-only reads", async () => {
+  const test = testHandler();
+  const hash = "a".repeat(64);
+  const body = {
+    operation: "link",
+    submission_id: 7,
+    target_event_id: 19,
+    acknowledge_current_source: true,
+    expected_source_hash: hash,
+  };
+  // The initial resolution commits; its response is discarded by the caller.
+  await test.handler(request(body));
+  test.store.calls.length = 0;
+  test.store.linkResult = {
+    outcome: "already_resolved",
+    eventId: 19,
+    pendingSubmissionId: null,
+  };
+  test.store.getResult = {
+    submission: { ...record, status: "accepted", target_event_id: 19 },
+    assets: [],
+  };
+  const retried = await test.handler(request(body));
+  assertEquals(retried.status, 200);
+  assertEquals((await retried.json()).resolution.outcome, "already_resolved");
+  assertEquals(test.store.calls, ["link"]);
+  assertEquals(test.store.linkValues, {
+    id: 7,
+    targetEventId: 19,
+    handledBy: adminUser().id,
+    acknowledgeCurrentSource: true,
+    expectedSourceHash: hash,
+  });
+  test.store.linkResult = { outcome: "target_conflict" };
+  assertEquals(
+    (await test.handler(request({ ...body, target_event_id: 20 }))).status,
+    409,
+  );
+});
+
+Deno.test("Promote acknowledgement preserves displayed hash, stable failure and retry precedence", async () => {
+  const test = testHandler();
+  const hash = "a".repeat(64);
+  const body = {
+    operation: "promote",
+    submission_id: 7,
+    target: "event",
+    acknowledge_current_source: true,
+    expected_source_hash: hash,
+  };
+  test.store.promoteResults = [
+    { outcome: "created", target: "event", entityId: 19 },
+    { outcome: "source_changed" },
+    { outcome: "already_promoted", target: "event", entityId: 19 },
+  ];
+  assertEquals((await test.handler(request(body))).status, 200);
+  assertEquals(test.store.promoteValues, {
+    id: 7,
+    target: "event",
+    handledBy: adminUser().id,
+    acknowledgeCurrentSource: true,
+    expectedSourceHash: hash,
+  });
+  const changed = await test.handler(request(body));
+  assertEquals(changed.status, 409);
+  assertEquals((await changed.json()).code, "SOURCE_CHANGED");
+  const retried = await test.handler(
+    request({ ...body, expected_source_hash: null }),
+  );
+  assertEquals(retried.status, 200);
+  assertEquals((await retried.json()).promotion, {
+    target_type: "event",
+    entity_id: 19,
+  });
+  assertEquals(test.store.calls, ["promote", "promote", "promote"]);
+  assertEquals(
+    (await test.handler(request({ ...body, handled_by: "spoof" }))).status,
+    400,
+  );
+});
+
+Deno.test("Imported Save null-start rejection maps422 and does not accept provenance spoofing", async () => {
+  const test = testHandler();
+  test.store.updateResults = [{ outcome: "start_date_required" }];
+  const body = {
+    operation: "update",
+    submission_id: 7,
+    input: { ...input(), start_date: null, end_date: null, all_day: false },
+  };
+  const failed = await test.handler(request(body));
+  assertEquals(failed.status, 422);
+  assertEquals((await failed.json()).code, "START_DATE_REQUIRED");
+  assertEquals(
+    (await test.handler(request({ ...body, external_event_record_id: null })))
+      .status,
+    400,
+  );
+});
+
+function mergeHandlerFixture() {
+  const test = testHandler();
+  const base = {
+    name: "Source",
+    category: "unknown" as const,
+    description: null,
+    description_delta: null,
+    city: "Campobasso",
+    latitude: "41",
+    longitude: "14",
+    all_day: false,
+    start_date: "2026-10-02T10:00:00.123456Z",
+    end_date: null,
+  };
+  const snapshot = { ...base, name: "Provider revision" };
+  test.store.getResult = {
+    submission: {
+      ...record,
+      ...snapshot,
+      latitude: 41,
+      longitude: 14,
+      category: "experience",
+      external_event_record_id: 1,
+      external_normalized: snapshot,
+      external_normalization_version: 1,
+      external_moderation_hash: "a".repeat(64),
+      modified_at: "2026-10-02T10:00:00.000001+00:00",
+      status: "pending",
+    },
+    assets: [],
+  };
+  test.store.externalRecordResult = {
+    id: 1,
+    provider: "fixture",
+    external_id: "1",
+    occurrence_key: null,
+    source_url: null,
+    event_id: 19,
+    ignored_at: null,
+    normalized: snapshot,
+    normalization_version: 1,
+    moderation_hash: "b".repeat(64),
+    proposed_normalized: base,
+    proposed_normalization_version: 1,
+    proposed_hash: "c".repeat(64),
+    metadata: {},
+    metadata_version: 1,
+    created_at: "now",
+    modified_at: "now",
+  };
+  test.store.eventResult = {
+    id: 19,
+    name: "Editorial title",
+    city_id: null,
+    city: null,
+    description: null,
+    description_delta: null,
+    latitude: 41,
+    longitude: 14,
+    category: "history",
+    all_day: false,
+    start_date: base.start_date,
+    end_date: null,
+    created_at: "now",
+    deleted_at: null,
+    modified_at: "2026-10-02 10:00:00.000002+00",
+  };
+  return test;
+}
+
+Deno.test("Merge preview recomputes semantic groups/current values and preserves raw DB tokens", async () => {
+  const test = mergeHandlerFixture();
+  const response = await test.handler(
+    request({
+      operation: "mergePreview",
+      submission_id: 7,
+      target_event_id: 19,
+    }),
+  );
+  assertEquals(response.status, 200);
+  const preview = (await response.json()).preview;
+  assertEquals(
+    preview.submission_version_token,
+    "2026-10-02T10:00:00.000001+00:00",
+  );
+  assertEquals(preview.event_version_token, "2026-10-02 10:00:00.000002+00");
+  assertEquals(preview.groups_to_apply, ["name", "category"]);
+  assertEquals(preview.groups.map((g: { overwrite: boolean }) => g.overwrite), [
+    true,
+    true,
+    false,
+    false,
+    false,
+  ]);
+  assertEquals(preview.groups[4].current.city, null);
+  assertEquals(preview.stale, true);
+  assertEquals(preview.moderation_hash, "b".repeat(64));
+  assertEquals(test.store.calls, ["getById", "getExternalRecord", "getEvent"]);
+  test.store.eventResult!.name = "Provider revision";
+  const refreshed = await test.handler(
+    request({
+      operation: "mergePreview",
+      submission_id: 7,
+      target_event_id: 19,
+    }),
+  );
+  assertEquals((await refreshed.json()).preview.groups[0].overwrite, false);
+  assertEquals(
+    (await test.handler(
+      request({
+        operation: "mergePreview",
+        submission_id: 7,
+        target_event_id: 19,
+        groups_to_apply: ["name"],
+      }),
+    )).status,
+    400,
+  );
+});
+
+Deno.test("Apply computes server groups while forwarding original tokens/hash/verified actor unchanged", async () => {
+  const test = mergeHandlerFixture();
+  const body = {
+    operation: "apply",
+    submission_id: 7,
+    target_event_id: 19,
+    submission_version_token: "2026-10-01 00:00:00.999999+00",
+    event_version_token: "2026-10-01T00:00:00.999998Z",
+    acknowledge_current_source: true,
+    expected_source_hash: "a".repeat(64),
+  };
+  const response = await test.handler(request(body));
+  assertEquals(response.status, 200);
+  assertEquals(test.store.applyValues, {
+    id: 7,
+    targetEventId: 19,
+    handledBy: adminUser().id,
+    groupsToApply: ["name", "category"],
+    submissionVersionToken: body.submission_version_token,
+    eventVersionToken: body.event_version_token,
+    acknowledgeCurrentSource: true,
+    expectedSourceHash: body.expected_source_hash,
+  });
+  test.store.applyResult = { outcome: "source_changed" };
+  const changed = await test.handler(request(body));
+  assertEquals(changed.status, 409);
+  assertEquals((await changed.json()).code, "SOURCE_CHANGED");
+  assertEquals(
+    (await test.handler(request({ ...body, groups_to_apply: ["location"] })))
+      .status,
+    400,
+  );
+  assertEquals(
+    (await test.handler(request({ ...body, handled_by: "spoof" }))).status,
+    400,
+  );
+});
+
+Deno.test("Apply accepted retry precedes canonicalization/readiness and remains authoritative for conflicts", async () => {
+  const test = mergeHandlerFixture();
+  test.store.getResult!.submission = {
+    ...test.store.getResult!.submission,
+    status: "accepted",
+    target_event_id: 19,
+    start_date: null,
+    description_delta: "invalid",
+  };
+  test.store.externalRecordResult = null;
+  test.store.eventResult = null;
+  test.store.applyResult = {
+    outcome: "already_resolved",
+    eventId: 19,
+    pendingSubmissionId: null,
+  };
+  const body = {
+    operation: "apply",
+    submission_id: 7,
+    target_event_id: 19,
+    submission_version_token: "old",
+    event_version_token: "old",
+    acknowledge_current_source: true,
+  };
+  const response = await test.handler(request(body));
+  assertEquals(response.status, 200);
+  assertEquals((await response.json()).resolution.outcome, "already_resolved");
+  assertEquals(test.store.calls, ["getById", "apply"]);
+  assertEquals(
+    (test.store.applyValues as { groupsToApply: string[] }).groupsToApply,
+    [],
+  );
+  test.store.applyResult = { outcome: "target_conflict" };
+  const conflict = await test.handler(
+    request({ ...body, target_event_id: 20 }),
+  );
+  assertEquals(conflict.status, 409);
+  assertEquals((await conflict.json()).code, "TARGET_CONFLICT");
+});
+
+Deno.test("Apply pending schedule readiness fails before canonicalization/merge/store writes", async () => {
+  for (
+    const [start, end, code] of [[null, null, "START_DATE_REQUIRED"], [
+      "2026-10-03T10:00:00Z",
+      "2026-10-02T10:00:00Z",
+      "INVALID_DATE_RANGE",
+    ]] as const
+  ) {
+    const test = mergeHandlerFixture();
+    test.store.getResult!.submission = {
+      ...test.store.getResult!.submission,
+      start_date: start,
+      end_date: end,
+      description_delta: "invalid",
+    };
+    const failed = await test.handler(
+      request({
+        operation: "apply",
+        submission_id: 7,
+        target_event_id: 19,
+        submission_version_token: "old",
+        event_version_token: "old",
+      }),
+    );
+    assertEquals(failed.status, 422);
+    assertEquals((await failed.json()).code, code);
+    assertEquals(test.store.calls, ["getById"]);
+  }
+});
+
+Deno.test("Apply stale preview tokens survive newer authoritative rereads byte-for-byte", async () => {
+  const test = mergeHandlerFixture();
+  const body = {
+    operation: "apply",
+    submission_id: 7,
+    target_event_id: 19,
+    submission_version_token: "2026-09-30 10:00:00.000001+00",
+    event_version_token: "2026-09-30T10:00:00.000002+00:00",
+  };
+  for (const outcome of ["submission_changed", "event_changed"] as const) {
+    test.store.getResult!.submission.modified_at =
+      "2026-10-03T20:00:00.999999Z";
+    test.store.eventResult!.modified_at = "2026-10-04T20:00:00.999998Z";
+    test.store.applyResult = { outcome };
+    const failed = await test.handler(request(body));
+    assertEquals(failed.status, 409);
+    assertEquals(
+      (test.store.applyValues as { submissionVersionToken: string })
+        .submissionVersionToken,
+      body.submission_version_token,
+    );
+    assertEquals(
+      (test.store.applyValues as { eventVersionToken: string })
+        .eventVersionToken,
+      body.event_version_token,
+    );
+  }
+});
+
+Deno.test("Pending preview refuses a newer normalization profile even when all persisted versions agree", async () => {
+  const test = mergeHandlerFixture();
+  test.store.getResult!.submission.external_normalization_version = 2;
+  test.store.externalRecordResult!.normalization_version = 2;
+  test.store.externalRecordResult!.proposed_normalization_version = 2;
+  const failed = await test.handler(
+    request({
+      operation: "mergePreview",
+      submission_id: 7,
+      target_event_id: 19,
+    }),
+  );
+  assertEquals(failed.status, 409);
+  assertEquals((await failed.json()).code, "NORMALIZATION_MISMATCH");
+  assertEquals(test.store.calls, ["getById", "getExternalRecord"]);
+});
+
+Deno.test("list DTO exposes nullable human and authoritative imported create/update mode", async () => {
+  const store = new FakeStore();
+  store.listResult = [record, {
+    ...record,
+    id: 8,
+    external_event_record_id: 12,
+    currentSource: {
+      event_id: null,
+      moderation_hash: "x",
+      normalized: { name: "Create" },
+    },
+  }, {
+    ...record,
+    id: 9,
+    external_event_record_id: 13,
+    currentSource: {
+      event_id: 42,
+      moderation_hash: "y",
+      normalized: { name: "Update" },
+    },
+  }];
+  const tested = testHandler(adminUser(), store);
+  const response = await tested.handler(request({ operation: "list" }));
+  const rows = (await responseJson(response)).submissions as Array<
+    Record<string, unknown>
+  >;
+  assertEquals(rows.map((row) => [row.external_mode, row.external_event_id]), [
+    [null, null],
+    ["create", null],
+    ["update", 42],
+  ]);
+  assertEquals(rows[2].current_source_normalized, { name: "Update" });
 });

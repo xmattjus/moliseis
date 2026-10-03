@@ -38,7 +38,36 @@ export type ValidatedAdminSubmissionInput =
   };
 
 export type ValidatedAdminContentSubmissionsRequest =
+  | {
+    operation: "apply";
+    submission_id: number;
+    target_event_id: number;
+    submission_version_token: string;
+    event_version_token: string;
+    acknowledge_current_source?: boolean;
+    expected_source_hash?: string | null;
+  }
+  | {
+    operation: "mergePreview";
+    submission_id: number;
+    target_event_id: number;
+  }
+  | {
+    operation: "eventCandidates";
+    submission_id: number;
+    target_event_id?: number;
+    search_name?: string;
+  }
+  | {
+    operation: "link";
+    submission_id: number;
+    target_event_id: number;
+    acknowledge_current_source?: boolean;
+    expected_source_hash?: string | null;
+  }
   | { operation: "list" }
+  | { operation: "listIgnoredSources" }
+  | { operation: "unIgnoreSource"; external_event_record_id: number }
   | { operation: "getById"; submission_id: number }
   | { operation: "create"; input: ValidatedAdminSubmissionInput }
   | {
@@ -50,11 +79,16 @@ export type ValidatedAdminContentSubmissionsRequest =
     operation: "changeStatus";
     submission_id: number;
     status: FinalSubmissionStatusWire;
+    ignore_source?: boolean;
+    acknowledge_current_source?: boolean;
+    expected_source_hash?: string | null;
   }
   | {
     operation: "promote";
     submission_id: number;
     target: PromotionTargetWire;
+    acknowledge_current_source?: boolean;
+    expected_source_hash?: string | null;
   }
   | {
     operation: "addAsset";
@@ -111,7 +145,11 @@ function hasExactKeys(
 
 function parsePositiveSafeInteger(
   value: unknown,
-  fieldName: "submission_id" | "asset_id",
+  fieldName:
+    | "submission_id"
+    | "asset_id"
+    | "external_event_record_id"
+    | "target_event_id",
 ): ValidationResult<number> {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0
     ? valid(value)
@@ -263,12 +301,18 @@ export function parseAdminContentSubmissionsRequest(
   }
   if (
     typeof value.operation !== "string" || ![
+      "apply",
+      "mergePreview",
+      "eventCandidates",
       "list",
+      "listIgnoredSources",
+      "unIgnoreSource",
       "getById",
       "create",
       "update",
       "changeStatus",
       "promote",
+      "link",
       "addAsset",
       "deleteAsset",
     ].includes(value.operation)
@@ -277,6 +321,25 @@ export function parseAdminContentSubmissionsRequest(
   }
 
   switch (value.operation) {
+    case "listIgnoredSources":
+      return hasExactKeys(value, ["operation"])
+        ? valid({ operation: "listIgnoredSources" })
+        : invalid("Request contains unsupported or missing fields.");
+    case "unIgnoreSource": {
+      if (!hasExactKeys(value, ["operation", "external_event_record_id"])) {
+        return invalid("Request contains unsupported or missing fields.");
+      }
+      const id = parsePositiveSafeInteger(
+        value.external_event_record_id,
+        "external_event_record_id",
+      );
+      return id.ok
+        ? valid({
+          operation: "unIgnoreSource",
+          external_event_record_id: id.value,
+        })
+        : id;
+    }
     case "list":
       return hasExactKeys(value, ["operation"])
         ? valid({ operation: "list" })
@@ -321,7 +384,20 @@ export function parseAdminContentSubmissionsRequest(
         : input;
     }
     case "changeStatus": {
-      if (!hasExactKeys(value, ["operation", "submission_id", "status"])) {
+      if (
+        !hasExactKeys(value, [
+          "operation",
+          "submission_id",
+          "status",
+          ...(Object.hasOwn(value, "ignore_source") ? ["ignore_source"] : []),
+          ...(Object.hasOwn(value, "acknowledge_current_source")
+            ? ["acknowledge_current_source"]
+            : []),
+          ...(Object.hasOwn(value, "expected_source_hash")
+            ? ["expected_source_hash"]
+            : []),
+        ])
+      ) {
         return invalid("Request contains unsupported or missing fields.");
       }
       const submissionId = parsePositiveSafeInteger(
@@ -334,16 +410,218 @@ export function parseAdminContentSubmissionsRequest(
       if (value.status !== "rejected") {
         return invalid("status must be rejected.");
       }
+      if (
+        Object.hasOwn(value, "ignore_source") &&
+        typeof value.ignore_source !== "boolean"
+      ) {
+        return invalid("ignore_source must be a boolean.");
+      }
+      if (
+        Object.hasOwn(value, "acknowledge_current_source") &&
+        typeof value.acknowledge_current_source !== "boolean"
+      ) return invalid("acknowledge_current_source must be a boolean.");
+      if (
+        Object.hasOwn(value, "expected_source_hash") &&
+        value.expected_source_hash !== null &&
+        (typeof value.expected_source_hash !== "string" ||
+          !/^[0-9a-f]{64}$/.test(value.expected_source_hash))
+      ) return invalid("expected_source_hash must be a SHA-256 hash or null.");
       return valid({
         operation: "changeStatus",
         submission_id: submissionId.value,
         status: value.status,
+        ...(Object.hasOwn(value, "acknowledge_current_source")
+          ? {
+            acknowledge_current_source: value
+              .acknowledge_current_source as boolean,
+          }
+          : {}),
+        ...(Object.hasOwn(value, "expected_source_hash")
+          ? {
+            expected_source_hash: value.expected_source_hash as string | null,
+          }
+          : {}),
+        ...(Object.hasOwn(value, "ignore_source")
+          ? { ignore_source: value.ignore_source as boolean }
+          : {}),
+      });
+    }
+    case "apply": {
+      if (
+        !hasExactKeys(value, [
+          "operation",
+          "submission_id",
+          "target_event_id",
+          "submission_version_token",
+          "event_version_token",
+          ...(Object.hasOwn(value, "acknowledge_current_source")
+            ? ["acknowledge_current_source"]
+            : []),
+          ...(Object.hasOwn(value, "expected_source_hash")
+            ? ["expected_source_hash"]
+            : []),
+        ])
+      ) return invalid("Request contains unsupported or missing fields.");
+      const id = parsePositiveSafeInteger(value.submission_id, "submission_id"),
+        target = parsePositiveSafeInteger(
+          value.target_event_id,
+          "target_event_id",
+        );
+      if (!id.ok) return id;
+      if (!target.ok) return target;
+      for (const key of ["submission_version_token", "event_version_token"]) {
+        if (
+          typeof value[key] !== "string" || !value[key] ||
+          value[key].length > 100
+        ) return invalid(`${key} must be an opaque version string.`);
+      }
+      if (
+        Object.hasOwn(value, "acknowledge_current_source") &&
+        typeof value.acknowledge_current_source !== "boolean"
+      ) return invalid("acknowledge_current_source must be a boolean.");
+      if (
+        Object.hasOwn(value, "expected_source_hash") &&
+        value.expected_source_hash !== null &&
+        (typeof value.expected_source_hash !== "string" ||
+          !/^[0-9a-f]{64}$/.test(value.expected_source_hash))
+      ) return invalid("expected_source_hash must be a SHA-256 hash or null.");
+      return valid({
+        operation: "apply",
+        submission_id: id.value,
+        target_event_id: target.value,
+        submission_version_token: value.submission_version_token as string,
+        event_version_token: value.event_version_token as string,
+        ...(Object.hasOwn(value, "acknowledge_current_source")
+          ? {
+            acknowledge_current_source: value
+              .acknowledge_current_source as boolean,
+          }
+          : {}),
+        ...(Object.hasOwn(value, "expected_source_hash")
+          ? {
+            expected_source_hash: value.expected_source_hash as string | null,
+          }
+          : {}),
+      });
+    }
+    case "mergePreview": {
+      if (
+        !hasExactKeys(value, ["operation", "submission_id", "target_event_id"])
+      ) return invalid("Request contains unsupported or missing fields.");
+      const id = parsePositiveSafeInteger(value.submission_id, "submission_id"),
+        target = parsePositiveSafeInteger(
+          value.target_event_id,
+          "target_event_id",
+        );
+      if (!id.ok) return id;
+      if (!target.ok) return target;
+      return valid({
+        operation: "mergePreview",
+        submission_id: id.value,
+        target_event_id: target.value,
+      });
+    }
+    case "eventCandidates": {
+      if (
+        !hasExactKeys(value, [
+          "operation",
+          "submission_id",
+          ...(Object.hasOwn(value, "target_event_id")
+            ? ["target_event_id"]
+            : []),
+          ...(Object.hasOwn(value, "search_name") ? ["search_name"] : []),
+        ])
+      ) return invalid("Request contains unsupported or missing fields.");
+      const id = parsePositiveSafeInteger(value.submission_id, "submission_id");
+      if (!id.ok) return id;
+      if (
+        Object.hasOwn(value, "target_event_id") &&
+        Object.hasOwn(value, "search_name")
+      ) return invalid("Specify Event ID or name, not both.");
+      const target = Object.hasOwn(value, "target_event_id")
+        ? parsePositiveSafeInteger(value.target_event_id, "target_event_id")
+        : null;
+      if (target && !target.ok) return target;
+      if (
+        Object.hasOwn(value, "search_name") &&
+        (typeof value.search_name !== "string" || !value.search_name.trim() ||
+          value.search_name.length > 150)
+      ) {
+        return invalid(
+          "search_name must be a nonempty name up to 150 characters.",
+        );
+      }
+      return valid({
+        operation: "eventCandidates",
+        submission_id: id.value,
+        ...(target?.ok ? { target_event_id: target.value } : {}),
+        ...(typeof value.search_name === "string"
+          ? { search_name: value.search_name.trim() }
+          : {}),
+      });
+    }
+    case "link": {
+      if (
+        !hasExactKeys(value, [
+          "operation",
+          "submission_id",
+          "target_event_id",
+          ...(Object.hasOwn(value, "acknowledge_current_source")
+            ? ["acknowledge_current_source"]
+            : []),
+          ...(Object.hasOwn(value, "expected_source_hash")
+            ? ["expected_source_hash"]
+            : []),
+        ])
+      ) return invalid("Request contains unsupported or missing fields.");
+      const id = parsePositiveSafeInteger(value.submission_id, "submission_id");
+      if (!id.ok) return id;
+      const target = parsePositiveSafeInteger(
+        value.target_event_id,
+        "target_event_id",
+      );
+      if (!target.ok) return target;
+      if (
+        Object.hasOwn(value, "acknowledge_current_source") &&
+        typeof value.acknowledge_current_source !== "boolean"
+      ) return invalid("acknowledge_current_source must be a boolean.");
+      if (
+        Object.hasOwn(value, "expected_source_hash") &&
+        value.expected_source_hash !== null &&
+        (typeof value.expected_source_hash !== "string" ||
+          !/^[0-9a-f]{64}$/.test(value.expected_source_hash))
+      ) return invalid("expected_source_hash must be a SHA-256 hash or null.");
+      return valid({
+        operation: "link",
+        submission_id: id.value,
+        target_event_id: target.value,
+        ...(Object.hasOwn(value, "acknowledge_current_source")
+          ? {
+            acknowledge_current_source: value
+              .acknowledge_current_source as boolean,
+          }
+          : {}),
+        ...(Object.hasOwn(value, "expected_source_hash")
+          ? {
+            expected_source_hash: value.expected_source_hash as string | null,
+          }
+          : {}),
       });
     }
     case "promote": {
-      if (!hasExactKeys(value, ["operation", "submission_id", "target"])) {
-        return invalid("Request contains unsupported or missing fields.");
-      }
+      if (
+        !hasExactKeys(value, [
+          "operation",
+          "submission_id",
+          "target",
+          ...(Object.hasOwn(value, "acknowledge_current_source")
+            ? ["acknowledge_current_source"]
+            : []),
+          ...(Object.hasOwn(value, "expected_source_hash")
+            ? ["expected_source_hash"]
+            : []),
+        ])
+      ) return invalid("Request contains unsupported or missing fields.");
       const submissionId = parsePositiveSafeInteger(
         value.submission_id,
         "submission_id",
@@ -352,10 +630,31 @@ export function parseAdminContentSubmissionsRequest(
       if (value.target !== "place" && value.target !== "event") {
         return invalid("target must be place or event.");
       }
+      if (
+        Object.hasOwn(value, "acknowledge_current_source") &&
+        typeof value.acknowledge_current_source !== "boolean"
+      ) return invalid("acknowledge_current_source must be a boolean.");
+      if (
+        Object.hasOwn(value, "expected_source_hash") &&
+        value.expected_source_hash !== null &&
+        (typeof value.expected_source_hash !== "string" ||
+          !/^[0-9a-f]{64}$/.test(value.expected_source_hash))
+      ) return invalid("expected_source_hash must be a SHA-256 hash or null.");
       return valid({
         operation: "promote",
         submission_id: submissionId.value,
         target: value.target,
+        ...(Object.hasOwn(value, "acknowledge_current_source")
+          ? {
+            acknowledge_current_source: value
+              .acknowledge_current_source as boolean,
+          }
+          : {}),
+        ...(Object.hasOwn(value, "expected_source_hash")
+          ? {
+            expected_source_hash: value.expected_source_hash as string | null,
+          }
+          : {}),
       });
     }
     case "addAsset": {

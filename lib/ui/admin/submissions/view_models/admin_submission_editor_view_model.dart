@@ -3,7 +3,10 @@ import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
+import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
@@ -43,6 +46,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     promote = Command1<AdminSubmissionPromotion, AdminPromotionTarget>(
       _promote,
     );
+    link = Command1<AdminEventResolution, int>(_link);
+    preview = Command0<void>(_preview);
+    findCandidates = Command1<void, String>(_findCandidates);
+    apply = Command0<AdminEventResolution>(_apply);
+    keepCurrent = Command1<void, AdminEventMergeGroup>(_keepCurrent);
     addAsset = Command0<void>(_addAsset);
     deleteAsset = Command1<void, int>(_deleteAsset);
   }
@@ -93,6 +101,72 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Removes one persisted image association from the pending submission.
   late Command1<void, int> deleteAsset;
+
+  AdminEventCandidates? _candidates;
+
+  /// Candidate discovery is advisory and never changes moderation readiness.
+  late Command1<void, String> findCandidates;
+
+  AdminEventCandidates? get candidates => _candidates;
+
+  /// Copies one complete Event group and saves through the ordinary editor.
+  late Command1<void, AdminEventMergeGroup> keepCurrent;
+
+  bool _acknowledgeCurrentSource = false;
+  String? _acknowledgedSourceHash;
+  bool _ignoreSource = false;
+  AdminSubmission? _followupSubmission;
+
+  /// Only the currently displayed stale source revision can be acknowledged.
+  bool get isSourceStale => _externalEvent?.stale ?? false;
+  bool get acknowledgeCurrentSource => _acknowledgeCurrentSource;
+  bool get ignoreSource => _ignoreSource;
+  AdminSubmission? get followupSubmission => _followupSubmission;
+
+  void setAcknowledgeCurrentSource({required bool selected}) {
+    _acknowledgeCurrentSource = selected && isSourceStale;
+    _acknowledgedSourceHash = _acknowledgeCurrentSource
+        ? _externalEvent?.currentHash
+        : null;
+    _notifyListeners();
+  }
+
+  void setIgnoreSource({required bool ignored}) {
+    _ignoreSource = ignored && _externalEvent != null;
+    _notifyListeners();
+  }
+
+  AdminExternalEvent? _externalEvent;
+  int? _targetEventId;
+  AdminEventMergePreview? _mergePreview;
+  int _previewGeneration = 0;
+  int _hydrationRevision = 0;
+
+  /// Only explicit backend reload or keep-current replaces field widget state.
+  int get hydrationRevision => _hydrationRevision;
+
+  /// Accepts against the selected canonical Event without copying media.
+  late Command1<AdminEventResolution, int> link;
+
+  /// Loads an authoritative merge preview for the linked Event.
+  late Command0<void> preview;
+
+  /// Applies the preview with its untouched concurrency tokens.
+  late Command0<AdminEventResolution> apply;
+
+  AdminExternalEvent? get externalEvent => _externalEvent;
+  bool get isExternalUpdate =>
+      _externalEvent?.mode == AdminExternalEventMode.update;
+  int? get targetEventId => _targetEventId;
+  AdminEventMergePreview? get mergePreview => _mergePreview;
+
+  /// Selecting a different target invalidates its preview.
+  void selectTargetEvent(int? id) {
+    _previewGeneration++;
+    _targetEventId = id;
+    _mergePreview = null;
+    _notifyListeners();
+  }
 
   /// Whether this route edits an existing persisted submission.
   bool get isEditMode => submissionId != null;
@@ -200,7 +274,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Whether any operation can mutate the editor or its submission.
   bool get operationRunning =>
-      save.running || promote.running || reject.running || assetMutationRunning;
+      save.running ||
+      promote.running ||
+      reject.running ||
+      link.running ||
+      apply.running ||
+      keepCurrent.running ||
+      assetMutationRunning;
 
   /// Updates the selected category and marks the editor dirty.
   void setCategory(ContentCategory? category) {
@@ -239,6 +319,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   void setEventEnabled(bool enabled) {
+    if (_externalEvent != null && !enabled) return;
     _eventDates = enabled
         ? _eventTimePolicy.enable(_eventDates)
         : _eventTimePolicy.disable(_eventDates);
@@ -326,6 +407,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
     final result = await _repository.getById(submissionId);
     return result.map((submission) {
+      if (_disposed) return;
+      _hydrationRevision++;
       _category = submission.category;
       _city = submission.city;
       _name = submission.name;
@@ -355,6 +438,14 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _contributorEmail = submission.userEmail;
       _status = submission.status;
       _promotion = submission.promotion;
+      _externalEvent = submission.externalEvent;
+      _acknowledgeCurrentSource = false;
+      _acknowledgedSourceHash = null;
+      _ignoreSource = false;
+      _targetEventId =
+          submission.externalEvent?.eventId ?? submission.targetEventId;
+      _previewGeneration++;
+      _mergePreview = null;
       _createdAt = submission.createdAt;
       _modifiedAt = submission.modifiedAt;
       _assets
@@ -366,8 +457,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     });
   }
 
-  Future<Result<void>> _save() async {
-    if (promote.running || reject.running || assetMutationRunning) {
+  Future<Result<void>> _save({bool fromKeepCurrent = false}) async {
+    if (promote.running ||
+        reject.running ||
+        link.running ||
+        apply.running ||
+        (keepCurrent.running && !fromKeepCurrent) ||
+        assetMutationRunning) {
       return Result.error(
         Exception('Attendi il completamento della moderazione.'),
       );
@@ -415,6 +511,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         : await _repository.update(submissionId, input);
 
     return result.map((_) {
+      _previewGeneration++;
+      _mergePreview = null;
       _isDirty = false;
       _notifyListeners();
     });
@@ -469,10 +567,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Guards shared by both moderation mutations: only a loaded, persisted,
   /// clean, pending submission can be moderated while nothing else runs.
   ///
-  /// [isPromoting] excludes the calling command from the mutual-exclusion
+  /// [caller] excludes the calling command from the mutual-exclusion
   /// check, because its own `running` state is already true while its action
   /// executes.
-  Exception? _moderationGuardError({required bool isPromoting}) {
+  Exception? _moderationGuardError({required String caller}) {
     final submissionId = this.submissionId;
     if (submissionId == null) {
       return Exception('Non puoi moderare un nuovo contributo.');
@@ -480,10 +578,15 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (!_hasLoadedDetail) {
       return Exception('Carica il contributo prima di moderarlo.');
     }
-    final otherModerationRunning = isPromoting
-        ? reject.running
-        : promote.running;
-    if (save.running || otherModerationRunning || assetMutationRunning) {
+    final otherModerationRunning =
+        (caller != 'promote' && promote.running) ||
+        (caller != 'reject' && reject.running) ||
+        (caller != 'link' && link.running) ||
+        (caller != 'apply' && apply.running);
+    if (save.running ||
+        otherModerationRunning ||
+        keepCurrent.running ||
+        assetMutationRunning) {
       return Exception('Attendi il completamento dell’operazione in corso.');
     }
     if (_isDirty) {
@@ -496,12 +599,19 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _reject() async {
-    final guard = _moderationGuardError(isPromoting: false);
+    final guard = _moderationGuardError(caller: 'reject');
     if (guard != null) return Result.error(guard);
 
     final submissionId = this.submissionId!;
-    final result = await _repository.reject(submissionId);
+    final result = await _repository.reject(
+      submissionId,
+      ignoreSource: _ignoreSource ? true : null,
+      acknowledgeCurrentSource: _acknowledgeCurrentSource ? true : null,
+      expectedSourceHash: _acknowledgedSourceHash,
+    );
+    await _refreshAfterResolution(result);
     return result.map((_) {
+      if (_disposed) return;
       _status = AdminSubmissionStatus.rejected;
       _notifyListeners();
     });
@@ -510,7 +620,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   Future<Result<AdminSubmissionPromotion>> _promote(
     AdminPromotionTarget target,
   ) async {
-    final guard = _moderationGuardError(isPromoting: true);
+    final guard = _moderationGuardError(caller: 'promote');
     if (guard != null) return Result.error(guard);
 
     if (!hasPublishableCategory) {
@@ -529,8 +639,15 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
 
     final submissionId = this.submissionId!;
-    final result = await _repository.promote(submissionId, target);
+    final result = await _repository.promote(
+      submissionId,
+      target,
+      acknowledgeCurrentSource: _acknowledgeCurrentSource ? true : null,
+      expectedSourceHash: _acknowledgedSourceHash,
+    );
+    await _refreshAfterResolution(result);
     return result.map((promotion) {
+      if (_disposed) return promotion;
       // Same-target idempotent retries report the original promotion exactly
       // like a first success; no reload is needed because the repository
       // result already carries the durable linkage.
@@ -539,6 +656,192 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _notifyListeners();
       return promotion;
     });
+  }
+
+  Future<Result<AdminEventResolution>> _link(int target) async {
+    final guard = _moderationGuardError(caller: 'link');
+    if (guard != null) return Result.error(guard);
+    if (startDate == null) {
+      return Result.error(
+        Exception('Imposta una data di inizio per collegare un evento.'),
+      );
+    }
+    final result = await _repository.link(
+      submissionId!,
+      target,
+      acknowledgeCurrentSource: _acknowledgeCurrentSource ? true : null,
+      expectedSourceHash: _acknowledgedSourceHash,
+    );
+    await _refreshAfterResolution(result);
+    return result.map((resolution) {
+      if (_disposed) return resolution;
+      _status = AdminSubmissionStatus.accepted;
+      _targetEventId = resolution.eventId;
+      _notifyListeners();
+      return resolution;
+    });
+  }
+
+  Future<Result<void>> _findCandidates(String search) async {
+    final id = submissionId;
+    if (id == null || startDate == null) {
+      return Result.error(
+        Exception('Carica un contributo evento prima di cercare.'),
+      );
+    }
+    final result = await _repository.eventCandidates(
+      id,
+      searchName: search.trim().isEmpty ? null : search.trim(),
+    );
+    return result.map((value) {
+      if (_disposed) return;
+      _candidates = value;
+      _notifyListeners();
+    });
+  }
+
+  Future<Result<void>> _preview({bool fromKeepCurrent = false}) async {
+    final id = submissionId;
+    final target = _targetEventId;
+    if (id == null ||
+        target == null ||
+        _isDirty ||
+        (operationRunning && !fromKeepCurrent)) {
+      return Result.error(
+        Exception(
+          'Seleziona un evento e salva le modifiche prima dell’anteprima.',
+        ),
+      );
+    }
+    final generation = _previewGeneration;
+    final result = await _repository.mergePreview(id, target);
+    return result.map((value) {
+      if (_disposed ||
+          _isDirty ||
+          _targetEventId != target ||
+          _previewGeneration != generation) {
+        return;
+      }
+      _mergePreview = value;
+      final external = _externalEvent;
+      if (external != null && value.currentSourceHash != null) {
+        if (external.currentHash != value.currentSourceHash) {
+          _acknowledgeCurrentSource = false;
+          _acknowledgedSourceHash = null;
+        }
+        _externalEvent = AdminExternalEvent(
+          recordId: external.recordId,
+          snapshotHash: external.snapshotHash,
+          snapshotVersion: external.snapshotVersion,
+          snapshot: external.snapshot,
+          mode: external.mode,
+          eventId: external.eventId,
+          currentHash: value.currentSourceHash,
+          currentSnapshot: value.currentSourceSnapshot,
+        );
+      }
+      _notifyListeners();
+    });
+  }
+
+  Future<Result<void>> _keepCurrent(AdminEventMergeGroup group) async {
+    if (_mergePreview == null ||
+        save.running ||
+        promote.running ||
+        reject.running ||
+        link.running ||
+        apply.running ||
+        preview.running ||
+        assetMutationRunning ||
+        !isEditable) {
+      return Result.error(Exception('Attendi e carica una nuova anteprima.'));
+    }
+    final values = group.current;
+    switch (group.name) {
+      case 'name':
+        _name = values['name'] as String;
+      case 'category':
+        _category = ContentCategory.values.byName(values['category'] as String);
+      case 'description':
+        _description = values['description'] as String?;
+        _descriptionDelta = (values['description_delta'] as List?)
+            ?.map((value) => Map<String, dynamic>.from(value as Map))
+            .toList();
+      case 'location':
+        _city = values['city'] as String?;
+        _latitudeText = values['latitude']?.toString() ?? '';
+        _longitudeText = values['longitude']?.toString() ?? '';
+      case 'schedule':
+        final start = DateTime.parse(values['start_date'] as String).toUtc();
+        final end = values['end_date'] == null
+            ? null
+            : DateTime.parse(values['end_date'] as String).toUtc();
+        _eventDates = EventDateDraft.exact(
+          startCalendarDate: _eventTimePolicy.calendarDateForUtc(start),
+          startInstantUtc: start,
+          endInstantUtc: end,
+          allDay: values['all_day'] as bool,
+        );
+        _eventTimeIssue = null;
+    }
+    _hydrationRevision++;
+    _markDirty();
+    final result = await _save(fromKeepCurrent: true);
+    if (_disposed) return const Result.success(null);
+    return await result.asyncFlatMap((_) => _preview(fromKeepCurrent: true));
+  }
+
+  Future<Result<AdminEventResolution>> _apply() async {
+    final guard = _moderationGuardError(caller: 'apply');
+    if (guard != null) return Result.error(guard);
+    final value = _mergePreview;
+    if (!isExternalUpdate || value == null) {
+      return Result.error(
+        Exception('Carica una nuova anteprima prima di applicare.'),
+      );
+    }
+    final result = await _repository.apply(
+      submissionId!,
+      value,
+      acknowledgeCurrentSource: _acknowledgeCurrentSource ? true : null,
+      expectedSourceHash: _acknowledgedSourceHash,
+    );
+    await _refreshAfterResolution(result);
+    return result.map((resolution) {
+      if (_disposed) return resolution;
+      _status = AdminSubmissionStatus.accepted;
+      _targetEventId = resolution.eventId;
+      _mergePreview = null;
+      _notifyListeners();
+      return resolution;
+    });
+  }
+
+  Future<void> _refreshAfterResolution<T>(Result<T> result) async {
+    if (_disposed || _externalEvent == null) return;
+    final sourceChanged = switch (result) {
+      Error(:final AdminContentSubmissionApiException error) =>
+        error.code == 'SOURCE_CHANGED',
+      _ => false,
+    };
+    if (result is Error && !sourceChanged) return;
+    _acknowledgeCurrentSource = false;
+    _acknowledgedSourceHash = null;
+    _mergePreview = null;
+    _previewGeneration++;
+    _notifyListeners();
+    await _loadDetail();
+    if (_disposed) return;
+    final pending = switch (result) {
+      Success(:final AdminEventResolution value) => value.pendingId,
+      _ => null,
+    };
+    if (pending != null) {
+      final followup = await _repository.getById(pending);
+      if (_disposed) return;
+      followup.map((value) => _followupSubmission = value);
+      _notifyListeners();
+    }
   }
 
   Future<Result<void>> _addAsset() async {
@@ -564,6 +867,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (save.running ||
         promote.running ||
         reject.running ||
+        link.running ||
+        apply.running ||
+        keepCurrent.running ||
         deleteAsset.running) {
       return Result.error(
         Exception('Attendi il completamento dell’operazione in corso.'),
@@ -620,7 +926,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         Exception('Puoi modificare le foto solo dei contributi in attesa.'),
       );
     }
-    if (save.running || promote.running || reject.running || addAsset.running) {
+    if (save.running ||
+        promote.running ||
+        reject.running ||
+        link.running ||
+        apply.running ||
+        keepCurrent.running ||
+        addAsset.running) {
       return Result.error(
         Exception('Attendi il completamento dell’operazione in corso.'),
       );
@@ -639,6 +951,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   void _markDirty() {
+    _previewGeneration++;
+    _mergePreview = null;
     _isDirty = true;
     _notifyListeners();
   }

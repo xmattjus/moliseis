@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/routing/route_names.dart';
@@ -54,7 +55,8 @@ void main() {
           GoRoute(
             path: '/editor/:id',
             name: RouteNames.adminSubmissionEditor,
-            builder: (context, _) => Scaffold(
+            builder: (context, state) => Scaffold(
+              key: ValueKey('editor_${state.pathParameters['id']}'),
               body: TextButton(
                 onPressed: () => context.pop(true),
                 child: const Text('EDIT_EDITOR_MARKER'),
@@ -69,6 +71,79 @@ void main() {
       router.dispose();
       viewModel.dispose();
       auth.dispose();
+    });
+
+    testWidgets(
+      'ignored source without pending can be reactivated and returned '
+      'proposal opened',
+      (tester) async {
+        repository
+          ..ignoredSourcesResult = const Result.success([
+            AdminIgnoredSource(
+              id: 12,
+              provider: 'eventimolise',
+              externalId: 'a',
+              name: 'Ignored source',
+              ignoredAt: '2026-10-02T10:00:00Z',
+            ),
+          ])
+          ..unIgnoreResult = const Result.success(
+            AdminEventResolution(outcome: 'unignored', pendingId: 8),
+          );
+        await viewModel.load.execute();
+        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Fonti ignorate'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Fonti ignorate'));
+        await tester.pumpAndSettle();
+        expect(find.text('Ignored source'), findsOneWidget);
+        expect(viewModel.items, isEmpty);
+        repository
+          ..ignoredSourcesResult = const Result.success([])
+          ..listResult = Result.success([sampleAdminSubmission(id: 8)]);
+        await tester.tap(find.text('Riattiva fonte'));
+        await tester.pumpAndSettle();
+        expect(repository.unIgnoreCalls, [12]);
+        expect(find.text('Fonte riattivata'), findsOneWidget);
+        expect(find.text('Nessuna fonte ignorata'), findsOneWidget);
+        expect(viewModel.items.single.id, 8);
+        await tester.tap(find.text('Apri revisione in attesa'));
+        await tester.pumpAndSettle();
+        expect(find.text('EDIT_EDITOR_MARKER'), findsOneWidget);
+        expect(find.byKey(const ValueKey('editor_8')), findsOneWidget);
+      },
+    );
+
+    testWidgets('un-ignore failure keeps ignored row reachable with feedback', (
+      tester,
+    ) async {
+      repository
+        ..ignoredSourcesResult = const Result.success([
+          AdminIgnoredSource(
+            id: 12,
+            provider: 'eventimolise',
+            externalId: 'a',
+            name: 'Ignored source',
+            ignoredAt: '2026-10-02T10:00:00Z',
+          ),
+        ])
+        ..unIgnoreResult = Result.error(TestException('Failed'));
+      await viewModel.load.execute();
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Fonti ignorate'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Fonti ignorate'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Riattiva fonte'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ignored source'), findsOneWidget);
+      expect(
+        find.text('Impossibile riattivare la fonte. Riprova.'),
+        findsOneWidget,
+      );
+      expect(find.text('Apri revisione in attesa'), findsNothing);
     });
 
     testWidgets('shows loading while the initial list request is pending', (
@@ -169,7 +244,7 @@ void main() {
 
       expect(
         tester.widget<ToggleButtons>(find.byType(ToggleButtons)).isSelected,
-        <bool>[false, false, true, false],
+        <bool>[false, false, true, false, false],
       );
     });
 

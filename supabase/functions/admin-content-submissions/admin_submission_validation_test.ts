@@ -673,3 +673,186 @@ Deno.test("Admin requires every temporal key and rejects invalid temporal repres
     expectInvalid({ operation: "create", input: input(fields) }, message);
   }
 });
+
+Deno.test("Reject ignore option is explicit boolean; actor and importer identity cannot be supplied", () => {
+  const body = {
+    operation: "changeStatus",
+    submission_id: 7,
+    status: "rejected",
+    ignore_source: true,
+  } as const;
+  assertEquals(parseAdminContentSubmissionsRequest(body), {
+    ok: true,
+    value: body,
+  });
+  for (
+    const extra of [{ handled_by: "spoof" }, { importer_user_id: "spoof" }, {
+      ignore_source: "true",
+    }, { status: "accepted" }]
+  ) {
+    assertEquals(
+      parseAdminContentSubmissionsRequest({ ...body, ...extra }).ok,
+      false,
+    );
+  }
+});
+
+Deno.test("Ignored source Admin operations have closed envelopes and positive ID", () => {
+  assertEquals(
+    parseAdminContentSubmissionsRequest({ operation: "listIgnoredSources" }).ok,
+    true,
+  );
+  assertEquals(
+    parseAdminContentSubmissionsRequest({
+      operation: "unIgnoreSource",
+      external_event_record_id: 19,
+    }).ok,
+    true,
+  );
+  for (
+    const body of [
+      { operation: "listIgnoredSources", handled_by: "spoof" },
+      {
+        operation: "unIgnoreSource",
+        external_event_record_id: 19,
+        handled_by: "spoof",
+      },
+      { operation: "unIgnoreSource", external_event_record_id: 0 },
+      {
+        operation: "unIgnoreSource",
+        external_event_record_id: 19,
+        importer_user_id: "spoof",
+      },
+    ]
+  ) assertEquals(parseAdminContentSubmissionsRequest(body).ok, false);
+});
+
+Deno.test("Reject acknowledgement preserves exact shown hash; missing semantic hash reaches resolution", () => {
+  const shown = "a".repeat(64);
+  const base = {
+    operation: "changeStatus",
+    submission_id: 7,
+    status: "rejected",
+    acknowledge_current_source: true,
+  } as const;
+  assertEquals(parseAdminContentSubmissionsRequest(base), {
+    ok: true,
+    value: base,
+  });
+  assertEquals(
+    parseAdminContentSubmissionsRequest({
+      ...base,
+      expected_source_hash: shown,
+    }),
+    { ok: true, value: { ...base, expected_source_hash: shown } },
+  );
+  for (
+    const patch of [
+      { acknowledge_current_source: 1 },
+      { expected_source_hash: 3 },
+      { expected_source_hash: ` ${shown}` },
+      { handled_by: "spoof" },
+    ]
+  ) {
+    assertEquals(
+      parseAdminContentSubmissionsRequest({ ...base, ...patch }).ok,
+      false,
+    );
+  }
+});
+
+Deno.test("Link closes Event target/actor envelope and preserves acknowledgement hash", () => {
+  const body = {
+    operation: "link",
+    submission_id: 7,
+    target_event_id: 19,
+    acknowledge_current_source: true,
+    expected_source_hash: "a".repeat(64),
+  } as const;
+  assertEquals(parseAdminContentSubmissionsRequest(body), {
+    ok: true,
+    value: body,
+  });
+  for (
+    const extra of [{ handled_by: "spoof" }, { groups_to_apply: ["name"] }, {
+      target_event_id: 0,
+    }, { acknowledge_current_source: "true" }]
+  ) {
+    assertEquals(
+      parseAdminContentSubmissionsRequest({ ...body, ...extra }).ok,
+      false,
+    );
+  }
+});
+
+Deno.test("Event candidate requests close actor fields and support manual name or Event ID", () => {
+  for (
+    const extra of [{}, { target_event_id: 19 }, { search_name: " Concert " }]
+  ) {
+    assertEquals(
+      parseAdminContentSubmissionsRequest({
+        operation: "eventCandidates",
+        submission_id: 7,
+        ...extra,
+      }).ok,
+      true,
+    );
+  }
+  for (
+    const extra of [{ target_event_id: 0 }, { search_name: " " }, {
+      target_event_id: 19,
+      search_name: "Concert",
+    }, { handled_by: "spoof" }]
+  ) {
+    assertEquals(
+      parseAdminContentSubmissionsRequest({
+        operation: "eventCandidates",
+        submission_id: 7,
+        ...extra,
+      }).ok,
+      false,
+    );
+  }
+});
+
+Deno.test("Apply accepts opaque tokens and rejects caller actor/group authority", () => {
+  const body = {
+    operation: "apply",
+    submission_id: 7,
+    target_event_id: 19,
+    submission_version_token: "  original raw token  ",
+    event_version_token: "old",
+  };
+  const parsed = parseAdminContentSubmissionsRequest(body);
+  assertEquals(parsed.ok, true);
+  if (parsed.ok && parsed.value.operation === "apply") {
+    assertEquals(
+      parsed.value.submission_version_token,
+      body.submission_version_token,
+    );
+  }
+  for (
+    const extra of [{ handled_by: "spoof" }, { handledBy: "spoof" }, {
+      importer_user_id: "spoof",
+    }, { groups_to_apply: ["name"] }]
+  ) {
+    assertEquals(
+      parseAdminContentSubmissionsRequest({ ...body, ...extra }).ok,
+      false,
+    );
+  }
+  assertEquals(
+    parseAdminContentSubmissionsRequest({
+      ...body,
+      acknowledge_current_source: true,
+    }).ok,
+    true,
+  );
+  assertEquals(
+    parseAdminContentSubmissionsRequest({
+      ...body,
+      submission_version_token: null,
+    }).ok,
+    false,
+  );
+});

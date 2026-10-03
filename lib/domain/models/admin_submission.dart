@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 import 'package:moliseis/domain/core/description_delta.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
@@ -32,6 +33,8 @@ class AdminSubmission {
     this.latitude,
     this.longitude,
     this.promotion,
+    this.externalEvent,
+    this.targetEventId,
     List<AdminSubmissionAsset> assets = const [],
   }) : descriptionDelta = freezeDescriptionDelta(descriptionDelta),
        assets = List<AdminSubmissionAsset>.unmodifiable(assets);
@@ -98,6 +101,12 @@ class AdminSubmission {
   /// editor.
   final List<AdminSubmissionAsset> assets;
 
+  /// External provenance is absent for human and legacy submissions.
+  final AdminExternalEvent? externalEvent;
+
+  /// Acceptance against an existing Event, distinct from promotion.
+  final int? targetEventId;
+
   /// Whether dates identify this submission as an event.
   ///
   /// The backend has no event flag, so this intentionally matches the public
@@ -127,11 +136,13 @@ class AdminSubmission {
         other.latitude == latitude &&
         other.longitude == longitude &&
         other.promotion == promotion &&
+        other.externalEvent == externalEvent &&
+        other.targetEventId == targetEventId &&
         const DeepCollectionEquality().equals(other.assets, assets);
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     city,
     name,
@@ -149,6 +160,8 @@ class AdminSubmission {
     latitude,
     longitude,
     promotion,
+    externalEvent,
+    targetEventId,
     const DeepCollectionEquality().hash(assets),
-  );
+  ]);
 }

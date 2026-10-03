@@ -12,6 +12,7 @@ type EmailState = "sending" | "sent" | "failed";
 
 type ContentSubmission = {
   id: number;
+  external_event_record_id: number | null;
   user_id: string;
   city: string;
   name: string;
@@ -196,9 +197,10 @@ function safeEqual(left: string, right: string): boolean {
 }
 
 export function shouldSkipStatusNotification(
-  submission: { user_id: string },
+  submission: { user_id: string; external_event_record_id?: number | null },
   importerUserId: string | null,
 ): boolean {
+  if (submission.external_event_record_id != null) return true;
   if (!importerUserId) {
     return false;
   }
@@ -634,6 +636,8 @@ export function parseContentSubmission(
 
   if (
     !isValidSubmissionId(row.id) ||
+    !(row.external_event_record_id === null ||
+      isValidSubmissionId(row.external_event_record_id)) ||
     typeof row.user_id !== "string" ||
     !row.user_id.trim() ||
     typeof row.city !== "string" ||
@@ -656,6 +660,7 @@ export function parseContentSubmission(
 
   return {
     id: row.id,
+    external_event_record_id: row.external_event_record_id as number | null,
     user_id: row.user_id,
     city: row.city,
     name: row.name,
@@ -681,6 +686,7 @@ async function fetchSubmission(
       .from("content_submissions")
       .select(`
         id,
+        external_event_record_id,
         user_id,
         city,
         name,
@@ -737,6 +743,7 @@ async function updateAndReturnId(params: {
         status_email_last_error: null,
       })
       .eq("id", params.submission.id)
+      .is("external_event_record_id", null)
       .eq("status", params.submission.status)
       .eq("handled_at", params.submission.handled_at);
 
@@ -1116,7 +1123,9 @@ export async function handleRequest(
 
     return jsonResponse({
       ignored: true,
-      reason: "Submission belongs to the external-events importer",
+      reason: submission.external_event_record_id !== null
+        ? "Submission has external provenance"
+        : "Submission belongs to the external-events importer",
       submissionId: submission.id,
     });
   }

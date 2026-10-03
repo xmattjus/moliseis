@@ -42,6 +42,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Future<void> _openEditor({int? submissionId}) async {
     final router = GoRouter.of(context);
+    final viewModel = widget.viewModel;
     final changed = submissionId == null
         ? await router.pushNamed<bool>(RouteNames.adminSubmissionNew)
         : await router.pushNamed<bool>(
@@ -49,7 +50,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             pathParameters: <String, String>{'id': submissionId.toString()},
           );
     if (!mounted || changed != true) return;
-    await widget.viewModel.load.execute();
+    await viewModel.load.execute();
+    if (!mounted) return;
+    if (viewModel.showIgnored) await viewModel.loadIgnored.execute();
   }
 
   void _logout() {
@@ -69,7 +72,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       body: RefreshIndicator(
         displacement: 64,
         edgeOffset: 106,
-        onRefresh: () => viewModel.load.execute(),
+        onRefresh: () => viewModel.showIgnored
+            ? viewModel.loadIgnored.execute()
+            : viewModel.load.execute(),
         notificationPredicate: (notification) {
           return notification.depth == 1;
         },
@@ -89,7 +94,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           title: const Text('Aggiorna'),
                           icon: const Icon(Symbols.sync, weight: 500),
                           tooltip: 'Aggiorna i contenuti',
-                          onPressed: viewModel.load.execute,
+                          onPressed: () => viewModel.showIgnored
+                              ? viewModel.loadIgnored.execute()
+                              : viewModel.load.execute(),
                         ),
                         MenuItem(
                           title: const Text('Logout'),
@@ -120,11 +127,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               minHeight: 40,
                               maxHeight: 40,
                             ),
-                            isSelected: _filters
-                                .map((status) => viewModel.filter == status)
-                                .toList(growable: false),
-                            onPressed: (index) =>
-                                viewModel.setFilter(_filters[index]),
+                            isSelected: [
+                              ..._filters.map(
+                                (status) =>
+                                    !viewModel.showIgnored &&
+                                    viewModel.filter == status,
+                              ),
+                              viewModel.showIgnored,
+                            ],
+                            onPressed: (index) {
+                              if (index == _filters.length) {
+                                viewModel.setIgnoredFilter();
+                                unawaited(viewModel.loadIgnored.execute());
+                              } else {
+                                viewModel.setFilter(_filters[index]);
+                              }
+                            },
                             children: const [
                               Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16),
@@ -141,6 +159,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 16),
                                 child: Text('Rifiutati'),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Text('Fonti ignorate'),
                               ),
                             ],
                           );
@@ -164,8 +186,84 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 listenable: Listenable.merge(<Listenable>[
                   viewModel,
                   viewModel.load,
+                  viewModel.loadIgnored,
+                  viewModel.unIgnore,
                 ]),
                 builder: (context, _) {
+                  if (viewModel.showIgnored) {
+                    if (viewModel.loadIgnored.running &&
+                        viewModel.ignoredSources.isEmpty) {
+                      return const SliverFillRemaining(
+                        child: EmptyView.loading(
+                          text: Text('Caricamento fonti ignorate...'),
+                        ),
+                      );
+                    }
+                    return SliverList.list(
+                      children: [
+                        // Keep the action below the pinned filter.
+                        const SizedBox(height: kToolbarHeight + 16),
+                        if (viewModel.loadIgnored.error)
+                          ListTile(
+                            title: const Text(
+                              'Impossibile caricare le fonti ignorate',
+                            ),
+                            trailing: TextButton(
+                              onPressed: viewModel.loadIgnored.execute,
+                              child: const Text('Riprova'),
+                            ),
+                          ),
+                        if (viewModel.unIgnore.error)
+                          const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'Impossibile riattivare la fonte. Riprova.',
+                            ),
+                          ),
+                        if (viewModel.unIgnore.completed)
+                          const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('Fonte riattivata'),
+                          ),
+                        if (viewModel.unignoredPendingId case final pending?)
+                          TextButton(
+                            onPressed: () => _openEditor(submissionId: pending),
+                            child: const Text('Apri revisione in attesa'),
+                          ),
+                        if (viewModel.ignoredSources.isEmpty &&
+                            !viewModel.loadIgnored.error)
+                          const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('Nessuna fonte ignorata'),
+                          ),
+                        for (final source in viewModel.ignoredSources)
+                          ListTile(
+                            key: ValueKey('admin_ignored_source_${source.id}'),
+                            title: Text(source.name),
+                            subtitle: Text(
+                              [
+                                source.provider,
+                                source.externalId,
+                                if (source.occurrenceKey != null)
+                                  source.occurrenceKey,
+                                source.ignoredAt,
+                              ].join(' · '),
+                            ),
+                            trailing: TextButton(
+                              onPressed:
+                                  viewModel.unIgnore.running ||
+                                      viewModel.loadIgnored.running ||
+                                      viewModel.load.running
+                                  ? null
+                                  : () => unawaited(
+                                      viewModel.unIgnore.execute(source.id),
+                                    ),
+                              child: const Text('Riattiva fonte'),
+                            ),
+                          ),
+                      ],
+                    );
+                  }
                   if (viewModel.loading && !viewModel.hasData) {
                     return const SliverFillRemaining(
                       hasScrollBody: false,

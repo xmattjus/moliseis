@@ -1,0 +1,27 @@
+{
+  "production_audit_backfill_cutover": "NOT_EXECUTED",
+  "dataset_kind": "production_export",
+  "population_evidence_ref": null,
+  "quiescent_t0": null,
+  "rome_calendar_date": null,
+  "updated_admin_client_evidence_ref": null,
+  "legacy_writer_freeze_and_drain_evidence_ref": null,
+  "counts": {
+    "source_note_parse_failures": null,
+    "invalid_source_observations": null,
+    "ambiguous_pending": null,
+    "unresolved_identity_link_conflicts": null,
+    "unexplained_shadow_mismatches": null,
+    "classified_records": null,
+    "null_watermarks": null,
+    "unexplained_dry_run_proposals": null
+  },
+  "total_classification_evidence_ref": null,
+  "verified_unhandled_null_watermark_evidence_ref": null,
+  "production_contract_dry_run": "NOT_EXECUTED",
+  "dry_run_proposal_explanation_evidence_refs": [],
+  "backfill_verification_evidence_ref": null,
+  "provenance_cutover_evidence_ref": null,
+  "permanent_legacy_retirement_evidence_ref": null,
+  "provenance_importer_activation_evidence_ref": null
+}

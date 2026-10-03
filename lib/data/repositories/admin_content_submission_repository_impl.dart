@@ -2,6 +2,7 @@ import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
 import 'package:moliseis/data/mappers/submission_asset_mapper.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/data/services/api/supabase_functions_fetch_error.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
@@ -71,15 +72,22 @@ final class AdminContentSubmissionRepositoryImpl
   }
 
   @override
-  Future<Result<void>> reject(int id) {
-    return _invoke<void>(
+  Future<Result<AdminEventResolution>> reject(
+    int id, {
+    bool? ignoreSource,
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  }) {
+    return _invoke(
       operation: 'changeStatus',
       body: <String, dynamic>{
         'operation': 'changeStatus',
         'submission_id': id,
         // Rejection is the only final transition this repository can express;
-        // acceptance is reachable exclusively through promote.
+        // Acceptance uses the explicit promotion/link/apply operations.
         'status': AdminSubmissionStatus.rejected.name,
+        'ignore_source': ?ignoreSource,
+        ..._sourceAcknowledgement(acknowledgeCurrentSource, expectedSourceHash),
       },
       parse: _rejectFromEnvelope,
     );
@@ -88,18 +96,113 @@ final class AdminContentSubmissionRepositoryImpl
   @override
   Future<Result<AdminSubmissionPromotion>> promote(
     int id,
-    AdminPromotionTarget target,
-  ) {
+    AdminPromotionTarget target, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  }) {
     return _invoke(
       operation: 'promote',
       body: <String, dynamic>{
         'operation': 'promote',
         'submission_id': id,
         'target': target.name,
+        ..._sourceAcknowledgement(acknowledgeCurrentSource, expectedSourceHash),
       },
       parse: _promotionFromEnvelope,
     );
   }
+
+  @override
+  Future<Result<AdminEventCandidates>> eventCandidates(
+    int id, {
+    String? searchName,
+    int? targetEventId,
+  }) => _invoke(
+    operation: 'eventCandidates',
+    body: {
+      'operation': 'eventCandidates',
+      'submission_id': id,
+      'search_name': ?searchName,
+      'target_event_id': ?targetEventId,
+    },
+    parse: (value) => adminEventCandidatesFromWire(
+      _object(value, 'candidates response')['candidates'],
+    ),
+  );
+
+  @override
+  Future<Result<AdminEventMergePreview>> mergePreview(
+    int id,
+    int targetEventId,
+  ) => _invoke(
+    operation: 'mergePreview',
+    body: {
+      'operation': 'mergePreview',
+      'submission_id': id,
+      'target_event_id': targetEventId,
+    },
+    parse: (value) => adminEventMergePreviewFromWire(
+      _object(value, 'preview response')['preview'],
+    ),
+  );
+
+  @override
+  Future<Result<AdminEventResolution>> link(
+    int id,
+    int targetEventId, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  }) => _invoke(
+    operation: 'link',
+    body: {
+      'operation': 'link',
+      'submission_id': id,
+      'target_event_id': targetEventId,
+      ..._sourceAcknowledgement(acknowledgeCurrentSource, expectedSourceHash),
+    },
+    parse: (value) => adminEventResolutionFromWire(
+      _object(value, 'link response')['resolution'],
+    ),
+  );
+
+  @override
+  Future<Result<AdminEventResolution>> apply(
+    int id,
+    AdminEventMergePreview preview, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  }) => _invoke(
+    operation: 'apply',
+    body: {
+      'operation': 'apply',
+      'submission_id': id,
+      'target_event_id': preview.targetEventId,
+      'submission_version_token': preview.submissionVersionToken,
+      'event_version_token': preview.eventVersionToken,
+      ..._sourceAcknowledgement(acknowledgeCurrentSource, expectedSourceHash),
+    },
+    parse: (value) => adminEventResolutionFromWire(
+      _object(value, 'apply response')['resolution'],
+    ),
+  );
+
+  @override
+  Future<Result<List<AdminIgnoredSource>>> listIgnoredSources() => _invoke(
+    operation: 'listIgnoredSources',
+    body: {'operation': 'listIgnoredSources'},
+    parse: (value) {
+      final sources = _object(value, 'ignored sources')['sources'];
+      if (sources is! List) throw const FormatException('sources is invalid');
+      return sources.map(adminIgnoredSourceFromWire).toList();
+    },
+  );
+
+  @override
+  Future<Result<AdminEventResolution>> unIgnoreSource(int recordId) => _invoke(
+    operation: 'unIgnoreSource',
+    body: {'operation': 'unIgnoreSource', 'external_event_record_id': recordId},
+    parse: adminEventResolutionFromWire,
+  );
 
   @override
   Future<Result<AdminSubmissionAsset>> addAsset(
@@ -218,7 +321,7 @@ void _deleteAssetFromEnvelope(Object? value) {
 }
 
 /// Requires the reject-only success contract of the changeStatus operation.
-void _rejectFromEnvelope(Object? value) {
+AdminEventResolution _rejectFromEnvelope(Object? value) {
   final envelope = _object(value, 'changeStatus response');
   if (envelope['ok'] != true) {
     throw const FormatException('ok is invalid');
@@ -227,6 +330,11 @@ void _rejectFromEnvelope(Object? value) {
       AdminSubmissionStatus.rejected) {
     throw const FormatException('status does not match request');
   }
+  final pending = envelope['pending_submission_id'];
+  if (pending != null && (pending is! int || pending <= 0)) {
+    throw const FormatException('pending_submission_id is invalid');
+  }
+  return AdminEventResolution(outcome: 'rejected', pendingId: pending as int?);
 }
 
 AdminSubmissionPromotion _promotionFromEnvelope(Object? value) {
@@ -248,3 +356,6 @@ Map<String, dynamic> _object(Object? value, String path) {
   }
   return object;
 }
+
+Map<String, dynamic> _sourceAcknowledgement(bool? acknowledge, String? hash) =>
+    {'acknowledge_current_source': ?acknowledge, 'expected_source_hash': ?hash};

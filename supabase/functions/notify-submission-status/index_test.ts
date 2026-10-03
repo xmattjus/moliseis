@@ -1,6 +1,7 @@
 import { assertEquals } from "jsr:@std/assert@1";
 
 import {
+  parseContentSubmission,
   parseRequest,
   serveRequest,
   shouldSkipStatusNotification,
@@ -129,4 +130,57 @@ Deno.test("skips status notifications for the configured external-events importe
     ),
     false,
   );
+});
+
+Deno.test("Structural external suppression is authoritative independent of legacy UUID", () => {
+  assertEquals(
+    shouldSkipStatusNotification({
+      user_id: "different",
+      external_event_record_id: 19,
+    }, null),
+    true,
+  );
+  assertEquals(
+    shouldSkipStatusNotification({
+      user_id: "different",
+      external_event_record_id: 19,
+    }, "legacy"),
+    true,
+  );
+  assertEquals(
+    shouldSkipStatusNotification({
+      user_id: "human",
+      external_event_record_id: null,
+    }, "legacy"),
+    false,
+  );
+});
+Deno.test("Authoritative notification row requires nullable positive provenance ID", () => {
+  const row = {
+    id: 7,
+    external_event_record_id: null,
+    user_id: "human",
+    city: "City",
+    name: "Event",
+    user_email: "human@example.test",
+    user_name: "Human",
+    handled_at: "2026-10-02T10:00:00Z",
+    status: "accepted",
+    rejection_reason: null,
+    status_email_state: null,
+    status_email_key: null,
+    status_email_attempted_at: null,
+  };
+  assertEquals(parseContentSubmission(row)?.external_event_record_id, null);
+  assertEquals(
+    parseContentSubmission({ ...row, external_event_record_id: 19 })
+      ?.external_event_record_id,
+    19,
+  );
+  for (const invalid of [undefined, 0, -1, "19"]) {
+    assertEquals(
+      parseContentSubmission({ ...row, external_event_record_id: invalid }),
+      null,
+    );
+  }
 });

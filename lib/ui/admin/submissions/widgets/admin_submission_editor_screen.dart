@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
@@ -18,6 +19,7 @@ import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/core/utils/content_submission_asset_size.dart';
+import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -36,6 +38,9 @@ class AdminSubmissionEditorScreen extends StatefulWidget {
 
 class _AdminSubmissionEditorScreenState
     extends State<AdminSubmissionEditorScreen> {
+  String _eventSearch = '';
+  final _eventTargetController = TextEditingController();
+
   final _formKey = GlobalKey<FormState>();
   final _locationFormKey = GlobalKey<FormState>();
   var _statusDialogOpen = false;
@@ -44,21 +49,78 @@ class _AdminSubmissionEditorScreenState
   @override
   void initState() {
     super.initState();
+    _syncEventTarget();
+    widget.viewModel.addListener(_syncEventTarget);
     widget.viewModel.save.addListener(_handleSaveCompleted);
     widget.viewModel.reject.addListener(_handleRejectCompleted);
     widget.viewModel.promote.addListener(_handlePromoteCompleted);
+    widget.viewModel.link.addListener(_handleLinkCompleted);
+    widget.viewModel.apply.addListener(_handleApplyCompleted);
     widget.viewModel.addAsset.addListener(_handleAddAssetCompleted);
     widget.viewModel.deleteAsset.addListener(_handleDeleteAssetCompleted);
   }
 
   @override
   void dispose() {
+    widget.viewModel.removeListener(_syncEventTarget);
+    _eventTargetController.dispose();
     widget.viewModel.save.removeListener(_handleSaveCompleted);
     widget.viewModel.reject.removeListener(_handleRejectCompleted);
     widget.viewModel.promote.removeListener(_handlePromoteCompleted);
+    widget.viewModel.link.removeListener(_handleLinkCompleted);
+    widget.viewModel.apply.removeListener(_handleApplyCompleted);
     widget.viewModel.addAsset.removeListener(_handleAddAssetCompleted);
     widget.viewModel.deleteAsset.removeListener(_handleDeleteAssetCompleted);
     super.dispose();
+  }
+
+  void _syncEventTarget() {
+    if (!mounted) return;
+    final target = widget.viewModel.targetEventId;
+    // Preserve raw manual input when it already represents the selected ID.
+    if (int.tryParse(_eventTargetController.text) == target) return;
+    final text = target?.toString() ?? '';
+    _eventTargetController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
+  void _handleLinkCompleted() {
+    if (!mounted) return;
+    _handleResolutionCompleted(widget.viewModel.link);
+  }
+
+  void _handleApplyCompleted() {
+    if (!mounted) return;
+    _handleResolutionCompleted(widget.viewModel.apply);
+  }
+
+  void _handleResolutionCompleted(Command<AdminEventResolution> command) {
+    if (!mounted || command.running || command.idle) return;
+    if (command.completed) {
+      context.pop(true);
+    } else if (command.error) {
+      _showModerationError(command.result);
+    }
+  }
+
+  void _showModerationError(Result<dynamic>? result) {
+    if (!mounted) return;
+    final message = switch (result) {
+      Error(:final AdminContentSubmissionApiException error) =>
+        _moderationErrorMessage(error.code),
+      _ => null,
+    };
+    if (message == null) {
+      showSnackBarGenericError(context: context);
+    } else {
+      showSnackBar(
+        context: context,
+        textContent: message,
+        type: SnackBarType.error,
+      );
+    }
   }
 
   void _handleSaveCompleted() {
@@ -84,7 +146,7 @@ class _AdminSubmissionEditorScreenState
           type: SnackBarType.error,
         );
       } else {
-        showSnackBarGenericError(context: context);
+        _showModerationError(save.result);
       }
     }
   }
@@ -108,7 +170,7 @@ class _AdminSubmissionEditorScreenState
           type: SnackBarType.error,
         );
       } else {
-        showSnackBarGenericError(context: context);
+        _showModerationError(reject.result);
       }
     }
   }
@@ -126,7 +188,7 @@ class _AdminSubmissionEditorScreenState
       if (result case Error<AdminSubmissionPromotion>(
         :final AdminContentSubmissionApiException error,
       )) {
-        message = _promotionErrorMessage(error.code);
+        message = _moderationErrorMessage(error.code);
       } else {
         message = null;
       }
@@ -144,19 +206,25 @@ class _AdminSubmissionEditorScreenState
 
   /// Maps known promotion failure codes to actionable Italian copy; unknown
   /// codes fall back to the generic snackbar.
-  String? _promotionErrorMessage(String? code) => switch (code) {
-    'PROMOTION_COORDINATES_REQUIRED' || 'PROMOTION_INVALID_COORDINATES' =>
+  String? _moderationErrorMessage(String? code) => switch (code
+      ?.toUpperCase()) {
+    'COORDINATES_REQUIRED' ||
+    'INVALID_COORDINATES' ||
+    'PROMOTION_COORDINATES_REQUIRED' ||
+    'PROMOTION_INVALID_COORDINATES' =>
       'Imposta coordinate valide e salva prima di pubblicare.',
-    'PROMOTION_CITY_NOT_FOUND' =>
+    'CITY_NOT_FOUND' || 'PROMOTION_CITY_NOT_FOUND' =>
       'La città non corrisponde a una località disponibile. '
           'Correggila e salva.',
     'PROMOTION_PLACE_HAS_EVENT_DATES' =>
       "Rimuovi le date dell'evento e salva prima di pubblicare "
           'come luogo.',
+    'START_DATE_REQUIRED' ||
+    'NOT_EVENT_SUBMISSION' ||
     'PROMOTION_START_DATE_REQUIRED' =>
       'Imposta una data di inizio e salva prima di pubblicare '
           "l'evento.",
-    'PROMOTION_INVALID_DATE_RANGE' =>
+    'INVALID_DATE_RANGE' || 'PROMOTION_INVALID_DATE_RANGE' =>
       "Correggi le date dell'evento e salva prima di pubblicare.",
     'PROMOTION_INVALID_NAME' =>
       'Inserisci un nome valido e salva prima di pubblicare.',
@@ -166,6 +234,20 @@ class _AdminSubmissionEditorScreenState
       'Seleziona una categoria e salva prima di pubblicare.',
     'PROMOTION_TARGET_CONFLICT' =>
       'Il contributo è già stato pubblicato con un tipo diverso.',
+    'PROMOTION_SOURCE_ALREADY_LINKED' || 'SOURCE_ALREADY_LINKED' =>
+      'La fonte è già collegata. Usa Collega o Applica aggiornamento.',
+    'SOURCE_CHANGED' =>
+      'La fonte è cambiata. Rileggi la versione corrente e conferma di nuovo.',
+    'EVENT_CHANGED' || 'SUBMISSION_CHANGED' =>
+      'I dati sono cambiati. Ricarica l’anteprima prima di applicare.',
+    'NORMALIZATION_MISMATCH' =>
+      'La versione della fonte richiede una migrazione. Contatta la redazione.',
+    'RELINK_CONFLICT' || 'TARGET_CONFLICT' =>
+      'Il contributo è collegato a un altro evento. Ricarica i dati.',
+    'LINK_REQUIRED' => 'Collega prima la fonte a un evento esistente.',
+    'EVENT_INACTIVE' ||
+    'EVENT_NOT_FOUND' => 'L’evento non è disponibile. Cerca un evento attivo.',
+    'INVALID_GROUPS' => 'Anteprima non valida. Ricaricala prima di applicare.',
     'INVALID_STATUS_TRANSITION' =>
       'Il contributo non è più in attesa. Ricarica la schermata.',
     _ => null,
@@ -255,26 +337,54 @@ class _AdminSubmissionEditorScreenState
     final viewModel = widget.viewModel;
     if (viewModel.operationRunning) return;
 
+    var ignoreSource = viewModel.ignoreSource;
     _unfocus();
     _statusDialogOpen = true;
     try {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) {
-          return AlertDialog(
-            content: const Text(
-              'Confermi di voler rifiutare questo contributo?',
+          return StatefulBuilder(
+            builder: (dialogContext, setDialogState) => AlertDialog(
+              scrollable: true,
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Confermi di voler rifiutare questo contributo?'),
+                  if (viewModel.externalEvent != null) ...[
+                    const Text(
+                      'Rifiutare una revisione considera quella revisione '
+                      'sorgente esaminata e scartata. Le modifiche ancora '
+                      'presenti in revisioni future non vengono riproposte '
+                      'finché il provider non modifica nuovamente il relativo '
+                      'gruppo.',
+                    ),
+                    CheckboxListTile(
+                      title: const Text(
+                        'Ignora anche le revisioni future della fonte',
+                      ),
+                      subtitle: const Text(
+                        'Le revisioni future saranno soppresse finché non '
+                        'riattivi la fonte da Fonti ignorate.',
+                      ),
+                      value: ignoreSource,
+                      onChanged: (value) =>
+                          setDialogState(() => ignoreSource = value ?? false),
+                    ),
+                  ],
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Annulla'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Conferma'),
+                ),
+              ],
             ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Annulla'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Conferma'),
-              ),
-            ],
           );
         },
       );
@@ -286,6 +396,7 @@ class _AdminSubmissionEditorScreenState
       }
       if (confirmed != true || viewModel.operationRunning) return;
 
+      viewModel.setIgnoreSource(ignored: ignoreSource);
       unawaited(viewModel.reject.execute());
     } finally {
       _statusDialogOpen = false;
@@ -346,6 +457,11 @@ class _AdminSubmissionEditorScreenState
           viewModel.save,
           viewModel.promote,
           viewModel.reject,
+          viewModel.link,
+          viewModel.apply,
+          viewModel.preview,
+          viewModel.keepCurrent,
+          viewModel.findCandidates,
           viewModel.addAsset,
           viewModel.deleteAsset,
         ]),
@@ -403,6 +519,8 @@ class _AdminSubmissionEditorScreenState
                           opacity: viewModel.isEditable ? 1.0 : 0.55,
                           child: ContentSubmissionFields(
                             formKey: _formKey,
+                            hydrationRevision: viewModel.hydrationRevision,
+                            eventModeLocked: viewModel.externalEvent != null,
                             category: viewModel.category,
                             city: viewModel.city,
                             name: viewModel.name,
@@ -565,7 +683,207 @@ class _AdminSubmissionEditorScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         spacing: 8,
                         children: <Widget>[
+                          if (viewModel.externalEvent case final external?) ...[
+                            if (external.stale)
+                              const Text(
+                                'La proposta è precedente alla versione '
+                                'corrente della fonte.',
+                              ),
+                            if (external.currentSnapshot
+                                case final source?) ...[
+                              const Text('Versione corrente della fonte'),
+                              for (final entry in source.entries.where(
+                                (entry) => entry.key != 'description_delta',
+                              ))
+                                Text(
+                                  '${switch (entry.key) {
+                                    'name' => 'Nome',
+                                    'category' => 'Categoria',
+                                    'description' => 'Descrizione',
+                                    'city' => 'Città',
+                                    'latitude' => 'Latitudine',
+                                    'longitude' => 'Longitudine',
+                                    'all_day' => 'Tutto il giorno',
+                                    'start_date' => 'Inizio',
+                                    'end_date' => 'Fine',
+                                    _ => entry.key,
+                                  }}: ${entry.value ?? "Non disponibile"}',
+                                ),
+                            ],
+                            if (external.stale &&
+                                status == AdminSubmissionStatus.pending)
+                              CheckboxListTile(
+                                key: const ValueKey(
+                                  'admin_acknowledge_current_source',
+                                ),
+                                title: const Text(
+                                  'Considera valutata anche la versione '
+                                  'corrente della fonte',
+                                ),
+                                value: viewModel.acknowledgeCurrentSource,
+                                onChanged: viewModel.operationRunning
+                                    ? null
+                                    : (value) =>
+                                          viewModel.setAcknowledgeCurrentSource(
+                                            selected: value ?? false,
+                                          ),
+                              ),
+                          ],
                           if (status == AdminSubmissionStatus.pending) ...[
+                            if (viewModel.startDate != null) ...[
+                              TextFormField(
+                                key: const ValueKey('admin_event_search'),
+                                decoration: const InputDecoration(
+                                  labelText: 'Cerca evento per nome',
+                                ),
+                                onChanged: (value) => _eventSearch = value,
+                              ),
+                              TextButton(
+                                onPressed: viewModel.findCandidates.running
+                                    ? null
+                                    : () => unawaited(
+                                        viewModel.findCandidates.execute(
+                                          _eventSearch,
+                                        ),
+                                      ),
+                                child: const Text('Cerca eventi'),
+                              ),
+                              if (viewModel.findCandidates.error)
+                                const Text(
+                                  'Impossibile cercare gli eventi. Riprova.',
+                                ),
+                              if (viewModel.candidates case final matches?) ...[
+                                for (final warning in matches.pendingWarnings)
+                                  Text(
+                                    'Altro contributo in attesa: '
+                                    '${warning.name} (#${warning.id}). '
+                                    'Questo avviso non blocca '
+                                    'la moderazione.',
+                                  ),
+                                for (final candidate in matches.events)
+                                  ListTile(
+                                    key: ValueKey(
+                                      'admin_event_candidate_${candidate.id}',
+                                    ),
+                                    title: Text(candidate.name),
+                                    subtitle: Text(
+                                      candidate.city == null
+                                          ? 'Città non disponibile '
+                                                '· #${candidate.id}'
+                                          : '${candidate.city} '
+                                                '· #${candidate.id}',
+                                    ),
+                                    selected:
+                                        viewModel.targetEventId == candidate.id,
+                                    onTap: viewModel.operationRunning
+                                        ? null
+                                        : () => viewModel.selectTargetEvent(
+                                            candidate.id,
+                                          ),
+                                  ),
+                              ],
+                              if (viewModel.targetEventId case final target?)
+                                Text('Evento selezionato: #$target'),
+                              TextFormField(
+                                key: const ValueKey('admin_event_target'),
+                                controller: _eventTargetController,
+                                decoration: const InputDecoration(
+                                  labelText: 'ID evento esistente',
+                                ),
+                                keyboardType: TextInputType.number,
+                                enabled: !viewModel.operationRunning,
+                                onChanged: (value) => viewModel
+                                    .selectTargetEvent(int.tryParse(value)),
+                              ),
+                              FilledButton.tonal(
+                                onPressed:
+                                    viewModel.isDirty ||
+                                        viewModel.operationRunning ||
+                                        viewModel.targetEventId == null
+                                    ? null
+                                    : () => unawaited(
+                                        viewModel.link.execute(
+                                          viewModel.targetEventId!,
+                                        ),
+                                      ),
+                                child: const Text('Collega a evento'),
+                              ),
+                              if (viewModel.isExternalUpdate) ...[
+                                TextButton(
+                                  onPressed:
+                                      viewModel.isDirty ||
+                                          viewModel.operationRunning
+                                      ? null
+                                      : viewModel.preview.execute,
+                                  child: const Text('Anteprima aggiornamento'),
+                                ),
+                                if (viewModel.preview.error ||
+                                    viewModel.keepCurrent.error)
+                                  Text(switch (viewModel.keepCurrent.error
+                                      ? viewModel.keepCurrent.result
+                                      : viewModel.preview.result) {
+                                    Error(
+                                      :final AdminContentSubmissionApiException
+                                      error,
+                                    ) =>
+                                      _moderationErrorMessage(error.code) ??
+                                          error.message,
+                                    _ =>
+                                      'Impossibile completare l’anteprima. '
+                                          'Verifica i dati e ricarica.',
+                                  }),
+                                if (viewModel.mergePreview case final merge?)
+                                  for (final group in merge.groups)
+                                    Card(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              group.apply
+                                                  ? '${group.name}: applicato'
+                                                  : '${group.name}: '
+                                                        'non applicato',
+                                            ),
+                                            if (group.overwrite)
+                                              const Text(
+                                                'Sovrascrive modifiche del '
+                                                'moderatore '
+                                                'nell’evento attuale',
+                                              ),
+                                            Text('Base: ${group.base}'),
+                                            Text('Fonte: ${group.source}'),
+                                            Text(
+                                              'Proposta: ${group.moderated}',
+                                            ),
+                                            Text('Attuale: ${group.current}'),
+                                            TextButton(
+                                              onPressed:
+                                                  viewModel.operationRunning
+                                                  ? null
+                                                  : () => unawaited(
+                                                      viewModel.keepCurrent
+                                                          .execute(group),
+                                                    ),
+                                              child: const Text(
+                                                'Mantieni valore attuale',
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                if (viewModel.mergePreview != null)
+                                  FilledButton(
+                                    onPressed: viewModel.operationRunning
+                                        ? null
+                                        : viewModel.apply.execute,
+                                    child: const Text('Applica aggiornamento'),
+                                  ),
+                              ],
+                            ],
                             if (viewModel.isDirty)
                               const Text(
                                 'Salva le modifiche prima di pubblicare o '
@@ -583,25 +901,26 @@ class _AdminSubmissionEditorScreenState
                                 // end-date-only historical row still counts
                                 // as an event and surfaces the start-date
                                 // readiness error on publication.
-                                FilledButton.tonal(
-                                  onPressed:
-                                      viewModel.isDirty ||
-                                          viewModel.operationRunning ||
-                                          !viewModel.hasPublishableCategory
-                                      ? null
-                                      : () => unawaited(
-                                          _confirmPublish(
-                                            viewModel.isEvent
-                                                ? AdminPromotionTarget.event
-                                                : AdminPromotionTarget.place,
+                                if (!viewModel.isExternalUpdate)
+                                  FilledButton.tonal(
+                                    onPressed:
+                                        viewModel.isDirty ||
+                                            viewModel.operationRunning ||
+                                            !viewModel.hasPublishableCategory
+                                        ? null
+                                        : () => unawaited(
+                                            _confirmPublish(
+                                              viewModel.isEvent
+                                                  ? AdminPromotionTarget.event
+                                                  : AdminPromotionTarget.place,
+                                            ),
                                           ),
-                                        ),
-                                  child: Text(
-                                    viewModel.isEvent
-                                        ? 'Pubblica come evento'
-                                        : 'Pubblica come luogo',
+                                    child: Text(
+                                      viewModel.isEvent
+                                          ? 'Pubblica come evento'
+                                          : 'Pubblica come luogo',
+                                    ),
                                   ),
-                                ),
                                 FilledButton.tonal(
                                   onPressed:
                                       viewModel.isDirty ||

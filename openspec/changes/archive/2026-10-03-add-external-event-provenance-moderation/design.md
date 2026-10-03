@@ -141,7 +141,7 @@ SQL SHALL NOT implement Unicode normalization, source canonicalization, hashing,
 
 Canonicalization SHALL define at minimum:
 
--   NFC Unicode normalization;
+-   NFC Unicode normalization of scalar textual fields and of each Quill string insert independently, without crossing operation boundaries;
 -   field-specific trim semantics matching persisted Admin validation;
 -   explicit null semantics;
 -   stable enum representation;
@@ -149,6 +149,10 @@ Canonicalization SHALL define at minimum:
 -   UTC timestamp strings with explicit canonical fractional precision, preserving PostgreSQL-supported microseconds without a lossy JavaScript `Date` round-trip;
 -   finite coordinates represented inside normalized JSON as canonical strings rather than JSON numbers, including deterministic handling of negative zero;
 -   canonical Quill operations using existing validation guarantees, operation order unchanged, terminal newline required, adjacent equivalent operations rejected as today, and attribute keys emitted in one fixed order.
+
+Scalar textual fields are normalized to NFC. When `description_delta` is present, each Quill string insert is NFC-normalized independently and normalization SHALL NOT cross operation boundaries. Operation order and attributes SHALL remain unchanged, with attribute keys emitted in the fixed canonical order. The canonical `description` SHALL be derived exactly from the concatenated canonical inserts with the required terminal newline removed. Input `description` SHALL be canonically equivalent to the Delta plain-text projection, verified by comparing both plain-text projections after global NFC normalization; arbitrary mismatches SHALL fail closed. When no Delta is present, `description` is normalized as an ordinary scalar string.
+
+Canonicalizer regressions SHALL cover composition inside one insert, a base character and combining mark separated by a formatting boundary with exact derived description and valid Admin no-op Save, equal canonical results/hashes for canonically equivalent inputs without a semantically relevant formatting-boundary difference, idempotence, acceptance by `parseAdminContentSubmissionsRequest`, and rejection of semantic description/Delta mismatches.
 
 `description` and `description_delta` remain one semantic merge group.
 

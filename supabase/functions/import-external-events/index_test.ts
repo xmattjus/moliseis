@@ -1,3 +1,4 @@
+import { canonicalizeExternalEvent } from "../_shared/external_event_normalization.ts";
 import { assertEquals, assertRejects } from "jsr:@std/assert@1";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.112.3";
 
@@ -7,7 +8,9 @@ import type {
 } from "../_shared/cloudinary.ts";
 import type { Database } from "../_shared/database.types.ts";
 import {
-  insertImportedSubmission,
+  importSourceAssetIfEligible,
+  ingestExternalEvent,
+  ingestPreparedObservations,
   uploadAndPersistImportedAsset,
 } from "./index.ts";
 import {
@@ -169,6 +172,20 @@ function prepareFixtureSource(source: SourceFixture): PreparedExternalEvent {
     throw new Error("Invalid fixture source temporal input");
   }
   return {
+    provider: "eventimolise",
+    externalId: "1",
+    occurrenceKey: null,
+    normalized: canonicalizeExternalEvent({
+      name: "Fixture event",
+      city: "Campobasso",
+      category: "unknown",
+      description: null,
+      description_delta: null,
+      latitude: null,
+      longitude: null,
+      ...temporal.value,
+    }),
+    metadata: {},
     sourceId: 1,
     sourceUrl: "https://fixture.invalid/event",
     city: "Campobasso",
@@ -183,22 +200,20 @@ function prepareFixtureSource(source: SourceFixture): PreparedExternalEvent {
 }
 
 class FakeImporterSubmissionClient {
-  readonly inserts: unknown[] = [];
-  from(table: string) {
-    assertEquals(table, "content_submissions");
-    return {
-      insert: (payload: unknown) => {
-        this.inserts.push(payload);
-        return {
-          select: (columns: string) => {
-            assertEquals(columns, "id");
-            return {
-              single: () => Promise.resolve({ data: { id: 17 }, error: null }),
-            };
-          },
-        };
-      },
-    };
+  readonly rpcCalls: Array<{ name: string; args: Record<string, unknown> }> =
+    [];
+  rpc(name: string, args: Record<string, unknown>) {
+    this.rpcCalls.push({ name, args });
+    return Promise.resolve({
+      data: [{
+        outcome: "ingested",
+        record_id: 5,
+        event_id: null,
+        pending_submission_id: 17,
+        pending_created: true,
+      }],
+      error: null,
+    });
   }
 }
 
@@ -249,18 +264,26 @@ for (
     const prepared = prepareFixtureSource(fixture.source);
     assertEquals(prepared.allDay, fixture.allDay);
     const admin = new FakeImporterSubmissionClient();
-    await insertImportedSubmission(
+    await ingestExternalEvent(
       admin as unknown as SupabaseClient<Database>,
       prepared,
-      { id: "fixture-user", email: "fixture@example.test", name: "Fixture" },
+      "fixture-user",
     );
-    assertEquals(admin.inserts.length, 1);
-    const payload = admin.inserts[0] as Record<string, unknown>;
+    assertEquals(admin.rpcCalls.length, 1);
+    assertEquals(admin.rpcCalls[0].name, "ingest_external_event");
+    const args = admin.rpcCalls[0].args;
+    const payload = args.p_normalized as Record<string, unknown>;
+    assertEquals(args.p_importer_user_id, "fixture-user");
+    assertEquals("p_user_email" in args, false);
+    assertEquals("p_user_name" in args, false);
     assertEquals(payload.all_day, fixture.allDay);
-    assertEquals(payload.start_date, fixture.start);
+    assertEquals(
+      payload.start_date,
+      fixture.start.replace(".000Z", ".000000Z"),
+    );
     assertEquals(payload.end_date, fixture.end);
     assertEquals(payload.category, "unknown");
-    assertEquals(payload.status, "pending");
+    assertEquals(args.p_normalization_version, 1);
     assertEquals("start_calendar_date" in payload, false);
     assertEquals("end_calendar_date" in payload, false);
   });
@@ -271,14 +294,311 @@ Deno.test("invalid source civil date rejects before importer write", async () =>
   await assertRejects(
     async () => {
       const prepared = prepareFixtureSource({ startDay: "2026-02-30" });
-      await insertImportedSubmission(
+      await ingestExternalEvent(
         admin as unknown as SupabaseClient<Database>,
         prepared,
-        { id: "fixture-user", email: "fixture@example.test", name: "Fixture" },
+        "fixture-user",
       );
     },
     Error,
     "Invalid fixture source civil input",
   );
-  assertEquals(admin.inserts, []);
+  assertEquals(admin.rpcCalls, []);
+});
+
+Deno.test("ingest transport preserves record, linked Event, existing pending and no-pending outcomes", async () => {
+  const prepared = prepareFixtureSource({
+    startDay: "2026-10-02",
+    startClock: "12:00",
+  });
+  for (
+    const expected of [
+      {
+        record_id: 5,
+        event_id: null,
+        pending_submission_id: 17,
+        pending_created: true,
+      },
+      {
+        record_id: 5,
+        event_id: 12,
+        pending_submission_id: 17,
+        pending_created: false,
+      },
+      {
+        record_id: 5,
+        event_id: 12,
+        pending_submission_id: null,
+        pending_created: false,
+      },
+    ]
+  ) {
+    const admin = {
+      rpc: () =>
+        Promise.resolve({
+          data: [{ outcome: "ingested", ...expected }],
+          error: null,
+        }),
+    };
+    assertEquals(
+      await ingestExternalEvent(
+        admin as unknown as SupabaseClient<Database>,
+        prepared,
+        "configured-user",
+      ),
+      expected,
+    );
+  }
+});
+
+Deno.test("ingest transport rejects failed and malformed RPC outcomes", async () => {
+  const prepared = prepareFixtureSource({
+    startDay: "2026-10-02",
+    startClock: "12:00",
+  });
+  for (
+    const response of [
+      { data: null, error: { message: "database unavailable" } },
+      { data: [], error: null },
+      { data: [{ outcome: "normalization_mismatch" }], error: null },
+      {
+        data: [{
+          outcome: "ingested",
+          record_id: null,
+          event_id: null,
+          pending_submission_id: null,
+          pending_created: false,
+        }],
+        error: null,
+      },
+      {
+        data: [{
+          outcome: "ingested",
+          record_id: 5,
+          event_id: null,
+          pending_submission_id: null,
+          pending_created: true,
+        }],
+        error: null,
+      },
+      {
+        data: [{
+          outcome: "ingested",
+          record_id: 5,
+          event_id: null,
+          pending_submission_id: 17,
+        }],
+        error: null,
+      },
+    ]
+  ) {
+    const admin = { rpc: () => Promise.resolve(response) };
+    await assertRejects(
+      () =>
+        ingestExternalEvent(
+          admin as unknown as SupabaseClient<Database>,
+          prepared,
+          "configured-user",
+        ),
+      Error,
+      "External ingest failed",
+    );
+  }
+});
+
+Deno.test("invalid normalized Event start/chronology/all-day state never invokes ingest RPC", async () => {
+  const prepared = prepareFixtureSource({
+    startDay: "2026-10-02",
+    startClock: "12:00",
+  });
+  for (
+    const patch of [
+      { start_date: null },
+      { start_date: "2026-02-30T10:00:00Z" },
+      { end_date: "2026-10-02T09:59:59.999999Z" },
+      { all_day: true },
+    ]
+  ) {
+    const admin = new FakeImporterSubmissionClient();
+    await assertRejects(() =>
+      ingestExternalEvent(
+        admin as unknown as SupabaseClient<Database>,
+        {
+          ...prepared,
+          normalized: { ...prepared.normalized, ...patch },
+        } as PreparedExternalEvent,
+        "configured-user",
+      )
+    );
+    assertEquals(admin.rpcCalls, []);
+  }
+});
+
+Deno.test("creation budget reaches later identities on repeated runs and repeated appearances cost no slots", async () => {
+  const base = prepareFixtureSource({
+    startDay: "2026-10-02",
+    startClock: "12:00",
+  });
+  const a = { ...base, externalId: "A", sourceId: 1 };
+  const b = { ...base, externalId: "B", sourceId: 2 };
+  const records = new Map<string, { recordId: number; name: unknown }>();
+  const calls: string[] = [];
+  const admin = {
+    rpc: (_name: string, args: Record<string, unknown>) => {
+      const id = String(args.p_external_id);
+      calls.push(id);
+      const existing = records.get(id);
+      const recordId = existing?.recordId ?? records.size + 1;
+      records.set(id, {
+        recordId,
+        name: (args.p_normalized as Record<string, unknown>).name,
+      });
+      return Promise.resolve({
+        data: [{
+          outcome: "ingested",
+          record_id: recordId,
+          event_id: null,
+          pending_submission_id: recordId + 10,
+          pending_created: !existing,
+        }],
+        error: null,
+      });
+    },
+  } as unknown as SupabaseClient<Database>;
+  const first = await ingestPreparedObservations(
+    admin,
+    [a, b],
+    "configured-user",
+    1,
+  );
+  assertEquals(calls, ["A"]);
+  assertEquals(first.created, 1);
+  assertEquals(first.limitReached, true);
+  calls.length = 0;
+  const second = await ingestPreparedObservations(
+    admin,
+    [a, a, b],
+    "configured-user",
+    1,
+  );
+  assertEquals(calls, ["A", "A", "B"]);
+  assertEquals(second.created, 1);
+  assertEquals(second.limitReached, false);
+  assertEquals(records.size, 2);
+  calls.length = 0;
+  const updatedB = {
+    ...b,
+    normalized: { ...b.normalized, name: "Later updated B" },
+  };
+  const third = await ingestPreparedObservations(
+    admin,
+    [a, a, updatedB],
+    "configured-user",
+    1,
+  );
+  assertEquals(calls, ["A", "A", "B"]);
+  assertEquals(records.get("B")?.name, "Later updated B");
+  assertEquals(third.created, 0);
+  assertEquals(third.limitReached, false);
+});
+
+class ClaimImporterClient {
+  readonly calls: Array<{ functionName: string; args: unknown }> = [];
+  constructor(private readonly outcomes: string[]) {}
+  rpc(functionName: string, args: unknown): Promise<RpcResponse> {
+    this.calls.push({ functionName, args });
+    return Promise.resolve({
+      data: [{ outcome: this.outcomes.shift()! }],
+      error: null,
+    });
+  }
+}
+const sourceAssetObservation = {
+  record_id: 1,
+  event_id: null,
+  pending_submission_id: 7,
+  pending_created: false,
+};
+const sourceAssetImage =
+  "https://eventimolise.it/wp-content/uploads/fixture.png";
+Deno.test("Edge eligible current image claims existing pending before upload and association", async () => {
+  const client = new ClaimImporterClient(["claimed", "created"]);
+  let uploads = 0;
+  const result = await importSourceAssetIfEligible(
+    client as unknown as SupabaseClient<Database>,
+    {
+      event: { imageUrl: sourceAssetImage },
+      observation: sourceAssetObservation,
+      cloudinary: cloudinaryConfig,
+    },
+    {
+      uploadRemoteImage: ({ sourceUrl }) => {
+        assertEquals(sourceUrl, sourceAssetImage);
+        assertEquals(client.calls, [{
+          functionName: "claim_external_event_source_asset",
+          args: { p_submission_id: 7 },
+        }]);
+        uploads++;
+        return Promise.resolve(uploadedAsset);
+      },
+      destroyCloudinaryImage: () => Promise.resolve(),
+    },
+  );
+  assertEquals(result, "uploaded");
+  assertEquals(uploads, 1);
+  assertEquals(client.calls.map((call) => call.functionName), [
+    "claim_external_event_source_asset",
+    "add_submission_assets",
+  ]);
+});
+Deno.test("Edge no image/ineligible image/linked/no pending never claims or uploads; nonwinner skips", async () => {
+  for (
+    const [imageUrl, observation] of [
+      [null, sourceAssetObservation],
+      ["https://other.example.test/image.png", sourceAssetObservation],
+      [sourceAssetImage, { ...sourceAssetObservation, event_id: 19 }],
+      [sourceAssetImage, {
+        ...sourceAssetObservation,
+        pending_submission_id: null,
+      }],
+    ] as const
+  ) {
+    const client = new ClaimImporterClient([]);
+    assertEquals(
+      await importSourceAssetIfEligible(
+        client as unknown as SupabaseClient<Database>,
+        { event: { imageUrl }, observation, cloudinary: cloudinaryConfig },
+      ),
+      "skipped",
+    );
+    assertEquals(client.calls, []);
+  }
+  for (
+    const outcome of [
+      "already_claimed",
+      "source_already_linked",
+      "assets_present",
+      "not_pending",
+      "not_imported",
+      "not_found",
+    ]
+  ) {
+    const client = new ClaimImporterClient([outcome]);
+    assertEquals(
+      await importSourceAssetIfEligible(
+        client as unknown as SupabaseClient<Database>,
+        {
+          event: { imageUrl: sourceAssetImage },
+          observation: sourceAssetObservation,
+          cloudinary: cloudinaryConfig,
+        },
+        {
+          uploadRemoteImage: () => Promise.reject(new Error("must not upload")),
+          destroyCloudinaryImage: () => Promise.resolve(),
+        },
+      ),
+      "skipped",
+    );
+    assertEquals(client.calls.length, 1);
+  }
 });

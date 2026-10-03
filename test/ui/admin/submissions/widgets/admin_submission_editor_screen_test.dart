@@ -11,6 +11,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
@@ -28,6 +29,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import '../../../../support/admin_moderation_error_cases.dart';
 import '../../../../support/fake_cache_manager.dart';
 import '../../../../support/fake_image_picker.dart';
 import '../../../../support/fake_repositories.dart';
@@ -84,6 +86,643 @@ void main() {
       router.dispose();
       viewModel.dispose();
     });
+
+    testWidgets(
+      'manual lookup shows canonical targets and nonblocking warnings',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            externalEvent: AdminExternalEvent(
+              recordId: 12,
+              snapshotHash: 'x',
+              snapshotVersion: 1,
+              snapshot: const {},
+              mode: AdminExternalEventMode.update,
+              eventId: 42,
+            ),
+          ),
+        );
+        repository.candidatesResult = Result.success(
+          AdminEventCandidates(
+            events: [const AdminEventCandidate(id: 43, name: 'Canonical')],
+            pendingWarnings: [
+              const AdminEventCandidate(id: 9, name: 'Pending'),
+            ],
+          ),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('admin_event_search')),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('admin_event_search')),
+          'festa',
+        );
+        await tester.ensureVisible(find.text('Cerca eventi'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cerca eventi'));
+        await tester.pumpAndSettle();
+        expect(repository.candidateCalls.single, (1, 'festa', null));
+        expect(
+          find.textContaining('Altro contributo in attesa: Pending'),
+          findsOneWidget,
+        );
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('admin_event_candidate_43')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('admin_event_candidate_43')),
+        );
+        await tester.pumpAndSettle();
+        expect(viewModel.targetEventId, 43);
+        final targetField = find.byKey(const ValueKey('admin_event_target'));
+        expect(
+          tester.widget<TextFormField>(targetField).controller!.text,
+          '43',
+        );
+        await tester.enterText(targetField, '0044');
+        expect(viewModel.targetEventId, 44);
+        expect(
+          tester.widget<TextFormField>(targetField).controller!.text,
+          '0044',
+        );
+        expect(viewModel.isDirty, isFalse);
+      },
+    );
+
+    testWidgets(
+      'merge shows overwrite and keep-current saves/reloads in place',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 3000));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final group = AdminEventMergeGroup(
+          name: 'location',
+          providerChanged: true,
+          moderatorChanged: false,
+          apply: true,
+          overwrite: true,
+          base: {'city': 'Campobasso'},
+          source: {'city': 'Campobasso'},
+          moderated: {'city': 'Campobasso'},
+          current: {'city': 'Termoli', 'latitude': '41.2', 'longitude': '14.3'},
+        );
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            externalEvent: AdminExternalEvent(
+              recordId: 12,
+              snapshotHash: 'x',
+              snapshotVersion: 1,
+              snapshot: const {},
+              mode: AdminExternalEventMode.update,
+              eventId: 42,
+            ),
+          ),
+        );
+        repository.previewResult = Result.success(
+          AdminEventMergePreview(
+            targetEventId: 42,
+            submissionVersionToken: 's',
+            eventVersionToken: 'e',
+            groups: [group],
+          ),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await viewModel.preview.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        expect(find.text('location: applicato'), findsOneWidget);
+        expect(find.textContaining('Sovrascrive modifiche'), findsOneWidget);
+        await tester.ensureVisible(find.text('Mantieni valore attuale'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Mantieni valore attuale'));
+        await tester.pumpAndSettle();
+        expect(repository.updateInputs.single.city, 'Termoli');
+        final cityInput = find.descendant(
+          of: find.widgetWithText(TextFormField, 'Città'),
+          matching: find.byType(EditableText),
+        );
+        expect(
+          tester.widget<EditableText>(cityInput).controller.text,
+          'Termoli',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Luogo o evento'),
+          'Edited after keep',
+        );
+        expect(viewModel.city, 'Termoli');
+        expect(viewModel.name, 'Edited after keep');
+        await viewModel.save.execute();
+        expect(repository.updateInputs.last.city, 'Termoli');
+        expect(repository.updateInputs.last.name, 'Edited after keep');
+        expect(repository.previewCalls, hasLength(2));
+      },
+    );
+
+    for (final (code, status, text) in adminModerationErrorCases) {
+      testWidgets('Link $code displays actionable feedback', (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(startDate: DateTime.utc(2026, 10, 2)),
+        );
+        repository.linkResult = Result.error(
+          AdminContentSubmissionApiException(
+            statusCode: status,
+            code: code,
+            message: 'Backend',
+          ),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        viewModel.selectTargetEvent(42);
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Collega a evento'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Collega a evento'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining(text), findsOneWidget);
+        expect(find.text('SHELL_MARKER'), findsNothing);
+      });
+    }
+
+    for (final currentCity in <String?>[null, 'Isernia']) {
+      testWidgets(
+        'keep-current rehydrates city $currentCity without old form text',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(800, 3000));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final group = AdminEventMergeGroup(
+            name: 'location',
+            providerChanged: true,
+            moderatorChanged: false,
+            apply: true,
+            overwrite: true,
+            base: {},
+            source: {},
+            moderated: {},
+            current: {'city': currentCity, 'latitude': null, 'longitude': null},
+          );
+          repository.getByIdResults[1] = Result.success(
+            sampleAdminSubmission(
+              startDate: DateTime.utc(2026, 10, 2),
+              externalEvent: AdminExternalEvent(
+                recordId: 12,
+                snapshotHash: 'x',
+                snapshotVersion: 1,
+                snapshot: const {},
+                mode: AdminExternalEventMode.update,
+                eventId: 42,
+              ),
+            ),
+          );
+          repository.previewResult = Result.success(
+            AdminEventMergePreview(
+              targetEventId: 42,
+              submissionVersionToken: 's',
+              eventVersionToken: 'e',
+              groups: [group],
+            ),
+          );
+          viewModel = AdminSubmissionEditorViewModel(
+            repository: repository,
+            contentSubmissionRepository: contentSubmissionRepository,
+            submissionId: 1,
+          );
+          await viewModel.load.execute();
+          await viewModel.preview.execute();
+          await tester.pumpWidget(app);
+          unawaited(router.push('/editor'));
+          await tester.pumpAndSettle();
+          await viewModel.keepCurrent.execute(group);
+          await tester.pumpAndSettle();
+          final input = find.descendant(
+            of: find.widgetWithText(TextFormField, 'Città'),
+            matching: find.byType(EditableText),
+          );
+          expect(
+            tester.widget<EditableText>(input).controller.text,
+            currentCity ?? '',
+          );
+          expect(viewModel.city, currentCity);
+          expect(repository.updateInputs.length, currentCity == null ? 0 : 1);
+          expect(find.text('SHELL_MARKER'), findsNothing);
+          if (currentCity != null) {
+            final nameGroup = AdminEventMergeGroup(
+              name: 'name',
+              providerChanged: true,
+              moderatorChanged: false,
+              apply: true,
+              overwrite: true,
+              base: {},
+              source: {},
+              moderated: {},
+              current: {'name': 'Canonical title'},
+            );
+            repository.previewResult = Result.success(
+              AdminEventMergePreview(
+                targetEventId: 42,
+                submissionVersionToken: 'new',
+                eventVersionToken: 'new',
+                groups: [nameGroup],
+              ),
+            );
+            await viewModel.preview.execute();
+            await viewModel.keepCurrent.execute(nameGroup);
+            await tester.pumpAndSettle();
+            final title = find.descendant(
+              of: find.widgetWithText(TextFormField, 'Luogo o evento'),
+              matching: find.byType(EditableText),
+            );
+            expect(
+              tester.widget<EditableText>(title).controller.text,
+              'Canonical title',
+            );
+            await tester.enterText(
+              find.widgetWithText(TextFormField, 'Luogo o evento'),
+              'New edit',
+            );
+            expect(viewModel.name, 'New edit');
+            await viewModel.save.execute();
+            expect(repository.updateInputs.last.name, 'New edit');
+            expect(repository.updateInputs.last.city, currentCity);
+          }
+        },
+      );
+    }
+
+    testWidgets(
+      'failed Link cannot mask the current Apply failure or start feedback',
+      (tester) async {
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            externalEvent: AdminExternalEvent(
+              recordId: 12,
+              snapshotHash: 'x',
+              snapshotVersion: 1,
+              snapshot: const {},
+              mode: AdminExternalEventMode.update,
+              eventId: 42,
+              currentHash: 'y',
+              currentSnapshot: const {},
+            ),
+          ),
+        );
+        repository
+          ..linkResult = const Result.error(
+            AdminContentSubmissionApiException(
+              statusCode: 409,
+              code: 'SOURCE_CHANGED',
+              message: 'Changed source',
+            ),
+          )
+          ..previewResult = Result.success(
+            AdminEventMergePreview(
+              targetEventId: 42,
+              submissionVersionToken: 's',
+              eventVersionToken: 'e',
+              groups: [],
+            ),
+          );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        await viewModel.link.execute(42);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('La fonte è cambiata'), findsOneWidget);
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+        await viewModel.preview.execute();
+        final pending = Completer<Result<AdminEventResolution>>();
+        repository.pendingApply = pending;
+        final applying = viewModel.apply.execute();
+        await tester.pump();
+        expect(find.textContaining('La fonte è cambiata'), findsNothing);
+        pending.complete(
+          const Result.error(
+            AdminContentSubmissionApiException(
+              statusCode: 409,
+              code: 'EVENT_CHANGED',
+              message: 'Changed Event',
+            ),
+          ),
+        );
+        await applying;
+        await tester.pumpAndSettle();
+        expect(find.textContaining('I dati sono cambiati'), findsOneWidget);
+        expect(find.textContaining('La fonte è cambiata'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'imported Reject explains revision discard and forwards ignore plus '
+      'stale acknowledgement',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            externalEvent: AdminExternalEvent(
+              recordId: 12,
+              snapshotHash: 'x',
+              snapshotVersion: 1,
+              snapshot: const {'name': 'X'},
+              mode: AdminExternalEventMode.create,
+              currentHash: 'y',
+              currentSnapshot: const {'name': 'Current Y'},
+            ),
+          ),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        expect(find.text('Nome: Current Y'), findsOneWidget);
+        expect(find.textContaining('La proposta è precedente'), findsOneWidget);
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('admin_acknowledge_current_source')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('admin_acknowledge_current_source')),
+        );
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Rifiuta'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Rifiuta'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('esaminata e scartata'), findsOneWidget);
+        expect(find.textContaining('soppresse finché'), findsOneWidget);
+        await tester.tap(
+          find.text('Ignora anche le revisioni future della fonte'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
+        await tester.pumpAndSettle();
+        expect(repository.sourceOptions.single, ('reject', true, true, 'y'));
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'source_changed displays fresh source and requires a new explicit '
+      'selection',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2800));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            externalEvent: AdminExternalEvent(
+              recordId: 12,
+              snapshotHash: 'x',
+              snapshotVersion: 1,
+              snapshot: const {},
+              mode: AdminExternalEventMode.create,
+              currentHash: 'y',
+              currentSnapshot: const {'name': 'Y'},
+            ),
+          ),
+        );
+        repository.linkResult = const Result.error(
+          AdminContentSubmissionApiException(
+            statusCode: 409,
+            code: 'SOURCE_CHANGED',
+            message: 'Changed',
+          ),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        viewModel.selectTargetEvent(42);
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('admin_acknowledge_current_source')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('admin_acknowledge_current_source')),
+        );
+        await tester.pumpAndSettle();
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            externalEvent: AdminExternalEvent(
+              recordId: 12,
+              snapshotHash: 'x',
+              snapshotVersion: 1,
+              snapshot: const {},
+              mode: AdminExternalEventMode.create,
+              currentHash: 'z',
+              currentSnapshot: const {'name': 'Z'},
+            ),
+          ),
+        );
+        await tester.ensureVisible(find.text('Collega a evento'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Collega a evento'));
+        await tester.pumpAndSettle();
+        expect(repository.sourceOptions.single.$4, 'y');
+        expect(find.text('Nome: Z'), findsOneWidget);
+        expect(find.textContaining('La fonte è cambiata'), findsOneWidget);
+        expect(
+          tester
+              .widget<CheckboxListTile>(
+                find.byKey(const ValueKey('admin_acknowledge_current_source')),
+              )
+              .value,
+          isFalse,
+        );
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('admin_acknowledge_current_source')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('admin_acknowledge_current_source')),
+        );
+        await tester.pumpAndSettle();
+        repository.linkResult = const Result.success(
+          AdminEventResolution(outcome: 'linked', eventId: 42),
+        );
+        viewModel.selectTargetEvent(42);
+        await viewModel.link.execute(42);
+        await tester.pumpAndSettle();
+        expect(repository.sourceOptions.last.$4, 'z');
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
+      },
+    );
+
+    testWidgets('non-stale imported Event cannot remove Event mode and has no '
+        'acknowledgement action', (tester) async {
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(
+          startDate: DateTime.utc(2026, 10, 2),
+          externalEvent: AdminExternalEvent(
+            recordId: 12,
+            snapshotHash: 'x',
+            snapshotVersion: 1,
+            snapshot: const {},
+            mode: AdminExternalEventMode.create,
+            currentHash: 'x',
+            currentSnapshot: const {},
+          ),
+        ),
+      );
+      viewModel = AdminSubmissionEditorViewModel(
+        repository: repository,
+        contentSubmissionRepository: contentSubmissionRepository,
+        submissionId: 1,
+      );
+      await viewModel.load.execute();
+      await tester.pumpWidget(app);
+      unawaited(router.push('/editor'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('admin_acknowledge_current_source')),
+        findsNothing,
+      );
+      final row = find
+          .ancestor(of: find.text('È un evento?'), matching: find.byType(Row))
+          .first;
+      expect(
+        tester
+            .widget<Checkbox>(
+              find.descendant(of: row, matching: find.byType(Checkbox)),
+            )
+            .onChanged,
+        isNull,
+      );
+      viewModel.setEventEnabled(false);
+      expect(viewModel.startDate, isNotNull);
+      expect(viewModel.isDirty, isFalse);
+    });
+
+    testWidgets(
+      'imported Save backend Event-readiness rejection preserves editor and '
+      'shows action',
+      (tester) async {
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            externalEvent: AdminExternalEvent(
+              recordId: 12,
+              snapshotHash: 'x',
+              snapshotVersion: 1,
+              snapshot: const {},
+              mode: AdminExternalEventMode.create,
+            ),
+          ),
+        );
+        repository.updateResult = const Result.error(
+          AdminContentSubmissionApiException(
+            statusCode: 422,
+            code: 'START_DATE_REQUIRED',
+            message: 'Start required',
+          ),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        viewModel.setName('Edited');
+        await viewModel.save.execute();
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Imposta una data di inizio'),
+          findsOneWidget,
+        );
+        expect(find.text('SHELL_MARKER'), findsNothing);
+        expect(viewModel.isDirty, isTrue);
+      },
+    );
+
+    for (final mode in AdminExternalEventMode.values) {
+      testWidgets('imported $mode offers correct resolution choices', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2200));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            externalEvent: AdminExternalEvent(
+              recordId: 12,
+              snapshotHash: 'x',
+              snapshotVersion: 1,
+              snapshot: const {'name': 'Source'},
+              mode: mode,
+              eventId: mode == AdminExternalEventMode.update ? 42 : null,
+            ),
+          ),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        await viewModel.load.execute();
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        expect(find.text('Collega a evento'), findsOneWidget);
+        expect(
+          find.text('Pubblica come evento'),
+          mode == AdminExternalEventMode.create ? findsOneWidget : findsNothing,
+        );
+        expect(
+          find.text('Anteprima aggiornamento'),
+          mode == AdminExternalEventMode.update ? findsOneWidget : findsNothing,
+        );
+      });
+    }
 
     testWidgets('rehydrates date-only and toggle off requests a new clock', (
       tester,
@@ -1194,6 +1833,10 @@ void main() {
         find.widgetWithText(FilledButton, 'Pubblica come luogo'),
         findsNothing,
       );
+      await tester.ensureVisible(
+        find.widgetWithText(FilledButton, 'Pubblica come evento'),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(
         find.widgetWithText(FilledButton, 'Pubblica come evento'),
       );

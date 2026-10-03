@@ -29,6 +29,11 @@ const record: SubmissionRecord = {
   longitude: null,
   promoted_place_id: null,
   promoted_event_id: null,
+  external_event_record_id: null,
+  external_normalized: null,
+  external_normalization_version: null,
+  external_moderation_hash: null,
+  target_event_id: null,
 };
 
 type RecordedQuery = {
@@ -68,6 +73,27 @@ class FakeQueryBuilder {
     return this;
   }
 
+  is(column: string, value: unknown): this {
+    this.#recorded.filters.push([column, value]);
+    return this;
+  }
+  not(column: string, operator: string, value: unknown): this {
+    this.#recorded.filters.push([`${column}:${operator}`, value]);
+    return this;
+  }
+  then(
+    resolve: (value: QueryResponse) => unknown,
+    reject?: (reason: unknown) => unknown,
+  ) {
+    return Promise.resolve(this.#client.nextQueryResult()).then(
+      resolve,
+      reject,
+    );
+  }
+  in(column: string, values: unknown[]): this {
+    this.#recorded.filters.push([column, values]);
+    return this;
+  }
   order(): this {
     return this;
   }
@@ -158,7 +184,10 @@ Deno.test("update applies the pending-only guarded predicate", async () => {
   assert(query.updateValues !== null);
   // Both guards must be present on the UPDATE itself: the id predicate AND the
   // status predicate that blocks accepted/rejected sources.
-  assertEquals(query.filters, [["id", 7], ["status", "pending"]]);
+  assertEquals(query.filters, [["id", 7], ["status", "pending"], [
+    "external_event_record_id",
+    null,
+  ]]);
   assertEquals(query.selects, [SUBMISSION_SELECT]);
 });
 
@@ -185,7 +214,9 @@ Deno.test("update classifies an empty guarded result as not_found or not_pending
     { outcome: "not_found" },
   );
   // The classification lookup queried only id and status by the requested id.
-  assertEquals(absentClient.queries[1].selects, ["id,status"]);
+  assertEquals(absentClient.queries[1].selects, [
+    "id,status,external_event_record_id",
+  ]);
   assertEquals(absentClient.queries[1].filters, [["id", 8]]);
 
   const moderatedClient = new FakeAdminClient();
@@ -628,12 +659,526 @@ Deno.test("Admin create/update/read carry normalized all-day mode with the dates
     });
     assertEquals(client.queries[1].updateValues, {
       ...values,
-      modified_at: "2026-10-01T12:00:00Z",
     });
-    assertEquals(client.queries[1].filters, [["id", 7], ["status", "pending"]]);
+    assertEquals(client.queries[1].filters, [
+      ["id", 7],
+      ["status", "pending"],
+      ...(values.start_date === null
+        ? [["external_event_record_id", null] as [string, unknown]]
+        : []),
+    ]);
     client.queueQuery({ data: stored, error: null });
     client.queueQuery({ data: [], error: null });
-    assertEquals(await store.getById(7), { submission: stored, assets: [] });
+    assertEquals(await store.getById(7), {
+      submission: stored,
+      assets: [],
+      currentSource: null,
+    });
     assert(SUBMISSION_SELECT.split(",").includes("all_day"));
   }
+});
+
+Deno.test("changeStatus routes immutable imported provenance to authoritative reject without generic write", async () => {
+  const client = new FakeAdminClient();
+  client.queueQuery({
+    data: { id: 7, external_event_record_id: 19 },
+    error: null,
+  });
+  client.queueRpc({
+    data: [{ outcome: "rejected", pending_submission_id: 8 }],
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  assertEquals(
+    await store.changeStatus({
+      id: 7,
+      status: "rejected",
+      handledBy: "admin",
+      modifiedAt: "now",
+    }),
+    { outcome: "updated", pendingSubmissionId: 8 },
+  );
+  assertEquals(client.rpcCalls, [{
+    functionName: "reject_external_event_submission",
+    args: { p_submission_id: 7, p_handled_by: "admin" },
+  }]);
+  assertEquals(client.queries.length, 1);
+  assertEquals(client.queries[0].updateValues, null);
+});
+Deno.test("changeStatus retains human pending-only rejection", async () => {
+  const client = new FakeAdminClient();
+  client.queueQuery({
+    data: { id: 7, external_event_record_id: null },
+    error: null,
+  });
+  client.queueQuery({ data: { id: 7 }, error: null });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  assertEquals(
+    await store.changeStatus({
+      id: 7,
+      status: "rejected",
+      handledBy: "admin",
+      modifiedAt: "now",
+    }),
+    "updated",
+  );
+  assertEquals(client.rpcCalls, []);
+  assertEquals(client.queries[1].updateValues, {
+    status: "rejected",
+    handled_by: "admin",
+    modified_at: "now",
+  });
+  assertEquals(client.queries[1].filters, [["id", 7], ["status", "pending"], [
+    "external_event_record_id",
+    null,
+  ]]);
+});
+
+Deno.test("Reject ignore option reaches RPC and is inapplicable to human content", async () => {
+  const client = new FakeAdminClient();
+  client.queueQuery({
+    data: { id: 7, external_event_record_id: 19 },
+    error: null,
+  });
+  client.queueRpc({
+    data: [{ outcome: "rejected", pending_submission_id: null }],
+    error: null,
+  });
+  client.queueQuery({
+    data: { id: 8, external_event_record_id: null },
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  assertEquals(
+    await store.changeStatus({
+      id: 7,
+      status: "rejected",
+      handledBy: "verified-admin",
+      modifiedAt: "now",
+      ignoreSource: true,
+    }),
+    { outcome: "updated", pendingSubmissionId: null },
+  );
+  assertEquals(client.rpcCalls[0], {
+    functionName: "reject_external_event_submission",
+    args: {
+      p_submission_id: 7,
+      p_handled_by: "verified-admin",
+      p_ignore_source: true,
+    },
+  });
+  assertEquals(
+    await store.changeStatus({
+      id: 8,
+      status: "rejected",
+      handledBy: "verified-admin",
+      modifiedAt: "now",
+      ignoreSource: true,
+    }),
+    "not_imported",
+  );
+  assertEquals(client.queries[1].updateValues, null);
+});
+
+Deno.test("Ignored source list needs no pending and un-ignore parses pending outcome", async () => {
+  const client = new FakeAdminClient();
+  client.queueQuery({
+    data: [{
+      id: 19,
+      provider: "eventimolise",
+      external_id: "2",
+      occurrence_key: null,
+      normalized: { name: "Source name" },
+      ignored_at: "now",
+      event_id: null,
+    }],
+    error: null,
+  });
+  client.queueRpc({
+    data: [{ outcome: "unignored", pending_submission_id: 9 }],
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  assertEquals(await store.listIgnoredSources(), [{
+    id: 19,
+    provider: "eventimolise",
+    external_id: "2",
+    occurrence_key: null,
+    name: "Source name",
+    ignored_at: "now",
+    event_id: null,
+  }]);
+  assertEquals(client.queries[0].filters, [["ignored_at:is", null]]);
+  assertEquals(await store.unIgnoreSource(19), {
+    outcome: "unignored",
+    pendingSubmissionId: 9,
+  });
+  assertEquals(client.rpcCalls[0], {
+    functionName: "set_source_ignored",
+    args: { p_external_event_record_id: 19, p_ignored: false },
+  });
+});
+
+Deno.test("Imported detail shows current hash/snapshot but Reject passes original shown hash despite reread", async () => {
+  const client = new FakeAdminClient();
+  const shown = "a".repeat(64), current = "b".repeat(64);
+  const imported = {
+    ...record,
+    external_event_record_id: 19,
+    external_moderation_hash: "c".repeat(64),
+  };
+  client.queueQuery({ data: imported, error: null });
+  client.queueQuery({ data: [], error: null });
+  client.queueQuery({
+    data: { moderation_hash: current, normalized: { name: "Current source" } },
+    error: null,
+  });
+  client.queueQuery({
+    data: { id: 7, external_event_record_id: 19 },
+    error: null,
+  });
+  client.queueRpc({
+    data: [{ outcome: "source_changed", pending_submission_id: null }],
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  assertEquals((await store.getById(7))?.currentSource, {
+    moderation_hash: current,
+    normalized: { name: "Current source" },
+  });
+  assertEquals(
+    await store.changeStatus({
+      id: 7,
+      status: "rejected",
+      handledBy: "verified-admin",
+      modifiedAt: "now",
+      acknowledgeCurrentSource: true,
+      expectedSourceHash: shown,
+    }),
+    "source_changed",
+  );
+  assertEquals(client.rpcCalls[0], {
+    functionName: "reject_external_event_submission",
+    args: {
+      p_submission_id: 7,
+      p_handled_by: "verified-admin",
+      p_acknowledge_current_source: true,
+      p_expected_source_hash: shown,
+    },
+  });
+  const human = new FakeAdminClient();
+  human.queueQuery({
+    data: { id: 8, external_event_record_id: null },
+    error: null,
+  });
+  assertEquals(
+    await createAdminSubmissionStore(
+      human as unknown as SupabaseClient<Database>,
+    ).changeStatus({
+      id: 8,
+      status: "rejected",
+      handledBy: "admin",
+      modifiedAt: "now",
+      acknowledgeCurrentSource: true,
+    }),
+    "source_changed",
+  );
+  assertEquals(human.queries[0].updateValues, null);
+});
+
+Deno.test("Human rejection is guarded against concurrent verified provenance backfill", async () => {
+  const client = new FakeAdminClient();
+  client.queueQuery({
+    data: { id: 7, external_event_record_id: null },
+    error: null,
+  });
+  client.queueQuery({ data: null, error: null });
+  client.queueQuery({
+    data: { id: 7, status: "pending", external_event_record_id: 19 },
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  assertEquals(
+    await store.changeStatus({
+      id: 7,
+      status: "rejected",
+      handledBy: "admin",
+      modifiedAt: "now",
+    }),
+    "external_requires_resolution",
+  );
+  assertEquals(client.queries[1].filters, [["id", 7], ["status", "pending"], [
+    "external_event_record_id",
+    null,
+  ]]);
+  assertEquals(client.queries[2].selects, [
+    "id,status,external_event_record_id",
+  ]);
+  assertEquals(client.rpcCalls, []);
+});
+
+Deno.test("Linked source promotion failure is a closed domain result, never promotion success", async () => {
+  const client = new FakeAdminClient();
+  client.queueRpc({
+    data: [promotionRow("source_already_linked", null, null)],
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  assertEquals(
+    await store.promote({ id: 7, target: "event", handledBy: "admin" }),
+    { outcome: "source_already_linked" },
+  );
+});
+
+Deno.test("Link RPC receives verified actor/original hash and parses only closed outcome rows", async () => {
+  const client = new FakeAdminClient();
+  const hash = "a".repeat(64);
+  client.queueRpc({
+    data: [{ outcome: "linked", event_id: 19, pending_submission_id: 8 }],
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  assertEquals(
+    await store.link({
+      id: 7,
+      targetEventId: 19,
+      handledBy: "verified-admin",
+      acknowledgeCurrentSource: true,
+      expectedSourceHash: hash,
+    }),
+    { outcome: "linked", eventId: 19, pendingSubmissionId: 8 },
+  );
+  assertEquals(client.rpcCalls[0], {
+    functionName: "link_content_submission_to_event",
+    args: {
+      p_submission_id: 7,
+      p_target_event_id: 19,
+      p_handled_by: "verified-admin",
+      p_acknowledge_current_source: true,
+      p_expected_source_hash: hash,
+    },
+  });
+  for (
+    const outcome of [
+      "not_event_submission",
+      "source_changed",
+      "relink_conflict",
+      "event_inactive",
+    ] as const
+  ) {
+    client.queueRpc({
+      data: [{ outcome, event_id: null, pending_submission_id: null }],
+      error: null,
+    });
+    assertEquals(
+      await store.link({ id: 7, targetEventId: 19, handledBy: "admin" }),
+      { outcome },
+    );
+  }
+  client.queueRpc({
+    data: [{ outcome: "linked", event_id: 20, pending_submission_id: null }],
+    error: null,
+  });
+  await assertRejects(
+    () => store.link({ id: 7, targetEventId: 19, handledBy: "admin" }),
+    AdminSubmissionStoreError,
+  );
+});
+
+Deno.test("Apply store forwards closed server groups and original opaque preview tokens unchanged", async () => {
+  const client = new FakeAdminClient();
+  client.queueRpc({
+    data: [{ outcome: "applied", event_id: 19, pending_submission_id: 8 }],
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  const params = {
+    id: 7,
+    targetEventId: 19,
+    handledBy: "verified-admin",
+    groupsToApply: [
+      "description",
+      "schedule",
+    ] as ("description" | "schedule")[],
+    submissionVersionToken: "2026-10-02T10:00:00.123456+00:00",
+    eventVersionToken: "2026-10-02 11:00:00.654321+00",
+    acknowledgeCurrentSource: true,
+    expectedSourceHash: "a".repeat(64),
+  };
+  assertEquals(await store.apply(params), {
+    outcome: "applied",
+    eventId: 19,
+    pendingSubmissionId: 8,
+  });
+  assertEquals(client.rpcCalls[0], {
+    functionName: "apply_external_event_submission",
+    args: {
+      p_submission_id: 7,
+      p_target_event_id: 19,
+      p_handled_by: "verified-admin",
+      p_groups_to_apply: params.groupsToApply,
+      p_submission_version_token: params.submissionVersionToken,
+      p_event_version_token: params.eventVersionToken,
+      p_acknowledge_current_source: true,
+      p_expected_source_hash: params.expectedSourceHash,
+    },
+  });
+  for (
+    const outcome of [
+      "normalization_mismatch",
+      "source_changed",
+      "base_required",
+      "event_changed",
+      "submission_changed",
+    ] as const
+  ) {
+    client.queueRpc({
+      data: [{ outcome, event_id: null, pending_submission_id: null }],
+      error: null,
+    });
+    assertEquals(await store.apply(params), { outcome });
+  }
+});
+
+Deno.test("Promote transports original acknowledgement hash and parses source_changed", async () => {
+  const client = new FakeAdminClient();
+  client.queueRpc({
+    data: [promotionRow("source_changed", null, null)],
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  const hash = "a".repeat(64);
+  assertEquals(
+    await store.promote({
+      id: 7,
+      target: "event",
+      handledBy: "admin",
+      acknowledgeCurrentSource: true,
+      expectedSourceHash: hash,
+    }),
+    { outcome: "source_changed" },
+  );
+  assertEquals(client.rpcCalls[0], {
+    functionName: "promote_content_submission",
+    args: {
+      p_submission_id: 7,
+      p_target: "event",
+      p_handled_by: "admin",
+      p_acknowledge_current_source: true,
+      p_expected_source_hash: hash,
+    },
+  });
+});
+
+Deno.test("Imported Save cannot remove Event start; persisted predicate covers human-to-imported race", async () => {
+  const client = new FakeAdminClient();
+  client.queueQuery({ data: null, error: null });
+  client.queueQuery({
+    data: { id: 7, status: "pending", external_event_record_id: 19 },
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  const input = {
+    category: "history" as const,
+    city: "Campobasso",
+    name: "Human then imported",
+    description: null,
+    description_delta: null,
+    start_date: null,
+    end_date: null,
+    all_day: false,
+    latitude: null,
+    longitude: null,
+  };
+  assertEquals(await store.update(7, input, "ignored"), {
+    outcome: "start_date_required",
+  });
+  assertEquals(client.queries[0].filters, [["id", 7], ["status", "pending"], [
+    "external_event_record_id",
+    null,
+  ]]);
+  assertEquals(client.queries[1].selects, [
+    "id,status,external_event_record_id",
+  ]);
+});
+
+Deno.test("Apply store preserves stable temporal readiness failures from RPC", async () => {
+  for (
+    const outcome of ["start_date_required", "invalid_date_range"] as const
+  ) {
+    const client = new FakeAdminClient();
+    client.queueRpc({
+      data: [{ outcome, event_id: null, pending_submission_id: null }],
+      error: null,
+    });
+    const store = createAdminSubmissionStore(
+      client as unknown as SupabaseClient<Database>,
+    );
+    assertEquals(
+      await store.apply({
+        id: 7,
+        targetEventId: 19,
+        handledBy: "admin",
+        groupsToApply: ["name"],
+        submissionVersionToken: "2026-10-02T10:00:00.000001Z",
+        eventVersionToken: "2026-10-02T10:00:00.000002Z",
+      }),
+      { outcome },
+    );
+  }
+});
+
+Deno.test("list batch-loads source mode and current state for create/update/human rows", async () => {
+  const client = new FakeAdminClient();
+  client.queueQuery({
+    data: [{ id: 1, external_event_record_id: 12 }, {
+      id: 2,
+      external_event_record_id: 13,
+    }, { id: 3, external_event_record_id: null }],
+    error: null,
+  });
+  client.queueQuery({
+    data: [{
+      id: 12,
+      moderation_hash: "x",
+      normalized: { name: "Create" },
+      event_id: null,
+    }, {
+      id: 13,
+      moderation_hash: "y",
+      normalized: { name: "Update" },
+      event_id: 42,
+    }],
+    error: null,
+  });
+  const rows = await createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  ).list();
+  assertEquals(rows[0].currentSource?.event_id, null);
+  assertEquals(rows[1].currentSource?.event_id, 42);
+  assertEquals(rows[2].currentSource, null);
+  assertEquals(client.queries.length, 2);
+  assertEquals(client.queries[1].filters, [["id", [12, 13]]]);
 });

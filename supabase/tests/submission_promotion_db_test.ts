@@ -2548,13 +2548,28 @@ Deno.test("promotion executes only as service_role", async () => {
   const setup = client();
 
   try {
-    // Optional corroboration: the RPC must not be SECURITY DEFINER.
-    const [proc] = await setup<{ prosecdef: boolean }[]>`
-      select prosecdef
-      from pg_catalog.pg_proc
-      where proname = 'promote_content_submission'
+    // Provenance resolution calls closed private helpers through this
+    // service-role-only definer. Verify its hardened path and unambiguous
+    // defaulted signature in addition to the real role denial probes below.
+    const procedures = await setup<
+      {
+        prosecdef: boolean;
+        proconfig: string[];
+        pronargs: number;
+        pronargdefaults: number;
+      }[]
+    >`
+      select prosecdef,proconfig,pronargs,pronargdefaults
+      from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid=p.pronamespace
+      where p.proname='promote_content_submission' and n.nspname='public'
     `;
-    assertEquals(proc.prosecdef, false);
+    assertEquals(procedures.length, 1);
+    assertEquals(procedures[0], {
+      prosecdef: true,
+      proconfig: ['search_path=""'],
+      pronargs: 5,
+      pronargdefaults: 2,
+    });
 
     try {
       await setup.begin(async (transaction) => {

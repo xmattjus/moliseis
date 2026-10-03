@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/data/mappers/admin_submission_mapper.dart';
+import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
@@ -13,6 +15,7 @@ import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../../../support/admin_moderation_error_cases.dart';
 import '../../../../support/fake_image_picker.dart';
 import '../../../../support/fake_repositories.dart';
 
@@ -28,6 +31,594 @@ void main() {
         submissionId: submissionId,
       );
     }
+
+    test('human Event link accepts without a promotion', () async {
+      final repository =
+          FakeAdminContentSubmissionRepository(
+              getByIdResults: {
+                1: Result.success(
+                  sampleAdminSubmission(startDate: DateTime.utc(2026, 10, 2)),
+                ),
+              },
+            )
+            ..linkResult = const Result.success(
+              AdminEventResolution(outcome: 'linked', eventId: 42),
+            );
+      final vm = createViewModel(repository: repository, submissionId: 1);
+      addTearDown(vm.dispose);
+      await vm.load.execute();
+      await vm.link.execute(42);
+      expect(repository.linkCalls, [(1, 42)]);
+      expect(vm.status, AdminSubmissionStatus.accepted);
+      expect(vm.promotion, isNull);
+    });
+
+    test('imported update uses linked Event preview for Apply', () async {
+      final repository =
+          FakeAdminContentSubmissionRepository(
+              getByIdResults: {
+                1: Result.success(
+                  sampleAdminSubmission(
+                    startDate: DateTime.utc(2026, 10, 2),
+                    externalEvent: AdminExternalEvent(
+                      recordId: 5,
+                      snapshotHash: 'x',
+                      snapshotVersion: 1,
+                      snapshot: const {'name': 'X'},
+                      mode: AdminExternalEventMode.update,
+                      eventId: 42,
+                    ),
+                  ),
+                ),
+              },
+            )
+            ..previewResult = Result.success(
+              AdminEventMergePreview(
+                targetEventId: 42,
+                submissionVersionToken: 's',
+                eventVersionToken: 'e',
+                groups: [],
+              ),
+            )
+            ..applyResult = const Result.success(
+              AdminEventResolution(outcome: 'applied', eventId: 42),
+            );
+      final vm = createViewModel(repository: repository, submissionId: 1);
+      addTearDown(vm.dispose);
+      await vm.load.execute();
+      expect(vm.isExternalUpdate, isTrue);
+      await vm.preview.execute();
+      await vm.apply.execute();
+      expect(repository.applyCalls.single.$2.submissionVersionToken, 's');
+      expect(vm.status, AdminSubmissionStatus.accepted);
+    });
+
+    test('manual candidate search keeps pending warnings advisory', () async {
+      final repository =
+          FakeAdminContentSubmissionRepository(
+              getByIdResults: {
+                1: Result.success(
+                  sampleAdminSubmission(startDate: DateTime.utc(2026, 10, 2)),
+                ),
+              },
+            )
+            ..candidatesResult = Result.success(
+              AdminEventCandidates(
+                events: [const AdminEventCandidate(id: 42, name: 'Canonical')],
+                pendingWarnings: [
+                  const AdminEventCandidate(id: 9, name: 'Pending'),
+                ],
+              ),
+            )
+            ..linkResult = const Result.success(
+              AdminEventResolution(outcome: 'linked', eventId: 42),
+            );
+      final vm = createViewModel(repository: repository, submissionId: 1);
+      addTearDown(vm.dispose);
+      await vm.load.execute();
+      await vm.findCandidates.execute('  festa  ');
+      expect(repository.candidateCalls.single, (1, 'festa', null));
+      expect(vm.candidates!.pendingWarnings.single.id, 9);
+      expect(vm.isDirty, isFalse);
+      vm.selectTargetEvent(42);
+      await vm.link.execute(42);
+      expect(vm.link.completed, isTrue);
+    });
+
+    test(
+      'keep-current saves the complete location and reloads preview',
+      () async {
+        final group = AdminEventMergeGroup(
+          name: 'location',
+          providerChanged: true,
+          moderatorChanged: false,
+          apply: true,
+          overwrite: true,
+          base: {},
+          source: {},
+          moderated: {},
+          current: {
+            'city': 'Termoli',
+            'latitude': '41.123456789',
+            'longitude': '14.555555555',
+          },
+        );
+        final repository =
+            FakeAdminContentSubmissionRepository(
+                getByIdResults: {
+                  1: Result.success(
+                    sampleAdminSubmission(
+                      startDate: DateTime.utc(2026, 10, 2),
+                      externalEvent: AdminExternalEvent(
+                        recordId: 5,
+                        snapshotHash: 'x',
+                        snapshotVersion: 1,
+                        snapshot: const {},
+                        mode: AdminExternalEventMode.update,
+                        eventId: 42,
+                      ),
+                    ),
+                  ),
+                },
+              )
+              ..previewResult = Result.success(
+                AdminEventMergePreview(
+                  targetEventId: 42,
+                  submissionVersionToken: 's',
+                  eventVersionToken: 'e',
+                  groups: [group],
+                ),
+              );
+        final vm = createViewModel(repository: repository, submissionId: 1);
+        addTearDown(vm.dispose);
+        await vm.load.execute();
+        await vm.preview.execute();
+        await vm.keepCurrent.execute(group);
+        expect(vm.keepCurrent.completed, isTrue);
+        expect(repository.updateInputs.single.city, 'Termoli');
+        expect(repository.updateInputs.single.latitude, 41.123456789);
+        expect(repository.updateInputs.single.longitude, 14.555555555);
+        expect(repository.previewCalls, hasLength(2));
+        expect(vm.isDirty, isFalse);
+        vm.setName('changed');
+        expect(vm.mergePreview, isNull);
+      },
+    );
+
+    test(
+      'keep-current null city remains null and fails ordinary Save',
+      () async {
+        final group = AdminEventMergeGroup(
+          name: 'location',
+          providerChanged: true,
+          moderatorChanged: false,
+          apply: true,
+          overwrite: true,
+          base: {},
+          source: {},
+          moderated: {},
+          current: {'city': null, 'latitude': null, 'longitude': null},
+        );
+        final repository =
+            FakeAdminContentSubmissionRepository(
+                getByIdResults: {
+                  1: Result.success(
+                    sampleAdminSubmission(
+                      startDate: DateTime.utc(2026, 10, 2),
+                      externalEvent: AdminExternalEvent(
+                        recordId: 5,
+                        snapshotHash: 'x',
+                        snapshotVersion: 1,
+                        snapshot: const {},
+                        mode: AdminExternalEventMode.update,
+                        eventId: 42,
+                      ),
+                    ),
+                  ),
+                },
+              )
+              ..previewResult = Result.success(
+                AdminEventMergePreview(
+                  targetEventId: 42,
+                  submissionVersionToken: 's',
+                  eventVersionToken: 'e',
+                  groups: [group],
+                ),
+              );
+        final vm = createViewModel(repository: repository, submissionId: 1);
+        addTearDown(vm.dispose);
+        await vm.load.execute();
+        await vm.preview.execute();
+        await vm.keepCurrent.execute(group);
+        expect(vm.keepCurrent.error, isTrue);
+        expect(vm.city, isNull);
+        expect(vm.latitudeText, isEmpty);
+        expect(repository.updateInputs, isEmpty);
+        expect(vm.mergePreview, isNull);
+      },
+    );
+
+    for (final entry in <String, Map<String, dynamic>>{
+      'description': {
+        'description': 'Current',
+        'description_delta': [
+          {
+            'insert': 'Current',
+            'attributes': {'bold': true},
+          },
+          {'insert': '\n'},
+        ],
+      },
+      'schedule': {
+        'start_date': '2026-10-02T10:00:00.123456Z',
+        'end_date': '2026-10-02T11:00:00.654321Z',
+        'all_day': false,
+      },
+    }.entries) {
+      test('keep-current ${entry.key} saves every atomic field', () async {
+        final group = AdminEventMergeGroup(
+          name: entry.key,
+          providerChanged: true,
+          moderatorChanged: false,
+          apply: true,
+          overwrite: true,
+          base: {},
+          source: {},
+          moderated: {},
+          current: entry.value,
+        );
+        final repository =
+            FakeAdminContentSubmissionRepository(
+                getByIdResults: {
+                  1: Result.success(
+                    sampleAdminSubmission(
+                      startDate: DateTime.utc(2026, 10, 2),
+                      externalEvent: AdminExternalEvent(
+                        recordId: 5,
+                        snapshotHash: 'x',
+                        snapshotVersion: 1,
+                        snapshot: const {},
+                        mode: AdminExternalEventMode.update,
+                        eventId: 42,
+                      ),
+                    ),
+                  ),
+                },
+              )
+              ..previewResult = Result.success(
+                AdminEventMergePreview(
+                  targetEventId: 42,
+                  submissionVersionToken: 's',
+                  eventVersionToken: 'e',
+                  groups: [group],
+                ),
+              );
+        final vm = createViewModel(repository: repository, submissionId: 1);
+        addTearDown(vm.dispose);
+        await vm.load.execute();
+        await vm.preview.execute();
+        await vm.keepCurrent.execute(group);
+        expect(vm.keepCurrent.completed, isTrue);
+        final input = repository.updateInputs.single;
+        if (entry.key == 'description') {
+          expect(input.description, 'Current');
+          expect(input.descriptionDelta, entry.value['description_delta']);
+        } else {
+          expect(
+            input.startDate,
+            DateTime.parse(entry.value['start_date'] as String),
+          );
+          expect(
+            input.endDate,
+            DateTime.parse(entry.value['end_date'] as String),
+          );
+          expect(input.allDay, isFalse);
+        }
+        expect(repository.previewCalls, hasLength(2));
+      });
+    }
+
+    test(
+      'Save while preview is in flight cannot restore old preview tokens',
+      () async {
+        final pending = Completer<Result<AdminEventMergePreview>>();
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: {
+            1: Result.success(
+              sampleAdminSubmission(
+                startDate: DateTime.utc(2026, 10, 2),
+                externalEvent: AdminExternalEvent(
+                  recordId: 5,
+                  snapshotHash: 'x',
+                  snapshotVersion: 1,
+                  snapshot: const {},
+                  mode: AdminExternalEventMode.update,
+                  eventId: 42,
+                ),
+              ),
+            ),
+          },
+        )..pendingPreview = pending;
+        final vm = createViewModel(repository: repository, submissionId: 1);
+        addTearDown(vm.dispose);
+        await vm.load.execute();
+        final fetching = vm.preview.execute();
+        vm.setName('saved change');
+        await vm.save.execute();
+        pending.complete(
+          Result.success(
+            AdminEventMergePreview(
+              targetEventId: 42,
+              submissionVersionToken: 'old',
+              eventVersionToken: 'old',
+              groups: [],
+            ),
+          ),
+        );
+        await fetching;
+        expect(vm.isDirty, isFalse);
+        expect(vm.mergePreview, isNull);
+        expect(repository.updateInputs, hasLength(1));
+      },
+    );
+
+    for (final (code, status, _) in adminModerationErrorCases) {
+      test(
+        'Link preserves typed $code and makes no success mutation',
+        () async {
+          final error = AdminContentSubmissionApiException(
+            statusCode: status,
+            code: code,
+            message: 'Backend',
+          );
+          final repository = FakeAdminContentSubmissionRepository(
+            getByIdResults: {
+              1: Result.success(
+                sampleAdminSubmission(startDate: DateTime.utc(2026, 10, 2)),
+              ),
+            },
+          )..linkResult = Result.error(error);
+          final vm = createViewModel(repository: repository, submissionId: 1);
+          addTearDown(vm.dispose);
+          await vm.load.execute();
+          await vm.link.execute(42);
+          expect(
+            (vm.link.result! as Error<AdminEventResolution>).error,
+            same(error),
+          );
+          expect(vm.status, AdminSubmissionStatus.pending);
+        },
+      );
+    }
+
+    for (final operation in ['reject', 'promote', 'link', 'apply']) {
+      test(
+        '$operation forwards only the explicitly displayed stale source hash',
+        () async {
+          final external = AdminExternalEvent(
+            recordId: 5,
+            snapshotHash: 'x',
+            snapshotVersion: 1,
+            snapshot: const {'name': 'X'},
+            mode: AdminExternalEventMode.update,
+            eventId: 42,
+            currentHash: 'y',
+            currentSnapshot: const {'name': 'Y'},
+          );
+          final repository =
+              FakeAdminContentSubmissionRepository(
+                  getByIdResults: {
+                    1: Result.success(
+                      sampleAdminSubmission(
+                        startDate: DateTime.utc(2026, 10, 2),
+                        externalEvent: external,
+                      ),
+                    ),
+                  },
+                )
+                ..previewResult = Result.success(
+                  AdminEventMergePreview(
+                    targetEventId: 42,
+                    submissionVersionToken: 's',
+                    eventVersionToken: 'e',
+                    groups: [],
+                  ),
+                )
+                ..linkResult = const Result.success(
+                  AdminEventResolution(outcome: 'linked', eventId: 42),
+                )
+                ..applyResult = const Result.success(
+                  AdminEventResolution(outcome: 'applied', eventId: 42),
+                );
+          final vm = createViewModel(repository: repository, submissionId: 1);
+          addTearDown(vm.dispose);
+          await vm.load.execute();
+          if (operation == 'apply') await vm.preview.execute();
+          vm.setAcknowledgeCurrentSource(selected: true);
+          switch (operation) {
+            case 'reject':
+              await vm.reject.execute();
+            case 'promote':
+              await vm.promote.execute(AdminPromotionTarget.event);
+            case 'link':
+              await vm.link.execute(42);
+            case 'apply':
+              await vm.apply.execute();
+          }
+          expect(repository.sourceOptions.single.$3, isTrue);
+          expect(repository.sourceOptions.single.$4, 'y');
+          expect(vm.acknowledgeCurrentSource, isFalse);
+          expect(repository.getByIdIds, [1, 1]);
+        },
+      );
+    }
+
+    test('source_changed refetches current source and requires renewed '
+        'acknowledgement', () async {
+      final repository =
+          FakeAdminContentSubmissionRepository(
+              getByIdResults: {
+                1: Result.success(
+                  sampleAdminSubmission(
+                    startDate: DateTime.utc(2026, 10, 2),
+                    externalEvent: AdminExternalEvent(
+                      recordId: 5,
+                      snapshotHash: 'x',
+                      snapshotVersion: 1,
+                      snapshot: const {},
+                      mode: AdminExternalEventMode.update,
+                      eventId: 42,
+                      currentHash: 'y',
+                      currentSnapshot: const {'name': 'Y'},
+                    ),
+                  ),
+                ),
+              },
+            )
+            ..linkResult = const Result.error(
+              AdminContentSubmissionApiException(
+                statusCode: 409,
+                code: 'SOURCE_CHANGED',
+                message: 'Review',
+              ),
+            );
+      final vm = createViewModel(repository: repository, submissionId: 1);
+      addTearDown(vm.dispose);
+      await vm.load.execute();
+      vm.setAcknowledgeCurrentSource(selected: true);
+      repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(
+          startDate: DateTime.utc(2026, 10, 2),
+          externalEvent: AdminExternalEvent(
+            recordId: 5,
+            snapshotHash: 'x',
+            snapshotVersion: 1,
+            snapshot: const {},
+            mode: AdminExternalEventMode.update,
+            eventId: 42,
+            currentHash: 'z',
+            currentSnapshot: const {'name': 'Z'},
+          ),
+        ),
+      );
+      await vm.link.execute(42);
+      expect(repository.sourceOptions.single.$4, 'y');
+      expect(vm.externalEvent!.currentHash, 'z');
+      expect(vm.externalEvent!.currentSnapshot!['name'], 'Z');
+      expect(vm.acknowledgeCurrentSource, isFalse);
+      expect(vm.link.error, isTrue);
+      vm.setAcknowledgeCurrentSource(selected: true);
+      await vm.link.execute(42);
+      expect(repository.sourceOptions.last.$4, 'z');
+    });
+
+    test('preview newer current source replaces display and clears prior '
+        'selection', () async {
+      final repository =
+          FakeAdminContentSubmissionRepository(
+              getByIdResults: {
+                1: Result.success(
+                  sampleAdminSubmission(
+                    startDate: DateTime.utc(2026, 10, 2),
+                    externalEvent: AdminExternalEvent(
+                      recordId: 5,
+                      snapshotHash: 'x',
+                      snapshotVersion: 1,
+                      snapshot: const {},
+                      mode: AdminExternalEventMode.update,
+                      eventId: 42,
+                      currentHash: 'y',
+                      currentSnapshot: const {'name': 'Y'},
+                    ),
+                  ),
+                ),
+              },
+            )
+            ..previewResult = Result.success(
+              AdminEventMergePreview(
+                targetEventId: 42,
+                submissionVersionToken: 's',
+                eventVersionToken: 'e',
+                groups: [],
+                currentSourceHash: 'z',
+                currentSourceSnapshot: {'name': 'Z'},
+              ),
+            );
+      final vm = createViewModel(repository: repository, submissionId: 1);
+      addTearDown(vm.dispose);
+      await vm.load.execute();
+      vm.setAcknowledgeCurrentSource(selected: true);
+      await vm.preview.execute();
+      expect(vm.externalEvent!.currentHash, 'z');
+      expect(vm.externalEvent!.currentSnapshot!['name'], 'Z');
+      expect(vm.acknowledgeCurrentSource, isFalse);
+    });
+
+    test('non-stale source cannot select acknowledgement', () async {
+      final repository =
+          FakeAdminContentSubmissionRepository(
+              getByIdResults: {
+                1: Result.success(
+                  sampleAdminSubmission(
+                    startDate: DateTime.utc(2026, 10, 2),
+                    externalEvent: AdminExternalEvent(
+                      recordId: 5,
+                      snapshotHash: 'x',
+                      snapshotVersion: 1,
+                      snapshot: const {},
+                      mode: AdminExternalEventMode.create,
+                      currentHash: 'x',
+                      currentSnapshot: const {},
+                    ),
+                  ),
+                ),
+              },
+            )
+            ..linkResult = const Result.success(
+              AdminEventResolution(outcome: 'linked', eventId: 42),
+            );
+      final vm = createViewModel(repository: repository, submissionId: 1);
+      addTearDown(vm.dispose);
+      await vm.load.execute();
+      vm.setAcknowledgeCurrentSource(selected: true);
+      expect(vm.isSourceStale, isFalse);
+      expect(vm.acknowledgeCurrentSource, isFalse);
+      await vm.link.execute(42);
+      expect(repository.sourceOptions.single.$3, isNull);
+      expect(repository.sourceOptions.single.$4, isNull);
+    });
+
+    test(
+      'successful stale rejection reloads resolved and follow-up pending',
+      () async {
+        final repository = FakeAdminContentSubmissionRepository(
+          getByIdResults: {
+            1: Result.success(
+              sampleAdminSubmission(
+                startDate: DateTime.utc(2026, 10, 2),
+                externalEvent: AdminExternalEvent(
+                  recordId: 5,
+                  snapshotHash: 'x',
+                  snapshotVersion: 1,
+                  snapshot: const {},
+                  mode: AdminExternalEventMode.create,
+                  currentHash: 'y',
+                  currentSnapshot: const {},
+                ),
+              ),
+            ),
+            2: Result.success(sampleAdminSubmission(id: 2, name: 'Follow-up')),
+          },
+        )..rejectPendingId = 2;
+        final vm = createViewModel(repository: repository, submissionId: 1);
+        addTearDown(vm.dispose);
+        await vm.load.execute();
+        await vm.reject.execute();
+        expect(repository.getByIdIds, [1, 1, 2]);
+        expect(vm.followupSubmission!.id, 2);
+        expect(vm.status, AdminSubmissionStatus.rejected);
+      },
+    );
 
     test('all-day create captures mode and Rome bounds', () async {
       final repository = FakeAdminContentSubmissionRepository();

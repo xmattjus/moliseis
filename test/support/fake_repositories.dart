@@ -10,6 +10,7 @@ import 'package:moliseis/data/services/api/weather/model/combined_weather_foreca
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
@@ -107,6 +108,8 @@ AdminSubmission sampleAdminSubmission({
   double? latitude,
   double? longitude,
   AdminSubmissionPromotion? promotion,
+  AdminExternalEvent? externalEvent,
+  int? targetEventId,
   List<AdminSubmissionAsset> assets = const [],
 }) {
   final timestamp = DateTime.utc(2026, 8, 20);
@@ -128,6 +131,8 @@ AdminSubmission sampleAdminSubmission({
     latitude: latitude,
     longitude: longitude,
     promotion: promotion,
+    externalEvent: externalEvent,
+    targetEventId: targetEventId,
     assets: assets,
   );
 }
@@ -249,25 +254,138 @@ final class FakeAdminContentSubmissionRepository
   }
 
   @override
-  Future<Result<void>> reject(int id) async {
+  Future<Result<AdminEventResolution>> reject(
+    int id, {
+    bool? ignoreSource,
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  }) async {
     rejectIds.add(id);
+    sourceOptions.add((
+      'reject',
+      ignoreSource,
+      acknowledgeCurrentSource,
+      expectedSourceHash,
+    ));
     final pending = pendingReject;
-    if (pending != null) return pending.future;
-    return rejectResult;
+    final result = pending == null ? rejectResult : await pending.future;
+    return result.map(
+      (_) =>
+          AdminEventResolution(outcome: 'rejected', pendingId: rejectPendingId),
+    );
   }
 
   @override
   Future<Result<AdminSubmissionPromotion>> promote(
     int id,
-    AdminPromotionTarget target,
-  ) async {
+    AdminPromotionTarget target, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  }) async {
     promoteCalls.add((id, target));
+    sourceOptions.add((
+      'promote',
+      null,
+      acknowledgeCurrentSource,
+      expectedSourceHash,
+    ));
     final pending = pendingPromote;
     if (pending != null) return pending.future;
     if (promoteResults.isEmpty) {
       return Result.error(TestException('No queued promote result'));
     }
     return promoteResults.removeAt(0);
+  }
+
+  int? rejectPendingId;
+  final sourceOptions = <(String, bool?, bool?, String?)>[];
+  Result<List<AdminIgnoredSource>> ignoredSourcesResult = const Result.success(
+    [],
+  );
+  Result<AdminEventResolution>? unIgnoreResult;
+  Completer<Result<AdminEventResolution>>? pendingUnIgnore;
+  int ignoredListCalls = 0;
+  final unIgnoreCalls = <int>[];
+  @override
+  Future<Result<List<AdminIgnoredSource>>> listIgnoredSources() async {
+    ignoredListCalls++;
+    return ignoredSourcesResult;
+  }
+
+  @override
+  Future<Result<AdminEventResolution>> unIgnoreSource(int recordId) async {
+    unIgnoreCalls.add(recordId);
+    if (pendingUnIgnore case final pending?) return await pending.future;
+    return unIgnoreResult ??
+        Result.error(TestException('No un-ignore configured'));
+  }
+
+  Result<AdminEventCandidates>? candidatesResult;
+  Result<AdminEventMergePreview>? previewResult;
+  Completer<Result<AdminEventMergePreview>>? pendingPreview;
+  Result<AdminEventResolution>? linkResult;
+  Result<AdminEventResolution>? applyResult;
+  Completer<Result<AdminEventResolution>>? pendingApply;
+  final candidateCalls = <(int, String?, int?)>[];
+  final previewCalls = <(int, int)>[];
+  final linkCalls = <(int, int)>[];
+  final applyCalls = <(int, AdminEventMergePreview)>[];
+
+  @override
+  Future<Result<AdminEventCandidates>> eventCandidates(
+    int id, {
+    String? searchName,
+    int? targetEventId,
+  }) async {
+    candidateCalls.add((id, searchName, targetEventId));
+    return candidatesResult ??
+        Result.error(TestException('No candidates configured'));
+  }
+
+  @override
+  Future<Result<AdminEventMergePreview>> mergePreview(
+    int id,
+    int targetEventId,
+  ) async {
+    previewCalls.add((id, targetEventId));
+    if (pendingPreview case final pending?) return await pending.future;
+    return previewResult ??
+        Result.error(TestException('No preview configured'));
+  }
+
+  @override
+  Future<Result<AdminEventResolution>> link(
+    int id,
+    int targetEventId, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  }) async {
+    linkCalls.add((id, targetEventId));
+    sourceOptions.add((
+      'link',
+      null,
+      acknowledgeCurrentSource,
+      expectedSourceHash,
+    ));
+    return linkResult ?? Result.error(TestException('No link configured'));
+  }
+
+  @override
+  Future<Result<AdminEventResolution>> apply(
+    int id,
+    AdminEventMergePreview preview, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  }) async {
+    applyCalls.add((id, preview));
+    sourceOptions.add((
+      'apply',
+      null,
+      acknowledgeCurrentSource,
+      expectedSourceHash,
+    ));
+    if (pendingApply case final pending?) return await pending.future;
+    return applyResult ?? Result.error(TestException('No apply configured'));
   }
 
   @override

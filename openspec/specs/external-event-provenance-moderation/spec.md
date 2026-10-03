@@ -1,8 +1,10 @@
+# external-event-provenance-moderation Specification
+
 ## Purpose
 
 Provide provider-generic external Event identity and provenance, deterministic source-change proposal generation, safe moderation against moderator-owned canonical Events, and auditable migration from the existing EventiMolise importer.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: External event identity is stable and provider-scoped
 
@@ -26,9 +28,45 @@ Normalized/proposed/metadata values SHALL satisfy jsonb-object checks, version f
 
 The complete moderation-relevant normalized shape SHALL be canonicalized only by one pure shared TypeScript boundary under `_shared`, reused by ingest, migration/shadow tooling, and Admin merge logic. Version 1 SHALL contain every field: `name`, `category`, `description`, `description_delta`, `city`, `latitude`, `longitude`, `all_day`, `start_date`, and `end_date`. Missing provider values SHALL use explicit canonical values, including `unknown` category and nullable descriptions/coordinates. `start_date` SHALL be non-null and satisfy the existing Event temporal contract; `end_date` MAY be null. An adapter unable to produce a valid Event start SHALL reject/quarantine that source row rather than persist a place-like source record.
 
-`moderation_hash` SHALL equal `SHA-256(canonicalEncode(normalized))` over the entire shape. Canonicalization SHALL define NFC Unicode normalization, field-specific trimming consistent with persisted Admin validation, explicit null semantics, stable enums, deterministic field ordering, UTC timestamp strings with explicit fractional precision preserving PostgreSQL microseconds without lossy JavaScript `Date` round trips, finite coordinates encoded as canonical JSON strings with deterministic negative-zero handling, and canonical Quill operations. Quill operation order SHALL be retained, a terminal newline SHALL be required, adjacent equivalent operations SHALL remain rejected, and attribute keys SHALL use fixed order.
+`moderation_hash` SHALL equal `SHA-256(canonicalEncode(normalized))` over the entire shape. Canonicalization SHALL define NFC Unicode normalization of scalar textual fields, field-specific trimming consistent with persisted Admin validation, explicit null semantics, stable enums, deterministic field ordering, UTC timestamp strings with explicit fractional precision preserving PostgreSQL microseconds without lossy JavaScript `Date` round trips, finite coordinates encoded as canonical JSON strings with deterministic negative-zero handling, and canonical Quill operations. Quill operation order SHALL be retained, a terminal newline SHALL be required, adjacent equivalent operations SHALL remain rejected, and attribute keys SHALL use fixed order.
+
+Scalar textual fields are normalized to NFC. When `description_delta` is present, each Quill string insert is NFC-normalized independently and normalization SHALL NOT cross operation boundaries. Operation order and attributes SHALL remain unchanged, with attribute keys emitted in the fixed canonical order. The canonical `description` SHALL be derived exactly from the concatenated canonical inserts with the required terminal newline removed. Input `description` SHALL be canonically equivalent to the Delta plain-text projection, verified by comparing both plain-text projections after global NFC normalization; arbitrary mismatches SHALL fail closed. When no Delta is present, `description` is normalized as an ordinary scalar string.
 
 SQL SHALL NOT implement canonicalization, Unicode/Quill/timestamp/coordinate normalization, hashing, or merge diff logic. Provider-specific data SHALL reside in versioned `metadata`. Provider cancelled/postponed states MAY reside there but SHALL NOT affect normalized state, hashes, merge, or proposal generation in Workstream A.
+
+#### Scenario: NFC composition within one Quill insert
+
+- **WHEN** a string insert contains a decomposed character entirely within that operation
+- **THEN** its canonical insert SHALL contain the NFC-composed character
+
+#### Scenario: NFC preserves Quill formatting boundaries
+
+- **GIVEN** a bold insert contains `e` and the following unformatted insert contains a combining acute accent and terminal newline
+- **WHEN** the Delta is canonicalized
+- **THEN** both operation boundaries and attributes SHALL be preserved
+- **AND** canonical description SHALL exactly concatenate the canonical inserts minus the terminal newline, retaining the cross-operation decomposed sequence
+- **AND** the canonical Delta and derived description SHALL pass `parseAdminContentSubmissionsRequest` and an unchanged Admin Save
+
+#### Scenario: Canonically equivalent inputs converge
+
+- **GIVEN** two inputs are canonically equivalent and do not differ by a semantically relevant formatting boundary
+- **WHEN** both are canonicalized and hashed
+- **THEN** their canonical results and hashes SHALL be identical
+
+#### Scenario: Canonicalization is idempotent
+
+- **WHEN** an already canonical normalized state is canonicalized again
+- **THEN** its complete canonical result SHALL remain identical
+
+#### Scenario: Canonical Delta is compatible with Admin validation
+
+- **WHEN** canonical Delta and its exactly derived description are submitted to `parseAdminContentSubmissionsRequest`
+- **THEN** description validation SHALL succeed
+
+#### Scenario: Semantic description mismatch fails closed
+
+- **WHEN** input description and Delta plain-text projection differ after global NFC normalization
+- **THEN** canonicalization SHALL reject the input rather than replace an arbitrary mismatch
 
 #### Scenario: Database round-trip preserves hash
 

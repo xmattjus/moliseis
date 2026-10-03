@@ -1,3 +1,12 @@
+import {
+  canonicalizeEvent,
+  canonicalizeExternalEvent,
+  canonicalizeSubmission,
+  type EventNormalizationInput,
+  EXTERNAL_EVENT_NORMALIZATION_VERSION,
+} from "../_shared/external_event_normalization.ts";
+import { calculateExternalEventMerge } from "../_shared/external_event_merge.ts";
+import { validateSubmissionDates } from "../_shared/submission_dates.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import {
   createClient,
@@ -15,6 +24,7 @@ import {
   type AdminSubmissionStore,
   AdminSubmissionStoreError,
   createAdminSubmissionStore,
+  type EventResolutionStoreResult,
   type PromoteStoreResult,
   type SubmissionAssetRecord,
   type SubmissionRecord,
@@ -52,6 +62,15 @@ type AdminSubmissionWire = {
   longitude: number | null;
   promoted_place_id: number | null;
   promoted_event_id: number | null;
+  external_event_record_id: number | null;
+  external_normalized: Json | null;
+  external_normalization_version: number | null;
+  external_moderation_hash: string | null;
+  target_event_id: number | null;
+  moderation_hash: string | null;
+  current_source_normalized: Json | null;
+  external_mode: "create" | "update" | null;
+  external_event_id: number | null;
   assets: AdminSubmissionAssetWire[];
 };
 
@@ -134,6 +153,18 @@ function promotionResponse(
           entity_id: result.entityId,
         },
       });
+    case "source_changed":
+      return errorResponse(
+        "SOURCE_CHANGED",
+        "The displayed source revision changed; reload before resolving.",
+        409,
+      );
+    case "source_already_linked":
+      return errorResponse(
+        "PROMOTION_SOURCE_ALREADY_LINKED",
+        "The source already links to an Event; use Link or Apply.",
+        409,
+      );
     case "not_found":
       return errorResponse("NOT_FOUND", "Submission not found.", 404);
     case "not_pending":
@@ -199,10 +230,135 @@ function promotionResponse(
   }
 }
 
+export function eventResolutionResponse(
+  result: EventResolutionStoreResult,
+): Response {
+  switch (result.outcome) {
+    case "linked":
+    case "applied":
+    case "already_resolved":
+      return jsonResponse({
+        resolution: {
+          outcome: result.outcome,
+          target_event_id: result.eventId,
+          pending_submission_id: result.pendingSubmissionId,
+        },
+      });
+    case "not_found":
+      return errorResponse("NOT_FOUND", "Submission not found.", 404);
+    case "event_not_found":
+      return errorResponse("EVENT_NOT_FOUND", "Event not found.", 404);
+    case "not_event_submission":
+      return errorResponse(
+        "NOT_EVENT_SUBMISSION",
+        "Only Event submissions can link to an Event.",
+        422,
+      );
+    case "source_changed":
+      return errorResponse(
+        "SOURCE_CHANGED",
+        "Review the current source version before acknowledging it.",
+        409,
+      );
+    case "not_pending":
+      return errorResponse(
+        "INVALID_STATUS_TRANSITION",
+        "Only pending submissions can be resolved.",
+        409,
+      );
+    case "target_conflict":
+      return errorResponse(
+        "TARGET_CONFLICT",
+        "Submission already resolved against another Event.",
+        409,
+      );
+    case "relink_conflict":
+      return errorResponse(
+        "RELINK_CONFLICT",
+        "The source already links to another Event.",
+        409,
+      );
+    case "not_imported":
+    case "source_not_linked":
+    case "base_required":
+      return errorResponse(
+        "LINK_REQUIRED",
+        "A linked imported source with a known base is required for Apply.",
+        409,
+      );
+    case "normalization_mismatch":
+      return errorResponse(
+        "NORMALIZATION_MISMATCH",
+        "Source normalization versions require migration.",
+        409,
+      );
+    case "invalid_groups":
+      return errorResponse(
+        "INVALID_GROUPS",
+        "Apply requires known unique semantic groups.",
+        422,
+      );
+    case "submission_changed":
+      return errorResponse(
+        "SUBMISSION_CHANGED",
+        "Submission changed; reload its preview.",
+        409,
+      );
+    case "event_changed":
+      return errorResponse(
+        "EVENT_CHANGED",
+        "Event changed; reload its preview.",
+        409,
+      );
+    case "start_date_required":
+      return errorResponse(
+        "START_DATE_REQUIRED",
+        "Event start date is required.",
+        422,
+      );
+    case "invalid_date_range":
+      return errorResponse(
+        "INVALID_DATE_RANGE",
+        "Event end must not precede start.",
+        422,
+      );
+    case "coordinates_required":
+      return errorResponse(
+        "COORDINATES_REQUIRED",
+        "Location requires coordinates.",
+        422,
+      );
+    case "invalid_coordinates":
+      return errorResponse(
+        "INVALID_COORDINATES",
+        "Location coordinates are invalid.",
+        422,
+      );
+    case "city_not_found":
+      return errorResponse(
+        "CITY_NOT_FOUND",
+        "Location city is not available.",
+        422,
+      );
+    case "event_inactive":
+      return errorResponse(
+        "EVENT_INACTIVE",
+        "The target Event is unavailable.",
+        409,
+      );
+  }
+}
+
 function toSubmissionWire(
   submission: SubmissionRecord,
   assets: SubmissionAssetRecord[] = [],
+  currentSource: {
+    moderation_hash: string;
+    normalized: Json;
+    event_id?: number | null;
+  } | null = null,
 ): AdminSubmissionWire {
+  currentSource ??= submission.currentSource ?? null;
   return {
     id: submission.id,
     city: submission.city,
@@ -222,6 +378,17 @@ function toSubmissionWire(
     longitude: submission.longitude,
     promoted_place_id: submission.promoted_place_id,
     promoted_event_id: submission.promoted_event_id,
+    external_event_record_id: submission.external_event_record_id,
+    external_normalized: submission.external_normalized,
+    external_normalization_version: submission.external_normalization_version,
+    external_moderation_hash: submission.external_moderation_hash,
+    target_event_id: submission.target_event_id,
+    moderation_hash: currentSource?.moderation_hash ?? null,
+    current_source_normalized: currentSource?.normalized ?? null,
+    external_mode: currentSource
+      ? (currentSource.event_id ? "update" : "create")
+      : null,
+    external_event_id: currentSource?.event_id ?? null,
     assets: assets.map(toAssetWire),
   };
 }
@@ -273,6 +440,76 @@ function getCreateProfile(
   const userName = metadataName.trim();
   if (!userName || userName.length > 100) return null;
   return { userEmail, userName };
+}
+
+function eventReadinessResponse(submission: SubmissionRecord): Response | null {
+  if (submission.start_date === null) {
+    return eventResolutionResponse({ outcome: "start_date_required" });
+  }
+  const temporal = validateSubmissionDates(
+    submission.start_date,
+    submission.end_date,
+    false,
+  );
+  if (!temporal.ok) {
+    return eventResolutionResponse({ outcome: "invalid_date_range" });
+  }
+  return null;
+}
+
+async function prepareMergePreview(
+  store: AdminSubmissionStore,
+  submission: SubmissionRecord,
+  targetEventId: number,
+) {
+  if (submission.status !== "pending") {
+    return eventResolutionResponse({ outcome: "not_pending" });
+  }
+  const readiness = eventReadinessResponse(submission);
+  if (readiness) return readiness;
+  if (submission.external_event_record_id === null) {
+    return eventResolutionResponse({ outcome: "not_imported" });
+  }
+  const source = await store.getExternalRecord(
+    submission.external_event_record_id,
+  );
+  if (!source || source.event_id === null) {
+    return eventResolutionResponse({ outcome: "source_not_linked" });
+  }
+  if (source.event_id !== targetEventId) {
+    return eventResolutionResponse({ outcome: "relink_conflict" });
+  }
+  if (source.proposed_normalized === null) {
+    return eventResolutionResponse({ outcome: "base_required" });
+  }
+  if (
+    submission.external_normalization_version !==
+      EXTERNAL_EVENT_NORMALIZATION_VERSION ||
+    source.normalization_version !==
+      submission.external_normalization_version ||
+    source.proposed_normalization_version !==
+      submission.external_normalization_version
+  ) return eventResolutionResponse({ outcome: "normalization_mismatch" });
+  const event = await store.getEvent(targetEventId);
+  if (!event) return eventResolutionResponse({ outcome: "event_inactive" });
+  const base = canonicalizeExternalEvent(
+    source.proposed_normalized as EventNormalizationInput,
+  );
+  const snapshot = canonicalizeExternalEvent(
+    submission.external_normalized as EventNormalizationInput,
+  );
+  const moderated = canonicalizeSubmission(submission);
+  const current = canonicalizeEvent(event);
+  return {
+    ...calculateExternalEventMerge(base, snapshot, moderated, current),
+    submission_version_token: submission.modified_at,
+    event_version_token: event.modified_at,
+    target_event_id: targetEventId,
+    stale: submission.external_moderation_hash !== source.moderation_hash,
+    external_moderation_hash: submission.external_moderation_hash,
+    moderation_hash: source.moderation_hash,
+    current_source_normalized: source.normalized,
+  };
 }
 
 export function createHandler(
@@ -359,6 +596,20 @@ export function createHandler(
 
       const store = dependencies.createStore();
       switch (parsed.value.operation) {
+        case "listIgnoredSources":
+          return jsonResponse({ sources: await store.listIgnoredSources() });
+        case "unIgnoreSource": {
+          const result = await store.unIgnoreSource(
+            parsed.value.external_event_record_id,
+          );
+          if (result.outcome === "not_found") {
+            return errorResponse("NOT_FOUND", "Source record not found.", 404);
+          }
+          return jsonResponse({
+            outcome: result.outcome,
+            pending_submission_id: result.pendingSubmissionId,
+          });
+        }
         case "list": {
           const submissions = await store.list();
           return jsonResponse({
@@ -373,7 +624,11 @@ export function createHandler(
             return errorResponse("NOT_FOUND", "Submission not found.", 404);
           }
           return jsonResponse({
-            submission: toSubmissionWire(result.submission, result.assets),
+            submission: toSubmissionWire(
+              result.submission,
+              result.assets,
+              result.currentSource ?? null,
+            ),
           });
         }
         case "create": {
@@ -408,6 +663,13 @@ export function createHandler(
               409,
             );
           }
+          if (result.outcome === "start_date_required") {
+            return errorResponse(
+              "START_DATE_REQUIRED",
+              "Imported submissions require an Event start date.",
+              422,
+            );
+          }
           return jsonResponse({
             submission: toSubmissionWire(result.submission),
           });
@@ -418,6 +680,18 @@ export function createHandler(
             status: parsed.value.status,
             handledBy: user.id,
             modifiedAt: dependencies.nowIso(),
+            ...(parsed.value.ignore_source !== undefined
+              ? { ignoreSource: parsed.value.ignore_source }
+              : {}),
+            ...(parsed.value.acknowledge_current_source !== undefined
+              ? {
+                acknowledgeCurrentSource:
+                  parsed.value.acknowledge_current_source,
+              }
+              : {}),
+            ...(parsed.value.expected_source_hash !== undefined
+              ? { expectedSourceHash: parsed.value.expected_source_hash }
+              : {}),
           });
           if (result === "not_found") {
             return errorResponse("NOT_FOUND", "Submission not found.", 404);
@@ -429,8 +703,131 @@ export function createHandler(
               409,
             );
           }
-          return jsonResponse({ ok: true, status: parsed.value.status });
+          if (result === "source_changed") {
+            return errorResponse(
+              "SOURCE_CHANGED",
+              "Review the current source version before acknowledging it.",
+              409,
+            );
+          }
+          if (result === "external_requires_resolution") {
+            return errorResponse(
+              "EXTERNAL_REQUIRES_RESOLUTION",
+              "Submission provenance changed; reload before resolving it.",
+              409,
+            );
+          }
+          if (result === "not_imported") {
+            return errorResponse(
+              "EXTERNAL_REQUIRES_RESOLUTION",
+              "Source options require an imported submission.",
+              409,
+            );
+          }
+          return jsonResponse({
+            ok: true,
+            status: parsed.value.status,
+            ...(typeof result === "object"
+              ? { pending_submission_id: result.pendingSubmissionId }
+              : {}),
+          });
         }
+        case "apply": {
+          const detail = await store.getById(parsed.value.submission_id);
+          if (!detail) return eventResolutionResponse({ outcome: "not_found" });
+          const params = {
+            id: parsed.value.submission_id,
+            targetEventId: parsed.value.target_event_id,
+            handledBy: user.id,
+            submissionVersionToken: parsed.value.submission_version_token,
+            eventVersionToken: parsed.value.event_version_token,
+            ...(parsed.value.acknowledge_current_source !== undefined
+              ? {
+                acknowledgeCurrentSource:
+                  parsed.value.acknowledge_current_source,
+              }
+              : {}),
+            ...(parsed.value.expected_source_hash !== undefined
+              ? { expectedSourceHash: parsed.value.expected_source_hash }
+              : {}),
+          };
+          // The RPC owns accepted retry/conflict discovery before old tokens,
+          // readiness, snapshots or pending-only canonicalization can intervene.
+          if (detail.submission.status !== "pending") {
+            return eventResolutionResponse(
+              await store.apply({ ...params, groupsToApply: [] }),
+            );
+          }
+          const preview = await prepareMergePreview(
+            store,
+            detail.submission,
+            parsed.value.target_event_id,
+          );
+          if (preview instanceof Response) return preview;
+          return eventResolutionResponse(
+            await store.apply({
+              ...params,
+              groupsToApply: preview.groups_to_apply,
+            }),
+          );
+        }
+        case "mergePreview": {
+          const detail = await store.getById(parsed.value.submission_id);
+          if (!detail) return eventResolutionResponse({ outcome: "not_found" });
+          const preview = await prepareMergePreview(
+            store,
+            detail.submission,
+            parsed.value.target_event_id,
+          );
+          if (preview instanceof Response) return preview;
+          return jsonResponse({ preview });
+        }
+        case "eventCandidates": {
+          const detail = await store.getById(parsed.value.submission_id);
+          if (!detail) {
+            return errorResponse("NOT_FOUND", "Submission not found.", 404);
+          }
+          if (detail.submission.status !== "pending") {
+            return errorResponse(
+              "INVALID_STATUS_TRANSITION",
+              "Candidate discovery requires a pending submission.",
+              409,
+            );
+          }
+          if (detail.submission.start_date === null) {
+            return errorResponse(
+              "NOT_EVENT_SUBMISSION",
+              "Event candidates require an Event submission.",
+              422,
+            );
+          }
+          const candidates = await store.findEventCandidates(
+            detail.submission,
+            parsed.value.target_event_id !== undefined
+              ? { eventId: parsed.value.target_event_id }
+              : parsed.value.search_name !== undefined
+              ? { name: parsed.value.search_name }
+              : undefined,
+          );
+          return jsonResponse({ candidates });
+        }
+        case "link":
+          return eventResolutionResponse(
+            await store.link({
+              id: parsed.value.submission_id,
+              targetEventId: parsed.value.target_event_id,
+              handledBy: user.id,
+              ...(parsed.value.acknowledge_current_source !== undefined
+                ? {
+                  acknowledgeCurrentSource:
+                    parsed.value.acknowledge_current_source,
+                }
+                : {}),
+              ...(parsed.value.expected_source_hash !== undefined
+                ? { expectedSourceHash: parsed.value.expected_source_hash }
+                : {}),
+            }),
+          );
         case "promote": {
           const result = await store.promote({
             id: parsed.value.submission_id,
@@ -438,6 +835,15 @@ export function createHandler(
             // The authenticated administrator is always the handler; a
             // client-supplied handled_by is never trusted.
             handledBy: user.id,
+            ...(parsed.value.acknowledge_current_source !== undefined
+              ? {
+                acknowledgeCurrentSource:
+                  parsed.value.acknowledge_current_source,
+              }
+              : {}),
+            ...(parsed.value.expected_source_hash !== undefined
+              ? { expectedSourceHash: parsed.value.expected_source_hash }
+              : {}),
           });
           return promotionResponse(result, parsed.value.target);
         }

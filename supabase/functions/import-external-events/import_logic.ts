@@ -1,3 +1,16 @@
+import {
+  calendarDateInRome,
+  normalizeDedupText,
+} from "../_shared/external_event_candidates.ts";
+export {
+  calendarDateInRome,
+  normalizeDedupText,
+} from "../_shared/external_event_candidates.ts";
+import {
+  canonicalizeExternalEvent,
+  type NormalizedExternalEvent,
+} from "../_shared/external_event_normalization.ts";
+import type { Json } from "../_shared/database.types.ts";
 import { validateSubmissionDates } from "../_shared/submission_dates.ts";
 import type { EventiMoliseEvent } from "./eventimolise.ts";
 
@@ -7,6 +20,12 @@ const MAX_NAME_LENGTH = 150;
 const MAX_CITY_LENGTH = 100;
 
 export type PreparedExternalEvent = {
+  provider: "eventimolise";
+  externalId: string;
+  occurrenceKey: string | null;
+  normalized: NormalizedExternalEvent;
+  metadata: Json;
+
   sourceId: number;
   sourceUrl: string;
   name: string;
@@ -18,14 +37,6 @@ export type PreparedExternalEvent = {
   internalNotes: string;
   dedupKey: string;
 };
-
-export function normalizeDedupText(value: string): string {
-  return value
-    .normalize("NFKC")
-    .trim()
-    .replace(/\s+/gu, " ")
-    .toLocaleLowerCase("it-IT");
-}
 
 function timeZoneOffsetMinutes(instantMs: number, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -57,7 +68,10 @@ export function zonedDateTimeToIso(
 ): string {
   const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   const timeMatch = time.match(/^(\d{2}):(\d{2})$/);
-  if (!dateMatch || !timeMatch) throw new Error("Invalid local date/time");
+  if (
+    !dateMatch || !timeMatch ||
+    !validateSubmissionDates(`${date}T${time}:00Z`, null, false).ok
+  ) throw new Error("Invalid local date/time");
 
   const year = Number(dateMatch[1]);
   const month = Number(dateMatch[2]);
@@ -76,22 +90,6 @@ export function zonedDateTimeToIso(
   }
 
   return new Date(instant).toISOString();
-}
-
-export function calendarDateInRome(isoTimestamp: string): string {
-  const instant = new Date(isoTimestamp);
-  if (Number.isNaN(instant.getTime())) throw new Error("Invalid ISO timestamp");
-
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(instant);
-  const values = Object.fromEntries(
-    parts.map((part) => [part.type, part.value]),
-  );
-  return `${values.year}-${values.month}-${values.day}`;
 }
 
 export function buildDedupKey(
@@ -215,7 +213,33 @@ export function prepareEvent(
     throw new Error("Invalid prepared EventiMolise dates");
   }
 
+  const normalized = canonicalizeExternalEvent({
+    name,
+    city,
+    category: "unknown",
+    description: null,
+    description_delta: null,
+    latitude: null,
+    longitude: null,
+    all_day: false,
+    start_date: temporal.value.start_date,
+    end_date: temporal.value.end_date,
+  });
+  if (!Number.isSafeInteger(event.id) || event.id <= 0) {
+    throw new Error("Invalid external Event identity");
+  }
   return {
+    provider: "eventimolise",
+    externalId: String(event.id),
+    occurrenceKey: null,
+    normalized,
+    metadata: {
+      categories: event.categories,
+      organizers: event.organizers,
+      locations: event.locations,
+      warnings,
+      internal_notes: notes.join("\n"),
+    },
     allDay: false,
     sourceId: event.id,
     sourceUrl: event.url,

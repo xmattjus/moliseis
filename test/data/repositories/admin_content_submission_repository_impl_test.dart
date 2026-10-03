@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_repository_impl.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
@@ -12,6 +13,7 @@ import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../support/admin_moderation_error_cases.dart';
 import '../../support/mock_logger.dart';
 import '../../support/recording_supabase_functions_http_client.dart';
 
@@ -54,6 +56,252 @@ void main() {
   });
 
   tearDown(() => client.dispose());
+
+  test(
+    'preview tokens survive Edge JSON to Apply request byte for byte',
+    () async {
+      const submissionToken = '2026-10-02 10:30:00.123456+02';
+      const eventToken = '2026-10-02T08:30:00.000001Z';
+      httpClient.queueJson({
+        'preview': {
+          'target_event_id': 42,
+          'submission_version_token': submissionToken,
+          'event_version_token': eventToken,
+          'groups': <Object?>[],
+        },
+      });
+      final preview = (await repository.mergePreview(7, 42)).getOrNull()!;
+      httpClient.queueJson({
+        'resolution': {
+          'outcome': 'applied',
+          'target_event_id': 42,
+          'pending_submission_id': 8,
+        },
+      });
+      final result = (await repository.apply(7, preview)).getOrNull()!;
+      expect(result.pendingId, 8);
+      expect(httpClient.requests.last.body, {
+        'operation': 'apply',
+        'submission_id': 7,
+        'target_event_id': 42,
+        'submission_version_token': submissionToken,
+        'event_version_token': eventToken,
+      });
+      expect(result, isA<AdminEventResolution>());
+    },
+  );
+
+  test(
+    'candidate discovery keeps canonical targets separate from warnings',
+    () async {
+      httpClient.queueJson({
+        'candidates': {
+          'events': [
+            {'id': 42, 'name': 'Event', 'city': null},
+          ],
+          'pending_warnings': [
+            {'id': 8, 'name': 'Pending', 'city': 'Termoli'},
+          ],
+        },
+      });
+      final matches = (await repository.eventCandidates(
+        7,
+        searchName: 'festa',
+      )).getOrNull()!;
+      expect(matches.events.single.id, 42);
+      expect(matches.events.single.city, isNull);
+      expect(matches.pendingWarnings.single.id, 8);
+      expect(httpClient.requests.single.body, {
+        'operation': 'eventCandidates',
+        'submission_id': 7,
+        'search_name': 'festa',
+      });
+    },
+  );
+
+  for (final (code, status, _) in adminModerationErrorCases) {
+    test('preserves $code API status/message on resolution failure', () async {
+      httpClient.queueJson({
+        'code': code,
+        'message': 'Original backend message',
+      }, status: status);
+      final result = await repository.link(7, 42);
+      final error =
+          (result as Error<AdminEventResolution>).error
+              as AdminContentSubmissionApiException;
+      expect(error.statusCode, status);
+      expect(error.code, code);
+      expect(error.message, 'Original backend message');
+    });
+  }
+
+  test(
+    'already linked source stays API error and never parses promotion success',
+    () async {
+      httpClient.queueJson({
+        'code': 'PROMOTION_SOURCE_ALREADY_LINKED',
+        'message': 'Use Link or Apply',
+        'promotion': {'target_type': 'wrong', 'entity_id': -1},
+      }, status: 409);
+      final result = await repository.promote(7, AdminPromotionTarget.event);
+      expect(result, isA<Error<AdminSubmissionPromotion>>());
+      final error =
+          (result as Error<AdminSubmissionPromotion>).error
+              as AdminContentSubmissionApiException;
+      expect(error.code, 'PROMOTION_SOURCE_ALREADY_LINKED');
+      expect(error.statusCode, 409);
+      expect(error.message, 'Use Link or Apply');
+      expect(error, isNot(isA<FormatException>()));
+    },
+  );
+
+  test(
+    'source options preserve displayed hash across all resolution envelopes',
+    () async {
+      final hash = 'abcdef0123456789' * 4;
+      httpClient.queueJson({
+        'ok': true,
+        'status': 'rejected',
+        'pending_submission_id': 9,
+      });
+      final rejected = (await repository.reject(
+        7,
+        ignoreSource: true,
+        acknowledgeCurrentSource: true,
+        expectedSourceHash: hash,
+      )).getOrNull()!;
+      expect(rejected.outcome, 'rejected');
+      expect(rejected.pendingId, 9);
+      expect(httpClient.requests.last.body, {
+        'operation': 'changeStatus',
+        'submission_id': 7,
+        'status': 'rejected',
+        'ignore_source': true,
+        'acknowledge_current_source': true,
+        'expected_source_hash': hash,
+      });
+      httpClient.queueJson({
+        'promotion': {'target_type': 'event', 'entity_id': 42},
+      });
+      await repository.promote(
+        7,
+        AdminPromotionTarget.event,
+        acknowledgeCurrentSource: true,
+        expectedSourceHash: hash,
+      );
+      expect(httpClient.requests.last.body, {
+        'operation': 'promote',
+        'submission_id': 7,
+        'target': 'event',
+        'acknowledge_current_source': true,
+        'expected_source_hash': hash,
+      });
+      httpClient.queueJson({
+        'resolution': {
+          'outcome': 'linked',
+          'target_event_id': 42,
+          'pending_submission_id': 10,
+        },
+      });
+      await repository.link(
+        7,
+        42,
+        acknowledgeCurrentSource: true,
+        expectedSourceHash: hash,
+      );
+      expect(httpClient.requests.last.body, {
+        'operation': 'link',
+        'submission_id': 7,
+        'target_event_id': 42,
+        'acknowledge_current_source': true,
+        'expected_source_hash': hash,
+      });
+      httpClient.queueJson({
+        'resolution': {
+          'outcome': 'already_resolved',
+          'target_event_id': 42,
+          'pending_submission_id': null,
+        },
+      });
+      final applied = (await repository.apply(
+        7,
+        AdminEventMergePreview(
+          targetEventId: 42,
+          submissionVersionToken: 'raw s',
+          eventVersionToken: 'raw e',
+          groups: [],
+        ),
+        acknowledgeCurrentSource: true,
+        expectedSourceHash: hash,
+      )).getOrNull()!;
+      expect(applied.outcome, 'already_resolved');
+      expect(httpClient.requests.last.body, {
+        'operation': 'apply',
+        'submission_id': 7,
+        'target_event_id': 42,
+        'submission_version_token': 'raw s',
+        'event_version_token': 'raw e',
+        'acknowledge_current_source': true,
+        'expected_source_hash': hash,
+      });
+      for (final request in httpClient.requests) {
+        expect(request.body! as Map, isNot(contains('handled_by')));
+        expect(
+          request.headers['authorization'],
+          'Bearer test-staff-access-token',
+        );
+      }
+    },
+  );
+
+  test(
+    'ignored sources and un-ignore are authenticated minimal operations',
+    () async {
+      httpClient.queueJson({
+        'sources': [
+          {
+            'id': 12,
+            'name': 'Ignored',
+            'provider': 'eventimolise',
+            'external_id': 'a',
+            'occurrence_key': null,
+            'ignored_at': '2026-10-02T10:00:00Z',
+            'event_id': null,
+          },
+        ],
+      });
+      final sources = (await repository.listIgnoredSources()).getOrNull()!;
+      expect(sources.single.externalId, 'a');
+      expect(sources.single.eventId, isNull);
+      expect(httpClient.requests.last.body, {
+        'operation': 'listIgnoredSources',
+      });
+      httpClient.queueJson({
+        'outcome': 'unignored',
+        'pending_submission_id': 8,
+      });
+      final result = (await repository.unIgnoreSource(12)).getOrNull()!;
+      expect(result.outcome, 'unignored');
+      expect(result.pendingId, 8);
+      expect(httpClient.requests.last.body, {
+        'operation': 'unIgnoreSource',
+        'external_event_record_id': 12,
+      });
+      httpClient.queueJson({
+        'code': 'FORBIDDEN',
+        'message': 'Admin only',
+      }, status: 403);
+      final denied = await repository.unIgnoreSource(12);
+      expect(
+        (denied as Error<AdminEventResolution>).error,
+        isA<AdminContentSubmissionApiException>(),
+      );
+      expect(
+        httpClient.requests.last.headers['authorization'],
+        'Bearer test-staff-access-token',
+      );
+    },
+  );
 
   group('successful Function operations', () {
     test(
