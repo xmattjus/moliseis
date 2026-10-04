@@ -67,6 +67,8 @@ Rejected alternatives: removing only `reset()` leaves retained contact controlle
 
 Primary evidence: local SDK `material/text_form_field.dart` lines 348, 390, 431–437; `widgets/form.dart` reset; `widgets/framework.dart` GlobalKey grafting and `_retakeInactiveElement`. Historical comparison: [Flutter 3.41.9 TextFormField source](https://raw.githubusercontent.com/flutter/flutter/3.41.9/packages/flutter/lib/src/material/text_form_field.dart), reset lines 410–415. Repository commit `6445f42` updates release Flutter from 3.47.4 to 3.47.5; it changes SDK pins only and does not establish which earlier release introduced the retained-value behavior.
 
+Apply evidence corrects the invoked component attribution: the public imports actually resolve TextFormField from `material_ui`; version 1.5.0 retains the same captured-initial-value reset semantics. RED 1/2 runtime stacks identify `material_ui/src/text_form_field.dart:450` as the onChanged caller. See implementation-verification.md for mandatory pre-fix evidence. This does not alter the approved key-rotation design or production scope.
+
 ### 3. Deterministic regressions before production edits
 
 Use existing `test/routing/content_submission_route_test.dart` for all route-policy assertions. Its `_ContentSubmissionRouteHarness` calls real `buildAppRouter`, provides the app-scoped VM, real screen/progress and fake dependencies; `fillValidForm`, `enterLabeledField`, `scrollToAndTap`, `mainScrollable` already exist. The screen suite's local `buildApp` has no parent `onExit`; it proves widget/draft behavior but cannot prove clean Home/Back policy. The restoration suite uses `_FormMarker` and is not suitable for these real-form regressions. No new harness or restoration rewrite is planned.

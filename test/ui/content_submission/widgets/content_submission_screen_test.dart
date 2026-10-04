@@ -1313,9 +1313,14 @@ void main() {
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
       expect(find.byType(ContentSubmissionScreen), findsOneWidget);
 
-      // The completed pop cleared the in-memory state and reset the form.
-      expect(vm.state.city, isEmpty);
-      expect(vm.state.name, isEmpty);
+      // Finalization already retired the session; completed pop only navigates.
+      expect(vm.state.city, isNull);
+      expect(vm.state.name, isNull);
+      expect(vm.hasUnsavedChanges, isFalse);
+      expect(
+        vm.state,
+        ContentSubmissionDraft(clientSubmissionId: vm.state.clientSubmissionId),
+      );
       expect(find.widgetWithText(TextFormField, 'Campobasso'), findsNothing);
       expect(find.widgetWithText(TextFormField, 'Test Event'), findsNothing);
 
@@ -1424,7 +1429,8 @@ void main() {
         await tester.tap(find.byType(BackButton));
         await tester.pumpAndSettle();
         expect(find.byType(ContentSubmissionScreen), findsOneWidget);
-        expect(vm.state.city, isEmpty);
+        expect(vm.state.city, isNull);
+        expect(vm.hasUnsavedChanges, isFalse);
         expect(vm.assets, isEmpty);
         expect(find.text('Campobasso'), findsNothing);
       },

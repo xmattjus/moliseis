@@ -8,6 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
+import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
@@ -20,6 +22,7 @@ import 'package:moliseis/ui/content_submission/view_models/content_submission_vi
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
+import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
@@ -99,6 +102,423 @@ void main() {
     );
     await scrollToAndTap(tester, termsCheckbox);
   }
+
+  group('Content Submission session presentation', () {
+    for (final populated in [false, true]) {
+      testWidgets(
+        populated
+            ? 'mixed late recovery preserves exact draft and clean Back'
+            : 'RED 2 empty late recovery preserves exact draft and clean Back',
+        (tester) async {
+          final restored = ContentSubmissionDraft(
+            clientSubmissionId: '12345678-1234-4234-8234-123456789abc',
+            city: populated ? 'Isernia' : null,
+            userEmail: populated ? 'recovered@example.com' : null,
+          );
+          final loadGate = Completer<Result<ContentSubmissionDraft?>>();
+          final repository = FakeContentSubmissionDraftRepository()
+            ..pendingLoadDraft = loadGate;
+          final harness = createHarness(draftRepository: repository);
+          addTearDown(harness.dispose);
+          final constructorIdentity =
+              harness.viewModel.state.clientSubmissionId;
+          unawaited(harness.viewModel.initialize());
+          await harness.pumpForm(
+            tester,
+            withGallerySentinel: true,
+            settleAfterPush: false,
+          );
+          expect(repository.loadDraftCallCount, 1);
+          expect(constructorIdentity, isNot(restored.clientSubmissionId));
+          expect(
+            harness.viewModel.state.clientSubmissionId,
+            constructorIdentity,
+          );
+          expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+          expect(find.text('Caricamento in corso...'), findsOneWidget);
+          expect(find.byType(TextFormField), findsNothing);
+          final adopted =
+              <
+                ({ContentSubmissionDraft draft, bool dirty, StackTrace caller})
+              >[];
+          harness.viewModel.addListener(() {
+            adopted.add((
+              draft: harness.viewModel.state,
+              dirty: harness.viewModel.hasUnsavedChanges,
+              caller: StackTrace.current,
+            ));
+          });
+
+          loadGate.complete(Result.success(restored));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(adopted.first.draft, restored);
+          expect(adopted.first.dirty, isFalse);
+          expect(
+            harness.viewModel.state,
+            restored,
+            reason: adopted
+                .where((snapshot) => snapshot.dirty)
+                .map((snapshot) => snapshot.caller)
+                .join('\n'),
+          );
+          expect(harness.viewModel.hasUnsavedChanges, isFalse);
+          expect(find.text('Modifiche non salvate'), findsNothing);
+          expect(repository.saveDraftCallCount, 0);
+          expect(repository.clearDraftCallCount, 0);
+          final email = find.widgetWithText(TextFormField, 'E-mail');
+          await tester.scrollUntilVisible(
+            email,
+            200,
+            scrollable: mainScrollable,
+          );
+          expect(
+            tester
+                .widget<TextField>(
+                  find.descendant(of: email, matching: find.byType(TextField)),
+                )
+                .controller!
+                .text,
+            restored.userEmail ?? '',
+          );
+          expect(harness.viewModel.state, restored);
+          await tester.scrollUntilVisible(
+            find.byType(BackButton),
+            -200,
+            scrollable: mainScrollable,
+          );
+          await tester.tap(find.byType(BackButton));
+          await tester.pumpAndSettle();
+          expect(find.text('Salvare le modifiche?'), findsNothing);
+          expect(
+            harness.router.routeInformationProvider.value.uri.path,
+            RoutePaths.gallery,
+          );
+          expect(harness.viewModel.checkpointCallCount, 0);
+          expect(harness.viewModel.restoreCallCount, 0);
+          expect(repository.saveDraftCallCount, 0);
+          expect(repository.clearDraftCallCount, 0);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    for (final action in ['Torna alla home', 'Back', 'Nuovo suggerimento']) {
+      testWidgets(
+        action == 'Torna alla home'
+            ? 'successful Home performs no additional lifecycle work'
+            : 'RED 3 recovered contacts stay retired through $action',
+        (tester) async {
+          final recovered = ContentSubmissionDraft(
+            clientSubmissionId: '12345678-1234-4234-8234-123456789abc',
+            city: 'Campobasso',
+            name: 'Recovered place',
+            userEmail: 'original@example.com',
+            userName: 'Original Author',
+            description: 'Original description',
+            descriptionDelta: const [
+              {'insert': 'Original description\n'},
+            ],
+            acceptedTerms: true,
+          );
+          final clearGate = Completer<Result<void>>();
+          final repository = FakeContentSubmissionDraftRepository(
+            loadDraftResult: Result.success(recovered),
+          )..pendingClearDraft = clearGate;
+          final harness = createHarness(draftRepository: repository);
+          addTearDown(harness.dispose);
+          await harness.viewModel.initialize();
+          await harness.pumpForm(tester, withGallerySentinel: true);
+          expect(harness.viewModel.state, recovered);
+          final oldForms = tester
+              .stateList<FormState>(find.byType(Form))
+              .toList();
+          for (final label in ['E-mail', 'Autore']) {
+            final field = find.widgetWithText(TextFormField, label);
+            await tester.scrollUntilVisible(
+              field,
+              200,
+              scrollable: mainScrollable,
+            );
+            expect(
+              tester
+                  .widget<TextField>(
+                    find.descendant(
+                      of: field,
+                      matching: find.byType(TextField),
+                    ),
+                  )
+                  .controller!
+                  .text,
+              label == 'E-mail' ? recovered.userEmail : recovered.userName,
+            );
+          }
+          for (final form in tester.stateList<FormState>(find.byType(Form))) {
+            if (!oldForms.contains(form)) oldForms.add(form);
+          }
+          expect(oldForms, hasLength(2));
+          final nextIdentities = <String>{};
+          harness.viewModel.addListener(() {
+            final id = harness.viewModel.state.clientSubmissionId;
+            if (id != recovered.clientSubmissionId) nextIdentities.add(id);
+          });
+          await scrollToAndTap(
+            tester,
+            find.widgetWithText(FilledButton, 'Invia'),
+          );
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(harness.submissionRepository.submitCallCount, 1);
+          harness.submissionRepository.completeSubmission(
+            const Result.success(null),
+          );
+          for (var frame = 0; frame < 20; frame++) {
+            if (repository.clearDraftCallCount == 1) break;
+            await tester.pump();
+          }
+          expect(repository.clearDraftCallCount, 1);
+          expect(harness.viewModel.submit.running, isTrue);
+          clearGate.complete(const Result.success(null));
+          await tester.pumpAndSettle();
+          expect(harness.viewModel.submit.completed, isTrue);
+          expect(tester.takeException(), isNull);
+          final freshId = harness.viewModel.state.clientSubmissionId;
+          final checkpointCalls = harness.viewModel.checkpointCallCount;
+          final restoreCalls = harness.viewModel.restoreCallCount;
+          final saveCalls = repository.saveDraftCallCount;
+          final stagedCalls =
+              harness.stagedAssetRepository.clearedSessions.length;
+          expect(nextIdentities, {freshId});
+          expect(freshId, isNot(recovered.clientSubmissionId));
+          if (action != 'Torna alla home') {
+            expect(
+              harness.viewModel.state,
+              ContentSubmissionDraft(clientSubmissionId: freshId),
+            );
+            expect(harness.viewModel.hasUnsavedChanges, isFalse);
+          }
+          await tester.tap(
+            action == 'Back' ? find.byType(BackButton) : find.text(action),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.text('Salvare le modifiche?'), findsNothing);
+          if (action == 'Torna alla home') {
+            expect(
+              harness.router.routeInformationProvider.value.uri.path,
+              RoutePaths.home,
+            );
+            expect(find.byType(ExploreScreen), findsOneWidget);
+          } else {
+            expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
+            expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+            for (final label in [
+              'E-mail',
+              'Autore',
+              'Città',
+              'Luogo o evento',
+            ]) {
+              final field = find.widgetWithText(TextFormField, label);
+              await tester.scrollUntilVisible(
+                field,
+                label == 'Città' || label == 'Luogo o evento' ? -200 : 200,
+                scrollable: mainScrollable,
+              );
+              expect(
+                tester
+                    .widget<TextField>(
+                      find.descendant(
+                        of: field,
+                        matching: find.byType(TextField),
+                      ),
+                    )
+                    .controller!
+                    .text,
+                isEmpty,
+              );
+            }
+            final editor = find.byType(QuillEditor);
+            await tester.scrollUntilVisible(
+              editor,
+              200,
+              scrollable: mainScrollable,
+            );
+            expect(
+              tester
+                  .widget<QuillEditor>(editor)
+                  .controller
+                  .document
+                  .toPlainText()
+                  .trim(),
+              isEmpty,
+            );
+            final terms = find.byType(CheckboxFormField);
+            await tester.scrollUntilVisible(
+              terms,
+              200,
+              scrollable: mainScrollable,
+            );
+            expect(
+              tester
+                  .widget<Checkbox>(
+                    find.descendant(of: terms, matching: find.byType(Checkbox)),
+                  )
+                  .value,
+              isFalse,
+            );
+            final newForms = tester.stateList<FormState>(find.byType(Form));
+            expect(newForms.every((form) => !oldForms.contains(form)), isTrue);
+            expect(find.text('Modifiche non salvate'), findsNothing);
+          }
+          expect(
+            harness.viewModel.state,
+            ContentSubmissionDraft(clientSubmissionId: freshId),
+          );
+          expect(harness.viewModel.hasUnsavedChanges, isFalse);
+          expect(harness.viewModel.assets, isEmpty);
+          expect(nextIdentities, {freshId});
+          expect(harness.viewModel.checkpointCallCount, checkpointCalls);
+          expect(harness.viewModel.restoreCallCount, restoreCalls);
+          expect(harness.viewModel.clear.idle, isTrue);
+          expect(repository.saveDraftCallCount, saveCalls);
+          expect(repository.clearDraftCallCount, 1);
+          expect(
+            harness.stagedAssetRepository.clearedSessions.length,
+            stagedCalls,
+          );
+          expect(harness.submissionRepository.submitCallCount, 1);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
+    testWidgets(
+      'same-session text input updates draft and structural dirtiness',
+      (tester) async {
+        final harness = createHarness();
+        addTearDown(harness.dispose);
+        await harness.viewModel.initialize();
+        await harness.pumpForm(tester);
+        final identity = harness.viewModel.state.clientSubmissionId;
+        final form = tester.state<FormState>(find.byType(Form).first);
+        await enterLabeledField(tester, 'Città', 'Isernia');
+        await tester.pumpAndSettle();
+        expect(harness.viewModel.state.clientSubmissionId, identity);
+        expect(harness.viewModel.state.city, 'Isernia');
+        expect(harness.viewModel.hasUnsavedChanges, isTrue);
+        expect(tester.state<FormState>(find.byType(Form).first), same(form));
+        expect(harness.draftRepository.saveDraftCallCount, 0);
+        await tester.scrollUntilVisible(
+          find.text('Suggerimento'),
+          -200,
+          scrollable: mainScrollable,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Modifiche non salvate'), findsOneWidget);
+        await harness.viewModel.checkpointDraft();
+        await tester.pump();
+        expect(harness.viewModel.hasUnsavedChanges, isFalse);
+        expect(find.text('Modifiche non salvate'), findsNothing);
+        expect(tester.state<FormState>(find.byType(Form).first), same(form));
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('RED 1 retirement stays canonical beneath real progress', (
+      tester,
+    ) async {
+      final clearGate = Completer<Result<void>>();
+      final draftRepository = FakeContentSubmissionDraftRepository()
+        ..pendingClearDraft = clearGate;
+      final harness = createHarness(draftRepository: draftRepository);
+      addTearDown(harness.dispose);
+      await harness.viewModel.initialize();
+      await harness.pumpForm(tester, withGallerySentinel: true);
+      await fillValidForm(tester);
+      final submittedIdentity = harness.viewModel.state.clientSubmissionId;
+      final retiredSnapshots =
+          <({ContentSubmissionDraft draft, bool dirty, StackTrace caller})>[];
+      harness.viewModel.addListener(() {
+        if (harness.viewModel.state.clientSubmissionId != submittedIdentity) {
+          retiredSnapshots.add((
+            draft: harness.viewModel.state,
+            dirty: harness.viewModel.hasUnsavedChanges,
+            caller: StackTrace.current,
+          ));
+        }
+      });
+
+      await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(harness.submissionRepository.submitCallCount, 1);
+      expect(harness.submissionRepository.submittedClientSubmissionIds, [
+        submittedIdentity,
+      ]);
+      expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+      expect(
+        find.byType(ContentSubmissionScreen, skipOffstage: false),
+        findsOneWidget,
+      );
+      harness.submissionRepository.completeSubmission(
+        const Result.success(null),
+      );
+      for (var frame = 0; frame < 20; frame++) {
+        if (draftRepository.clearDraftCallCount == 1) break;
+        await tester.pump();
+      }
+      expect(draftRepository.clearDraftCallCount, 1);
+      expect(harness.viewModel.submit.running, isTrue);
+      expect(harness.viewModel.clear.idle, isTrue);
+      expect(find.text('Nuovo suggerimento'), findsNothing);
+      expect(harness.viewModel.state.clientSubmissionId, submittedIdentity);
+
+      clearGate.complete(const Result.success(null));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(harness.viewModel.submit.completed, isTrue);
+      expect(find.text('Nuovo suggerimento'), findsOneWidget);
+      final freshIdentity = harness.viewModel.state.clientSubmissionId;
+      final canonical = ContentSubmissionDraft(
+        clientSubmissionId: freshIdentity,
+      );
+      expect(freshIdentity, isNot(submittedIdentity));
+      expect(retiredSnapshots, isNotEmpty);
+      expect(retiredSnapshots.first.draft, canonical);
+      expect(retiredSnapshots.first.dirty, isFalse);
+      expect(
+        retiredSnapshots
+            .map((snapshot) => snapshot.draft.clientSubmissionId)
+            .toSet(),
+        {freshIdentity},
+      );
+      final syntheticCalls = retiredSnapshots
+          .where((snapshot) => snapshot.dirty)
+          .map((snapshot) => snapshot.caller)
+          .join('\n');
+      expect(
+        harness.viewModel.state,
+        canonical,
+        reason:
+            'Retirement first emitted canonical clean state. '
+            'Subsequent dirty notifications came from:\n$syntheticCalls',
+      );
+      expect(harness.viewModel.state.city, isNull);
+      expect(harness.viewModel.state.name, isNull);
+      expect(harness.viewModel.state.description, isNull);
+      expect(harness.viewModel.state.descriptionDelta, isNull);
+      expect(harness.viewModel.state.userEmail, isNull);
+      expect(harness.viewModel.state.userName, isNull);
+      expect(harness.viewModel.state.acceptedTerms, isNull);
+      expect(
+        harness.viewModel.state.eventDates,
+        const EventDateDraft.disabled(),
+      );
+      expect(harness.viewModel.assets, isEmpty);
+      expect(harness.viewModel.hasUnsavedChanges, isFalse);
+      expect(harness.stagedAssetRepository.clearedSessions, [
+        submittedIdentity,
+      ]);
+    });
+  });
 
   group('Content Submission production route exit', () {
     testWidgets('clean replacement exits without a dialog or draft write', (
@@ -1090,7 +1510,7 @@ final class _ContentSubmissionRouteHarness {
     );
     syncViewModel = SyncViewModel(syncUseCase: syncUseCase);
     auth = ControllableAdminAuth();
-    viewModel = ContentSubmissionViewModel(
+    viewModel = _RecordingContentSubmissionViewModel(
       logger: MockLogger(),
       contentSubmissionRepository: submissionRepository,
       draftRepository: draftRepository,
@@ -1115,12 +1535,13 @@ final class _ContentSubmissionRouteHarness {
   late final ControllableAdminAuth auth;
   late final GoRouter router;
   late final SyncViewModel syncViewModel;
-  late final ContentSubmissionViewModel viewModel;
+  late final _RecordingContentSubmissionViewModel viewModel;
   late final UrlLaunchService urlLaunchService;
 
   Future<void> pumpForm(
     WidgetTester tester, {
     bool withGallerySentinel = false,
+    bool settleAfterPush = true,
   }) async {
     router.go(
       withGallerySentinel ? RoutePaths.gallery : RoutePaths.contentSubmission,
@@ -1134,6 +1555,7 @@ final class _ContentSubmissionRouteHarness {
           ChangeNotifierProvider<ContentSubmissionViewModel>.value(
             value: viewModel,
           ),
+          ChangeNotifierProvider<SyncViewModel>.value(value: syncViewModel),
           Provider<UrlLaunchService>.value(value: urlLaunchService),
         ],
         child: MaterialApp.router(
@@ -1151,7 +1573,12 @@ final class _ContentSubmissionRouteHarness {
     await tester.pump();
     if (withGallerySentinel) {
       unawaited(router.push(RoutePaths.contentSubmission));
-      await tester.pumpAndSettle();
+      if (settleAfterPush) {
+        await tester.pumpAndSettle();
+      } else {
+        await tester.pump();
+        await tester.pump();
+      }
     }
   }
 
@@ -1160,5 +1587,32 @@ final class _ContentSubmissionRouteHarness {
     auth.dispose();
     syncViewModel.dispose();
     viewModel.dispose();
+  }
+}
+
+/// Counts public lifecycle calls while executing the real ViewModel behavior.
+final class _RecordingContentSubmissionViewModel
+    extends ContentSubmissionViewModel {
+  _RecordingContentSubmissionViewModel({
+    required super.logger,
+    required super.contentSubmissionRepository,
+    required super.draftRepository,
+    required super.stagedAssetRepository,
+    super.imagePicker,
+  });
+
+  int checkpointCallCount = 0;
+  int restoreCallCount = 0;
+
+  @override
+  Future<Result<void>> checkpointDraft() {
+    checkpointCallCount++;
+    return super.checkpointDraft();
+  }
+
+  @override
+  Future<Result<void>> restoreCheckpointDraft() {
+    restoreCallCount++;
+    return super.restoreCheckpointDraft();
   }
 }

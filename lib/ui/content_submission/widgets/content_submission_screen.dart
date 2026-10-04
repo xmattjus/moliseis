@@ -43,9 +43,8 @@ class ContentSubmissionScreen extends StatefulWidget {
 }
 
 class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
-  final _form1Key = GlobalKey<FormState>();
-  final _form2Key = GlobalKey<FormState>();
-  var _clearEpoch = 0;
+  var _form1Key = GlobalKey<FormState>();
+  var _form2Key = GlobalKey<FormState>();
   late String _sessionIdentity;
   var _boundaryPending = false;
   var _allowIosExplicitPop = false;
@@ -54,7 +53,7 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
   void initState() {
     super.initState();
     _sessionIdentity = widget.viewModel.state.clientSubmissionId;
-    widget.viewModel.addListener(_handleSessionRetired);
+    widget.viewModel.addListener(_handleSessionIdentityChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(widget.viewModel.retrieveLostAssets.execute());
@@ -63,26 +62,22 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
 
   @override
   void dispose() {
-    widget.viewModel.removeListener(_handleSessionRetired);
+    widget.viewModel.removeListener(_handleSessionIdentityChanged);
     super.dispose();
   }
 
-  /// Rebuilds the shared form after the ViewModel retires its current session.
+  /// Replaces both forms when recovery or retirement changes the session.
   ///
-  /// While the clear command runs, the form is replaced by a loading state so
-  /// stale submitted values cannot be edited. Incrementing [_clearEpoch]
-  /// replaces the shared form before a post-frame `FormState.reset()` reapplies
-  /// the cleared values.
-  void _handleSessionRetired() {
+  /// Fresh Form states present the authoritative draft without replaying old
+  /// initial values or invoking user-edit callbacks through a form reset.
+  void _handleSessionIdentityChanged() {
     if (!mounted) return;
     final nextIdentity = widget.viewModel.state.clientSubmissionId;
     if (_sessionIdentity == nextIdentity) return;
-    _sessionIdentity = nextIdentity;
-    setState(() => _clearEpoch++);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _form1Key.currentState?.reset();
-      _form2Key.currentState?.reset();
+    setState(() {
+      _sessionIdentity = nextIdentity;
+      _form1Key = GlobalKey<FormState>();
+      _form2Key = GlobalKey<FormState>();
     });
   }
 
@@ -278,7 +273,6 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                         sliver: SliverList.list(
                           children: [
                             ContentSubmissionFields(
-                              key: ValueKey(_clearEpoch),
                               formKey: _form1Key,
                               category: widget.viewModel.state.category,
                               city: widget.viewModel.state.city,
