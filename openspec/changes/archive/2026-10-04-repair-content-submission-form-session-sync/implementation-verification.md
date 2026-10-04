@@ -2,7 +2,8 @@
 
 - Starting HEAD: `68638d6278a952f8662d919ddb860866cd3f2d0f`.
 - Preserved preexisting changes: shared submission fields, color-scheme extension, pubspec/lock, and the user's Task 2.5 revision allowing a pre-fix green RED 3.
-- Flutter 3.47.5 / Dart 3.13.4; local go_router 18.0.2. Public lifecycle source is unchanged since the planning baseline.
+- Flutter 3.47.5 / Dart 3.13.4; the actual local dependency resolution included `material_ui 1.5.0` and `go_router 18.0.2`. Public lifecycle source is unchanged since the planning baseline.
+- The working tree already contained independent dependency updates in `pubspec.yaml` and `pubspec.lock` when implementation started from `68638d6`. All apply baseline, RED and post-fix tests, including the full suite and analyzer, ran against this intentionally updated local resolution. This is the authoritative execution baseline, not a discrepancy with the committed manifest. Those dependency updates were not introduced by `repair-content-submission-form-session-sync`, were preserved, and are not required by the fix. `material_ui 1.5.0` is the runtime implementation whose `TextFormField.reset()` appears in the RED stacks below.
 - Five-suite execution baseline: 226 tests passed. Analyzer: 177 diagnostics (173 info, 4 warnings, zero errors), exit 1. Logs `/tmp/form_session_apply_baseline_tests.log` and `/tmp/form_session_apply_baseline_analyze.log`.
 - Recording harness alone: all 24 existing production-route tests passed (`/tmp/form_session_harness.log`). The local delegating ViewModel is explicitly authorized by the approved design/user request; it does not replace dirty comparison, retirement, submission or route policy.
 
@@ -52,8 +53,17 @@ The production imports use `material_ui`'s TextFormField, not Flutter's identica
 
 ## Device smoke and readiness
 
-**Device smoke PASS — user reported.** After the automated implementation checks, the user confirmed successful smoke testing of tasks 5.1 and 5.2 on an Android emulator: **Pixel 10 Pro, Android 17 Google APIs**. Tasks 5.1/5.2 are now complete. These results were performed and reported by the user, not independently executed by the agent. Build mode/version and whether the optional persisted-empty condition was exercised were not specified; no additional claim is made about them.
+**Device smoke PASS — user reported.**
+
+Manual checks for Tasks 5.1 and 5.2 were performed on a Pixel 10 Pro Android emulator running Android 17 Google APIs using a debug build. The user performed and reported these checks; the agent did not independently execute them.
+
+The checks covered:
+- untouched fresh form exit;
+- successful submission → Home without an erroneous save-draft prompt;
+- successful submission → Nuovo suggerimento / Back with a fresh clean form.
+
+This is feature-level manual smoke evidence, not store-release readiness. Release/store validation remains outside the scope of this repair. The optional persisted-empty device condition was not separately reported; its deterministic automated regression evidence remains recorded above.
 
 The earlier agent device enumeration found only macOS/Chrome and did not constitute a smoke test (`/tmp/form_session_devices.json`). The subsequent user report supersedes the previous manual-verification unavailability.
 
-**Ready for review:** all 23 tasks are complete, including user-reported manual smoke checks. Bug A is fixed with causality proven before production edits. Bug B's late persisted-adoption path is proven and covered; broader empty-form reports are not assumed to have one cause. No further production issue emerged. The change remains active and has not been archived.
+**Completion:** all 23 tasks are complete, including user-reported manual smoke checks. Bug A is fixed with causality proven before production edits. Bug B's late persisted-adoption path is proven and covered; broader empty-form reports are not assumed to have one cause. The implementation, regression tests and OpenSpec delta at `eecab1a97404d166b7d32c8c945a6dbe94469869` have been approved by adversarial review. No further production issue emerged; canonical sync and archive were completed on 2026-10-04. Strict pre-sync validation passed; all 11 canonical specs passed validation after sync. The one added requirement and all seven scenarios match the delta, with existing canonical text preserved.

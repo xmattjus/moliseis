@@ -32,8 +32,8 @@
 
 ## 5. Device smoke and evidence
 
-Execution note: the user reports tasks 5.1 and 5.2 successfully smoke tested on a Pixel 10 Pro Android emulator running Android 17 Google APIs. This completes the previously outstanding manual checks. See implementation-verification.md for attribution and build-information limits.
+Execution note: manual smoke verification for tasks 5.1 and 5.2 was performed and reported by the user in debug mode on a Pixel 10 Pro Android emulator running Android 17 Google APIs. Store/release-build readiness is outside the scope of this repair. See implementation-verification.md for attribution and evidence.
 
-- [x] 5.1 On an available release-mode/device build, open untouched fresh form and exit, then submit valid content and choose Home; verify no save prompt. Record device/build and result or explicit unavailability rather than claiming an unrun smoke check.
+- [x] 5.1 On an available device or emulator build, open an untouched fresh form and exit, then submit valid content and choose Home; verify no save prompt. Record device/emulator, platform and build mode rather than implying store-release readiness.
 - [x] 5.2 Repeat successful submit with Nuovo suggerimento and Back, verify empty contact/rich text, unchecked terms and disabled event controls without extra rotation; if RED 2 proved the late-recovery path, smoke that persisted-empty condition where practical. Record separately any remaining Bug B uncertainty.
 - [x] 5.3 Record pre-fix RED results, post-fix focused/full tests, analyzer comparison, strict validation and smoke evidence in the change before requesting review/archive. Confirm production scope stayed within the screen and that no backend/storage/dependency rollout is required.
