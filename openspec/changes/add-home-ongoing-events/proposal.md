@@ -4,23 +4,23 @@ Home does not distinguish events that have already started and are still active 
 
 ## What Changes
 
-- Introduce `EventRepository.getOngoingEventIds()` with membership at a UTC instant captured only once: inclusive ranged events; null-end events limited to the Rome civil day of their start, after their start; soft-deleted events excluded.
+- Introduce `EventRepository.getOngoingEventIds(DateTime snapshotUtc)` with membership at the UTC snapshot supplied by the caller: inclusive ranged events; null-end events limited to the Rome civil day of their start, after their start; soft-deleted events excluded.
 - Apply the same persisted bounds to timed and `allDay` events, without reinterpreting the flag.
-- Make `getNextEventIds()` strictly future, preserving ordering, the limit of 6 and the inclusive end of the current Rome day +30.
-- Expose `ongoingIds`, `ongoing`, `loadOngoingIds`, `loadOngoing` in `EventViewModel`, following the existing Command/Result and ID resolution patterns.
-- Initialize both loads in the Home route and reclassify when returning to Home retained by the shell; preserve the existing sync flow.
+- Make `getNextEventIds(DateTime snapshotUtc)` strictly future relative to the same supplied snapshot, preserving ordering, the limit of 6 and the inclusive end of its Rome day +30.
+- Expose `ongoingIds`, `ongoing`, `loadOngoingIds`, `loadOngoing` in `EventViewModel`, following the existing Command/Result and ID resolution patterns; both ID commands accept the explicit UTC snapshot.
+- Make `refreshHomeDiscovery()` own exactly one clock capture per discovery pass and supply that snapshot to both queries, guaranteeing temporal disjointness for the pass even if time advances during entity resolution. Initialize both loads in the Home route and reclassify when returning to Home retained by the shell; preserve the existing sync flow.
 - Integrate a distinct section named “Eventi in corso” **only after the developer's UI design**. No visual decision is included in the change.
-- Add deterministic repository, ViewModel and navigation/refresh tests; no timers or polling.
+- Add deterministic repository, ViewModel and navigation/refresh tests, including an advancing clock and delayed first entity resolution to verify the shared snapshot; no timers or polling.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `home-ongoing-events`: ongoing membership, separation from upcoming, application state, bootstrap and reclassification in supported Home paths, with a visual gate.
+- `home-ongoing-events`: ongoing membership, separation from upcoming for each shared-snapshot discovery pass, application state, bootstrap and reclassification in supported Home paths, with a visual gate.
 
 ### Modified Capabilities
 
-- `event-temporal-integrity`: update “Upcoming events remain start-date-based” to require starts strictly after the UTC snapshot, preserving the inclusive civil upper bound.
+- `event-temporal-integrity`: update “Upcoming events remain start-date-based” to require starts strictly after the caller-supplied UTC snapshot shared with ongoing in a Home discovery pass, preserving the inclusive civil upper bound.
 
 ## Impact
 

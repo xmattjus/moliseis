@@ -5,7 +5,7 @@ Expose events active at the current instant as a distinct Home discovery set, pr
 ## ADDED Requirements
 
 ### Requirement: Ongoing intervals use inclusive instant membership
-Ongoing retrieval SHALL classify against one UTC snapshot captured once per operation. A non-deleted event with a non-null end SHALL be ongoing exactly when start <= snapshot <= end. It SHALL NOT use overlap with the whole current day as a substitute, round instants, or apply epsilon adjustments. Retrieval SHALL include active intervals regardless of their initial calendar year.
+Ongoing retrieval SHALL classify against the UTC snapshot supplied by its caller. Each Home discovery pass SHALL capture that snapshot once in application orchestration and supply it unchanged to both ongoing and upcoming retrieval; neither query SHALL acquire a separate current instant. A non-deleted event with a non-null end SHALL be ongoing exactly when start <= snapshot <= end. It SHALL NOT use overlap with the whole current day as a substitute, round instants, or apply epsilon adjustments. Retrieval SHALL include active intervals regardless of their initial calendar year.
 
 #### Scenario: Multi-day event spans now
 - **WHEN** a non-deleted event began yesterday and ends tomorrow
@@ -76,12 +76,28 @@ Ongoing retrieval SHALL exclude soft-deleted events and return all matching IDs 
 - **WHEN** more than six non-deleted events qualify, including equal-start events
 - **THEN** all are returned with stable start and identity ordering
 
-### Requirement: Ongoing and upcoming are disjoint at the same snapshot
-For the same dataset and current UTC snapshot, ongoing and upcoming ID sets SHALL have an empty intersection by their retrieval contracts. Presentation SHALL NOT repair overlap using local filtering or deduplication. Separate operations SHALL each capture their own instant; this requirement SHALL NOT assert atomicity across independent clock readings or live reclassification while time passes.
+### Requirement: Home discovery passes share one snapshot and produce disjoint sets
+Each Home discovery pass SHALL capture exactly one current UTC snapshot in application orchestration and pass it to both retrieval operations. Both classifications, the current Rome day and the upcoming-window end SHALL use that same snapshot even if entity resolution delays the second query across a temporal boundary. For the same dataset, ongoing and upcoming ID sets returned by a successful pass SHALL have an empty intersection by their retrieval contracts, without a temporal gap caused by different clock readings. Presentation SHALL NOT repair overlap using local filtering or deduplication. This requirement SHALL NOT assert atomic cache reads, reclassify retained state after failed retrieval or provide live updates while time passes.
 
 #### Scenario: Same dataset contains active and future events
-- **WHEN** both sets are queried at the same fixed snapshot over active, ended and future events
-- **THEN** their ID intersection is empty and eligible active and future events remain in their respective sets
+- **WHEN** a successful Home pass queries both sets over active, ended and future events
+- **THEN** application orchestration supplies the same captured snapshot to both, their ID intersection is empty and eligible active and future events remain in their respective sets
+
+#### Scenario: Entity resolution crosses an event start
+- **WHEN** a pass captures `10:59:59.900Z`, first resolves an already-active event with a delayed lookup, and queries upcoming after the clock advances to `11:00:00.200Z` while another event starts at `11:00:00Z`
+- **THEN** both queries receive `10:59:59.900Z`, the later-start event is upcoming and not ongoing for that pass, and it does not disappear from both sets due to clock drift
+
+#### Scenario: A later pass observes the advanced clock
+- **WHEN** a subsequent pass begins at `11:00:00.200Z` for that same event whose end still includes the new snapshot
+- **THEN** one new snapshot governs both queries and the event is ongoing and not upcoming
+
+#### Scenario: Entity resolution crosses Rome midnight
+- **WHEN** a pass captures an instant before Rome midnight and delayed entity resolution finishes after midnight
+- **THEN** both classifications and the upcoming-window end remain based on the captured Rome day, including null-end membership
+
+#### Scenario: A coalesced pass captures a fresh shared instant
+- **WHEN** a return request is queued during a pass and the clock advances before the next pass starts
+- **THEN** the first pass retains its original snapshot and the subsequent pass captures one new snapshot shared by both queries
 
 ### Requirement: Rome civil boundaries are independent of device timezone
 The current civil day and inclusive UTC bounds SHALL use Europe/Rome independently of device timezone and SHALL respect actual DST day lengths. Null-end membership SHALL end at the last represented microsecond of its Rome day, without conversion to half-open persisted ends.
@@ -118,7 +134,7 @@ Temporal discovery SHALL be owned by the repository boundary and exposed through
 - **THEN** successfully resolved entities are published in repository order with failed lookups omitted
 
 ### Requirement: Home re-entry refreshes temporal discovery
-Initial Home creation SHALL load both ongoing and upcoming discovery. A supported navigation away from Home followed by return SHALL re-execute both classifications against the then-current cache and clock, even when the shell retains the application state. Manual sync and pull-to-refresh SHALL retain the existing sync navigation/error contract and reclassify both sets when Home returns. Overlapping return requests SHALL not be silently lost because another load is running. The system SHALL NOT introduce periodic refresh, polling, a global clock notifier or a lifecycle framework for this feature. Continuously visible Home SHALL retain snapshot state until an explicit reload or supported return.
+Initial Home creation SHALL load both ongoing and upcoming discovery through a pass with one shared UTC snapshot. A supported navigation away from Home followed by return SHALL re-execute both classifications against the then-current cache and clock, even when the shell retains the application state. Manual sync and pull-to-refresh SHALL retain the existing sync navigation/error contract and reclassify both sets when Home returns. Overlapping return requests SHALL not be silently lost because another load is running. The system SHALL NOT introduce periodic refresh, polling, a global clock notifier or a lifecycle framework for this feature. Continuously visible Home SHALL retain snapshot state until an explicit reload or supported return.
 
 #### Scenario: Initial Home load
 - **WHEN** the Home route is first created
@@ -142,7 +158,7 @@ Initial Home creation SHALL load both ongoing and upcoming discovery. A supporte
 
 #### Scenario: Return happens while a prior load is pending
 - **WHEN** another Home return requests discovery during an earlier load
-- **THEN** a coalesced subsequent pass completes and the return request is not discarded
+- **THEN** a coalesced subsequent pass captures its own single shared snapshot, completes and the return request is not discarded
 
 #### Scenario: Home owner is disposed while loading
 - **WHEN** a Home owner is disposed with IDs or entity resolution in flight
