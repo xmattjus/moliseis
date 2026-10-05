@@ -64,6 +64,8 @@ This causes one discovery path plus N additional lookups and makes `SearchViewMo
 
 The direct replacement must preserve effective current behavior, not merely reproduce the raw ID query. In particular, place search queries do not uniformly enforce soft deletion themselves today; the subsequent `PlaceRepository.getById()` does. Once that second lookup disappears, `SearchRepositoryImpl` must enforce equivalent soft-delete filtering on every place result path before returning domain models.
 
+`Result.zip2` awaits place discovery first and returns its error without starting event discovery on failure. Both current search methods mutate the shared parameterized `_cityQuery`; parallelizing the two phases would change short-circuit behavior and risk shared-query interference.
+
 Event search already relies on the canonical annual-visibility rule and its city traversal mirrors that rule; that behavior must remain unchanged.
 
 Current result ordering is all deduplicated place matches, then all deduplicated event matches. Within each type, first-match order from the existing name/city/category aggregation is retained. The optimization must not silently introduce a new relevance algorithm or sorting policy.
@@ -159,6 +161,8 @@ ViewModel Command A -> List<int> -> intermediate state
   -> ViewModel Command B -> N getById() -> List<DomainModel>
 ```
 
+One discovery query for latest/upcoming removes the explicit ID query → N `getById` chain. Domain mapping still accesses lazy ObjectBox city/media relations and may cause additional reads. Search retains multiple internal match queries behind one logical repository operation. No single-disk-read claim or measured performance improvement is made.
+
 Per-item `getById` remains valid for actual detail/single-entity use cases and is not deprecated globally. Retaining the two-stage chain would preserve unnecessary operations and mask error ownership.
 
 ### 2. Latest places become one repository query and one Command
@@ -240,6 +244,10 @@ Future<Result<List<ContentBase>>> getResultsByQuery(String text);
 
 The repository already owns the search rules and SHALL now also own materialization.
 
+Place discovery SHALL complete successfully before event discovery starts, preserving the current `Result.zip2` sequential short-circuit semantics. The two phases SHALL NOT be parallelized or executed through `Future.wait`, because they share parameterized repository query state. A place-phase `Result.error` SHALL be returned as the overall error without starting the event phase. This preserves ordering of phase execution as well as output order; it does not add a new execution policy across simultaneous public searches.
+
+The focused repository regression SHALL prove that a place-phase failure leaves event-phase query execution count at zero and preserves the original error in the overall `Result.error`. Verify actual phase/query execution using existing test support or a narrow test seam; do not reintroduce removed public ID APIs solely for counters.
+
 The direct result preserves current effective behavior:
 
 1. Resolve place matches by the existing name, associated-city and category paths.
@@ -261,6 +269,18 @@ For search results/suggestions, remove direct entity resolution from `SearchView
 Preferred dependency after dormant-related cleanup: `SearchRepository`, rather than `SearchRepository`, `EventRepository`, `ExploreGetByIdUseCase`, if execution-head search confirms those extra dependencies have no remaining SearchViewModel use.
 
 `loadResults` and `loadSuggestions` continue to use the current `Command1<void, String>` implementation and existing minimum-query-length rule. Both invoke the direct repository API and make one final collection replacement after successful completion.
+
+Retain the `_disposed` guard immediately after awaiting `getResultsByQuery` and before any successful collection replacement or `notifyListeners()`:
+
+```dart
+final result = await _searchRepository.getResultsByQuery(query);
+if (_disposed) return result.map((_) {});
+// Commit successful results only after this guard.
+```
+
+Replace the old pending-place-ID disposal regression with equivalent direct-result regressions for both results and suggestions: start the Command, keep the direct repository Future pending, dispose the ViewModel, complete with a successful non-empty collection, then verify no assignment to `_results`/`_suggestions`, no ViewModel `notifyListeners()` and no late mutation. The Command may settle normally under current semantics. Keep assertions about ViewModel notification separate from Command notifications.
+
+The repository now owns both phases, so disposal of its caller during a pending operation does not promise to prevent the repository-owned event phase from executing. Preserve the no-late-publication guarantee without introducing cancellation, a disposal callback into the repository, or a new concurrency primitive. The independent place-error short-circuit guarantee in Decision 6 remains mandatory.
 
 A short/invalid query retains the current no-op semantics unless focused UI tests prove that clearing is already required by the existing contract; this optimization must not invent new query UX.
 
@@ -304,6 +324,8 @@ The same Command representing a user-visible logical load SHALL own the discover
 - `loadResults` / `loadSuggestions` own search repository errors.
 
 Do not preserve accidental behavior caused by an upstream ID Command failing while the UI observes a downstream entity Command. Successful empty retrieval and failed retrieval remain distinct states.
+
+Per-item missing lookup semantics are intentionally retired with the removed lookup stage. A recoverable failure of direct repository query/materialization SHALL fail the logical repository operation through `Result.error`; it SHALL NOT be converted into a partial success by skipping individual entities. Replace obsolete “silently skips when getById fails” tests with direct operation failure/no-partial-publication regressions. Preserve the existing boundary between expected recoverable `Exception` failures and unexpected programming `Error` propagation; this decision does not require blanket catching `StateError` or every thrown object.
 
 Existing last-success retention behavior must be established from each active flow's UI/tests before implementation. Do not clear previously visible successful state on error unless that is already the effective intended contract.
 

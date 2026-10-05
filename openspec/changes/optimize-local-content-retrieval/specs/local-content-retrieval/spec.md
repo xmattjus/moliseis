@@ -79,8 +79,6 @@ Direct model retrieval SHALL preserve each feature's existing repository-owned q
 
 For targeted active flows, the Command observed by the UI SHALL own the repository discovery Result for that logical load. An intermediate ID Command SHALL NOT hide repository discovery failure from a downstream entity Command.
 
-The current Command implementation and its execution semantics SHALL remain unchanged by this capability.
-
 #### Scenario: Latest-place discovery fails
 
 - **WHEN** the direct latest-place repository operation returns `Result.error`
@@ -93,14 +91,14 @@ The current Command implementation and its execution semantics SHALL remain unch
 
 #### Scenario: Search discovery fails
 
-- **WHEN** direct active search returns `Result.error`
-- **THEN** the currently executed search/suggestion Command exposes that failure without publishing partial results
+- **WHEN** direct active search returns `Result.error`, including a recoverable query or materialization failure
+- **THEN** the currently executed search/suggestion Command exposes that failure without publishing partial results or silently skipping failed materialization to report success
 
 ### Requirement: Successful list publication is atomic after retrieval
 
 Targeted ViewModels SHALL publish a successful collection only after the direct repository retrieval completes. They SHALL NOT construct visible list state by clearing it and appending individual entities across a series of awaited per-item lookups.
 
-This requirement does not introduce cancellation or latest-wins semantics.
+Atomic successful publication SHALL NOT by itself imply cancellation or latest-wins guarantees.
 
 #### Scenario: Direct list succeeds
 
@@ -146,14 +144,3 @@ The current generic loading skeleton SHALL NOT require a preliminary ID retrieva
 
 - **WHEN** the final content query is in progress
 - **THEN** the existing generic loading surface can render without first querying the final result count
-
-### Requirement: Command/concurrency replacement remains a separate concern
-
-This retrieval optimization SHALL preserve the current Command implementation and existing concurrency/lifecycle policy except where code disappears entirely with a removed flow.
-
-It SHALL NOT introduce command_it, restartable/latest-wins execution, cooperative cancellation or a new state-management mechanism.
-
-#### Scenario: Optimization is complete
-
-- **WHEN** all targeted direct retrieval paths and regressions are green
-- **THEN** the application has a simpler retrieval baseline on which a later Command/concurrency hardening change can be evaluated independently

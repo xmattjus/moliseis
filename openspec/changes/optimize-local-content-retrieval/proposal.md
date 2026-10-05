@@ -2,17 +2,18 @@
 
 Several local content-discovery flows first query ObjectBox for entity IDs and then immediately resolve those IDs one by one through `getById`. The pattern was originally useful for UI loading placeholders whose count matched the eventual content count, but the current loading surfaces no longer consume those ID counts.
 
-The remaining ID-first flows therefore add repository work, asynchronous boundaries, intermediate ViewModel state and chained Commands without providing product value. For a six-item section, a discovery query followed by six individual lookups can require up to seven local retrieval operations where ObjectBox can return the already-filtered, ordered and limited domain content from one query.
+The remaining ID-first flows therefore add repository work, asynchronous boundaries, intermediate ViewModel state and chained Commands without providing product value. For a six-item section, the current flow performs one ID discovery query followed by up to six explicit per-item `getById` calls. Direct retrieval removes those lookups by returning the already-filtered, ordered and limited domain content from one discovery query. Mapping can still load lazy ObjectBox relations such as city and media; this is not a claim of one disk read or one total ObjectBox access.
 
 The pattern also obscures error ownership. `ExploreViewModel` and `EventViewModel` expose UI-facing entity Commands while discovery failures occur in separate ID Commands, so existing UI error branches may never observe the actual repository failure and retry may resolve stale IDs instead of repeating discovery.
 
-Before replacing the current Command implementation with `command_it` and concurrency-aware wrappers, the local retrieval flows should be simplified so one logical list load normally consists of one repository operation, one Command and one final ViewModel state commit.
+Before replacing the current Command implementation with `command_it` and concurrency-aware wrappers, the local retrieval flows should be simplified so one logical list load normally consists of one repository operation, one Command and one final ViewModel state commit. Search retains its existing internal discovery phases; one public repository call does not mean one underlying search query.
 
 ## What Changes
 
 - **BREAKING (internal source contracts):** Replace latest-place ID discovery followed by per-item lookup with direct `Place` retrieval from `PlaceRepository`.
 - **BREAKING (internal source contracts):** Replace upcoming-event ID discovery followed by per-item lookup with direct `Event` retrieval from `EventRepository`, preserving the current temporal contract, ordering and result limit. This change does not implement the separately planned ongoing/upcoming temporal semantics.
 - **BREAKING (internal source contracts):** Consolidate active search discovery so `SearchRepository` returns the final mixed place/event domain results directly rather than exposing place and event ID lists for the ViewModel to resolve.
+- Preserve sequential, short-circuiting place-then-event search discovery and the SearchViewModel guard against late state publication after disposal. Direct retrieval retires per-item missing-lookup omission; recoverable query/materialization failure fails the logical operation without partial results.
 - Move effective filtering currently supplied indirectly by subsequent `getById` calls into the owning direct repository query, including soft-delete filtering.
 - Make the same Command observed by the UI own the repository discovery `Result`, so discovery errors are surfaced through that Command rather than being hidden behind an intermediate ID Command.
 - Publish successful list results as a single final state replacement rather than incrementally mutating ViewModel collections across asynchronous per-item lookups.
