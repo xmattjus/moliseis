@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Upcoming events remain start-date-based
-Upcoming-event retrieval SHALL include only non-deleted events whose start occurs strictly after the current UTC snapshot supplied by its caller and at or before the inclusive end of the Europe/Rome calendar day thirty civil days after the current Rome day. It SHALL remain start-date-based even when the window crosses New Year, sorted by start ascending and limited to six results. It SHALL NOT include an event whose start is equal to or before the captured instant merely because its interval remains active. The current Rome day and future-window end SHALL be derived from that same supplied snapshot, independently of device timezone. For a Home discovery pass, application orchestration SHALL capture the current UTC instant once and supply the same value to ongoing and upcoming retrieval. Upcoming retrieval SHALL NOT read a separate current instant.
+Upcoming-event retrieval SHALL include only non-deleted events whose start occurs strictly after the current UTC snapshot supplied by its caller and at or before the inclusive end of the Europe/Rome calendar day thirty civil days after the current Rome day. It SHALL remain start-date-based even when the window crosses New Year, returned directly as an ordered Event collection sorted by start ascending and limited to six results. It SHALL NOT include an event whose start is equal to or before the captured instant merely because its interval remains active. The current Rome day and future-window end SHALL be derived from that same supplied snapshot, independently of device timezone. For a Home discovery pass, application orchestration SHALL capture the current UTC instant once and supply the same value to ongoing and upcoming retrieval. Upcoming retrieval SHALL NOT read a separate current instant.
 
 #### Scenario: January start appears in a December window
 - **WHEN** the current snapshot is in December and a future January event start is inside the configured upcoming window
@@ -32,7 +32,7 @@ Upcoming-event retrieval SHALL include only non-deleted events whose start occur
 - **THEN** upcoming retrieval excludes it
 
 #### Scenario: Delayed discovery uses the supplied snapshot
-- **WHEN** a Home pass supplies a snapshot before an event start and the upcoming query runs after that start because the first entity resolution was delayed
+- **WHEN** a Home pass supplies a snapshot before an event start and the upcoming query runs after that start because the first discovery query was delayed
 - **THEN** the event remains eligible as upcoming for the supplied snapshot, and the query does not replace it with the later wall-clock time
 
 #### Scenario: Existing upcoming ordering and limit

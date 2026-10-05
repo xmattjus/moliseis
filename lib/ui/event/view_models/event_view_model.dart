@@ -20,7 +20,6 @@ class EventViewModel extends ChangeNotifier {
     unawaited(loadAll.execute());
     loadByDate = Command1(_loadByDate);
     loadNext = Command0(_loadNext);
-    loadNextIds = Command0(_loadNextIds);
   }
 
   final EventRepository _eventRepository;
@@ -30,21 +29,18 @@ class EventViewModel extends ChangeNotifier {
   late Command0<void> loadAll;
   late Command1<void, EventCalendarDate> loadByDate;
   late Command0<void> loadNext;
-  late Command0<void> loadNextIds;
 
   var _all = <Event>[];
   var _byDate = <Event>[];
   EventCalendarDate? _loadedDate;
   int? _loadedDateRevision;
   var _yearlyRevision = 0;
-  final _next = <Event>[];
-  var _nextIds = <int>[];
+  var _next = <Event>[];
   late EventCalendarDate _selectedDate = currentCalendarDate;
 
   UnmodifiableListView<Event> get all => UnmodifiableListView(_all);
   UnmodifiableListView<Event> get byMonth => UnmodifiableListView(_byDate);
   UnmodifiableListView<Event> get next => UnmodifiableListView(_next);
-  UnmodifiableListView<int> get nextIds => UnmodifiableListView(_nextIds);
   EventCalendarDate get selectedDate => _selectedDate;
 
   EventCalendarDate get currentCalendarDate =>
@@ -145,30 +141,12 @@ class EventViewModel extends ChangeNotifier {
     return month != 0 ? month : left.day.compareTo(right.day);
   }
 
-  Future<Result<void>> _loadNextIds() async {
-    final result = await _eventRepository.getNextEventIds();
-
-    final ids = result.getOrNull();
-    if (ids != null) _nextIds = ids;
-
-    notifyListeners();
-
-    // Only trigger the next-events fetch when IDs were loaded successfully.
-    if (result.isSuccess) unawaited(loadNext.execute());
-
-    return result;
-  }
-
   Future<Result<void>> _loadNext() async {
-    _next.clear();
+    final result = await _eventRepository.getNextEvents();
 
-    for (final id in _nextIds) {
-      final event = (await _eventRepository.getById(id)).getOrNull();
-      if (event != null) _next.add(event);
-    }
-
-    notifyListeners();
-
-    return const Result.success(null);
+    return result.map((events) {
+      _next = events;
+      notifyListeners();
+    });
   }
 }

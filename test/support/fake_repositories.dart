@@ -16,6 +16,7 @@ import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/content_submission.dart';
@@ -444,7 +445,7 @@ final class FakeEventRepository extends EventRepository {
     this.getByDateRangeResult = const Result.success([]),
     this.getByCategoriesResult = const Result.success([]),
     this.getByCoordinatesResult = const Result.success([]),
-    this.getNextEventIdsResult = const Result.success([]),
+    this.getNextEventsResult = const Result.success([]),
     this.getFavouriteEventIdsResult = const Result.success([]),
     this.getFavouritesResult = const Result.success([]),
     this.setFavouriteEventResult = const Result.success(null),
@@ -461,7 +462,10 @@ final class FakeEventRepository extends EventRepository {
   Result<List<Event>> getByCoordinatesResult;
   Completer<Result<List<Event>>>? pendingGetByCoordinates;
   Completer<void>? getByCoordinatesCalled;
-  Result<List<int>> getNextEventIdsResult;
+  Result<List<Event>> getNextEventsResult;
+  Completer<Result<List<Event>>>? pendingGetNextEvents;
+  int getNextEventsCallCount = 0;
+  int getByIdCallCount = 0;
   Result<List<int>> getFavouriteEventIdsResult;
   Result<Iterable<Event>> getFavouritesResult;
   Result<void> setFavouriteEventResult;
@@ -535,15 +539,20 @@ final class FakeEventRepository extends EventRepository {
   }
 
   @override
-  Future<Result<Event>> getById(int id) =>
-      pendingGetById[id]?.future ??
-      Future.value(
-        getByIdResults[id] ??
-            Result.error(TestException('Event $id not configured')),
-      );
+  Future<Result<Event>> getById(int id) {
+    getByIdCallCount++;
+    return pendingGetById[id]?.future ??
+        Future.value(
+          getByIdResults[id] ??
+              Result.error(TestException('Event $id not configured')),
+        );
+  }
 
   @override
-  Future<Result<List<int>>> getNextEventIds() async => getNextEventIdsResult;
+  Future<Result<List<Event>>> getNextEvents() {
+    getNextEventsCallCount++;
+    return pendingGetNextEvents?.future ?? Future.value(getNextEventsResult);
+  }
 
   @override
   Future<Result<List<int>>> getFavouriteEventIds() async =>
@@ -625,7 +634,7 @@ final class ControllableEventRepository extends EventRepository {
   ) async => const Result.success([]);
 
   @override
-  Future<Result<List<int>>> getNextEventIds() async => const Result.success([]);
+  Future<Result<List<Event>>> getNextEvents() async => const Result.success([]);
 
   @override
   Future<Result<List<int>>> getFavouriteEventIds() async =>
@@ -685,8 +694,7 @@ final class FakePlaceRepository extends PlaceRepository {
     this.getFavouritePlaceIdsResult = const Result.success([]),
     this.getFavouritePlaceIdsHandler,
     this.getFavouritesResult = const Result.success([]),
-    this.getIdsByCoordinatesResult = const Result.success([]),
-    this.getLatestPlaceIdsResult = const Result.success([]),
+    this.getLatestResult = const Result.success([]),
     this.getSuggestedPlaceIdsResult = const Result.success([]),
     this.setFavouritePlaceResult = const Result.success(null),
     this.setFavouritePlaceHandler,
@@ -706,8 +714,10 @@ final class FakePlaceRepository extends PlaceRepository {
   Result<List<int>> getFavouritePlaceIdsResult;
   Future<Result<List<int>>> Function()? getFavouritePlaceIdsHandler;
   Result<Iterable<Place>> getFavouritesResult;
-  Result<List<int>> getIdsByCoordinatesResult;
-  Result<List<int>> getLatestPlaceIdsResult;
+  Result<List<Place>> getLatestResult;
+  Completer<Result<List<Place>>>? pendingGetLatest;
+  int getLatestCallCount = 0;
+  int getByIdCallCount = 0;
   Result<List<int>> getSuggestedPlaceIdsResult;
   Result<List<Place>> getSuggestedPlacesResult;
   Future<Result<List<Place>>> Function()? getSuggestionsHandler;
@@ -763,25 +773,24 @@ final class FakePlaceRepository extends PlaceRepository {
   }
 
   @override
-  Future<Result<Place>> getById(int id) =>
-      pendingGetById[id]?.future ??
-      Future.value(
-        getByIdResults[id] ??
-            Result.error(TestException('Place $id not configured')),
-      );
+  Future<Result<Place>> getById(int id) {
+    getByIdCallCount++;
+    return pendingGetById[id]?.future ??
+        Future.value(
+          getByIdResults[id] ??
+              Result.error(TestException('Place $id not configured')),
+        );
+  }
 
   @override
   Future<Result<List<int>>> getFavouritePlaceIds() async =>
       getFavouritePlaceIdsHandler?.call() ?? getFavouritePlaceIdsResult;
 
   @override
-  Future<Result<List<int>>> getIdsByCoordinates(
-    List<double> coordinates,
-  ) async => getIdsByCoordinatesResult;
-
-  @override
-  Future<Result<List<int>>> getLatestPlaceIds() async =>
-      getLatestPlaceIdsResult;
+  Future<Result<List<Place>>> getLatest() {
+    getLatestCallCount++;
+    return pendingGetLatest?.future ?? Future.value(getLatestResult);
+  }
 
   @override
   Future<Result<List<Place>>> getSuggestions() {
@@ -1222,46 +1231,50 @@ final class FakeContentSubmissionDraftRepository
 
 /// A [SearchRepository] fake that never exposes persisted search data.
 final class FakeSearchRepository implements SearchRepository {
+  FakeSearchRepository({
+    this.pastSearchesResult = const Result.success([]),
+    this.addToHistoryResult = const Result.success(null),
+    this.removeFromHistoryResult = const Result.success(null),
+    this.resultsByQueryResult = const Result.success([]),
+  });
+
+  Result<List<String>> pastSearchesResult;
+  Result<void> addToHistoryResult;
+  Result<void> removeFromHistoryResult;
+  Result<List<ContentBase>> resultsByQueryResult;
   int getPastSearchesCallCount = 0;
+  int getResultsByQueryCallCount = 0;
+  String? lastQuery;
   Completer<Result<List<String>>>? pendingGetPastSearches;
   Completer<Result<void>>? pendingAddToPastSearches;
   Completer<Result<void>>? pendingRemoveFromPastSearches;
-  Completer<Result<List<int>>>? pendingGetPlaceIdsByQuery;
-  Completer<Result<List<int>>>? pendingGetRelatedResults;
-  int getEventIdsByQueryCallCount = 0;
+  Completer<Result<List<ContentBase>>>? pendingGetResultsByQuery;
 
   @override
-  Future<Result<void>> addToPastSearches(String text) async =>
-      pendingAddToPastSearches?.future ?? const Result.success(null);
+  Future<Result<void>> addToPastSearches(String text) =>
+      pendingAddToPastSearches?.future ?? Future.value(addToHistoryResult);
 
   @override
-  Future<Result<List<int>>> getEventIdsByQuery(String text) async {
-    getEventIdsByQueryCallCount++;
-    return const Result.success(<int>[]);
+  Future<Result<List<ContentBase>>> getResultsByQuery(String text) {
+    getResultsByQueryCallCount++;
+    lastQuery = text;
+    return pendingGetResultsByQuery?.future ??
+        Future.value(resultsByQueryResult);
   }
-
-  @override
-  Future<Result<List<int>>> getPlaceIdsByQuery(String text) async =>
-      pendingGetPlaceIdsByQuery?.future ?? const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getRelatedResults(String text) async =>
-      pendingGetRelatedResults?.future ?? const Result.success(<int>[]);
 
   @override
   Future<Result<List<String>>> getPastSearches() async {
     getPastSearchesCallCount++;
     final result =
         await (pendingGetPastSearches?.future ??
-            Future<Result<List<String>>>.value(
-              const Result.success(<String>[]),
-            ));
+            Future.value(pastSearchesResult));
     return result.map(List.of);
   }
 
   @override
-  Future<Result<void>> removeFromPastSearches(String text) async =>
-      pendingRemoveFromPastSearches?.future ?? const Result.success(null);
+  Future<Result<void>> removeFromPastSearches(String text) =>
+      pendingRemoveFromPastSearches?.future ??
+      Future.value(removeFromHistoryResult);
 }
 
 // ---------------------------------------------------------------------------

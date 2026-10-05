@@ -1,14 +1,21 @@
 // Test readability benefits from separate statements over cascades.
 // ignore_for_file: cascade_invocations
 
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/repositories/search_repository_impl.dart';
+import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../support/controllable_search_repository.dart';
 import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
 import '../../support/objectbox_test_store.dart';
@@ -16,7 +23,7 @@ import '../../support/objectbox_test_store.dart';
 void main() {
   final fixedNowUtc = DateTime.utc(2026, 3, 15, 12);
 
-  group('SearchRepositoryImpl - getEventIdsByQuery', () {
+  group('SearchRepositoryImpl - direct event matches', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late Box<CityEntity> cityBox;
     late Box<EventEntity> eventBox;
@@ -76,35 +83,39 @@ void main() {
           );
 
           expect(
-            (await yearlyRepository.getEventIdsByQuery(
+            (await yearlyRepository.getResultsByQuery(
               'Cross-year',
-            )).getOrNull(),
+            )).getOrNull()?.map((item) => item.remoteId),
             contains(60),
           );
           expect(
-            (await yearlyRepository.getEventIdsByQuery(
+            (await yearlyRepository.getResultsByQuery(
               'Cross-year',
-            )).getOrNull(),
+            )).getOrNull()?.map((item) => item.remoteId),
             isNot(contains(61)),
           );
           expect(
-            (await yearlyRepository.getEventIdsByQuery('natura')).getOrNull(),
+            (await yearlyRepository.getResultsByQuery(
+              'natura',
+            )).getOrNull()?.map((item) => item.remoteId),
             contains(60),
           );
           expect(
-            (await yearlyRepository.getEventIdsByQuery('natura')).getOrNull(),
+            (await yearlyRepository.getResultsByQuery(
+              'natura',
+            )).getOrNull()?.map((item) => item.remoteId),
             isNot(contains(61)),
           );
           expect(
-            (await yearlyRepository.getEventIdsByQuery(
+            (await yearlyRepository.getResultsByQuery(
               'Campobasso',
-            )).getOrNull(),
+            )).getOrNull()?.map((item) => item.remoteId),
             contains(60),
           );
           expect(
-            (await yearlyRepository.getEventIdsByQuery(
+            (await yearlyRepository.getResultsByQuery(
               'Campobasso',
-            )).getOrNull(),
+            )).getOrNull()?.map((item) => item.remoteId),
             isNot(contains(61)),
           );
         }
@@ -145,15 +156,27 @@ void main() {
           nowUtc: () => DateTime.utc(2026, 12, 31, 23, 30),
         );
 
-        final direct = await romeRepository.getEventIdsByQuery('Rome year');
-        final cityResult = await romeRepository.getEventIdsByQuery('Termoli');
-        final category = await romeRepository.getEventIdsByQuery('natura');
+        final direct = await romeRepository.getResultsByQuery('Rome year');
+        final cityResult = await romeRepository.getResultsByQuery('Termoli');
+        final category = await romeRepository.getResultsByQuery('natura');
 
-        expect(direct.getOrNull(), contains(50));
-        expect(cityResult.getOrNull(), contains(50));
-        expect(cityResult.getOrNull(), isNot(contains(51)));
-        expect(category.getOrNull(), contains(52));
-        expect(category.getOrNull(), isNot(contains(53)));
+        expect(direct.getOrNull()?.map((item) => item.remoteId), contains(50));
+        expect(
+          cityResult.getOrNull()?.map((item) => item.remoteId),
+          contains(50),
+        );
+        expect(
+          cityResult.getOrNull()?.map((item) => item.remoteId),
+          isNot(contains(51)),
+        );
+        expect(
+          category.getOrNull()?.map((item) => item.remoteId),
+          contains(52),
+        );
+        expect(
+          category.getOrNull()?.map((item) => item.remoteId),
+          isNot(contains(53)),
+        );
       });
 
       test('includes current-year event whose name matches query', () async {
@@ -167,10 +190,12 @@ void main() {
           ),
         );
 
-        final result = await repository.getEventIdsByQuery('tartufo');
+        final result = await repository.getResultsByQuery('tartufo');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
+        expect(result, isA<Success<List<ContentBase>>>());
+        final ids = (result as Success<List<ContentBase>>).value.map(
+          (item) => item.remoteId,
+        );
         expect(ids, contains(1));
       });
 
@@ -184,10 +209,12 @@ void main() {
           ),
         );
 
-        final result = await repository.getEventIdsByQuery('sagra');
+        final result = await repository.getResultsByQuery('sagra');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
+        expect(result, isA<Success<List<ContentBase>>>());
+        final ids = (result as Success<List<ContentBase>>).value.map(
+          (item) => item.remoteId,
+        );
         expect(ids, isNot(contains(2)));
       });
 
@@ -203,10 +230,12 @@ void main() {
             ),
           );
 
-          final result = await repository.getEventIdsByQuery('futuro');
+          final result = await repository.getResultsByQuery('futuro');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids, isNot(contains(3)));
         },
       );
@@ -233,10 +262,12 @@ void main() {
           );
           eventBox.put(event);
 
-          final result = await repository.getEventIdsByQuery('Campobasso');
+          final result = await repository.getResultsByQuery('Campobasso');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids, contains(4));
         },
       );
@@ -256,10 +287,12 @@ void main() {
           );
           eventBox.put(event);
 
-          final result = await repository.getEventIdsByQuery('Isernia');
+          final result = await repository.getResultsByQuery('Isernia');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids, isNot(contains(5)));
         },
       );
@@ -279,10 +312,12 @@ void main() {
           );
           eventBox.put(event);
 
-          final result = await repository.getEventIdsByQuery('Bojano');
+          final result = await repository.getResultsByQuery('Bojano');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids, contains(6));
         },
       );
@@ -307,10 +342,12 @@ void main() {
             ),
           );
 
-          final result = await repository.getEventIdsByQuery('fantasma');
+          final result = await repository.getResultsByQuery('fantasma');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids, isNot(contains(200)));
         },
       );
@@ -330,10 +367,12 @@ void main() {
             ),
           );
 
-          final result = await repository.getEventIdsByQuery('natura');
+          final result = await repository.getResultsByQuery('natura');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids, isNot(contains(201)));
         },
       );
@@ -355,10 +394,12 @@ void main() {
           );
           eventBox.put(event);
 
-          final result = await repository.getEventIdsByQuery('Termoli');
+          final result = await repository.getResultsByQuery('Termoli');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids, isNot(contains(202)));
         },
       );
@@ -376,10 +417,12 @@ void main() {
         );
         eventBox.put(event);
 
-        final result = await repository.getEventIdsByQuery('Larino');
+        final result = await repository.getResultsByQuery('Larino');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
+        expect(result, isA<Success<List<ContentBase>>>());
+        final ids = (result as Success<List<ContentBase>>).value.map(
+          (item) => item.remoteId,
+        );
         expect(ids, isNot(contains(203)));
       });
     });
@@ -390,7 +433,7 @@ void main() {
 
     group('deduplication', () {
       test(
-        'returns each event ID only once when it matches both name and city',
+        'returns each event only once when it matches both name and city',
         () async {
           final now = fixedNowUtc;
           final city = makeCityEntity(remoteId: 20, name: 'Venafro');
@@ -407,10 +450,12 @@ void main() {
           );
           eventBox.put(event);
 
-          final result = await repository.getEventIdsByQuery('Venafro');
+          final result = await repository.getResultsByQuery('Venafro');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids.where((id) => id == 7), hasLength(1));
         },
       );
@@ -421,10 +466,10 @@ void main() {
     // -------------------------------------------------------------------------
 
     test('returns empty list when store is empty', () async {
-      final result = await repository.getEventIdsByQuery('anything');
+      final result = await repository.getResultsByQuery('anything');
 
-      expect(result, isA<Success<List<int>>>());
-      expect((result as Success<List<int>>).value, isEmpty);
+      expect(result, isA<Success<List<ContentBase>>>());
+      expect((result as Success<List<ContentBase>>).value, isEmpty);
     });
 
     // -------------------------------------------------------------------------
@@ -446,10 +491,12 @@ void main() {
             ),
           );
 
-          final result = await repository.getEventIdsByQuery('natura');
+          final result = await repository.getResultsByQuery('natura');
 
-          expect(result, isA<Success<List<int>>>());
-          final ids = (result as Success<List<int>>).value;
+          expect(result, isA<Success<List<ContentBase>>>());
+          final ids = (result as Success<List<ContentBase>>).value.map(
+            (item) => item.remoteId,
+          );
           expect(ids, contains(100));
         },
       );
@@ -467,10 +514,12 @@ void main() {
           ),
         );
 
-        final result = await repository.getEventIdsByQuery('natura');
+        final result = await repository.getResultsByQuery('natura');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
+        expect(result, isA<Success<List<ContentBase>>>());
+        final ids = (result as Success<List<ContentBase>>).value.map(
+          (item) => item.remoteId,
+        );
         expect(ids, isNot(contains(101)));
       });
 
@@ -487,20 +536,22 @@ void main() {
           ),
         );
 
-        final result = await repository.getEventIdsByQuery('cibo');
+        final result = await repository.getResultsByQuery('cibo');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
+        expect(result, isA<Success<List<ContentBase>>>());
+        final ids = (result as Success<List<ContentBase>>).value.map(
+          (item) => item.remoteId,
+        );
         expect(ids, contains(102));
       });
     });
   });
 
   // -------------------------------------------------------------------------
-  // getPlaceIdsByQuery
+  // getResultsByQuery
   // -------------------------------------------------------------------------
 
-  group('SearchRepositoryImpl - getPlaceIdsByQuery', () {
+  group('SearchRepositoryImpl - direct place matches', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late Box<PlaceEntity> placeBox;
     late SearchRepositoryImpl repository;
@@ -529,10 +580,12 @@ void main() {
           ),
         );
 
-        final result = await repository.getPlaceIdsByQuery('natura');
+        final result = await repository.getResultsByQuery('natura');
 
-        expect(result, isA<Success<List<int>>>());
-        final ids = (result as Success<List<int>>).value;
+        expect(result, isA<Success<List<ContentBase>>>());
+        final ids = (result as Success<List<ContentBase>>).value.map(
+          (item) => item.remoteId,
+        );
         expect(ids, contains(200));
       },
     );
@@ -542,10 +595,12 @@ void main() {
         makePlaceEntity(remoteId: 201, name: 'Castello di Campobasso'),
       );
 
-      final result = await repository.getPlaceIdsByQuery('Castello');
+      final result = await repository.getResultsByQuery('Castello');
 
-      expect(result, isA<Success<List<int>>>());
-      final ids = (result as Success<List<int>>).value;
+      expect(result, isA<Success<List<ContentBase>>>());
+      final ids = (result as Success<List<ContentBase>>).value.map(
+        (item) => item.remoteId,
+      );
       expect(ids, contains(201));
     });
 
@@ -558,110 +613,245 @@ void main() {
         ),
       );
 
-      final result = await repository.getPlaceIdsByQuery('cibo');
+      final result = await repository.getResultsByQuery('cibo');
 
-      expect(result, isA<Success<List<int>>>());
-      final ids = (result as Success<List<int>>).value;
+      expect(result, isA<Success<List<ContentBase>>>());
+      final ids = (result as Success<List<ContentBase>>).value.map(
+        (item) => item.remoteId,
+      );
       expect(ids.where((id) => id == 202), hasLength(1));
     });
 
     test('returns empty list when store is empty', () async {
-      final result = await repository.getPlaceIdsByQuery('anything');
+      final result = await repository.getResultsByQuery('anything');
 
-      expect(result, isA<Success<List<int>>>());
-      expect((result as Success<List<int>>).value, isEmpty);
+      expect(result, isA<Success<List<ContentBase>>>());
+      expect((result as Success<List<ContentBase>>).value, isEmpty);
     });
   });
 
-  // -------------------------------------------------------------------------
-  // getRelatedResults
-  // -------------------------------------------------------------------------
-
-  group('SearchRepositoryImpl - getRelatedResults', () {
-    late TestObjectBoxEnvironment objectBoxEnvironment;
-    late Box<PlaceEntity> placeBox;
+  group('SearchRepositoryImpl - direct mixed discovery contracts', () {
+    late TestObjectBoxEnvironment environment;
+    late Box<CityEntity> cities;
+    late Box<PlaceEntity> places;
+    late Box<EventEntity> events;
     late SearchRepositoryImpl repository;
 
     setUp(() async {
-      objectBoxEnvironment = await TestObjectBoxEnvironment.create();
-      placeBox = objectBoxEnvironment.store.box<PlaceEntity>();
+      environment = await TestObjectBoxEnvironment.create();
+      cities = environment.store.box<CityEntity>();
+      places = environment.store.box<PlaceEntity>();
+      events = environment.store.box<EventEntity>();
       repository = SearchRepositoryImpl(
         logger: MockLogger(),
-        objectBoxI: TestObjectBox(objectBoxEnvironment.store),
+        objectBoxI: TestObjectBox(environment.store),
+        nowUtc: () => fixedNowUtc,
       );
     });
 
     tearDown(() async {
-      await objectBoxEnvironment.dispose();
+      await environment.dispose();
     });
 
-    test('returns places with the most frequent non-zero category '
-        'from the previous search', () async {
-      // Two places share the same category (nature).
-      placeBox.put(
-        makePlaceEntity(
-          remoteId: 300,
-          name: 'Unique name alpha',
-          contentCategoryIndex: 1, // ContentCategory.nature
-        ),
-      );
-
-      placeBox.put(
-        makePlaceEntity(
-          remoteId: 301,
-          name: 'Natura viva',
-          contentCategoryIndex: 1, // ContentCategory.nature
-        ),
-      );
-
-      // A third place with a different category.
-      placeBox.put(
-        makePlaceEntity(
-          remoteId: 302,
-          name: 'Museo storico',
-          contentCategoryIndex: 2, // ContentCategory.history
-        ),
-      );
-
-      // Search by name (not category) so `_categorySearched` is false,
-      // and only one nature place is returned.
-      final searchResult = await repository.getPlaceIdsByQuery(
-        'Unique name alpha',
-      );
-      expect(searchResult, isA<Success<List<int>>>());
-      expect((searchResult as Success<List<int>>).value, contains(300));
-
-      // The related results should return the other nature place (301)
-      // that was not in the original search but shares the most frequent
-      // category (nature).
-      final result = await repository.getRelatedResults('anything');
-
-      expect(result, isA<Success<List<int>>>());
-      final ids = (result as Success<List<int>>).value;
-      expect(ids, contains(301));
-      expect(ids, isNot(contains(300)));
-      expect(ids, isNot(contains(302)));
-    });
-
-    test(
-      'returns empty list when the previous search was category-based',
-      () async {
-        placeBox.put(
+    for (final path in ['name', 'city', 'category']) {
+      test('excludes deleted places on the $path matching path', () async {
+        cities.put(makeCityEntity(remoteId: 1, name: 'Natura'));
+        places.putMany([
           makePlaceEntity(
-            remoteId: 310,
-            name: 'Some place',
-            contentCategoryIndex: 1,
+            remoteId: 1,
+            name: path == 'name' ? 'Natura visible' : 'Visible',
+            cityId: path == 'city' ? 1 : null,
+            contentCategoryIndex: path == 'category' ? 1 : 0,
           ),
-        );
+          makePlaceEntity(
+            remoteId: 2,
+            name: path == 'name' ? 'Natura deleted' : 'Deleted',
+            cityId: path == 'city' ? 1 : null,
+            contentCategoryIndex: path == 'category' ? 1 : 0,
+            isDeleted: true,
+          ),
+        ]);
 
-        // A category-based search sets `_categorySearched = true`.
-        await repository.getPlaceIdsByQuery('natura');
+        final result = await repository.getResultsByQuery('natura');
 
-        final result = await repository.getRelatedResults('anything');
+        expect(result, isA<Success<List<ContentBase>>>());
+        expect(result.getOrNull()!.map((item) => item.remoteId), [1]);
+        expect(result.getOrNull()!.single, isA<Place>());
+      });
+    }
 
-        expect(result, isA<Success<List<int>>>());
-        expect((result as Success<List<int>>).value, isEmpty);
-      },
-    );
+    test('keeps name/city/category first-match order, type grouping and '
+        'equal numeric IDs without cross-type deduplication', () async {
+      cities.put(makeCityEntity(remoteId: 1, name: 'Natura'));
+      // Numeric order deliberately differs from match-path order.
+      places.putMany([
+        makePlaceEntity(
+          remoteId: 30,
+          name: 'Natura name',
+          cityId: 1,
+          contentCategoryIndex: 1,
+        ),
+        makePlaceEntity(remoteId: 20, name: 'City match', cityId: 1),
+        makePlaceEntity(
+          remoteId: 10,
+          name: 'Category match',
+          contentCategoryIndex: 1,
+        ),
+      ]);
+      events.putMany([
+        makeEventEntity(
+          remoteId: 30,
+          name: 'Natura name',
+          cityId: 1,
+          contentCategoryIndex: 1,
+          startDate: fixedNowUtc,
+        ),
+        makeEventEntity(
+          remoteId: 20,
+          name: 'City match',
+          cityId: 1,
+          startDate: fixedNowUtc,
+        ),
+        makeEventEntity(
+          remoteId: 10,
+          name: 'Category match',
+          contentCategoryIndex: 1,
+          startDate: fixedNowUtc,
+        ),
+      ]);
+
+      final result = await repository.getResultsByQuery('natura');
+      final values = (result as Success<List<ContentBase>>).value;
+
+      expect(values.map((item) => item.remoteId), [30, 20, 10, 30, 20, 10]);
+      expect(values.take(3), everyElement(isA<Place>()));
+      expect(values.skip(3), everyElement(isA<Event>()));
+    });
+
+    test('maps final place and event fields and lazy city relations', () async {
+      cities.put(makeCityEntity(remoteId: 1, name: 'Campobasso'));
+      places.put(
+        makePlaceEntity(
+          remoteId: 2,
+          name: 'Shared place',
+          description: 'Place description',
+          contentCategoryIndex: 1,
+          coordinates: [41.56, 14.66],
+          cityId: 1,
+          isSaved: true,
+        ),
+      );
+      final endDate = fixedNowUtc.add(const Duration(days: 1));
+      events.put(
+        makeEventEntity(
+          remoteId: 3,
+          name: 'Shared event',
+          description: 'Event description',
+          contentCategoryIndex: 4,
+          coordinates: [41.56, 14.66],
+          cityId: 1,
+          startDate: fixedNowUtc,
+          endDate: endDate,
+          allDay: true,
+        ),
+      );
+
+      final result = await repository.getResultsByQuery('Shared');
+      final values = (result as Success<List<ContentBase>>).value;
+      final place = values[0] as Place;
+      final event = values[1] as Event;
+
+      expect(place.remoteId, 2);
+      expect(place.name, 'Shared place');
+      expect(place.description, 'Place description');
+      expect(place.category, ContentCategory.nature);
+      expect(place.city!.name, 'Campobasso');
+      // ObjectBox stores indexed coordinates as Float32.
+      expect(place.coordinates.latitude, closeTo(41.56, 0.00001));
+      expect(place.coordinates.longitude, closeTo(14.66, 0.00001));
+      expect(place.isSaved, isTrue);
+      expect(event.remoteId, 3);
+      expect(event.name, 'Shared event');
+      expect(event.description, 'Event description');
+      expect(event.category, ContentCategory.food);
+      expect(event.city!.name, 'Campobasso');
+      expect(event.startDate, fixedNowUtc);
+      expect(event.endDate, endDate);
+      expect(event.allDay, isTrue);
+    });
+
+    test('place failure short-circuits before event execution and preserves '
+        'the original error', () async {
+      final placeError = Exception('Place discovery failed');
+      final controlled = ControllableSearchRepository(
+        logger: MockLogger(),
+        objectBoxI: TestObjectBox(environment.store),
+      );
+      controlled.placePhase = (_) async => Result.error(placeError);
+      controlled.eventPhase = (_) async => Result.success([makeEvent()]);
+
+      final result = await controlled.getResultsByQuery('query');
+
+      expect(result, isA<Error<List<ContentBase>>>());
+      expect((result as Error<List<ContentBase>>).error, same(placeError));
+      expect(controlled.placePhaseCalls, 1);
+      expect(controlled.eventPhaseCalls, 0);
+    });
+
+    test('event discovery waits for successful place discovery', () async {
+      final pendingPlace = Completer<Result<List<Place>>>();
+      final expectedPlace = makePlace();
+      final expectedEvent = makeEvent();
+      final controlled = ControllableSearchRepository(
+        logger: MockLogger(),
+        objectBoxI: TestObjectBox(environment.store),
+      );
+      controlled.placePhase = (_) => pendingPlace.future;
+      controlled.eventPhase = (_) async => Result.success([expectedEvent]);
+
+      final operation = controlled.getResultsByQuery('query');
+      await Future<void>.delayed(Duration.zero);
+      expect(controlled.placePhaseCalls, 1);
+      expect(controlled.eventPhaseCalls, 0);
+      pendingPlace.complete(Result.success([expectedPlace]));
+      final result = await operation;
+
+      expect(controlled.eventPhaseCalls, 1);
+      expect(result.getOrNull(), [same(expectedPlace), same(expectedEvent)]);
+    });
+
+    test('event phase error fails the whole operation without place-only '
+        'partial success', () async {
+      final eventError = Exception('Event materialization failed');
+      final controlled = ControllableSearchRepository(
+        logger: MockLogger(),
+        objectBoxI: TestObjectBox(environment.store),
+      );
+      controlled.placePhase = (_) async => Result.success([makePlace()]);
+      controlled.eventPhase = (_) async => Result.error(eventError);
+
+      final result = await controlled.getResultsByQuery('query');
+
+      expect(result, isA<Error<List<ContentBase>>>());
+      expect(result.getOrNull(), isNull);
+      expect((result as Error<List<ContentBase>>).error, same(eventError));
+      expect(controlled.eventPhaseCalls, 1);
+    });
+
+    test('unexpected programming errors propagate instead of becoming '
+        'recoverable errors', () async {
+      final programmingError = StateError('Corrupt persisted entity');
+      final controlled = ControllableSearchRepository(
+        logger: MockLogger(),
+        objectBoxI: TestObjectBox(environment.store),
+      );
+      controlled.placePhase = (_) async => throw programmingError;
+
+      await expectLater(
+        controlled.getResultsByQuery('query'),
+        throwsA(same(programmingError)),
+      );
+      expect(controlled.eventPhaseCalls, 0);
+    });
   });
 }

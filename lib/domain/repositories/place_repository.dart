@@ -32,11 +32,8 @@ abstract class PlaceRepository with Synchronizable<PlaceDto> {
   /// Returns the IDs of all places marked as favourites.
   Future<Result<List<int>>> getFavouritePlaceIds();
 
-  /// Returns the IDs of places near the given [coordinates].
-  Future<Result<List<int>>> getIdsByCoordinates(List<double> coordinates);
-
-  /// Returns the IDs of the most recently added places.
-  Future<Result<List<int>>> getLatestPlaceIds();
+  /// Returns up to six non-deleted places, newest creation first.
+  Future<Result<List<Place>>> getLatest();
 
   /// Returns place suggestions.
   Future<Result<List<Place>>> getSuggestions();

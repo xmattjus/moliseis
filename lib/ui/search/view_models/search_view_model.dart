@@ -3,38 +3,27 @@ import 'dart:collection' show UnmodifiableListView;
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
-import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
-import 'package:moliseis/domain/use-cases/explore_get_by_id_use_case.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// ViewModel for the search screen.
 ///
-/// Manages past search history, live search results, and contextually
-/// related content. All async actions are exposed as [Command]s so that
+/// Manages past search history, live search results, and suggestions.
+/// All async actions are exposed as [Command]s so that
 /// UI widgets can observe running, completed, and error states without
 /// direct async/await wiring.
 class SearchViewModel extends ChangeNotifier {
-  SearchViewModel({
-    required EventRepository eventRepository,
-    required ExploreGetByIdUseCase exploreGetByIdUseCase,
-    required SearchRepository searchRepository,
-  }) : _eventRepository = eventRepository,
-       _exploreGetByIdUseCase = exploreGetByIdUseCase,
-       _searchRepository = searchRepository {
+  SearchViewModel({required SearchRepository searchRepository})
+    : _searchRepository = searchRepository {
     addToPastSearches = Command1(_addToPastSearches);
     loadPastSearches = Command0(_loadPastSearches)..execute();
     loadResults = Command1(_loadResults);
-    loadRelatedResults = Command0(_loadRelatedResults);
-    loadRelatedResultsIds = Command1(_loadRelatedResultsIds);
     removeFromPastSearches = Command1(_removeFromPastSearches);
     loadSuggestions = Command1(_loadSuggestions);
   }
 
-  final EventRepository _eventRepository;
-  final ExploreGetByIdUseCase _exploreGetByIdUseCase;
   final SearchRepository _searchRepository;
   bool _disposed = false;
 
@@ -60,35 +49,21 @@ class SearchViewModel extends ChangeNotifier {
   /// No-op for queries shorter than 3 characters.
   late Command1<void, String> loadResults;
 
-  /// Fetches full content for each ID in [relatedResultIds] and populates
-  /// [relatedResults].
-  ///
-  /// IDs whose lookup fails are silently skipped; [relatedResults] will
-  /// contain only the successfully resolved items.
-  late Command0<void> loadRelatedResults;
-
-  /// Resolves place IDs related to a query and triggers [loadRelatedResults].
-  ///
-  /// No-op for queries shorter than 3 characters.
-  late Command1<void, String> loadRelatedResultsIds;
-
   /// Removes a query string from the persistent search history.
   ///
   /// Uses an optimistic update: the entry is removed locally before the delete
   /// succeeds and restored on error.
   late Command1<void, String> removeFromPastSearches;
 
-  /// Loads search suggestions for a query into [results].
+  /// Loads search suggestions for a query into [suggestions].
   ///
   /// No-op for queries shorter than 3 characters. Shares the same
   /// underlying search logic as [loadResults].
   late Command1<void, String> loadSuggestions;
 
   var _pastSearches = <String>[];
-  final _results = <ContentBase>[];
-  final _suggestions = <ContentBase>[];
-  var _relatedResults = <ContentBase>[];
-  var _relatedResultsIds = <int>[];
+  var _results = <ContentBase>[];
+  var _suggestions = <ContentBase>[];
   final List<ContentCategory> _types = ContentCategory.values.minusUnknown;
 
   /// An unmodifiable view of the persisted past search queries.
@@ -103,18 +78,10 @@ class SearchViewModel extends ChangeNotifier {
   UnmodifiableListView<ContentBase> get suggestions =>
       UnmodifiableListView(_suggestions);
 
-  /// An unmodifiable view of the related content results.
-  UnmodifiableListView<ContentBase> get relatedResults =>
-      UnmodifiableListView(_relatedResults);
-
-  /// An unmodifiable view of the related content IDs.
-  UnmodifiableListView<int> get relatedResultIds =>
-      UnmodifiableListView(_relatedResultsIds);
-
   /// Returns true when [query] is long enough to trigger a search.
   ///
-  /// Queries shorter than 3 characters are treated as no-ops by [loadResults],
-  /// [loadSuggestions], and [loadRelatedResultsIds].
+  /// Queries shorter than 3 characters are treated as no-ops by [loadResults]
+  /// and [loadSuggestions].
   static bool isSearchQueryValid(String query) => query.length >= 3;
 
   Future<Result<void>> _addToPastSearches(String query) async {
@@ -158,38 +125,9 @@ class SearchViewModel extends ChangeNotifier {
     });
   }
 
-  Future<Result<void>> _loadResults(String query) => _search(query, _results);
-
-  Future<Result<void>> _loadRelatedResults() async {
-    final relatedResults = <ContentBase>[];
-
-    for (final id in _relatedResultsIds) {
-      final result = await _exploreGetByIdUseCase.getById(id);
-      if (_disposed) return const Result.success(null);
-
-      result.map(relatedResults.add);
-    }
-
-    _relatedResults = relatedResults;
-    notifyListeners();
-
-    return const Result.success(null);
-  }
-
-  Future<Result<void>> _loadRelatedResultsIds(String query) async {
-    if (!isSearchQueryValid(query)) {
-      return const Result.success(null);
-    }
-
-    final result = await _searchRepository.getRelatedResults(query);
-    if (_disposed) return result.map((_) {});
-
-    return result.asyncMap((relatedResultsIds) async {
-      _relatedResultsIds = relatedResultsIds;
-
-      await loadRelatedResults.execute();
-    });
-  }
+  Future<Result<void>> _loadResults(String query) => _search(query, (results) {
+    _results = results;
+  });
 
   Future<Result<void>> _removeFromPastSearches(String query) async {
     // Optimistically removes the query from past searches.
@@ -208,34 +146,20 @@ class SearchViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _loadSuggestions(String query) =>
-      _search(query, _suggestions);
+      _search(query, (results) {
+        _suggestions = results;
+      });
 
-  Future<Result<void>> _search(String query, List<ContentBase> list) async {
+  Future<Result<void>> _search(
+    String query,
+    void Function(List<ContentBase>) commit,
+  ) async {
     if (!isSearchQueryValid(query)) return const Result.success(null);
-
-    list.clear();
-
-    return Result.zip2(
-      () => _searchRepository.getPlaceIdsByQuery(query),
-      () => _disposed
-          ? Future.value(const Result.success(<int>[]))
-          : _searchRepository.getEventIdsByQuery(query),
-      (placeIds, eventIds) async {
-        if (_disposed) return const Result.success(null);
-        for (final id in placeIds) {
-          final getPlace = await _exploreGetByIdUseCase.getById(id);
-          if (_disposed) return const Result.success(null);
-          getPlace.map((place) => list.add(place));
-        }
-
-        for (final id in eventIds) {
-          final getEvent = await _eventRepository.getById(id);
-          if (_disposed) return const Result.success(null);
-          getEvent.map((event) => list.add(event));
-        }
-
-        return const Result.success(null);
-      },
-    );
+    final result = await _searchRepository.getResultsByQuery(query);
+    if (_disposed) return result.map((_) {});
+    return result.map((results) {
+      commit(results);
+      notifyListeners();
+    });
   }
 }

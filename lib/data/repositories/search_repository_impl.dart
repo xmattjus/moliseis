@@ -1,11 +1,17 @@
+import 'package:meta/meta.dart';
 import 'package:moliseis/data/core/object_box_conditions.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/data-sources/search_query.dart';
+import 'package:moliseis/data/mappers/event_entity_mapper.dart';
+import 'package:moliseis/data/mappers/place_entity_mapper.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -34,12 +40,6 @@ class SearchRepositoryImpl implements SearchRepository {
   late final Query<PlaceEntity> _placeQuery;
   final Box<SearchQuery> _searchHistoryBox;
 
-  /// The list of the Place IDs returned by the last search.
-  var _lastPlaceResultIds = <int>[];
-
-  /// Whether the last search was made by category.
-  var _categorySearched = false;
-
   DateTime get _currentUtc => _nowUtc().toUtc();
 
   /// Caches the ObjectBox queries.
@@ -51,12 +51,20 @@ class SearchRepositoryImpl implements SearchRepository {
 
     _placeQuery = _objectBox.store
         .box<PlaceEntity>()
-        .query(PlaceEntity_.name.contains('', caseSensitive: false))
+        .query(
+          PlaceEntity_.name
+              .contains('', caseSensitive: false)
+              .and(PlaceEntity_.isDeleted.equals(false)),
+        )
         .build();
 
     _placeCategoryQuery = _objectBox.store
         .box<PlaceEntity>()
-        .query(PlaceEntity_.contentCategoryIndex.oneOf(<int>[]))
+        .query(
+          PlaceEntity_.contentCategoryIndex
+              .oneOf(<int>[])
+              .and(PlaceEntity_.isDeleted.equals(false)),
+        )
         .build();
   }
 
@@ -89,42 +97,79 @@ class SearchRepositoryImpl implements SearchRepository {
   }
 
   @override
-  Future<Result<List<int>>> getEventIdsByQuery(String text) async {
-    final nowUtc = _currentUtc;
-    final currentYearCondition = ObjectBoxConditions.visibleEventInCurrentYear(
-      nowUtc,
-    );
-    final eventQuery = _objectBox.store
-        .box<EventEntity>()
-        .query(
-          EventEntity_.name
-              .contains(text, caseSensitive: false)
-              .and(currentYearCondition),
-        )
-        .build();
-
-    final eventCategoryQuery = _objectBox.store
-        .box<EventEntity>()
-        .query(
-          EventEntity_.contentCategoryIndex
-              .oneOf(_getCategoryIndexes(text))
-              .and(currentYearCondition),
-        )
-        .build();
-
-    try {
-      _cityQuery.param(CityEntity_.name).value = text;
-
-      final (categoryQuery, cityQuery, nameQuery) = (
-        eventCategoryQuery.findIds(),
-        _cityQuery.findIds(),
-        eventQuery.findIds(),
+  Future<Result<List<ContentBase>>> getResultsByQuery(String text) =>
+      Result.zip2(
+        () => searchPlaces(text),
+        () => searchEvents(text),
+        (places, events) => Result.success(<ContentBase>[...places, ...events]),
       );
 
-      final results = <int>[...nameQuery];
+  /// Discovers and materializes places before event discovery can begin.
+  ///
+  /// Kept overridable for focused phase-order and failure regressions.
+  @protected
+  Future<Result<List<Place>>> searchPlaces(String text) async {
+    try {
+      _cityQuery.param(CityEntity_.name).value = text;
+      _placeQuery.param(PlaceEntity_.name).value = text;
+      _placeCategoryQuery.param(PlaceEntity_.contentCategoryIndex).values =
+          _getCategoryIndexes(text);
 
-      final cities = _objectBox.store.box<CityEntity>().getMany(cityQuery);
+      final categories = _placeCategoryQuery.find();
+      final cities = _cityQuery.find();
+      final matches = _placeQuery.find();
+      for (final city in cities) {
+        matches.addAll(city.places.where((place) => !place.isDeleted));
+      }
+      matches.addAll(categories);
+      final seen = <int>{};
+      return Result.success(
+        matches
+            .where((place) => seen.add(place.remoteId))
+            .map((place) => place.toModel())
+            .toList(),
+      );
+    } on Exception catch (exception, stackTrace) {
+      _logger.log(
+        const EntityLoadFailed('search', method: 'getResultsByQuery'),
+        error: exception,
+        stackTrace: stackTrace,
+      );
+      return Result.error(exception);
+    }
+  }
 
+  /// Discovers and materializes events after successful place discovery.
+  ///
+  /// Uses one clock capture for name, city and category annual visibility.
+  @protected
+  Future<Result<List<Event>>> searchEvents(String text) async {
+    Query<EventEntity>? eventQuery;
+    Query<EventEntity>? eventCategoryQuery;
+    try {
+      final nowUtc = _currentUtc;
+      final currentYearCondition =
+          ObjectBoxConditions.visibleEventInCurrentYear(nowUtc);
+      eventQuery = _objectBox.store
+          .box<EventEntity>()
+          .query(
+            EventEntity_.name
+                .contains(text, caseSensitive: false)
+                .and(currentYearCondition),
+          )
+          .build();
+      eventCategoryQuery = _objectBox.store
+          .box<EventEntity>()
+          .query(
+            EventEntity_.contentCategoryIndex
+                .oneOf(_getCategoryIndexes(text))
+                .and(currentYearCondition),
+          )
+          .build();
+      _cityQuery.param(CityEntity_.name).value = text;
+      final categories = eventCategoryQuery.find();
+      final cities = _cityQuery.find();
+      final matches = eventQuery.find();
       final currentYear = _eventTimePolicy.currentCalendarDate(nowUtc).year;
       final currentYearStart = _eventTimePolicy
           .utcRangeForCalendarDate(EventCalendarDate(currentYear, 1, 1))
@@ -132,129 +177,35 @@ class SearchRepositoryImpl implements SearchRepository {
       final currentYearEnd = _eventTimePolicy
           .utcRangeForCalendarDate(EventCalendarDate(currentYear, 12, 31))
           .endUtc;
-
-      // Mirrors ObjectBoxConditions.visibleEventInCurrentYear so the in-memory
-      // city traversal stays consistent with the ObjectBox query paths above.
       for (final city in cities) {
-        if (city == null) continue;
-        for (final event in city.events) {
-          if (_isVisibleEventInCurrentYear(
-            event,
-            currentYearStart,
-            currentYearEnd,
-          )) {
-            results.add(event.remoteId);
-          }
-        }
+        matches.addAll(
+          city.events.where(
+            (event) => _isVisibleEventInCurrentYear(
+              event,
+              currentYearStart,
+              currentYearEnd,
+            ),
+          ),
+        );
       }
-
-      results.addAll(categoryQuery);
-
-      // Purges the query results from any duplicate.
-      _removeDuplicates(results);
-
-      return Result.success(results);
+      matches.addAll(categories);
+      final seen = <int>{};
+      return Result.success(
+        matches
+            .where((event) => seen.add(event.remoteId))
+            .map((event) => event.toModel())
+            .toList(),
+      );
     } on Exception catch (exception, stackTrace) {
       _logger.log(
-        const EntityLoadFailed('search', method: 'getEventIdsByQuery'),
+        const EntityLoadFailed('search', method: 'getResultsByQuery'),
         error: exception,
         stackTrace: stackTrace,
       );
-
       return Result.error(exception);
     } finally {
-      eventQuery.close();
-      eventCategoryQuery.close();
-    }
-  }
-
-  @override
-  Future<Result<List<int>>> getPlaceIdsByQuery(String text) async {
-    try {
-      _cityQuery.param(CityEntity_.name).value = text;
-
-      _placeQuery.param(PlaceEntity_.name).value = text;
-
-      _placeCategoryQuery.param(PlaceEntity_.contentCategoryIndex).values =
-          _getCategoryIndexes(text);
-
-      // Generates a record.
-      // Source: https://stackoverflow.com/a/77073846
-      final (categoryQuery, cityQuery, placeQuery) = (
-        _placeCategoryQuery.findIds(),
-        _cityQuery.findIds(),
-        _placeQuery.findIds(),
-      );
-
-      final results = <int>[...placeQuery];
-
-      final cities = _objectBox.store.box<CityEntity>().getMany(cityQuery);
-
-      for (final city in cities) {
-        if (city != null) {
-          for (final place in city.places) {
-            results.add(place.remoteId);
-          }
-        }
-      }
-
-      _categorySearched = categoryQuery.isNotEmpty;
-
-      results.addAll(categoryQuery);
-
-      // Purges the query results from any duplicate.
-      _removeDuplicates(results);
-
-      _lastPlaceResultIds = results;
-
-      return Result.success(results);
-    } on Exception catch (exception, stackTrace) {
-      _logger.log(
-        const EntityLoadFailed('search', method: 'getPlaceIdsByQuery'),
-        error: exception,
-        stackTrace: stackTrace,
-      );
-
-      return Result.error(exception);
-    }
-  }
-
-  @override
-  Future<Result<List<int>>> getRelatedResults(String text) async {
-    if (_categorySearched) {
-      return const Result.success(<int>[]);
-    }
-
-    try {
-      final placeBox = _objectBox.store.box<PlaceEntity>();
-
-      final places = placeBox.getMany(_lastPlaceResultIds);
-
-      final places1 = <PlaceEntity>[];
-
-      for (final place in places) {
-        if (place != null) {
-          places1.add(place);
-        }
-      }
-
-      final related = _getRelatedResults(places1);
-
-      final results = related.map<int>((entity) => entity.remoteId).toList();
-
-      final set1 = results.toSet();
-      final set2 = _lastPlaceResultIds.toSet();
-      final diff = set1.difference(set2).toList();
-
-      return Result.success(diff);
-    } on Exception catch (exception, stackTrace) {
-      _logger.log(
-        const EntityLoadFailed('search', method: 'getRelatedResults'),
-        error: exception,
-        stackTrace: stackTrace,
-      );
-
-      return Result.error(exception);
+      eventQuery?.close();
+      eventCategoryQuery?.close();
     }
   }
 
@@ -299,33 +250,6 @@ class SearchRepositoryImpl implements SearchRepository {
     }
   }
 
-  List<PlaceEntity> _getRelatedResults(List<PlaceEntity> searchResults) {
-    // Creates a frequency map from direct search results where each key is
-    // a ContentCategory and the corresponding value represents how many
-    // times that type appears in the results.
-    final freqMap = searchResults.fold<Map<ContentCategory, int>>({}, (
-      map,
-      element,
-    ) {
-      final category = contentCategoryFromIndex(element.contentCategoryIndex);
-      map[category] = (map[category] ?? 0) + 1;
-      return map;
-    });
-
-    // Sorts the frequency map from the most to the least appeared type.
-    final sorted = freqMap.keys.toList()
-      ..sort((k1, k2) => (freqMap[k2]!).compareTo(freqMap[k1]!));
-
-    if (sorted.isEmpty) return const [];
-
-    // Finds all places having the most appeared type.
-    _placeCategoryQuery.param(PlaceEntity_.contentCategoryIndex).values = [
-      sorted.first.index,
-    ];
-
-    return _placeCategoryQuery.find();
-  }
-
   List<int> _getCategoryIndexes(String query) {
     final matchingTypes = ContentCategory.values.where(
       (type) => type.label.toLowerCase().contains(query.toLowerCase()),
@@ -334,11 +258,6 @@ class SearchRepositoryImpl implements SearchRepository {
     final typeIndexes = matchingTypes.map((type) => type.index).toList();
 
     return typeIndexes;
-  }
-
-  void _removeDuplicates(List<int> ids) {
-    final uniqueIds = <int>{};
-    ids.retainWhere(uniqueIds.add);
   }
 
   /// Whether [event] is visible ([EventEntity.isDeleted] is `false`) and

@@ -66,7 +66,7 @@ Ongoing retrieval SHALL use the same persisted start and end bounds for timed an
 - **THEN** it is ongoing under the non-null-end interval rule
 
 ### Requirement: Ongoing retrieval excludes deleted events and provides a stable ordered set
-Ongoing retrieval SHALL exclude soft-deleted events and return all matching IDs ordered by start ascending and event identity ascending for equal starts. It SHALL NOT add an arbitrary result cap tied to an unspecified visual layout.
+Ongoing retrieval SHALL exclude soft-deleted events and return the complete matching Event collection directly, ordered by start ascending and event identity ascending for equal starts. It SHALL NOT add an arbitrary result cap tied to an unspecified visual layout.
 
 #### Scenario: Deleted interval contains now
 - **WHEN** a soft-deleted event otherwise qualifies as ongoing
@@ -77,22 +77,22 @@ Ongoing retrieval SHALL exclude soft-deleted events and return all matching IDs 
 - **THEN** all are returned with stable start and identity ordering
 
 ### Requirement: Home discovery passes share one snapshot and produce disjoint sets
-Each Home discovery pass SHALL capture exactly one current UTC snapshot in application orchestration and pass it to both retrieval operations. Both classifications, the current Rome day and the upcoming-window end SHALL use that same snapshot even if entity resolution delays the second query across a temporal boundary. For the same dataset, ongoing and upcoming ID sets returned by a successful pass SHALL have an empty intersection by their retrieval contracts, without a temporal gap caused by different clock readings. Presentation SHALL NOT repair overlap using local filtering or deduplication. This requirement SHALL NOT assert atomic cache reads, reclassify retained state after failed retrieval or provide live updates while time passes.
+Each Home discovery pass SHALL capture exactly one current UTC snapshot in application orchestration and pass it to both retrieval operations. Both classifications, the current Rome day and the upcoming-window end SHALL use that same snapshot even if the first discovery query delays the second query across a temporal boundary. For the same dataset, ongoing and upcoming Event collections returned by a successful pass SHALL have an empty intersection by their retrieval contracts, without a temporal gap caused by different clock readings. Presentation SHALL NOT repair overlap using local filtering or deduplication. This requirement SHALL NOT assert atomic cache reads, reclassify retained state after failed retrieval or provide live updates while time passes.
 
 #### Scenario: Same dataset contains active and future events
 - **WHEN** a successful Home pass queries both sets over active, ended and future events
-- **THEN** application orchestration supplies the same captured snapshot to both, their ID intersection is empty and eligible active and future events remain in their respective sets
+- **THEN** application orchestration supplies the same captured snapshot to both, their event-identity intersection is empty and eligible active and future events remain in their respective sets
 
-#### Scenario: Entity resolution crosses an event start
-- **WHEN** a pass captures `10:59:59.900Z`, first resolves an already-active event with a delayed lookup, and queries upcoming after the clock advances to `11:00:00.200Z` while another event starts at `11:00:00Z`
+#### Scenario: First discovery query crosses an event start
+- **WHEN** a pass captures `10:59:59.900Z`, delays its first ongoing discovery query over an already-active event, and queries upcoming after the clock advances to `11:00:00.200Z` while another event starts at `11:00:00Z`
 - **THEN** both queries receive `10:59:59.900Z`, the later-start event is upcoming and not ongoing for that pass, and it does not disappear from both sets due to clock drift
 
 #### Scenario: A later pass observes the advanced clock
 - **WHEN** a subsequent pass begins at `11:00:00.200Z` for that same event whose end still includes the new snapshot
 - **THEN** one new snapshot governs both queries and the event is ongoing and not upcoming
 
-#### Scenario: Entity resolution crosses Rome midnight
-- **WHEN** a pass captures an instant before Rome midnight and delayed entity resolution finishes after midnight
+#### Scenario: First discovery query crosses Rome midnight
+- **WHEN** a pass captures an instant before Rome midnight and the delayed first discovery query finishes after midnight
 - **THEN** both classifications and the upcoming-window end remain based on the captured Rome day, including null-end membership
 
 #### Scenario: A coalesced pass captures a fresh shared instant
@@ -115,23 +115,23 @@ The current civil day and inclusive UTC bounds SHALL use Europe/Rome independent
 - **THEN** classification respects the actual 23-hour or 25-hour civil bounds and their inclusive end
 
 ### Requirement: Home receives classified read-only state
-Temporal discovery SHALL be owned by the repository boundary and exposed through the existing application command/result flow as read-only ongoing and upcoming collections. Home SHALL consume these collections without date comparisons, synthetic ends, temporal deduplication or corrective sorting. A failed ID retrieval SHALL retain the last successful collection and expose the error without launching entity resolution; a successful empty retrieval SHALL clear earlier results. Individual failed entity lookups SHALL be omitted without changing the order of successful lookups, preserving existing discovery error behavior.
+Temporal discovery SHALL be owned by the repository boundary and return ordered Event collections directly through the existing application command/result flow as read-only ongoing and upcoming state. Home SHALL consume these collections without date comparisons, synthetic ends, temporal deduplication or corrective sorting. A recoverable direct query or materialization failure SHALL retain the last successful collection and expose the error on the command representing that retrieval, without partial publication; successful empty retrieval SHALL clear earlier results. Successful collection publication SHALL occur in a single final state replacement after direct retrieval completes, without per-ID entity resolution.
 
-#### Scenario: Ongoing ID retrieval succeeds
-- **WHEN** ongoing IDs load successfully
-- **THEN** entities are resolved in retrieval order and the resulting read-only collection is published before the load finishes
+#### Scenario: Ongoing retrieval succeeds
+- **WHEN** direct ongoing retrieval returns an ordered Event collection successfully
+- **THEN** that complete read-only collection is published in repository order before the load finishes
 
-#### Scenario: Ongoing ID retrieval fails after a success
-- **WHEN** a later ID retrieval returns a recoverable error
-- **THEN** the prior successful state remains available, the error is exposed and entity loading is not launched for that failed request
+#### Scenario: Ongoing retrieval fails after a success
+- **WHEN** a later direct retrieval returns a recoverable error
+- **THEN** the prior successful state remains available and the same retrieval command exposes the error without publishing a partial collection
 
 #### Scenario: Successful reload is empty
-- **WHEN** a subsequent successful ID retrieval returns no ongoing IDs
-- **THEN** the ongoing entity collection becomes empty and is distinguishable from retrieval error
+- **WHEN** a subsequent successful direct retrieval returns no ongoing events
+- **THEN** the ongoing collection becomes empty and is distinguishable from retrieval error
 
-#### Scenario: Entity lookup partially fails
-- **WHEN** some retrieved IDs cannot be resolved
-- **THEN** successfully resolved entities are published in repository order with failed lookups omitted
+#### Scenario: Direct retrieval remains pending
+- **WHEN** a direct discovery query has not completed
+- **THEN** the earlier successful collection remains available without incrementally accumulated entities
 
 ### Requirement: Home re-entry refreshes temporal discovery
 Initial Home creation SHALL load both ongoing and upcoming discovery through a pass with one shared UTC snapshot. A supported navigation away from Home followed by return SHALL re-execute both classifications against the then-current cache and clock, even when the shell retains the application state. Manual sync and pull-to-refresh SHALL retain the existing sync navigation/error contract and reclassify both sets when Home returns. Overlapping return requests SHALL not be silently lost because another load is running. The system SHALL NOT introduce periodic refresh, polling, a global clock notifier or a lifecycle framework for this feature. Continuously visible Home SHALL retain snapshot state until an explicit reload or supported return.
@@ -161,7 +161,7 @@ Initial Home creation SHALL load both ongoing and upcoming discovery through a p
 - **THEN** a coalesced subsequent pass captures its own single shared snapshot, completes and the return request is not discarded
 
 #### Scenario: Home owner is disposed while loading
-- **WHEN** a Home owner is disposed with IDs or entity resolution in flight
+- **WHEN** a Home owner is disposed with direct discovery retrieval in flight
 - **THEN** late completion does not publish state or schedule further Home loads on the disposed owner
 
 ### Requirement: Home visual implementation is gated on developer design

@@ -1142,6 +1142,36 @@ void main() {
 
     tearDown(() => environment.dispose());
 
+    test('returns a successful empty direct collection', () async {
+      final result = await repository.getNextEvents();
+      expect(result, isA<Success<List<Event>>>());
+      expect(result.getOrNull(), isEmpty);
+    });
+
+    test('maps at most six visible events in ascending start order', () async {
+      for (var i = 8; i >= 1; i--) {
+        eventBox.put(
+          makeEventEntity(
+            remoteId: i,
+            name: 'Event $i',
+            startDate: DateTime.utc(2027, 1, i),
+          ),
+        );
+      }
+      eventBox.put(
+        makeEventEntity(
+          remoteId: 99,
+          isDeleted: true,
+          startDate: DateTime.utc(2026, 12, 31, 23),
+        ),
+      );
+      final result = await repository.getNextEvents();
+      expect(result, isA<Success<List<Event>>>());
+      final events = result.getOrNull()!;
+      expect(events.map((event) => event.remoteId), [1, 2, 3, 4, 5, 6]);
+      expect(events.first.name, 'Event 1');
+    });
+
     test(
       'all-day membership, DST overlap, cross-year and start sorting',
       () async {
@@ -1203,7 +1233,12 @@ void main() {
         );
         // Upcoming remains based on starts: the overlapping earlier event is
         // excluded even though it is an all-day multi-day event.
-        expect((await repository.getNextEventIds()).getOrNull(), [43]);
+        expect(
+          (await repository.getNextEvents()).getOrNull()!.map(
+            (event) => event.remoteId,
+          ),
+          [43],
+        );
       },
     );
 
@@ -1220,14 +1255,17 @@ void main() {
       ]);
 
       final currentYear = await repository.getByCurrentYear();
-      final upcoming = await repository.getNextEventIds();
+      final upcoming = await repository.getNextEvents();
 
       expect(
         (currentYear as Success<List<Event>>).value.map((e) => e.remoteId),
         [4, 1, 2],
       );
-      expect((upcoming as Success<List<int>>).value, [1, 2]);
-      expect(upcoming.value, isNot(contains(4)));
+      expect(
+        (upcoming as Success<List<Event>>).value.map((event) => event.remoteId),
+        [1, 2],
+      );
+      expect(upcoming.value, isNot(containsEventId(4)));
     });
 
     test(
@@ -1259,9 +1297,11 @@ void main() {
         final summerDay = await repository.getByDate(
           EventCalendarDate(2026, 6, 1),
         );
-        final upcoming = await repository.getNextEventIds();
+        final upcoming = await repository.getNextEvents();
         final summerEvents = (summerDay as Success<List<Event>>).value;
-        final upcomingIds = (upcoming as Success<List<int>>).value;
+        final upcomingIds = (upcoming as Success<List<Event>>).value.map(
+          (event) => event.remoteId,
+        );
 
         expect(summerEvents, containsEventId(10));
         expect(summerEvents, isNot(containsEventId(11)));

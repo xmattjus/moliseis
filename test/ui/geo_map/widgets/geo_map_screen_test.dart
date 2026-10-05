@@ -11,9 +11,7 @@ import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_c
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
-import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
-import 'package:moliseis/domain/use-cases/explore_get_by_id_use_case.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
@@ -54,8 +52,6 @@ void main() {
         ),
       );
       final searchViewModel = SearchViewModel(
-        eventRepository: FakeEventRepository(),
-        exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
         searchRepository: _FakeSearchRepository(),
       );
       final weatherViewModel = _buildWeatherViewModel();
@@ -130,8 +126,6 @@ void main() {
         ),
       );
       final searchViewModel = SearchViewModel(
-        eventRepository: FakeEventRepository(),
-        exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
         searchRepository: _FakeSearchRepository(),
       );
       final weatherViewModel = _buildWeatherViewModel();
@@ -342,7 +336,7 @@ void main() {
 
     expect(find.byType(GeoMapModalPost), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Chiudi'));
+    await tester.tap(find.byTooltip('Chiudi').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(GeoMapModalPost), findsNothing);
@@ -745,11 +739,7 @@ GeoMapViewModel _buildGeoMapViewModel({Event? event}) {
 }
 
 SearchViewModel _buildSearchViewModel() {
-  return SearchViewModel(
-    eventRepository: FakeEventRepository(),
-    exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
-    searchRepository: _FakeSearchRepository(),
-  );
+  return SearchViewModel(searchRepository: _FakeSearchRepository());
 }
 
 FavouriteViewModel _buildFavouriteViewModel({Event? event}) {
@@ -793,31 +783,17 @@ WeatherViewModel _buildWeatherViewModel() {
   );
 }
 
-final class _FakeExploreGetByIdUseCase implements ExploreGetByIdUseCase {
-  @override
-  Future<Result<Place>> getById(int id) async =>
-      Result.error(TestException('Place $id not configured'));
-}
-
 final class _FakeSearchRepository implements SearchRepository {
   @override
   Future<Result<void>> addToPastSearches(String text) async =>
       const Result.success(null);
 
   @override
-  Future<Result<List<int>>> getEventIdsByQuery(String text) async =>
-      const Result.success([]);
-
-  @override
-  Future<Result<List<int>>> getPlaceIdsByQuery(String text) async =>
+  Future<Result<List<ContentBase>>> getResultsByQuery(String text) async =>
       const Result.success([]);
 
   @override
   Future<Result<List<String>>> getPastSearches() async =>
-      const Result.success([]);
-
-  @override
-  Future<Result<List<int>>> getRelatedResults(String text) async =>
       const Result.success([]);
 
   @override

@@ -15,6 +15,7 @@ import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_we
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/media.dart';
@@ -1057,16 +1058,8 @@ final class _FakeSearchRepository implements SearchRepository {
       const Result.success(null);
 
   @override
-  Future<Result<List<int>>> getEventIdsByQuery(String text) async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getPlaceIdsByQuery(String text) async =>
-      const Result.success(<int>[]);
-
-  @override
-  Future<Result<List<int>>> getRelatedResults(String text) async =>
-      const Result.success(<int>[]);
+  Future<Result<List<ContentBase>>> getResultsByQuery(String text) async =>
+      const Result.success(<ContentBase>[]);
 
   @override
   Future<Result<List<String>>> getPastSearches() async =>

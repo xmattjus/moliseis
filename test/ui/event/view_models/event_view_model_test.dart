@@ -133,33 +133,57 @@ void main() {
       );
     });
 
-    group('loadNextIds', () {
-      test('does not trigger loadNext when getNextEventIds fails', () async {
-        final vm = await buildLoaded(
-          FakeEventRepository(
-            getNextEventIdsResult: Result.error(
-              TestException('ids fetch failed'),
-            ),
-          ),
+    group('loadNext', () {
+      test('publishes direct repository order without per-ID lookup', () async {
+        final events = [makeEvent(remoteId: 2), makeEvent()];
+        final repo = FakeEventRepository(
+          getNextEventsResult: Result.success(events),
         );
-
-        await vm.loadNextIds.execute();
-
-        expect(vm.loadNextIds.error, isTrue);
-        // loadNext must not have been triggered by the failed loadNextIds.
-        expect(vm.loadNext.completed, isFalse);
-        expect(vm.loadNext.error, isFalse);
+        final vm = await buildLoaded(repo);
+        await vm.loadNext.execute();
+        expect(vm.next, events);
+        expect(vm.loadNext.completed, isTrue);
+        expect(repo.getNextEventsCallCount, 1);
+        expect(repo.getByIdCallCount, 0);
       });
 
-      test('triggers loadNext when getNextEventIds succeeds', () async {
-        // Default repo has getNextEventIdsResult = Result.success([]).
-        final vm = await buildLoaded(FakeEventRepository());
+      test('owns discovery error and retries the query', () async {
+        final failure = TestException('discovery failed');
+        final repo = FakeEventRepository(
+          getNextEventsResult: Result.error(failure),
+        );
+        final vm = await buildLoaded(repo);
+        await vm.loadNext.execute();
+        expect(vm.loadNext.error, isTrue);
+        expect((vm.loadNext.result! as Error<void>).error, same(failure));
+        repo.getNextEventsResult = Result.success([makeEvent()]);
+        await vm.loadNext.execute();
+        expect(repo.getNextEventsCallCount, 2);
+        expect(vm.loadNext.completed, isTrue);
+        expect(vm.next, hasLength(1));
+      });
 
-        await vm.loadNextIds.execute();
-        await pumpEventQueue(times: 10);
-
-        expect(vm.loadNextIds.completed, isTrue);
-        // loadNext ran over an empty list and completed without error.
+      test('retains prior state while pending and on error, '
+          'clears on empty success', () async {
+        final first = makeEvent();
+        final repo = FakeEventRepository(
+          getNextEventsResult: Result.success([first]),
+        );
+        final vm = await buildLoaded(repo);
+        await vm.loadNext.execute();
+        final pending = Completer<Result<List<Event>>>();
+        repo.pendingGetNextEvents = pending;
+        final load = vm.loadNext.execute();
+        expect(vm.next, [first]);
+        pending.complete(Result.error(TestException('query failed')));
+        await load;
+        expect(vm.next, [first]);
+        expect(vm.loadNext.error, isTrue);
+        repo
+          ..pendingGetNextEvents = null
+          ..getNextEventsResult = const Result.success([]);
+        await vm.loadNext.execute();
+        expect(vm.next, isEmpty);
         expect(vm.loadNext.completed, isTrue);
       });
     });

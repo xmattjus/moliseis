@@ -3,16 +3,14 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/domain/models/place.dart';
+import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
-import 'package:moliseis/domain/use-cases/explore_get_by_id_use_case.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/ui/search/widgets/search_result_screen.dart';
 import 'package:moliseis/utils/result.dart';
 
-import '../../../../support/fake_repositories.dart';
 import '../../../../support/fixtures.dart';
 import '../../../../support/predictive_back.dart';
 
@@ -427,8 +425,6 @@ void main() {
   group('SearchResultScreen canonical query', () {
     ({GoRouter router, SearchViewModel viewModel, Widget app}) buildFixture() {
       final viewModel = SearchViewModel(
-        eventRepository: FakeEventRepository(),
-        exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
         searchRepository: _FakeSearchRepository(),
       );
       final router = GoRouter(
@@ -550,11 +546,7 @@ final class _SearchFixture {
     : _surfaceSize = surfaceSize {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     controller = SearchController();
-    viewModel = SearchViewModel(
-      eventRepository: FakeEventRepository(),
-      exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
-      searchRepository: _FakeSearchRepository(),
-    );
+    viewModel = SearchViewModel(searchRepository: _FakeSearchRepository());
     router = GoRouter(
       initialLocation: '/',
       routes: <RouteBase>[
@@ -640,8 +632,6 @@ final class _ShellSearchFixture {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     controller = SearchController();
     viewModel = SearchViewModel(
-      eventRepository: FakeEventRepository(),
-      exploreGetByIdUseCase: _FakeExploreGetByIdUseCase(),
       searchRepository: _FakeSearchRepository(pastSearches: pastSearches),
     );
     router = GoRouter(
@@ -813,12 +803,6 @@ class _SearchHostPage extends StatelessWidget {
   }
 }
 
-final class _FakeExploreGetByIdUseCase implements ExploreGetByIdUseCase {
-  @override
-  Future<Result<Place>> getById(int id) async =>
-      Result.error(TestException('Place $id not configured'));
-}
-
 final class _FakeSearchRepository implements SearchRepository {
   _FakeSearchRepository({this.pastSearches = const []});
 
@@ -829,20 +813,12 @@ final class _FakeSearchRepository implements SearchRepository {
       const Result.success(null);
 
   @override
-  Future<Result<List<int>>> getEventIdsByQuery(String text) async =>
-      const Result.success([]);
-
-  @override
-  Future<Result<List<int>>> getPlaceIdsByQuery(String text) async =>
+  Future<Result<List<ContentBase>>> getResultsByQuery(String text) async =>
       const Result.success([]);
 
   @override
   Future<Result<List<String>>> getPastSearches() async =>
       Result.success(List<String>.of(pastSearches));
-
-  @override
-  Future<Result<List<int>>> getRelatedResults(String text) async =>
-      const Result.success([]);
 
   @override
   Future<Result<void>> removeFromPastSearches(String text) async =>

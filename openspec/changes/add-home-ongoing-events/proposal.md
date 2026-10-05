@@ -4,13 +4,13 @@ Home does not distinguish events that have already started and are still active 
 
 ## What Changes
 
-- Introduce `EventRepository.getOngoingEventIds(DateTime snapshotUtc)` with membership at the UTC snapshot supplied by the caller: inclusive ranged events; null-end events limited to the Rome civil day of their start, after their start; soft-deleted events excluded.
+- Introduce `EventRepository.getOngoingEvents(DateTime snapshotUtc)` returning ordered `Event` collections directly, with membership at the UTC snapshot supplied by the caller: inclusive ranged events; null-end events limited to the Rome civil day of their start, after their start; soft-deleted events excluded.
 - Apply the same persisted bounds to timed and `allDay` events, without reinterpreting the flag.
-- Make `getNextEventIds(DateTime snapshotUtc)` strictly future relative to the same supplied snapshot, preserving ordering, the limit of 6 and the inclusive end of its Rome day +30.
-- Expose `ongoingIds`, `ongoing`, `loadOngoingIds`, `loadOngoing` in `EventViewModel`, following the existing Command/Result and ID resolution patterns; both ID commands accept the explicit UTC snapshot.
-- Make `refreshHomeDiscovery()` own exactly one clock capture per discovery pass and supply that snapshot to both queries, guaranteeing temporal disjointness for the pass even if time advances during entity resolution. Initialize both loads in the Home route and reclassify when returning to Home retained by the shell; preserve the existing sync flow.
+- Make `getNextEvents(DateTime snapshotUtc)` strictly future relative to the same supplied snapshot, preserving ordering, the limit of 6 and the inclusive end of its Rome day +30.
+- Expose read-only `ongoing` and `next` state through `loadOngoing` and `loadNext` in `EventViewModel`, following the existing Command/Result and direct-retrieval pattern; both commands accept the explicit UTC snapshot and publish one final collection after success.
+- Make `refreshHomeDiscovery()` own exactly one clock capture per discovery pass and supply that snapshot to both queries, guaranteeing temporal disjointness for the pass even if time advances during the first discovery query. Initialize both loads in the Home route and reclassify when returning to Home retained by the shell; preserve the existing sync flow.
 - Integrate a distinct section named “Eventi in corso” **only after the developer's UI design**. No visual decision is included in the change.
-- Add deterministic repository, ViewModel and navigation/refresh tests, including an advancing clock and delayed first entity resolution to verify the shared snapshot; no timers or polling.
+- Add deterministic repository, ViewModel and navigation/refresh tests, including an advancing clock and delayed first discovery query to verify the shared snapshot; no timers or polling.
 
 ## Capabilities
 

@@ -404,10 +404,10 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  // getLatestPlaceIds
+  // getLatest
   // ---------------------------------------------------------------------------
 
-  group('PlaceRepositoryImpl - getLatestPlaceIds', () {
+  group('PlaceRepositoryImpl - getLatest', () {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late Box<PlaceEntity> placeBox;
     late PlaceRepositoryImpl repository;
@@ -422,7 +422,7 @@ void main() {
       await objectBoxEnvironment.dispose();
     });
 
-    test('returns at most 6 IDs ordered by most recently created', () async {
+    test('returns at most 6 models ordered by most recently created', () async {
       for (var i = 1; i <= 10; i++) {
         placeBox.put(
           makePlaceEntity(
@@ -433,10 +433,12 @@ void main() {
         );
       }
 
-      final result = await repository.getLatestPlaceIds();
+      final result = await repository.getLatest();
 
-      expect(result, isA<Success<List<int>>>());
-      final ids = (result as Success<List<int>>).value;
+      expect(result, isA<Success<List<Place>>>());
+      final places = (result as Success<List<Place>>).value;
+      final ids = places.map((place) => place.remoteId).toList();
+      expect(places.first.name, 'Place 10');
       // Returns exactly 6 items (the cap).
       expect(ids.length, lessThanOrEqualTo(6));
       // The 6 most recent places are IDs 10..5 (createdAt Jan 10..5).
@@ -447,11 +449,25 @@ void main() {
       expect(ids, equals([10, 9, 8, 7, 6, 5]));
     });
 
-    test('returns empty list when store is empty', () async {
-      final result = await repository.getLatestPlaceIds();
+    test('excludes deleted places before applying the limit', () async {
+      placeBox.put(
+        makePlaceEntity(
+          remoteId: 99,
+          isDeleted: true,
+          createdAt: DateTime(2027),
+        ),
+      );
+      placeBox.put(makePlaceEntity(remoteId: 1, name: 'Visible'));
+      final result = await repository.getLatest();
+      expect(result, isA<Success<List<Place>>>());
+      expect(result.getOrNull()!.map((place) => place.remoteId), [1]);
+    });
 
-      expect(result, isA<Success<List<int>>>());
-      expect((result as Success<List<int>>).value, isEmpty);
+    test('returns empty list when store is empty', () async {
+      final result = await repository.getLatest();
+
+      expect(result, isA<Success<List<Place>>>());
+      expect((result as Success<List<Place>>).value, isEmpty);
     });
   });
 

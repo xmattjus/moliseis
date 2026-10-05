@@ -113,6 +113,16 @@ Pre-existing modified files at planning time, outside this change, are:
 
 Preserve these changes and re-record execution-time status. Package dirtiness is not permission to alter dependencies as part of this change.
 
+### Execution audit (2026-10-05)
+
+Execution started at approved HEAD `93226baf09ed37301dca38bbfd3f0c649e93a97b`. The eleven pre-existing modified paths listed above are preserved; content hashes were captured before edits. No production drift from the approved design was found. Baseline focused place/event/search repository and event/search ViewModel suites passed (142 tests); baseline `flutter analyze` exited 1 with 177 diagnostics, including four pre-existing warnings and no errors.
+
+Runtime search confirmed no external consumer of Explore `latestIds`, `loadNear`/`near` or the ID coordinate API. Related-search trigger/widget integrations are comments, including the map modal's commented integration; the fully commented widget and dormant flow can be removed. Active Post/Map coordinate retrieval and genuine favourite-ID APIs remain outside the removal set. SyncUseCase and BaseSyncRepository materialize complete DTO content into the existing local entities; backend/schema changes are unnecessary.
+
+Test support inspected: `fixtures.dart` supplies domain and persistence factories; `objectbox_test_store.dart` supplies real temporary stores; `fake_repositories.dart` supplies configurable repository results, counters and completers. These are reused/extended. A focused `ControllableSearchRepository` subclass under `test/support/` overrides protected place/event phase methods on the concrete implementation while retaining production sequential composition and a real store. This narrow seam proves pending/error short-circuit behavior without fake ObjectBox queries, restored public ID APIs or a new query abstraction.
+
+The approved atomic-publication contract retains last successful collection while retrieval is pending or fails. Existing Search tests established successful empty replacement and no-op short queries, but did not require clearing earlier successful content on error; the old pre-await clear is removed rather than retained as partial publication behavior. Search disposal suppresses state assignment/notification; repository-owned phase cancellation is not promised.
+
 ## Goals / Non-Goals
 
 ### Goals
@@ -405,3 +415,21 @@ No deprecated compatibility methods such as `getLatestPlaceIds()` delegating to 
 No architectural question is intentionally left for implementation.
 
 Codex must re-audit execution HEAD before applying the plan and may document factual drift. It must not independently choose a different concurrency architecture, preserve dead ID stages for convenience, or implement the separate ongoing-event feature.
+
+
+## Implementation verification
+
+Implementation completed in the working tree based on `93226baf09ed37301dca38bbfd3f0c649e93a97b`; HEAD remains unchanged. The change is ready for a separate archive request and has not been archived. All task branches are satisfied; 5.6 is inapplicable because the runtime audit selected deletion.
+
+- Direct latest/upcoming/search retrieval is covered by 152 passing focused repository/ViewModel tests. Search repository alone passes 30 tests, including sequential phase short-circuit/error identity, pending-place ordering, soft deletion on every place path, first-match grouping and cross-type numeric identity, mapping and unexpected-error propagation. Both Search commands have direct-pending disposal regressions and no partial publication.
+- Routing, Search widgets and Map screen focused run: 229 passed, one existing skip. Explore suggestions: five passed. The new production-router Home test verifies both observed discovery errors, retry queries, empty success and zero per-item resolution. It passes its explicit focused run (one test) and the final full suite.
+- Final `flutter test`: exit 0, 1790 passed, three existing skips. The first full run exposed two incorrect new Search test assertions (Float32 precision and regenerated fixture timestamps); those were corrected and the complete suite rerun successfully.
+- Final `flutter analyze`: exit 1 with 170 existing diagnostics, zero errors and four pre-existing warnings (submission async return and experimental Quill clipboard members). Baseline was 177 diagnostics with the same warnings. Normalizing line positions and comparing diagnostic multisets finds no new diagnostic attributable to this change.
+- Both `openspec validate optimize-local-content-retrieval --strict --no-interactive` and `openspec validate add-home-ongoing-events --strict --no-interactive` pass. The future ongoing plan uses direct Event collections and Commands while preserving shared snapshots, temporal predicates, refresh/coalescing and lifecycle requirements; ongoing production behavior is not implemented.
+- Final source audit finds no removed discovery API/state names in active production/tests, the updated Result skill or the reconciled ongoing plan. Historical references in this change's audit/removal instructions and archived specifications intentionally remain. Favourite-ID APIs and active coordinate retrieval are unchanged; Command, backend, DTOs and generated schema have no change attributable to this task.
+- Independent adversarial review and coordinator inspection found no material residual issue in retrieval, filtering, ordering, error ownership, lifecycle or scope. No performance benchmark or total disk-read claim is made.
+- `git diff --check` passes. SHA-256 comparison confirms all 11 pre-existing dirty files remain byte-for-byte unchanged. Dart formatting was limited to intentionally modified files.
+
+Bounded support adjustments: a protected phase seam on the concrete Search repository supports deterministic sequential/error tests without restoring ID APIs; the existing EventsRouteHarness accepts an optional shared FakePlaceRepository for the Home regression. The Map close test selects the first existing close control because the pre-existing dirty Map UI renders two matching controls for media-less content; that UI file was preserved, and its duplicate control remains outside this change. No other scope deviation was required.
+
+Execution logs: `/tmp/local-retrieval-baseline-tests.log`, `/tmp/local-retrieval-baseline-analyze.log`, `/tmp/local-retrieval-focused-final.log`, `/tmp/local-retrieval-routing-widgets-final.log`, `/tmp/local-retrieval-suggestions.log`, `/tmp/local-retrieval-home-test.log`, `/tmp/local-retrieval-full-test-final.log`, `/tmp/local-retrieval-final-analyze.log`. Initial dirty-file hashes: `/tmp/local-retrieval-baseline.json`.

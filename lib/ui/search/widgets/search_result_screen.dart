@@ -12,7 +12,6 @@ import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
-// import 'package:moliseis/ui/search/widgets/search_result_related_sliver_list.dart';
 import 'package:moliseis/ui/search/widgets/search_result_sliver_list.dart';
 
 class SearchResultScreen extends StatefulWidget {
@@ -88,13 +87,6 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                   },
                   viewModel: widget.viewModel,
                 ),
-                /*
-                SearchResultRelatedSliverList(
-                  onResultPressed: (content) =>
-                      _onSearchResultPressed(context, content),
-                  viewModel: widget.viewModel,
-                ),
-                */
               ],
             ),
             Align(
@@ -113,9 +105,6 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                     onSuggestionPressed: (content) {
                       _controller.closeView(content.name);
                       _showSearchResults(content.name);
-                      // widget.viewModel.loadRelatedResultsIds.execute(
-                      //   _controller.text,
-                      // );
                     },
                     viewModel: widget.viewModel,
                   ),

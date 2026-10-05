@@ -64,7 +64,10 @@ final class EventsProviderHarness {
 
 /// Production-router fixture for Events branch navigation tests.
 final class EventsRouteHarness {
-  EventsRouteHarness({required this.eventRepository}) {
+  EventsRouteHarness({
+    required this.eventRepository,
+    FakePlaceRepository? placeRepository,
+  }) : placeRepository = placeRepository ?? FakePlaceRepository() {
     final settingsRepository = FakeSettingsRepository(
       lastSyncedAt: DateTime.now(),
     );
@@ -86,6 +89,7 @@ final class EventsRouteHarness {
   }
 
   final FakeEventRepository eventRepository;
+  final FakePlaceRepository placeRepository;
   late final ControllableAdminAuth auth;
   late final SyncViewModel syncViewModel;
   late final GoRouter router;
@@ -93,8 +97,6 @@ final class EventsRouteHarness {
   /// Builds the production router with the dependencies needed by the Explore
   /// and Events branches.
   Widget get app {
-    final placeRepository = FakePlaceRepository();
-
     return MultiProvider(
       providers: <SingleChildWidget>[
         Provider<EventRepository>.value(value: eventRepository),

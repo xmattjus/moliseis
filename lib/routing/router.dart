@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
-import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
@@ -309,18 +308,13 @@ GoRouter buildAppRouter({
                           final viewModel = EventViewModel(
                             repository: context.read(),
                           );
-                          unawaited(viewModel.loadNextIds.execute());
+                          unawaited(viewModel.loadNext.execute());
                           return viewModel;
                         },
                       ),
                       ChangeNotifierProvider<ExploreViewModel>(
-                        create: (context) => ExploreViewModel(
-                          byIdUseCase: ExploreUseCase(
-                            eventRepository: context.read(),
-                            placeRepository: context.read(),
-                          ),
-                          placeRepository: context.read(),
-                        ),
+                        create: (context) =>
+                            ExploreViewModel(placeRepository: context.read()),
                       ),
                       ChangeNotifierProvider<SuggestionViewModel>(
                         create: (context) => SuggestionViewModel(
@@ -328,14 +322,8 @@ GoRouter buildAppRouter({
                         ),
                       ),
                       ChangeNotifierProvider<SearchViewModel>(
-                        create: (context) => SearchViewModel(
-                          eventRepository: context.read(),
-                          exploreGetByIdUseCase: ExploreUseCase(
-                            eventRepository: context.read(),
-                            placeRepository: context.read(),
-                          ),
-                          searchRepository: context.read(),
-                        ),
+                        create: (context) =>
+                            SearchViewModel(searchRepository: context.read()),
                       ),
                     ],
                     builder: (context, _) {
@@ -362,11 +350,6 @@ GoRouter buildAppRouter({
                           key: ValueKey(query),
                           create: (context) {
                             final viewModel = SearchViewModel(
-                              eventRepository: context.read(),
-                              exploreGetByIdUseCase: ExploreUseCase(
-                                eventRepository: context.read(),
-                                placeRepository: context.read(),
-                              ),
                               searchRepository: context.read(),
                             );
 
@@ -524,14 +507,8 @@ GoRouter buildAppRouter({
                         ),
                       ),
                       ChangeNotifierProvider<SearchViewModel>(
-                        create: (context) => SearchViewModel(
-                          eventRepository: context.read(),
-                          exploreGetByIdUseCase: ExploreUseCase(
-                            eventRepository: context.read(),
-                            placeRepository: context.read(),
-                          ),
-                          searchRepository: context.read(),
-                        ),
+                        create: (context) =>
+                            SearchViewModel(searchRepository: context.read()),
                       ),
                     ],
                     child: Builder(

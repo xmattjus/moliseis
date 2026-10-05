@@ -91,52 +91,45 @@ Future<Result<void>> _addToPastSearches(String query) async {
 }
 ```
 
-### 3. Chaining async operations — asyncMap
+### 3. Direct retrieval and lifecycle guards
 
-When the next step is itself async but doesn't return `Result`, use `asyncMap`.
+List discovery returns complete domain models. Await the repository once,
+check disposal, then replace visible state synchronously on success. An error
+retains the previous successful collection; successful empty retrieval clears it.
 
 ```dart
-Future<Result<void>> _loadRelatedResultsIds(String query) async {
-  final result = await _searchRepository.getRelatedResults(query);
-
-  return result.asyncMap((ids) async {
-    _relatedResultsIds = ids;
-    await loadRelatedResults.execute();
-  });
-}
+final result = await _searchRepository.getResultsByQuery(query);
+if (_disposed) return result.map((_) {});
+return result.map((results) {
+  _results = results;
+  notifyListeners();
+});
 ```
 
-### 4. Combining two independent operations — zip2
+Use `asyncMap` when a successful transform actually needs an await;
+use `asyncFlatMap` when that next async operation itself returns a Result.
+Do not introduce discovery IDs merely to resolve every entity separately.
 
-Run two async `Result`-returning functions in sequence; short-circuit on
-the first error without manual `switch` boilerplate.
+### 4. Combining two operations — zip2
+
+`Result.zip2` runs the functions sequentially and short-circuits on the first
+error. Search repository phases preserve this ordering because they share
+parameterized query state. They must not be replaced with `Future.wait`.
 
 ```dart
 return Result.zip2(
-  () => _searchRepository.getPlaceIdsByQuery(query),
-  () => _searchRepository.getEventIdsByQuery(query),
-  (placeIds, eventIds) async {
-    for (final id in placeIds) {
-      final r = await _exploreGetByIdUseCase.getById(id);
-      r.map((place) => _results.add(place));
-    }
-    // ... process eventIds ...
-    return const Result.success(null);
-  },
+  () => searchPlaces(text),
+  () => searchEvents(text),
+  (places, events) => Result.success(<ContentBase>[...places, ...events]),
 );
 ```
 
-### 5. Partial-failure loops — map inside loop, continue on error
+### 5. Direct discovery failures
 
-When iterating over IDs, use `map` to collect successes and silently skip
-failures. Do **not** short-circuit the loop with `flatMap`.
-
-```dart
-for (final id in _relatedResultsIds) {
-  final result = await _exploreGetByIdUseCase.getById(id);
-  result.map((item) => relatedResults.add(item));  // errors are ignored
-}
-```
+A recoverable query/materialization Exception fails the logical repository
+operation. Do not convert it into partial success or publish a partial list.
+The removed per-item lookup stage no longer supplies skip-on-error semantics.
+ID APIs remain appropriate when identity membership is the actual requested data.
 
 ### 6. Early-return success for no-ops
 

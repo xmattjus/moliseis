@@ -310,7 +310,7 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   }
 
   @override
-  Future<Result<List<int>>> getNextEventIds() async {
+  Future<Result<List<Event>>> getNextEvents() async {
     Query<EventEntity>? query;
 
     final today = _eventTimePolicy.currentCalendarDate(_currentUtc);
@@ -335,12 +335,12 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
 
       query = builder.build()..limit = 6;
 
-      final results = query.findIds();
+      final results = await query.findAsync();
 
-      return Result.success(results);
+      return Result.success(results.map((entity) => entity.toModel()).toList());
     } on Exception catch (exception, stackTrace) {
       logger.log(
-        const EntityLoadFailed('event', method: 'getNextEventIds'),
+        const EntityLoadFailed('event', method: 'getNextEvents'),
         error: exception,
         stackTrace: stackTrace,
       );

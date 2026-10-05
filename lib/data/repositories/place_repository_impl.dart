@@ -218,57 +218,28 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
   }
 
   @override
-  Future<Result<List<int>>> getIdsByCoordinates(
-    List<double> coordinates,
-  ) async {
+  Future<Result<List<Place>>> getLatest() async {
     Query<PlaceEntity>? query;
 
     try {
-      final condition = PlaceEntity_.coordinates
-          .nearestNeighborsF32(coordinates, 3)
-          .and(_isNotDeleted);
+      query =
+          _box
+              .query(_isNotDeleted)
+              .order(PlaceEntity_.createdAt, flags: Order.descending)
+              .build()
+            ..limit = 6;
 
-      query = _box.query(condition).build();
-
-      final resultsWithScores = await query.findIdsWithScoresAsync();
-
-      return Result.success(
-        resultsWithScores.map<int>((element) => element.id).toList(),
-      );
+      final places = await query.findAsync();
+      return Result.success(places.map((entity) => entity.toModel()).toList());
     } on Exception catch (exception, stackTrace) {
       logger.log(
-        const EntityLoadFailed('place', method: 'getIdsByCoordinates'),
+        const EntityLoadFailed('place', method: 'getLatest'),
         error: exception,
         stackTrace: stackTrace,
       );
-
       return Result.error(exception);
     } finally {
       query?.close();
-    }
-  }
-
-  @override
-  Future<Result<List<int>>> getLatestPlaceIds() async {
-    try {
-      final query = _box
-          .query(_isNotDeleted)
-          .order(PlaceEntity_.createdAt, flags: Order.descending);
-
-      final builder = query.build()..limit = 6;
-
-      final places = await builder.findIdsAsync();
-
-      builder.close();
-
-      return Result.success(places);
-    } on Exception catch (exception, stackTrace) {
-      logger.log(
-        const EntityLoadFailed('place', method: 'getLatestPlaceIds'),
-        error: exception,
-        stackTrace: stackTrace,
-      );
-      return Result.error(exception);
     }
   }
 

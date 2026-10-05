@@ -2,7 +2,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
-// import 'package:moliseis/ui/search/widgets/search_result_related_sliver_list.dart';
 import 'package:moliseis/ui/search/widgets/search_result_sliver_list.dart';
 
 /// Shows search results inside the geo-map bottom sheet.
@@ -56,12 +55,6 @@ class GeoMapModalSearchResultsState extends State<GeoMapModalSearchResults> {
           },
           viewModel: widget.viewModel,
         ),
-        /*
-        SearchResultRelatedSliverList(
-          onResultPressed: widget.onResultPressed,
-          viewModel: widget.viewModel,
-        ),
-        */
       ],
     );
   }

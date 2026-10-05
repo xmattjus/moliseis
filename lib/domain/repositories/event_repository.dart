@@ -42,8 +42,8 @@ abstract class EventRepository with Synchronizable<EventDto> {
   /// Returns the event with the given [id].
   Future<Result<Event>> getById(int id);
 
-  /// Returns the IDs of the upcoming events.
-  Future<Result<List<int>>> getNextEventIds();
+  /// Returns up to six non-deleted upcoming events, ordered by start.
+  Future<Result<List<Event>>> getNextEvents();
 
   /// Returns the IDs of all events marked as favourites.
   Future<Result<List<int>>> getFavouriteEventIds();
