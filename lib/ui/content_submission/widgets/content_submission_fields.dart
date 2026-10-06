@@ -34,8 +34,17 @@ class ContentSubmissionFields extends StatelessWidget {
     required this.onStartDateChanged,
     required this.onStartTimeChanged,
     required this.onEndDateChanged,
+    this.hydrationRevision,
+    this.eventModeLocked = false,
     super.key,
   });
+
+  /// Rehydrates programmatically copied fields without resetting normal typing.
+  /// Public contribution editors leave this absent.
+  final int? hydrationRevision;
+
+  /// Imported Event semantics cannot be removed through the editor.
+  final bool eventModeLocked;
 
   final GlobalKey<FormState> formKey;
   final ContentCategory? category;
@@ -97,6 +106,9 @@ class ContentSubmissionFields extends StatelessWidget {
             spacing: 12,
             children: <Widget>[
               TextFormField(
+                key: hydrationRevision == null
+                    ? null
+                    : ValueKey((hydrationRevision, 'city')),
                 initialValue: city,
                 decoration: const InputDecoration(
                   labelText: 'Città',
@@ -115,6 +127,9 @@ class ContentSubmissionFields extends StatelessWidget {
                 autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
               TextFormField(
+                key: hydrationRevision == null
+                    ? null
+                    : ValueKey((hydrationRevision, 'name')),
                 initialValue: name,
                 decoration: const InputDecoration(
                   labelText: 'Luogo o evento',
@@ -134,6 +149,9 @@ class ContentSubmissionFields extends StatelessWidget {
                 autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
               ContentSubmissionDescriptionFormField(
+                key: hydrationRevision == null
+                    ? null
+                    : ValueKey((hydrationRevision, 'description')),
                 initialDescription: description,
                 initialDescriptionDelta: descriptionDelta,
                 onChanged: onDescriptionChanged,
@@ -149,7 +167,9 @@ class ContentSubmissionFields extends StatelessWidget {
             Text('È un evento?', style: textStyle),
             Checkbox(
               value: isEvent,
-              onChanged: (value) => onEventChanged(value ?? false),
+              onChanged: eventModeLocked
+                  ? null
+                  : (value) => onEventChanged(value ?? false),
             ),
           ],
         ),
