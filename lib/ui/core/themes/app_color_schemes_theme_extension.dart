@@ -1,15 +1,18 @@
+import 'package:flex_seed_scheme/flex_seed_scheme.dart';
 import 'package:material_ui/material_ui.dart';
 
 final class _AppSeeds {
   const _AppSeeds();
 
-  Color get main => const Color(0xFF10A549);
-  Color get nature => const Color(0xFF52EA3E);
-  Color get history => const Color(0XFFe83c70);
-  Color get folklore => const Color(0XFFe8ea3f);
-  Color get food => const Color(0XFF3fa1ec);
-  Color get allure => const Color(0XFFe9863a);
-  Color get experience => const Color(0XFF3ce9e6);
+  Color get primaryKey => const Color(0xFF10A549);
+  Color get secondaryKey => const Color(0xFF176B87);
+  Color get tertiaryKey => const Color(0xFFB84E23);
+  Color get naturePrimaryKey => const Color(0xFF52EA3E);
+  Color get historyPrimaryKey => const Color(0XFFe83c70);
+  Color get folklorePrimaryKey => const Color(0XFFe8ea3f);
+  Color get foodPrimaryKey => const Color(0XFF3fa1ec);
+  Color get allurePrimaryKey => const Color(0XFFe9863a);
+  Color get experiencePrimaryKey => const Color(0XFF3ce9e6);
 }
 
 class AppColorSchemesThemeExtension
@@ -28,40 +31,42 @@ class AppColorSchemesThemeExtension
     const appSeeds = _AppSeeds();
 
     return AppColorSchemesThemeExtension._internal(
-      main: ColorScheme.fromSeed(
-        seedColor: appSeeds.main,
+      main: SeedColorScheme.fromSeeds(
         brightness: brightness,
-        dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+        primaryKey: appSeeds.primaryKey,
+        secondaryKey: appSeeds.secondaryKey,
+        tertiaryKey: appSeeds.tertiaryKey,
+        variant: FlexSchemeVariant.vivid,
       ),
-      nature: ColorScheme.fromSeed(
-        seedColor: appSeeds.nature,
+      nature: SeedColorScheme.fromSeeds(
+        primaryKey: appSeeds.naturePrimaryKey,
         brightness: brightness,
-        dynamicSchemeVariant: DynamicSchemeVariant.vibrant,
+        variant: FlexSchemeVariant.vibrant,
       ),
-      history: ColorScheme.fromSeed(
-        seedColor: appSeeds.history,
+      history: SeedColorScheme.fromSeeds(
+        primaryKey: appSeeds.historyPrimaryKey,
         brightness: brightness,
-        dynamicSchemeVariant: DynamicSchemeVariant.vibrant,
+        variant: FlexSchemeVariant.vibrant,
       ),
-      folklore: ColorScheme.fromSeed(
-        seedColor: appSeeds.folklore,
+      folklore: SeedColorScheme.fromSeeds(
+        primaryKey: appSeeds.folklorePrimaryKey,
         brightness: brightness,
-        dynamicSchemeVariant: DynamicSchemeVariant.vibrant,
+        variant: FlexSchemeVariant.vibrant,
       ),
-      food: ColorScheme.fromSeed(
-        seedColor: appSeeds.food,
+      food: SeedColorScheme.fromSeeds(
+        primaryKey: appSeeds.foodPrimaryKey,
         brightness: brightness,
-        dynamicSchemeVariant: DynamicSchemeVariant.vibrant,
+        variant: FlexSchemeVariant.vibrant,
       ),
-      allure: ColorScheme.fromSeed(
-        seedColor: appSeeds.allure,
+      allure: SeedColorScheme.fromSeeds(
+        primaryKey: appSeeds.allurePrimaryKey,
         brightness: brightness,
-        dynamicSchemeVariant: DynamicSchemeVariant.vibrant,
+        variant: FlexSchemeVariant.vibrant,
       ),
-      experience: ColorScheme.fromSeed(
-        seedColor: appSeeds.experience,
+      experience: SeedColorScheme.fromSeeds(
+        primaryKey: appSeeds.experiencePrimaryKey,
         brightness: brightness,
-        dynamicSchemeVariant: DynamicSchemeVariant.vibrant,
+        variant: FlexSchemeVariant.vibrant,
       ),
     );
   }
