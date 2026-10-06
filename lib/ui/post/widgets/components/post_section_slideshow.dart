@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 /// Encapsulates the post media slideshow with optional overlay controls.
 ///
@@ -13,7 +14,6 @@ class PostSectionSlideshow extends StatelessWidget {
     required this.height,
     required this.media,
     required this.visibilityNotifier,
-    this.overlayBuilder,
     this.chromeColor,
     super.key,
   });
@@ -22,38 +22,28 @@ class PostSectionSlideshow extends StatelessWidget {
   final List<Media> media;
   final ValueNotifier<bool> visibilityNotifier;
 
-  /// Optional builder to layer controls (e.g., drag handle, close button)
-  /// over the slideshow.
-  ///
-  /// If provided, the slideshow will be placed in a [Stack] with the
-  /// overlay widgets positioned on top. Used for modal-specific UI.
-  final Widget Function(BuildContext context)? overlayBuilder;
-
   /// The color the slideshow bottom chrome will have.
   final Color? chromeColor;
 
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: AnimatedBuilder(
-        animation: visibilityNotifier,
-        builder: (context, child) {
-          final slideshow = PostMediaSlideshow(
-            height: height,
-            media: media,
-            visibilityNotifier: visibilityNotifier,
-            chromeColor: chromeColor,
-          );
-
-          // If overlay is provided (e.g., for modal), stack it on top.
-          if (overlayBuilder != null) {
-            return Stack(
-              children: <Widget>[slideshow, overlayBuilder!(context)],
-            );
-          }
-
-          return slideshow;
-        },
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: AnimatedBuilder(
+          animation: visibilityNotifier,
+          builder: (context, _) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ClipRRect(
+              borderRadius: context.appShapes.circular.cornerExtraLarge,
+              child: PostMediaSlideshow(
+                height: height,
+                media: media,
+                visibilityNotifier: visibilityNotifier,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

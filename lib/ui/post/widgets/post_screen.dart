@@ -66,7 +66,6 @@ class _PostScreenState extends State<PostScreen> {
         systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
       body: SafeArea(
-        top: false,
         child: ListenableBuilder(
           listenable: Listenable.merge([
             widget.viewModel.loadEvent,
@@ -82,13 +81,7 @@ class _PostScreenState extends State<PostScreen> {
                 child: CustomScrollView(
                   controller: _scrollController,
                   slivers: <Widget>[
-                    if (content.media.isNotEmpty)
-                      PostSectionSlideshow(
-                        height: _mediaSlideshowHeight,
-                        media: content.media,
-                        visibilityNotifier:
-                            _slideshowVisibilityNotifier.notifier,
-                      ),
+                    const SliverPadding(padding: EdgeInsets.only(top: 16)),
                     PostSectionHeader(
                       content: content,
                       weatherViewModel: widget.weatherViewModel,
@@ -98,6 +91,13 @@ class _PostScreenState extends State<PostScreen> {
                       onCategoryPressed: () =>
                           _buildCategoriesRoute(content.category),
                     ),
+                    if (content.media.isNotEmpty)
+                      PostSectionSlideshow(
+                        height: _mediaSlideshowHeight,
+                        media: content.media,
+                        visibilityNotifier:
+                            _slideshowVisibilityNotifier.notifier,
+                      ),
                     PostSectionDescription(content: content),
                     PostSectionMapPreview(
                       content: content,

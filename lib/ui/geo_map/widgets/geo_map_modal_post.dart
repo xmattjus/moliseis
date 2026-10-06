@@ -69,16 +69,7 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
       child: CustomScrollView(
         controller: _scrollController,
         slivers: <Widget>[
-          if (widget.content.media.isNotEmpty)
-            PostSectionSlideshow(
-              height: _mediaSlideshowHeight,
-              media: widget.content.media,
-              visibilityNotifier: _slideshowVisibilityNotifier.notifier,
-              overlayBuilder: _buildTopControls,
-              chromeColor: context.colorScheme.surfaceContainerLow,
-            )
-          else
-            SliverToBoxAdapter(child: _buildTopControls(context)),
+          SliverToBoxAdapter(child: _buildTopControls(context)),
           PostSectionHeader(
             content: widget.content,
             weatherViewModel: widget.weatherViewModel,
@@ -90,6 +81,13 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
               //  chip is pressed.
             },
           ),
+          if (widget.content.media.isNotEmpty)
+            PostSectionSlideshow(
+              height: _mediaSlideshowHeight,
+              media: widget.content.media,
+              visibilityNotifier: _slideshowVisibilityNotifier.notifier,
+              chromeColor: context.colorScheme.surfaceContainerLow,
+            ),
           PostSectionDescription(content: widget.content),
           PostSectionNearbyContent(
             coordinates: widget.content.coordinates,
@@ -110,15 +108,11 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
       height: 64,
       child: Stack(
         children: <Widget>[
-          Positioned(
+          const Positioned(
             left: 0,
             top: 0,
             right: 0,
-            child: Center(
-              child: AppBottomSheetDragHandle(
-                color: context.colorScheme.surfaceContainerHighest,
-              ),
-            ),
+            child: Center(child: AppBottomSheetDragHandle()),
           ),
           Positioned(
             top: 8,

@@ -47,4 +47,16 @@ class AppTextStyles {
       decorationColor: color,
     );
   }
+
+  static TextStyle? postName(BuildContext context) =>
+      Theme.of(context).textTheme.headlineLarge?.copyWith(
+        fontFamily: 'Fraunces',
+        fontVariations: const [
+          FontVariation.weight(500),
+          FontVariation('SOFT', 50),
+        ],
+      );
+
+  static TextStyle? postCityName(BuildContext context) =>
+      Theme.of(context).textTheme.titleMedium?.copyWith(fontFamily: 'Lexend');
 }

@@ -377,7 +377,9 @@ void main() {
     ('/home/category/nature/posts/1?type=event', 'Esplora'),
     ('/home/search_results/posts/1?q=molise&type=event', 'Esplora'),
   ]) {
-    testWidgets('Apri mappa preserves $source in its branch', (tester) async {
+    testWidgets('map expansion preserves $source in its branch', (
+      tester,
+    ) async {
       final fixture = RouteOwnershipFixture();
       addTearDown(fixture.dispose);
       await tester.pumpWidget(fixture.app);
@@ -389,7 +391,7 @@ void main() {
       final sourceUri = fixture.uri;
 
       await tester.scrollUntilVisible(
-        find.byType(PostSectionMapPreview),
+        find.byTooltip('Allarga mappa'),
         250,
         scrollable: find
             .descendant(
@@ -398,7 +400,7 @@ void main() {
             )
             .first,
       );
-      await tester.tap(find.text('Apri mappa'));
+      await tester.tap(find.byTooltip('Allarga mappa'));
       await tester.pumpAndSettle();
 
       expect(fixture.uri.path, RoutePaths.geoMap);
@@ -433,7 +435,7 @@ void main() {
       final postState = tester.state(find.byType(PostScreen));
 
       await tester.scrollUntilVisible(
-        find.byType(PostSectionMapPreview),
+        find.byTooltip('Allarga mappa'),
         250,
         scrollable: find
             .descendant(
@@ -442,7 +444,7 @@ void main() {
             )
             .first,
       );
-      await tester.tap(find.text('Apri mappa'));
+      await tester.tap(find.byTooltip('Allarga mappa'));
       await tester.pumpAndSettle();
 
       await startPredictiveBack(tester);

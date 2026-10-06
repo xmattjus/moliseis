@@ -29,7 +29,8 @@ class PostSectionHeader extends StatelessWidget {
       sliver: SliverToBoxAdapter(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
           spacing: 16,
           children: <Widget>[
             Expanded(
@@ -41,8 +42,8 @@ class PostSectionHeader extends StatelessWidget {
                   ContentNameAndCity(
                     name: content.name,
                     cityName: content.city?.name,
-                    nameStyle: AppTextStyles.title(context),
-                    cityNameStyle: AppTextStyles.subtitle(context),
+                    nameStyle: AppTextStyles.postName(context),
+                    cityNameStyle: AppTextStyles.postCityName(context),
                     overflow: TextOverflow.visible,
                   ),
                   if (content case final Event event)

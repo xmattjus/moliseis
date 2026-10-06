@@ -17,7 +17,6 @@ class PostMediaSlideshow extends StatefulWidget {
     required this.height,
     required this.media,
     required this.visibilityNotifier,
-    this.chromeColor,
     super.key,
   });
 
@@ -27,20 +26,13 @@ class PostMediaSlideshow extends StatefulWidget {
   /// A [ValueNotifier] that indicates whether the slideshow is visible or not.
   final ValueNotifier<bool> visibilityNotifier;
 
-  /// The color the slideshow bottom chrome will have.
-  final Color? chromeColor;
-
   @override
   State<PostMediaSlideshow> createState() => _PostMediaSlideshowState();
 }
 
 class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     with TickerProviderStateMixin {
-  static const _bottomChromeHeight = 40.0;
-  static const _bottomChromeOffset = -4.0;
-  static const _pageIndicatorBottomOffset = 8.0;
-  static const _pauseButtonOffset = 16.0;
-  static const _pauseButtonAdditionalBottomSpacing = 24.0;
+  static const _innerChromeOffset = 16.0;
 
   late final AnimationController _animationController;
 
@@ -210,32 +202,10 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     ),
   );
 
-  Widget _buildBottomChrome(BuildContext context, BoxConstraints constraints) =>
-      Positioned(
-        bottom: _bottomChromeOffset,
-        child: Container(
-          width: constraints.maxWidth,
-          height: _bottomChromeHeight,
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: context.appColors.modalBorderColor,
-                width: context.appSizes.borderSide.medium,
-              ),
-            ),
-            borderRadius: BorderRadius.only(
-              topLeft: context.appShapes.circular.cornerExtraLarge.topLeft,
-              topRight: context.appShapes.circular.cornerExtraLarge.topRight,
-            ),
-            color: widget.chromeColor ?? context.colorScheme.surface,
-          ),
-        ),
-      );
-
   Widget _buildPageIndicator(int itemCount) => Positioned(
     left: 0,
     right: 0,
-    bottom: _bottomChromeHeight + _pageIndicatorBottomOffset,
+    bottom: _innerChromeOffset,
     child: Center(
       child: AppPageIndicator(
         pageController: _pageController,
@@ -245,12 +215,8 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
   );
 
   Widget _buildPauseButtonOverlay() => Positioned(
-    bottom:
-        _bottomChromeHeight +
-        _pageIndicatorBottomOffset +
-        _pauseButtonOffset +
-        _pauseButtonAdditionalBottomSpacing,
-    right: _pauseButtonOffset,
+    top: _innerChromeOffset,
+    right: _innerChromeOffset,
     child: AnimatedBuilder(
       animation: Listenable.merge([
         widget.visibilityNotifier,
@@ -313,7 +279,6 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
         return Stack(
           children: <Widget>[
             _buildMediaPager(constraints),
-            _buildBottomChrome(context, constraints),
             if (_initTicker) _buildPageIndicator(widget.media.length),
             if (_initTicker) _buildPauseButtonOverlay(),
           ],

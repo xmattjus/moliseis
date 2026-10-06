@@ -6,6 +6,7 @@ import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/app_show_modal_bottom_sheet.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/widgets/components/weather_forecast_modal.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class WeatherForecastButton extends StatefulWidget {
   const WeatherForecastButton({
@@ -71,6 +72,10 @@ class _WeatherForecastButtonState extends State<WeatherForecastButton> {
                 isScrollControlled: true,
               );
             },
+            style: FilledButton.styleFrom(
+              foregroundColor: context.colorScheme.onTertiaryContainer,
+              backgroundColor: context.colorScheme.tertiaryContainer,
+            ),
             icon: icon,
             label: temperatureText,
           );

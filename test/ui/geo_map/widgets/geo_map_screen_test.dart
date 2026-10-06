@@ -336,7 +336,8 @@ void main() {
 
     expect(find.byType(GeoMapModalPost), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Chiudi').first);
+    expect(find.byTooltip('Chiudi'), findsOneWidget);
+    await tester.tap(find.byTooltip('Chiudi'));
     await tester.pumpAndSettle();
 
     expect(find.byType(GeoMapModalPost), findsNothing);
