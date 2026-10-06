@@ -12,24 +12,25 @@ dependencies:
   # A
   # B
   # C
-  cached_network_image_ce: ^4.13.0
+  cached_network_image_ce: ^4.13.1
   collection: ^1.19.1
-  cronet_http: ^1.6.0
+  cronet_http: ^1.10.0
   crypto: ^3.0.7
   cupertino_http: ^3.1.0
-  cupertino_icons: ^1.0.9
-  cupertino_ui: any
+  cupertino_icons: ^2.0.0
+  cupertino_ui: ^1.1.1
   # D
   dart_mappable: ^4.8.0
-  device_info_plus: ^13.2.0
+  device_info_plus: ^13.3.0
   # E
   email_validator: ^3.0.0
-  envied: ^1.3.5
+  envied: ^1.3.10
   expressive_navigation_bar:
     git:
       url: https://github.com/xmattjus/expressive_navigation_bar.git
       ref: main
   # F
+  flex_seed_scheme: ^5.0.1
   flutter:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4
@@ -38,7 +39,7 @@ dependencies:
   flutter_map: ^8.3.2
   flutter_quill: ^11.5.1
   # G
-  go_router: ^18.0.1
+  go_router: ^18.0.2
   # H
   http: ^1.6.0
   # I
@@ -51,8 +52,8 @@ dependencies:
   # M
   markdown_widget: ^2.3.2+8
   material_color_utilities: ^0.13.0
-  material_symbols_icons: 4.2960.0
-  material_ui: any
+  material_symbols_icons: ^4.2960.0
+  material_ui: ^1.5.0
   meta: ^1.17.0
   # N
   # O
@@ -66,15 +67,15 @@ dependencies:
   # Q
   # R
   # S
-  sentry: ^10.0.0-rc.0
-  sentry_flutter: ^10.0.0-rc.0
-  sentry_supabase: ^10.0.0-rc.0
-  share_plus: ^13.3.0
+  sentry: ^10.0.0-rc.2
+  sentry_flutter: ^10.0.0-rc.2
+  sentry_supabase: ^10.0.0-rc.2
+  share_plus: ^13.3.1
   skeletonizer: ^3.0.0
   smooth_page_indicator: ^3.0.0
   string_validator: ^1.2.0
-  supabase: ^2.12.2
-  supabase_flutter: ^2.14.2
+  supabase: ^2.16.2
+  supabase_flutter: ^2.18.0
   super_sliver_list: ^0.4.1
   swipe_image_gallery: ^0.11.0
   # T
@@ -97,7 +98,7 @@ dev_dependencies:
   # D
   # E
   dart_mappable_builder: ^4.8.0
-  envied_generator: ^1.3.5
+  envied_generator: ^1.3.10
   # F
   file: ^7.0.1
   flutter_test:
