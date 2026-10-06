@@ -195,6 +195,9 @@ class _MoliseIsAppState extends State<MoliseIsApp> {
           localizationsDelegates: const [
             FlutterQuillLocalizations.delegate,
             ...GlobalMaterialLocalizations.delegates,
+            // Quill uses Flutter's selection toolbar, whose localization type
+            // differs from the Cupertino type provided by material_ui.
+            flutter_localizations.GlobalCupertinoLocalizations.delegate,
           ],
           supportedLocales: const [
             Locale.fromSubtags(languageCode: 'en'),
