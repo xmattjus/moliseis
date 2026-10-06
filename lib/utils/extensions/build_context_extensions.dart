@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/ui/core/themes/app_typography.dart';
 import 'package:moliseis/ui/core/themes/theme_extensions.dart';
 
 import 'package:moliseis/utils/enums.dart';
@@ -19,6 +20,9 @@ extension BuildContextExtensions on BuildContext {
   ThemeData get theme => Theme.of(this);
 
   TextTheme get textTheme => theme.textTheme;
+
+  /// Semantic and emphasized typography derived from the localized theme.
+  AppTypography get appTypography => AppTypography.of(this);
 
   ColorScheme get colorScheme => theme.colorScheme;
 

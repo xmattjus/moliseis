@@ -4,6 +4,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field.dart';
 import 'package:moliseis/ui/core/utils/quill_document_codec.dart';
 
+import '../../../support/typography_assertions.dart';
+
 void main() {
   Widget buildApp({
     String? initialDescription,
@@ -41,6 +43,75 @@ void main() {
   }
 
   group('ContentSubmissionDescriptionFormField', () {
+    testWidgets('editable rich attributes preserve inherited non-weight axes', (
+      tester,
+    ) async {
+      const axes = [FontVariation('SOFT', 50)];
+      await pumpApp(
+        tester,
+        buildApp(
+          theme: ThemeData(
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(
+                fontFamily: 'Fraunces',
+                fontVariations: axes,
+              ),
+            ),
+          ),
+          initialDescriptionDelta: [
+            {
+              'insert': 'Combined',
+              'attributes': {
+                'bold': true,
+                'italic': true,
+                'underline': true,
+                'link': 'https://example.com',
+              },
+            },
+            {'insert': '\nListed'},
+            {
+              'insert': '\n',
+              'attributes': {'list': 'bullet'},
+            },
+          ],
+        ),
+      );
+      final finder = find.byWidgetPredicate(
+        (widget) =>
+            widget is RichText &&
+            widget.text.toPlainText().contains('Combined'),
+      );
+      final style = effectiveSpanStyle(
+        tester.widget<RichText>(finder).text,
+        'Combined',
+      )!;
+      expect(style.fontWeight, FontWeight.bold);
+      expect(style.fontStyle, FontStyle.italic);
+      expect(style.decoration, TextDecoration.underline);
+      expect(style.fontVariations, axes);
+      expect(
+        style.color,
+        Theme.of(tester.element(finder)).colorScheme.secondary,
+      );
+      final listed = find.byWidgetPredicate(
+        (widget) =>
+            widget is RichText && widget.text.toPlainText().contains('Listed'),
+      );
+      expect(
+        effectiveSpanStyle(
+          tester.widget<RichText>(listed).text,
+          'Listed',
+        )!.fontVariations,
+        axes,
+      );
+      final styles = tester
+          .widget<QuillEditor>(find.byType(QuillEditor))
+          .config
+          .customStyles!;
+      expect(styles.paragraph!.verticalSpacing, VerticalSpacing.zero);
+      expect(styles.lists!.verticalSpacing, VerticalSpacing.zero);
+    });
+
     testWidgets('initializes from a valid Delta', (tester) async {
       final delta = <Map<String, dynamic>>[
         <String, dynamic>{

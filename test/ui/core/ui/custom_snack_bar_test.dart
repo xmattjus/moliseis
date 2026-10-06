@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
@@ -9,6 +10,7 @@ import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 
 import '../../../support/mock_logger.dart';
+import '../../../support/typography_measurement_harness.dart';
 
 void main() {
   testWidgets('logs a no-op when the global messenger is absent', (
@@ -161,6 +163,98 @@ void main() {
     expect(find.text('First'), findsNothing);
     expect(find.text('Queued'), findsNothing);
     expect(find.text('Replacement'), findsOneWidget);
+  });
+
+  group('ambient typography measurement', () {
+    setUpAll(loadTypographyMeasurementFont);
+
+    for (final direction in TextDirection.values) {
+      testWidgets('visible feedback follows current inputs in $direction', (
+        tester,
+      ) async {
+        final inputs = ValueNotifier(
+          const MediaQueryData(size: Size(390, 600)),
+        );
+        addTearDown(inputs.dispose);
+        late BuildContext context;
+        const message = 'Aggiornamento pronto per tutti';
+        await tester.pumpWidget(
+          TypographyMeasurementApp(
+            mediaQuery: inputs,
+            direction: direction,
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            home: Builder(
+              builder: (innerContext) {
+                context = innerContext;
+                return const Scaffold(body: SizedBox.shrink());
+              },
+            ),
+          ),
+        );
+        showSnackBar(
+          context: context,
+          textContent: message,
+          duration: SnackBarDuration.long,
+          action: SnackBarAction(label: 'OK', onPressed: () {}),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 250));
+
+        for (final data in [
+          const MediaQueryData(size: Size(390, 600)),
+          const MediaQueryData(
+            size: Size(390, 600),
+            textScaler: TextScaler.linear(2),
+          ),
+          const MediaQueryData(
+            size: Size(390, 600),
+            boldText: true,
+            lineHeightScaleFactorOverride: 2,
+            letterSpacingOverride: 6,
+            wordSpacingOverride: 8,
+          ),
+          const MediaQueryData(size: Size(390, 600)),
+        ]) {
+          inputs.value = data;
+          await tester.pump();
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(
+              of: find.text(message),
+              matching: find.byType(RichText),
+            ),
+          );
+          final reference = measureRenderedText(
+            paragraph,
+            maxWidth: data.size.width - 48,
+          );
+          final lineCount = reference.computeLineMetrics().length;
+          reference.dispose();
+          final stackedAction = find.ancestor(
+            of: find.byType(SnackBarAction),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Align &&
+                  widget.alignment == AlignmentGeometry.bottomEnd,
+            ),
+          );
+          expect(stackedAction, lineCount > 1 ? findsOneWidget : findsNothing);
+          expect(paragraph.textDirection, direction);
+          expect(paragraph.locale, const Locale('en'));
+          expect(paragraph.textScaler, data.textScaler);
+          final style = paragraph.text.style!;
+          if (data.boldText) {
+            expect(style.fontWeight, FontWeight.bold);
+          }
+          if (data.lineHeightScaleFactorOverride != null) {
+            expect(style.height, data.lineHeightScaleFactorOverride);
+            expect(style.letterSpacing, data.letterSpacingOverride);
+            expect(style.wordSpacing, data.wordSpacingOverride);
+          }
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 
   group('showSnackBar action color', () {

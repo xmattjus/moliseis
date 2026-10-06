@@ -43,6 +43,7 @@ class _AppNavigationRailState extends State<AppNavigationRail> {
   @override
   Widget build(BuildContext context) {
     final textTheme = context.textTheme;
+    final emphasized = context.appTypography.emphasized;
 
     return NavigationRail(
       extended: _isExtended,
@@ -62,9 +63,11 @@ class _AppNavigationRailState extends State<AppNavigationRail> {
             selectedIcon: destination.selectedIcon,
             label: Text(
               destination.label,
-              style: textTheme.labelMedium?.copyWith(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
+              style: isSelected
+                  ? emphasized.labelMedium
+                  : textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.normal,
+                    ),
             ),
           );
         }),

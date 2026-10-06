@@ -77,15 +77,25 @@ class _PostMediaSlideshowPauseButtonState
     // Calculates the button's text total width before rendering it on screen.
     final textSpan = TextSpan(
       text: text,
-      style: TextTheme.of(context).labelLarge,
+      style: TextTheme.of(context).labelLarge!.copyWith(
+        fontWeight: MediaQuery.boldTextOf(context) ? FontWeight.bold : null,
+        height: MediaQuery.maybeLineHeightScaleFactorOverrideOf(context),
+        letterSpacing: MediaQuery.maybeLetterSpacingOverrideOf(context),
+        wordSpacing: MediaQuery.maybeWordSpacingOverrideOf(context),
+      ),
     );
 
     final textPainter = TextPainter(
       text: textSpan,
       textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      locale: Localizations.maybeLocaleOf(context),
+      maxLines: 1,
     )..layout();
 
-    return textPainter.width;
+    final width = textPainter.width;
+    textPainter.dispose();
+    return width;
   }
 
   @override
@@ -139,6 +149,9 @@ class _PostMediaSlideshowPauseButtonState
           child: FilledButton.tonalIcon(
             onPressed: widget.onPressed,
             style: ButtonStyle(
+              textStyle: WidgetStatePropertyAll(
+                TextTheme.of(context).labelLarge,
+              ),
               backgroundColor: WidgetStateProperty.resolveWith((states) {
                 if (states.contains(WidgetState.disabled)) {
                   return backgroundColor.withValues(alpha: 0.45);
@@ -167,8 +180,10 @@ class _PostMediaSlideshowPauseButtonState
                 ? const EmptyBox()
                 : Opacity(
                     opacity: _opacityAnimation.value,
-                    child: const Text(
+                    child: Text(
                       'Attiva scorrimento automatico',
+                      locale: Localizations.maybeLocaleOf(context),
+                      maxLines: 1,
                       softWrap: false,
                       overflow: TextOverflow.fade,
                     ),

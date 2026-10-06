@@ -145,12 +145,6 @@ SnackBar _buildSnackBar(
     SnackBarType.error => Symbols.error,
   };
 
-  final contentStyle = context.textTheme.bodyMedium?.copyWith(
-    color: foreground,
-  );
-
-  final width = MediaQuery.maybeWidthOf(context) ?? double.infinity;
-
   /// Rebuilds the call-site action with a per-type `textColor` so its label
   /// reads as a tappable text button on this snack bar's container background.
   ///
@@ -183,57 +177,80 @@ SnackBar _buildSnackBar(
           onPressed: action.onPressed,
         );
 
-  final textSpan = TextSpan(text: textContent, style: contentStyle);
-  final snackBarContentWidth = width - (horizontalMargin * 2);
+  return SnackBar(
+    content: Builder(
+      builder: (context) {
+        final contentStyle = context.textTheme.bodyMedium!.copyWith(
+          color: foreground,
+        );
+        // Match Text's effective accessibility style without changing the role.
+        final measuredStyle = contentStyle.copyWith(
+          fontWeight: MediaQuery.boldTextOf(context) ? FontWeight.bold : null,
+          height: MediaQuery.maybeLineHeightScaleFactorOverrideOf(context),
+          letterSpacing: MediaQuery.maybeLetterSpacingOverrideOf(context),
+          wordSpacing: MediaQuery.maybeWordSpacingOverrideOf(context),
+        );
+        final locale = Localizations.maybeLocaleOf(context);
+        final width = MediaQuery.sizeOf(context).width;
+        final textSpan = TextSpan(text: textContent, style: measuredStyle);
+        final snackBarContentWidth = width - (horizontalMargin * 2);
 
-  final textPainter = TextPainter(
-    text: textSpan,
-    textDirection: TextDirection.ltr,
-  )..layout(maxWidth: snackBarContentWidth);
+        final textPainter = TextPainter(
+          text: textSpan,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+          locale: locale,
+          maxLines: contentMaxLines,
+        )..layout(maxWidth: snackBarContentWidth);
 
-  final contentLinesSpan = textPainter.computeLineMetrics().length;
+        final contentLinesSpan = textPainter.computeLineMetrics().length;
+        textPainter.dispose();
 
-  // Keep long feedback readable by allowing its text to use the complete snack
-  // bar width below the leading icon. TextPainter may run before the app font
-  // has loaded, so the character threshold keeps this conservative.
-  final usesFullWidthText =
-      contentLinesSpan > 1 || textContent.length > fullWidthTextLength;
+        // Keep long feedback readable below the leading icon. TextPainter may
+        // run before the app font has loaded, so the character threshold keeps
+        // this conservative.
+        final usesFullWidthText =
+            contentLinesSpan > 1 || textContent.length > fullWidthTextLength;
 
-  final leadingIcon = Icon(icon, color: foreground, size: leadingIconSize);
+        final leadingIcon = Icon(
+          icon,
+          color: foreground,
+          size: leadingIconSize,
+        );
 
-  final contentText = Text(
-    textContent,
-    style: contentStyle,
-    maxLines: contentMaxLines,
-    overflow: TextOverflow.ellipsis,
-  );
+        final contentText = Text(
+          textContent,
+          style: contentStyle,
+          locale: locale,
+          maxLines: contentMaxLines,
+          overflow: TextOverflow.ellipsis,
+        );
 
-  final row = Row(
-    spacing: contentSpacing,
-    children: [
-      leadingIcon,
-      Expanded(child: contentText),
-      if (!usesFullWidthText && contentLinesSpan == 1) ?recoloredAction,
-    ],
-  );
-
-  final snackBarContent = contentLinesSpan == 1
-      ? row
-      : Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        final row = Row(
           spacing: contentSpacing,
           children: [
-            row,
-            if (recoloredAction != null)
-              Align(
-                alignment: AlignmentGeometry.bottomEnd,
-                child: recoloredAction,
-              ),
+            leadingIcon,
+            Expanded(child: contentText),
+            if (!usesFullWidthText && contentLinesSpan == 1) ?recoloredAction,
           ],
         );
 
-  return SnackBar(
-    content: snackBarContent,
+        return contentLinesSpan == 1
+            ? row
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: contentSpacing,
+                children: [
+                  row,
+                  if (recoloredAction != null)
+                    Align(
+                      alignment: AlignmentGeometry.bottomEnd,
+                      child: recoloredAction,
+                    ),
+                ],
+              );
+      },
+    ),
     backgroundColor: background,
     elevation: 3,
     margin: const EdgeInsetsDirectional.symmetric(

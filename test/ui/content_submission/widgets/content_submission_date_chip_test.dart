@@ -104,6 +104,16 @@ void main() {
       find.byType(CupertinoDatePicker),
     );
     expect(picker.initialDateTime, DateTime(2026, 8, 20));
+    final headerFinder = find.text('Seleziona una data');
+    final header = tester.widget<Text>(headerFinder);
+    expect(
+      header.style,
+      CupertinoTheme.of(
+        tester.element(headerFinder),
+      ).textTheme.navTitleTextStyle,
+    );
+    expect(header.style!.fontFamily, isNot('system'));
+
     await tester.tap(find.text('Conferma'));
     await tester.pump();
 
@@ -143,6 +153,16 @@ void main() {
     );
 
     expect(picker.initialDateTime, DateTime(2000, 1, 1, 10));
+    final headerFinder = find.text("Seleziona un'ora");
+    final header = tester.widget<Text>(headerFinder);
+    expect(
+      header.style,
+      CupertinoTheme.of(
+        tester.element(headerFinder),
+      ).textTheme.navTitleTextStyle,
+    );
+    expect(header.style!.fontFamily, isNot('system'));
+
     debugDefaultTargetPlatformOverride = null;
     await tester.binding.setSurfaceSize(null);
   });

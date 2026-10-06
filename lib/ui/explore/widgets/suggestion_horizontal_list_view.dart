@@ -8,7 +8,6 @@ import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_parameters.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
@@ -37,9 +36,7 @@ class SuggestiondHorizontalListView extends StatelessWidget {
     final borderRadius = context.appShapes.circular.cornerExtraLarge;
 
     final height =
-        (MediaQuery.sizeOf(context).height * 0.45) -
-        sectionTextBottomPadding +
-        (AppTextStyles.section(context)?.height ?? 16.0);
+        (MediaQuery.sizeOf(context).height * 0.45) - sectionTextBottomPadding;
 
     return SliverList.list(
       children: [

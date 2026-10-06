@@ -2,7 +2,6 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/event.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 /// Displays a localized date and time summary for an event.
@@ -48,9 +47,9 @@ class _EventFormattedDateTimeState extends State<EventFormattedDateTime> {
 
     final color = widget.iconColor ?? context.colorScheme.primary;
 
-    final textStyle = AppTextStyles.subtitle(
-      context,
-    )?.copyWith(color: widget.textColor);
+    final textStyle = context.textTheme.bodyMedium?.copyWith(
+      color: widget.textColor,
+    );
 
     // Normalize the event range to ensure startDate is before endDate.
     if (startInstant.isAfter(endInstant)) {

@@ -153,37 +153,41 @@ class _ContentSubmissionDateChipState extends State<ContentSubmissionDateChip> {
                   data: const CupertinoThemeData(
                     primaryColor: CupertinoColors.activeBlue,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      CupertinoButton(
-                        sizeStyle: CupertinoButtonSize.medium,
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: const Text('Annulla'),
-                      ),
-                      Expanded(
-                        child: Text(
-                          widget._mode == _ContentSubmissionDateChipMode.date
-                              ? 'Seleziona una data'
-                              : "Seleziona un'ora",
-                          style: Theme.of(dialogContext).textTheme.titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                fontFamily: 'system',
-                              ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      CupertinoButton(
-                        sizeStyle: CupertinoButtonSize.medium,
-                        onPressed: () {
-                          final value = _selectedDateTime;
-                          if (value != null) _emit(value);
-                          Navigator.of(dialogContext).pop();
-                        },
-                        child: const Text('Conferma'),
-                      ),
-                    ],
+                  child: Builder(
+                    builder: (context) {
+                      if (!mounted) return const SizedBox.shrink();
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          CupertinoButton(
+                            sizeStyle: CupertinoButtonSize.medium,
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            child: const Text('Annulla'),
+                          ),
+                          Expanded(
+                            child: Text(
+                              widget._mode ==
+                                      _ContentSubmissionDateChipMode.date
+                                  ? 'Seleziona una data'
+                                  : "Seleziona un'ora",
+                              style: CupertinoTheme.of(
+                                context,
+                              ).textTheme.navTitleTextStyle,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          CupertinoButton(
+                            sizeStyle: CupertinoButtonSize.medium,
+                            onPressed: () {
+                              final value = _selectedDateTime;
+                              if (value != null) _emit(value);
+                              Navigator.of(dialogContext).pop();
+                            },
+                            child: const Text('Conferma'),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
                 Expanded(

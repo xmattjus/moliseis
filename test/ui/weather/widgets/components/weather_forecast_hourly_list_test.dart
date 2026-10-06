@@ -7,6 +7,7 @@ import 'package:moliseis/data/services/api/weather/model/current_forecast/curren
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
+import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/widgets/components/weather_forecast_hourly_list.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
@@ -98,13 +99,16 @@ void main() {
     WeatherViewModel viewModel, {
     int currentHourOverride = 0,
   }) {
-    return MaterialApp(
-      home: Scaffold(
-        body: WeatherForecastHourlyList(
-          borderColor: Colors.grey,
-          backgroundColor: Colors.white,
-          viewModel: viewModel,
-          currentHourOverride: currentHourOverride,
+    return Builder(
+      builder: (context) => MaterialApp(
+        theme: AppThemeData.light(context: context),
+        home: Scaffold(
+          body: WeatherForecastHourlyList(
+            borderColor: Colors.grey,
+            backgroundColor: Colors.white,
+            viewModel: viewModel,
+            currentHourOverride: currentHourOverride,
+          ),
         ),
       ),
     );
@@ -141,6 +145,13 @@ void main() {
 
       expect(find.byType(SuperListView), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
+      final hour = tester.widget<Text>(find.text('01'));
+      final baseline = Theme.of(
+        tester.element(find.text('01')),
+      ).textTheme.bodySmall!;
+      expect(hour.style, baseline.copyWith(fontWeight: FontWeight.w300));
+      expect(hour.style!.fontFamily, 'Lexend');
+      expect(hour.style!.fontVariations, isNull);
     });
 
     testWidgets('shows loading indicator after failed load', (tester) async {

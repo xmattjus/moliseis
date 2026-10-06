@@ -11,7 +11,6 @@ import 'package:moliseis/ui/content_submission/view_models/content_submission_vi
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
@@ -188,9 +187,9 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
     final textTheme = context.textTheme;
     final textStyle = textTheme.bodyLarge;
 
-    final linkTextStyle = AppTextStyles.link(
-      context,
-    )?.copyWith(fontSize: textTheme.bodyMedium?.fontSize);
+    final linkTextStyle = context.appTypography.link?.copyWith(
+      fontSize: textTheme.bodyMedium?.fontSize,
+    );
 
     return AnnotatedRegion(
       value: SystemUiOverlayStyle(

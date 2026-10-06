@@ -142,11 +142,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                               hourLabel: Text(
                                 hour,
                                 style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      fontVariations: const <FontVariation>[
-                                        FontVariation.weight(300),
-                                      ],
-                                    ),
+                                    ?.copyWith(fontWeight: FontWeight.w300),
                                 softWrap: false,
                               ),
                               icon: Icon(

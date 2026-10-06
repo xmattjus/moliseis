@@ -11,9 +11,9 @@ import 'package:moliseis/ui/post/widgets/components/post_description.dart';
 /// the post detail ([PostDescription]), so rich-text descriptions look
 /// identical in both places and follow the active app theme.
 ///
-/// The base text style is the theme's `bodyLarge` with `fontVariations`
-/// cleared, so variable-font axes from the theme cannot interfere with the
-/// bold, italic, and underline emphasis Quill applies to inline styles. Block
+/// The base text style is the theme's `bodyLarge`, preserving non-weight
+/// variable-font axes. Quill's inline attributes control standard weights,
+/// italic and underline without clearing those axes. Block
 /// styles use zero spacing because the surrounding widgets already provide
 /// padding and vertical rhythm. Links use `colorScheme.secondary` and the
 /// placeholder uses `onSurfaceVariant` at 60% opacity.
@@ -22,11 +22,7 @@ import 'package:moliseis/ui/post/widgets/components/post_description.dart';
 /// `bodyLarge`.
 DefaultStyles descriptionDeltaStyles(BuildContext context) {
   final theme = Theme.of(context);
-  final baseStyle =
-      theme.textTheme.bodyLarge?.copyWith(
-        fontVariations: const <FontVariation>[],
-      ) ??
-      const TextStyle(fontSize: 16);
+  final baseStyle = theme.textTheme.bodyLarge ?? const TextStyle(fontSize: 16);
 
   DefaultTextBlockStyle blockStyle(TextStyle style) {
     return DefaultTextBlockStyle(

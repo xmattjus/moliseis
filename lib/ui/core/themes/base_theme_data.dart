@@ -61,6 +61,7 @@ class BaseThemeData {
         },
       ),
       colorScheme: colorScheme,
+      fontFamily: 'Lexend',
       textTheme: appTextTheme,
       chipTheme:
           chipTheme ??

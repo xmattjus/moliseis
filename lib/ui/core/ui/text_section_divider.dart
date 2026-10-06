@@ -1,5 +1,5 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class TextSectionDivider extends StatelessWidget {
   const TextSectionDivider(
@@ -17,7 +17,7 @@ class TextSectionDivider extends StatelessWidget {
       padding: padding,
       child: Text(
         data,
-        style: AppTextStyles.section(context),
+        style: context.appTypography.section,
         overflow: TextOverflow.visible,
       ),
     );

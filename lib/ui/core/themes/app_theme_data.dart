@@ -46,6 +46,7 @@ class AppThemeData {
         brightness: Brightness.dark,
         surface: Colors.black,
       ),
+      fontFamily: 'Lexend',
       textTheme: appTextTheme,
     );
   }

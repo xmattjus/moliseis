@@ -2,8 +2,8 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/routing/route_names.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 /// Call-to-action card inviting users to submit a place or event suggestion.
 ///
@@ -38,9 +38,9 @@ class ContentSubmissionCTAButton extends StatelessWidget {
                       children: <Widget>[
                         Text(
                           'Suggerisci un luogo o un evento',
-                          style: AppTextStyles.titleSmaller(
-                            context,
-                          )?.copyWith(color: fgColor),
+                          style: context.textTheme.titleMedium?.copyWith(
+                            color: fgColor,
+                          ),
                         ),
                         Text(
                           'Fai scoprire i migliori luoghi o eventi che il '

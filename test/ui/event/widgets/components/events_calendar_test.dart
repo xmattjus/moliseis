@@ -1,9 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_calendar.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day_markers.dart';
+import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_month.dart';
 import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -11,6 +14,61 @@ import '../../../../support/fake_repositories.dart';
 import '../../../../support/fixtures.dart';
 
 void main() {
+  testWidgets(
+    'calendar keeps separate weekday and month role sources in both themes',
+    (tester) async {
+      await initializeDateFormatting('en');
+      for (final brightness in Brightness.values) {
+        late BuildContext calendarContext;
+        await tester.pumpWidget(
+          Builder(
+            builder: (context) {
+              final theme = brightness == Brightness.light
+                  ? AppThemeData.light(context: context)
+                  : AppThemeData.dark(context: context);
+              return MaterialApp(
+                theme: theme,
+                home: Scaffold(
+                  body: Builder(
+                    builder: (context) {
+                      calendarContext = context;
+                      return EventsVerticalCalendarMonth(
+                        dateSymbols: dateTimeSymbolMap()['en']!,
+                        month: 3,
+                        year: 2026,
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+        final month = tester.widget<Text>(find.text('March 2026'));
+        final monthColor = brightness == Brightness.dark
+            ? Colors.white70
+            : Colors.black87;
+        expect(
+          month.style,
+          Theme.of(
+            calendarContext,
+          ).textTheme.titleMedium!.copyWith(color: monthColor),
+        );
+        final weekday = tester.widget<Text>(find.text('Mon'));
+        final weekdayColor = brightness == Brightness.dark
+            ? Colors.white54
+            : Colors.black45;
+        expect(
+          weekday.style,
+          DatePickerTheme.defaults(
+            calendarContext,
+          ).weekdayStyle!.copyWith(color: weekdayColor),
+        );
+      }
+    },
+  );
+
   group('EventViewModel.loadByDate', () {
     test('includes multi-day event on middle day when repository getByDate is '
         'empty', () async {

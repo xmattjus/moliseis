@@ -12,9 +12,102 @@ import 'package:moliseis/ui/post/widgets/components/post_description.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../support/fixtures.dart';
+import '../../../../support/typography_assertions.dart';
 
 void main() {
   group('PostDescription', () {
+    testWidgets(
+      'rich inline attributes preserve axes and paragraph/list styling',
+      (tester) async {
+        const base = TextStyle(
+          fontFamily: 'Fraunces',
+          fontSize: 16,
+          fontVariations: [FontVariation('SOFT', 50)],
+        );
+        await _pumpDescription(
+          tester,
+          makePlace(
+            descriptionDelta: [
+              {
+                'insert': 'Formatted',
+                'attributes': {
+                  'bold': true,
+                  'italic': true,
+                  'underline': true,
+                  'link': 'https://example.com',
+                },
+              },
+              {'insert': '\nListed'},
+              {
+                'insert': '\n',
+                'attributes': {'list': 'bullet'},
+              },
+            ],
+          ),
+          theme: ThemeData(textTheme: const TextTheme(bodyLarge: base)),
+        );
+        final rich = tester.widget<RichText>(_richTextContaining('Formatted'));
+        final style = effectiveSpanStyle(rich.text, 'Formatted')!;
+        expect(style.fontWeight, FontWeight.bold);
+        expect(style.fontStyle, FontStyle.italic);
+        expect(style.decoration, TextDecoration.underline);
+        expect(
+          style.color,
+          Theme.of(
+            tester.element(_richTextContaining('Formatted')),
+          ).colorScheme.secondary,
+        );
+        expect(style.fontVariations, base.fontVariations);
+        final listed = tester.widget<RichText>(_richTextContaining('Listed'));
+        expect(
+          effectiveSpanStyle(listed.text, 'Listed')!.fontVariations,
+          base.fontVariations,
+        );
+        final styles = tester
+            .widget<QuillEditor>(find.byType(QuillEditor))
+            .config
+            .customStyles!;
+        expect(styles.paragraph!.verticalSpacing, VerticalSpacing.zero);
+        expect(styles.paragraph!.lineSpacing, VerticalSpacing.zero);
+        expect(styles.lists!.verticalSpacing, VerticalSpacing.zero);
+      },
+    );
+
+    testWidgets('legacy Markdown retains heading and link metrics', (
+      tester,
+    ) async {
+      await _pumpDescription(
+        tester,
+        makePlace(
+          description:
+              '# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6\n\n[Link](https://example.com)',
+        ),
+      );
+      final expected = [
+        (48.0, 1.0),
+        (36.0, 1.0),
+        (24.0, 1.0),
+        (16.0, 1.25),
+        (14.0, 1.0),
+        (13.0, 1.0),
+      ];
+      for (var i = 0; i < expected.length; i++) {
+        final span = tester
+            .widget<RichText>(_richTextContaining('H${i + 1}'))
+            .text;
+        final style = effectiveSpanStyle(span, 'H${i + 1}')!;
+        expect(style.fontSize, expected[i].$1);
+        expect(style.height, expected[i].$2);
+      }
+      final style = effectiveSpanStyle(
+        tester.widget<RichText>(_richTextContaining('Link')).text,
+        'Link',
+      )!;
+      expect(style.fontSize, 14);
+      expect(style.height, 1);
+      expect(style.decoration, TextDecoration.underline);
+    });
+
     testWidgets('prefers a valid Delta over the Markdown fallback', (
       tester,
     ) async {
@@ -299,9 +392,11 @@ Future<void> _pumpDescription(
   ContentBase content, {
   Locale locale = const Locale('en'),
   UrlLaunchService? urlLaunchService,
+  ThemeData? theme,
 }) async {
   final app = MaterialApp(
     scaffoldMessengerKey: $scaffoldMessengerKey,
+    theme: theme,
     locale: locale,
     localizationsDelegates: const [
       FlutterQuillLocalizations.delegate,

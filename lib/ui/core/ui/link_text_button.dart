@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class LinkTextButton extends StatelessWidget {
   /// Creates a Material [TextButton] with a style appropriate for launching
@@ -33,7 +33,7 @@ class LinkTextButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final textStyle = AppTextStyles.link(context) ?? theme.textTheme.bodySmall;
+    final textStyle = context.appTypography.link ?? theme.textTheme.bodySmall;
     // The color the map attribution icons and texts will have.
     final foregroundColor = color ?? textStyle?.color;
 

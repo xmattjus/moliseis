@@ -9,7 +9,6 @@ import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
@@ -29,7 +28,7 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildSectionText(BuildContext context, String s) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(s, style: AppTextStyles.section(context)),
+      child: Text(s, style: context.appTypography.section),
     );
   }
 

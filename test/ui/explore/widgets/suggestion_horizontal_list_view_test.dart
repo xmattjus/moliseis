@@ -7,6 +7,7 @@ import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_parameters.dart';
+import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
@@ -23,6 +24,45 @@ import '../../../support/fixtures.dart';
 
 void main() {
   group('SuggestiondHorizontalListView', () {
+    testWidgets(
+      'carousel viewport ignores line-height ratios and text scaling',
+      (tester) async {
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        for (final height in [600.0, 800.0]) {
+          await tester.binding.setSurfaceSize(Size(800, height));
+          for (final scale in [1.0, 2.0]) {
+            for (final lineHeight in [1.5, 3.0]) {
+              final viewModel = SuggestionViewModel(
+                placeRepository: FakePlaceRepository(
+                  getSuggestedPlacesResult: Result.success([
+                    makePlace(name: 'Castello'),
+                  ]),
+                ),
+              );
+              final fixture = _buildFixture(
+                viewModel,
+                mediaQuery: MediaQueryData(
+                  size: Size(800, height),
+                  textScaler: TextScaler.linear(scale),
+                ),
+                sectionHeight: lineHeight,
+              );
+              await tester.pumpWidget(fixture.app);
+              await tester.pumpAndSettle();
+              expect(
+                tester.getSize(find.byType(ListView)).height,
+                height * .45 - 8,
+              );
+              expect(tester.takeException(), isNull);
+              await tester.pumpWidget(const SizedBox.shrink());
+              fixture.dispose();
+            }
+          }
+        }
+        await tester.binding.setSurfaceSize(null);
+      },
+    );
+
     testWidgets('shows five placeholders while suggestions are loading', (
       tester,
     ) async {
@@ -185,7 +225,11 @@ final class _SuggestionFixture {
   }
 }
 
-_SuggestionFixture _buildFixture(SuggestionViewModel suggestionViewModel) {
+_SuggestionFixture _buildFixture(
+  SuggestionViewModel suggestionViewModel, {
+  MediaQueryData? mediaQuery,
+  double? sectionHeight,
+}) {
   final favouriteViewModel = FavouriteViewModel(
     favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
       eventRepository: FakeEventRepository(),
@@ -218,7 +262,26 @@ _SuggestionFixture _buildFixture(SuggestionViewModel suggestionViewModel) {
   return _SuggestionFixture(
     app: ChangeNotifierProvider<FavouriteViewModel>.value(
       value: favouriteViewModel,
-      child: MaterialApp.router(routerConfig: router),
+      child: Builder(
+        builder: (context) {
+          final theme = AppThemeData.light(context: context);
+          return MaterialApp.router(
+            routerConfig: router,
+            theme: sectionHeight == null
+                ? theme
+                : theme.copyWith(
+                    textTheme: theme.textTheme.copyWith(
+                      titleMedium: theme.textTheme.titleMedium!.copyWith(
+                        height: sectionHeight,
+                      ),
+                    ),
+                  ),
+            builder: (context, child) => mediaQuery == null
+                ? child!
+                : MediaQuery(data: mediaQuery, child: child!),
+          );
+        },
+      ),
     ),
     favouriteViewModel: favouriteViewModel,
     router: router,

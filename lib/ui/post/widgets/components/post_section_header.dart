@@ -1,11 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/content/content_name_and_city.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/widgets/weather_forecast_button.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 /// Displays the post title and weather forecast button in a row.
 ///
@@ -42,8 +42,8 @@ class PostSectionHeader extends StatelessWidget {
                   ContentNameAndCity(
                     name: content.name,
                     cityName: content.city?.name,
-                    nameStyle: AppTextStyles.postName(context),
-                    cityNameStyle: AppTextStyles.postCityName(context),
+                    nameStyle: context.appTypography.emphasized.headlineLarge,
+                    cityNameStyle: context.textTheme.titleMedium,
                     overflow: TextOverflow.visible,
                   ),
                   if (content case final Event event)

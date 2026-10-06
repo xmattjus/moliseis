@@ -1,7 +1,7 @@
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_rich_text.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 
 class ContentNameAndCity extends StatelessWidget {
   /// Creates a vertical array composed of two [CustomRichText]s, one for [name]
@@ -38,14 +38,14 @@ class ContentNameAndCity extends StatelessWidget {
           Text(name),
           labelTextStyle:
               nameStyle ??
-              AppTextStyles.titleSmaller(context)?.copyWith(color: color),
+              context.textTheme.titleMedium?.copyWith(color: color),
           overflow: overflow,
         ),
         CustomRichText(
           Text(cityName ?? 'Molise'),
           labelTextStyle:
               cityNameStyle ??
-              AppTextStyles.subtitle(context)?.copyWith(color: color),
+              context.textTheme.bodyMedium?.copyWith(color: color),
           icon: const Icon(Symbols.place),
           overflow: overflow,
         ),

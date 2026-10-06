@@ -6,11 +6,11 @@ import 'package:markdown_widget/markdown_widget.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/description_delta_styles.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/utils/quill_document_codec.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 MarkdownConfig _appMarkdownConfig(BuildContext context) =>
@@ -24,7 +24,7 @@ MarkdownConfig _appMarkdownConfig(BuildContext context) =>
         const H6Config(style: TextStyle(fontSize: 13, height: 1)),
         LinkConfig(
           style:
-              AppTextStyles.link(context)?.copyWith(fontSize: 14, height: 1) ??
+              context.appTypography.link?.copyWith(fontSize: 14, height: 1) ??
               const TextStyle(
                 color: Color(0xff0969da),
                 decoration: TextDecoration.underline,
@@ -154,7 +154,7 @@ class _PostDescriptionState extends State<PostDescription> {
     if (quillController != null) {
       return SliverList.list(
         children: <Widget>[
-          Text('Descrizione', style: AppTextStyles.section(context)),
+          Text('Descrizione', style: context.appTypography.section),
           const SizedBox(height: 8),
           QuillEditor(
             controller: quillController,
@@ -177,7 +177,7 @@ class _PostDescriptionState extends State<PostDescription> {
     }
 
     final children = <Widget>[
-      Text('Descrizione', style: AppTextStyles.section(context)),
+      Text('Descrizione', style: context.appTypography.section),
       ..._markdownWidgets,
     ];
 

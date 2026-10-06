@@ -1,6 +1,5 @@
-import 'package:flutter/widgets.dart';
 import 'package:intl/date_symbols.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 
 class EventsVerticalCalendarMonth extends StatelessWidget {
@@ -25,7 +24,7 @@ class EventsVerticalCalendarMonth extends StatelessWidget {
       children: <Widget>[
         Text(
           capitalizedMonthName,
-          style: AppTextStyles.calendarMonthSection(context),
+          style: _calendarMonthSection(context),
           textAlign: TextAlign.center,
         ),
         GridView.builder(
@@ -41,7 +40,7 @@ class EventsVerticalCalendarMonth extends StatelessWidget {
             return Center(
               child: Text(
                 shiftedWeekDays[index],
-                style: AppTextStyles.calendarWeekDay(context),
+                style: _calendarWeekDay(context),
               ),
             );
           },
@@ -49,4 +48,20 @@ class EventsVerticalCalendarMonth extends StatelessWidget {
       ],
     );
   }
+
+  /// Keeps weekday typography aligned with the Material date picker.
+  TextStyle? _calendarWeekDay(BuildContext context) =>
+      DatePickerTheme.defaults(context).weekdayStyle?.copyWith(
+        color: context.theme.brightness == Brightness.light
+            ? Colors.black45
+            : Colors.white54,
+      );
+
+  /// Applies the calendar's local month-heading contrast to titleMedium.
+  TextStyle? _calendarMonthSection(BuildContext context) =>
+      context.textTheme.titleMedium?.copyWith(
+        color: context.theme.brightness == Brightness.light
+            ? Colors.black87
+            : Colors.white70,
+      );
 }

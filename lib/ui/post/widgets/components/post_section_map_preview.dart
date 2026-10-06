@@ -2,7 +2,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/map_attribution.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
@@ -31,7 +30,7 @@ class PostSectionMapPreview extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             spacing: 16,
-            children: [Text('Mappa', style: AppTextStyles.section(context))],
+            children: [Text('Mappa', style: context.appTypography.section)],
           ),
           const SizedBox(height: 8),
           Stack(

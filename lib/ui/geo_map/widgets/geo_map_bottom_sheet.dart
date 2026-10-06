@@ -1,7 +1,6 @@
 import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/ui/core/themes/text_styles.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_surface.dart';
@@ -125,12 +124,12 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
                 children: <Widget>[
                   Text(
                     'Esplora Placeholder: nome di un luogo',
-                    style: AppTextStyles.title(context),
+                    style: context.textTheme.titleLarge,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Placeholder: nome di un paese',
-                    style: AppTextStyles.subtitle(context),
+                    style: context.textTheme.bodyMedium,
                   ),
                 ],
               ),
