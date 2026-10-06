@@ -1,12 +1,20 @@
 # Feature completion verification
 
-Completion review: **6 October 2026**. Execution HEAD remains
-`a35487852f9e45b9c7d4ff4541e4a5f04b329b9a` (`main`).
+Completion review: **6 October 2026**.
+
+- Original execution base: `a35487852f9e45b9c7d4ff4541e4a5f04b329b9a` (`main`).
+- Published implementation commit: `3494922d47b877dc016eb6feb64f22e647696d6d` (`main`).
+- Verification scope: the final checks below ran on the integrated local working
+  tree, including intentional changes not yet pushed, notably `go_router 18.0.2`
+  and the related UI redesign and test updates. These results do not claim that
+  the published implementation commit was verified in isolation. The local
+  changes are preserved work, not failures or blockers of this feature.
 
 Status: **IMPLEMENTATION COMPLETE — 32/32 tasks verified**.
 The developer supplied the ongoing-section UI in `ExploreScreen` and requested
-review and completion of the plan. The UI gate is closed. Canonical spec
-synchronization, archival, staging, commit and push were not performed.
+review and completion of the plan. The UI gate is closed. The implementation
+was subsequently committed and published as recorded above. Canonical spec
+synchronization and archival are covered by the separate finalization below.
 
 ## Supplied UI and review
 
@@ -27,7 +35,7 @@ component behavior was preserved; no visual redesign was introduced.
 
 ## Completion edits and preserved work
 
-This completion pass changed only the Explore widget tests and the change's
+The UI completion pass changed only the Explore widget tests and the change's
 proposal/design/tasks/verification documents. The developer's `ExploreScreen`
 implementation was preserved byte-for-byte, as were the dependencies and all
 other captured working-tree files. `go_router` remains **18.0.2**.
@@ -63,15 +71,15 @@ the full analyzer result is not represented as a clean PASS.
 
 The complete Definition of Done has been reviewed. Tasks 6.1–6.3 and 7.5 are
 now checked, with all prior technical contracts still covered. No technical
-or UI-design question remains open. The change is complete but remains in the
-active change directory pending a separate synchronization/archive request.
+or UI-design question remains open. The separate finalization request authorizes
+canonical synchronization and archival after strict validation.
 
 ## Previous technical-pass evidence (historical)
 
 The following records the earlier UI-gated state and its then-current failures;
 it is superseded by the completion status and results above.
 
-Execution HEAD: `a35487852f9e45b9c7d4ff4541e4a5f04b329b9a` (`main`).
+Original technical-pass execution base: `a35487852f9e45b9c7d4ff4541e4a5f04b329b9a` (`main`).
 
 Status: **READY / TECHNICAL IMPLEMENTATION COMPLETE, UI DESIGN GATED**.
 This is not completion or archival of the whole feature.
@@ -88,8 +96,10 @@ byte-for-byte at completion (including the intentional deletion). These cover
 submission fields, theme files, map/post components, weather, `pubspec.yaml`
 and `pubspec.lock`. Local `go_router` remains **18.0.2**. No dependency,
 backend, schema, generator, importer, search or calendar change was made by
-this implementation. No staging, commit, push, spec synchronization or archive
-operation was performed.
+this implementation. At that historical technical pass, staging, commit, push,
+spec synchronization and archival had not yet been performed. This is not the
+current publication status: the implementation was later committed and pushed
+as `3494922d47b877dc016eb6feb64f22e647696d6d`.
 
 Production changes:
 
@@ -192,5 +202,29 @@ open because no developer visual design was supplied. Task **7.5** remains open
 because its whole-feature Definition of Done requires the approved visual
 surface; its independent technical review has been performed. No new ongoing
 visual surface, placement, card, count, skeleton, empty/error UI or CTA was
-invented. The change must not be archived until the gate and final whole-feature
-verification are completed.
+invented. At that stage, archival was gated on visual and whole-feature
+verification. Those gates were subsequently satisfied as documented above.
+
+
+## OpenSpec finalization — 6 October 2026
+
+The final delta review found no material contradiction. All three capabilities
+were synchronized into canonical specifications: `home-ongoing-events`,
+`event-temporal-integrity` and `local-content-retrieval`. Existing unrelated
+requirements and all retained scenarios were preserved. The developer UI gate
+remains satisfied; the historical UI-gated status above is not the current state.
+
+`openspec validate add-home-ongoing-events --strict --no-interactive` passed
+before archival. `openspec validate --specs` passed for all 13 canonical specs.
+The archive location is
+`openspec/changes/archive/2026-10-06-add-home-ongoing-events/`.
+
+This finalization changes only OpenSpec documents. No Flutter checks were
+repeated, and no new Flutter verification result is claimed. All technical
+results above retain their original integrated-local-working-tree scope.
+
+Post-archive verification confirmed that each canonical requirement matches its
+archived delta, unrelated canonical requirements are unchanged, and no active
+copy remains. `git diff --check` passed and `git status --short` was executed.
+All captured production, test, dependency and unrelated OpenSpec files were
+verified unchanged by this finalization. No residual material finding emerged.
