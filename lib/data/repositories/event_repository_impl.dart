@@ -310,22 +310,57 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   }
 
   @override
-  Future<Result<List<Event>>> getNextEvents() async {
+  Future<Result<List<Event>>> getOngoingEvents(DateTime snapshotUtc) async {
     Query<EventEntity>? query;
 
-    final today = _eventTimePolicy.currentCalendarDate(_currentUtc);
-    final todayRange = _eventTimePolicy.utcRangeForCalendarDate(today);
-    final endCarrier = DateTime.utc(today.year, today.month, today.day + 30);
-    final endDate = EventCalendarDate(
-      endCarrier.year,
-      endCarrier.month,
-      endCarrier.day,
-    );
-    final endRange = _eventTimePolicy.utcRangeForCalendarDate(endDate);
+    try {
+      final nowUtc = snapshotUtc.toUtc();
+      final today = _eventTimePolicy.currentCalendarDate(nowUtc);
+      final day = _eventTimePolicy.utcRangeForCalendarDate(today);
+      final ranged = EventEntity_.endDate.greaterOrEqualDate(nowUtc);
+      final singleDay = EventEntity_.endDate.isNull().and(
+        EventEntity_.startDate.betweenDate(day.startUtc, day.endUtc),
+      );
+      final condition = _isNotDeleted
+          .and(EventEntity_.startDate.lessOrEqualDate(nowUtc))
+          .and(ranged.or(singleDay));
+      final builder = _box
+          .query(condition)
+          .order(EventEntity_.startDate)
+          .order(EventEntity_.remoteId, flags: Order.unsigned);
+      query = builder.build();
+
+      final results = await query.findAsync();
+
+      return Result.success(results.map((entity) => entity.toModel()).toList());
+    } on Exception catch (exception, stackTrace) {
+      logger.log(
+        const EntityLoadFailed('event', method: 'getOngoingEvents'),
+        error: exception,
+        stackTrace: stackTrace,
+      );
+      return Result.error(exception);
+    } finally {
+      query?.close();
+    }
+  }
+
+  @override
+  Future<Result<List<Event>>> getNextEvents(DateTime snapshotUtc) async {
+    Query<EventEntity>? query;
 
     try {
+      final nowUtc = snapshotUtc.toUtc();
+      final today = _eventTimePolicy.currentCalendarDate(nowUtc);
+      final endCarrier = DateTime.utc(today.year, today.month, today.day + 30);
+      final endDate = EventCalendarDate(
+        endCarrier.year,
+        endCarrier.month,
+        endCarrier.day,
+      );
+      final endRange = _eventTimePolicy.utcRangeForCalendarDate(endDate);
       final condition = EventEntity_.startDate
-          .greaterOrEqualDate(todayRange.startUtc)
+          .greaterThanDate(nowUtc)
           .and(EventEntity_.startDate.lessOrEqualDate(endRange.endUtc))
           .and(_isNotDeleted);
 

@@ -1,66 +1,37 @@
 import 'dart:async';
 
-import 'package:cached_network_image_ce/cached_network_image.dart'
-    show CacheManager;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
-import 'package:moliseis/data/dtos/city_dto.dart';
-import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
-import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
-import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
-import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
-import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
-import 'package:moliseis/data/services/url_launch_service.dart';
-import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
-import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
-import 'package:moliseis/domain/repositories/city_repository.dart';
-import 'package:moliseis/domain/repositories/content_submission_repository.dart';
-import 'package:moliseis/domain/repositories/event_repository.dart';
-import 'package:moliseis/domain/repositories/place_repository.dart';
-import 'package:moliseis/domain/repositories/search_repository.dart';
-import 'package:moliseis/domain/repositories/settings_repository.dart';
-import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
-import 'package:moliseis/domain/use-cases/sync_use_case.dart';
-import 'package:moliseis/main.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/routing/router.dart';
-import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
-import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
-import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
-import 'package:moliseis/utils/logging/logging.dart';
-import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
-import 'package:provider/single_child_widget.dart';
 
-import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
 import '../support/mock_gotrue_client.dart';
-import '../support/mock_logger.dart';
-import '../support/recording_tile_http_client.dart';
+import '../support/sync_harness.dart';
 
 void main() {
   group('buildAppRouter sync redirect', () {
     testWidgets('unknown route renders the route error screen', (tester) async {
-      final harness = _SyncHarness();
-      final router = _buildTestRouterApp(harness);
+      final harness = SyncHarness();
+      final router = buildSyncRouterApp(harness);
 
       await tester.pumpWidget(router.app);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       router.router.go('/home/does-not-exist');
       await tester.pumpAndSettle();
@@ -73,11 +44,11 @@ void main() {
     });
 
     testWidgets('cold start without a due sync stays on /home', (tester) async {
-      final harness = _SyncHarness();
-      final router = _buildTestRouterApp(harness);
+      final harness = SyncHarness();
+      final router = buildSyncRouterApp(harness);
 
       await tester.pumpWidget(router.app);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       expect(router.router.routeInformationProvider.value.uri.path, '/home');
       expect(find.byType(SyncScreen), findsNothing);
@@ -86,11 +57,11 @@ void main() {
     testWidgets('automatic sync from /home preserves /home and returns', (
       tester,
     ) async {
-      final harness = _SyncHarness(autoSync: true);
-      final router = _buildTestRouterApp(harness);
+      final harness = SyncHarness(autoSync: true);
+      final router = buildSyncRouterApp(harness);
 
       await tester.pumpWidget(router.app);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       final uri = router.router.routeInformationProvider.value.uri;
       expect(uri.path, RoutePaths.sync);
@@ -109,15 +80,15 @@ void main() {
     testWidgets('manual sync from /home preserves /home and returns', (
       tester,
     ) async {
-      final harness = _SyncHarness();
-      final router = _buildTestRouterApp(harness);
+      final harness = SyncHarness();
+      final router = buildSyncRouterApp(harness);
 
       await tester.pumpWidget(router.app);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
       expect(router.router.routeInformationProvider.value.uri.path, '/home');
 
       unawaited(harness.viewModel.sync.execute(true));
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       final uri = router.router.routeInformationProvider.value.uri;
       expect(uri.path, RoutePaths.sync);
@@ -139,28 +110,28 @@ void main() {
       final eventRepository = FakeEventRepository(
         getByIdResults: <int, Result<Event>>{1: Result.success(event)},
       );
-      final harness = _SyncHarness();
-      final router = _buildTestRouterApp(
+      final harness = SyncHarness();
+      final router = buildSyncRouterApp(
         harness,
         eventRepository: eventRepository,
       );
 
       await tester.pumpWidget(router.app);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       router.router.goNamed(
         RouteNames.homePost,
         pathParameters: <String, String>{'id': '1'},
         queryParameters: <String, String>{'type': 'event'},
       );
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       var uri = router.router.routeInformationProvider.value.uri;
       expect(uri.path, '/home/posts/1');
       expect(uri.queryParameters['type'], 'event');
 
       unawaited(harness.viewModel.sync.execute(true));
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       uri = router.router.routeInformationProvider.value.uri;
       expect(uri.path, RoutePaths.sync);
@@ -175,20 +146,20 @@ void main() {
     });
 
     testWidgets('non-fatal error returns to the preserved URI', (tester) async {
-      final harness = _SyncHarness(
+      final harness = SyncHarness(
         cityResult: Result.error(TestException('sync failed')),
       );
-      final router = _buildTestRouterApp(harness);
+      final router = buildSyncRouterApp(harness);
 
       await tester.pumpWidget(router.app);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       unawaited(harness.viewModel.sync.execute(true));
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
       expect(router.router.routeInformationProvider.value.uri.path, '/sync');
 
       harness.release();
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pump(const Duration(milliseconds: 400));
@@ -206,14 +177,14 @@ void main() {
     });
 
     testWidgets('fatal first-sync error remains on /sync', (tester) async {
-      final harness = _SyncHarness(
+      final harness = SyncHarness(
         autoSync: true,
         cityResult: Result.error(TestException('sync failed')),
       );
-      final router = _buildTestRouterApp(harness);
+      final router = buildSyncRouterApp(harness);
 
       await tester.pumpWidget(router.app);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
       expect(router.router.routeInformationProvider.value.uri.path, '/sync');
 
       harness.release();
@@ -235,20 +206,20 @@ void main() {
       testWidgets(
         'rejects invalid from value "$from" and falls back to /home',
         (tester) async {
-          final harness = _SyncHarness();
-          final router = _buildTestRouterApp(harness);
+          final harness = SyncHarness();
+          final router = buildSyncRouterApp(harness);
 
           await tester.pumpWidget(router.app);
-          await _pumpRedirects(tester);
+          await pumpSyncRedirects(tester);
 
           // Keep the command running while substituting the crafted value.
           unawaited(harness.viewModel.sync.execute(true));
-          await _pumpRedirects(tester);
+          await pumpSyncRedirects(tester);
 
           router.router.go(
             '${RoutePaths.sync}?from=${Uri.encodeComponent(from)}',
           );
-          await _pumpRedirects(tester);
+          await pumpSyncRedirects(tester);
           expect(
             router.router.routeInformationProvider.value.uri.path,
             '/sync',
@@ -271,20 +242,20 @@ void main() {
       final auth = ControllableAdminAuth(
         initialUser: makeAuthUser(isAdmin: true),
       );
-      final harness = _SyncHarness();
-      final router = _buildTestRouterApp(harness, auth: auth);
+      final harness = SyncHarness();
+      final router = buildSyncRouterApp(harness, auth: auth);
 
       router.router.go(RoutePaths.admin);
       unawaited(harness.viewModel.sync.execute(true));
       await tester.pumpWidget(router.app);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       final syncUri = router.router.routeInformationProvider.value.uri;
       expect(syncUri.path, RoutePaths.sync);
       expect(syncUri.queryParameters['from'], RoutePaths.admin);
 
       harness.release();
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       expect(
         router.router.routeInformationProvider.value.uri.path,
@@ -296,20 +267,20 @@ void main() {
       'sync restores an anonymous user to /admin/login after completing',
       (tester) async {
         final auth = ControllableAdminAuth();
-        final harness = _SyncHarness();
-        final router = _buildTestRouterApp(harness, auth: auth);
+        final harness = SyncHarness();
+        final router = buildSyncRouterApp(harness, auth: auth);
 
         router.router.go(RoutePaths.admin);
         unawaited(harness.viewModel.sync.execute(true));
         await tester.pumpWidget(router.app);
-        await _pumpRedirects(tester);
+        await pumpSyncRedirects(tester);
 
         final syncUri = router.router.routeInformationProvider.value.uri;
         expect(syncUri.path, RoutePaths.sync);
         expect(syncUri.queryParameters['from'], RoutePaths.admin);
 
         harness.release();
-        await _pumpRedirects(tester);
+        await pumpSyncRedirects(tester);
 
         expect(
           router.router.routeInformationProvider.value.uri.path,
@@ -317,6 +288,113 @@ void main() {
         );
       },
     );
+  });
+
+  group('Home temporal discovery after sync', () {
+    for (final trigger in ['menu', 'pull-to-refresh']) {
+      testWidgets(
+        '$trigger refreshes both collections after the cache commit',
+        (tester) async {
+          if (trigger == 'pull-to-refresh') {
+            debugDefaultTargetPlatformOverride = TargetPlatform.android;
+            addTearDown(() => debugDefaultTargetPlatformOverride = null);
+          }
+          await tester.binding.setSurfaceSize(
+            trigger == 'menu' ? const Size(1000, 1800) : const Size(400, 600),
+          );
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final repository = FakeEventRepository();
+          final active = makeEvent(remoteId: 51);
+          final future = makeEvent(remoteId: 52);
+          var committed = false;
+          final harness = SyncHarness(
+            onCommit: () {
+              committed = true;
+              repository
+                ..getOngoingEventsResult = Result.success([active])
+                ..getNextEventsResult = Result.success([future]);
+            },
+          );
+          final fixture = buildSyncRouterApp(
+            harness,
+            eventRepository: repository,
+          );
+          await tester.pumpWidget(fixture.app);
+          await tester.pumpAndSettle();
+          expect(repository.getOngoingEventsCallCount, 1);
+          expect(repository.getNextEventsCallCount, 1);
+          if (trigger == 'menu') {
+            await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+          } else {
+            final scroll = find.byType(CustomScrollView).first;
+            await tester.dragFrom(
+              tester.getTopLeft(scroll) + const Offset(150, 180),
+              const Offset(0, 1000),
+            );
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 300));
+          }
+          await pumpSyncRedirects(tester);
+          expect(fixture.router.state.matchedLocation, RoutePaths.sync);
+          expect(committed, isFalse);
+          expect(repository.getOngoingEventsCallCount, 1);
+          harness.release();
+          await tester.pumpAndSettle();
+          expect(committed, isTrue);
+          expect(fixture.router.state.matchedLocation, RoutePaths.home);
+          final vm = tester
+              .widget<ExploreScreen>(find.byType(ExploreScreen))
+              .eventViewModel;
+          expect(vm.ongoing, [active]);
+          expect(vm.next, [future]);
+          expect(repository.getOngoingEventsCallCount, 2);
+          expect(repository.getNextEventsCallCount, 2);
+          expect(
+            repository.receivedOngoingSnapshots,
+            repository.receivedNextSnapshots,
+          );
+          expect(tester.takeException(), isNull);
+          debugDefaultTargetPlatformOverride = null;
+        },
+      );
+    }
+
+    testWidgets('non-fatal sync error reloads valid cached discovery', (
+      tester,
+    ) async {
+      final active = makeEvent(remoteId: 61);
+      final future = makeEvent(remoteId: 62);
+      final repository = FakeEventRepository()
+        ..getOngoingEventsResult = Result.success([active])
+        ..getNextEventsResult = Result.success([future]);
+      final harness = SyncHarness(
+        cityResult: Result.error(TestException('offline')),
+      );
+      final fixture = buildSyncRouterApp(harness, eventRepository: repository);
+      await tester.pumpWidget(fixture.app);
+      await tester.pumpAndSettle();
+      unawaited(harness.viewModel.sync.execute(true));
+      await pumpSyncRedirects(tester);
+      harness.release();
+      await pumpSyncRedirects(tester);
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 400));
+      final vm = tester
+          .widget<ExploreScreen>(find.byType(ExploreScreen))
+          .eventViewModel;
+      expect(fixture.router.state.matchedLocation, RoutePaths.home);
+      expect(vm.ongoing, [active]);
+      expect(vm.next, [future]);
+      expect(repository.getOngoingEventsCallCount, 2);
+      expect(repository.getNextEventsCallCount, 2);
+      expect(
+        find.text(
+          "Si è verificato un errore durante l'aggiornamento dei contenuti",
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('buildAppRouter sync restoration', () {
@@ -328,18 +406,18 @@ void main() {
       final holder = _SyncRestorationHolder(settingsFactory: () => settings);
 
       await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
       final before = holder.fixture!;
 
       before.router.go(RoutePaths.settings);
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
       expect(
         before.router.routeInformationProvider.value.uri.path,
         RoutePaths.settings,
       );
 
       unawaited(before.harness.viewModel.sync.execute(true));
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
       expect(
         before.router.routeInformationProvider.value.uri.path,
         RoutePaths.sync,
@@ -355,7 +433,7 @@ void main() {
       );
 
       await tester.restartAndRestore();
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       final after = holder.fixture!;
       expect(after, isNot(same(before)));
@@ -379,7 +457,7 @@ void main() {
       );
 
       await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
       final before = holder.fixture!;
       expect(before.harness.viewModel.sync.running, isTrue);
       expect(
@@ -397,7 +475,7 @@ void main() {
       );
 
       await tester.restartAndRestore();
-      await _pumpRedirects(tester);
+      await pumpSyncRedirects(tester);
 
       final after = holder.fixture!;
       expect(after, isNot(same(before)));
@@ -425,8 +503,8 @@ void main() {
 
   group('MoliseIsApp router lifecycle', () {
     testWidgets('theme rebuild keeps the same router and URI', (tester) async {
-      final harness = _SyncHarness();
-      await tester.pumpWidget(_buildRealApp(harness));
+      final harness = SyncHarness();
+      await tester.pumpWidget(buildRealSyncApp(harness));
       await tester.pumpAndSettle();
 
       final exploreContext = tester.element(find.byType(ExploreScreen));
@@ -466,53 +544,10 @@ const List<String> _invalidFromValues = <String>[
   '/home/does-not-exist',
 ];
 
-/// Pumps enough frames for the asynchronous sync redirect chain to complete
-/// without settling on the indeterminate loading spinner.
-Future<void> _pumpRedirects(WidgetTester tester) async {
-  for (var i = 0; i < 12; i++) {
-    await tester.pump();
-  }
-}
-
-/// A [SyncViewModel] whose running sync is controlled through [gate].
-final class _SyncHarness {
-  _SyncHarness({
-    bool autoSync = false,
-    bool gated = true,
-    FakeSettingsRepository? settings,
-    Result<List<CityDto>> cityResult = const Result.success(<CityDto>[]),
-  }) {
-    gate = gated ? Completer<void>() : null;
-    this.settings =
-        settings ??
-        FakeSettingsRepository(lastSyncedAt: autoSync ? null : DateTime.now());
-    final useCase = SyncUseCase(
-      cityRepository: _GatedCityRepository(
-        gate: gate,
-        prepareResult: cityResult,
-      ),
-      eventRepository: FakeEventRepository(),
-      mediaRepository: FakeMediaRepository(),
-      placeRepository: FakePlaceRepository(),
-      settingsRepository: this.settings,
-      transactionCoordinator: FakeTransactionCoordinator(),
-    );
-    viewModel = SyncViewModel(syncUseCase: useCase);
-  }
-
-  Completer<void>? gate;
-  late final FakeSettingsRepository settings;
-  late final SyncViewModel viewModel;
-
-  void release() {
-    gate?.complete();
-  }
-}
-
 /// Rebuilds the production router with a fresh [SyncViewModel] on restoration.
 final class _SyncRestorationFixture {
   _SyncRestorationFixture({required FakeSettingsRepository settings}) {
-    harness = _SyncHarness(settings: settings);
+    harness = SyncHarness(settings: settings);
     auth = ControllableAdminAuth();
     router = buildAppRouter(
       syncViewModel: harness.viewModel,
@@ -521,11 +556,11 @@ final class _SyncRestorationFixture {
   }
 
   late final ControllableAdminAuth auth;
-  late final _SyncHarness harness;
+  late final SyncHarness harness;
   late final GoRouter router;
 
   Widget get app => MultiProvider(
-    providers: _buildProviders(harness, auth: auth),
+    providers: buildSyncProviders(harness, auth: auth),
     child: MaterialApp.router(
       scaffoldMessengerKey: $scaffoldMessengerKey,
       restorationScopeId: 'app',
@@ -594,152 +629,4 @@ class _RestorableSyncHarnessState extends State<_RestorableSyncHarness> {
 
   @override
   Widget build(BuildContext context) => fixture.app;
-}
-
-/// Gates the city preparation so the whole sync is observable as running.
-final class _GatedCityRepository extends CityRepository {
-  _GatedCityRepository({required this.gate, required this.prepareResult});
-
-  final Completer<void>? gate;
-  final Result<List<CityDto>> prepareResult;
-
-  @override
-  Future<Result<List<CityDto>>> prepareSync() async {
-    if (gate != null) {
-      await gate!.future;
-    }
-    return prepareResult;
-  }
-
-  @override
-  Result<void> commitSync(List<CityDto> dtos) => const Result.success(null);
-}
-
-/// A [SearchRepository] fake that never surfaces persisted data.
-final class _FakeSearchRepository implements SearchRepository {
-  @override
-  Future<Result<void>> addToPastSearches(String text) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<List<ContentBase>>> getResultsByQuery(String text) async =>
-      const Result.success(<ContentBase>[]);
-
-  @override
-  Future<Result<List<String>>> getPastSearches() async =>
-      const Result.success(<String>[]);
-
-  @override
-  Future<Result<void>> removeFromPastSearches(String text) async =>
-      const Result.success(null);
-}
-
-/// Builds the production router with the full provider tree the real screens
-/// require, plus the controlled [harness] sync view model.
-({GoRouter router, Widget app, ControllableAdminAuth auth}) _buildTestRouterApp(
-  _SyncHarness harness, {
-  FakeEventRepository? eventRepository,
-  ControllableAdminAuth? auth,
-}) {
-  final authHarness = auth ?? ControllableAdminAuth();
-  final router = buildAppRouter(
-    syncViewModel: harness.viewModel,
-    adminAuthViewModel: authHarness.viewModel,
-  );
-  addTearDown(authHarness.dispose);
-  addTearDown(router.dispose);
-
-  final app = MultiProvider(
-    providers: _buildProviders(
-      harness,
-      auth: authHarness,
-      eventRepository: eventRepository,
-    ),
-    child: MaterialApp.router(
-      scaffoldMessengerKey: $scaffoldMessengerKey,
-      routerConfig: router,
-    ),
-  );
-
-  return (router: router, app: app, auth: authHarness);
-}
-
-/// Builds the production app root so the router lifecycle under theme rebuilds
-/// is exercised exactly as shipped.
-Widget _buildRealApp(_SyncHarness harness) {
-  final auth = ControllableAdminAuth();
-  addTearDown(auth.dispose);
-
-  return MultiProvider(
-    providers: _buildProviders(harness, auth: auth),
-    child: const MoliseIsApp(),
-  );
-}
-
-/// The providers the real screens resolved from the router tree require.
-List<SingleChildWidget> _buildProviders(
-  _SyncHarness harness, {
-  required ControllableAdminAuth auth,
-  FakeEventRepository? eventRepository,
-}) {
-  final eventRepo = eventRepository ?? FakeEventRepository();
-  final placeRepo = FakePlaceRepository();
-  final logger = MockLogger();
-  final weatherApiClient = CachedWeatherApiClient(
-    weatherApiClient: FakeWeatherApiClient(),
-    currentWeatherCache:
-        LruCache<
-          String,
-          WeatherForecastDataCacheEntry<CurrentWeatherForecastData>
-        >(maxSize: 8),
-    hourlyWeatherCache:
-        LruCache<
-          String,
-          WeatherForecastDataCacheEntry<HourlyWeatherForecastData>
-        >(maxSize: 8),
-    dailyWeatherCache:
-        LruCache<
-          String,
-          WeatherForecastDataCacheEntry<DailyWeatherForecastData>
-        >(maxSize: 8),
-    logger: logger,
-  );
-  final settingsRepository = FakeSettingsRepository();
-
-  return <SingleChildWidget>[
-    Provider<AdminContentSubmissionRepository>.value(
-      value: FakeAdminContentSubmissionRepository(),
-    ),
-    Provider<ContentSubmissionRepository>.value(
-      value: FakeContentSubmissionRepository(),
-    ),
-    Provider<EventRepository>.value(value: eventRepo),
-    Provider<PlaceRepository>.value(value: placeRepo),
-    Provider<SearchRepository>.value(value: _FakeSearchRepository()),
-    Provider<SettingsRepository>.value(value: settingsRepository),
-    Provider<CachedWeatherApiClient>.value(value: weatherApiClient),
-    Provider<CacheManager>.value(value: FakeCacheManager()),
-    Provider<http.Client>.value(value: RecordingTileHttpClient()),
-    Provider<Logger>.value(value: logger),
-    Provider<UrlLaunchService>(create: (_) => UrlLaunchService(logger: logger)),
-    ChangeNotifierProvider<FavouriteViewModel>(
-      create: (_) => FavouriteViewModel(
-        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
-          eventRepository: eventRepo,
-          placeRepository: placeRepo,
-        ),
-      ),
-    ),
-    ChangeNotifierProvider<ThemeViewModel>(
-      create: (_) => ThemeViewModel(settingsRepository: settingsRepository),
-    ),
-    ChangeNotifierProvider<SettingsViewModel>(
-      create: (_) => SettingsViewModel(
-        settingsRepository: settingsRepository,
-        sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
-      ),
-    ),
-    ChangeNotifierProvider<SyncViewModel>.value(value: harness.viewModel),
-    ChangeNotifierProvider<AdminAuthViewModel>.value(value: auth.viewModel),
-  ];
 }

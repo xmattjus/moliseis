@@ -42,8 +42,20 @@ abstract class EventRepository with Synchronizable<EventDto> {
   /// Returns the event with the given [id].
   Future<Result<Event>> getById(int id);
 
-  /// Returns up to six non-deleted upcoming events, ordered by start.
-  Future<Result<List<Event>>> getNextEvents();
+  /// Returns all non-deleted events active at the supplied [snapshotUtc].
+  ///
+  /// Ranged bounds are inclusive. Null-end events remain within their Rome
+  /// civil start day and must already have started. Results are ordered by
+  /// start, then identity, without a cap or an all-day classification branch.
+  Future<Result<List<Event>>> getOngoingEvents(DateTime snapshotUtc);
+
+  /// Returns up to six non-deleted events starting after [snapshotUtc].
+  ///
+  /// Starts are ordered ascending and bounded by the inclusive final
+  /// microsecond of the Rome civil day thirty days after the snapshot's day.
+  /// Home supplies the same snapshot to this and [getOngoingEvents]; neither
+  /// discovery operation samples a separate clock.
+  Future<Result<List<Event>>> getNextEvents(DateTime snapshotUtc);
 
   /// Returns the IDs of all events marked as favourites.
   Future<Result<List<int>>> getFavouriteEventIds();

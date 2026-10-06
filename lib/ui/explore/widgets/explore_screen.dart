@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
@@ -8,6 +9,7 @@ import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_parameters.dart';
+import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/category/widgets/category_button.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_cta_button.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
@@ -45,9 +47,70 @@ class ExploreScreen extends StatefulWidget {
 
 class _ExploreScreenState extends State<ExploreScreen> {
   final _searchController = SearchController();
+  GoRouter? _router;
+  late EventViewModel _eventViewModel;
+  bool _wasHomeVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _eventViewModel = widget.eventViewModel;
+  }
+
+  @override
+  void didUpdateWidget(covariant ExploreScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _eventViewModel = widget.eventViewModel;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final router = GoRouter.of(context);
+    if (identical(router, _router)) return;
+    _router?.routerDelegate.removeListener(_onRouteChanged);
+    _router = router;
+    // The route provider owns initial discovery, including recreated Home.
+    _wasHomeVisible = _isHomeVisible(router);
+    router.routerDelegate.addListener(_onRouteChanged);
+  }
+
+  void _onRouteChanged() {
+    if (!mounted) return;
+    final router = _router;
+    if (router == null) return;
+    final isHomeVisible = _isHomeVisible(router);
+    final returnedHome = !_wasHomeVisible && isHomeVisible;
+    _wasHomeVisible = isHomeVisible;
+    if (!returnedHome) return;
+    final viewModel = _eventViewModel;
+
+    void refresh() {
+      if (!mounted) return;
+      if (!identical(_router, router) ||
+          !identical(_eventViewModel, viewModel) ||
+          !_isHomeVisible(router)) {
+        return;
+      }
+      unawaited(viewModel.refreshHomeDiscovery());
+    }
+
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => refresh());
+    } else {
+      refresh();
+    }
+  }
+
+  // An error route can have no matches while retained Home is still mounted.
+  bool _isHomeVisible(GoRouter router) =>
+      router.routerDelegate.currentConfiguration.matches.isNotEmpty &&
+      router.state.matchedLocation == RoutePaths.home;
 
   @override
   void dispose() {
+    _router?.routerDelegate.removeListener(_onRouteChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -151,13 +214,66 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
               const SliverToBoxAdapter(
                 child: TextSectionDivider(
+                  'Eventi in corso',
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                ),
+              ),
+              ListenableBuilder(
+                listenable: widget.eventViewModel.loadOngoing,
+                builder: (context, _) {
+                  if (widget.eventViewModel.loadOngoing.completed) {
+                    return SliverPadding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 16),
+                      sliver: ContentSliverGrid(
+                        widget.eventViewModel.ongoing,
+                        onPressed: (content) {
+                          GoRouter.of(context).goNamed(
+                            RouteNames.homePost,
+                            pathParameters: {'id': content.remoteId.toString()},
+                            queryParameters: {
+                              'type': RouteParameters.contentTypeSlug(
+                                content is Event
+                                    ? ContentType.event
+                                    : ContentType.place,
+                              ),
+                            },
+                          );
+                        },
+                      ),
+                    );
+                  }
+
+                  if (widget.eventViewModel.loadOngoing.error) {
+                    return SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      sliver: SliverToBoxAdapter(
+                        child: EmptyView.error(
+                          text: const Text(
+                            'Si è verificato un errore durante il caricamento.',
+                          ),
+                          action: TextButton(
+                            onPressed: () => unawaited(
+                              widget.eventViewModel.refreshHomeDiscovery(),
+                            ),
+                            child: const Text('Riprova'),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return const SkeletonContentSliverGrid();
+                },
+              ),
+              const SliverToBoxAdapter(
+                child: TextSectionDivider(
                   'Prossimi eventi',
                   padding: EdgeInsets.symmetric(horizontal: 16),
                 ),
               ),
               ListenableBuilder(
                 listenable: widget.eventViewModel.loadNext,
-                builder: (context, child) {
+                builder: (context, _) {
                   if (widget.eventViewModel.loadNext.completed) {
                     return SliverPadding(
                       padding: const EdgeInsets.only(top: 8, bottom: 16),
@@ -190,7 +306,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           ),
                           action: TextButton(
                             onPressed: () => unawaited(
-                              widget.eventViewModel.loadNext.execute(),
+                              widget.eventViewModel.refreshHomeDiscovery(),
                             ),
                             child: const Text('Riprova'),
                           ),
@@ -235,7 +351,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
               ListenableBuilder(
                 listenable: widget.exploreViewModel.loadLatest,
-                builder: (context, child) {
+                builder: (context, _) {
                   if (widget.exploreViewModel.loadLatest.completed) {
                     return ContentSliverGrid(
                       widget.exploreViewModel.latest,

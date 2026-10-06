@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Completer, unawaited;
 import 'dart:collection' show UnmodifiableListView;
 
 import 'package:material_ui/material_ui.dart';
@@ -19,7 +19,8 @@ class EventViewModel extends ChangeNotifier {
     loadAll = Command0(_loadAll);
     unawaited(loadAll.execute());
     loadByDate = Command1(_loadByDate);
-    loadNext = Command0(_loadNext);
+    loadOngoing = Command1(_loadOngoing);
+    loadNext = Command1(_loadNext);
   }
 
   final EventRepository _eventRepository;
@@ -28,18 +29,31 @@ class EventViewModel extends ChangeNotifier {
 
   late Command0<void> loadAll;
   late Command1<void, EventCalendarDate> loadByDate;
-  late Command0<void> loadNext;
+
+  /// Retrieves ongoing models for the supplied discovery-pass UTC snapshot.
+  late Command1<void, DateTime> loadOngoing;
+
+  /// Retrieves upcoming models for the same discovery-pass UTC snapshot.
+  late Command1<void, DateTime> loadNext;
 
   var _all = <Event>[];
   var _byDate = <Event>[];
   EventCalendarDate? _loadedDate;
   int? _loadedDateRevision;
   var _yearlyRevision = 0;
+  var _ongoing = <Event>[];
   var _next = <Event>[];
+  bool _disposed = false;
+  bool _homeRefreshPending = false;
+  Future<void>? _homeRefresh;
+  final _commandWaits = <void Function()>{};
   late EventCalendarDate _selectedDate = currentCalendarDate;
 
   UnmodifiableListView<Event> get all => UnmodifiableListView(_all);
   UnmodifiableListView<Event> get byMonth => UnmodifiableListView(_byDate);
+
+  /// Last successful ongoing collection in repository order, exposed read-only.
+  UnmodifiableListView<Event> get ongoing => UnmodifiableListView(_ongoing);
   UnmodifiableListView<Event> get next => UnmodifiableListView(_next);
   EventCalendarDate get selectedDate => _selectedDate;
 
@@ -79,6 +93,7 @@ class EventViewModel extends ChangeNotifier {
 
   Future<Result<void>> _loadAll() async {
     final result = await _eventRepository.getByCurrentYear();
+    if (_disposed) return result.map((_) {});
 
     final events = result.getOrNull();
     if (events != null) {
@@ -141,12 +156,93 @@ class EventViewModel extends ChangeNotifier {
     return month != 0 ? month : left.day.compareTo(right.day);
   }
 
-  Future<Result<void>> _loadNext() async {
-    final result = await _eventRepository.getNextEvents();
+  Future<Result<void>> _loadOngoing(DateTime snapshotUtc) async {
+    if (_disposed) return const Result.success(null);
+    final result = await _eventRepository.getOngoingEvents(snapshotUtc);
+    if (_disposed) return result.map((_) {});
+
+    return result.map((events) {
+      _ongoing = events;
+      notifyListeners();
+    });
+  }
+
+  Future<Result<void>> _loadNext(DateTime snapshotUtc) async {
+    if (_disposed) return const Result.success(null);
+    final result = await _eventRepository.getNextEvents(snapshotUtc);
+    if (_disposed) return result.map((_) {});
 
     return result.map((events) {
       _next = events;
       notifyListeners();
     });
+  }
+
+  /// Refreshes both discovery collections with one UTC snapshot per pass.
+  ///
+  /// Concurrent requests share the in-flight Future and request a subsequent
+  /// coalesced pass, whose snapshot is captured only when that pass starts.
+  /// Each retrieval command exposes its own error and retains its valid state.
+  Future<void> refreshHomeDiscovery() {
+    if (_disposed) return Future.value();
+    _homeRefreshPending = true;
+    final runningRefresh = _homeRefresh;
+    if (runningRefresh != null) return runningRefresh;
+
+    final completion = Completer<void>();
+    _homeRefresh = completion.future;
+    unawaited(_runHomeDiscovery(completion));
+    return completion.future;
+  }
+
+  Future<void> _runHomeDiscovery(Completer<void> completion) async {
+    try {
+      while (!_disposed && _homeRefreshPending) {
+        _homeRefreshPending = false;
+        while (!_disposed && (loadOngoing.running || loadNext.running)) {
+          await _waitForCommand(loadOngoing);
+          await _waitForCommand(loadNext);
+        }
+        if (_disposed) break;
+
+        final snapshotUtc = _nowUtc().toUtc();
+        await loadOngoing.execute(snapshotUtc);
+        if (_disposed) break;
+        await loadNext.execute(snapshotUtc);
+      }
+      _homeRefresh = null;
+      completion.complete();
+    } on Object catch (error, stackTrace) {
+      _homeRefresh = null;
+      completion.completeError(error, stackTrace);
+    }
+  }
+
+  Future<void> _waitForCommand(Command<void> command) {
+    if (_disposed || !command.running) return Future.value();
+    final completion = Completer<void>();
+    late void Function() listener;
+    void finish() {
+      command.removeListener(listener);
+      _commandWaits.remove(finish);
+      if (!completion.isCompleted) completion.complete();
+    }
+
+    listener = () {
+      if (!command.running) finish();
+    };
+    _commandWaits.add(finish);
+    command.addListener(listener);
+    return completion.future;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _homeRefreshPending = false;
+    for (final finish in _commandWaits.toList()) {
+      finish();
+    }
+    super.dispose();
   }
 }

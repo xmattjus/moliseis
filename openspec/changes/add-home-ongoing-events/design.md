@@ -1,6 +1,6 @@
 ## Context
 
-Motivation in `proposal.md`. The original temporal audit covered checkout `main` at `1743a285c7771cd61f2aab101f0bbe56d4aa9c18` and planning commit `d3a5cf0a61c48e44269909dde952956f70d786df`. This plan is reconciled after the focused production gates of `optimize-local-content-retrieval` passed, against its optimized working tree based on HEAD `93226baf09ed37301dca38bbfd3f0c649e93a97b`. The optimization changes retrieval ownership, not production temporal membership. Pre-existing changes to submission/theme/post/weather and pubspec remain unrelated and must be preserved.
+Motivation in `proposal.md`. The original temporal audit covered checkout `main` at `1743a285c7771cd61f2aab101f0bbe56d4aa9c18` and planning commit `d3a5cf0a61c48e44269909dde952956f70d786df`. This plan is now reconciled against `main` HEAD `a35487852f9e45b9c7d4ff4541e4a5f04b329b9a`, after `optimize-local-content-retrieval` completed, was archived and was synchronized into the canonical `local-content-retrieval` specification. The optimization changes retrieval ownership, not production temporal membership. The developer's local working tree also intentionally contains a `go_router 18.0.2` dependency update that is not yet pushed to `main`; implementation must preserve that local update and must not infer or perform a downgrade from the `18.0.1` lockfile currently visible on GitHub. Other unrelated local changes must likewise be preserved.
 
 ### Evidence and differences from the backlog
 
@@ -18,6 +18,8 @@ Motivation in `proposal.md`. The original temporal audit covered checkout `main`
 ### Specification compatibility
 
 Canonical `event-temporal-integrity` currently allows starts in the inclusive window from midnight; the delta explicitly modifies the entire upcoming requirement, not annual/day overlap. Archives `2026-09-30-harden-event-temporal-semantics` and `2026-08-30-repair-event-time-review-findings` deliberately preserved that contract and deferred ongoing: this is the subsequent intentional change, not retroactive hardening of the archives. Archive `2026-10-01-add-event-all-day-semantics` and canonical `event-all-day-semantics` establish absent meaningful time and inclusive bounds: none of their requirements changes. The subsequent provenance change (`2026-10-03-add-external-event-provenance-moderation`) also concerns import identity, not membership. An explicit final date equal to the initial date is valid and produces a non-null end: do not reduce all single-day allDay events to the null-end case alone.
+
+Canonical `local-content-retrieval`, synchronized by archived change `2026-10-05-optimize-local-content-retrieval`, now owns the rule that active list discovery returns final domain models directly, publishes successful collections atomically and exposes discovery failure on one UI-facing Command. This change extends those guarantees to the new ongoing-event Home discovery rather than recreating ID-first plumbing. Temporal membership itself remains owned by `event-temporal-integrity` and `home-ongoing-events`.
 
 ## Goals / Non-Goals
 
@@ -55,11 +57,11 @@ Update contract documentation. Adapt the three regressions in `Rome query bounda
 
 ### 3. EventViewModel state and commands
 
-Add `_ongoing` and its UnmodifiableListView getter alongside the existing `_next` state. Use `Command1<void, DateTime>` for `loadOngoing` and convert `loadNext` from Command0 to `Command1<void, DateTime>`. `_loadOngoing(DateTime snapshotUtc)` and `_loadNext(DateTime snapshotUtc)` forward that argument unchanged to `getOngoingEvents` and `getNextEvents`, without reading a clock. No ID state, second entity-resolution command, forwarding use case or move into ExploreViewModel. Migrate next command tests to `.execute(snapshotUtc)` and both shared repository fakes to the required argument, recording received snapshots.
+Add `_ongoing` and its UnmodifiableListView getter alongside the existing `_next` state. Use `Command1<void, DateTime>` for `loadOngoing` and convert `loadNext` from Command0 to `Command1<void, DateTime>`. `_loadOngoing(DateTime snapshotUtc)` and `_loadNext(DateTime snapshotUtc)` forward that argument unchanged to `getOngoingEvents` and `getNextEvents`, without reading a clock. No ID state, second entity-resolution command, forwarding use case or move into ExploreViewModel. Migrate next command tests to .execute(snapshotUtc) and update all repository fakes for the required argument; snapshot recording and discovery controls belong to FakeEventRepository, while ControllableEventRepository remains minimally interface-compatible.
 
 Each command awaits its direct repository operation and owns its Result. On success, replace its complete entity collection in repository order and notify once, including empty success clearing earlier state. On recoverable query/materialization error, retain the prior successful collection and return Result.error on that same UI-facing command; do not publish partial results. The removed per-ID missing-lookup behavior is not recreated. Preserve the repository Exception boundary rather than catching unexpected programming errors. The ViewModel does not reclassify, sort or add items. Home observes `loadOngoing` and `loadNext` directly without a separate discovery error command.
 
-All Home classification refreshes go through `refreshHomeDiscovery()`. A retry requests a fresh discovery pass rather than resolving stale IDs. Direct command calls remain serialized by the existing Command; the coordinator must await a direct command already in flight before starting the next pass (one-shot listener removed on completion, not polling). Awaiting each direct command includes publication of its complete collection.
+All Home classification refreshes go through `refreshHomeDiscovery()`. This includes the existing “Prossimi eventi” error action: its retry must call `refreshHomeDiscovery()`, not `loadNext.execute(...)`, and the View must never manufacture a `DateTime` snapshot. The future “Eventi in corso” retry, if the approved visual design exposes one, follows the same coordinator entry point. A retry therefore captures one fresh pass snapshot and reruns both temporal classifications while each UI-facing Command continues to own its own repository Result. Direct command calls remain serialized by the existing Command; the coordinator must await a direct command already in flight before starting the next pass (one-shot listener removed on completion, not polling). Awaiting each direct command includes publication of its complete collection.
 
 Add a `_disposed` flag to the ViewModel, set in dispose before super.dispose. After await, ongoing/next and the coordinator do not mutate/notify or start other commands if disposed. Also guard completion of the constructor's `_loadAll` with the same flag, because it can be pending when `/sync` unmounts Home. Do not rewrite the calendar/byDate cache or global Command. Do not dispose commands still running: Command notifies in its own finally; this feature does not introduce a general command cancellation/disposal policy.
 
@@ -77,11 +79,11 @@ The callback captures router/VM references while mounted; schedule post-frame if
 
 Preserve `_startSync`, SyncViewModel, SyncUseCase and `_redirectForSync`: no parallel sync listener, which could duplicate fetches or precede commits. After manual menu/pull-to-refresh, return to Home must reload both classifications against the updated cache commit through bootstrap or the return hook. A non-fatal error also returns and reclassifies valid cache; a fatal first-sync remains on SyncScreen under the existing contract. Verify this with the production router.
 
-Home consumes `eventViewModel.ongoing` and `next` without temporal comparisons, deduplication, synthetic ends or corrective reordering. The only mandatory new title is “Eventi in corso”. The visual surface and its rendering tests remain gated until the developer defines position, layout, components/cards, visible count, responsive behavior, spacing, styling, animations, skeletons, empty/error presentation and any CTAs. Do not implicitly clone the upcoming grid. Successful empty membership and an error are distinct functional states; their presentation is reserved for the design.
+Home consumes `eventViewModel.ongoing` and `next` without temporal comparisons, deduplication, synthetic ends or corrective reordering. The existing “Prossimi eventi” retry migration to `refreshHomeDiscovery()` is functional plumbing and is not blocked by the new-section visual gate. The only mandatory new title is “Eventi in corso”. The visual surface and its rendering tests remain gated until the developer defines position, layout, components/cards, visible count, responsive behavior, spacing, styling, animations, skeletons, empty/error presentation and any CTAs. Do not implicitly clone the upcoming grid. Successful empty membership and an error are distinct functional states; their presentation is reserved for the design.
 
 ### 6. Tests and reuse
 
-Before editing tests, load the unit/widget skills and `molise-is-test-support-reuse`; for repositories also `molise-is-objectbox-test-store`. For State/dispose callbacks use `molise-is-async-mounted-context-safety`. Reuse `TestObjectBoxEnvironment`, `TestObjectBox`, `makeEventEntity`, `MockLogger`, `MockSupabase`, `FakeEventRepository` and `ControllableEventRepository` in `test/support/fake_repositories.dart`. Both fakes must implement the new method (default empty success); add only necessary results/counters/completers, with defaults unchanged. Do not invent fake Box/Store/Query or a second local repository fake.
+Before editing tests, load the unit/widget skills and `molise-is-test-support-reuse`; for repositories also `molise-is-objectbox-test-store`. For State/dispose callbacks use `molise-is-async-mounted-context-safety`. Reuse `TestObjectBoxEnvironment`, `TestObjectBox`, `makeEventEntity`, `MockLogger`, `MockSupabase` and the existing repository fakes in `test/support/fake_repositories.dart`. `FakeEventRepository` is the discovery-control fake: extend it with ongoing result/pending state/call count, received ongoing/next snapshots and snapshot-aware handlers only where the advancing-clock tests require them; migrate its existing next method to the required snapshot argument. `ControllableEventRepository` remains specialized for controlled `getById` races used by Map tests: update only the signatures/default no-op implementations required by the interface unless a concrete discovery test proves additional controls are necessary. Do not add discovery completers/counters to it pre-emptively, and do not invent fake Box/Store/Query or a second local repository fake.
 
 Mandatory repository matrix in `test/data/repositories/event_repository_impl_test.dart`, explicit fixed UTC snapshot argument and a single dataset where indicated:
 
@@ -135,4 +137,22 @@ Implement in reviewable units: ongoing repository and tests; upcoming/delta regr
 
 ## Open Questions
 
-Only visual design deliberately reserved for the developer. No technical/temporal/ownership decision deferred to the implementer. Hooks and harnesses have concrete test gates; they do not require new architectural exploration.
+No technical, temporal, ownership or visual decision remains open. On
+6 October 2026 the developer supplied the visual design through the implemented
+`lib/ui/explore/widgets/explore_screen.dart` surface and requested its review.
+The delivered implementation is the design authority for tasks 6.1–6.3.
+
+## Delivered Developer UI
+
+The developer placed “Eventi in corso” after the content-submission CTA and
+before “Prossimi eventi”. The section uses the existing `ContentSliverGrid`,
+including its responsive cards/list items, full collection rendering and
+empty-success presentation. Section title/padding, loading skeleton and error
+presentation follow the developer's code. No additional visual decision is
+introduced by completion of this change.
+
+`loadOngoing` drives loading/success/error rendering and `ongoing` supplies
+content in repository order. Retry requests `refreshHomeDiscovery()`. Opening
+an ongoing event uses the existing Home post route with its identity and event
+type. Widget verification covers this delivered surface, independent sources,
+empty/error/loading states, coordinated retry and event navigation.

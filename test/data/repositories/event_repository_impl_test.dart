@@ -15,6 +15,7 @@ import 'package:moliseis/generated/objectbox.g.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:objectbox/objectbox.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../support/fixtures.dart';
 import '../../support/mock_logger.dart';
@@ -371,6 +372,36 @@ void main() {
           objectBoxI: MockObjectBox(mockStore),
         );
       });
+
+      test(
+        'ongoing query failure returns and logs its own Result.error',
+        () async {
+          final result = await mockRepository.getOngoingEvents(fixedNowUtc);
+          expect(result, isA<Error<List<Event>>>());
+          final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>()!;
+          expect(
+            (failedCall.event as EntityLoadFailed).method,
+            'getOngoingEvents',
+          );
+          expect(failedCall.error, same((result as Error<List<Event>>).error));
+          expect(failedCall.stackTrace, isNotNull);
+        },
+      );
+
+      test(
+        'upcoming query failure returns and logs its own Result.error',
+        () async {
+          final result = await mockRepository.getNextEvents(fixedNowUtc);
+          expect(result, isA<Error<List<Event>>>());
+          final failedCall = mockLogger.firstCallOfType<EntityLoadFailed>()!;
+          expect(
+            (failedCall.event as EntityLoadFailed).method,
+            'getNextEvents',
+          );
+          expect(failedCall.error, same((result as Error<List<Event>>).error));
+          expect(failedCall.stackTrace, isNotNull);
+        },
+      );
 
       test(
         'getByDate returns Result.error when _getByDateRange rethrows',
@@ -1124,6 +1155,419 @@ void main() {
     });
   });
 
+  group('EventRepositoryImpl - shared-snapshot Home discovery', () {
+    late TestObjectBoxEnvironment environment;
+    late Box<EventEntity> eventBox;
+    late EventRepositoryImpl repository;
+    final policy = EventTimePolicy();
+    final snapshot = DateTime.utc(2026, 3, 15, 12);
+
+    setUp(() async {
+      environment = await TestObjectBoxEnvironment.create();
+      eventBox = environment.store.box<EventEntity>();
+      repository = EventRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: MockSupabase(),
+        objectBoxI: TestObjectBox(environment.store),
+        nowUtc: () => throw StateError('Discovery must not read its own clock'),
+      );
+    });
+    tearDown(() => environment.dispose());
+
+    for (final scenario
+        in <
+          ({
+            String name,
+            DateTime start,
+            DateTime? end,
+            bool deleted,
+            bool ongoing,
+          })
+        >[
+          (
+            name: 'ranged yesterday to tomorrow',
+            start: DateTime.utc(2026, 3, 14, 12),
+            end: DateTime.utc(2026, 3, 16, 12),
+            deleted: false,
+            ongoing: true,
+          ),
+          (
+            name: 'timed active today',
+            start: DateTime.utc(2026, 3, 15, 11),
+            end: DateTime.utc(2026, 3, 15, 13),
+            deleted: false,
+            ongoing: true,
+          ),
+          (
+            name: 'future today',
+            start: DateTime.utc(2026, 3, 15, 20),
+            end: DateTime.utc(2026, 3, 15, 22),
+            deleted: false,
+            ongoing: false,
+          ),
+          (
+            name: 'ended today',
+            start: DateTime.utc(2026, 3, 15, 8),
+            end: DateTime.utc(2026, 3, 15, 9),
+            deleted: false,
+            ongoing: false,
+          ),
+          (
+            name: 'start equals snapshot',
+            start: snapshot,
+            end: DateTime.utc(2026, 3, 16),
+            deleted: false,
+            ongoing: true,
+          ),
+          (
+            name: 'end equals snapshot',
+            start: DateTime.utc(2026, 3, 14),
+            end: snapshot,
+            deleted: false,
+            ongoing: true,
+          ),
+          (
+            name: 'start and end equal snapshot',
+            start: snapshot,
+            end: snapshot,
+            deleted: false,
+            ongoing: true,
+          ),
+          (
+            name: 'null end started today',
+            start: DateTime.utc(2026, 3, 15, 10),
+            end: null,
+            deleted: false,
+            ongoing: true,
+          ),
+          (
+            name: 'null end at snapshot',
+            start: snapshot,
+            end: null,
+            deleted: false,
+            ongoing: true,
+          ),
+          (
+            name: 'null end future today',
+            start: DateTime.utc(2026, 3, 15, 20),
+            end: null,
+            deleted: false,
+            ongoing: false,
+          ),
+          (
+            name: 'null end yesterday',
+            start: DateTime.utc(2026, 3, 14, 12),
+            end: null,
+            deleted: false,
+            ongoing: false,
+          ),
+          (
+            name: 'soft-deleted active range',
+            start: DateTime.utc(2026, 3, 14),
+            end: DateTime.utc(2026, 3, 16),
+            deleted: true,
+            ongoing: false,
+          ),
+          (
+            name: 'active interval started in previous year',
+            start: DateTime.utc(2025, 12),
+            end: DateTime.utc(2026, 4),
+            deleted: false,
+            ongoing: true,
+          ),
+        ]) {
+      test('ongoing: ${scenario.name}', () async {
+        eventBox.put(
+          makeEventEntity(
+            remoteId: 1,
+            startDate: scenario.start,
+            endDate: scenario.end,
+            isDeleted: scenario.deleted,
+          ),
+        );
+        final result = await repository.getOngoingEvents(snapshot);
+        expect(result, isA<Success<List<Event>>>());
+        expect(
+          result.getOrNull()!.map((event) => event.remoteId),
+          scenario.ongoing ? [1] : <int>[],
+        );
+      });
+    }
+
+    test('all-day null-end, multi-day and explicit same-day final date '
+        'use persisted bounds', () async {
+      final today = policy.utcRangeForCalendarDate(
+        EventCalendarDate(2026, 3, 15),
+      );
+      eventBox.putMany([
+        makeEventEntity(remoteId: 1, allDay: true, startDate: today.startUtc),
+        makeEventEntity(
+          remoteId: 2,
+          allDay: true,
+          startDate: policy
+              .utcRangeForCalendarDate(EventCalendarDate(2026, 3, 14))
+              .startUtc,
+          endDate: policy
+              .utcRangeForCalendarDate(EventCalendarDate(2026, 3, 16))
+              .endUtc,
+        ),
+        makeEventEntity(
+          remoteId: 3,
+          allDay: true,
+          startDate: today.startUtc,
+          endDate: today.endUtc,
+        ),
+      ]);
+      final result = await repository.getOngoingEvents(snapshot);
+      expect(result.getOrNull()!.map((event) => event.remoteId), [2, 1, 3]);
+      expect(result.getOrNull()!.every((event) => event.allDay), isTrue);
+    });
+
+    test('ongoing start order includes active pre-epoch intervals', () async {
+      eventBox.putMany([
+        makeEventEntity(
+          remoteId: 1,
+          startDate: DateTime.utc(2026, 3, 15, 10),
+          endDate: DateTime.utc(2027),
+        ),
+        makeEventEntity(
+          remoteId: 2,
+          startDate: DateTime.utc(1969, 12, 31),
+          endDate: DateTime.utc(2027),
+        ),
+      ]);
+      final result = await repository.getOngoingEvents(snapshot);
+      expect(result.getOrNull()!.map((event) => event.remoteId), [2, 1]);
+    });
+
+    test(
+      'ongoing has no six-result cap and orders equal starts by identity',
+      () async {
+        for (final id in [9, 7, 3, 8, 2, 6, 1, 5, 4]) {
+          eventBox.put(
+            makeEventEntity(
+              remoteId: id,
+              startDate: id == 9
+                  ? DateTime.utc(2026, 3, 14)
+                  : DateTime.utc(2026, 3, 15, 10),
+              endDate: DateTime.utc(2026, 3, 16),
+            ),
+          );
+        }
+        final result = await repository.getOngoingEvents(snapshot);
+        expect(result.getOrNull()!.map((event) => event.remoteId), [
+          9,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+        ]);
+      },
+    );
+
+    test(
+      'Rome day differs from UTC and is independent of package local timezone',
+      () async {
+        final currentDay = policy.utcRangeForCalendarDate(
+          EventCalendarDate(2026, 7, 2),
+        );
+        final previousDay = policy.utcRangeForCalendarDate(
+          EventCalendarDate(2026, 7, 1),
+        );
+        final previousLocal = tz.local;
+        addTearDown(() => tz.setLocalLocation(previousLocal));
+        tz.setLocalLocation(tz.getLocation('America/New_York'));
+        eventBox.putMany([
+          makeEventEntity(remoteId: 1, startDate: currentDay.startUtc),
+          makeEventEntity(remoteId: 2, startDate: previousDay.startUtc),
+        ]);
+        final result = await repository.getOngoingEvents(
+          DateTime.utc(2026, 7, 1, 22, 30),
+        );
+        expect(result.getOrNull()!.map((event) => event.remoteId), [1]);
+        expect(tz.local.name, 'America/New_York');
+      },
+    );
+
+    for (final date in [
+      EventCalendarDate(2026, 7, 1),
+      EventCalendarDate(2026, 3, 29),
+      EventCalendarDate(2026, 10, 25),
+    ]) {
+      test('Rome final microsecond and next midnight on $date', () async {
+        final day = policy.utcRangeForCalendarDate(date);
+        final nextCarrier = DateTime.utc(date.year, date.month, date.day + 1);
+        final nextDay = policy.utcRangeForCalendarDate(
+          EventCalendarDate(
+            nextCarrier.year,
+            nextCarrier.month,
+            nextCarrier.day,
+          ),
+        );
+        eventBox.putMany([
+          makeEventEntity(remoteId: 1, startDate: day.startUtc),
+          makeEventEntity(
+            remoteId: 2,
+            startDate: day.startUtc,
+            endDate: day.endUtc,
+          ),
+          makeEventEntity(remoteId: 3, startDate: nextDay.startUtc),
+          makeEventEntity(remoteId: 4, startDate: day.endUtc),
+        ]);
+        final before = await repository.getOngoingEvents(day.endUtc);
+        final atMidnight = await repository.getOngoingEvents(nextDay.startUtc);
+        expect(before.getOrNull()!.map((event) => event.remoteId), [1, 2, 4]);
+        expect(atMidnight.getOrNull()!.map((event) => event.remoteId), [3]);
+        expect(
+          nextDay.startUtc.difference(day.endUtc),
+          const Duration(microseconds: 1),
+        );
+        if (date.month == 3 || date.month == 10) {
+          expect(
+            nextDay.startUtc.difference(day.startUtc).inHours,
+            date.month == 3 ? 23 : 25,
+          );
+        }
+      });
+    }
+
+    test(
+      'upcoming excludes past/equal starts and deletion, includes +1 microsecond and future today',
+      () async {
+        eventBox.putMany([
+          makeEventEntity(
+            remoteId: 1,
+            startDate: DateTime.utc(2026, 3, 15, 11),
+            endDate: DateTime.utc(2026, 3, 16),
+          ),
+          makeEventEntity(
+            remoteId: 2,
+            startDate: snapshot,
+            endDate: DateTime.utc(2026, 3, 16),
+          ),
+          makeEventEntity(
+            remoteId: 3,
+            startDate: snapshot.add(const Duration(microseconds: 1)),
+          ),
+          makeEventEntity(
+            remoteId: 4,
+            startDate: DateTime.utc(2026, 3, 15, 20),
+          ),
+          makeEventEntity(
+            remoteId: 5,
+            startDate: snapshot.add(const Duration(microseconds: 1)),
+            isDeleted: true,
+          ),
+        ]);
+        final result = await repository.getNextEvents(snapshot);
+        expect(result.getOrNull()!.map((event) => event.remoteId), [3, 4]);
+      },
+    );
+
+    test('December snapshot includes January future starts', () async {
+      eventBox.put(
+        makeEventEntity(remoteId: 1, startDate: DateTime.utc(2027, 1, 3)),
+      );
+      final result = await repository.getNextEvents(
+        DateTime.utc(2026, 12, 20, 12),
+      );
+      expect(result.getOrNull()!.map((event) => event.remoteId), [1]);
+    });
+
+    for (final clock in [
+      DateTime.utc(2026, 3, 15, 12),
+      DateTime.utc(2026, 10, 15, 12),
+      DateTime.utc(2026, 12, 31, 23, 30),
+    ]) {
+      test('upcoming inclusive civil +30 upper boundary from $clock', () async {
+        final today = policy.currentCalendarDate(clock);
+        final endCarrier = DateTime.utc(
+          today.year,
+          today.month,
+          today.day + 30,
+        );
+        final bound = policy
+            .utcRangeForCalendarDate(
+              EventCalendarDate(
+                endCarrier.year,
+                endCarrier.month,
+                endCarrier.day,
+              ),
+            )
+            .endUtc;
+        eventBox.putMany([
+          makeEventEntity(remoteId: 1, startDate: bound),
+          makeEventEntity(
+            remoteId: 2,
+            startDate: bound.add(const Duration(microseconds: 1)),
+          ),
+        ]);
+        final result = await repository.getNextEvents(clock);
+        expect(result.getOrNull()!.map((event) => event.remoteId), [1]);
+      });
+    }
+
+    test('upcoming limits six in ascending start order', () async {
+      for (var id = 8; id >= 1; id--) {
+        eventBox.put(
+          makeEventEntity(
+            remoteId: id,
+            startDate: snapshot.add(Duration(hours: id)),
+          ),
+        );
+      }
+      final result = await repository.getNextEvents(snapshot);
+      expect(result.getOrNull()!.map((event) => event.remoteId), [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+      ]);
+    });
+
+    test('same dataset and explicit snapshot produce non-empty disjoint '
+        'collections without clock reads', () async {
+      eventBox.putMany([
+        makeEventEntity(
+          remoteId: 1,
+          startDate: DateTime.utc(2026, 3, 14),
+          endDate: DateTime.utc(2026, 3, 16),
+        ),
+        makeEventEntity(remoteId: 2, startDate: snapshot, endDate: snapshot),
+        makeEventEntity(remoteId: 3, startDate: DateTime.utc(2026, 3, 15, 10)),
+        makeEventEntity(
+          remoteId: 4,
+          startDate: snapshot.add(const Duration(microseconds: 1)),
+        ),
+        makeEventEntity(remoteId: 5, startDate: DateTime.utc(2026, 3, 15, 20)),
+        makeEventEntity(
+          remoteId: 6,
+          startDate: DateTime.utc(2026, 3, 15, 8),
+          endDate: DateTime.utc(2026, 3, 15, 9),
+        ),
+      ]);
+      final ongoing = (await repository.getOngoingEvents(
+        snapshot,
+      )).getOrNull()!;
+      final next = (await repository.getNextEvents(snapshot)).getOrNull()!;
+      expect(ongoing.map((event) => event.remoteId), [1, 3, 2]);
+      expect(next.map((event) => event.remoteId), [4, 5]);
+      expect(
+        ongoing
+            .map((event) => event.remoteId)
+            .toSet()
+            .intersection(next.map((event) => event.remoteId).toSet()),
+        isEmpty,
+      );
+    });
+  });
+
   group('EventRepositoryImpl - Rome query boundaries', () {
     late TestObjectBoxEnvironment environment;
     late Box<EventEntity> eventBox;
@@ -1143,7 +1587,9 @@ void main() {
     tearDown(() => environment.dispose());
 
     test('returns a successful empty direct collection', () async {
-      final result = await repository.getNextEvents();
+      final result = await repository.getNextEvents(
+        DateTime.utc(2026, 12, 31, 23, 30),
+      );
       expect(result, isA<Success<List<Event>>>());
       expect(result.getOrNull(), isEmpty);
     });
@@ -1165,7 +1611,9 @@ void main() {
           startDate: DateTime.utc(2026, 12, 31, 23),
         ),
       );
-      final result = await repository.getNextEvents();
+      final result = await repository.getNextEvents(
+        DateTime.utc(2026, 12, 31, 23, 30),
+      );
       expect(result, isA<Success<List<Event>>>());
       final events = result.getOrNull()!;
       expect(events.map((event) => event.remoteId), [1, 2, 3, 4, 5, 6]);
@@ -1234,10 +1682,10 @@ void main() {
         // Upcoming remains based on starts: the overlapping earlier event is
         // excluded even though it is an all-day multi-day event.
         expect(
-          (await repository.getNextEvents()).getOrNull()!.map(
-            (event) => event.remoteId,
-          ),
-          [43],
+          (await repository.getNextEvents(
+            DateTime.utc(2026, 12, 31, 23, 30),
+          )).getOrNull()!.map((event) => event.remoteId),
+          isEmpty,
         );
       },
     );
@@ -1255,7 +1703,9 @@ void main() {
       ]);
 
       final currentYear = await repository.getByCurrentYear();
-      final upcoming = await repository.getNextEvents();
+      final upcoming = await repository.getNextEvents(
+        DateTime.utc(2026, 12, 31, 23, 30),
+      );
 
       expect(
         (currentYear as Success<List<Event>>).value.map((e) => e.remoteId),
@@ -1263,7 +1713,7 @@ void main() {
       );
       expect(
         (upcoming as Success<List<Event>>).value.map((event) => event.remoteId),
-        [1, 2],
+        [2],
       );
       expect(upcoming.value, isNot(containsEventId(4)));
     });
@@ -1297,7 +1747,9 @@ void main() {
         final summerDay = await repository.getByDate(
           EventCalendarDate(2026, 6, 1),
         );
-        final upcoming = await repository.getNextEvents();
+        final upcoming = await repository.getNextEvents(
+          DateTime.utc(2026, 12, 31, 23, 30),
+        );
         final summerEvents = (summerDay as Success<List<Event>>).value;
         final upcomingIds = (upcoming as Success<List<Event>>).value.map(
           (event) => event.remoteId,
@@ -1305,7 +1757,8 @@ void main() {
 
         expect(summerEvents, containsEventId(10));
         expect(summerEvents, isNot(containsEventId(11)));
-        expect(upcomingIds, containsAll([12, 13]));
+        expect(upcomingIds, contains(13));
+        expect(upcomingIds, isNot(contains(12)));
         expect(upcomingIds, isNot(contains(14)));
       },
     );

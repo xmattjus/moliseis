@@ -446,6 +446,7 @@ final class FakeEventRepository extends EventRepository {
     this.getByCategoriesResult = const Result.success([]),
     this.getByCoordinatesResult = const Result.success([]),
     this.getNextEventsResult = const Result.success([]),
+    this.getOngoingEventsResult = const Result.success([]),
     this.getFavouriteEventIdsResult = const Result.success([]),
     this.getFavouritesResult = const Result.success([]),
     this.setFavouriteEventResult = const Result.success(null),
@@ -462,6 +463,15 @@ final class FakeEventRepository extends EventRepository {
   Result<List<Event>> getByCoordinatesResult;
   Completer<Result<List<Event>>>? pendingGetByCoordinates;
   Completer<void>? getByCoordinatesCalled;
+  Result<List<Event>> getOngoingEventsResult;
+  Completer<Result<List<Event>>>? pendingGetOngoingEvents;
+  int getOngoingEventsCallCount = 0;
+  final receivedOngoingSnapshots = <DateTime>[];
+  final receivedNextSnapshots = <DateTime>[];
+  Future<Result<List<Event>>> Function(DateTime snapshotUtc)?
+  getOngoingEventsHandler;
+  Future<Result<List<Event>>> Function(DateTime snapshotUtc)?
+  getNextEventsHandler;
   Result<List<Event>> getNextEventsResult;
   Completer<Result<List<Event>>>? pendingGetNextEvents;
   int getNextEventsCallCount = 0;
@@ -549,9 +559,21 @@ final class FakeEventRepository extends EventRepository {
   }
 
   @override
-  Future<Result<List<Event>>> getNextEvents() {
+  Future<Result<List<Event>>> getOngoingEvents(DateTime snapshotUtc) {
+    getOngoingEventsCallCount++;
+    receivedOngoingSnapshots.add(snapshotUtc);
+    return getOngoingEventsHandler?.call(snapshotUtc) ??
+        pendingGetOngoingEvents?.future ??
+        Future.value(getOngoingEventsResult);
+  }
+
+  @override
+  Future<Result<List<Event>>> getNextEvents(DateTime snapshotUtc) {
     getNextEventsCallCount++;
-    return pendingGetNextEvents?.future ?? Future.value(getNextEventsResult);
+    receivedNextSnapshots.add(snapshotUtc);
+    return getNextEventsHandler?.call(snapshotUtc) ??
+        pendingGetNextEvents?.future ??
+        Future.value(getNextEventsResult);
   }
 
   @override
@@ -634,7 +656,12 @@ final class ControllableEventRepository extends EventRepository {
   ) async => const Result.success([]);
 
   @override
-  Future<Result<List<Event>>> getNextEvents() async => const Result.success([]);
+  Future<Result<List<Event>>> getNextEvents(DateTime snapshotUtc) async =>
+      const Result.success([]);
+
+  @override
+  Future<Result<List<Event>>> getOngoingEvents(DateTime snapshotUtc) async =>
+      const Result.success([]);
 
   @override
   Future<Result<List<int>>> getFavouriteEventIds() async =>

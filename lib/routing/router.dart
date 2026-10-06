@@ -308,7 +308,7 @@ GoRouter buildAppRouter({
                           final viewModel = EventViewModel(
                             repository: context.read(),
                           );
-                          unawaited(viewModel.loadNext.execute());
+                          unawaited(viewModel.refreshHomeDiscovery());
                           return viewModel;
                         },
                       ),
