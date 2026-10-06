@@ -72,10 +72,10 @@ Direct model retrieval SHALL preserve each feature's existing repository-owned q
 - **WHEN** more than six visible places exist
 - **THEN** latest-place retrieval returns the same six most recently created places under the established descending creation order
 
-#### Scenario: Upcoming event contract
+#### Scenario: Temporal discovery follows its owning capabilities
 
-- **WHEN** upcoming events are retrieved before the separate ongoing-events change is implemented
-- **THEN** direct model retrieval uses the current canonical upcoming temporal contract, ordering and limit without adopting future snapshot semantics early
+- **WHEN** Home retrieves upcoming or ongoing events directly
+- **THEN** upcoming follows `event-temporal-integrity` and ongoing follows `home-ongoing-events`, including their classification, ordering and limits; `local-content-retrieval` governs direct materialization, atomic publication and Command semantics without redefining temporal classification
 
 #### Scenario: Search result ordering
 

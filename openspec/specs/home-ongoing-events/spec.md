@@ -166,13 +166,13 @@ Initial Home creation SHALL load both ongoing and upcoming discovery through a p
 - **WHEN** a Home owner is disposed with direct discovery retrieval in flight
 - **THEN** late completion does not publish state or schedule further Home loads on the disposed owner
 
-### Requirement: Home visual implementation is gated on developer design
-Home SHALL provide a distinct section named “Eventi in corso” after the developer supplies its visual design. This change SHALL NOT prescribe position, layout, cards, visible count, responsive behavior, spacing, typography, colors, animations, skeletons, empty/error presentation or CTAs. Functional data and refresh implementation SHALL be reviewable before that gate; the feature SHALL NOT be considered fully complete before the approved visual surface and its functional rendering tests exist.
+### Requirement: Home presents distinct temporal discovery sections
+Home SHALL expose a distinct section named “Eventi in corso” consuming the classified `ongoing` collection, while “Prossimi eventi” SHALL consume `next`. The View SHALL NOT introduce temporal classification, deduplication, synthetic ends or corrective sorting. Any retry for either section SHALL enter through `refreshHomeDiscovery()`. These data-consumption requirements SHALL NOT prescribe additional visual choices.
 
-#### Scenario: Design has not been supplied
-- **WHEN** technical data and refresh work is implementable but developer UI decisions are absent
-- **THEN** visual implementation stays gated without inventing a layout or marking the entire feature complete
+#### Scenario: Home renders temporal discovery collections
+- **WHEN** Home renders its ongoing and upcoming collections
+- **THEN** “Eventi in corso” consumes `ongoing` and “Prossimi eventi” consumes `next`, preserving repository membership and ordering without View-level temporal classification, deduplication, synthetic ends or corrective sorting
 
-#### Scenario: Approved visual surface consumes ongoing
-- **WHEN** the developer design is supplied and the Home section is implemented
-- **THEN** “Eventi in corso” consumes the classified ongoing collection separately from “Prossimi eventi”
+#### Scenario: Home retries temporal discovery
+- **WHEN** a retry is requested for either temporal section
+- **THEN** it enters through `refreshHomeDiscovery()` with the coordinator owning the shared discovery snapshot
