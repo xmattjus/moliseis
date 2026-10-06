@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    as flutter_localizations;
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -14,6 +16,7 @@ import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/services/supabase_anonymous_session.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
+import 'package:moliseis/ui/core/app_scroll_behavior.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
@@ -187,6 +190,7 @@ class _MoliseIsAppState extends State<MoliseIsApp> {
     return Consumer<ThemeViewModel>(
       builder: (_, viewModel, _) {
         return MaterialApp.router(
+          scrollBehavior: const AppScrollBehavior(),
           scaffoldMessengerKey: $scaffoldMessengerKey,
           restorationScopeId: 'app',
           routerConfig: router,
