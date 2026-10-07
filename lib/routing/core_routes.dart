@@ -94,6 +94,21 @@ GoRoute postRoute({
     path: RoutePaths.post,
     name: name,
     builder: (context, state) {
+      // A child page can cover its parent's error page, so validate the
+      // inherited Category before resolving any Post content.
+      final categorySlug = state.pathParameters['categorySlug'];
+      if (categorySlug != null &&
+          categorySlug != RouteParameters.allCategorySlug &&
+          RouteParameters.categoryFromSlug(categorySlug) == null) {
+        return BranchDetailPopScope(
+          branchIndex: branchIndex,
+          child: RouteErrorScreen(
+            uri: state.uri,
+            error: GoException('Unknown category "$categorySlug"'),
+          ),
+        );
+      }
+
       final rawId = state.pathParameters['id'];
       final id = RouteParameters.contentId(rawId);
 

@@ -64,6 +64,54 @@ void main() {
     }
   });
 
+  group('nested Category Post validation', () {
+    for (final (branchIndex, branch) in <(int, String)>[
+      (0, 'home'),
+      (1, 'favourites'),
+      (2, 'events'),
+    ]) {
+      for (final slug in <String>['0', 'bogus']) {
+        testWidgets('$branch rejects $slug before building the child Post', (
+          tester,
+        ) async {
+          final location = '/$branch/category/$slug/posts/1?type=event';
+          final fixture = RouteOwnershipFixture(initialLocation: location);
+          addTearDown(fixture.dispose);
+          await tester.pumpWidget(fixture.app);
+          await tester.pumpAndSettle();
+
+          expect(fixture.uri.toString(), location);
+          expect(find.byType(RouteErrorScreen), findsOneWidget);
+          expect(find.byType(PostScreen, skipOffstage: false), findsNothing);
+          expect(fixture.eventRepository.getByIdCallCount, 0);
+          expect(fixture.placeRepository.getByIdCallCount, 0);
+        });
+      }
+
+      testWidgets('$branch preserves canonical all and its child place Post', (
+        tester,
+      ) async {
+        final location = '/$branch/category/all/posts/2?type=place';
+        final fixture = RouteOwnershipFixture(initialLocation: location);
+        addTearDown(fixture.dispose);
+        await tester.pumpWidget(fixture.app);
+        await tester.pumpAndSettle();
+
+        expect(fixture.uri.toString(), location);
+        expect(
+          find.byType(RouteErrorScreen, skipOffstage: false),
+          findsNothing,
+        );
+        final post = tester.widget<PostScreen>(find.byType(PostScreen));
+        expect(post.isEvent, isFalse);
+        expect(post.viewModel.content.remoteId, 2);
+        expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 1);
+        final branchKey = fixture.branchNavigatorKeys[branchIndex];
+        expect(branchKey.currentState!.widget.pages.length, 3);
+      });
+    }
+  });
+
   group('post route parameters', () {
     for (final location in <String>[
       '/home/posts/2',
