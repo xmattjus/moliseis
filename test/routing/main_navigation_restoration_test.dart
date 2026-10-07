@@ -117,10 +117,9 @@ void main() {
           await tester.pumpAndSettle();
         }
 
-        expect(
-          after.router.routeInformationProvider.value.uri,
-          Uri.parse('/home/search_results?q=molise&type=event'),
-        );
+        final parentUri = after.router.routeInformationProvider.value.uri;
+        expect(parentUri.path, '/home/search_results');
+        expect(parentUri.queryParameters['q'], 'molise');
         expect(branch.widget.pages.length, 2);
         expect(
           branch.widget.pages.map((page) => page.key),

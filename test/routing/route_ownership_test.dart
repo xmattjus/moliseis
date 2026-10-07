@@ -114,16 +114,16 @@ void main() {
 
   for (final (location, parent, pageCount, parentLabel)
       in <(String, String, int, String)>[
-        ('/home/posts/1?type=event', '/home?type=event', 2, 'Home root'),
+        ('/home/posts/1?type=event', '/home', 2, 'Home root'),
         (
           '/home/category/nature/posts/1?type=event',
-          '/home/category/nature?type=event',
+          '/home/category/nature',
           3,
           'Categorie',
         ),
         (
           '/home/search_results/posts/1?q=molise&type=event',
-          '/home/search_results?q=molise&type=event',
+          '/home/search_results',
           3,
           'Search molise root',
         ),
@@ -148,7 +148,10 @@ void main() {
         expect(fixture.exploreNavigatorKey.currentState!.widget.pages, pages);
         await commitPredictiveBack(tester);
 
-        expect(fixture.uri, Uri.parse(parent));
+        expect(fixture.uri.path, parent);
+        if (parent == '/home/search_results') {
+          expect(fixture.uri.queryParameters['q'], 'molise');
+        }
         expect(
           fixture.exploreNavigatorKey.currentState!.widget.pages.length,
           pageCount - 1,

@@ -2,6 +2,7 @@ import 'dart:async' show Completer, unawaited;
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
+import 'package:expressive_navigation_bar/expressive_navigation_bar.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
@@ -50,6 +51,8 @@ import 'package:moliseis/ui/search/widgets/search_result_screen.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
+import 'package:moliseis/utils/enums.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
@@ -65,6 +68,12 @@ import '../support/mock_logger.dart';
 import '../support/recording_tile_http_client.dart';
 
 void main() {
+  const responsiveViewports = <(WindowSizeClass, Size)>[
+    (WindowSizeClass.compact, Size(390, 844)),
+    (WindowSizeClass.medium, Size(700, 900)),
+    (WindowSizeClass.expanded, Size(1000, 900)),
+    (WindowSizeClass.large, Size(1300, 900)),
+  ];
   testWidgets(
     'NAV-01 [upstream #188018] inactive Post branch must not consume '
     'Map root Back',
@@ -115,8 +124,11 @@ void main() {
     skip: true,
   );
 
-  for (final size in <Size>[const Size(390, 844), const Size(1300, 900)]) {
-    testWidgets('NAV-02 Map shell chrome stays stable under Gallery at $size', (
+  for (final (windowClass, size) in responsiveViewports) {
+    final usesBottomNavigation =
+        windowClass == WindowSizeClass.compact ||
+        windowClass == WindowSizeClass.medium;
+    testWidgets('NAV-02 Map/Gallery chrome in ${windowClass.name} at $size', (
       tester,
     ) async {
       tester.view.devicePixelRatio = 1;
@@ -133,12 +145,13 @@ void main() {
       final shellFinder = find.byType(ScaffoldShell, skipOffstage: false);
       final mapFinder = find.byType(GeoMapScreen, skipOffstage: false);
       final chromeFinder = find.byType(
-        size.width == 390 ? ResponsiveNavigationBar : AppNavigationRail,
+        usesBottomNavigation ? ResponsiveNavigationBar : AppNavigationRail,
         skipOffstage: false,
       );
       final mapState = tester.state(mapFinder);
       final mapViewModel = tester.widget<GeoMapScreen>(mapFinder).viewModel;
       expect(shellFinder, findsOneWidget);
+      expect(tester.element(shellFinder).windowSizeClass, windowClass);
       expect(chromeFinder, findsOneWidget);
       final chromeRect = tester.getRect(chromeFinder);
 
@@ -262,8 +275,11 @@ void main() {
     },
   );
 
-  for (final size in <Size>[const Size(390, 844), const Size(1300, 900)]) {
-    testWidgets('structural shell chrome and selected section at $size', (
+  for (final (windowClass, size) in responsiveViewports) {
+    final usesBottomNavigation =
+        windowClass == WindowSizeClass.compact ||
+        windowClass == WindowSizeClass.medium;
+    testWidgets('shell chrome and selection in ${windowClass.name} at $size', (
       tester,
     ) async {
       tester.view.devicePixelRatio = 1;
@@ -309,7 +325,27 @@ void main() {
           ).currentIndex,
           index,
         );
-        if (size.width == 390) {
+        expect(
+          tester.element(find.byType(ScaffoldShell)).windowSizeClass,
+          windowClass,
+        );
+        if (usesBottomNavigation) {
+          expect(
+            tester
+                .widget<ExpressiveNavigationBar>(
+                  find.byType(ExpressiveNavigationBar),
+                )
+                .fixedDestinationWidth,
+            windowClass == WindowSizeClass.medium,
+          );
+          expect(
+            tester
+                .widgetList<ExpressiveNavigationDestination>(
+                  find.byType(ExpressiveNavigationDestination),
+                )
+                .map((destination) => destination.horizontalLabel),
+            everyElement(windowClass == WindowSizeClass.medium),
+          );
           expect(
             tester
                 .widget<ResponsiveNavigationBar>(
@@ -320,6 +356,10 @@ void main() {
           );
           expect(find.byType(AppNavigationRail), findsNothing);
         } else {
+          expect(
+            tester.widget<NavigationRail>(find.byType(NavigationRail)).extended,
+            windowClass == WindowSizeClass.large,
+          );
           expect(
             tester
                 .widget<AppNavigationRail>(find.byType(AppNavigationRail))
@@ -333,220 +373,227 @@ void main() {
     });
   }
 
-  for (final size in <Size>[const Size(390, 844), const Size(1300, 900)]) {
-    testWidgets(
-      'production shell chrome and routed content share Semantics at $size',
-      (tester) async {
-        final semantics = tester.ensureSemantics();
-        try {
-          tester.view.devicePixelRatio = 1;
-          tester.view.physicalSize = size;
-          addTearDown(tester.view.resetPhysicalSize);
-          addTearDown(tester.view.resetDevicePixelRatio);
-          final fixture = _buildTestRouterApp(
-            _MapHarness(),
-            eventRepository: FakeEventRepository(
-              getByIdResults: <int, Result<Event>>{
-                1: Result.success(makeEvent(name: 'Semantics Post')),
-              },
-            ),
-          );
-          addTearDown(fixture.router.dispose);
-          await tester.pumpWidget(fixture.app);
-          for (final (location, contentLabel) in <(String, String)>[
-            ('/home', 'Molise Is'),
-            ('/home/posts/1?type=event', 'Semantics Post'),
-            ('/home/category/nature', 'Categorie'),
-            ('/home/search_results?q=molise', 'Risultati'),
+  for (final (windowClass, size) in responsiveViewports) {
+    final usesBottomNavigation =
+        windowClass == WindowSizeClass.compact ||
+        windowClass == WindowSizeClass.medium;
+    testWidgets('shell Semantics in ${windowClass.name} at $size', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final fixture = _buildTestRouterApp(
+          _MapHarness(),
+          eventRepository: FakeEventRepository(
+            getByIdResults: <int, Result<Event>>{
+              1: Result.success(makeEvent(name: 'Semantics Post')),
+            },
+          ),
+        );
+        addTearDown(fixture.router.dispose);
+        await tester.pumpWidget(fixture.app);
+        for (final (location, contentLabel) in <(String, String)>[
+          ('/home', 'Molise Is'),
+          ('/home/posts/1?type=event', 'Semantics Post'),
+          ('/home/category/nature', 'Categorie'),
+          ('/home/search_results?q=molise', 'Risultati'),
+        ]) {
+          fixture.router.go(location);
+          await tester.pumpAndSettle();
+          for (final label in <String>[
+            'Esplora',
+            'Preferiti',
+            'Eventi',
+            'Mappa',
           ]) {
-            fixture.router.go(location);
-            await tester.pumpAndSettle();
-            for (final label in <String>[
-              'Esplora',
-              'Preferiti',
-              'Eventi',
-              'Mappa',
-            ]) {
-              final destination = find.descendant(
-                of: find.byType(
-                  size.width == 390
-                      ? ResponsiveNavigationBar
-                      : AppNavigationRail,
-                ),
-                matching: find.bySemanticsLabel(RegExp(label)),
-              );
-              expect(destination, findsOneWidget);
-              expect(
-                tester
-                    .getSemantics(destination)
-                    .getSemanticsData()
-                    .flagsCollection
-                    .isSelected
-                    .toBoolOrNull(),
-                label == 'Esplora',
-              );
-            }
-            expect(find.bySemanticsLabel(RegExp(contentLabel)), findsOneWidget);
-            if (size.width == 390) {
-              expect(
-                tester
-                    .widget<ResponsiveNavigationBar>(
-                      find.byType(ResponsiveNavigationBar),
-                    )
-                    .selectedIndex,
-                0,
-              );
-            } else {
-              expect(
-                tester
-                    .widget<AppNavigationRail>(find.byType(AppNavigationRail))
-                    .selectedIndex,
-                0,
-              );
-            }
+            final destination = find.descendant(
+              of: find.byType(
+                usesBottomNavigation
+                    ? ResponsiveNavigationBar
+                    : AppNavigationRail,
+              ),
+              matching: find.bySemanticsLabel(RegExp(label)),
+            );
+            expect(destination, findsOneWidget);
+            expect(
+              tester
+                  .getSemantics(destination)
+                  .getSemanticsData()
+                  .flagsCollection
+                  .isSelected
+                  .toBoolOrNull(),
+              label == 'Esplora',
+            );
           }
-          expect(tester.takeException(), isNull);
-        } finally {
-          semantics.dispose();
+          expect(find.bySemanticsLabel(RegExp(contentLabel)), findsOneWidget);
+          expect(
+            tester.element(find.byType(ScaffoldShell)).windowSizeClass,
+            windowClass,
+          );
+          if (usesBottomNavigation) {
+            expect(
+              tester
+                  .widget<ResponsiveNavigationBar>(
+                    find.byType(ResponsiveNavigationBar),
+                  )
+                  .selectedIndex,
+              0,
+            );
+          } else {
+            expect(
+              tester
+                  .widget<NavigationRail>(find.byType(NavigationRail))
+                  .extended,
+              windowClass == WindowSizeClass.large,
+            );
+            expect(
+              tester
+                  .widget<AppNavigationRail>(find.byType(AppNavigationRail))
+                  .selectedIndex,
+              0,
+            );
+          }
         }
-      },
-    );
+        expect(tester.takeException(), isNull);
+      } finally {
+        semantics.dispose();
+      }
+    });
   }
 
-  for (final size in <Size>[const Size(390, 844), const Size(1300, 900)]) {
+  for (final (windowClass, size) in responsiveViewports) {
+    final usesBottomNavigation =
+        windowClass == WindowSizeClass.compact ||
+        windowClass == WindowSizeClass.medium;
+    final contentLayout = windowClass == WindowSizeClass.compact
+        ? 'list'
+        : 'grid';
     for (final (location, screen) in <(String, Type)>[
       ('/home/posts/1?type=event', PostScreen),
       ('/home/category/nature', CategoryScreen),
       ('/home/search_results?q=molise', SearchResultScreen),
     ]) {
-      testWidgets(
-        'final $screen content is reachable above shell chrome at $size',
-        (tester) async {
-          tester.view.devicePixelRatio = 1;
-          tester.view.physicalSize = size;
-          tester.view.viewPadding = const FakeViewPadding(bottom: 28);
-          tester.view.padding = const FakeViewPadding(bottom: 28);
-          addTearDown(tester.view.resetPhysicalSize);
-          addTearDown(tester.view.resetDevicePixelRatio);
-          addTearDown(tester.view.resetViewPadding);
-          addTearDown(tester.view.resetPadding);
-          final items = <Event>[
-            for (var id = 1; id <= 12; id++)
-              makeEvent(
-                remoteId: id,
-                name: 'Content ${id.toString().padLeft(2, '0')}',
-                category: ContentCategory.nature,
-              ),
-          ];
-          final repository = FakeEventRepository(
-            getByIdResults: <int, Result<Event>>{
-              for (final item in items) item.remoteId: Result.success(item),
-            },
-            getByCategoriesResult: Result.success(items),
-          );
-          final nearbyPlace = makePlace(
-            remoteId: 12,
-            name: 'Final nearby place',
-          );
-          final fixture = _buildTestRouterApp(
-            _MapHarness(),
-            eventRepository: repository,
-            placeRepository: FakePlaceRepository(
-              getByCoordinatesResult: Result.success(<Place>[nearbyPlace]),
-              getByIdResults: {12: Result.success(nearbyPlace)},
+      testWidgets('final $screen content reachable in ${windowClass.name} '
+          'at $size', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        tester.view.viewPadding = const FakeViewPadding(bottom: 28);
+        tester.view.padding = const FakeViewPadding(bottom: 28);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewPadding);
+        addTearDown(tester.view.resetPadding);
+        final items = <Event>[
+          for (var id = 1; id <= 12; id++)
+            makeEvent(
+              remoteId: id,
+              name: 'Content ${id.toString().padLeft(2, '0')}',
+              category: ContentCategory.nature,
             ),
-            searchRepository: FakeSearchRepository(
-              resultsByQueryResult: Result.success(items),
-            ),
-          );
-          addTearDown(fixture.router.dispose);
-          await tester.pumpWidget(fixture.app);
-          fixture.router.go(location);
-          await tester.pumpAndSettle();
-          final tail = screen == PostScreen
-              ? find.byWidgetPredicate(
-                  (widget) =>
-                      widget is ContentBaseCardGridItem &&
-                      widget.content is Place &&
-                      widget.content.remoteId == 12,
-                )
-              : find.byKey(
-                  ValueKey<String>(
-                    '${size.width == 390 ? 'list' : 'grid'}-item:12-11',
-                  ),
-                );
-          final verticalScroll = find
-              .descendant(
-                of: find.byType(screen),
-                matching: find.byWidgetPredicate(
-                  (widget) =>
-                      widget is Scrollable &&
-                      widget.axisDirection == AxisDirection.down,
-                ),
+        ];
+        final repository = FakeEventRepository(
+          getByIdResults: <int, Result<Event>>{
+            for (final item in items) item.remoteId: Result.success(item),
+          },
+          getByCategoriesResult: Result.success(items),
+        );
+        final nearbyPlace = makePlace(remoteId: 12, name: 'Final nearby place');
+        final fixture = _buildTestRouterApp(
+          _MapHarness(),
+          eventRepository: repository,
+          placeRepository: FakePlaceRepository(
+            getByCoordinatesResult: Result.success(<Place>[nearbyPlace]),
+            getByIdResults: {12: Result.success(nearbyPlace)},
+          ),
+          searchRepository: FakeSearchRepository(
+            resultsByQueryResult: Result.success(items),
+          ),
+        );
+        addTearDown(fixture.router.dispose);
+        await tester.pumpWidget(fixture.app);
+        fixture.router.go(location);
+        await tester.pumpAndSettle();
+        final tail = screen == PostScreen
+            ? find.byWidgetPredicate(
+                (widget) =>
+                    widget is ContentBaseCardGridItem &&
+                    widget.content is Place &&
+                    widget.content.remoteId == 12,
               )
-              .last;
-          if (screen == PostScreen) {
-            await tester.drag(verticalScroll, const Offset(0, -2000));
-            // Materializing the last sliver loads nearby repository content.
-            await tester.pumpAndSettle();
-          }
-          await tester.scrollUntilVisible(
-            tail,
-            300,
-            scrollable: verticalScroll,
-          );
-          // Reach the actual scroll end before measuring against the chrome.
+            : find.byKey(ValueKey<String>('$contentLayout-item:12-11'));
+        final verticalScroll = find
+            .descendant(
+              of: find.byType(screen),
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Scrollable &&
+                    widget.axisDirection == AxisDirection.down,
+              ),
+            )
+            .last;
+        if (screen == PostScreen) {
           await tester.drag(verticalScroll, const Offset(0, -2000));
+          // Materializing the last sliver loads nearby repository content.
           await tester.pumpAndSettle();
-          expect(tail, findsOneWidget);
-          final itemRect = tester.getRect(tail);
-          if (size.width == 390) {
-            final navRect = tester.getRect(
-              find.byType(ResponsiveNavigationBar),
-            );
-            expect(itemRect.bottom, lessThanOrEqualTo(navRect.top));
-            expect(itemRect.top, greaterThanOrEqualTo(0));
-            expect(tail.hitTestable(), findsOneWidget);
-          } else {
-            final railRect = tester.getRect(find.byType(AppNavigationRail));
-            expect(itemRect.left, greaterThanOrEqualTo(railRect.right));
-            expect(itemRect.bottom, lessThanOrEqualTo(size.height - 28));
-            expect(find.byType(ResponsiveNavigationBar), findsNothing);
-            expect(tail.hitTestable(), findsOneWidget);
-          }
-          await tester.tap(tail);
-          await tester.pumpAndSettle();
-          expect(
-            fixture.router.routeInformationProvider.value.uri.path,
-            location
-                    .split('?')
-                    .first
-                    .replaceFirst(RegExp(r'/posts/1$'), '/posts/12') +
-                (screen == PostScreen ? '' : '/posts/12'),
-          );
+        }
+        await tester.scrollUntilVisible(tail, 300, scrollable: verticalScroll);
+        // Reach the actual scroll end before measuring against the chrome.
+        await tester.drag(verticalScroll, const Offset(0, -2000));
+        await tester.pumpAndSettle();
+        expect(tail, findsOneWidget);
+        expect(
+          tester.element(find.byType(ScaffoldShell)).windowSizeClass,
+          windowClass,
+        );
+        final itemRect = tester.getRect(tail);
+        if (usesBottomNavigation) {
+          final navRect = tester.getRect(find.byType(ResponsiveNavigationBar));
+          expect(itemRect.bottom, lessThanOrEqualTo(navRect.top));
+          expect(itemRect.top, greaterThanOrEqualTo(0));
+          expect(tail.hitTestable(), findsOneWidget);
+        } else {
+          final railRect = tester.getRect(find.byType(AppNavigationRail));
+          expect(itemRect.left, greaterThanOrEqualTo(railRect.right));
+          expect(itemRect.bottom, lessThanOrEqualTo(size.height - 28));
+          expect(find.byType(ResponsiveNavigationBar), findsNothing);
+          expect(tail.hitTestable(), findsOneWidget);
+        }
+        await tester.tap(tail);
+        await tester.pumpAndSettle();
+        expect(
+          fixture.router.routeInformationProvider.value.uri.path,
+          location
+                  .split('?')
+                  .first
+                  .replaceFirst(RegExp(r'/posts/1$'), '/posts/12') +
+              (screen == PostScreen ? '' : '/posts/12'),
+        );
+        expect(
+          fixture
+              .router
+              .routeInformationProvider
+              .value
+              .uri
+              .queryParameters['type'],
+          screen == PostScreen ? 'place' : 'event',
+        );
+        if (screen == SearchResultScreen) {
           expect(
             fixture
                 .router
                 .routeInformationProvider
                 .value
                 .uri
-                .queryParameters['type'],
-            screen == PostScreen ? 'place' : 'event',
+                .queryParameters['q'],
+            'molise',
           );
-          if (screen == SearchResultScreen) {
-            expect(
-              fixture
-                  .router
-                  .routeInformationProvider
-                  .value
-                  .uri
-                  .queryParameters['q'],
-              'molise',
-            );
-          }
-          expect(tester.takeException(), isNull);
-        },
-      );
+        }
+        expect(tester.takeException(), isNull);
+      });
     }
   }
 

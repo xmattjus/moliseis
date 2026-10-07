@@ -37,10 +37,13 @@
       `ScaffoldShell` contract. Keep `ShellRouteVisibility` and
       `BranchDetailPopScope` unchanged unless a failing regression proves an
       independent bug; chrome visibility must not become Back eligibility.
-- [x] 2.4 Add compact and expanded production-router regressions proving main
-      navigation is present and the correct section selected on shell roots,
+- [x] 2.4 Add compact (390), medium (700), expanded (1000) and large (1300)
+      production-router regressions proving main navigation is present and the
+      correct section selected on shell roots,
       Category, direct Post, Category Post, Search Results, Search Post and Map
-      with/without canonical selection.
+      with/without canonical selection. Verify the actual WindowSizeClass,
+      medium horizontal/fixed-width bar and expanded collapsed vs large
+      extended rail.
 
 ## 3. Preserve Gallery and Branch Navigation Semantics
 
@@ -68,7 +71,8 @@
       route ownership fixture for direct Post -> section root,
       Category/Post -> Category, and Search/Post -> Search Results preserving
       `q`. For every case assert exactly one visible route is popped and the
-      expected branch page count/URI remains.
+      expected branch page count and parent path remain. For Search also
+      assert canonical `q`; do not constrain `type` on a parent URI.
 - [x] 4.2 Add one predictive cancel regression on Category/Post: capture URI,
       Explore Navigator page count, `PostScreen State` and `PostViewModel`;
       drive start -> update(non-zero) -> cancel; require every captured value
@@ -84,14 +88,16 @@
 ## 5. Add the go_router 18.0.2 Shell Semantics Regression
 
 - [x] 5.1 Add an app-level widget regression using
-      `tester.ensureSemantics()` that proves compact
+      `tester.ensureSemantics()` that proves compact and medium
       `ResponsiveNavigationBar` Semantics and active routed content Semantics
       coexist on a shell root and after navigation to a nested shell
       destination. Use user-facing labels/roles where practical rather than
       implementation-private widget structure.
 - [x] 5.2 Add the corresponding expanded-window proof for
-      `AppNavigationRail`, including a child-route transition. Require the
-      correct selected section and active routed content to remain present in
+      initially collapsed `AppNavigationRail` at 1000 px, including a
+      child-route transition; keep 1300 px as a separate large/extended-rail
+      regression. Require the correct selected section and active routed
+      content to remain present in
       the Semantics tree.
 - [x] 5.3 Include Search Results in at least one semantics transition because
       it changes from chrome-hidden to chrome-visible in this change.
@@ -101,19 +107,20 @@
 
 ## 6. Prove Compact Content Reachability
 
-- [x] 6.1 Add focused compact tests with enough content to scroll Post,
-      Category and Search Results to their final meaningful/interactive item
+- [x] 6.1 Add focused compact and medium tests with enough content to scroll
+      Post, Category and Search Results to their final meaningful/interactive item
       while the bottom navigation is visible. Require the final item to be
-      brought fully above the navigation and activated where applicable.
+      brought fully above the measured navigation and activated where
+      applicable, including medium grid content with the bottom bar.
 - [x] 6.2 If Post already passes, make no Post production layout change. If it
       fails, use the smallest existing-convention bottom inset/padding fix and
       pin it with the focused test.
 - [x] 6.3 Apply the same fail-first rule independently to Category and Search
       Results. Do not globally disable `extendBody`, create a shell-metrics
       subsystem or change expanded rail geometry to fix compact overlap.
-- [x] 6.4 Verify expanded Post/Category/Search Results continue to use the rail
-      without a compact-only bottom-padding workaround causing visible
-      geometry regressions.
+- [x] 6.4 Verify true expanded (1000 px, collapsed rail) and large (1300 px,
+      extended rail) Post/Category/Search Results preserve content reachability
+      without a bottom-bar padding workaround causing geometry regressions.
 
 ## 7. Strengthen Restoration and Canonical Query State
 
@@ -135,9 +142,10 @@
       `/home/search_results/posts/1?q=molise&type=event` and assert exact path,
       `q`, `type`, Explore/Search declarative ancestry, and the relevant branch
       stack. Then verify normal Back and the reliable Android predictive-Back
-      path each pop exactly to `/home/search_results?q=molise&type=event`,
-      preserving both query parameters without flattening/skipping the
-      restored parent.
+      path each pop to the exact parent path `/home/search_results`, preserving
+      canonical `q=molise` without flattening/skipping the restored parent.
+      Do not require `type` either to remain or to be removed after Back; its
+      presence is required on the restored Post before Back.
 - [x] 7.4 Reuse the production-router restoration pattern/support already
       present in `sync_redirect_test.dart` where practical. A minimal
       extraction into shared **test-only** support is allowed if needed to

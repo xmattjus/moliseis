@@ -114,7 +114,7 @@ Remove `showNavigation` from:
 `ScaffoldShell` always renders:
 
 - compact/medium: `ResponsiveNavigationBar`;
-- expanded: `AppNavigationRail`.
+- expanded and larger: `AppNavigationRail`.
 
 The invariant is:
 
@@ -208,7 +208,7 @@ at least:
   -> /home/category/nature
 
 /home/search_results/posts/1?q=molise&type=event
-  -> /home/search_results?q=molise&type=event
+  -> parent path /home/search_results, with q=molise
 ```
 
 A Category-only predictive commit may be table-driven with the same matrix if
@@ -217,9 +217,13 @@ it materially improves proof without duplication.
 Each commit must pop exactly one visible route and preserve the expected parent
 branch stack.
 
-`go_router` preserves query parameters when removing the child match. The
-Search parent therefore retains both `q` and `type`; no cleanup redirect is
-required.
+Assert the parent path for direct Post and Category/Post. For Search/Post,
+also assert the same canonical `q`. Do not require `type` to remain or to be
+removed from any parent URI.
+
+`go_router` 18.0.2 currently preserves query parameters when removing the
+child match. A retained `type` on the parent is tolerated as inert input; it
+is not part of the application Back contract. No cleanup redirect is required.
 
 Add one high-value cancel case, preferably Category -> Post:
 
@@ -259,9 +263,22 @@ bottom navigation. Their current tail layouts differ:
 - Category ends with a small fixed spacer;
 - Search Results has no dedicated navigation-bottom padding.
 
-Add focused compact tests proving the final meaningful/interactive content of
-each screen can be brought above the app-owned bottom navigation and activated
-where applicable.
+Add focused compact and medium tests proving the final meaningful/interactive
+content of each screen can be brought above the app-owned bottom navigation
+and activated where applicable. Medium combines grid content with the bottom
+bar, whereas compact uses list content.
+
+Use representative widths tied to the actual project classes:
+
+| Width | WindowSizeClass | Navigation mode |
+| --- | --- | --- |
+| 390 px | compact | bottom bar, non-horizontal destination labels |
+| 700 px | medium | bottom bar, horizontal labels and fixed destination width |
+| 1000 px | expanded | initially collapsed rail |
+| 1300 px | large | initially extended rail |
+
+Verify the actual class in the tests. Retain 1300 px as a large regression;
+it does not substitute for the expanded proof at 1000 px.
 
 Only if a screen fails the proof, apply the smallest screen-local inset/padding
 correction following existing conventions.
@@ -288,8 +305,9 @@ changes.
 
 Cover:
 
-- compact `ResponsiveNavigationBar`;
-- expanded `AppNavigationRail`;
+- compact and medium `ResponsiveNavigationBar`;
+- true expanded `AppNavigationRail`, initially collapsed;
+- large extended rail as an additional regression;
 - at least one root-to-detail transition and Search Results;
 - stable selected section.
 
@@ -358,9 +376,11 @@ and assert:
 - `type=event`;
 - Explore/Search parent ancestry is reconstructed by the relevant real route
   definitions;
-- normal Back and the reliable Android predictive-Back path return exactly to
-  `/home/search_results?q=molise&type=event`, preserving the query map rather
-  than flattening/skipping a level.
+- normal Back and the reliable Android predictive-Back path return to the
+  exact parent path `/home/search_results` with `q=molise`, without
+  flattening/skipping a level;
+- post-Back assertions do not constrain whether `type` remains on the parent.
+  The restored Post itself must still retain its canonical `q` and `type`.
 
 Reuse/adapt the existing production-router restoration pattern already present
 in the Sync restoration tests where practical. A minimal extraction into
@@ -428,8 +448,8 @@ timing-sensitive synthetic test merely to claim coverage.
 | active-tab reselect | detail/Search -> branch root |
 | cross-tab return | origin detail route + state/VM retained |
 | Gallery | opaque root route covers shell; pop reveals stable chrome |
-| compact tail | Post/Category/Search final content reachable above nav |
-| expanded | rail visible without compact workaround |
+| compact/medium tail | Post/Category/Search final content reachable above nav |
+| expanded/large | collapsed/extended rail visible without bottom-bar workaround |
 | Semantics | navigation chrome + routed content exposed together |
 | restoration Map | `contentId/type` retained |
 | restoration Search Post | path + `q/type` + parentage retained |
