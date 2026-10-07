@@ -43,7 +43,8 @@ import 'recording_tile_http_client.dart';
 /// The fixture intentionally excludes the production sync redirect, which is
 /// not part of route ownership.
 final class RouteOwnershipFixture {
-  RouteOwnershipFixture() {
+  /// Starts the real Category/Post route factories at [initialLocation].
+  RouteOwnershipFixture({String initialLocation = RoutePaths.home}) {
     eventRepository = FakeEventRepository(
       getByIdResults: <int, Result<Event>>{
         1: Result.success(makeEvent()),
@@ -78,7 +79,7 @@ final class RouteOwnershipFixture {
 
     router = GoRouter(
       navigatorKey: rootNavigatorKey,
-      initialLocation: RoutePaths.home,
+      initialLocation: initialLocation,
       errorBuilder: (_, state) =>
           RouteErrorScreen(uri: state.uri, error: state.error),
       routes: <RouteBase>[
@@ -120,16 +121,6 @@ final class RouteOwnershipFixture {
                           branchIndex: 0,
                         ),
                       ],
-                    ),
-                    GoRoute(
-                      parentNavigatorKey: exploreNavigatorKey,
-                      path: RoutePaths.homeSearchResultsLegacy,
-                      redirect: redirectLegacySearchResults,
-                    ),
-                    GoRoute(
-                      parentNavigatorKey: exploreNavigatorKey,
-                      path: RoutePaths.homeSearchResultsLegacyPost,
-                      redirect: redirectLegacySearchResults,
                     ),
                     postRoute(
                       name: RouteNames.homePost,

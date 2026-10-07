@@ -111,12 +111,11 @@ void main() {
   });
 
   testWidgets('category page belongs to its branch', (tester) async {
-    final fixture = RouteOwnershipFixture();
+    final fixture = RouteOwnershipFixture(
+      initialLocation: '/home/category/nature',
+    );
     addTearDown(fixture.dispose);
     await tester.pumpWidget(fixture.app);
-    await tester.pumpAndSettle();
-
-    fixture.router.go('/home/category/nature');
     await tester.pumpAndSettle();
 
     expect(find.text('Categorie'), findsOneWidget);
@@ -130,12 +129,11 @@ void main() {
   });
 
   testWidgets('post page belongs to its branch', (tester) async {
-    final fixture = RouteOwnershipFixture();
+    final fixture = RouteOwnershipFixture(
+      initialLocation: '/home/posts/1?type=event',
+    );
     addTearDown(fixture.dispose);
     await tester.pumpWidget(fixture.app);
-    await tester.pumpAndSettle();
-
-    fixture.router.go('/home/posts/1?type=event');
     await tester.pumpAndSettle();
 
     expect(find.byType(PostScreen), findsOneWidget);
@@ -149,12 +147,11 @@ void main() {
   });
 
   testWidgets('search results page belongs to its branch', (tester) async {
-    final fixture = RouteOwnershipFixture();
+    final fixture = RouteOwnershipFixture(
+      initialLocation: '/home/search_results?q=molise',
+    );
     addTearDown(fixture.dispose);
     await tester.pumpWidget(fixture.app);
-    await tester.pumpAndSettle();
-
-    fixture.router.go('/home/search_results?q=molise');
     await tester.pumpAndSettle();
 
     expect(find.text('Search molise root'), findsOneWidget);
@@ -195,13 +192,13 @@ void main() {
   testWidgets('back from a category post returns to its category parent', (
     tester,
   ) async {
-    final fixture = RouteOwnershipFixture();
+    final fixture = RouteOwnershipFixture(
+      initialLocation: '/home/category/nature/posts/1?type=event',
+    );
     addTearDown(fixture.dispose);
     await tester.pumpWidget(fixture.app);
     await tester.pumpAndSettle();
 
-    fixture.router.go('/home/category/nature/posts/1?type=event');
-    await tester.pumpAndSettle();
     expect(find.byType(PostScreen), findsOneWidget);
 
     expect(await tester.binding.handlePopRoute(), isTrue);

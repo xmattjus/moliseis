@@ -627,13 +627,14 @@ void main() {
     testWidgets('direct /map renders the default map without selection', (
       tester,
     ) async {
+      tester.binding.platformDispatcher.defaultRouteNameTestValue = '/map';
+      addTearDown(
+        tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+      );
       final harness = _MapHarness();
       final router = _buildTestRouterApp(harness);
 
       await tester.pumpWidget(router.app);
-      await tester.pumpAndSettle();
-
-      router.router.go(RoutePaths.geoMap);
       await tester.pumpAndSettle();
 
       expect(find.byType(GeoMapScreen), findsOneWidget);
@@ -645,11 +646,16 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('legacy random key redirects to the canonical map URI', (
+    testWidgets('former Map key stays in the URI without selecting content', (
       tester,
     ) async {
       final harness = _MapHarness();
-      final router = _buildTestRouterApp(harness);
+      final router = _buildTestRouterApp(
+        harness,
+        eventRepository: FakeEventRepository(
+          getByIdResults: <int, Result<Event>>{1: Result.success(makeEvent())},
+        ),
+      );
 
       await tester.pumpWidget(router.app);
       await tester.pumpAndSettle();
@@ -659,14 +665,38 @@ void main() {
 
       final uri = router.router.routeInformationProvider.value.uri;
       expect(uri.path, RoutePaths.geoMap);
-      expect(uri.queryParameters.containsKey('key'), isFalse);
+      expect(uri.queryParameters['key'], 'legacy');
+      final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
+      expect(map.initialContentId, isNull);
+      expect(map.initialContentType, isNull);
+      expect(map.viewModel.selectedContent, isNull);
+      expect(find.byType(GeoMapModalPost), findsNothing);
       expect(uri.queryParameters['source'], 'restored');
+
+      router.router.go('/map?contentId=1&type=event&key=legacy');
+      await tester.pumpAndSettle();
+      expect(
+        router.router.routeInformationProvider.value.uri.toString(),
+        '/map?contentId=1&type=event&key=legacy',
+      );
+      final selectedMap = tester.widget<GeoMapScreen>(
+        find.byType(GeoMapScreen),
+      );
+      expect(selectedMap.initialContentId, 1);
+      expect(selectedMap.initialContentType, ContentType.event);
+      expect(selectedMap.viewModel.selectedContent?.remoteId, 1);
+      expect(find.byType(GeoMapModalPost), findsOneWidget);
     });
 
     testWidgets('/map?contentId=<event>&type=event selects the event', (
       tester,
     ) async {
       final event = makeEvent(name: 'Evento 1');
+      tester.binding.platformDispatcher.defaultRouteNameTestValue =
+          '/map?contentId=1&type=event';
+      addTearDown(
+        tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+      );
       final harness = _MapHarness();
       final router = _buildTestRouterApp(
         harness,
@@ -676,12 +706,6 @@ void main() {
       );
 
       await tester.pumpWidget(router.app);
-      await tester.pumpAndSettle();
-
-      router.router.goNamed(
-        RouteNames.geoMap,
-        queryParameters: <String, String>{'contentId': '1', 'type': 'event'},
-      );
       await tester.pumpAndSettle();
 
       final mapContext = tester.element(find.byType(GeoMapScreen));
@@ -712,6 +736,11 @@ void main() {
       tester,
     ) async {
       final place = makePlace(remoteId: 3, name: 'Luogo 3');
+      tester.binding.platformDispatcher.defaultRouteNameTestValue =
+          '/map?contentId=3&type=place';
+      addTearDown(
+        tester.binding.platformDispatcher.clearDefaultRouteNameTestValue,
+      );
       final harness = _MapHarness();
       final router = _buildTestRouterApp(
         harness,
@@ -721,12 +750,6 @@ void main() {
       );
 
       await tester.pumpWidget(router.app);
-      await tester.pumpAndSettle();
-
-      router.router.goNamed(
-        RouteNames.geoMap,
-        queryParameters: <String, String>{'contentId': '3', 'type': 'place'},
-      );
       await tester.pumpAndSettle();
 
       final modal = tester.widget<GeoMapModalPost>(

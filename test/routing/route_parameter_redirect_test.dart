@@ -8,25 +8,21 @@ import '../support/route_ownership_fixture.dart';
 
 void main() {
   group('category route parameters', () {
-    const legacyIndexes = <(int, String)>[
-      (0, 'nature'),
-      (1, 'history'),
-      (2, 'folklore'),
-      (3, 'food'),
-      (4, 'allure'),
-      (5, 'experience'),
-    ];
-
-    for (final (index, slug) in legacyIndexes) {
-      testWidgets('legacy index $index redirects to the $slug slug', (
-        tester,
-      ) async {
-        final fixture = RouteOwnershipFixture();
+    for (final slug in <String>[
+      'nature',
+      'history',
+      'folklore',
+      'food',
+      'allure',
+      'experience',
+      'all',
+    ]) {
+      testWidgets('canonical category $slug stays unchanged', (tester) async {
+        final fixture = RouteOwnershipFixture(
+          initialLocation: '/home/category/$slug',
+        );
         addTearDown(fixture.dispose);
         await tester.pumpWidget(fixture.app);
-        await tester.pumpAndSettle();
-
-        fixture.router.go('/home/category/$index');
         await tester.pumpAndSettle();
 
         expect(fixture.uri.path, '/home/category/$slug');
@@ -34,139 +30,79 @@ void main() {
       });
     }
 
-    testWidgets('legacy all-categories index -1 redirects to the all slug', (
-      tester,
-    ) async {
-      final fixture = RouteOwnershipFixture();
-      addTearDown(fixture.dispose);
-      await tester.pumpWidget(fixture.app);
-      await tester.pumpAndSettle();
-
-      fixture.router.go('/home/category/-1');
-      await tester.pumpAndSettle();
-
-      expect(fixture.uri.path, '/home/category/all');
-      expect(find.text('Categorie'), findsOneWidget);
-    });
-
-    testWidgets('legacy index redirect preserves child suffixes and isEvent', (
-      tester,
-    ) async {
-      final fixture = RouteOwnershipFixture();
-      addTearDown(fixture.dispose);
-      await tester.pumpWidget(fixture.app);
-      await tester.pumpAndSettle();
-
-      fixture.router.go('/home/category/0/posts/1?isEvent=true');
-      await tester.pumpAndSettle();
-
-      expect(fixture.uri.path, '/home/category/nature/posts/1');
-      expect(fixture.uri.queryParameters['type'], 'event');
-      expect(find.byType(PostScreen), findsOneWidget);
-    });
-
-    testWidgets('canonical category slugs stay unchanged', (tester) async {
-      final fixture = RouteOwnershipFixture();
-      addTearDown(fixture.dispose);
-      await tester.pumpWidget(fixture.app);
-      await tester.pumpAndSettle();
-
-      fixture.router.go('/home/category/nature');
-      await tester.pumpAndSettle();
-
-      expect(fixture.uri.path, '/home/category/nature');
-      expect(find.text('Categorie'), findsOneWidget);
-    });
-
-    for (final slug in <String>['bogus', 'unknown', '6', '-2']) {
-      testWidgets('invalid category value "$slug" renders the error screen', (
+    for (final slug in <String>[
+      '0',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '-1',
+      'bogus',
+      'unknown',
+      '6',
+      '-2',
+    ]) {
+      testWidgets('invalid category "$slug" errors without rewriting', (
         tester,
       ) async {
-        final fixture = RouteOwnershipFixture();
+        final fixture = RouteOwnershipFixture(
+          initialLocation: '/home/category/$slug',
+        );
         addTearDown(fixture.dispose);
         await tester.pumpWidget(fixture.app);
         await tester.pumpAndSettle();
 
-        fixture.router.go('/home/category/$slug');
-        await tester.pumpAndSettle();
-
+        expect(fixture.uri.path, '/home/category/$slug');
         expect(find.byType(RouteErrorScreen), findsOneWidget);
+        expect(
+          fixture.exploreNavigatorKey.currentState!.widget.pages.length,
+          2,
+        );
+        expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 1);
       });
     }
   });
 
   group('post route parameters', () {
-    testWidgets('legacy isEvent=true redirects to type=event', (tester) async {
-      final fixture = RouteOwnershipFixture();
-      addTearDown(fixture.dispose);
-      await tester.pumpWidget(fixture.app);
-      await tester.pumpAndSettle();
+    for (final location in <String>[
+      '/home/posts/2',
+      '/home/posts/1?isEvent=true',
+      '/home/posts/2?isEvent=false',
+      '/home/posts/1?isEvent=unknown',
+    ]) {
+      testWidgets('$location errors without migrating to type', (tester) async {
+        final fixture = RouteOwnershipFixture(initialLocation: location);
+        addTearDown(fixture.dispose);
+        await tester.pumpWidget(fixture.app);
+        await tester.pumpAndSettle();
 
-      fixture.router.go('/home/posts/1?isEvent=true');
-      await tester.pumpAndSettle();
+        expect(fixture.uri.toString(), location);
+        expect(fixture.uri.queryParameters.containsKey('type'), isFalse);
+        expect(find.byType(RouteErrorScreen), findsOneWidget);
+        expect(find.byType(PostScreen), findsNothing);
+      });
+    }
 
-      expect(fixture.uri.queryParameters['type'], 'event');
-      expect(fixture.uri.queryParameters.containsKey('isEvent'), isFalse);
-      expect(find.byType(PostScreen), findsOneWidget);
-    });
+    for (final (id, type) in <(int, String)>[(1, 'event'), (2, 'place')]) {
+      for (final stale in <String?>[null, 'true', 'false', 'unknown']) {
+        testWidgets('canonical $type accepts stale isEvent=$stale unchanged', (
+          tester,
+        ) async {
+          final location =
+              '/home/posts/$id?type=$type${stale == null ? '' : '&isEvent=$stale'}';
+          final fixture = RouteOwnershipFixture(initialLocation: location);
+          addTearDown(fixture.dispose);
+          await tester.pumpWidget(fixture.app);
+          await tester.pumpAndSettle();
 
-    testWidgets('legacy isEvent=false redirects to type=place', (tester) async {
-      final fixture = RouteOwnershipFixture();
-      addTearDown(fixture.dispose);
-      await tester.pumpWidget(fixture.app);
-      await tester.pumpAndSettle();
-
-      fixture.router.go('/home/posts/2?isEvent=false');
-      await tester.pumpAndSettle();
-
-      expect(fixture.uri.queryParameters['type'], 'place');
-      expect(fixture.uri.queryParameters.containsKey('isEvent'), isFalse);
-    });
-
-    testWidgets('missing type defaults to type=place', (tester) async {
-      final fixture = RouteOwnershipFixture();
-      addTearDown(fixture.dispose);
-      await tester.pumpWidget(fixture.app);
-      await tester.pumpAndSettle();
-
-      fixture.router.go('/home/posts/2');
-      await tester.pumpAndSettle();
-
-      expect(fixture.uri.queryParameters['type'], 'place');
-    });
-
-    testWidgets('canonical type values stay unchanged', (tester) async {
-      final fixture = RouteOwnershipFixture();
-      addTearDown(fixture.dispose);
-      await tester.pumpWidget(fixture.app);
-      await tester.pumpAndSettle();
-
-      fixture.router.go('/home/posts/1?type=event');
-      await tester.pumpAndSettle();
-      expect(fixture.uri.queryParameters['type'], 'event');
-
-      fixture.router.go('/home/posts/2?type=place');
-      await tester.pumpAndSettle();
-      expect(fixture.uri.queryParameters['type'], 'place');
-    });
-
-    testWidgets('canonical type removes a simultaneous legacy isEvent', (
-      tester,
-    ) async {
-      final fixture = RouteOwnershipFixture();
-      addTearDown(fixture.dispose);
-      await tester.pumpWidget(fixture.app);
-      await tester.pumpAndSettle();
-
-      fixture.router.go(
-        '/home/posts/1?type=event&isEvent=false&source=restored',
-      );
-      await tester.pumpAndSettle();
-
-      expect(fixture.uri.queryParameters['type'], 'event');
-      expect(fixture.uri.queryParameters.containsKey('isEvent'), isFalse);
-      expect(fixture.uri.queryParameters['source'], 'restored');
-    });
+          expect(fixture.uri.toString(), location);
+          final post = tester.widget<PostScreen>(find.byType(PostScreen));
+          expect(post.isEvent, type == 'event');
+          expect(post.viewModel.content.remoteId, id);
+        });
+      }
+    }
 
     for (final type in <String>['bogus', 'Event', '']) {
       testWidgets('invalid type "$type" renders the error screen', (
@@ -202,54 +138,64 @@ void main() {
   });
 
   group('search route parameters', () {
-    testWidgets('legacy search path redirects to the q query parameter', (
+    for (final location in <String>[
+      '/home/search_results/molise',
+      '/home/search_results/molise/posts/1?type=event',
+      '/home/search_results/molise?q=other',
+    ]) {
+      testWidgets('legacy Search $location is unmatched without rewriting', (
+        tester,
+      ) async {
+        final fixture = RouteOwnershipFixture(initialLocation: location);
+        addTearDown(fixture.dispose);
+        await tester.pumpWidget(fixture.app);
+        await tester.pumpAndSettle();
+
+        expect(fixture.uri.toString(), location);
+        expect(
+          fixture.router.configuration.findMatch(fixture.uri).isError,
+          isTrue,
+        );
+        expect(find.byType(RouteErrorScreen), findsOneWidget);
+        expect(find.byType(PostScreen), findsNothing);
+      });
+    }
+
+    testWidgets('cold Search Post reconstructs its Search parent', (
       tester,
     ) async {
-      final fixture = RouteOwnershipFixture();
+      final fixture = RouteOwnershipFixture(
+        initialLocation: '/home/search_results/posts/1?q=molise&type=event',
+      );
       addTearDown(fixture.dispose);
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
 
-      fixture.router.go('/home/search_results/molise');
+      expect(
+        fixture.uri.toString(),
+        '/home/search_results/posts/1?q=molise&type=event',
+      );
+      expect(find.byType(PostScreen), findsOneWidget);
+      expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 3);
+      expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 1);
+      fixture.router.pop();
       await tester.pumpAndSettle();
-
       expect(fixture.uri.path, '/home/search_results');
       expect(fixture.uri.queryParameters['q'], 'molise');
       expect(find.text('Search molise root'), findsOneWidget);
     });
 
-    testWidgets('legacy search post redirects to the canonical q and type', (
-      tester,
-    ) async {
-      final fixture = RouteOwnershipFixture();
+    testWidgets('missing Search q remains an empty query', (tester) async {
+      final fixture = RouteOwnershipFixture(
+        initialLocation: '/home/search_results',
+      );
       addTearDown(fixture.dispose);
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
 
-      fixture.router.go('/home/search_results/molise/posts/1?isEvent=true');
-      await tester.pumpAndSettle();
-
-      expect(fixture.uri.path, '/home/search_results/posts/1');
-      expect(fixture.uri.queryParameters['q'], 'molise');
-      expect(fixture.uri.queryParameters['type'], 'event');
-      expect(find.byType(PostScreen), findsOneWidget);
+      expect(fixture.uri.toString(), '/home/search_results');
+      expect(find.text('Search  root'), findsOneWidget);
     });
-
-    testWidgets(
-      'legacy search path value is authoritative over an existing q',
-      (tester) async {
-        final fixture = RouteOwnershipFixture();
-        addTearDown(fixture.dispose);
-        await tester.pumpWidget(fixture.app);
-        await tester.pumpAndSettle();
-
-        fixture.router.go('/home/search_results/molise?q=other');
-        await tester.pumpAndSettle();
-
-        expect(fixture.uri.path, '/home/search_results');
-        expect(fixture.uri.queryParameters['q'], 'molise');
-      },
-    );
 
     for (final text in <String>[
       'molise interno',
@@ -274,11 +220,40 @@ void main() {
         expect(fixture.uri.path, '/home/search_results');
         expect(fixture.uri.queryParameters['q'], text);
         expect(find.text('Search $text root'), findsOneWidget);
+
+        fixture.router.goNamed(
+          RouteNames.homeSearchResultPost,
+          pathParameters: <String, String>{'id': '1'},
+          queryParameters: <String, String>{'q': text, 'type': 'event'},
+        );
+        await tester.pumpAndSettle();
+        expect(fixture.uri.path, '/home/search_results/posts/1');
+        expect(fixture.uri.queryParameters, <String, String>{
+          'q': text,
+          'type': 'event',
+        });
+        expect(
+          tester
+              .widget<PostScreen>(find.byType(PostScreen))
+              .viewModel
+              .content
+              .remoteId,
+          1,
+        );
+        expect(
+          fixture.exploreNavigatorKey.currentState!.widget.pages.length,
+          3,
+        );
+        expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 1);
+
+        fixture.router.pop();
+        await tester.pumpAndSettle();
+        expect(fixture.uri.path, '/home/search_results');
+        expect(fixture.uri.queryParameters['q'], text);
+        expect(find.text('Search $text root'), findsOneWidget);
       });
 
-      testWidgets('legacy search path "$text" redirects with the same query', (
-        tester,
-      ) async {
+      testWidgets('legacy search path "$text" is unmatched', (tester) async {
         final fixture = RouteOwnershipFixture();
         addTearDown(fixture.dispose);
         await tester.pumpWidget(fixture.app);
@@ -287,9 +262,16 @@ void main() {
         fixture.router.go('/home/search_results/${Uri.encodeComponent(text)}');
         await tester.pumpAndSettle();
 
-        expect(fixture.uri.path, '/home/search_results');
-        expect(fixture.uri.queryParameters['q'], text);
-        expect(find.text('Search $text root'), findsOneWidget);
+        expect(
+          fixture.uri.path,
+          '/home/search_results/${Uri.encodeComponent(text)}',
+        );
+        expect(fixture.uri.queryParameters.containsKey('q'), isFalse);
+        expect(
+          fixture.router.configuration.findMatch(fixture.uri).isError,
+          isTrue,
+        );
+        expect(find.byType(RouteErrorScreen), findsOneWidget);
       });
     }
   });

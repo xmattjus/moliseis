@@ -372,16 +372,6 @@ GoRouter buildAppRouter({
                       ),
                     ],
                   ),
-                  GoRoute(
-                    parentNavigatorKey: _exploreShellNavigatorKey,
-                    path: RoutePaths.homeSearchResultsLegacy,
-                    redirect: redirectLegacySearchResults,
-                  ),
-                  GoRoute(
-                    parentNavigatorKey: _exploreShellNavigatorKey,
-                    path: RoutePaths.homeSearchResultsLegacyPost,
-                    redirect: redirectLegacySearchResults,
-                  ),
                   postRoute(
                     name: RouteNames.homePost,
                     parentNavigatorKey: _exploreShellNavigatorKey,
@@ -477,7 +467,6 @@ GoRouter buildAppRouter({
               GoRoute(
                 path: RoutePaths.geoMap,
                 name: RouteNames.geoMap,
-                redirect: _redirectLegacyMapKey,
                 builder: (context, state) {
                   final contentId = RouteParameters.contentId(
                     state.uri.queryParameters['contentId'],
@@ -612,16 +601,4 @@ String? _validatedFrom(BuildContext context, String? from) {
   if (GoRouter.of(context).configuration.findMatch(uri).isError) return null;
 
   return from;
-}
-
-/// Canonicalizes restored map locations that carried the old random key.
-///
-/// Compatibility marker: the `key` query parameter is supported only for
-/// restored pre-2.3.0 locations and can be removed in the next major release.
-String? _redirectLegacyMapKey(BuildContext _, GoRouterState state) {
-  final query = state.uri.queryParameters;
-  if (!query.containsKey('key')) return null;
-
-  final canonicalQuery = <String, String>{...query}..remove('key');
-  return state.uri.replace(queryParameters: canonicalQuery).toString();
 }

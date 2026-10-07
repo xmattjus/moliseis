@@ -12,9 +12,6 @@ import 'package:moliseis/domain/models/content_type.dart';
 /// - Content type: `type=event` or `type=place` query parameter.
 /// - Search: `q=<query>` query parameter.
 /// - Content id: a positive integer path parameter.
-///
-/// Legacy numeric category indexes, `isEvent` booleans, and search paths are
-/// decoded here so route redirects can canonicalize restored locations.
 abstract final class RouteParameters {
   /// The canonical slug that selects every category.
   static const allCategorySlug = 'all';
@@ -25,24 +22,10 @@ abstract final class RouteParameters {
   /// The canonical content type value for places.
   static const placeType = 'place';
 
-  /// The navigable category slugs in canonical order.
-  ///
-  /// Index `i` of this list corresponds to legacy category index `i`, and
-  /// legacy index `-1` corresponds to [allCategorySlug].
-  static const List<String> categorySlugs = <String>[
-    'nature',
-    'history',
-    'folklore',
-    'food',
-    'allure',
-    'experience',
-  ];
-
   /// Encodes [category] into its canonical URL slug.
   ///
   /// [ContentCategory.unknown] is not navigable, so it is encoded as
-  /// [allCategorySlug], matching the legacy behavior where an unknown category
-  /// index produced the "all categories" location.
+  /// [allCategorySlug] to select all categories.
   static String categorySlug(ContentCategory category) => switch (category) {
     ContentCategory.unknown => allCategorySlug,
     ContentCategory.nature => 'nature',
@@ -66,22 +49,6 @@ abstract final class RouteParameters {
     'experience' => ContentCategory.experience,
     _ => null,
   };
-
-  /// Decodes a legacy numeric category [index] into a canonical slug.
-  ///
-  /// Legacy index `-1` (the "all categories" location) decodes to
-  /// [allCategorySlug]; indexes `0..5` decode to the navigable categories in
-  /// declaration order. Returns null for out-of-range indexes, which must
-  /// render the router error UI rather than be silently accepted.
-  static String? categorySlugFromLegacyIndex(int index) {
-    if (index == -1) {
-      return allCategorySlug;
-    }
-    if (index >= 0 && index < categorySlugs.length) {
-      return categorySlugs[index];
-    }
-    return null;
-  }
 
   /// Decodes the canonical content type [value] into a [ContentType].
   ///

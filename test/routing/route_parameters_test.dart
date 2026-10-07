@@ -65,32 +65,6 @@ void main() {
     });
   });
 
-  group('RouteParameters.categorySlugFromLegacyIndex', () {
-    test('decodes the all-categories index', () {
-      expect(
-        RouteParameters.categorySlugFromLegacyIndex(-1),
-        RouteParameters.allCategorySlug,
-      );
-    });
-
-    test('decodes every navigable legacy index in declaration order', () {
-      expect(RouteParameters.categorySlugFromLegacyIndex(0), 'nature');
-      expect(RouteParameters.categorySlugFromLegacyIndex(1), 'history');
-      expect(RouteParameters.categorySlugFromLegacyIndex(2), 'folklore');
-      expect(RouteParameters.categorySlugFromLegacyIndex(3), 'food');
-      expect(RouteParameters.categorySlugFromLegacyIndex(4), 'allure');
-      expect(RouteParameters.categorySlugFromLegacyIndex(5), 'experience');
-    });
-
-    test('returns null for out-of-range indexes', () {
-      expect(RouteParameters.categorySlugFromLegacyIndex(6), isNull);
-      expect(RouteParameters.categorySlugFromLegacyIndex(7), isNull);
-      expect(RouteParameters.categorySlugFromLegacyIndex(-2), isNull);
-      expect(RouteParameters.categorySlugFromLegacyIndex(-100), isNull);
-      expect(RouteParameters.categorySlugFromLegacyIndex(100), isNull);
-    });
-  });
-
   group('RouteParameters.contentType', () {
     test('decodes event and place', () {
       expect(RouteParameters.contentType('event'), ContentType.event);
