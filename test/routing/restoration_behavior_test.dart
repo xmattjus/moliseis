@@ -86,6 +86,9 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.text('Map root'), findsOneWidget);
           expect(after.uri.path, '/map');
+          // Synthetic route-match/URI retention only, not Map selection.
+          expect(after.uri.queryParameters['contentId'], '5');
+          expect(after.uri.queryParameters['type'], 'event');
 
           // The restored router stays fully functional: pop the restored
           // gallery and open it again from a fresh navigation.

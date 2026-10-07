@@ -208,7 +208,7 @@ at least:
   -> /home/category/nature
 
 /home/search_results/posts/1?q=molise&type=event
-  -> /home/search_results?q=molise
+  -> /home/search_results?q=molise&type=event
 ```
 
 A Category-only predictive commit may be table-driven with the same matrix if
@@ -216,6 +216,10 @@ it materially improves proof without duplication.
 
 Each commit must pop exactly one visible route and preserve the expected parent
 branch stack.
+
+`go_router` preserves query parameters when removing the child match. The
+Search parent therefore retains both `q` and `type`; no cleanup redirect is
+required.
 
 Add one high-value cancel case, preferably Category -> Post:
 
@@ -355,7 +359,8 @@ and assert:
 - Explore/Search parent ancestry is reconstructed by the relevant real route
   definitions;
 - normal Back and the reliable Android predictive-Back path return exactly to
-  Search Results with `q=molise`, rather than flattening/skipping a level.
+  `/home/search_results?q=molise&type=event`, preserving the query map rather
+  than flattening/skipping a level.
 
 Reuse/adapt the existing production-router restoration pattern already present
 in the Sync restoration tests where practical. A minimal extraction into

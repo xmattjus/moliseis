@@ -16,6 +16,7 @@ import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/media.dart';
@@ -29,17 +30,23 @@ import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/routing/router.dart';
+import 'package:moliseis/ui/category/widgets/category_screen.dart';
 import 'package:moliseis/ui/core/ui/app_navigation_rail.dart';
+import 'package:moliseis/ui/core/ui/content/content_base_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/responsive_navigation_bar.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
+import 'package:moliseis/ui/event/widgets/events_screen.dart';
+import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
+import 'package:moliseis/ui/favourite/widgets/favourite_screen.dart';
 import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_post.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_screen.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
+import 'package:moliseis/ui/search/widgets/search_result_screen.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
@@ -98,10 +105,12 @@ void main() {
       expect(postNavigator.widget.pages.length, 2);
       expect(tester.state(postFinder), same(postState));
     },
-    // go_router 18.0.1 consumes Map-root Back with an inactive stacked branch.
+    // Reproduced on go_router 18.0.2: Map-root Back returns true while the
+    // inactive Post keeps its two pages, mounted State and State identity.
     // https://github.com/flutter/flutter/issues/188018
     // https://github.com/flutter/packages/pull/11910
-    // Both are open. Unskip after a released fix makes handlePopRoute false
+    // Both remain open as checked on 2026-10-07. Unskip after a released fix
+    // makes handlePopRoute false
     // while preserving the inactive Post State and stack.
     skip: true,
   );
@@ -129,8 +138,9 @@ void main() {
       );
       final mapState = tester.state(mapFinder);
       final mapViewModel = tester.widget<GeoMapScreen>(mapFinder).viewModel;
-      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isTrue);
+      expect(shellFinder, findsOneWidget);
       expect(chromeFinder, findsOneWidget);
+      final chromeRect = tester.getRect(chromeFinder);
 
       final media = Media(
         remoteId: 1,
@@ -153,8 +163,17 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byType(GalleryPreviewScreen), findsOneWidget);
-      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isTrue);
+      final galleryContext = tester.element(find.byType(GalleryPreviewScreen));
+      expect(ModalRoute.of(galleryContext)!.opaque, isTrue);
+      expect(Navigator.of(galleryContext).widget.pages.length, 2);
+      expect(find.byType(ResponsiveNavigationBar), findsNothing);
+      expect(find.byType(AppNavigationRail), findsNothing);
+      expect(shellFinder, findsOneWidget);
       expect(chromeFinder, findsOneWidget);
+      expect(
+        tester.getRect(find.byType(GalleryPreviewScreen)),
+        Offset.zero & size,
+      );
       expect(tester.state(mapFinder), same(mapState));
       expect(
         tester.widget<GeoMapScreen>(mapFinder).viewModel,
@@ -164,8 +183,9 @@ void main() {
       expect(await tester.binding.handlePopRoute(), isTrue);
       await tester.pumpAndSettle();
       expect(find.byType(GalleryPreviewScreen), findsNothing);
-      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isTrue);
+      expect(shellFinder, findsOneWidget);
       expect(chromeFinder, findsOneWidget);
+      expect(tester.getRect(chromeFinder), chromeRect);
       expect(tester.state(mapFinder), same(mapState));
       expect(
         tester.widget<GeoMapScreen>(mapFinder).viewModel,
@@ -174,56 +194,361 @@ void main() {
     });
   }
 
-  testWidgets('NAV-02 Explore detail chrome stays hidden under Gallery', (
-    tester,
-  ) async {
-    final harness = _MapHarness();
-    final router = _buildTestRouterApp(
-      harness,
-      eventRepository: FakeEventRepository(
-        getByIdResults: <int, Result<Event>>{1: Result.success(makeEvent())},
-      ),
-    );
-    addTearDown(router.router.dispose);
-    await tester.pumpWidget(router.app);
-
-    final media = Media(
-      remoteId: 1,
-      url: 'https://example.com/gallery.jpg',
-      width: 800,
-      height: 600,
-      createdAt: DateTime.utc(2026),
-      modifiedAt: DateTime.utc(2026),
-      areaName: 'Molise',
-      cityName: 'Campobasso',
-    );
-    final shellFinder = find.byType(ScaffoldShell, skipOffstage: false);
-    for (final location in <String>[
-      '/home/search_results?q=molise',
-      '/home/category/nature',
-      '/home/posts/1?type=event',
-    ]) {
-      router.router.go(location);
-      await tester.pumpAndSettle();
-      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isFalse);
-
-      unawaited(
-        router.router.pushNamed<void>(
-          RouteNames.gallery,
-          extra: GalleryPreviewRouteData(
-            media: <Media>[media],
-            initialIndex: 0,
-          ).toExtra(),
+  testWidgets(
+    'NAV-02 Explore detail retains persistent chrome beneath opaque Gallery',
+    (tester) async {
+      final harness = _MapHarness();
+      final router = _buildTestRouterApp(
+        harness,
+        eventRepository: FakeEventRepository(
+          getByIdResults: <int, Result<Event>>{1: Result.success(makeEvent())},
         ),
       );
-      await tester.pumpAndSettle();
-      expect(find.byType(GalleryPreviewScreen), findsOneWidget);
-      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isFalse);
-      expect(await tester.binding.handlePopRoute(), isTrue);
-      await tester.pumpAndSettle();
-      expect(tester.widget<ScaffoldShell>(shellFinder).showNavigation, isFalse);
+      addTearDown(router.router.dispose);
+      await tester.pumpWidget(router.app);
+
+      final media = Media(
+        remoteId: 1,
+        url: 'https://example.com/gallery.jpg',
+        width: 800,
+        height: 600,
+        createdAt: DateTime.utc(2026),
+        modifiedAt: DateTime.utc(2026),
+        areaName: 'Molise',
+        cityName: 'Campobasso',
+      );
+      final shellFinder = find.byType(ScaffoldShell, skipOffstage: false);
+      final chromeFinder = find.byType(
+        ResponsiveNavigationBar,
+        skipOffstage: false,
+      );
+      for (final location in <String>[
+        '/home/search_results?q=molise',
+        '/home/category/nature',
+        '/home/posts/1?type=event',
+      ]) {
+        router.router.go(location);
+        await tester.pumpAndSettle();
+        expect(shellFinder, findsOneWidget);
+        expect(chromeFinder, findsOneWidget);
+        final chromeRect = tester.getRect(chromeFinder);
+
+        unawaited(
+          router.router.pushNamed<void>(
+            RouteNames.gallery,
+            extra: GalleryPreviewRouteData(
+              media: <Media>[media],
+              initialIndex: 0,
+            ).toExtra(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(GalleryPreviewScreen), findsOneWidget);
+        final galleryContext = tester.element(
+          find.byType(GalleryPreviewScreen),
+        );
+        expect(ModalRoute.of(galleryContext)!.opaque, isTrue);
+        expect(Navigator.of(galleryContext).widget.pages.length, 2);
+        expect(find.byType(ResponsiveNavigationBar), findsNothing);
+        expect(find.byType(AppNavigationRail), findsNothing);
+        expect(shellFinder, findsOneWidget);
+        expect(chromeFinder, findsOneWidget);
+        expect(await tester.binding.handlePopRoute(), isTrue);
+        await tester.pumpAndSettle();
+        expect(shellFinder, findsOneWidget);
+        expect(chromeFinder, findsOneWidget);
+        expect(tester.getRect(chromeFinder), chromeRect);
+      }
+    },
+  );
+
+  for (final size in <Size>[const Size(390, 844), const Size(1300, 900)]) {
+    testWidgets('structural shell chrome and selected section at $size', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final fixture = _buildTestRouterApp(
+        _MapHarness(),
+        eventRepository: FakeEventRepository(
+          getByIdResults: <int, Result<Event>>{1: Result.success(makeEvent())},
+        ),
+      );
+      addTearDown(fixture.router.dispose);
+      await tester.pumpWidget(fixture.app);
+      for (final (location, index, screen) in <(String, int, Type)>[
+        ('/home', 0, ExploreScreen),
+        ('/favourites', 1, FavouriteScreen),
+        ('/events', 2, EventsScreen),
+        ('/map', 3, GeoMapScreen),
+        ('/map?contentId=1&type=event', 3, GeoMapScreen),
+        ('/home/category/nature', 0, CategoryScreen),
+        ('/favourites/category/nature', 1, CategoryScreen),
+        ('/events/category/nature', 2, CategoryScreen),
+        ('/home/posts/1?type=event', 0, PostScreen),
+        ('/favourites/posts/1?type=event', 1, PostScreen),
+        ('/events/posts/1?type=event', 2, PostScreen),
+        ('/home/category/nature/posts/1?type=event', 0, PostScreen),
+        ('/favourites/category/nature/posts/1?type=event', 1, PostScreen),
+        ('/events/category/nature/posts/1?type=event', 2, PostScreen),
+        ('/home/search_results?q=molise', 0, SearchResultScreen),
+        ('/home/search_results/posts/1?q=molise&type=event', 0, PostScreen),
+      ]) {
+        fixture.router.go(location);
+        await tester.pumpAndSettle();
+        expect(
+          fixture.router.routeInformationProvider.value.uri.toString(),
+          location,
+        );
+        expect(find.byType(screen), findsOneWidget);
+        expect(
+          StatefulNavigationShell.of(
+            tester.element(find.byType(screen)),
+          ).currentIndex,
+          index,
+        );
+        if (size.width == 390) {
+          expect(
+            tester
+                .widget<ResponsiveNavigationBar>(
+                  find.byType(ResponsiveNavigationBar),
+                )
+                .selectedIndex,
+            index,
+          );
+          expect(find.byType(AppNavigationRail), findsNothing);
+        } else {
+          expect(
+            tester
+                .widget<AppNavigationRail>(find.byType(AppNavigationRail))
+                .selectedIndex,
+            index,
+          );
+          expect(find.byType(ResponsiveNavigationBar), findsNothing);
+        }
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in <Size>[const Size(390, 844), const Size(1300, 900)]) {
+    testWidgets(
+      'production shell chrome and routed content share Semantics at $size',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final fixture = _buildTestRouterApp(
+            _MapHarness(),
+            eventRepository: FakeEventRepository(
+              getByIdResults: <int, Result<Event>>{
+                1: Result.success(makeEvent(name: 'Semantics Post')),
+              },
+            ),
+          );
+          addTearDown(fixture.router.dispose);
+          await tester.pumpWidget(fixture.app);
+          for (final (location, contentLabel) in <(String, String)>[
+            ('/home', 'Molise Is'),
+            ('/home/posts/1?type=event', 'Semantics Post'),
+            ('/home/category/nature', 'Categorie'),
+            ('/home/search_results?q=molise', 'Risultati'),
+          ]) {
+            fixture.router.go(location);
+            await tester.pumpAndSettle();
+            for (final label in <String>[
+              'Esplora',
+              'Preferiti',
+              'Eventi',
+              'Mappa',
+            ]) {
+              final destination = find.descendant(
+                of: find.byType(
+                  size.width == 390
+                      ? ResponsiveNavigationBar
+                      : AppNavigationRail,
+                ),
+                matching: find.bySemanticsLabel(RegExp(label)),
+              );
+              expect(destination, findsOneWidget);
+              expect(
+                tester
+                    .getSemantics(destination)
+                    .getSemanticsData()
+                    .flagsCollection
+                    .isSelected
+                    .toBoolOrNull(),
+                label == 'Esplora',
+              );
+            }
+            expect(find.bySemanticsLabel(RegExp(contentLabel)), findsOneWidget);
+            if (size.width == 390) {
+              expect(
+                tester
+                    .widget<ResponsiveNavigationBar>(
+                      find.byType(ResponsiveNavigationBar),
+                    )
+                    .selectedIndex,
+                0,
+              );
+            } else {
+              expect(
+                tester
+                    .widget<AppNavigationRail>(find.byType(AppNavigationRail))
+                    .selectedIndex,
+                0,
+              );
+            }
+          }
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+  }
+
+  for (final size in <Size>[const Size(390, 844), const Size(1300, 900)]) {
+    for (final (location, screen) in <(String, Type)>[
+      ('/home/posts/1?type=event', PostScreen),
+      ('/home/category/nature', CategoryScreen),
+      ('/home/search_results?q=molise', SearchResultScreen),
+    ]) {
+      testWidgets(
+        'final $screen content is reachable above shell chrome at $size',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          tester.view.viewPadding = const FakeViewPadding(bottom: 28);
+          tester.view.padding = const FakeViewPadding(bottom: 28);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetViewPadding);
+          addTearDown(tester.view.resetPadding);
+          final items = <Event>[
+            for (var id = 1; id <= 12; id++)
+              makeEvent(
+                remoteId: id,
+                name: 'Content ${id.toString().padLeft(2, '0')}',
+                category: ContentCategory.nature,
+              ),
+          ];
+          final repository = FakeEventRepository(
+            getByIdResults: <int, Result<Event>>{
+              for (final item in items) item.remoteId: Result.success(item),
+            },
+            getByCategoriesResult: Result.success(items),
+          );
+          final nearbyPlace = makePlace(
+            remoteId: 12,
+            name: 'Final nearby place',
+          );
+          final fixture = _buildTestRouterApp(
+            _MapHarness(),
+            eventRepository: repository,
+            placeRepository: FakePlaceRepository(
+              getByCoordinatesResult: Result.success(<Place>[nearbyPlace]),
+              getByIdResults: {12: Result.success(nearbyPlace)},
+            ),
+            searchRepository: FakeSearchRepository(
+              resultsByQueryResult: Result.success(items),
+            ),
+          );
+          addTearDown(fixture.router.dispose);
+          await tester.pumpWidget(fixture.app);
+          fixture.router.go(location);
+          await tester.pumpAndSettle();
+          final tail = screen == PostScreen
+              ? find.byWidgetPredicate(
+                  (widget) =>
+                      widget is ContentBaseCardGridItem &&
+                      widget.content is Place &&
+                      widget.content.remoteId == 12,
+                )
+              : find.byKey(
+                  ValueKey<String>(
+                    '${size.width == 390 ? 'list' : 'grid'}-item:12-11',
+                  ),
+                );
+          final verticalScroll = find
+              .descendant(
+                of: find.byType(screen),
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                ),
+              )
+              .last;
+          if (screen == PostScreen) {
+            await tester.drag(verticalScroll, const Offset(0, -2000));
+            // Materializing the last sliver loads nearby repository content.
+            await tester.pumpAndSettle();
+          }
+          await tester.scrollUntilVisible(
+            tail,
+            300,
+            scrollable: verticalScroll,
+          );
+          // Reach the actual scroll end before measuring against the chrome.
+          await tester.drag(verticalScroll, const Offset(0, -2000));
+          await tester.pumpAndSettle();
+          expect(tail, findsOneWidget);
+          final itemRect = tester.getRect(tail);
+          if (size.width == 390) {
+            final navRect = tester.getRect(
+              find.byType(ResponsiveNavigationBar),
+            );
+            expect(itemRect.bottom, lessThanOrEqualTo(navRect.top));
+            expect(itemRect.top, greaterThanOrEqualTo(0));
+            expect(tail.hitTestable(), findsOneWidget);
+          } else {
+            final railRect = tester.getRect(find.byType(AppNavigationRail));
+            expect(itemRect.left, greaterThanOrEqualTo(railRect.right));
+            expect(itemRect.bottom, lessThanOrEqualTo(size.height - 28));
+            expect(find.byType(ResponsiveNavigationBar), findsNothing);
+            expect(tail.hitTestable(), findsOneWidget);
+          }
+          await tester.tap(tail);
+          await tester.pumpAndSettle();
+          expect(
+            fixture.router.routeInformationProvider.value.uri.path,
+            location
+                    .split('?')
+                    .first
+                    .replaceFirst(RegExp(r'/posts/1$'), '/posts/12') +
+                (screen == PostScreen ? '' : '/posts/12'),
+          );
+          expect(
+            fixture
+                .router
+                .routeInformationProvider
+                .value
+                .uri
+                .queryParameters['type'],
+            screen == PostScreen ? 'place' : 'event',
+          );
+          if (screen == SearchResultScreen) {
+            expect(
+              fixture
+                  .router
+                  .routeInformationProvider
+                  .value
+                  .uri
+                  .queryParameters['q'],
+              'molise',
+            );
+          }
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
-  });
+  }
 
   group('buildAppRouter geoMap selection', () {
     testWidgets(

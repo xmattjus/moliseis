@@ -55,10 +55,7 @@ final class TargetTopologyFixture {
           restorationScopeId: 'appShell',
           pageBuilder: (_, state, navigationShell) => MaterialPage<void>(
             restorationId: 'appShellPage',
-            child: ScaffoldShell(
-              navigationShell: navigationShell,
-              showNavigation: state.topRoute?.path.startsWith('/') ?? false,
-            ),
+            child: ScaffoldShell(navigationShell: navigationShell),
           ),
           branches: <StatefulShellBranch>[
             _branch(

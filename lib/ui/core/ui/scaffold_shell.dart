@@ -13,13 +13,11 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class ScaffoldShell extends StatelessWidget {
   const ScaffoldShell({
     required StatefulNavigationShell navigationShell,
-    required this.showNavigation,
     Key? key,
   }) : _navigationShell = navigationShell,
        super(key: key ?? const ValueKey('ScaffoldShell'));
 
   final StatefulNavigationShell _navigationShell;
-  final bool showNavigation;
 
   @override
   Widget build(BuildContext context) {
@@ -33,8 +31,7 @@ class ScaffoldShell extends StatelessWidget {
         child: Scaffold(
           body: Row(
             children: <Widget>[
-              if (showNavigation &&
-                  windowSizeClass.isAtLeast(WindowSizeClass.expanded))
+              if (windowSizeClass.isAtLeast(WindowSizeClass.expanded))
                 AppNavigationRail(
                   selectedIndex: _navigationShell.currentIndex,
                   onDestinationSelected: _onDestinationSelected,
@@ -43,8 +40,7 @@ class ScaffoldShell extends StatelessWidget {
               Expanded(child: _navigationShell),
             ],
           ),
-          bottomNavigationBar:
-              showNavigation && windowSizeClass.isAtMost(WindowSizeClass.medium)
+          bottomNavigationBar: windowSizeClass.isAtMost(WindowSizeClass.medium)
               ? ResponsiveNavigationBar(
                   selectedIndex: _navigationShell.currentIndex,
                   onDestinationSelected: _onDestinationSelected,

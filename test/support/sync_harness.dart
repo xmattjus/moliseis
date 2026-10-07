@@ -224,3 +224,118 @@ List<SingleChildWidget> buildSyncProviders(
     ChangeNotifierProvider<AdminAuthViewModel>.value(value: auth.viewModel),
   ];
 }
+
+/// Rebuilds the production router with a fresh [SyncViewModel] on restoration.
+final class SyncRestorationFixture {
+  SyncRestorationFixture({
+    required FakeSettingsRepository settings,
+    FakeEventRepository? eventRepository,
+  }) : _eventRepository = eventRepository {
+    harness = SyncHarness(settings: settings);
+    auth = ControllableAdminAuth();
+    router = buildAppRouter(
+      syncViewModel: harness.viewModel,
+      adminAuthViewModel: auth.viewModel,
+    );
+  }
+
+  final FakeEventRepository? _eventRepository;
+
+  /// Auth lifecycle belonging to this router instance.
+  late final ControllableAdminAuth auth;
+
+  /// Fresh sync state, with the gate released during disposal if needed.
+  late final SyncHarness harness;
+
+  /// Real application router, including its restoration scopes and pages.
+  late final GoRouter router;
+
+  /// Production providers and MaterialApp restoration root.
+  Widget get app => MultiProvider(
+    providers: buildSyncProviders(
+      harness,
+      auth: auth,
+      eventRepository: _eventRepository,
+    ),
+    child: MaterialApp.router(
+      scaffoldMessengerKey: $scaffoldMessengerKey,
+      restorationScopeId: 'app',
+      routerConfig: router,
+    ),
+  );
+
+  /// Detaches routing before releasing any pending sync and disposing state.
+  void dispose() {
+    router.dispose();
+    auth.dispose();
+
+    final sync = harness.viewModel.sync;
+    if (!sync.running) {
+      harness.viewModel.dispose();
+      return;
+    }
+
+    void disposeWhenComplete() {
+      if (sync.running) return;
+
+      sync.removeListener(disposeWhenComplete);
+      scheduleMicrotask(harness.viewModel.dispose);
+    }
+
+    // Detach the router before unblocking the command. It may notify while
+    // completing, so dispose the view model only after that notification.
+    sync.addListener(disposeWhenComplete);
+    final gate = harness.gate;
+    if (gate != null && !gate.isCompleted) gate.complete();
+  }
+}
+
+/// Holds test state that can either persist or be recreated on restoration.
+final class SyncRestorationHolder {
+  SyncRestorationHolder({
+    required this.settingsFactory,
+    this.eventRepositoryFactory,
+  });
+
+  /// Supplies persisted or fresh settings for each process reconstruction.
+  final FakeSettingsRepository Function() settingsFactory;
+
+  /// Supplies deterministic content dependencies for each reconstruction.
+  final FakeEventRepository Function()? eventRepositoryFactory;
+
+  /// Fixture belonging to the currently mounted harness instance.
+  SyncRestorationFixture? fixture;
+}
+
+/// Recreates the production router and providers after process restoration.
+class RestorableSyncHarness extends StatefulWidget {
+  const RestorableSyncHarness({required this.holder, super.key});
+
+  /// Retains test access across replacement of the entire router and state.
+  final SyncRestorationHolder holder;
+
+  @override
+  State<RestorableSyncHarness> createState() => _RestorableSyncHarnessState();
+}
+
+class _RestorableSyncHarnessState extends State<RestorableSyncHarness> {
+  late final SyncRestorationFixture fixture = SyncRestorationFixture(
+    settings: widget.holder.settingsFactory(),
+    eventRepository: widget.holder.eventRepositoryFactory?.call(),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    widget.holder.fixture = fixture;
+  }
+
+  @override
+  void dispose() {
+    fixture.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => fixture.app;
+}

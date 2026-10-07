@@ -4,17 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
-import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
-import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
@@ -403,9 +400,9 @@ void main() {
     ) async {
       // Persist a recent timestamp so the fresh view model skips auto-sync.
       final settings = FakeSettingsRepository(lastSyncedAt: DateTime.now());
-      final holder = _SyncRestorationHolder(settingsFactory: () => settings);
+      final holder = SyncRestorationHolder(settingsFactory: () => settings);
 
-      await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
+      await tester.pumpWidget(RestorableSyncHarness(holder: holder));
       await pumpSyncRedirects(tester);
       final before = holder.fixture!;
 
@@ -450,13 +447,13 @@ void main() {
     testWidgets('restored due sync remains on /sync until it completes', (
       tester,
     ) async {
-      final holder = _SyncRestorationHolder(
+      final holder = SyncRestorationHolder(
         // Each fixture needs its own settings so completing the old gated
         // sync cannot make the fresh view model think it is up to date.
         settingsFactory: FakeSettingsRepository.new,
       );
 
-      await tester.pumpWidget(_RestorableSyncHarness(holder: holder));
+      await tester.pumpWidget(RestorableSyncHarness(holder: holder));
       await pumpSyncRedirects(tester);
       final before = holder.fixture!;
       expect(before.harness.viewModel.sync.running, isTrue);
@@ -543,90 +540,3 @@ const List<String> _invalidFromValues = <String>[
   '/sync?from=%2Fhome',
   '/home/does-not-exist',
 ];
-
-/// Rebuilds the production router with a fresh [SyncViewModel] on restoration.
-final class _SyncRestorationFixture {
-  _SyncRestorationFixture({required FakeSettingsRepository settings}) {
-    harness = SyncHarness(settings: settings);
-    auth = ControllableAdminAuth();
-    router = buildAppRouter(
-      syncViewModel: harness.viewModel,
-      adminAuthViewModel: auth.viewModel,
-    );
-  }
-
-  late final ControllableAdminAuth auth;
-  late final SyncHarness harness;
-  late final GoRouter router;
-
-  Widget get app => MultiProvider(
-    providers: buildSyncProviders(harness, auth: auth),
-    child: MaterialApp.router(
-      scaffoldMessengerKey: $scaffoldMessengerKey,
-      restorationScopeId: 'app',
-      routerConfig: router,
-    ),
-  );
-
-  void dispose() {
-    router.dispose();
-    auth.dispose();
-
-    final sync = harness.viewModel.sync;
-    if (!sync.running) {
-      harness.viewModel.dispose();
-      return;
-    }
-
-    void disposeWhenComplete() {
-      if (sync.running) return;
-
-      sync.removeListener(disposeWhenComplete);
-      scheduleMicrotask(harness.viewModel.dispose);
-    }
-
-    // Detach the router before unblocking the command. It may notify while
-    // completing, so dispose the view model only after that notification.
-    sync.addListener(disposeWhenComplete);
-    final gate = harness.gate;
-    if (gate != null && !gate.isCompleted) gate.complete();
-  }
-}
-
-/// Holds test state that can either persist or be recreated on restoration.
-final class _SyncRestorationHolder {
-  _SyncRestorationHolder({required this.settingsFactory});
-
-  final FakeSettingsRepository Function() settingsFactory;
-  _SyncRestorationFixture? fixture;
-}
-
-class _RestorableSyncHarness extends StatefulWidget {
-  const _RestorableSyncHarness({required this.holder});
-
-  final _SyncRestorationHolder holder;
-
-  @override
-  State<_RestorableSyncHarness> createState() => _RestorableSyncHarnessState();
-}
-
-class _RestorableSyncHarnessState extends State<_RestorableSyncHarness> {
-  late final _SyncRestorationFixture fixture = _SyncRestorationFixture(
-    settings: widget.holder.settingsFactory(),
-  );
-
-  @override
-  void initState() {
-    super.initState();
-    widget.holder.fixture = fixture;
-  }
-
-  @override
-  void dispose() {
-    fixture.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => fixture.app;
-}

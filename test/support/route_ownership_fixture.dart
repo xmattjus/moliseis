@@ -194,15 +194,8 @@ final class RouteOwnershipFixture {
               ],
             ),
           ],
-          builder: (_, state, navigationShell) => ScaffoldShell(
-            navigationShell: navigationShell,
-            showNavigation: <String>{
-              RouteNames.home,
-              RouteNames.favourites,
-              RouteNames.events,
-              RouteNames.geoMap,
-            }.contains(state.topRoute?.name),
-          ),
+          builder: (_, state, navigationShell) =>
+              ScaffoldShell(navigationShell: navigationShell),
         ),
       ],
     );

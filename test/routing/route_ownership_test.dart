@@ -8,6 +8,7 @@ import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/ui/core/ui/responsive_navigation_bar.dart';
 import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
@@ -21,6 +22,193 @@ import '../support/predictive_back.dart';
 import '../support/route_ownership_fixture.dart';
 
 void main() {
+  for (final location in <String>[
+    '/home/category/nature/posts/1?type=event',
+    '/home/search_results?q=molise',
+  ]) {
+    testWidgets('active Explore chrome resets $location to its branch root', (
+      tester,
+    ) async {
+      final fixture = RouteOwnershipFixture(initialLocation: location);
+      addTearDown(fixture.dispose);
+      await tester.pumpWidget(fixture.app);
+      await tester.pumpAndSettle();
+      expect(fixture.uri, Uri.parse(location));
+      expect(
+        tester
+            .widget<ResponsiveNavigationBar>(
+              find.byType(ResponsiveNavigationBar),
+            )
+            .selectedIndex,
+        0,
+      );
+
+      await tester.tap(find.text('Esplora'));
+      await tester.pumpAndSettle();
+
+      expect(fixture.uri, Uri.parse('/home'));
+      expect(find.text('Home root'), findsOneWidget);
+      expect(find.byType(PostScreen), findsNothing);
+      expect(fixture.exploreNavigatorKey.currentState!.widget.pages.length, 1);
+      expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'chrome cross-tab return preserves the Post URI, State and ViewModel',
+    (tester) async {
+      final fixture = RouteOwnershipFixture(
+        initialLocation: '/home/category/nature/posts/1?type=event',
+      );
+      addTearDown(fixture.dispose);
+      await tester.pumpWidget(fixture.app);
+      await tester.pumpAndSettle();
+      final uri = fixture.uri;
+      final postState = tester.state(find.byType(PostScreen));
+      final viewModel = tester
+          .widget<PostScreen>(find.byType(PostScreen))
+          .viewModel;
+      final pages = fixture.exploreNavigatorKey.currentState!.widget.pages;
+
+      await tester.tap(find.text('Preferiti'));
+      await tester.pumpAndSettle();
+      expect(fixture.uri, Uri.parse('/favourites'));
+      expect(find.text('Favourites root'), findsOneWidget);
+      expect(postState.mounted, isTrue);
+      expect(
+        tester.state(find.byType(PostScreen, skipOffstage: false)),
+        same(postState),
+      );
+      expect(fixture.exploreNavigatorKey.currentState!.widget.pages, pages);
+      expect(
+        tester
+            .widget<ResponsiveNavigationBar>(
+              find.byType(ResponsiveNavigationBar),
+            )
+            .selectedIndex,
+        1,
+      );
+
+      await tester.tap(find.text('Esplora'));
+      await tester.pumpAndSettle();
+      expect(fixture.uri, uri);
+      expect(tester.state(find.byType(PostScreen)), same(postState));
+      expect(
+        tester.widget<PostScreen>(find.byType(PostScreen)).viewModel,
+        same(viewModel),
+      );
+      expect(fixture.exploreNavigatorKey.currentState!.widget.pages, pages);
+      expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 1);
+      expect(
+        tester
+            .widget<ResponsiveNavigationBar>(
+              find.byType(ResponsiveNavigationBar),
+            )
+            .selectedIndex,
+        0,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final (location, parent, pageCount, parentLabel)
+      in <(String, String, int, String)>[
+        ('/home/posts/1?type=event', '/home?type=event', 2, 'Home root'),
+        (
+          '/home/category/nature/posts/1?type=event',
+          '/home/category/nature?type=event',
+          3,
+          'Categorie',
+        ),
+        (
+          '/home/search_results/posts/1?q=molise&type=event',
+          '/home/search_results?q=molise&type=event',
+          3,
+          'Search molise root',
+        ),
+      ]) {
+    testWidgets('Android predictive commit removes one level from $location', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        final fixture = RouteOwnershipFixture(initialLocation: location);
+        addTearDown(fixture.dispose);
+        await tester.pumpWidget(fixture.app);
+        await tester.pumpAndSettle();
+        expect(fixture.uri, Uri.parse(location));
+        final postState = tester.state(find.byType(PostScreen));
+        final pages = fixture.exploreNavigatorKey.currentState!.widget.pages;
+        expect(pages.length, pageCount);
+
+        await startPredictiveBack(tester);
+        await updatePredictiveBack(tester, 0.5);
+        expect(fixture.uri, Uri.parse(location));
+        expect(fixture.exploreNavigatorKey.currentState!.widget.pages, pages);
+        await commitPredictiveBack(tester);
+
+        expect(fixture.uri, Uri.parse(parent));
+        expect(
+          fixture.exploreNavigatorKey.currentState!.widget.pages.length,
+          pageCount - 1,
+        );
+        expect(
+          fixture.exploreNavigatorKey.currentState!.widget.pages.map(
+            (page) => page.key,
+          ),
+          pages.take(pageCount - 1).map((page) => page.key),
+        );
+        expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 1);
+        expect(find.byType(PostScreen), findsNothing);
+        expect(find.text(parentLabel), findsOneWidget);
+        expect(postState.mounted, isFalse);
+        expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+  }
+
+  testWidgets(
+    'Android predictive cancel preserves Category Post identity and pages',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        final fixture = RouteOwnershipFixture(
+          initialLocation: '/home/category/nature/posts/1?type=event',
+        );
+        addTearDown(fixture.dispose);
+        await tester.pumpWidget(fixture.app);
+        await tester.pumpAndSettle();
+        final uri = fixture.uri;
+        final pages = fixture.exploreNavigatorKey.currentState!.widget.pages;
+        final postState = tester.state(find.byType(PostScreen));
+        final viewModel = tester
+            .widget<PostScreen>(find.byType(PostScreen))
+            .viewModel;
+        expect(pages.length, 3);
+
+        await startPredictiveBack(tester);
+        await updatePredictiveBack(tester, 0.5);
+        await cancelPredictiveBack(tester);
+
+        expect(fixture.uri, uri);
+        expect(fixture.exploreNavigatorKey.currentState!.widget.pages, pages);
+        expect(tester.state(find.byType(PostScreen)), same(postState));
+        expect(
+          tester.widget<PostScreen>(find.byType(PostScreen)).viewModel,
+          same(viewModel),
+        );
+        expect(postState.mounted, isTrue);
+        expect(fixture.rootNavigatorKey.currentState!.widget.pages.length, 1);
+        expect(tester.takeException(), isNull);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
   testWidgets('NAV-07 Post A completion cannot affect replacement Post B', (
     tester,
   ) async {

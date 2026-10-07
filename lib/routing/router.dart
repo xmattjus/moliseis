@@ -516,18 +516,9 @@ GoRouter buildAppRouter({
           ),
         ],
         pageBuilder: (_, state, navigationShell) {
-          final showNavigation = <String>{
-            RoutePaths.home,
-            RoutePaths.favourites,
-            RoutePaths.events,
-            RoutePaths.geoMap,
-          }.contains(state.uri.path);
           return MaterialPage<void>(
             restorationId: 'appShellPage',
-            child: ScaffoldShell(
-              navigationShell: navigationShell,
-              showNavigation: showNavigation,
-            ),
+            child: ScaffoldShell(navigationShell: navigationShell),
           );
         },
       ),
