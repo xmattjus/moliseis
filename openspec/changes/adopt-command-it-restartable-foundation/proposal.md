@@ -6,9 +6,9 @@ The Compass-derived Command drops new requests while running. Search consequentl
 
 - Add direct `command_it: ^9.5.2` and `stream_transform: ^2.1.2` dependencies during apply, following the current caret policy and synchronizing the lockfile.
 - Introduce nullable Result integration through thin factories/extensions; preserve never-run, running, success, domain error and unexpected error separately. New code uses run/runAsync/isRunning/isRunningSync.
-- Introduce one composed RestartableCommand using switchMap and per-execution command_it children, immediate authority revocation, cooperative cancellation and deferred child cleanup.
+- Introduce one composed RestartableCommand using switchMap and per-execution command_it children, immediate authority revocation, nonblocking subscription cancellation and deferred ordinary-child cleanup. ProgressHandle specialization is deferred until a real consumer defines its expected cancellation contract.
 - Migrate Search loadResults/loadSuggestions and GeoMap's unified event/place/clear selection boundary. Separate asynchronous retrieval from synchronous authoritative ViewModel commits.
-- Route unexpected command errors once through existing AppLogger/Talker/Sentry, preserving opt-out and stack traces and excluding parameters.
+- Preserve upstream assertion-failure development policy; route handled unexpected runtime command errors once through existing AppLogger/Talker/Sentry, preserving opt-out and stack traces and excluding parameters.
 - Remove only proven redundant selection generations and dropped-command retries. Keep legacy Command for excluded consumers, including history writes, Post and other domain coordinators/mutations.
 - Record baseline, upstream audit, complete consumer inventory and a second-wave migration ledger. The stale unimplemented admin change is a future re-audit item, never a predecessor.
 
