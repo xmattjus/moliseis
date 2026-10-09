@@ -1,21 +1,195 @@
+// Sequential statements keep command scheduling assertions readable.
+// ignore_for_file: cascade_invocations
+
+import 'dart:async';
+
 import 'package:flutter/foundation.dart'
     show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
-import 'package:moliseis/domain/repositories/search_repository.dart';
+
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/ui/search/widgets/search_result_screen.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../../../support/command_test_support.dart';
+import '../../../../support/fake_repositories.dart';
 import '../../../../support/fixtures.dart';
 import '../../../../support/predictive_back.dart';
 
 void main() {
   group('AppSearchAnchor', () {
+    testWidgets('debounce admits only latest input and repeated builders '
+        'do not postpone it', (tester) async {
+      final repository = FakeSearchRepository();
+      final fixture = _SearchFixture(
+        cleanupOnClose: false,
+        surfaceSize: const Size(390, 844),
+        searchRepository: repository,
+      );
+      addTearDown(fixture.dispose);
+      await fixture.pumpApp(tester);
+      await _openSearch(tester, fixture);
+      fixture.controller.text = 'alpha';
+      await tester.pump(const Duration(milliseconds: 200));
+      fixture.controller.text = 'bravo';
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(repository.capturedQueries, isEmpty);
+      final anchor = tester.widget<SearchAnchor>(
+        find.byType(SearchAnchor).first,
+      );
+      anchor.suggestionsBuilder(
+        tester.element(find.byType(SearchAnchor).first),
+        fixture.controller,
+      );
+      await tester.pump(const Duration(milliseconds: 199));
+      expect(repository.capturedQueries, isEmpty);
+      await tester.pump(const Duration(milliseconds: 1));
+      await pumpCommandTurns(tester);
+      expect(repository.capturedQueries, ['bravo']);
+      fixture.controller.closeView(null);
+      await tester.pumpAndSettle();
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets(
+      'old completion during next debounce cannot repopulate suggestions',
+      (tester) async {
+        final a = Completer<Result<List<ContentBase>>>();
+        final b = Completer<Result<List<ContentBase>>>();
+        final repository = FakeSearchRepository(
+          resultsByQueryHandler: (query) =>
+              query == 'alpha' ? a.future : b.future,
+        );
+        final fixture = _SearchFixture(
+          cleanupOnClose: false,
+          surfaceSize: const Size(390, 844),
+          searchRepository: repository,
+        );
+        addTearDown(fixture.dispose);
+        await fixture.pumpApp(tester);
+        await _openSearch(tester, fixture);
+        fixture.controller.text = 'alpha';
+        await tester.pump(const Duration(milliseconds: 500));
+        await pumpCommandTurns(tester);
+        fixture.controller.text = 'bravo';
+        a.complete(Result.success([makePlace()]));
+        await pumpCommandTurns(tester);
+        expect(fixture.viewModel.suggestions, isEmpty);
+        expect(repository.capturedQueries, ['alpha']);
+        await tester.pump(const Duration(milliseconds: 500));
+        await pumpCommandTurns(tester);
+        expect(repository.capturedQueries, ['alpha', 'bravo']);
+        b.complete(const Result.success([]));
+        await pumpCommandTurns(tester);
+        fixture.controller.closeView(null);
+        await tester.pumpAndSettle();
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+
+    for (final short in ['a', '']) {
+      testWidgets(
+        'valid pending to ${short.isEmpty ? 'empty history' : 'short'} '
+        'revokes suggestions',
+        (tester) async {
+          final pending = Completer<Result<List<ContentBase>>>();
+          final repository = FakeSearchRepository(
+            pastSearchesResult: const Result.success(['saved query']),
+            resultsByQueryHandler: (_) => pending.future,
+          );
+          final fixture = _SearchFixture(
+            cleanupOnClose: false,
+            surfaceSize: const Size(390, 844),
+            searchRepository: repository,
+          );
+          addTearDown(fixture.dispose);
+          await fixture.pumpApp(tester);
+          await _openSearch(tester, fixture);
+          fixture.controller.text = 'alpha';
+          await tester.pump(const Duration(milliseconds: 500));
+          await pumpCommandTurns(tester);
+          fixture.controller.text = short;
+          pending.complete(Result.success([makePlace()]));
+          await pumpCommandTurns(tester);
+          expect(fixture.viewModel.suggestions, isEmpty);
+          expect(repository.capturedQueries, ['alpha']);
+          if (short.isEmpty) expect(find.text('saved query'), findsOneWidget);
+          fixture.controller.closeView(null);
+          await tester.pumpAndSettle();
+          debugDefaultTargetPlatformOverride = null;
+        },
+      );
+    }
+
+    for (final replaceOwner in [false, true]) {
+      testWidgets('${replaceOwner ? 'VM' : 'controller'} replacement '
+          'cancels old debounce', (tester) async {
+        final oldRepository = FakeSearchRepository();
+        final newRepository = FakeSearchRepository();
+        final oldVm = SearchViewModel(searchRepository: oldRepository);
+        final newVm = SearchViewModel(searchRepository: newRepository);
+        final oldController = SearchController();
+        final newController = SearchController();
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AppSearchAnchor(
+                controller: oldController,
+                viewModel: oldVm,
+                onSuggestionPressed: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final anchor = tester.widget<SearchAnchor>(find.byType(SearchAnchor));
+        final element = tester.element(find.byType(SearchAnchor));
+        oldController.text = 'alpha';
+        anchor.suggestionsBuilder(element, oldController);
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AppSearchAnchor(
+                controller: replaceOwner ? oldController : newController,
+                viewModel: replaceOwner ? newVm : oldVm,
+                onSuggestionPressed: (_) {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 600));
+        await pumpCommandTurns(tester);
+        expect(oldRepository.capturedQueries, isEmpty);
+        expect(newRepository.capturedQueries, isEmpty);
+        final currentAnchor = tester.widget<SearchAnchor>(
+          find.byType(SearchAnchor),
+        );
+        final controller = replaceOwner ? oldController : newController;
+        controller.text = 'bravo';
+        currentAnchor.suggestionsBuilder(
+          tester.element(find.byType(SearchAnchor)),
+          controller,
+        );
+        await tester.pump(const Duration(milliseconds: 500));
+        await pumpCommandTurns(tester);
+        expect((replaceOwner ? newRepository : oldRepository).capturedQueries, [
+          'bravo',
+        ]);
+        await tester.pumpWidget(const SizedBox.shrink());
+        oldVm.dispose();
+        newVm.dispose();
+        oldController.dispose();
+        newController.dispose();
+        await tester.pump(const Duration(milliseconds: 50));
+      });
+    }
+
     group('compact full-screen search', () {
       testWidgets('fallback back closes the popup and keeps the route', (
         tester,
@@ -425,7 +599,7 @@ void main() {
   group('SearchResultScreen canonical query', () {
     ({GoRouter router, SearchViewModel viewModel, Widget app}) buildFixture() {
       final viewModel = SearchViewModel(
-        searchRepository: _FakeSearchRepository(),
+        searchRepository: FakeSearchRepository(),
       );
       final router = GoRouter(
         initialLocation: '/home/search_results?q=old',
@@ -451,7 +625,8 @@ void main() {
       final fixture = buildFixture();
       addTearDown(fixture.router.dispose);
       addTearDown(fixture.viewModel.dispose);
-      await fixture.viewModel.loadResults.execute('old');
+      fixture.viewModel.loadResults.run('old');
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
 
@@ -478,7 +653,8 @@ void main() {
       final fixture = buildFixture();
       addTearDown(fixture.router.dispose);
       addTearDown(fixture.viewModel.dispose);
-      await fixture.viewModel.loadResults.execute('old');
+      fixture.viewModel.loadResults.run('old');
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
 
@@ -542,11 +718,16 @@ _SearchFixture _expandedFixture({required bool cleanupOnClose}) {
 // ---------------------------------------------------------------------------
 
 final class _SearchFixture {
-  _SearchFixture({required bool cleanupOnClose, required Size surfaceSize})
-    : _surfaceSize = surfaceSize {
+  _SearchFixture({
+    required bool cleanupOnClose,
+    required Size surfaceSize,
+    FakeSearchRepository? searchRepository,
+  }) : _surfaceSize = surfaceSize {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     controller = SearchController();
-    viewModel = SearchViewModel(searchRepository: _FakeSearchRepository());
+    viewModel = SearchViewModel(
+      searchRepository: searchRepository ?? FakeSearchRepository(),
+    );
     router = GoRouter(
       initialLocation: '/',
       routes: <RouteBase>[
@@ -632,7 +813,9 @@ final class _ShellSearchFixture {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     controller = SearchController();
     viewModel = SearchViewModel(
-      searchRepository: _FakeSearchRepository(pastSearches: pastSearches),
+      searchRepository: FakeSearchRepository(
+        pastSearchesResult: Result.success(pastSearches),
+      ),
     );
     router = GoRouter(
       navigatorKey: rootNavigatorKey,
@@ -801,26 +984,4 @@ class _SearchHostPage extends StatelessWidget {
       ),
     );
   }
-}
-
-final class _FakeSearchRepository implements SearchRepository {
-  _FakeSearchRepository({this.pastSearches = const []});
-
-  final List<String> pastSearches;
-
-  @override
-  Future<Result<void>> addToPastSearches(String text) async =>
-      const Result.success(null);
-
-  @override
-  Future<Result<List<ContentBase>>> getResultsByQuery(String text) async =>
-      const Result.success([]);
-
-  @override
-  Future<Result<List<String>>> getPastSearches() async =>
-      Result.success(List<String>.of(pastSearches));
-
-  @override
-  Future<Result<void>> removeFromPastSearches(String text) async =>
-      const Result.success(null);
 }

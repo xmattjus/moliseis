@@ -12,6 +12,7 @@ import 'package:moliseis/ui/category/widgets/category_content_and_type_selection
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
+import 'package:moliseis/ui/geo_map/view_models/geo_map_selection_intent.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/animated_geo_map_search_bar.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/animated_map_attribution.dart';
@@ -22,6 +23,7 @@ import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/utils/debounceable.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 /// Interactive map that shows nearby content and search results in a bottom
 /// sheet.
@@ -108,33 +110,13 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   /// made from map markers or search results.
   ({int id, ContentType type})? _pendingSelection;
 
-  /// Maximum number of times the resolution listener retries the requested
-  /// identity after a successful but mismatched command completion.
-  ///
-  /// A single retry is enough to recover from an `execute()` silently dropped
-  /// by `Command._execute` while a previous execution was still running
-  /// (rapid deep-link navigation). A persistent mismatch — the repository
-  /// returning content for a different id on success — becomes terminal after
-  /// this budget, mirroring the no-match error branch.
-  static const int _maxResolutionRetries = 1;
-
-  /// Current retry count for the resolution of [_pendingSelection].
-  ///
-  /// Reset to zero whenever a new request is issued or the resolution reaches
-  /// a terminal state (match, error, or retry budget exhausted).
-  int _resolutionRetries = 0;
-
-  /// A newer URI request was dropped because the command for the previous
-  /// identity was still running. Its completion (including an error) must
-  /// trigger a lookup for the newer identity.
-  bool _retryAfterPriorCommand = false;
-
   @override
   void initState() {
     super.initState();
 
-    widget.viewModel.showEvent.addListener(_onSelectionResolutionChanged);
-    widget.viewModel.showPlace.addListener(_onSelectionResolutionChanged);
+    widget.viewModel.selectContent.results.addListener(
+      _onSelectionResolutionChanged,
+    );
     _resolveRequestedSelection();
 
     _debouncedUpdate = debounce<bool, void>(
@@ -147,23 +129,30 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   void didUpdateWidget(covariant GeoMapScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Standalone screen owners may still replace the view model even though
-    // the Map route retains its instance across URI changes.
-    if (!identical(oldWidget.viewModel, widget.viewModel)) {
-      oldWidget.viewModel.showEvent.removeListener(
+    final selectionOwnerChanged = !identical(
+      oldWidget.viewModel,
+      widget.viewModel,
+    );
+    if (selectionOwnerChanged) {
+      oldWidget.viewModel.selectContent.results.removeListener(
         _onSelectionResolutionChanged,
       );
-      oldWidget.viewModel.showPlace.removeListener(
+      widget.viewModel.selectContent.results.addListener(
         _onSelectionResolutionChanged,
       );
-      widget.viewModel.showEvent.addListener(_onSelectionResolutionChanged);
-      widget.viewModel.showPlace.addListener(_onSelectionResolutionChanged);
     }
     if (!identical(oldWidget.weatherViewModel, widget.weatherViewModel)) {
       oldWidget.weatherViewModel.dispose();
     }
 
+    final routeSelectionChanged =
+        (oldWidget.initialContentId, oldWidget.initialContentType) !=
+        (widget.initialContentId, widget.initialContentType);
+    if (!routeSelectionChanged && !selectionOwnerChanged) return;
+
     if (widget.initialContentId != null && widget.initialContentType != null) {
+      _selectedContent = null;
+      _scheduleCallbackOnNextFrame = false;
       _resolveRequestedSelection();
     } else {
       // A location without content identity is the default map: abandon any
@@ -171,8 +160,6 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       // falls back to the explore modal instead of a stale post skeleton.
       widget.viewModel.invalidateRequestedSelection();
       _pendingSelection = null;
-      _resolutionRetries = 0;
-      _retryAfterPriorCommand = false;
       _scheduleCallbackOnNextFrame = false;
       _selectedContent = null;
       _searchQuery = '';
@@ -191,8 +178,9 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
 
   @override
   void dispose() {
-    widget.viewModel.showEvent.removeListener(_onSelectionResolutionChanged);
-    widget.viewModel.showPlace.removeListener(_onSelectionResolutionChanged);
+    widget.viewModel.selectContent.results.removeListener(
+      _onSelectionResolutionChanged,
+    );
     widget.weatherViewModel.dispose();
     _sheetController.dispose();
     _mapController.dispose();
@@ -209,8 +197,6 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     final request = id != null && type != null ? (id: id, type: type) : null;
     final viewModel = widget.viewModel..invalidateRequestedSelection();
     _pendingSelection = request;
-    _resolutionRetries = 0;
-    _retryAfterPriorCommand = false;
     if (request == null) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -220,11 +206,11 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
         return;
       }
 
-      final command = request.type == ContentType.event
-          ? viewModel.showEvent
-          : viewModel.showPlace;
-      _retryAfterPriorCommand = command.running;
-      unawaited(command.execute(request.id));
+      viewModel.requestSelection(
+        request.type == ContentType.event
+            ? EventSelection(request.id)
+            : PlaceSelection(request.id),
+      );
     });
   }
 
@@ -232,66 +218,41 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   /// resolves, or falls back to the default map with a snack bar when the
   /// repository has no matching item.
   void _onSelectionResolutionChanged() {
+    if (!mounted) return;
     final request = _pendingSelection;
     if (request == null) return;
-
-    final selected = widget.viewModel.selectedContent;
-    if (selected != null && _matches(request, selected)) {
+    final snapshot = widget.viewModel.selectContent.results.value;
+    final intent = snapshot.paramData;
+    final matchesRequest = switch (intent) {
+      EventSelection(:final id) =>
+        request.id == id && request.type == ContentType.event,
+      PlaceSelection(:final id) =>
+        request.id == id && request.type == ContentType.place,
+      _ => false,
+    };
+    if (!matchesRequest || snapshot.isRunning || snapshot.idle) return;
+    final content = snapshot.data?.getOrNull();
+    if (snapshot.completed && intent!.matchesPayload(content)) {
       setState(() {
         _pendingSelection = null;
-        _resolutionRetries = 0;
-        _selectedContent = selected;
-        _currentCenter = selected.coordinates;
+        _selectedContent = content;
+        _currentCenter = content!.coordinates;
         _searchQuery = '';
         _searchController.text = '';
       });
       _scheduleCallbackOnNextFrame = true;
       return;
     }
-
-    final command = request.type == ContentType.event
-        ? widget.viewModel.showEvent
-        : widget.viewModel.showPlace;
-    if (command.running) return;
-
-    final retryAfterPriorCommand = _retryAfterPriorCommand;
-    _retryAfterPriorCommand = false;
-    if (command.error && !retryAfterPriorCommand) {
-      _terminateResolutionWithFeedback();
-      return;
-    }
-
-    // The command completed with a different selection. The legitimate case
-    // is a superseded request that Command._execute silently dropped while a
-    // previous execution was still running (rapid deep-link navigation), so
-    // the requested identity is retried on the current view model. A
-    // persistent mismatch — the repository returning content for a different
-    // id on success (stale cache, repo bug) — is bounded by
-    // [_maxResolutionRetries] and becomes terminal once the budget is
-    // exhausted, mirroring the no-match error branch.
-    if (_resolutionRetries >= _maxResolutionRetries) {
-      _terminateResolutionWithFeedback();
-      return;
-    }
-
-    _resolutionRetries += 1;
-    unawaited(
-      request.type == ContentType.event
-          ? widget.viewModel.showEvent.execute(request.id)
-          : widget.viewModel.showPlace.execute(request.id),
-    );
+    _terminateResolutionWithFeedback();
   }
 
   /// Clears the in-flight resolution and the local selection state, and
   /// notifies the user that the requested content could not be shown.
   ///
-  /// Used both when the command completes with an error and when the retry
-  /// budget for persistent selection mismatches is exhausted.
+  /// Handles a terminal domain/runtime failure or invalid repository identity.
   void _terminateResolutionWithFeedback() {
     setState(() {
       _pendingSelection = null;
-      _resolutionRetries = 0;
-      _retryAfterPriorCommand = false;
       _selectedContent = null;
       _searchQuery = '';
       _searchController.text = '';
@@ -301,12 +262,6 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
       textContent: 'Contenuto non trovato',
       type: SnackBarType.error,
     );
-  }
-
-  /// Returns true when [content] matches the requested [request] identity.
-  bool _matches(({int id, ContentType type}) request, ContentBase content) {
-    final type = content is Event ? ContentType.event : ContentType.place;
-    return content.remoteId == request.id && type == request.type;
   }
 
   @override
@@ -508,11 +463,12 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
   }
 
   void _onSearchSubmitted(String text) {
+    _abandonRequestedSelection();
     if (_searchController.isOpen) {
       _searchController.closeView(text);
     }
 
-    unawaited(widget.searchViewModel.loadResults.execute(text));
+    widget.searchViewModel.loadResults.run(text);
 
     setState(() {
       _selectedContent = null;
@@ -542,6 +498,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     required LatLng coordinates,
     ContentBase? content,
   }) {
+    if (content != null) _abandonRequestedSelection();
     setState(() {
       if (content != null) {
         _selectedContent = content;
@@ -587,9 +544,17 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
     );
   }
 
+  /// Revokes route lookup before a local marker, search or close transition.
+  void _abandonRequestedSelection() {
+    widget.viewModel.invalidateRequestedSelection();
+    _pendingSelection = null;
+    _scheduleCallbackOnNextFrame = false;
+  }
+
   /// Clears selected content, the search query, and controller text, and
   /// animates the sheet back to its default extent.
   void _closeTransientSheet() {
+    _abandonRequestedSelection();
     setState(() {
       _currentCenter = _mapController.camera.center;
       _selectedContent = null;

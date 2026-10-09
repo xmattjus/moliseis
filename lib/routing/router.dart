@@ -353,7 +353,7 @@ GoRouter buildAppRouter({
                               searchRepository: context.read(),
                             );
 
-                            unawaited(viewModel.loadResults.execute(query));
+                            viewModel.loadResults.run(query);
 
                             return viewModel;
                           },

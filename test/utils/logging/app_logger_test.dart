@@ -446,6 +446,42 @@ void main() {
       });
     });
 
+    for (final enabled in [false, true]) {
+      test(
+        'command failure respects runtime Sentry enabled=$enabled',
+        () async {
+          sentryFlag.enabled = enabled;
+          final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
+          final error = StateError('command runtime failure');
+          final stack = StackTrace.fromString('original command stack');
+
+          logger.log(
+            const CommandExecutionFailed(debugName: 'search_results'),
+            error: error,
+            stackTrace: stack,
+          );
+          await Future<void>.delayed(Duration.zero);
+
+          verify(
+            () => mockTalker.log(
+              {
+                'command_execution_failed',
+                {'debugName': 'search_results'},
+              },
+              logLevel: LogLevel.error,
+              exception: error,
+              stackTrace: stack,
+            ),
+          ).called(1);
+          expect(fakeTransport.envelopes, hasLength(enabled ? 1 : 0));
+          expect(
+            Sentry.currentHub.scope.breadcrumbs,
+            hasLength(enabled ? 1 : 0),
+          );
+        },
+      );
+    }
+
     group('event name assertion', () {
       test('valid three-segment name passes assertion', () {
         final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);

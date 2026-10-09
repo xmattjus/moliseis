@@ -59,7 +59,9 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 
+import '../support/command_test_support.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
@@ -68,6 +70,37 @@ import '../support/mock_logger.dart';
 import '../support/recording_tile_http_client.dart';
 
 void main() {
+  final response = CombinedWeatherForecastResponse(
+    latitude: 41.56,
+    longitude: 14.66,
+    generationTimeMs: 1,
+    utcOffsetSeconds: 7200,
+    timezone: 'Europe/Rome',
+    timezoneAbbreviation: 'CEST',
+    elevation: 700,
+    current: CurrentWeatherForecastData(
+      time: DateTime.utc(2026, 4, 7, 10),
+      interval: 900,
+      temperature2m: 18.5,
+      isDay: 1,
+      weatherCode: 0,
+      precipitation: 0,
+    ),
+    hourly: const HourlyWeatherForecastData(
+      time: [],
+      temperature2m: [],
+      weatherCode: [],
+      precipitationProbability: [],
+      isDay: [],
+    ),
+    daily: const DailyWeatherForecastData(
+      time: [],
+      weatherCode: [],
+      temperature2mMax: [],
+      temperature2mMin: [],
+      precipitationProbabilityMax: [],
+    ),
+  );
   const responsiveViewports = <(WindowSizeClass, Size)>[
     (WindowSizeClass.compact, Size(390, 844)),
     (WindowSizeClass.medium, Size(700, 900)),
@@ -369,6 +402,8 @@ void main() {
           expect(find.byType(ResponsiveNavigationBar), findsNothing);
         }
       }
+      await tester.pump(const Duration(milliseconds: 50));
+      await pumpCommandTurns(tester);
       expect(tester.takeException(), isNull);
     });
   }
@@ -458,6 +493,8 @@ void main() {
             );
           }
         }
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
       } finally {
         semantics.dispose();
@@ -592,6 +629,8 @@ void main() {
             'molise',
           );
         }
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
       });
     }
@@ -624,8 +663,8 @@ void main() {
         await tester.pumpAndSettle();
 
         router.router.go('/map?contentId=1&type=event');
-        await tester.pump();
-        await tester.pump();
+        await pumpCommandTurns(tester);
+        await pumpCommandTurns(tester);
         final firstWeather = tester
             .widget<GeoMapScreen>(find.byType(GeoMapScreen))
             .weatherViewModel;
@@ -634,8 +673,8 @@ void main() {
         ]);
         weather.pendingCombinedForecast = null;
         router.router.go('/map?contentId=2&type=event');
-        await tester.pump();
-        await tester.pump();
+        await pumpCommandTurns(tester);
+        await pumpCommandTurns(tester);
         final secondWeather = tester
             .widget<GeoMapScreen>(find.byType(GeoMapScreen))
             .weatherViewModel;
@@ -648,11 +687,13 @@ void main() {
         ));
 
         pending.complete(Result.error(TestException('weather unavailable')));
-        await tester.pump();
-        await tester.pump();
+        await pumpCommandTurns(tester);
+        await pumpCommandTurns(tester);
         expect(secondWeather.currentTemperatureCelsius, '--.-');
         expect(weather.getCombinedWeatherForecastCallCount, 2);
         await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
       },
     );
@@ -683,10 +724,10 @@ void main() {
           await tester.pumpWidget(router.app);
           await tester.pumpAndSettle();
           router.router.go('/map?contentId=1&type=$type');
-          await tester.pump();
+          await pumpCommandTurns(tester);
           final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
           router.router.go('/map?contentId=2&type=$type');
-          await tester.pump();
+          await pumpCommandTurns(tester);
           expect(
             tester.widget<GeoMapScreen>(find.byType(GeoMapScreen)).viewModel,
             same(map.viewModel),
@@ -705,15 +746,15 @@ void main() {
                   : Result.success(makePlace()),
             );
           }
-          await tester.pump();
-          await tester.pump();
+          await pumpCommandTurns(tester);
+          await pumpCommandTurns(tester);
           expect(find.byType(GeoMapModalPost), findsNothing);
           if (type == 'event') {
             secondEvent.complete(Result.success(makeEvent(remoteId: 2)));
           } else {
             secondPlace.complete(Result.success(makePlace(remoteId: 2)));
           }
-          await tester.pump();
+          await pumpCommandTurns(tester);
           await tester.pumpAndSettle();
           expect(
             tester
@@ -723,6 +764,8 @@ void main() {
             2,
           );
           expect(map.viewModel.selectedContent?.remoteId, 2);
+          await tester.pump(const Duration(milliseconds: 50));
+          await pumpCommandTurns(tester);
           expect(tester.takeException(), isNull);
         });
       }
@@ -746,16 +789,16 @@ void main() {
       await tester.pumpWidget(router.app);
       await tester.pumpAndSettle();
       router.router.go('/map?contentId=1&type=event');
-      await tester.pump();
+      await pumpCommandTurns(tester);
       final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
-      expect(map.viewModel.showEvent.running, isTrue);
+      expect(map.viewModel.selectContent.isRunningSync.value, isTrue);
 
       router.router.go('/map?contentId=2&type=place');
-      await tester.pump();
-      expect(map.viewModel.showPlace.running, isTrue);
+      await pumpCommandTurns(tester);
+      expect(map.viewModel.selectContent.isRunningSync.value, isTrue);
       pendingPlace.complete(Result.success(makePlace(remoteId: 2)));
-      await tester.pump();
-      await tester.pump();
+      await pumpCommandTurns(tester);
+      await pumpCommandTurns(tester);
       expect(
         tester
             .widget<GeoMapModalPost>(find.byType(GeoMapModalPost))
@@ -765,8 +808,8 @@ void main() {
       );
 
       pendingEvent.complete(Result.success(makeEvent()));
-      await tester.pump();
-      await tester.pump();
+      await pumpCommandTurns(tester);
+      await pumpCommandTurns(tester);
       await tester.pumpAndSettle();
       expect(
         tester
@@ -776,6 +819,8 @@ void main() {
         2,
       );
       expect(map.viewModel.selectedContent?.remoteId, 2);
+      await tester.pump(const Duration(milliseconds: 50));
+      await pumpCommandTurns(tester);
       expect(tester.takeException(), isNull);
     });
 
@@ -793,15 +838,17 @@ void main() {
       await tester.pumpWidget(router.app);
       await tester.pumpAndSettle();
       router.router.go('/map?contentId=1&type=event');
-      await tester.pump();
+      await pumpCommandTurns(tester);
       final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
       router.router.go(RoutePaths.geoMap);
-      await tester.pump();
+      await pumpCommandTurns(tester);
       pendingEvent.complete(Result.success(makeEvent()));
-      await tester.pump();
-      await tester.pump();
+      await pumpCommandTurns(tester);
+      await pumpCommandTurns(tester);
       expect(find.byType(GeoMapModalPost), findsNothing);
       expect(map.viewModel.selectedContent, isNull);
+      await tester.pump(const Duration(milliseconds: 50));
+      await pumpCommandTurns(tester);
       expect(tester.takeException(), isNull);
     });
 
@@ -828,7 +875,7 @@ void main() {
         places.pendingGetAll = pendingPlaces;
         searches.pendingGetPastSearches = pendingSearches;
         router.router.go(RoutePaths.geoMap);
-        await tester.pump();
+        await pumpCommandTurns(tester);
 
         final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
         expect(map.viewModel.loadEvents.running, isTrue);
@@ -848,11 +895,13 @@ void main() {
         pendingEvents.complete(Result.success(<Event>[makeEvent()]));
         pendingPlaces.complete(Result.success(<Place>[makePlace()]));
         pendingSearches.complete(const Result.success(<String>['molise']));
-        await tester.pump();
-        await tester.pump();
+        await pumpCommandTurns(tester);
+        await pumpCommandTurns(tester);
         expect(map.viewModel.allEvents, isEmpty);
         expect(map.viewModel.allPlaces, isEmpty);
         expect(map.searchViewModel.pastSearches, isEmpty);
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
       },
     );
@@ -980,6 +1029,8 @@ void main() {
         router.router.go(RoutePaths.geoMap);
         await tester.pumpAndSettle();
         final afterBranch = tester.widget<GeoMapScreen>(finder);
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
         expect(tester.state(finder), same(initialState));
         expect(afterBranch.viewModel, same(initial.viewModel));
@@ -995,6 +1046,86 @@ void main() {
         ), initialLoads);
       },
     );
+
+    for (final refreshSource in ['sync', 'admin_auth']) {
+      for (final pendingSelection in [false, true]) {
+        testWidgets('same URI ${pendingSelection ? 'pending' : 'successful'} '
+            'preserves selection across $refreshSource refresh', (
+          tester,
+        ) async {
+          await tester.binding.setSurfaceSize(const Size(1280, 1600));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final events = FakeEventRepository(
+            getByIdResults: {1: Result.success(makeEvent())},
+          );
+          final pending = Completer<Result<Event>>();
+          if (pendingSelection) events.pendingGetById[1] = pending;
+          final harness = _MapHarness();
+          final weather = FakeWeatherApiClient(
+            result: Result.success(response),
+          );
+          final fixture = _buildTestRouterApp(
+            harness,
+            eventRepository: events,
+            weatherApiClient: weather,
+          );
+          addTearDown(fixture.router.dispose);
+          await tester.pumpWidget(fixture.app);
+          await tester.pumpAndSettle();
+          fixture.router.go('/map?contentId=1&type=event');
+          await pumpCommandTurns(tester);
+          if (!pendingSelection) await tester.pumpAndSettle();
+          final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
+          final sheet = tester.widget<GeoMapBottomSheet>(
+            find.byType(GeoMapBottomSheet),
+          );
+          if (!pendingSelection) {
+            final animation = sheet.controller.animateTo(
+              0.7,
+              duration: const Duration(milliseconds: 1),
+              curve: Curves.linear,
+            );
+            await tester.pumpAndSettle();
+            await animation;
+          }
+          if (refreshSource == 'sync') {
+            await harness.viewModel.sync.execute(false);
+          } else {
+            fixture.auth.setUser(makeAuthUser());
+            fixture.auth.emit(AuthChangeEvent.tokenRefreshed);
+          }
+          await pumpCommandTurns(tester);
+          final refreshed = tester.widget<GeoMapScreen>(
+            find.byType(GeoMapScreen),
+          );
+          expect(refreshed.viewModel, same(map.viewModel));
+          expect(events.getByIdCallCount, 1);
+
+          if (pendingSelection) {
+            expect(find.byType(GeoMapModalPost), findsNothing);
+            pending.complete(Result.success(makeEvent()));
+          } else {
+            expect(
+              refreshed.viewModel.selectedContent,
+              same(map.viewModel.selectedContent),
+            );
+            expect(find.byType(GeoMapModalPost), findsOneWidget);
+            expect(sheet.controller.size, closeTo(0.7, 0.01));
+          }
+          await tester.pumpAndSettle();
+          expect(events.getByIdCallCount, 1);
+          expect(find.byType(GeoMapModalPost), findsOneWidget);
+          await pumpCommandTurns(tester);
+          expect(
+            refreshed.weatherViewModel.loadCurrentForecast.completed,
+            isTrue,
+          );
+          expect(weather.getCombinedWeatherForecastCallCount, 1);
+          expect(find.text('Contenuto non trovato'), findsNothing);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
 
     testWidgets('direct /map renders the default map without selection', (
       tester,
@@ -1015,6 +1146,8 @@ void main() {
         router.router.routeInformationProvider.value.uri.path,
         RoutePaths.geoMap,
       );
+      await tester.pump(const Duration(milliseconds: 50));
+      await pumpCommandTurns(tester);
       expect(tester.takeException(), isNull);
     });
 
@@ -1101,6 +1234,8 @@ void main() {
       expect(uri.path, RoutePaths.geoMap);
       expect(uri.queryParameters['contentId'], '1');
       expect(uri.queryParameters['type'], 'event');
+      await tester.pump(const Duration(milliseconds: 50));
+      await pumpCommandTurns(tester);
       expect(tester.takeException(), isNull);
     });
 
@@ -1128,6 +1263,8 @@ void main() {
         find.byType(GeoMapModalPost),
       );
       expect(modal.content.remoteId, place.remoteId);
+      await tester.pump(const Duration(milliseconds: 50));
+      await pumpCommandTurns(tester);
       expect(tester.takeException(), isNull);
     });
 
@@ -1156,6 +1293,8 @@ void main() {
           expect(find.byType(GeoMapScreen), findsOneWidget);
           expect(find.byType(GeoMapModalPost), findsNothing);
           expect(find.byType(RouteErrorScreen), findsNothing);
+          await tester.pump(const Duration(milliseconds: 50));
+          await pumpCommandTurns(tester);
           expect(tester.takeException(), isNull);
         },
       );
@@ -1181,6 +1320,8 @@ void main() {
 
         expect(find.byType(GeoMapModalPost), findsNothing);
         expect(find.text('Contenuto non trovato'), findsOneWidget);
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
       },
     );
@@ -1233,6 +1374,8 @@ void main() {
         final uri = router.router.routeInformationProvider.value.uri;
         expect(uri.path, RoutePaths.geoMap);
         expect(uri.queryParameters['contentId'], '2');
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
       },
     );
@@ -1271,6 +1414,8 @@ void main() {
 
         expect(find.byType(GeoMapModalPost), findsNothing);
         expect(sheet.controller.size, closeTo(0.3, 0.01));
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
       },
     );
@@ -1322,6 +1467,8 @@ void main() {
         final uri = router.router.routeInformationProvider.value.uri;
         expect(uri.queryParameters['contentId'], '1');
         expect(uri.queryParameters['type'], 'event');
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
         expect(tester.takeException(), isNull);
       },
     );
@@ -1350,7 +1497,7 @@ final class _MapHarness {
 
 /// Builds the production router with the full provider tree the real screens
 /// require, plus the controlled [harness] sync view model.
-({GoRouter router, Widget app}) _buildTestRouterApp(
+({GoRouter router, Widget app, ControllableAdminAuth auth}) _buildTestRouterApp(
   _MapHarness harness, {
   FakeEventRepository? eventRepository,
   FakePlaceRepository? placeRepository,
@@ -1378,7 +1525,7 @@ final class _MapHarness {
     ),
   );
 
-  return (router: router, app: app);
+  return (router: router, app: app, auth: auth);
 }
 
 /// The providers the real screens resolved from the router tree require.

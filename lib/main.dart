@@ -20,6 +20,7 @@ import 'package:moliseis/ui/core/app_scroll_behavior.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
+import 'package:moliseis/utils/command_configuration.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/http_client.dart';
 import 'package:moliseis/utils/logging/logging.dart';
@@ -52,6 +53,8 @@ Future<void> _main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   SentryWidgetsFlutterBinding.ensureInitialized();
+
+  configureCommandReporting(_logger);
 
   // Retrieves an HTTP client instance initialized with the `runWithClient`
   // method.

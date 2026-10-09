@@ -1263,12 +1263,17 @@ final class FakeSearchRepository implements SearchRepository {
     this.addToHistoryResult = const Result.success(null),
     this.removeFromHistoryResult = const Result.success(null),
     this.resultsByQueryResult = const Result.success([]),
+    this.resultsByQueryHandler,
   });
 
   Result<List<String>> pastSearchesResult;
   Result<void> addToHistoryResult;
   Result<void> removeFromHistoryResult;
   Result<List<ContentBase>> resultsByQueryResult;
+
+  /// Optional per-query execution control; defaults preserve existing behavior.
+  Future<Result<List<ContentBase>>> Function(String)? resultsByQueryHandler;
+  final List<String> capturedQueries = [];
   int getPastSearchesCallCount = 0;
   int getResultsByQueryCallCount = 0;
   String? lastQuery;
@@ -1285,6 +1290,8 @@ final class FakeSearchRepository implements SearchRepository {
   Future<Result<List<ContentBase>>> getResultsByQuery(String text) {
     getResultsByQueryCallCount++;
     lastQuery = text;
+    capturedQueries.add(text);
+    if (resultsByQueryHandler != null) return resultsByQueryHandler!(text);
     return pendingGetResultsByQuery?.future ??
         Future.value(resultsByQueryResult);
   }
@@ -1318,6 +1325,10 @@ final class FakeWeatherApiClient extends WeatherApiClient {
   /// in the current test — matching the `post_screen_test` variant.
   Result<CombinedWeatherForecastResponse>? result;
   Completer<Result<CombinedWeatherForecastResponse>>? pendingCombinedForecast;
+
+  /// Optional per-coordinate response for deterministic forecast races.
+  Future<Result<CombinedWeatherForecastResponse>> Function(double, double)?
+  combinedForecastHandler;
   int getCombinedWeatherForecastCallCount = 0;
   final combinedForecastCoordinates = <(double, double)>[];
 
@@ -1329,7 +1340,8 @@ final class FakeWeatherApiClient extends WeatherApiClient {
   }) async {
     getCombinedWeatherForecastCallCount++;
     combinedForecastCoordinates.add((latitude, longitude));
-    return pendingCombinedForecast?.future ??
+    return combinedForecastHandler?.call(latitude, longitude) ??
+        pendingCombinedForecast?.future ??
         result ??
         Result.error(Exception('Weather not configured for this test'));
   }

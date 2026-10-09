@@ -1,6 +1,7 @@
 import 'package:moliseis/utils/logging/logging.dart';
 
 part 'events/core_events.dart';
+part 'events/command_events.dart';
 part 'events/local_persistence_log_events.dart';
 part 'events/network_log_events.dart';
 part 'events/repository_log_events.dart';

@@ -4,6 +4,7 @@ import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 class SearchResultSliverList extends StatelessWidget {
   const SearchResultSliverList({
@@ -22,9 +23,10 @@ class SearchResultSliverList extends StatelessWidget {
     return SliverMainAxisGroup(
       slivers: [
         ListenableBuilder(
-          listenable: viewModel.loadResults,
+          listenable: viewModel.loadResults.results,
           builder: (context, child) {
-            if (viewModel.loadResults.completed) {
+            final snapshot = viewModel.loadResults.results.value;
+            if (snapshot.completed) {
               if (viewModel.results.isEmpty) {
                 return const SliverToBoxAdapter(
                   child: EmptyView(
@@ -42,7 +44,7 @@ class SearchResultSliverList extends StatelessWidget {
               }
             }
 
-            if (viewModel.loadResults.error) {
+            if (snapshot.hasFailure) {
               return SliverToBoxAdapter(
                 child: EmptyView(
                   text: const Text(

@@ -10,19 +10,19 @@ import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/search_anchor_skeleton_list.dart';
 import 'package:moliseis/ui/search/widgets/components/search_anchor_suggestion_list.dart';
-import 'package:moliseis/utils/debounceable.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 class AppSearchAnchor extends StatefulWidget {
   const AppSearchAnchor({
+    required this.onSuggestionPressed,
+    required this.viewModel,
     this.controller,
     this.hintText = 'Cerca per luogo, evento o categoria',
     this.leading,
     this.onSubmitted,
     this.onBackPressed,
     this.elevation,
-    required this.onSuggestionPressed,
-    required this.viewModel,
     super.key,
   });
 
@@ -68,11 +68,8 @@ class AppSearchAnchor extends StatefulWidget {
 }
 
 class _AppSearchAnchorState extends State<AppSearchAnchor> {
-  late final Debounceable<Iterable<ContentBase>?, String> _debouncedSearch;
-
-  /// The query currently being searched for. If null, there is no pending
-  /// request.
-  String? _currentQuery;
+  Timer? _suggestionTimer;
+  String? _lastSuggestionInput;
 
   /// The list of past searches.
   late List<Widget> _lastHistory = <Widget>[];
@@ -88,13 +85,14 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
   late bool _isFullScreen;
 
   @override
-  void initState() {
-    super.initState();
-
-    _debouncedSearch = debounce<Iterable<ContentBase>?, String>(
-      duration: const Duration(milliseconds: 500),
-      function: _search,
-    ).call;
+  void didUpdateWidget(covariant AppSearchAnchor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.viewModel, widget.viewModel) ||
+        !identical(oldWidget.controller, widget.controller)) {
+      _suggestionTimer?.cancel();
+      _lastSuggestionInput = null;
+      _lastOptions = [];
+    }
   }
 
   @override
@@ -106,6 +104,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
 
   @override
   void dispose() {
+    _suggestionTimer?.cancel();
     _internalSearchController?.dispose();
     super.dispose();
   }
@@ -174,7 +173,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
 
             widget.onSubmitted?.call(query);
           },
-          suggestionsBuilder: (context, controller) async {
+          suggestionsBuilder: (context, controller) {
             // The popup view route outlives this anchor State: it stays
             // alive during its exit transition and remains a listener on
             // the SearchController, so it can re-invoke this closure after
@@ -183,10 +182,11 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
             // cannot throw — and skip all widget/context access.
             if (!mounted) return _lastHistory;
 
-            // Capture before any await — the widget may unmount while the
-            // debounce timer or the API call is in flight.
+            // Capture owner references for popup callbacks.
             final viewModel = widget.viewModel;
             final onSuggestionPressed = widget.onSuggestionPressed;
+
+            _admitSuggestions(viewModel, controller.text);
 
             if (controller.text.isEmpty) {
               final history = viewModel.pastSearches;
@@ -198,21 +198,17 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
               );
             }
 
-            final options = (await _debouncedSearch(controller.text))?.toList();
-
-            // Guard again after the debounce await — the anchor may have
-            // been unmounted while the timer was pending.
-            if (!mounted) return _lastOptions;
-
-            if (options == null) {
+            if (!SearchViewModel.isSearchQueryValid(controller.text)) {
+              if (_lastOptions.isNotEmpty) _lastOptions = [];
               return _lastOptions;
             }
 
             return _lastOptions = <Widget>[
               ListenableBuilder(
-                listenable: viewModel.loadSuggestions,
+                listenable: viewModel.loadSuggestions.results,
                 builder: (context, _) {
-                  if (viewModel.loadSuggestions.completed) {
+                  final snapshot = viewModel.loadSuggestions.results.value;
+                  if (snapshot.completed) {
                     if (viewModel.suggestions.isEmpty) {
                       return const Padding(
                         padding: EdgeInsets.all(16),
@@ -234,7 +230,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                     );
                   }
 
-                  if (viewModel.loadSuggestions.error) {
+                  if (snapshot.hasFailure) {
                     return const ListTile(
                       title: Text('Si è verificato un problema, riprova.'),
                     );
@@ -361,40 +357,20 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
     widget.onBackPressed?.call();
   }
 
-  // Calls the "remote" API to search with the given query. Returns null when
-  // the call has been made obsolete.
-  Future<Iterable<ContentBase>?> _search([String? query]) async {
-    // The debounce timer (500 ms) may fire after the anchor has been
-    // unmounted by a goNamed submission while the debounce window was
-    // still pending. Guard before any widget access.
-    if (!mounted) return null;
-
-    // If the query is too short, do not search.
-    if (query == null || !SearchViewModel.isSearchQueryValid(query)) {
-      // Resets the last shown options.
-      _lastOptions = <Widget>[];
-
-      return null;
+  /// Debounces admission only; execution authority is revoked on every edit.
+  void _admitSuggestions(SearchViewModel viewModel, String text) {
+    if (_lastSuggestionInput == text) return;
+    _lastSuggestionInput = text;
+    _suggestionTimer?.cancel();
+    viewModel.loadSuggestions.invalidate();
+    if (!SearchViewModel.isSearchQueryValid(text)) {
+      viewModel.loadSuggestions.run(text);
+      return;
     }
-
-    _currentQuery = query;
-
-    // Capture the view model before the await — the widget may unmount
-    // while the load is in flight.
-    final viewModel = widget.viewModel;
-    await viewModel.loadSuggestions.execute(query);
-
-    // The load may have completed after the anchor unmounted.
-    if (!mounted) return null;
-
-    final Iterable<ContentBase> options = viewModel.suggestions;
-
-    // If another search happened after this one, throw away these options.
-    if (_currentQuery != query) {
-      return null;
-    }
-    _currentQuery = null;
-
-    return options;
+    _suggestionTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      if (!identical(widget.viewModel, viewModel)) return;
+      viewModel.loadSuggestions.run(text);
+    });
   }
 }

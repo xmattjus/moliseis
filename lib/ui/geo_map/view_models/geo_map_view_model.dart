@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:collection/collection.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
@@ -5,20 +7,28 @@ import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
-import 'package:moliseis/utils/command.dart';
+import 'package:moliseis/ui/geo_map/view_models/geo_map_selection_intent.dart';
+import 'package:moliseis/utils/command.dart' as legacy;
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/restartable_command.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 class GeoMapViewModel extends ChangeNotifier {
   GeoMapViewModel({required GeoMapUseCase geoMapUseCase})
     : _geoMapUseCase = geoMapUseCase {
-    loadEvents = Command0(_loadEvents)..execute();
-    loadNearContent = Command1(_loadNearContent);
-    loadPlaces = Command0(_loadPlaces)..execute();
-    setSelectedCategories = Command1(_setSelectedCategories);
-    setSelectedTypes = Command1(_setSelectedTypes);
-    showEvent = Command1(_showEvent);
-    showPlace = Command1(_showPlace);
+    loadEvents = legacy.Command0(_loadEvents);
+    unawaited(loadEvents.execute());
+    loadNearContent = legacy.Command1(_loadNearContent);
+    loadPlaces = legacy.Command0(_loadPlaces);
+    unawaited(loadPlaces.execute());
+    setSelectedCategories = legacy.Command1(_setSelectedCategories);
+    setSelectedTypes = legacy.Command1(_setSelectedTypes);
+    selectContent = RestartableCommand(
+      (intent) => _fetchSelection(geoMapUseCase, intent),
+      debugName: 'geo_map_selection',
+    );
+    selectContent.results.addListener(_commitSelection);
 
     equality = const DeepCollectionEquality();
   }
@@ -29,16 +39,20 @@ class GeoMapViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    selectContent.results.removeListener(_commitSelection);
+    selectContent.dispose();
     super.dispose();
   }
 
-  late Command0<void> loadEvents;
-  late Command1<void, LatLng> loadNearContent;
-  late Command0<void> loadPlaces;
-  late Command1<void, Set<ContentCategory>> setSelectedCategories;
-  late Command1<void, Set<ContentType>> setSelectedTypes;
-  late Command1<void, int> showEvent;
-  late Command1<void, int> showPlace;
+  late legacy.Command0<void> loadEvents;
+  late legacy.Command1<void, LatLng> loadNearContent;
+  late legacy.Command0<void> loadPlaces;
+  late legacy.Command1<void, Set<ContentCategory>> setSelectedCategories;
+  late legacy.Command1<void, Set<ContentType>> setSelectedTypes;
+
+  /// Single latest-intent event/place/clear execution boundary.
+  late final RestartableCommand<GeoMapSelectionIntent, ContentBase?>
+  selectContent;
 
   late DeepCollectionEquality equality;
 
@@ -49,7 +63,6 @@ class GeoMapViewModel extends ChangeNotifier {
     ContentCategory.values.minusUnknown,
   );
   ContentBase? _selectedContent;
-  int _selectionGeneration = 0;
   var _selectedTypes = Set<ContentType>.from(ContentType.values);
 
   UnmodifiableListView<ContentBase> get allEvents =>
@@ -65,8 +78,7 @@ class GeoMapViewModel extends ChangeNotifier {
   /// Invalidates an older lookup when the Map URI requests a new selection
   /// or returns to the default map.
   void invalidateRequestedSelection() {
-    _selectionGeneration++;
-    _selectedContent = null;
+    requestSelection(const ClearSelection());
   }
 
   UnmodifiableSetView<ContentType> get selectedTypes =>
@@ -177,27 +189,35 @@ class GeoMapViewModel extends ChangeNotifier {
     return const Result.success(null);
   }
 
-  Future<Result<void>> _showEvent(int id) async {
-    final generation = ++_selectionGeneration;
-    final result = await _geoMapUseCase.getEventById(id);
-    if (_disposed || generation != _selectionGeneration) return result;
-    final content = result.getOrNull();
-    if (content != null) {
-      _selectedContent = content;
-      notifyListeners();
-    }
-    return result;
+  /// Clears old selection and accepts a new authoritative intent immediately.
+  void requestSelection(GeoMapSelectionIntent intent) {
+    _selectedContent = null;
+    selectContent.run(intent);
   }
 
-  Future<Result<void>> _showPlace(int id) async {
-    final generation = ++_selectionGeneration;
-    final result = await _geoMapUseCase.getPlaceById(id);
-    if (_disposed || generation != _selectionGeneration) return result;
-    final content = result.getOrNull();
-    if (content != null) {
+  static Future<Result<ContentBase?>> _fetchSelection(
+    GeoMapUseCase useCase,
+    GeoMapSelectionIntent intent,
+  ) async {
+    final Result<ContentBase> result;
+    switch (intent) {
+      case EventSelection(:final id):
+        result = await useCase.getEventById(id);
+      case PlaceSelection(:final id):
+        result = await useCase.getPlaceById(id);
+      case ClearSelection():
+        return const Result.success(null);
+    }
+    return result.map<ContentBase?>((content) => content);
+  }
+
+  void _commitSelection() {
+    final snapshot = selectContent.results.value;
+    if (!snapshot.completed) return;
+    snapshot.data!.map((content) {
+      if (snapshot.paramData?.matchesPayload(content) != true) return;
       _selectedContent = content;
       notifyListeners();
-    }
-    return result;
+    });
   }
 }

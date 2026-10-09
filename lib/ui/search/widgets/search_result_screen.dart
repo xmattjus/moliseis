@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
@@ -81,9 +79,7 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                   onResultPressed: (content) =>
                       _onSearchResultPressed(context, content),
                   onRetrySearchPressed: () {
-                    unawaited(
-                      widget.viewModel.loadResults.execute(widget.query),
-                    );
+                    widget.viewModel.loadResults.run(widget.query);
                   },
                   viewModel: widget.viewModel,
                 ),

@@ -51,7 +51,7 @@ class GeoMapModalSearchResultsState extends State<GeoMapModalSearchResults> {
         SearchResultSliverList(
           onResultPressed: widget.onResultPressed,
           onRetrySearchPressed: () {
-            widget.viewModel.loadResults.execute(widget.query);
+            widget.viewModel.loadResults.run(widget.query);
           },
           viewModel: widget.viewModel,
         ),

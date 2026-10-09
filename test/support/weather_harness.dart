@@ -12,9 +12,12 @@ import 'fake_repositories.dart';
 import 'mock_logger.dart';
 
 /// Builds a weather model with the existing fail-fast weather fake.
-WeatherViewModel buildWeatherViewModel(MockLogger mockLogger) {
-  final weatherApiClient = CachedWeatherApiClient(
-    weatherApiClient: FakeWeatherApiClient(),
+WeatherViewModel buildWeatherViewModel(
+  MockLogger mockLogger, {
+  FakeWeatherApiClient? weatherApiClient,
+}) {
+  final cachedClient = CachedWeatherApiClient(
+    weatherApiClient: weatherApiClient ?? FakeWeatherApiClient(),
     currentWeatherCache:
         LruCache<
           String,
@@ -34,7 +37,7 @@ WeatherViewModel buildWeatherViewModel(MockLogger mockLogger) {
   );
 
   return WeatherViewModel(
-    weatherApiClient: weatherApiClient,
+    weatherApiClient: cachedClient,
     weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
     weatherCodeIconMapper: const WmoWeatherIconMapper(),
   );
