@@ -111,3 +111,35 @@ Map event selection, place selection and default-map/clear invalidation SHALL sh
 #### Scenario: Selection owner changes
 - **WHEN** route identity remains the same but the selection ViewModel owner is replaced
 - **THEN** the new owner resolves that identity and prior-owner callbacks cannot affect its selection
+
+### Requirement: Forecast widget owns current-weather initialization across updates
+
+The current-weather widget SHALL own its initial and updated owner/target forecast requests. Its enclosing Map screen SHALL retain only owner disposal/rebinding responsibility and SHALL NOT initialize forecasts for retained selections. Replacing the Weather owner or changing semantic content identity/coordinates SHALL request current weather for the current target exactly once; unchanged owner/identity/coordinates rebuilds SHALL NOT request again. Initial/update callbacks SHALL avoid duplicate admission. When same-owner single-flight work is pending for a previous target, the widget SHALL request the latest still-desired target after that work settles and SHALL NOT present old-target success as current weather. Weather commands and their existing disposal guards SHALL retain their current semantics.
+
+#### Scenario: Initial owner
+- **WHEN** the forecast widget mounts with a content target
+- **THEN** it requests current forecast once using the current coordinates
+
+#### Scenario: Same widget receives new forecast owner
+- **WHEN** the retained widget receives a new Weather owner for unchanged content/coordinates
+- **THEN** the new owner receives one current-forecast request without another Map content lookup, and the widget observes the new owner only
+
+#### Scenario: Unchanged target rebuild
+- **WHEN** owner, semantic content identity and coordinates are unchanged on rebuild
+- **THEN** no additional current-forecast request occurs
+
+#### Scenario: Changed target during same-owner pending request
+- **WHEN** a retained widget changes content identity or coordinates while the same owner's old request is pending
+- **THEN** the latest desired target is requested once after settlement, and old-target success is not displayed as that target's weather
+
+#### Scenario: Changed target after completion
+- **WHEN** the retained widget changes content identity or coordinates after the prior request settles
+- **THEN** it requests forecast for the new target once, even if the previous command completed or failed
+
+#### Scenario: Old owner completes late
+- **WHEN** the previous owner completes after replacement
+- **THEN** it cannot change the new owner's state or widget observations, and no lifecycle exception occurs
+
+#### Scenario: Update before initial deferred request
+- **WHEN** owner or target changes before the initial request callback runs
+- **THEN** only the current owner/target is requested once
