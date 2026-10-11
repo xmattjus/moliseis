@@ -175,21 +175,19 @@ A `mounted` guard at the top of an async method protects the *first* `widget.`
 read, but any `widget.` read *after* the `await` is still unguarded — the
 widget may unmount during the await. The preferred hardening is to **capture
 all `widget.` references into locals before the first await**, then use only
-the captured locals after the await, plus a post-await `mounted` guard:
+the captured locals after the await, plus a post-await `mounted` guard.
+This illustrative example assumes a normal async ViewModel method returning
+`Future<void>`; it does not prescribe a command execution API:
 
 ```dart
-Future<Iterable<ContentBase>?> _search([String? query]) async {
-  if (!mounted) return null;              // <-- guard before any widget access
-
-  // ...validation...
-
+Future<void> _refresh() async {
+  if (!mounted) return;                   // <-- guard before any widget access
   final viewModel = widget.viewModel;     // <-- capture BEFORE await
-  await viewModel.loadSuggestions.execute(query);
+  await viewModel.someAsyncOperation();
 
-  if (!mounted) return null;              // <-- post-await guard
-
-  final options = viewModel.suggestions;  // <-- captured local, not widget.
-  return options;
+  if (!mounted) return;                   // <-- post-await guard
+  // ...use captured viewModel, never widget.viewModel...
+  setState(() {});                        // <-- safe after the guard
 }
 ```
 

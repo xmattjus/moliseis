@@ -174,11 +174,31 @@ Do **not** apply a blanket "nothing may ever throw" rule. Internal code and
 infrastructure failures at the architectural boundary that owns the error
 contract, and preserve existing logging/error-reporting behavior.
 
-### `Command0` / `Command1`
+### Command execution
 
-Use the existing Command pattern for user-initiated async ViewModel actions and
-state updates. Views should trigger commands rather than duplicate orchestration
-logic unless a concrete existing pattern justifies otherwise.
+For new ViewModel async actions, use the `command_it`-based infrastructure:
+
+- Use `createResultCommand` / `createResultCommandNoParam` from
+  `lib/utils/result_command.dart` as the default for ordinary single-flight
+  actions. These wrap `command_it.Command<P, Result<T>?>`; concurrent invocations
+  are rejected while the current execution is running. Any coalescing required
+  by a consumer belongs in its orchestration.
+- Use `RestartableCommand<P, T>` from `lib/utils/restartable_command.dart` only
+  when newer intent must supersede older async work, such as search or
+  identity/selection reads. It composes child `command_it` commands with
+  `switchMap`; obsolete work loses publication authority even if it continues
+  physically. It is not the default for ordinary actions.
+- Expected recoverable failures remain `Result.error`. Raw throws remain
+  unexpected runtime/programming command failures and use the configured global
+  reporting path. Do not catch generic `Object` and convert it to `Result.error`.
+- Views should trigger commands rather than duplicate ViewModel orchestration.
+
+`lib/utils/command.dart`, `Command`, `Command0`, and `Command1` exist only for
+legacy compatibility with consumers that have not yet migrated. They are
+deprecated for new code: do not introduce new imports or references, including
+public contracts built on the legacy base type. Existing consumers may remain
+until explicitly migrated by a reviewed change; do not opportunistically migrate
+them during unrelated work.
 
 ### Provider / `ChangeNotifier`
 

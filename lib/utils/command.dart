@@ -9,20 +9,36 @@ import 'package:moliseis/utils/result.dart';
 typedef CommandAction0<T> = Future<Result<T>> Function();
 typedef CommandAction1<T, A> = Future<Result<T>> Function(A);
 
-/// Facilitates interaction with a ViewModel.
+/// Legacy compatibility for ViewModels that have not yet migrated.
+///
+/// Deprecated for new code. Use `createResultCommand` /
+/// `createResultCommandNoParam` for ordinary single-flight actions, or
+/// `RestartableCommand` when newer intent must supersede older work.
 ///
 /// Encapsulates an action,
 /// exposes its running and error states,
 /// and ensures that it can't be launched again until it finishes.
 ///
-/// Use [Command0] for actions without arguments.
-/// Use [Command1] for actions with one argument.
+/// Existing consumers use [Command0] for actions without arguments and
+/// [Command1] for actions with one argument.
 ///
 /// Actions must return a [Result]. Unexpected exceptions thrown by `action`
 /// — whether before its first `await` or during an awaited step — are
 /// captured and surfaced as [Error] results, so the UI is never left in a
 /// silent [idle] state with [running] false.
+@Deprecated(
+  'Legacy compatibility command. Do not use in new code. '
+  'Use createResultCommand/createResultCommandNoParam for ordinary '
+  'single-flight actions, or RestartableCommand when newer intent must '
+  'supersede older work.',
+)
 abstract class Command<T> extends ChangeNotifier {
+  @Deprecated(
+    'Legacy compatibility command. Do not use in new code. '
+    'Use createResultCommand/createResultCommandNoParam for ordinary '
+    'single-flight actions, or RestartableCommand when newer intent must '
+    'supersede older work.',
+  )
   Command();
 
   bool _running = false;
@@ -94,7 +110,19 @@ abstract class Command<T> extends ChangeNotifier {
 
 /// [Command] without arguments.
 /// Takes a [CommandAction0] as action.
+@Deprecated(
+  'Legacy compatibility command. Do not use in new code. '
+  'Use createResultCommand/createResultCommandNoParam for ordinary '
+  'single-flight actions, or RestartableCommand when newer intent must '
+  'supersede older work.',
+)
 class Command0<T> extends Command<T> {
+  @Deprecated(
+    'Legacy compatibility command. Do not use in new code. '
+    'Use createResultCommand/createResultCommandNoParam for ordinary '
+    'single-flight actions, or RestartableCommand when newer intent must '
+    'supersede older work.',
+  )
   Command0(this._action);
 
   final CommandAction0<T> _action;
@@ -107,7 +135,19 @@ class Command0<T> extends Command<T> {
 
 /// [Command] with one argument.
 /// Takes a [CommandAction1] as action.
+@Deprecated(
+  'Legacy compatibility command. Do not use in new code. '
+  'Use createResultCommand/createResultCommandNoParam for ordinary '
+  'single-flight actions, or RestartableCommand when newer intent must '
+  'supersede older work.',
+)
 class Command1<T, A> extends Command<T> {
+  @Deprecated(
+    'Legacy compatibility command. Do not use in new code. '
+    'Use createResultCommand/createResultCommandNoParam for ordinary '
+    'single-flight actions, or RestartableCommand when newer intent must '
+    'supersede older work.',
+  )
   Command1(this._action);
 
   final CommandAction1<T, A> _action;
