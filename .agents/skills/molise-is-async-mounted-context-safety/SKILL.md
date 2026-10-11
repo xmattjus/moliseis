@@ -42,9 +42,9 @@ paths discovered during the adversarial review of the initial fix.
 
 Reference files in this repo:
 - `lib/ui/search/widgets/components/app_search_anchor.dart` — canonical fix
-  (all guard sites: `suggestionsBuilder` top-of-closure + post-debounce,
-  `_search` top + post-await, `_handleOnClose`, `onDeleted` delayed callback,
-  `_buildViewBuilder`).
+  (`suggestionsBuilder` top-of-closure guard, captured owner references,
+  `_admitSuggestions` debounce/admission lifecycle, `_handleOnClose`,
+  `onDeleted` delayed callback, `_buildViewBuilder`).
 - `lib/ui/geo_map/widgets/geo_map_screen.dart` — `if (!mounted) return;`
 - `lib/ui/sync/widgets/sync_screen.dart` — `if (!mounted) return;`
 - `lib/ui/post/widgets/components/post_media_slideshow.dart` — `mounted` guards

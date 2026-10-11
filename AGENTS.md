@@ -189,9 +189,19 @@ For new ViewModel async actions, use the `command_it`-based infrastructure:
   `switchMap`; obsolete work loses publication authority even if it continues
   physically. It is not the default for ordinary actions.
 - Expected recoverable failures remain `Result.error`. Raw throws remain
-  unexpected runtime/programming command failures and use the configured global
-  reporting path. Do not catch generic `Object` and convert it to `Result.error`.
+  unexpected runtime/programming failures and must not be converted to
+  `Result.error` merely to satisfy command lifecycle behavior. Do not catch
+  generic `Object` and convert it to `Result.error` to bypass lifecycle or
+  error-routing behavior. While a command remains live, handled unexpected
+  failures use the configured `command_it` global reporting path.
 - Views should trigger commands rather than duplicate ViewModel orchestration.
+
+`command_it 9.5.2` has a known late-throw-after-dispose limitation: after a
+disposed command's deferred internal notifier teardown, a raw async throw can
+fail on disposed internal state before reaching the configured global exception
+handler. Do not rely on global reporting to make post-dispose raw throws safe.
+Preserve appropriate ViewModel lifecycle guards and re-audit this constraint
+when `command_it` is upgraded.
 
 `lib/utils/command.dart`, `Command`, `Command0`, and `Command1` exist only for
 legacy compatibility with consumers that have not yet migrated. They are
