@@ -25,6 +25,117 @@ import '../../support/objectbox_test_store.dart';
 void main() {
   setUpAll(setUpMockSupabase);
 
+  test('Place remote nulls persist through lifecycle and replay', () async {
+    final environment = await TestObjectBoxEnvironment.create();
+    addTearDown(environment.dispose);
+    final remote = MockSupabaseEnvironment();
+    final repository = PlaceRepositoryImpl(
+      logger: MockLogger(),
+      supabaseI: remote.mockSupabase,
+      objectBoxI: TestObjectBox(environment.store),
+    );
+    final box = environment.store.box<PlaceEntity>();
+    var previousDeleted = false;
+    box.put(
+      makePlaceEntity(
+        remoteId: 1,
+        description: 'Old',
+        cityId: 7,
+        modifiedAt: DateTime.utc(2024),
+        isDeleted: previousDeleted,
+      ).copyWith(isSaved: true),
+    );
+    for (final state in [
+      (2025, false),
+      (2026, true),
+      (2027, true),
+      (2028, false),
+    ]) {
+      // A non-null local value demonstrates each lifecycle merge clears it.
+      box.put(box.get(1)!.copyWith(description: 'Old'));
+      final marker = DateTime.utc(state.$1);
+      remote.stubSelectResponse([
+        {
+          'id': 1,
+          'name': 'Remote',
+          'description': null,
+          'description_delta': null,
+          'latitude': 41.0,
+          'longitude': 14.0,
+          'category': 'unknown',
+          'city_id': 7,
+          'created_at': '2024-01-01T00:00:00Z',
+          'modified_at': marker.toIso8601String(),
+          'deleted_at': state.$2 ? marker.toIso8601String() : null,
+        },
+      ]);
+      final prepared = (await repository.prepareSync()).getOrNull()!;
+      expect(repository.commitSync(prepared), isA<Success<void>>());
+      final stored = box.get(1)!;
+      expect(stored.remoteId, 1);
+      expect(stored.modifiedAt.toUtc(), marker);
+      expect(stored.isDeleted, state.$2);
+      expect(stored.description, isNull);
+      expect(stored.isSaved, isTrue);
+      expect(stored.cityToOneId, 7);
+      expect(stored.city.targetId, 7);
+      expect(repository.commitSync(prepared), isA<Success<void>>());
+      final replay = box.get(1)!;
+      expect(replay.modifiedAt.toUtc(), marker);
+      expect(replay.isDeleted, state.$2);
+      previousDeleted = state.$2;
+    }
+    expect(previousDeleted, isFalse);
+  });
+
+  test(
+    'Place prepare rejects a later page without local publication',
+    () async {
+      final environment = await TestObjectBoxEnvironment.create();
+      addTearDown(environment.dispose);
+      final remote = MockSupabaseEnvironment()
+        ..stubSelectPages(
+          [
+            [
+              {
+                'id': 1,
+                'name': 'Row',
+                'description': null,
+                'latitude': 0.0,
+                'longitude': 0.0,
+                'category': 'unknown',
+                'city_id': null,
+                'created_at': '2026-01-01T00:00:00Z',
+                'modified_at': '2026-01-01T00:00:00Z',
+              },
+            ],
+          ],
+          errorPage: 1,
+          error: const PostgrestException(message: 'later page failed'),
+        );
+      final repository = PlaceRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: remote.mockSupabase,
+        objectBoxI: TestObjectBox(environment.store),
+      );
+      final result = await repository.prepareSync(
+        modifiedAtOrAfter: DateTime.utc(2026),
+      );
+      expect(result, isA<Error<List<PlaceDto>>>());
+      expect(environment.store.box<PlaceEntity>().count(), 0);
+      expect(remote.requests, hasLength(2));
+      expect(
+        remote.requests.every((uri) => uri.path.endsWith('/places')),
+        isTrue,
+      );
+      expect(remote.requests.last.queryParameters['id'], 'gt.1');
+      expect(
+        remote.requests.last.queryParameters['modified_at'],
+        'gte.2026-01-01T00:00:00.000Z',
+      );
+    },
+  );
+
   // ---------------------------------------------------------------------------
   // getAll
   // ---------------------------------------------------------------------------
@@ -964,7 +1075,11 @@ void main() {
 
     test('preserves city relations through soft deletion and a Keep merge', () {
       placeBox.put(
-        makePlaceEntity(remoteId: 1, cityId: 7, modifiedAt: DateTime.utc(2024)),
+        makePlaceEntity(
+          remoteId: 1,
+          cityId: 7,
+          modifiedAt: DateTime.utc(2024),
+        ).copyWith(isSaved: true),
       );
 
       final deleteResult = repository.commitSync([
@@ -975,8 +1090,19 @@ void main() {
       ]);
 
       expect(deleteResult, isA<Success<void>>());
+      expect(placeBox.get(1)?.isSaved, isTrue);
       expect(placeBox.get(1)?.cityToOneId, 7);
       expect(placeBox.get(1)?.city.targetId, 7);
+
+      expect(placeBox.get(1)?.isDeleted, isTrue);
+      expect(placeBox.get(1)?.modifiedAt.toUtc(), DateTime.utc(2025));
+      final newerDeleted = _relationTestPlaceDto(
+        modifiedAt: DateTime.utc(2026),
+        deletedAt: DateTime.utc(2026),
+      );
+      expect(repository.commitSync([newerDeleted]), isA<Success<void>>());
+      expect(placeBox.get(1)?.modifiedAt.toUtc(), DateTime.utc(2026));
+      expect(placeBox.get(1)?.isSaved, isTrue);
 
       final restoreResult = repository.commitSync([
         _relationTestPlaceDto(modifiedAt: DateTime.utc(2027)),
@@ -984,6 +1110,11 @@ void main() {
 
       expect(restoreResult, isA<Success<void>>());
       expect(placeBox.get(1)?.isDeleted, isFalse);
+      expect(placeBox.get(1)?.isSaved, isTrue);
+      expect(placeBox.get(1)?.modifiedAt.toUtc(), DateTime.utc(2027));
+      repository.commitSync([newerDeleted]);
+      expect(placeBox.get(1)?.isDeleted, isFalse);
+      expect(placeBox.get(1)?.modifiedAt.toUtc(), DateTime.utc(2027));
       expect(placeBox.get(1)?.cityToOneId, 7);
       expect(placeBox.get(1)?.city.targetId, 7);
     });

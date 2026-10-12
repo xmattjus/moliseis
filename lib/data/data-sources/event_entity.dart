@@ -76,9 +76,11 @@ class EventEntity implements SyncEntity {
 
   final bool isSaved;
 
+  /// Copies local state; omitted nullable values are retained and explicit
+  /// null clears authoritative remote fields.
   EventEntity copyWith({
     String? name,
-    String? description,
+    Object? description = _unset,
     Object? descriptionDelta = _unset,
     DateTime? startDate,
     Object? endDate = _unset,
@@ -93,7 +95,9 @@ class EventEntity implements SyncEntity {
   }) => EventEntity(
     remoteId: remoteId,
     name: name ?? this.name,
-    description: description ?? this.description,
+    description: identical(description, _unset)
+        ? this.description
+        : description as String?,
     descriptionDelta: identical(descriptionDelta, _unset)
         ? this.descriptionDelta
         : descriptionDelta as List<Map<String, dynamic>>?,

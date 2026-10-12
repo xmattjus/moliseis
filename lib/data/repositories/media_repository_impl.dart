@@ -1,4 +1,5 @@
 import 'package:moliseis/data/core/base_sync_repository.dart';
+import 'package:moliseis/data/core/fetch_paginated_sync_dtos.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/dtos/media_dto.dart';
 import 'package:moliseis/data/mappers/mappers.dart';
@@ -30,11 +31,13 @@ class MediaRepositoryImpl extends BaseSyncRepository<MediaDto, MediaEntity>
   String get entityName => 'media';
 
   @override
-  Future<List<MediaDto>> fetchRemote() async {
-    final response = await _supabase.client.from(tableName).select();
-
-    return response.map<MediaDto>(MediaDtoMapper.fromMap).toList();
-  }
+  Future<List<MediaDto>> fetchRemote({DateTime? modifiedAtOrAfter}) =>
+      fetchPaginatedSyncDtos(
+        _supabase.client,
+        tableName,
+        MediaDtoMapper.fromMap,
+        modifiedAtOrAfter: modifiedAtOrAfter,
+      );
 
   @override
   MediaEntity? getLocalById(int id) => _box.get(id);
@@ -51,11 +54,6 @@ class MediaRepositoryImpl extends BaseSyncRepository<MediaDto, MediaEntity>
   @override
   MediaEntity mergeEntity(MediaDto dto, MediaEntity existing) =>
       dto.mergeInto(existing);
-
-  @override
-  MediaEntity markEntityDeleted(MediaEntity existing) {
-    return existing.copyWith(isDeleted: true);
-  }
 
   Condition<MediaEntity> get _isNotDeleted =>
       MediaEntity_.isDeleted.equals(false);

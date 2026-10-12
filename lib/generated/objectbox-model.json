@@ -24,7 +24,7 @@
     },
     {
       "id": "6:8898619296747710534",
-      "lastPropertyId": "10:398867547277998639",
+      "lastPropertyId": "11:6213775870090488596",
       "name": "AppSettings",
       "properties": [
         {
@@ -56,6 +56,11 @@
         {
           "id": "10:398867547277998639",
           "name": "lastSyncedAt",
+          "type": 12
+        },
+        {
+          "id": "11:6213775870090488596",
+          "name": "contentSyncCursorAt",
           "type": 12
         }
       ],

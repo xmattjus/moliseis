@@ -1,126 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:moliseis/data/core/base_sync_repository.dart';
-import 'package:moliseis/domain/core/sync_dto.dart';
-import 'package:moliseis/domain/core/sync_entity.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
-import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 
 import '../../support/mock_logger.dart';
 
-// ---------------------------------------------------------------------------
-// Test doubles
-// ---------------------------------------------------------------------------
-
-class FakeSyncDto implements SyncDto {
-  const FakeSyncDto({
-    required this.id,
-    required this.modifiedAt,
-    this.deletedAt,
-  });
-
-  @override
-  final int id;
-  @override
-  final DateTime modifiedAt;
-  @override
-  final DateTime? deletedAt;
-}
-
-class FakeSyncEntity implements SyncEntity {
-  FakeSyncEntity({
-    required this.remoteId,
-    required this.modifiedAt,
-    this.isDeleted = false,
-  });
-
-  @override
-  final int remoteId;
-  @override
-  final DateTime modifiedAt;
-  @override
-  final bool isDeleted;
-}
-
-class StubSyncRepository
-    extends BaseSyncRepository<FakeSyncDto, FakeSyncEntity> {
-  StubSyncRepository(super.logger, {this.supportsSoftDelete = true});
-
-  @override
-  final bool supportsSoftDelete;
-
-  final storedEntities = <int, FakeSyncEntity>{};
-  final remoteDtos = <FakeSyncDto>[];
-
-  int putManyCallCount = 0;
-  final putManyCalls = <List<FakeSyncEntity>>[];
-  final createdEntities = <FakeSyncEntity>[];
-  final mergedEntities = <FakeSyncEntity>[];
-  final deletedEntities = <FakeSyncEntity>[];
-
-  @override
-  String get tableName => 'fakes';
-
-  @override
-  String get entityName => 'fake';
-
-  @override
-  Future<List<FakeSyncDto>> fetchRemote() async => remoteDtos;
-
-  @override
-  FakeSyncEntity? getLocalById(int id) => storedEntities[id];
-
-  @override
-  void put(FakeSyncEntity entity) {
-    storedEntities[entity.remoteId] = entity;
-  }
-
-  @override
-  void putMany(List<FakeSyncEntity> entities) {
-    putManyCallCount++;
-    putManyCalls.add(List.of(entities));
-    for (final entity in entities) {
-      storedEntities[entity.remoteId] = entity;
-    }
-  }
-
-  @override
-  FakeSyncEntity createEntity(FakeSyncDto dto) {
-    final entity = FakeSyncEntity(
-      remoteId: dto.id,
-      modifiedAt: dto.modifiedAt,
-      isDeleted: dto.deletedAt != null,
-    );
-    createdEntities.add(entity);
-    return entity;
-  }
-
-  @override
-  FakeSyncEntity mergeEntity(FakeSyncDto dto, FakeSyncEntity existing) {
-    final entity = FakeSyncEntity(
-      remoteId: dto.id,
-      modifiedAt: dto.modifiedAt,
-      isDeleted: dto.deletedAt != null,
-    );
-    mergedEntities.add(entity);
-    return entity;
-  }
-
-  @override
-  FakeSyncEntity markEntityDeleted(FakeSyncEntity existing) {
-    final entity = FakeSyncEntity(
-      remoteId: existing.remoteId,
-      modifiedAt: existing.modifiedAt,
-      isDeleted: true,
-    );
-    deletedEntities.add(entity);
-    return entity;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+import '../../support/sync_repository_test_support.dart';
 
 void main() {
   group('BaseSyncRepository.prepareSync', () {
@@ -143,8 +27,15 @@ void main() {
       expect(dtos[0].id, equals(1));
     });
 
+    test('forwards the supplied inclusive lower bound unchanged', () async {
+      final lowerBound = DateTime.utc(2026, 2);
+      await repository.prepareSync(modifiedAtOrAfter: lowerBound);
+      expect(repository.receivedLowerBound, lowerBound);
+    });
+
     test('returns Result.error when fetchRemote throws', () async {
-      final throwingRepository = _ThrowingStubSyncRepository(mockLogger);
+      final throwingRepository = StubSyncRepository(mockLogger)
+        ..fetchError = Exception('Supabase unavailable');
 
       final result = await throwingRepository.prepareSync();
 
@@ -223,7 +114,7 @@ void main() {
           ),
         ]);
 
-        expect(repository.deletedEntities, hasLength(1));
+        expect(repository.mergedEntities, hasLength(1));
         expect(repository.storedEntities[1]?.isDeleted, isTrue);
         expect(mockLogger.eventsOfType<EntityDeleteSuccess>(), hasLength(1));
       },
@@ -238,7 +129,6 @@ void main() {
         ),
       ]);
 
-      expect(repository.deletedEntities, isEmpty);
       expect(repository.createdEntities, isEmpty);
       expect(repository.putManyCallCount, equals(0));
     });
@@ -302,7 +192,6 @@ void main() {
       repository.commitSync([FakeSyncDto(id: 1, modifiedAt: DateTime(2026))]);
 
       expect(repository.mergedEntities, hasLength(1));
-      expect(repository.deletedEntities, isEmpty);
       expect(repository.storedEntities[1]?.isDeleted, isFalse);
       expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
     });
@@ -325,30 +214,73 @@ void main() {
       expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
     });
 
-    test('ignores deletedAt when supportsSoftDelete is false', () {
-      final noSoftDeleteRepo = StubSyncRepository(
-        mockLogger,
-        supportsSoftDelete: false,
+    for (final deleted in [false, true]) {
+      for (final remoteDeleted in [false, true]) {
+        for (final year in [2024, 2025]) {
+          test(
+            'ignores year $year replay from deleted=$deleted to $remoteDeleted',
+            () {
+              final local = FakeSyncEntity(
+                remoteId: 1,
+                modifiedAt: DateTime(2025),
+                isDeleted: deleted,
+              );
+              repository.storedEntities[1] = local;
+              repository.commitSync([
+                FakeSyncDto(
+                  id: 1,
+                  modifiedAt: DateTime(year),
+                  deletedAt: remoteDeleted ? DateTime(2026) : null,
+                ),
+              ]);
+              expect(repository.storedEntities[1], same(local));
+              expect(repository.putManyCallCount, 0);
+            },
+          );
+        }
+      }
+    }
+
+    test('merges newer deleted state and replay is idempotent', () {
+      repository.storedEntities[1] = FakeSyncEntity(
+        remoteId: 1,
+        modifiedAt: DateTime(2025),
+        isDeleted: true,
       );
-
-      // Test readability benefits from separate statements over cascades.
-      // ignore: cascade_invocations
-      noSoftDeleteRepo.commitSync([
-        FakeSyncDto(
-          id: 1,
-          modifiedAt: DateTime(2026),
-          deletedAt: DateTime(2026, 2),
-        ),
-      ]);
-
-      expect(noSoftDeleteRepo.deletedEntities, isEmpty);
-      expect(noSoftDeleteRepo.createdEntities, hasLength(1));
+      final dto = FakeSyncDto(
+        id: 1,
+        modifiedAt: DateTime(2026),
+        deletedAt: DateTime(2026, 2),
+      );
+      repository
+        ..commitSync([dto])
+        ..commitSync([dto]);
+      expect(repository.storedEntities[1]!.modifiedAt, dto.modifiedAt);
+      expect(repository.storedEntities[1]!.isDeleted, isTrue);
+      expect(repository.putManyCallCount, 1);
     });
+
+    test(
+      'duplicate older tombstone cannot overwrite freshly created active',
+      () {
+        repository.commitSync([
+          FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
+          FakeSyncDto(
+            id: 1,
+            modifiedAt: DateTime(2025),
+            deletedAt: DateTime(2025),
+          ),
+        ]);
+        expect(repository.storedEntities[1]!.isDeleted, isFalse);
+        expect(repository.putManyCalls.single, hasLength(1));
+      },
+    );
 
     test(
       'returns Result.error and logs RepositorySyncFailed when putMany throws',
       () {
-        final throwingRepo = _CommitThrowingStubSyncRepository(mockLogger);
+        final throwingRepo = StubSyncRepository(mockLogger)
+          ..commitError = Exception('Local write failed');
 
         final result = throwingRepo.commitSync([
           FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
@@ -363,26 +295,4 @@ void main() {
       },
     );
   });
-}
-
-// ---------------------------------------------------------------------------
-// Throwing variant for error-path tests
-// ---------------------------------------------------------------------------
-
-class _ThrowingStubSyncRepository extends StubSyncRepository {
-  _ThrowingStubSyncRepository(super.logger);
-
-  @override
-  Future<List<FakeSyncDto>> fetchRemote() async {
-    throw Exception('Supabase unavailable');
-  }
-}
-
-class _CommitThrowingStubSyncRepository extends StubSyncRepository {
-  _CommitThrowingStubSyncRepository(super.logger);
-
-  @override
-  void putMany(List<FakeSyncEntity> entities) {
-    throw Exception('Local write failed');
-  }
 }

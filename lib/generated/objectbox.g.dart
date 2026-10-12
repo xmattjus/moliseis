@@ -51,7 +51,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(6, 8898619296747710534),
     name: 'AppSettings',
-    lastPropertyId: const obx_int.IdUid(10, 398867547277998639),
+    lastPropertyId: const obx_int.IdUid(11, 6213775870090488596),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -87,6 +87,12 @@ final _entities = <obx_int.ModelEntity>[
       obx_int.ModelProperty(
         id: const obx_int.IdUid(10, 398867547277998639),
         name: 'lastSyncedAt',
+        type: 12,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(11, 6213775870090488596),
+        name: 'contentSyncCursorAt',
         type: 12,
         flags: 0,
       ),
@@ -877,7 +883,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         object.id = id;
       },
       objectToFB: (AppSettings object, fb.Builder fbb) {
-        fbb.startTable(11);
+        fbb.startTable(12);
         fbb.addInt64(0, object.id);
         fbb.addInt64(3, object.dbMode);
         fbb.addInt64(4, object.dbBrightness);
@@ -888,6 +894,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
           object.lastSyncedAt == null
               ? null
               : object.lastSyncedAt!.microsecondsSinceEpoch * 1000,
+        );
+        fbb.addInt64(
+          10,
+          object.contentSyncCursorAt == null
+              ? null
+              : object.contentSyncCursorAt!.microsecondsSinceEpoch * 1000,
         );
         fbb.finish(fbb.endTable());
         return object.id;
@@ -900,10 +912,17 @@ obx_int.ModelDefinition getObjectBoxModel() {
           rootOffset,
           22,
         );
+        final contentSyncCursorAtValue = const fb.Int64Reader()
+            .vTableGetNullable(buffer, rootOffset, 24);
         final lastSyncedAtParam = lastSyncedAtValue == null
             ? null
             : DateTime.fromMicrosecondsSinceEpoch(
                 (lastSyncedAtValue / 1000).round(),
+              );
+        final contentSyncCursorAtParam = contentSyncCursorAtValue == null
+            ? null
+            : DateTime.fromMicrosecondsSinceEpoch(
+                (contentSyncCursorAtValue / 1000).round(),
               );
         final crashReportingParam = const fb.BoolReader().vTableGet(
           buffer,
@@ -914,6 +933,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final object =
             AppSettings(
                 lastSyncedAt: lastSyncedAtParam,
+                contentSyncCursorAt: contentSyncCursorAtParam,
                 crashReporting: crashReportingParam,
               )
               ..id = const fb.Int64Reader().vTableGet(buffer, rootOffset, 4, 0)
@@ -1744,6 +1764,11 @@ class AppSettings_ {
   /// See [AppSettings.lastSyncedAt].
   static final lastSyncedAt = obx.QueryDateNanoProperty<AppSettings>(
     _entities[1].properties[5],
+  );
+
+  /// See [AppSettings.contentSyncCursorAt].
+  static final contentSyncCursorAt = obx.QueryDateNanoProperty<AppSettings>(
+    _entities[1].properties[6],
   );
 }
 

@@ -1505,7 +1505,11 @@ final class _ContentSubmissionRouteHarness {
       eventRepository: FakeEventRepository(),
       mediaRepository: FakeMediaRepository(),
       placeRepository: FakePlaceRepository(),
-      settingsRepository: FakeSettingsRepository(lastSyncedAt: DateTime.now()),
+      settingsRepository: FakeSettingsRepository(
+        lastSyncedAt: DateTime.now(),
+        contentSyncCursorAt: DateTime.utc(2026, 10, 12),
+      ),
+      cursorSource: FakeSyncCursorSource(),
       transactionCoordinator: FakeTransactionCoordinator(),
     );
     syncViewModel = SyncViewModel(syncUseCase: syncUseCase);

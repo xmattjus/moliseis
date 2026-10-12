@@ -26,6 +26,131 @@ import '../../support/objectbox_test_store.dart';
 void main() {
   setUpAll(setUpMockSupabase);
 
+  test('Media remote nulls persist through lifecycle and replay', () async {
+    final environment = await TestObjectBoxEnvironment.create();
+    addTearDown(environment.dispose);
+    final remote = MockSupabaseEnvironment();
+    final repository = MediaRepositoryImpl(
+      logger: MockLogger(),
+      supabaseI: remote.mockSupabase,
+      objectBoxI: TestObjectBox(environment.store),
+    );
+    final box = environment.store.box<MediaEntity>();
+    var previousDeleted = false;
+    box.put(
+      makeMediaEntity(
+        title: 'Old',
+        author: 'Old',
+        license: 'Old',
+        licenseUrl: 'Old',
+        eventId: 7,
+        modifiedAt: DateTime.utc(2024),
+        isDeleted: previousDeleted,
+      ),
+    );
+    for (final state in [
+      (2025, false),
+      (2026, true),
+      (2027, true),
+      (2028, false),
+    ]) {
+      // A non-null local value demonstrates each lifecycle merge clears it.
+      box.put(
+        box
+            .get(1)!
+            .copyWith(
+              title: 'Old',
+              author: 'Old',
+              license: 'Old',
+              licenseUrl: 'Old',
+            ),
+      );
+      final marker = DateTime.utc(state.$1);
+      remote.stubSelectResponse([
+        {
+          'id': 1,
+          'description': null,
+          'author': null,
+          'license': null,
+          'license_url': null,
+          'url': 'https://example.com/new.jpg',
+          'width': 900,
+          'height': 600,
+          'event_id': 7,
+          'place_id': null,
+          'created_at': '2024-01-01T00:00:00Z',
+          'modified_at': marker.toIso8601String(),
+          'deleted_at': state.$2 ? marker.toIso8601String() : null,
+        },
+      ]);
+      final prepared = (await repository.prepareSync()).getOrNull()!;
+      expect(repository.commitSync(prepared), isA<Success<void>>());
+      final stored = box.get(1)!;
+      expect(stored.remoteId, 1);
+      expect(stored.modifiedAt.toUtc(), marker);
+      expect(stored.isDeleted, state.$2);
+      expect(stored.title, isNull);
+      expect(stored.author, isNull);
+      expect(stored.license, isNull);
+      expect(stored.licenseUrl, isNull);
+      expect(stored.eventToOneId, 7);
+      expect(stored.event.targetId, 7);
+      expect(repository.commitSync(prepared), isA<Success<void>>());
+      final replay = box.get(1)!;
+      expect(replay.modifiedAt.toUtc(), marker);
+      expect(replay.isDeleted, state.$2);
+      previousDeleted = state.$2;
+    }
+    expect(previousDeleted, isFalse);
+  });
+
+  test(
+    'Media prepare rejects a later page without local publication',
+    () async {
+      final environment = await TestObjectBoxEnvironment.create();
+      addTearDown(environment.dispose);
+      final remote = MockSupabaseEnvironment()
+        ..stubSelectPages(
+          [
+            [
+              {
+                'id': 1,
+                'url': 'https://example.com/image.jpg',
+                'width': 10,
+                'height': 10,
+                'event_id': 7,
+                'place_id': null,
+                'created_at': '2026-01-01T00:00:00Z',
+                'modified_at': '2026-01-01T00:00:00Z',
+              },
+            ],
+          ],
+          errorPage: 1,
+          error: const PostgrestException(message: 'later page failed'),
+        );
+      final repository = MediaRepositoryImpl(
+        logger: MockLogger(),
+        supabaseI: remote.mockSupabase,
+        objectBoxI: TestObjectBox(environment.store),
+      );
+      final result = await repository.prepareSync(
+        modifiedAtOrAfter: DateTime.utc(2026),
+      );
+      expect(result, isA<Error<List<MediaDto>>>());
+      expect(environment.store.box<MediaEntity>().count(), 0);
+      expect(remote.requests, hasLength(2));
+      expect(
+        remote.requests.every((uri) => uri.path.endsWith('/media')),
+        isTrue,
+      );
+      expect(remote.requests.last.queryParameters['id'], 'gt.1');
+      expect(
+        remote.requests.last.queryParameters['modified_at'],
+        'gte.2026-01-01T00:00:00.000Z',
+      );
+    },
+  );
+
   // ---------------------------------------------------------------------------
   // getByEventId
   // ---------------------------------------------------------------------------
@@ -471,12 +596,26 @@ void main() {
         expect(mediaBox.get(1)?.event.targetId, 7);
         expect(mediaBox.get(1)?.place.targetId, 0);
 
+        expect(mediaBox.get(1)?.isDeleted, isTrue);
+        expect(mediaBox.get(1)?.modifiedAt.toUtc(), DateTime.utc(2025));
+        final newerDeleted = _relationTestMediaDto(
+          modifiedAt: DateTime.utc(2026),
+          deletedAt: DateTime.utc(2026),
+        );
+        expect(repository.commitSync([newerDeleted]), isA<Success<void>>());
+        expect(mediaBox.get(1)?.modifiedAt.toUtc(), DateTime.utc(2026));
+        expect(mediaBox.get(1)?.isDeleted, isTrue);
+
         final restoreResult = repository.commitSync([
           _relationTestMediaDto(modifiedAt: DateTime.utc(2027)),
         ]);
 
         expect(restoreResult, isA<Success<void>>());
         expect(mediaBox.get(1)?.isDeleted, isFalse);
+        expect(mediaBox.get(1)?.modifiedAt.toUtc(), DateTime.utc(2027));
+        repository.commitSync([newerDeleted]);
+        expect(mediaBox.get(1)?.isDeleted, isFalse);
+        expect(mediaBox.get(1)?.modifiedAt.toUtc(), DateTime.utc(2027));
         expect(mediaBox.get(1)?.eventToOneId, 7);
         expect(mediaBox.get(1)?.placeToOneId, isNull);
         expect(mediaBox.get(1)?.event.targetId, 7);

@@ -56,7 +56,11 @@ SyncViewModel _buildViewModel({required CityRepository cityRepository}) {
       eventRepository: FakeEventRepository(),
       mediaRepository: FakeMediaRepository(),
       placeRepository: FakePlaceRepository(),
-      settingsRepository: FakeSettingsRepository(lastSyncedAt: DateTime.now()),
+      settingsRepository: FakeSettingsRepository(
+        lastSyncedAt: DateTime.now(),
+        contentSyncCursorAt: DateTime.utc(2026, 10, 12),
+      ),
+      cursorSource: FakeSyncCursorSource(),
       transactionCoordinator: FakeTransactionCoordinator(),
     ),
   );
@@ -75,7 +79,9 @@ final class _GatedCityRepository extends CityRepository {
   final Completer<void> gate;
 
   @override
-  Future<Result<List<CityDto>>> prepareSync() async {
+  Future<Result<List<CityDto>>> prepareSync({
+    DateTime? modifiedAtOrAfter,
+  }) async {
     await gate.future;
     return const Result.success(<CityDto>[]);
   }

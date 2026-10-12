@@ -2,6 +2,7 @@ import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/dtos/media_dto.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
+import 'package:moliseis/domain/core/sync_cursor_source.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
@@ -10,6 +11,11 @@ import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+
+/// Safety window for request-scoped canonical writes becoming visible late.
+///
+/// This is an operational overlap, not a commit-order guarantee.
+const syncOverlap = Duration(hours: 24);
 
 /// Orchestrates synchronization of all local repositories with the backend.
 ///
@@ -28,12 +34,16 @@ class SyncUseCase {
     required PlaceRepository placeRepository,
     required SettingsRepository settingsRepository,
     required SyncTransactionCoordinator transactionCoordinator,
+    required SyncCursorSource cursorSource,
+    DateTime Function()? now,
   }) : _cityRepository = cityRepository,
        _eventRepository = eventRepository,
        _mediaRepository = mediaRepository,
        _placeRepository = placeRepository,
        _settingsRepository = settingsRepository,
-       _transactionCoordinator = transactionCoordinator;
+       _transactionCoordinator = transactionCoordinator,
+       _cursorSource = cursorSource,
+       _now = now ?? DateTime.now;
 
   final CityRepository _cityRepository;
   final EventRepository _eventRepository;
@@ -41,6 +51,8 @@ class SyncUseCase {
   final PlaceRepository _placeRepository;
   final SettingsRepository _settingsRepository;
   final SyncTransactionCoordinator _transactionCoordinator;
+  final SyncCursorSource _cursorSource;
+  final DateTime Function() _now;
 
   /// Synchronizes all repositories using a two-phase protocol.
   ///
@@ -48,8 +60,9 @@ class SyncUseCase {
   /// **Phase 2** – Commits all DTOs atomically inside a single write
   /// transaction.
   ///
-  /// On success, records the current timestamp as the last successful sync
-  /// time. Returns [Result.error] if any phase fails.
+  /// Saves the pre-fetch server cursor only after content commit, together with
+  /// the completion time. A settings failure leaves committed content available
+  /// for harmless replay from the previous cursor and returns [Result.error].
   Future<Result<void>> sync() async {
     final transaction = Sentry.startTransaction(
       'sync',
@@ -60,12 +73,24 @@ class SyncUseCase {
     var spanStatus = const SpanStatus.internalError();
 
     try {
-      // Phase 1: fetch all remote data concurrently
+      // Observe U before any fetch; it is not a transactional snapshot.
+      final cursor = _settingsRepository.contentSyncCursorAt;
+      final cursorResult = await _cursorSource.getCurrentCursor();
+      final DateTime serverCursor;
+      switch (cursorResult) {
+        case Success(:final value):
+          serverCursor = value.toUtc();
+        case Error(:final error):
+          return Result.error(error);
+      }
+      final lowerBound = cursor?.toUtc().subtract(syncOverlap);
+
+      // Phase 1: fetch all remote data concurrently, even when U equals C.
       final (cityResult, placeResult, eventResult, mediaResult) = await (
-        _cityRepository.prepareSync(),
-        _placeRepository.prepareSync(),
-        _eventRepository.prepareSync(),
-        _mediaRepository.prepareSync(),
+        _cityRepository.prepareSync(modifiedAtOrAfter: lowerBound),
+        _placeRepository.prepareSync(modifiedAtOrAfter: lowerBound),
+        _eventRepository.prepareSync(modifiedAtOrAfter: lowerBound),
+        _mediaRepository.prepareSync(modifiedAtOrAfter: lowerBound),
       ).wait;
 
       final List<CityDto> cityDtos;
@@ -127,7 +152,11 @@ class SyncUseCase {
         return commitResult;
       }
 
-      await _settingsRepository.setModifiedAt(DateTime.now());
+      final settingsResult = await _settingsRepository.setSyncState(
+        lastSyncedAt: _now(),
+        contentSyncCursorAt: serverCursor,
+      );
+      if (settingsResult.isError) return settingsResult;
       spanStatus = const SpanStatus.ok();
       return const Result.success(null);
     } finally {
@@ -138,16 +167,18 @@ class SyncUseCase {
   /// Whether synchronization is needed or not based on the last successful
   /// sync time.
   ///
-  /// Synchronization is needed if more than 3 days have passed since the last
+  /// An absent content cursor forces bootstrap immediately. Otherwise
+  /// synchronization is needed if at least 3 days have passed since the last
   /// successful synchronization, or if there was never a successful
   /// synchronization.
   bool get isSyncRequired {
+    if (_settingsRepository.contentSyncCursorAt == null) return true;
     final lastSyncedAt = _settingsRepository.lastSyncedAt;
 
     if (lastSyncedAt != null) {
       final nextScheduledSync = lastSyncedAt.add(const Duration(days: 3));
 
-      if (DateTime.now().isBefore(nextScheduledSync)) {
+      if (_now().isBefore(nextScheduledSync)) {
         return false;
       }
     }

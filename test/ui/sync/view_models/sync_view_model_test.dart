@@ -8,6 +8,7 @@ import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 
 import '../../../support/fake_repositories.dart';
+import '../../../support/sync_use_case_test_support.dart';
 
 void main() {
   // Builds a SyncUseCase with configurable prepareSync() results and settings.
@@ -24,7 +25,52 @@ void main() {
       mediaRepository: FakeMediaRepository(prepareResult: mediaResult),
       placeRepository: FakePlaceRepository(prepareResult: placeResult),
       settingsRepository: settings,
+      cursorSource: FakeSyncCursorSource(),
       transactionCoordinator: FakeTransactionCoordinator(),
+    );
+  }
+
+  test(
+    'upgraded recent cache bootstraps immediately and failure is nonfatal',
+    () async {
+      final now = DateTime.utc(2026, 10, 12, 12);
+      final settings = FakeSettingsRepository(lastSyncedAt: now);
+      final deps = buildSyncUseCase(
+        settings: settings,
+        now: () => now,
+        cityResult: Result.error(TestException('offline')),
+      );
+      final viewModel = SyncViewModel(syncUseCase: deps.useCase);
+      addTearDown(viewModel.dispose);
+      await pumpEventQueue();
+      expect(deps.cityRepo.prepareCalls, [null]);
+      expect(viewModel.sync.error, isTrue);
+      expect(viewModel.fatalError, isFalse);
+      expect(settings.contentSyncCursorAt, isNull);
+      expect(settings.lastSyncedAt, now);
+    },
+  );
+
+  for (final bootstrap in [true, false]) {
+    test(
+      'forced sync chooses bootstrap/delta from the cursor: $bootstrap',
+      () async {
+        final now = DateTime.utc(2026, 10, 12, 12);
+        final settings = FakeSettingsRepository(
+          lastSyncedAt: now,
+          contentSyncCursorAt: now,
+        );
+        final deps = buildSyncUseCase(settings: settings, now: () => now);
+        final viewModel = SyncViewModel(syncUseCase: deps.useCase);
+        addTearDown(viewModel.dispose);
+        expect(viewModel.sync.idle, isTrue);
+        if (bootstrap) settings.contentSyncCursorAt = null;
+        await viewModel.sync.execute(true);
+        expect(deps.cityRepo.prepareCalls, [
+          if (bootstrap) null else now.subtract(const Duration(hours: 24)),
+        ]);
+        expect(viewModel.sync.completed, isTrue);
+      },
     );
   }
 
@@ -33,6 +79,7 @@ void main() {
       // modifiedAt 1 day ago → isSyncRequired = false
       final settings = FakeSettingsRepository(
         lastSyncedAt: DateTime.now().subtract(const Duration(days: 1)),
+        contentSyncCursorAt: DateTime.utc(2026, 10, 12),
       );
       final viewModel = SyncViewModel(
         syncUseCase: buildUseCase(settings: settings),
@@ -53,7 +100,7 @@ void main() {
       await pumpEventQueue();
 
       expect(viewModel.sync.completed, isTrue);
-      expect(settings.setModifiedAtCalled, isTrue);
+      expect(settings.setSyncStateCalled, isTrue);
     });
   });
 
@@ -103,6 +150,7 @@ void main() {
         final error = TestException('sync failed');
         final settings = FakeSettingsRepository(
           lastSyncedAt: DateTime.now().subtract(const Duration(days: 1)),
+          contentSyncCursorAt: DateTime.utc(2026, 10, 12),
         );
         final viewModel = SyncViewModel(
           syncUseCase: buildUseCase(
@@ -124,6 +172,7 @@ void main() {
       // modifiedAt 1 day ago → isSyncRequired = false → no auto-execute
       final settings = FakeSettingsRepository(
         lastSyncedAt: DateTime.now().subtract(const Duration(days: 1)),
+        contentSyncCursorAt: DateTime.utc(2026, 10, 12),
       );
       final viewModel = SyncViewModel(
         syncUseCase: buildUseCase(settings: settings),
@@ -132,8 +181,8 @@ void main() {
       await viewModel.sync.execute(true);
 
       expect(viewModel.sync.completed, isTrue);
-      // setModifiedAt is only called when the underlying sync() actually runs
-      expect(settings.setModifiedAtCalled, isTrue);
+      // setSyncState is only called when the underlying sync() actually runs
+      expect(settings.setSyncStateCalled, isTrue);
     });
 
     test(
@@ -142,6 +191,7 @@ void main() {
         // modifiedAt 1 day ago → isSyncRequired = false → no auto-execute
         final settings = FakeSettingsRepository(
           lastSyncedAt: DateTime.now().subtract(const Duration(days: 1)),
+          contentSyncCursorAt: DateTime.utc(2026, 10, 12),
         );
         final viewModel = SyncViewModel(
           syncUseCase: buildUseCase(settings: settings),
@@ -151,7 +201,7 @@ void main() {
 
         expect(viewModel.sync.completed, isTrue);
         // No actual network sync occurred
-        expect(settings.setModifiedAtCalled, isFalse);
+        expect(settings.setSyncStateCalled, isFalse);
       },
     );
   });

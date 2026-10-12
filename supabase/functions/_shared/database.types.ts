@@ -544,6 +544,10 @@ export type Database = {
         Args: { p_asset_id: number; p_submission_id: number };
         Returns: string;
       };
+      get_content_sync_cursor: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
       ingest_external_event: {
         Args: {
           p_external_id: string;

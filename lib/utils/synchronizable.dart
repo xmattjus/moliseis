@@ -9,8 +9,10 @@ mixin Synchronizable<T extends SyncDto> {
   /// Fetches remote DTOs without writing to the local database.
   ///
   /// Returns the fetched DTOs wrapped in a [Result]. Call [commitSync]
-  /// with the returned DTOs to write them to the local database.
-  Future<Result<List<T>>> prepareSync();
+  /// with the returned DTOs to write them to the local database. A null
+  /// [modifiedAtOrAfter] retrieves all rows; otherwise retrieval includes
+  /// markers equal to or newer than the supplied lower bound.
+  Future<Result<List<T>>> prepareSync({DateTime? modifiedAtOrAfter});
 
   /// Writes the given remote [dtos] to the local database.
   ///

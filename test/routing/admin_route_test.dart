@@ -344,7 +344,10 @@ final class _AdminRouteHarness {
   _AdminRouteHarness({User? initialUser}) {
     auth = ControllableAdminAuth(initialUser: initialUser);
     repository = FakeAdminContentSubmissionRepository();
-    settingsRepository = FakeSettingsRepository(lastSyncedAt: DateTime.now());
+    settingsRepository = FakeSettingsRepository(
+      lastSyncedAt: DateTime.now(),
+      contentSyncCursorAt: DateTime.utc(2026, 10, 12),
+    );
     syncViewModel = SyncViewModel(
       syncUseCase: SyncUseCase(
         cityRepository: FakeCityRepository(),
@@ -352,6 +355,7 @@ final class _AdminRouteHarness {
         mediaRepository: FakeMediaRepository(),
         placeRepository: FakePlaceRepository(),
         settingsRepository: settingsRepository,
+        cursorSource: FakeSyncCursorSource(),
         transactionCoordinator: FakeTransactionCoordinator(),
       ),
     );

@@ -26,6 +26,9 @@ abstract class SettingsRepository implements Initializable {
   /// with the backend.
   DateTime? get lastSyncedAt;
 
+  /// Server cursor already covered locally; null requires a full bootstrap.
+  DateTime? get contentSyncCursorAt;
+
   /// Returns the user selected theme brightness (system, light, dark).
   ThemeBrightness get themeBrightness;
 
@@ -41,7 +44,14 @@ abstract class SettingsRepository implements Initializable {
 
   Future<Result<void>> setCrashReporting(bool enable);
   Future<Result<void>> setContentSort(ContentSort sort);
-  Future<Result<void>> setModifiedAt(DateTime dateTime);
+
+  /// Persists completion time and covered server cursor in one settings save.
+  ///
+  /// A failed save must leave both cached values unchanged.
+  Future<Result<void>> setSyncState({
+    required DateTime lastSyncedAt,
+    required DateTime contentSyncCursorAt,
+  });
   Future<Result<void>> setThemeBrightness(ThemeBrightness brightness);
   Future<Result<void>> setThemeType(ThemeType type);
 }

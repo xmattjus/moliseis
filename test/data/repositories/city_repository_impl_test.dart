@@ -15,6 +15,46 @@ import '../../support/objectbox_test_store.dart';
 void main() {
   setUpAll(setUpMockSupabase);
 
+  test('City prepare rejects a later page without local publication', () async {
+    final environment = await TestObjectBoxEnvironment.create();
+    addTearDown(environment.dispose);
+    final remote = MockSupabaseEnvironment()
+      ..stubSelectPages(
+        [
+          [
+            {
+              'id': 1,
+              'name': 'Row',
+              'created_at': '2026-01-01T00:00:00Z',
+              'modified_at': '2026-01-01T00:00:00Z',
+            },
+          ],
+        ],
+        errorPage: 1,
+        error: const PostgrestException(message: 'later page failed'),
+      );
+    final repository = CityRepositoryImpl(
+      logger: MockLogger(),
+      supabaseI: remote.mockSupabase,
+      objectBoxI: TestObjectBox(environment.store),
+    );
+    final result = await repository.prepareSync(
+      modifiedAtOrAfter: DateTime.utc(2026),
+    );
+    expect(result, isA<Error<List<CityDto>>>());
+    expect(environment.store.box<CityEntity>().count(), 0);
+    expect(remote.requests, hasLength(2));
+    expect(
+      remote.requests.every((uri) => uri.path.endsWith('/cities')),
+      isTrue,
+    );
+    expect(remote.requests.last.queryParameters['id'], 'gt.1');
+    expect(
+      remote.requests.last.queryParameters['modified_at'],
+      'gte.2026-01-01T00:00:00.000Z',
+    );
+  });
+
   // ---------------------------------------------------------------------------
   // prepareSync — error path
   // ---------------------------------------------------------------------------
@@ -155,6 +195,57 @@ void main() {
       expect(mockLogger.containsEvent<EntityInsertSuccess>(), isFalse);
       expect(mockLogger.containsEvent<EntityUpdateSuccess>(), isFalse);
     });
+
+    test(
+      'City newer lifecycle merges preserve relations and replay freshness',
+      () {
+        cityBox.put(
+          makeCityEntity(remoteId: 1, modifiedAt: DateTime.utc(2024)),
+        );
+        for (final state in [(2025, true), (2026, true), (2027, false)]) {
+          final dto = CityDto(
+            id: 1,
+            name: 'City ${state.$1}',
+            createdAt: DateTime.utc(2024),
+            modifiedAt: DateTime.utc(state.$1),
+            deletedAt: state.$2 ? DateTime.utc(state.$1) : null,
+          );
+          expect(repository.commitSync([dto]), isA<Success<void>>());
+          final stored = cityBox.get(1)!;
+          expect(stored.remoteId, 1);
+          expect(stored.isDeleted, state.$2);
+          expect(stored.name, dto.name);
+          expect(stored.modifiedAt.toUtc(), dto.modifiedAt);
+        }
+        expect(
+          repository.commitSync([
+            CityDto(
+              id: 1,
+              name: 'Stale',
+              createdAt: DateTime.utc(2024),
+              modifiedAt: DateTime.utc(2026),
+              deletedAt: DateTime.utc(2026),
+            ),
+          ]),
+          isA<Success<void>>(),
+        );
+        expect(cityBox.get(1)!.isDeleted, isFalse);
+        expect(cityBox.get(1)!.name, 'City 2027');
+        expect(
+          repository.commitSync([
+            CityDto(
+              id: 2,
+              name: 'Absent tombstone',
+              createdAt: DateTime.utc(2024),
+              modifiedAt: DateTime.utc(2027),
+              deletedAt: DateTime.utc(2027),
+            ),
+          ]),
+          isA<Success<void>>(),
+        );
+        expect(cityBox.get(2), isNull);
+      },
+    );
 
     test('prepareSync returns Error when Supabase query fails', () async {
       supabaseEnv.stubSelectError(

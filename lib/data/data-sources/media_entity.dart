@@ -61,11 +61,13 @@ class MediaEntity implements SyncEntity {
 
   final ToOne<EventEntity> event;
 
+  /// Copies local state; omitted nullable values are retained and explicit
+  /// null clears authoritative remote fields.
   MediaEntity copyWith({
-    String? title,
-    String? author,
-    String? license,
-    String? licenseUrl,
+    Object? title = _unset,
+    Object? author = _unset,
+    Object? license = _unset,
+    Object? licenseUrl = _unset,
     String? url,
     int? width,
     int? height,
@@ -76,10 +78,12 @@ class MediaEntity implements SyncEntity {
     bool? isDeleted,
   }) => MediaEntity(
     remoteId: remoteId,
-    title: title ?? this.title,
-    author: author ?? this.author,
-    license: license ?? this.license,
-    licenseUrl: licenseUrl ?? this.licenseUrl,
+    title: identical(title, _unset) ? this.title : title as String?,
+    author: identical(author, _unset) ? this.author : author as String?,
+    license: identical(license, _unset) ? this.license : license as String?,
+    licenseUrl: identical(licenseUrl, _unset)
+        ? this.licenseUrl
+        : licenseUrl as String?,
     url: url ?? this.url,
     width: width ?? this.width,
     height: height ?? this.height,

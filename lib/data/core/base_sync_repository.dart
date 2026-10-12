@@ -19,7 +19,7 @@ abstract class BaseSyncRepository<
   String get tableName;
 
   /// Used to fetch new data from the [tableName] backend table.
-  Future<List<TDto>> fetchRemote();
+  Future<List<TDto>> fetchRemote({DateTime? modifiedAtOrAfter});
 
   TEntity? getLocalById(int id);
 
@@ -31,21 +31,17 @@ abstract class BaseSyncRepository<
 
   TEntity mergeEntity(TDto dto, TEntity existing);
 
-  TEntity markEntityDeleted(TEntity existing);
-
-  bool get supportsSoftDelete => true;
-
   /// Fetches remote DTOs without writing to the local database.
   ///
   /// This is the first phase of a two-phase sync. It performs network I/O
   /// and returns the fetched DTOs wrapped in a [Result]. Call [commitSync]
   /// with the returned DTOs to write them to the local database.
   @override
-  Future<Result<List<TDto>>> prepareSync() async {
+  Future<Result<List<TDto>>> prepareSync({DateTime? modifiedAtOrAfter}) async {
     logger.log(RepositorySyncStarted(entityName));
 
     try {
-      final dtos = await fetchRemote();
+      final dtos = await fetchRemote(modifiedAtOrAfter: modifiedAtOrAfter);
       return Result.success(dtos);
     } on Exception catch (e, stackTrace) {
       logger.log(
@@ -71,18 +67,8 @@ abstract class BaseSyncRepository<
       for (final dto in dtos) {
         final existing = pendingById[dto.id] ?? getLocalById(dto.id);
 
-        if (supportsSoftDelete && dto.deletedAt != null) {
-          if (existing != null) {
-            final deleted = markEntityDeleted(existing);
-            pendingPuts.add(deleted);
-            pendingById[dto.id] = deleted;
-
-            logger.log(EntityDeleteSuccess(entityName, dto.id));
-          }
-          continue;
-        }
-
         if (existing == null) {
+          if (dto.deletedAt != null) continue;
           final created = createEntity(dto);
           pendingPuts.add(created);
           pendingById[dto.id] = created;
@@ -96,7 +82,11 @@ abstract class BaseSyncRepository<
           pendingPuts.add(merged);
           pendingById[dto.id] = merged;
 
-          logger.log(EntityUpdateSuccess(entityName, dto.id));
+          logger.log(
+            dto.deletedAt != null
+                ? EntityDeleteSuccess(entityName, dto.id)
+                : EntityUpdateSuccess(entityName, dto.id),
+          );
         }
       }
 

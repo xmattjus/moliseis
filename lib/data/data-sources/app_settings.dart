@@ -12,6 +12,7 @@ class AppSettings {
     this.brightness = ThemeBrightness.system,
     this.contentSort = ContentSort.byName,
     this.lastSyncedAt,
+    this.contentSyncCursorAt,
     this.crashReporting = true,
   }) : id = _settingsId;
 
@@ -87,6 +88,12 @@ class AppSettings {
   @Property(type: PropertyType.dateNano)
   final DateTime? lastSyncedAt;
 
+  /// Server high-water timestamp covered by the last committed content sync.
+  ///
+  /// Null requires a full bootstrap, including when an older cache exists.
+  @Property(type: PropertyType.dateNano)
+  final DateTime? contentSyncCursorAt;
+
   final bool crashReporting;
 
   AppSettings copyWith({
@@ -94,6 +101,7 @@ class AppSettings {
     ThemeBrightness? brightness,
     ContentSort? contentSort,
     DateTime? lastSyncedAt,
+    DateTime? contentSyncCursorAt,
     bool? crashReporting,
   }) {
     return AppSettings(
@@ -101,6 +109,7 @@ class AppSettings {
       brightness: brightness ?? this.brightness,
       contentSort: contentSort ?? this.contentSort,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
+      contentSyncCursorAt: contentSyncCursorAt ?? this.contentSyncCursorAt,
       crashReporting: crashReporting ?? this.crashReporting,
     );
   }

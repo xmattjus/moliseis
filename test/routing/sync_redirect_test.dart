@@ -173,6 +173,30 @@ void main() {
       );
     });
 
+    testWidgets(
+      'upgraded cursor-less cache bootstraps and offline failure returns home',
+      (tester) async {
+        final settings = FakeSettingsRepository(lastSyncedAt: DateTime.now());
+        final harness = SyncHarness(
+          settings: settings,
+          cityResult: Result.error(TestException('offline bootstrap')),
+        );
+        final fixture = buildSyncRouterApp(harness);
+        await tester.pumpWidget(fixture.app);
+        await pumpSyncRedirects(tester);
+        expect(fixture.router.state.matchedLocation, RoutePaths.sync);
+        harness.release();
+        await pumpSyncRedirects(tester);
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(harness.viewModel.fatalError, isFalse);
+        expect(settings.contentSyncCursorAt, isNull);
+        expect(fixture.router.state.matchedLocation, RoutePaths.home);
+        expect(find.byType(ExploreScreen), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('fatal first-sync error remains on /sync', (tester) async {
       final harness = SyncHarness(
         autoSync: true,
@@ -399,7 +423,10 @@ void main() {
       tester,
     ) async {
       // Persist a recent timestamp so the fresh view model skips auto-sync.
-      final settings = FakeSettingsRepository(lastSyncedAt: DateTime.now());
+      final settings = FakeSettingsRepository(
+        lastSyncedAt: DateTime.now(),
+        contentSyncCursorAt: DateTime.utc(2026, 10, 12),
+      );
       final holder = SyncRestorationHolder(settingsFactory: () => settings);
 
       await tester.pumpWidget(RestorableSyncHarness(holder: holder));

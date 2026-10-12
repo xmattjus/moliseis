@@ -9,6 +9,7 @@ import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
 import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/domain/core/event_time.dart';
+import 'package:moliseis/domain/core/sync_cursor_source.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
@@ -82,8 +83,17 @@ final class TestException implements Exception {
 
 /// A pass-through transaction coordinator that simply executes the function.
 final class FakeTransactionCoordinator implements SyncTransactionCoordinator {
+  /// Optional failure without invoking the content callback.
+  Result<void>? result;
+
+  /// Counts commits so tests can assert preparation never commits early.
+  int calls = 0;
+
   @override
-  Result<void> runInWriteTransaction(Result<void> Function() fn) => fn();
+  Result<void> runInWriteTransaction(Result<void> Function() fn) {
+    calls++;
+    return result ?? fn();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -418,11 +428,26 @@ final class FakeCityRepository extends CityRepository {
   FakeCityRepository({this.prepareResult = const Result.success([])});
 
   Result<List<CityDto>> prepareResult;
+
+  /// Records the lower bound supplied by each preparation.
+  final prepareCalls = <DateTime?>[];
+
+  /// Optional deterministic gate for sync concurrency tests.
+  Completer<Result<List<CityDto>>>? pendingPrepare;
+
+  /// Signals that preparation has started, before waiting on its gate.
+  Completer<void>? prepareStarted;
+
   bool commitCalled = false;
   List<CityDto>? committedDtos;
 
   @override
-  Future<Result<List<CityDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<CityDto>>> prepareSync({DateTime? modifiedAtOrAfter}) {
+    prepareCalls.add(modifiedAtOrAfter);
+    final started = prepareStarted;
+    if (started != null && !started.isCompleted) started.complete();
+    return pendingPrepare?.future ?? Future.value(prepareResult);
+  }
 
   @override
   Result<void> commitSync(List<CityDto> dtos) {
@@ -456,6 +481,16 @@ final class FakeEventRepository extends EventRepository {
 
   // Configurable results (non-final for mid-test reconfiguration)
   Result<List<EventDto>> prepareResult;
+
+  /// Records the lower bound supplied by each preparation.
+  final prepareCalls = <DateTime?>[];
+
+  /// Optional deterministic gate for sync concurrency tests.
+  Completer<Result<List<EventDto>>>? pendingPrepare;
+
+  /// Signals that preparation has started, before waiting on its gate.
+  Completer<void>? prepareStarted;
+
   Result<List<Event>> getByCurrentYearResult;
   Result<List<Event>> getByDateResult;
   Result<List<Event>> getByDateRangeResult;
@@ -501,7 +536,12 @@ final class FakeEventRepository extends EventRepository {
   final setFavouriteEventCalls = <({int id, bool save})>[];
 
   @override
-  Future<Result<List<EventDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<EventDto>>> prepareSync({DateTime? modifiedAtOrAfter}) {
+    prepareCalls.add(modifiedAtOrAfter);
+    final started = prepareStarted;
+    if (started != null && !started.isCompleted) started.complete();
+    return pendingPrepare?.future ?? Future.value(prepareResult);
+  }
 
   @override
   Result<void> commitSync(List<EventDto> dtos) {
@@ -624,8 +664,8 @@ final class ControllableEventRepository extends EventRepository {
   }
 
   @override
-  Future<Result<List<EventDto>>> prepareSync() async =>
-      const Result.success([]);
+  Future<Result<List<EventDto>>> prepareSync({DateTime? modifiedAtOrAfter}) =>
+      Future.value(const Result.success([]));
 
   @override
   Result<void> commitSync(List<EventDto> dtos) => const Result.success(null);
@@ -684,6 +724,16 @@ final class FakeMediaRepository extends MediaRepository {
   });
 
   Result<List<MediaDto>> prepareResult;
+
+  /// Records the lower bound supplied by each preparation.
+  final prepareCalls = <DateTime?>[];
+
+  /// Optional deterministic gate for sync concurrency tests.
+  Completer<Result<List<MediaDto>>>? pendingPrepare;
+
+  /// Signals that preparation has started, before waiting on its gate.
+  Completer<void>? prepareStarted;
+
   Result<List<Media>> getByEventIdResult;
   Result<List<Media>> getByPlaceIdResult;
 
@@ -691,7 +741,12 @@ final class FakeMediaRepository extends MediaRepository {
   List<MediaDto>? committedDtos;
 
   @override
-  Future<Result<List<MediaDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<MediaDto>>> prepareSync({DateTime? modifiedAtOrAfter}) {
+    prepareCalls.add(modifiedAtOrAfter);
+    final started = prepareStarted;
+    if (started != null && !started.isCompleted) started.complete();
+    return pendingPrepare?.future ?? Future.value(prepareResult);
+  }
 
   @override
   Result<void> commitSync(List<MediaDto> dtos) {
@@ -731,6 +786,16 @@ final class FakePlaceRepository extends PlaceRepository {
   }) : getByIdResults = getByIdResults ?? {};
 
   Result<List<PlaceDto>> prepareResult;
+
+  /// Records the lower bound supplied by each preparation.
+  final prepareCalls = <DateTime?>[];
+
+  /// Optional deterministic gate for sync concurrency tests.
+  Completer<Result<List<PlaceDto>>>? pendingPrepare;
+
+  /// Signals that preparation has started, before waiting on its gate.
+  Completer<void>? prepareStarted;
+
   Result<List<Place>> getAllResult;
   Completer<Result<List<Place>>>? pendingGetAll;
   Result<List<Place>> getByCategoriesResult;
@@ -765,7 +830,12 @@ final class FakePlaceRepository extends PlaceRepository {
   int getAllCallCount = 0;
 
   @override
-  Future<Result<List<PlaceDto>>> prepareSync() async => prepareResult;
+  Future<Result<List<PlaceDto>>> prepareSync({DateTime? modifiedAtOrAfter}) {
+    prepareCalls.add(modifiedAtOrAfter);
+    final started = prepareStarted;
+    if (started != null && !started.isCompleted) started.complete();
+    return pendingPrepare?.future ?? Future.value(prepareResult);
+  }
 
   @override
   Result<void> commitSync(List<PlaceDto> dtos) {
@@ -843,12 +913,13 @@ final class FakeSettingsRepository implements SettingsRepository {
     this.crashReporting = false,
     this.contentSort = ContentSort.byName,
     this.lastSyncedAt,
+    this.contentSyncCursorAt,
     this.themeBrightness = ThemeBrightness.system,
     this.themeType = ThemeType.system,
     this.initializeResult = const Result.success(null),
     this.setCrashReportingResult = const Result.success(null),
     this.setContentSortResult = const Result.success(null),
-    this.setModifiedAtResult = const Result.success(null),
+    this.setSyncStateResult = const Result.success(null),
     this.setThemeBrightnessResult = const Result.success(null),
     this.setThemeTypeResult = const Result.success(null),
   });
@@ -861,6 +932,8 @@ final class FakeSettingsRepository implements SettingsRepository {
   @override
   DateTime? lastSyncedAt;
   @override
+  DateTime? contentSyncCursorAt;
+  @override
   ThemeBrightness themeBrightness;
   @override
   ThemeType themeType;
@@ -869,12 +942,12 @@ final class FakeSettingsRepository implements SettingsRepository {
   Result<void> initializeResult;
   Result<void> setCrashReportingResult;
   Result<void> setContentSortResult;
-  Result<void> setModifiedAtResult;
+  Result<void> setSyncStateResult;
   Result<void> setThemeBrightnessResult;
   Result<void> setThemeTypeResult;
 
   // Call tracking
-  bool setModifiedAtCalled = false;
+  bool setSyncStateCalled = false;
 
   @override
   Future<Result<void>> initialize() async => initializeResult;
@@ -892,10 +965,16 @@ final class FakeSettingsRepository implements SettingsRepository {
   }
 
   @override
-  Future<Result<void>> setModifiedAt(DateTime dateTime) async {
-    setModifiedAtCalled = true;
-    if (setModifiedAtResult is Success<void>) lastSyncedAt = dateTime;
-    return setModifiedAtResult;
+  Future<Result<void>> setSyncState({
+    required DateTime lastSyncedAt,
+    required DateTime contentSyncCursorAt,
+  }) async {
+    setSyncStateCalled = true;
+    if (setSyncStateResult is Success<void>) {
+      this.lastSyncedAt = lastSyncedAt;
+      this.contentSyncCursorAt = contentSyncCursorAt;
+    }
+    return setSyncStateResult;
   }
 
   @override
@@ -1344,5 +1423,23 @@ final class FakeWeatherApiClient extends WeatherApiClient {
         pendingCombinedForecast?.future ??
         result ??
         Result.error(Exception('Weather not configured for this test'));
+  }
+}
+
+/// Configurable server-time source shared by sync tests and UI harnesses.
+final class FakeSyncCursorSource implements SyncCursorSource {
+  FakeSyncCursorSource({Result<DateTime>? result})
+    : result = result ?? Result.success(DateTime.utc(2026, 10, 12, 12));
+
+  /// The response returned by the next cursor observation.
+  Result<DateTime> result;
+
+  /// Number of cursor observations.
+  int calls = 0;
+
+  @override
+  Future<Result<DateTime>> getCurrentCursor() {
+    calls++;
+    return Future.value(result);
   }
 }

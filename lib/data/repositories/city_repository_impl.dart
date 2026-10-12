@@ -1,4 +1,5 @@
 import 'package:moliseis/data/core/base_sync_repository.dart';
+import 'package:moliseis/data/core/fetch_paginated_sync_dtos.dart';
 import 'package:moliseis/data/data-sources/city_entity.dart';
 import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/data/mappers/mappers.dart';
@@ -28,11 +29,13 @@ class CityRepositoryImpl extends BaseSyncRepository<CityDto, CityEntity>
   String get entityName => 'city';
 
   @override
-  Future<List<CityDto>> fetchRemote() async {
-    final response = await _supabase.client.from(tableName).select();
-
-    return response.map<CityDto>(CityDtoMapper.fromMap).toList();
-  }
+  Future<List<CityDto>> fetchRemote({DateTime? modifiedAtOrAfter}) =>
+      fetchPaginatedSyncDtos(
+        _supabase.client,
+        tableName,
+        CityDtoMapper.fromMap,
+        modifiedAtOrAfter: modifiedAtOrAfter,
+      );
 
   @override
   CityEntity? getLocalById(int id) => _box.get(id);
@@ -49,9 +52,4 @@ class CityRepositoryImpl extends BaseSyncRepository<CityDto, CityEntity>
   @override
   CityEntity mergeEntity(CityDto dto, CityEntity existing) =>
       dto.mergeInto(existing);
-
-  @override
-  CityEntity markEntityDeleted(CityEntity existing) {
-    return existing.copyWith(isDeleted: true);
-  }
 }

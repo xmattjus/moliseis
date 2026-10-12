@@ -38,6 +38,7 @@ void main() {
       expect(settings.brightness, ThemeBrightness.system);
       expect(settings.contentSort, ContentSort.byName);
       expect(settings.crashReporting, isTrue);
+      expect(settings.contentSyncCursorAt, isNull);
     });
 
     test('load always reads the singleton id record', () async {

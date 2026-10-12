@@ -60,6 +60,9 @@ class SettingsRepositoryImpl implements SettingsRepository {
   DateTime? get lastSyncedAt => _cache.lastSyncedAt;
 
   @override
+  DateTime? get contentSyncCursorAt => _cache.contentSyncCursorAt;
+
+  @override
   ThemeBrightness get themeBrightness => _cache.brightness;
 
   @override
@@ -78,8 +81,14 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   @override
-  Future<Result<void>> setModifiedAt(DateTime dateTime) {
-    final newSettings = _cache.copyWith(lastSyncedAt: dateTime);
+  Future<Result<void>> setSyncState({
+    required DateTime lastSyncedAt,
+    required DateTime contentSyncCursorAt,
+  }) {
+    final newSettings = _cache.copyWith(
+      lastSyncedAt: lastSyncedAt,
+      contentSyncCursorAt: contentSyncCursorAt,
+    );
     return _persistNewSettings(newSettings);
   }
 

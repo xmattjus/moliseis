@@ -63,7 +63,10 @@ final class SyncHarness {
     gate = gated ? Completer<void>() : null;
     this.settings =
         settings ??
-        FakeSettingsRepository(lastSyncedAt: autoSync ? null : DateTime.now());
+        FakeSettingsRepository(
+          lastSyncedAt: autoSync ? null : DateTime.now(),
+          contentSyncCursorAt: autoSync ? null : DateTime.utc(2026, 10, 12),
+        );
     final useCase = SyncUseCase(
       cityRepository: _GatedCityRepository(
         gate: gate,
@@ -74,6 +77,7 @@ final class SyncHarness {
       mediaRepository: FakeMediaRepository(),
       placeRepository: FakePlaceRepository(),
       settingsRepository: this.settings,
+      cursorSource: FakeSyncCursorSource(),
       transactionCoordinator: FakeTransactionCoordinator(),
     );
     viewModel = SyncViewModel(syncUseCase: useCase);
@@ -101,7 +105,9 @@ final class _GatedCityRepository extends CityRepository {
   final void Function()? onCommit;
 
   @override
-  Future<Result<List<CityDto>>> prepareSync() async {
+  Future<Result<List<CityDto>>> prepareSync({
+    DateTime? modifiedAtOrAfter,
+  }) async {
     if (gate != null) {
       await gate!.future;
     }

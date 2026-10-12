@@ -1492,13 +1492,17 @@ void main() {
 /// out of the map tests.
 final class _MapHarness {
   _MapHarness() {
-    settings = FakeSettingsRepository(lastSyncedAt: DateTime.now());
+    settings = FakeSettingsRepository(
+      lastSyncedAt: DateTime.now(),
+      contentSyncCursorAt: DateTime.utc(2026, 10, 12),
+    );
     final useCase = SyncUseCase(
       cityRepository: FakeCityRepository(),
       eventRepository: FakeEventRepository(),
       mediaRepository: FakeMediaRepository(),
       placeRepository: FakePlaceRepository(),
       settingsRepository: settings,
+      cursorSource: FakeSyncCursorSource(),
       transactionCoordinator: FakeTransactionCoordinator(),
     );
     viewModel = SyncViewModel(syncUseCase: useCase);

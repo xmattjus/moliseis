@@ -1,4 +1,5 @@
 import 'package:moliseis/data/core/base_sync_repository.dart';
+import 'package:moliseis/data/core/fetch_paginated_sync_dtos.dart';
 import 'package:moliseis/data/core/object_box_conditions.dart';
 import 'package:moliseis/data/data-sources/event_entity.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
@@ -40,11 +41,13 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   String get entityName => 'event';
 
   @override
-  Future<List<EventDto>> fetchRemote() async {
-    final response = await _supabase.client.from(tableName).select();
-
-    return response.map<EventDto>(EventDtoMapper.fromMap).toList();
-  }
+  Future<List<EventDto>> fetchRemote({DateTime? modifiedAtOrAfter}) =>
+      fetchPaginatedSyncDtos(
+        _supabase.client,
+        tableName,
+        EventDtoMapper.fromMap,
+        modifiedAtOrAfter: modifiedAtOrAfter,
+      );
 
   @override
   EventEntity? getLocalById(int id) => _box.get(id);
@@ -61,11 +64,6 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   @override
   EventEntity mergeEntity(EventDto dto, EventEntity existing) =>
       dto.mergeInto(existing);
-
-  @override
-  EventEntity markEntityDeleted(EventEntity existing) {
-    return existing.copyWith(isDeleted: true);
-  }
 
   Condition<EventEntity> get _isNotDeleted =>
       EventEntity_.isDeleted.equals(false);

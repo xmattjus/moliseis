@@ -20,8 +20,10 @@ void main() {
   ) async {
     final event = makeEvent(remoteId: 5);
     final holder = SyncRestorationHolder(
-      settingsFactory: () =>
-          FakeSettingsRepository(lastSyncedAt: DateTime.now()),
+      settingsFactory: () => FakeSettingsRepository(
+        lastSyncedAt: DateTime.now(),
+        contentSyncCursorAt: DateTime.utc(2026, 10, 12),
+      ),
       eventRepositoryFactory: () =>
           FakeEventRepository(getByIdResults: {5: Result.success(event)}),
     );
@@ -65,8 +67,10 @@ void main() {
       try {
         final event = makeEvent();
         final holder = SyncRestorationHolder(
-          settingsFactory: () =>
-              FakeSettingsRepository(lastSyncedAt: DateTime.now()),
+          settingsFactory: () => FakeSettingsRepository(
+            lastSyncedAt: DateTime.now(),
+            contentSyncCursorAt: DateTime.utc(2026, 10, 12),
+          ),
           eventRepositoryFactory: () =>
               FakeEventRepository(getByIdResults: {1: Result.success(event)}),
         );

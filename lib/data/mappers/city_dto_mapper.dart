@@ -11,6 +11,7 @@ extension CityDtoExtensions on CityDto {
     name: name,
     createdAt: createdAt,
     modifiedAt: modifiedAt,
+    isDeleted: deletedAt != null,
     places: ToMany<PlaceEntity>(),
     events: ToMany<EventEntity>(),
   );
@@ -19,5 +20,6 @@ extension CityDtoExtensions on CityDto {
     name: name,
     createdAt: createdAt,
     modifiedAt: modifiedAt,
+    isDeleted: deletedAt != null,
   );
 }

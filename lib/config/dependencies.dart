@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';
+import 'package:moliseis/data/core/supabase_sync_cursor_source.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
@@ -215,6 +216,7 @@ List<SingleChildWidget> providers(
         mediaRepository: context.read(),
         placeRepository: context.read(),
         settingsRepository: context.read(),
+        cursorSource: SupabaseSyncCursorSource(supabase.client),
         transactionCoordinator: ObjectBoxSyncTransactionCoordinator(
           objectBox.store,
         ),

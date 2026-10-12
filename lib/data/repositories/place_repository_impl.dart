@@ -1,4 +1,5 @@
 import 'package:moliseis/data/core/base_sync_repository.dart';
+import 'package:moliseis/data/core/fetch_paginated_sync_dtos.dart';
 import 'package:moliseis/data/data-sources/place_entity.dart';
 import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/data/mappers/mappers.dart';
@@ -32,11 +33,13 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
   String get entityName => 'place';
 
   @override
-  Future<List<PlaceDto>> fetchRemote() async {
-    final response = await _supabase.client.from(tableName).select();
-
-    return response.map<PlaceDto>(PlaceDtoMapper.fromMap).toList();
-  }
+  Future<List<PlaceDto>> fetchRemote({DateTime? modifiedAtOrAfter}) =>
+      fetchPaginatedSyncDtos(
+        _supabase.client,
+        tableName,
+        PlaceDtoMapper.fromMap,
+        modifiedAtOrAfter: modifiedAtOrAfter,
+      );
 
   @override
   PlaceEntity? getLocalById(int id) => _box.get(id);
@@ -53,11 +56,6 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
   @override
   PlaceEntity mergeEntity(PlaceDto dto, PlaceEntity existing) =>
       dto.mergeInto(existing);
-
-  @override
-  PlaceEntity markEntityDeleted(PlaceEntity existing) {
-    return existing.copyWith(isDeleted: true);
-  }
 
   Condition<PlaceEntity> get _isNotDeleted =>
       PlaceEntity_.isDeleted.equals(false);

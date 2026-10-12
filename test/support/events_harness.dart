@@ -70,6 +70,7 @@ final class EventsRouteHarness {
   }) : placeRepository = placeRepository ?? FakePlaceRepository() {
     final settingsRepository = FakeSettingsRepository(
       lastSyncedAt: DateTime.now(),
+      contentSyncCursorAt: DateTime.utc(2026, 10, 12),
     );
     syncViewModel = SyncViewModel(
       syncUseCase: SyncUseCase(
@@ -78,6 +79,7 @@ final class EventsRouteHarness {
         mediaRepository: FakeMediaRepository(),
         placeRepository: FakePlaceRepository(),
         settingsRepository: settingsRepository,
+        cursorSource: FakeSyncCursorSource(),
         transactionCoordinator: FakeTransactionCoordinator(),
       ),
     );
