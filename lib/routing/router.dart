@@ -502,8 +502,9 @@ GoRouter buildAppRouter({
                     ],
                     child: Builder(
                       builder: (context) => GeoMapScreen(
-                        initialContentId: contentId,
-                        initialContentType: contentType,
+                        routeSelection: contentId != null && contentType != null
+                            ? (id: contentId, type: contentType)
+                            : null,
                         viewModel: context.read<GeoMapViewModel>(),
                         searchViewModel: context.read<SearchViewModel>(),
                         weatherViewModel: weatherViewModel,

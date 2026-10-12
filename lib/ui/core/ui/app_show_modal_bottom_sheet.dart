@@ -26,6 +26,7 @@ Future<T?> appShowModalBottomSheet<T>({
   Offset? anchorPoint,
   AnimationStyle? sheetAnimationStyle,
   bool? requestFocus,
+  void Function(ModalBottomSheetRoute<T>)? onRouteCreated,
 }) {
   assert(
     debugCheckHasMediaQuery(context),
@@ -40,37 +41,35 @@ Future<T?> appShowModalBottomSheet<T>({
 
   final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
   final localizations = MaterialLocalizations.of(context);
-  return navigator.push(
-    ModalBottomSheetRoute<T>(
-      builder: builder,
-      capturedThemes: InheritedTheme.capture(
-        from: context,
-        to: navigator.context,
-      ),
-      isScrollControlled: isScrollControlled,
-      scrollControlDisabledMaxHeightRatio: scrollControlDisabledMaxHeightRatio,
-      barrierLabel: barrierLabel ?? localizations.scrimLabel,
-      barrierOnTapHint: localizations.scrimOnTapHint(
-        localizations.bottomSheetLabel,
-      ),
-      backgroundColor: backgroundColor,
-      elevation: elevation,
-      shape: shape,
-      clipBehavior: clipBehavior,
-      constraints: BoxConstraints(
-        maxWidth: context.appSizes.bottomSheetMaxWidth,
-      ),
-      isDismissible: isDismissible,
-      modalBarrierColor:
-          barrierColor ?? Theme.of(context).bottomSheetTheme.modalBarrierColor,
-      enableDrag: enableDrag,
-      showDragHandle: showDragHandle,
-      settings: routeSettings,
-      transitionAnimationController: transitionAnimationController,
-      anchorPoint: anchorPoint,
-      useSafeArea: useSafeArea,
-      sheetAnimationStyle: sheetAnimationStyle,
-      requestFocus: requestFocus,
+  final route = ModalBottomSheetRoute<T>(
+    builder: builder,
+    capturedThemes: InheritedTheme.capture(
+      from: context,
+      to: navigator.context,
     ),
+    isScrollControlled: isScrollControlled,
+    scrollControlDisabledMaxHeightRatio: scrollControlDisabledMaxHeightRatio,
+    barrierLabel: barrierLabel ?? localizations.scrimLabel,
+    barrierOnTapHint: localizations.scrimOnTapHint(
+      localizations.bottomSheetLabel,
+    ),
+    backgroundColor: backgroundColor,
+    elevation: elevation,
+    shape: shape,
+    clipBehavior: clipBehavior,
+    constraints: BoxConstraints(maxWidth: context.appSizes.bottomSheetMaxWidth),
+    isDismissible: isDismissible,
+    modalBarrierColor:
+        barrierColor ?? Theme.of(context).bottomSheetTheme.modalBarrierColor,
+    enableDrag: enableDrag,
+    showDragHandle: showDragHandle,
+    settings: routeSettings,
+    transitionAnimationController: transitionAnimationController,
+    anchorPoint: anchorPoint,
+    useSafeArea: useSafeArea,
+    sheetAnimationStyle: sheetAnimationStyle,
+    requestFocus: requestFocus,
   );
+  onRouteCreated?.call(route);
+  return navigator.push(route);
 }

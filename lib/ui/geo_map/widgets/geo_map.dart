@@ -95,6 +95,7 @@ class _GeoMapState extends State<GeoMap> {
           ? const Color(0xFF2E2E2E)
           : const Color(0xFFEAEADD),
       onMapEvent: (event) {
+        if (event.source == MapEventSource.mapController) return;
         if (event is MapEventMoveStart) {
           widget.onPositionChangeStart?.call(_mapController.camera.center);
         } else if (event is MapEventFlingAnimationEnd ||

@@ -6,18 +6,21 @@ import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 class WeatherForecastDaysList extends StatefulWidget {
   const WeatherForecastDaysList({
     required this.borderColor,
     required this.backgroundColor,
     required this.viewModel,
+    this.expectedTarget,
     super.key,
   });
 
   final Color borderColor;
   final Color backgroundColor;
   final WeatherViewModel viewModel;
+  final WeatherTarget? expectedTarget;
 
   @override
   State<WeatherForecastDaysList> createState() =>
@@ -62,9 +65,29 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             ListenableBuilder(
-              listenable: viewModel.loadDailyForecast,
+              listenable: Listenable.merge([
+                viewModel.loadDailyForecast.results,
+              ]),
               builder: (context, child) {
-                if (viewModel.loadDailyForecast.completed) {
+                final target = widget.expectedTarget ?? viewModel.currentTarget;
+                final snapshot = viewModel.loadDailyForecast.results.value;
+                if (viewModel.isDisposed ||
+                    target == null ||
+                    viewModel.currentTarget != target) {
+                  return const SizedBox.shrink();
+                }
+                if (snapshot.paramData == target &&
+                    snapshot.hasFailure &&
+                    !viewModel.loadDailyForecast.isRunningSync.value) {
+                  return TextButton(
+                    onPressed: () =>
+                        viewModel.requestDaily(target, retry: true),
+                    child: const Text('Riprova'),
+                  );
+                }
+                if (snapshot.paramData == target &&
+                    snapshot.completed &&
+                    !viewModel.loadDailyForecast.isRunningSync.value) {
                   final dailyData = viewModel.getDailyForecastData;
 
                   if (dailyData == null) {

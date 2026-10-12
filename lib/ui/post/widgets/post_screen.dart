@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -43,8 +45,55 @@ class _PostScreenState extends State<PostScreen> {
   late final SlideshowVisibilityNotifier _slideshowVisibilityNotifier =
       SlideshowVisibilityNotifier(threshold: _mediaSlideshowHeight * 0.6);
 
+  Listenable get _contentLoad =>
+      widget.isEvent ? widget.viewModel.loadEvent : widget.viewModel.loadPlace;
+
+  bool get _contentCompleted => widget.isEvent
+      ? widget.viewModel.loadEvent.completed
+      : widget.viewModel.loadPlace.completed;
+
+  @override
+  void initState() {
+    super.initState();
+    _contentLoad.addListener(_bindWeatherTarget);
+    _bindWeatherTarget();
+  }
+
+  @override
+  void didUpdateWidget(covariant PostScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.viewModel, widget.viewModel) ||
+        oldWidget.isEvent != widget.isEvent ||
+        !identical(oldWidget.weatherViewModel, widget.weatherViewModel)) {
+      (oldWidget.isEvent
+              ? oldWidget.viewModel.loadEvent
+              : oldWidget.viewModel.loadPlace)
+          .removeListener(_bindWeatherTarget);
+      oldWidget.weatherViewModel.setTarget(null);
+      _contentLoad.addListener(_bindWeatherTarget);
+      _bindWeatherTarget();
+    }
+  }
+
+  void _bindWeatherTarget() {
+    if (!mounted) return;
+    if (!_contentCompleted) {
+      widget.weatherViewModel.setTarget(null);
+      return;
+    }
+    final content = widget.viewModel.content;
+    widget.weatherViewModel.setTarget((
+      id: content.remoteId,
+      type: content is Event ? ContentType.event : ContentType.place,
+      latitude: content.coordinates.latitude,
+      longitude: content.coordinates.longitude,
+    ));
+  }
+
   @override
   void dispose() {
+    _contentLoad.removeListener(_bindWeatherTarget);
+    widget.weatherViewModel.setTarget(null);
     _slideshowVisibilityNotifier.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -72,9 +121,14 @@ class _PostScreenState extends State<PostScreen> {
             widget.viewModel.loadPlace,
           ]),
           builder: (context, child) {
-            if (widget.viewModel.loadEvent.completed ||
-                widget.viewModel.loadPlace.completed) {
-              final content = widget.viewModel.content;
+            if (_contentCompleted) {
+              final owner = widget.viewModel;
+              final content = owner.content;
+              bool ownsContent() =>
+                  mounted &&
+                  identical(widget.viewModel, owner) &&
+                  _contentCompleted &&
+                  identical(owner.content, content);
 
               return NotificationListener<ScrollNotification>(
                 onNotification: _onScrollNotification,
@@ -120,10 +174,47 @@ class _PostScreenState extends State<PostScreen> {
                       },
                     ),
                     PostSectionNearbyContent(
-                      coordinates: content.coordinates,
                       onContentPressed: _buildPostRoute,
-                      loadNearContentCommand: widget.viewModel.loadNearContent,
-                      nearContent: widget.viewModel.nearContent,
+                      loadListenable: owner.loadNearContent,
+                      loadKey: (
+                        owner,
+                        content.remoteId,
+                        content is Event
+                            ? ContentType.event
+                            : ContentType.place,
+                        content.coordinates,
+                      ),
+                      onLoad: () {
+                        if (ownsContent() && content.coordinates.isValid) {
+                          unawaited(
+                            owner.loadNearContent.execute(content.coordinates),
+                          );
+                        }
+                      },
+                      readState: () {
+                        if (!ownsContent()) {
+                          return (
+                            pending: true,
+                            items: const <ContentBase>[],
+                            error: null,
+                          );
+                        }
+                        final command = owner.loadNearContent;
+                        return (
+                          pending:
+                              command.running ||
+                              (!command.completed && !command.error),
+                          items: command.completed
+                              ? owner.nearContent
+                              : const <ContentBase>[],
+                          error: command.error
+                              ? command.result?.fold<Object?>(
+                                  (_) => null,
+                                  (error) => error,
+                                )
+                              : null,
+                        );
+                      },
                     ),
                     SliverPadding(
                       padding: EdgeInsets.only(bottom: context.bottomPadding),

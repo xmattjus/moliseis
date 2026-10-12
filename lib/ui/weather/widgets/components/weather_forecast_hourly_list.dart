@@ -4,6 +4,7 @@ import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 class WeatherForecastHourlyList extends StatefulWidget {
@@ -11,6 +12,7 @@ class WeatherForecastHourlyList extends StatefulWidget {
     required this.borderColor,
     required this.backgroundColor,
     required this.viewModel,
+    this.expectedTarget,
     this.currentHourOverride,
     super.key,
   });
@@ -18,6 +20,7 @@ class WeatherForecastHourlyList extends StatefulWidget {
   final Color borderColor;
   final Color backgroundColor;
   final WeatherViewModel viewModel;
+  final WeatherTarget? expectedTarget;
 
   /// Overrides the current hour used to highlight the active slot.
   ///
@@ -91,9 +94,29 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
               ),
             ),
             ListenableBuilder(
-              listenable: viewModel.loadHourlyForecast,
+              listenable: Listenable.merge([
+                viewModel.loadHourlyForecast.results,
+              ]),
               builder: (_, _) {
-                if (viewModel.loadHourlyForecast.completed) {
+                final target = widget.expectedTarget ?? viewModel.currentTarget;
+                final snapshot = viewModel.loadHourlyForecast.results.value;
+                if (viewModel.isDisposed ||
+                    target == null ||
+                    viewModel.currentTarget != target) {
+                  return const SizedBox.shrink();
+                }
+                if (snapshot.paramData == target &&
+                    snapshot.hasFailure &&
+                    !viewModel.loadHourlyForecast.isRunningSync.value) {
+                  return TextButton(
+                    onPressed: () =>
+                        viewModel.requestHourly(target, retry: true),
+                    child: const Text('Riprova'),
+                  );
+                }
+                if (snapshot.paramData == target &&
+                    snapshot.completed &&
+                    !viewModel.loadHourlyForecast.isRunningSync.value) {
                   final hourlyData = viewModel.getHourlyForecastData;
 
                   if (hourlyData == null) {
@@ -109,10 +132,19 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                   if (!identical(_scrolledForHourlyData, hourlyData)) {
                     _scrolledForHourlyData = hourlyData;
                     SchedulerBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) {
+                      if (!mounted) return;
+                      if (!identical(widget.viewModel, viewModel) ||
+                          viewModel.isDisposed ||
+                          viewModel.currentTarget != target ||
+                          !identical(
+                            viewModel.getHourlyForecastData,
+                            hourlyData,
+                          )) {
                         return;
                       }
-                      _scrollToItem(currentHour);
+                      if (currentHour >= 0 && currentHour < itemCount) {
+                        _scrollToItem(currentHour);
+                      }
                     });
                   }
 
@@ -153,7 +185,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                               ),
                               label: Text(
                                 index == currentHour
-                                    ? widget.viewModel.currentTemperatureCelsius
+                                    ? viewModel.currentTemperatureCelsius
                                     : '${hourlyData.temperature2m[index].toStringAsFixed(1)}°',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),

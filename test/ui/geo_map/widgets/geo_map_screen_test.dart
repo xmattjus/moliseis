@@ -1,9 +1,11 @@
 import 'dart:async' show Completer;
 
 import 'package:command_it/command_it.dart' as command_it;
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
@@ -19,14 +21,17 @@ import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
+import 'package:moliseis/ui/geo_map/view_models/geo_map_mode.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_selection_intent.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/components/animated_geo_map_search_bar.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_bottom_sheet.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_post.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_search_results.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_screen.dart';
 import 'package:moliseis/ui/search/view_models/search_view_model.dart';
+import 'package:moliseis/ui/search/widgets/search_result_sliver_list.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
@@ -75,6 +80,604 @@ void main() {
       precipitationProbabilityMax: [],
     ),
   );
+  for (final outcome in ['success', 'empty', 'expected', 'runtime']) {
+    testWidgets('Map equal Search fences both publication windows: $outcome', (
+      tester,
+    ) async {
+      final logger = MockLogger();
+      final restore = installCommandTestReporting(logger);
+      addTearDown(restore);
+      final repository = FakeSearchRepository(
+        resultsByQueryResult: Result.success([makeEvent(name: 'Previous A')]),
+      );
+      final searches = SearchViewModel(searchRepository: repository);
+      final vm = _buildGeoMapViewModel();
+      await tester.pumpWidget(
+        _buildApp(
+          favouriteViewModel: _buildFavouriteViewModel(),
+          child: GeoMapScreen(
+            routeSelection: null,
+            viewModel: vm,
+            searchViewModel: searches,
+            weatherViewModel: _buildWeatherViewModel(),
+          ),
+        ),
+      );
+      await pumpCommandTurns(tester);
+      tester
+          .widget<AnimatedGeoMapSearchBar>(find.byType(AnimatedGeoMapSearchBar))
+          .onSubmitted!('festival');
+      await pumpCommandTurns(tester);
+      final previous = tester.widget<GeoMapModalSearchResults>(
+        find.byType(GeoMapModalSearchResults),
+      );
+      expect(
+        admitsGeoMapSearchSnapshot(previous.admission, vm, searches),
+        isTrue,
+      );
+      final oldSnapshot = searches.loadResults.results.value;
+      // Leaving Search and submitting the same value before neutral publication
+      // must exclude the still-public previous completed execution.
+      vm.showContent(makePlace());
+      final pending = Completer<Result<List<ContentBase>>>();
+      repository.resultsByQueryHandler = (_) => pending.future;
+      tester
+          .widget<AnimatedGeoMapSearchBar>(find.byType(AnimatedGeoMapSearchBar))
+          .onSubmitted!('festival');
+      expect(searches.loadResults.results.value, same(oldSnapshot));
+      expect(searches.loadResults.isRunningSync.value, isTrue);
+      final newMode = vm.mode as GeoMapSearchResults;
+      final immediateFence = (
+        searchOwner: searches,
+        mode: newMode,
+        excludedSnapshot: oldSnapshot,
+      );
+      expect(admitsGeoMapSearchSnapshot(immediateFence, vm, searches), isFalse);
+      await pumpCommandTurns(tester);
+      final current = tester.widget<GeoMapModalSearchResults>(
+        find.byType(GeoMapModalSearchResults),
+      );
+      expect(current.admission!.mode, same(newMode));
+      expect(find.byType(SearchResultSliverList), findsNothing);
+      expect(searches.results.single.name, 'Previous A');
+      var settledBeforePublication = false;
+      void observeSettlement() {
+        if (!searches.loadResults.isRunningSync.value) {
+          settledBeforePublication = true;
+          expectSync(searches.loadResults.results.value.isRunning, isTrue);
+          expectSync(
+            admitsGeoMapSearchSnapshot(current.admission, vm, searches),
+            isFalse,
+          );
+        }
+      }
+
+      searches.loadResults.isRunningSync.addListener(observeSettlement);
+      switch (outcome) {
+        case 'success':
+          pending.complete(Result.success([makeEvent(name: 'Newest A')]));
+        case 'empty':
+          pending.complete(const Result.success([]));
+        case 'expected':
+          pending.complete(Result.error(TestException('latest expected')));
+        case 'runtime':
+          pending.completeError(StateError('latest runtime'));
+      }
+      await pumpCommandTurns(tester);
+      searches.loadResults.isRunningSync.removeListener(observeSettlement);
+      expect(settledBeforePublication, isTrue);
+      expect(
+        admitsGeoMapSearchSnapshot(current.admission, vm, searches),
+        isTrue,
+      );
+      expect(find.byType(SearchResultSliverList), findsOneWidget);
+      if (outcome == 'success') {
+        expect(searches.results.single.name, 'Newest A');
+      }
+      if (outcome == 'empty') {
+        expect(
+          find.text('Non è stato trovato alcun risultato.'),
+          findsOneWidget,
+        );
+      }
+      if (outcome == 'expected' || outcome == 'runtime') {
+        expect(
+          find.text('Si è verificato un errore durante il caricamento.'),
+          findsOneWidget,
+        );
+        final completed = searches.loadResults.results.value;
+        current.onRetryPressed();
+        expect(searches.loadResults.isRunningSync.value, isTrue);
+        expect(searches.loadResults.results.value, same(completed));
+        expect(
+          admitsGeoMapSearchSnapshot(current.admission, vm, searches),
+          isFalse,
+        );
+        await pumpCommandTurns(tester);
+      }
+      // A stale result callback cannot restore its old Search or Post surface.
+      current.onBackPressed();
+      current.onResultPressed(makeEvent(remoteId: 22));
+      current.onRetryPressed();
+      expect(vm.mode, isA<GeoMapExplore>());
+      expect(vm.resolvedContent, isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      vm.dispose();
+      searches.dispose();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final reentry in ['semantic', 'running', 'terminal']) {
+    testWidgets('Map Search $reentry reentry cannot restore obsolete mode', (
+      tester,
+    ) async {
+      final repository = FakeSearchRepository();
+      final searches = SearchViewModel(searchRepository: repository);
+      final vm = _buildGeoMapViewModel();
+      await tester.pumpWidget(
+        _buildApp(
+          favouriteViewModel: _buildFavouriteViewModel(),
+          child: GeoMapScreen(
+            routeSelection: null,
+            viewModel: vm,
+            searchViewModel: searches,
+            weatherViewModel: _buildWeatherViewModel(),
+          ),
+        ),
+      );
+      await pumpCommandTurns(tester);
+      var switched = false;
+      void supersede() {
+        if (!switched &&
+            vm.mode is GeoMapSearchResults &&
+            (reentry != 'terminal' ||
+                searches.loadResults.results.value.completed)) {
+          switched = true;
+          vm.showContent(makePlace(remoteId: 8));
+        }
+      }
+
+      final source = (switch (reentry) {
+        'semantic' => vm,
+        'running' => searches.loadResults.isRunningSync,
+        _ => searches.loadResults.results,
+      })..addListener(supersede);
+      final submit = tester
+          .widget<AnimatedGeoMapSearchBar>(find.byType(AnimatedGeoMapSearchBar))
+          .onSubmitted!;
+      submit('festival');
+      await pumpCommandTurns(tester);
+      expect(switched, isTrue);
+      expect(vm.resolvedContent?.remoteId, 8);
+      expect(find.byType(GeoMapModalSearchResults), findsNothing);
+      expect(
+        repository.getResultsByQueryCallCount,
+        reentry == 'terminal' ? 1 : 0,
+      );
+      submit('ab');
+      expect(vm.resolvedContent?.remoteId, 8);
+      source.removeListener(supersede);
+      await tester.pumpWidget(const SizedBox.shrink());
+      vm.dispose();
+      searches.dispose();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'Search repeat, retry, invalid input and owner replacement stay fenced',
+    (tester) async {
+      final repository = FakeSearchRepository();
+      final first = Completer<Result<List<ContentBase>>>();
+      final second = Completer<Result<List<ContentBase>>>();
+      var calls = 0;
+      repository.resultsByQueryHandler = (_) =>
+          ++calls == 1 ? first.future : second.future;
+      final searches = SearchViewModel(searchRepository: repository);
+      final vm = _buildGeoMapViewModel();
+      final weather = _buildWeatherViewModel();
+      await tester.pumpWidget(
+        _buildApp(
+          favouriteViewModel: _buildFavouriteViewModel(),
+          child: GeoMapScreen(
+            routeSelection: null,
+            viewModel: vm,
+            searchViewModel: searches,
+            weatherViewModel: weather,
+          ),
+        ),
+      );
+      await pumpCommandTurns(tester);
+      final submit = tester
+          .widget<AnimatedGeoMapSearchBar>(find.byType(AnimatedGeoMapSearchBar))
+          .onSubmitted!;
+      submit('festival');
+      final firstMode = vm.mode;
+      submit('festival'); // The first queued child must never perform I/O.
+      expect(vm.mode, isNot(same(firstMode)));
+      await pumpCommandTurns(tester);
+      expect(calls, 1);
+      final old = tester.widget<GeoMapModalSearchResults>(
+        find.byType(GeoMapModalSearchResults),
+      );
+      final mode = vm.mode;
+      submit('ab');
+      expect(vm.mode, same(mode));
+      expect(searches.loadResults.isRunningSync.value, isTrue);
+      submit('museum'); // A different query after loading also revokes A.
+      await pumpCommandTurns(tester);
+      expect(calls, 2);
+      first.complete(Result.success([makeEvent(name: 'Obsolete festival')]));
+      await pumpCommandTurns(tester);
+      expect(find.byType(SearchResultSliverList), findsNothing);
+      old.onResultPressed(makePlace(remoteId: 44));
+      old.onRetryPressed();
+      expect((vm.mode as GeoMapSearchResults).query, 'museum');
+      expect(calls, 2);
+      second.complete(Result.success([makeEvent(name: 'Museum result')]));
+      await pumpCommandTurns(tester);
+      expect(searches.results.single.name, 'Museum result');
+      final museumMode = vm.mode;
+      // Retain the actual Element: the helper creates a new GoRouter.
+      final element = tester.element(find.byType(GeoMapScreen));
+      element.owner!.buildScope(element, () {
+        element.update(
+          GeoMapScreen(
+            routeSelection: null,
+            viewModel: vm,
+            searchViewModel: searches,
+            weatherViewModel: weather,
+          ),
+        );
+      });
+      await pumpCommandTurns(tester);
+      expect(vm.mode, same(museumMode));
+      expect(calls, 2);
+      final replacementRepository = FakeSearchRepository(
+        resultsByQueryResult: Result.success([makePlace(name: 'New owner')]),
+      );
+      final replacement = SearchViewModel(
+        searchRepository: replacementRepository,
+      );
+      element.owner!.buildScope(element, () {
+        element.update(
+          GeoMapScreen(
+            routeSelection: null,
+            viewModel: vm,
+            searchViewModel: replacement,
+            weatherViewModel: weather,
+          ),
+        );
+      });
+      await pumpCommandTurns(tester);
+      expect(replacementRepository.capturedQueries, ['museum']);
+      expect(replacement.results.single.name, 'New owner');
+      expect(find.byType(SearchResultSliverList), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      old.onRetryPressed();
+      old.onResultPressed(makeEvent());
+      expect(replacementRepository.getResultsByQueryCallCount, 1);
+      vm.dispose();
+      searches.dispose();
+      replacement.dispose();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final beforeScreen in [true, false]) {
+    for (final replacement in ['lookup', 'materialized', 'explore']) {
+      testWidgets('reentrant $replacement beforeScreen=$beforeScreen '
+          'owns effects and feedback', (tester) async {
+        final events = FakeEventRepository();
+        final pending = Completer<Result<Event>>();
+        events.pendingGetById[1] = pending;
+        final vm = GeoMapViewModel(
+          geoMapUseCase: GeoMapUseCase(
+            eventRepository: events,
+            placeRepository: FakePlaceRepository(),
+          ),
+        );
+        final searches = _buildSearchViewModel();
+        var replaced = false;
+        void supersede() {
+          if (!replaced &&
+              vm.mode is GeoMapExplore &&
+              vm.selectContent.results.value.hasFailure) {
+            replaced = true;
+            switch (replacement) {
+              case 'lookup':
+                vm.requestSelection(const EventSelection(1));
+              case 'materialized':
+                vm.showContent(makeEvent(name: 'Local current'));
+              case 'explore':
+                vm.showExplore(vm.exploreAnchor);
+            }
+          }
+        }
+
+        if (beforeScreen) vm.addListener(supersede);
+        await tester.pumpWidget(
+          _buildApp(
+            favouriteViewModel: _buildFavouriteViewModel(),
+            child: GeoMapScreen(
+              routeSelection: (id: 1, type: ContentType.event),
+              viewModel: vm,
+              searchViewModel: searches,
+              weatherViewModel: _buildWeatherViewModel(),
+            ),
+          ),
+        );
+        await pumpCommandTurns(tester);
+        if (!beforeScreen) vm.addListener(supersede);
+        final next = Completer<Result<Event>>();
+        events.pendingGetById[1] = next;
+        pending.complete(Result.error(TestException('superseded feedback')));
+        await pumpCommandTurns(tester);
+        expect(replaced, isTrue);
+        expect(find.text('Contenuto non trovato'), findsNothing);
+        if (replacement == 'lookup') {
+          expect(events.getByIdCallCount, 2);
+          next.complete(Result.success(makeEvent(name: 'Latest lookup')));
+          await pumpCommandTurns(tester);
+          expect(vm.resolvedContent?.name, 'Latest lookup');
+        } else if (replacement == 'materialized') {
+          expect(events.getByIdCallCount, 1);
+          expect(vm.resolvedContent?.name, 'Local current');
+        } else {
+          expect(vm.mode, isA<GeoMapExplore>());
+          expect(vm.resolvedContent, isNull);
+        }
+        vm.removeListener(supersede);
+        await tester.pumpWidget(const SizedBox.shrink());
+        vm.dispose();
+        searches.dispose();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets(
+    'camera settle cancels old movement and fallback aligns live center',
+    (tester) async {
+      final events = FakeEventRepository();
+      final vm = GeoMapViewModel(
+        geoMapUseCase: GeoMapUseCase(
+          eventRepository: events,
+          placeRepository: FakePlaceRepository(),
+        ),
+      );
+      final searches = _buildSearchViewModel();
+      await tester.pumpWidget(
+        _buildApp(
+          favouriteViewModel: _buildFavouriteViewModel(),
+          child: GeoMapScreen(
+            routeSelection: null,
+            viewModel: vm,
+            searchViewModel: searches,
+            weatherViewModel: _buildWeatherViewModel(),
+          ),
+        ),
+      );
+      await pumpCommandTurns(tester);
+      final map = tester.widget<GeoMap>(find.byType(GeoMap));
+      final initial = vm.exploreAnchor;
+      const a = LatLng(41.7, 14.7);
+      const b = LatLng(41.9, 14.9);
+      final onMapEvent = tester
+          .widget<FlutterMap>(find.byType(FlutterMap))
+          .options
+          .onMapEvent!;
+      map.mapController!.move(a, 13);
+      onMapEvent(
+        MapEventMoveEnd(
+          source: MapEventSource.mapController,
+          camera: map.mapController!.camera,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 1600));
+      expect(vm.exploreAnchor, initial);
+      onMapEvent(
+        MapEventMoveEnd(
+          source: MapEventSource.onDrag,
+          camera: map.mapController!.camera,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 1000));
+      expect(vm.exploreAnchor, initial);
+      onMapEvent(
+        MapEventMoveStart(
+          source: MapEventSource.onDrag,
+          camera: map.mapController!.camera,
+        ),
+      );
+      map.mapController!.move(b, 13);
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(vm.exploreAnchor, initial);
+      onMapEvent(
+        MapEventMoveEnd(
+          source: MapEventSource.onDrag,
+          camera: map.mapController!.camera,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(vm.exploreAnchor, b);
+      final pending = Completer<Result<Event>>();
+      events.pendingGetById[1] = pending;
+      vm.requestSelection(const EventSelection(1));
+      await pumpCommandTurns(tester);
+      map.mapController!.move(a, 13);
+      pending.complete(Result.error(TestException('current failure')));
+      await pumpCommandTurns(tester);
+      expect(vm.mode, isA<GeoMapExplore>());
+      expect(vm.exploreAnchor, a);
+      expect(vm.nearbyTarget?.latitude, a.latitude);
+      expect(map.mapController!.camera.center, a);
+      expect(find.text('Contenuto non trovato'), findsOneWidget);
+      // A pending settle is revoked by synchronous Post presentation, whose
+      // programmatic movement must never commit a remembered Explore anchor.
+      map.onPositionChangeEnd!(a);
+      vm.showContent(makePlace());
+      await pumpCommandTurns(tester);
+      await tester.pump(const Duration(milliseconds: 1700));
+      expect(vm.exploreAnchor, a);
+      expect(vm.mode, isA<GeoMapPostDetail>());
+      await tester.pumpWidget(const SizedBox.shrink());
+      vm.dispose();
+      searches.dispose();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('initial default keeps its initialized mode without admission', (
+    tester,
+  ) async {
+    final vm = _buildGeoMapViewModel();
+    final mode = vm.mode;
+    final searches = _buildSearchViewModel();
+    await tester.pumpWidget(
+      _buildApp(
+        favouriteViewModel: _buildFavouriteViewModel(),
+        child: ChangeNotifierProvider<GeoMapViewModel>.value(
+          value: vm,
+          child: Builder(
+            builder: (context) => GeoMapScreen(
+              routeSelection: null,
+              viewModel: context.read<GeoMapViewModel>(),
+              searchViewModel: searches,
+              weatherViewModel: _buildWeatherViewModel(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await pumpCommandTurns(tester);
+    expect(vm.mode, same(mode));
+    expect(vm.selectContent.results.value.idle, isTrue);
+    expect(find.byType(GeoMapModalPost), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    vm.dispose();
+    searches.dispose();
+    await tester.pump(const Duration(milliseconds: 50));
+  });
+
+  for (final ending in ['route', 'local', 'default', 'unmount']) {
+    testWidgets('route preparation ABA $ending '
+        'rejects work before next frame', (tester) async {
+      final old = Completer<Result<Event>>();
+      final next = Completer<Result<Event>>();
+      final events = FakeEventRepository()
+        ..pendingGetById[1] = old
+        ..pendingGetById[2] = next;
+      final vm = GeoMapViewModel(
+        geoMapUseCase: GeoMapUseCase(
+          eventRepository: events,
+          placeRepository: FakePlaceRepository(),
+        ),
+      );
+      final searches = _buildSearchViewModel();
+      final weather = _buildWeatherViewModel();
+      await tester.pumpWidget(
+        _buildApp(
+          favouriteViewModel: _buildFavouriteViewModel(),
+          child: ChangeNotifierProvider<GeoMapViewModel>.value(
+            value: vm,
+            child: Builder(
+              builder: (context) => GeoMapScreen(
+                routeSelection: (id: 1, type: ContentType.event),
+                viewModel: context.read<GeoMapViewModel>(),
+                searchViewModel: searches,
+                weatherViewModel: weather,
+              ),
+            ),
+          ),
+        ),
+      );
+      await pumpCommandTurns(tester);
+      expect(events.getByIdCallCount, 1);
+      final element = tester.element(find.byType(GeoMapScreen));
+      var notifications = 0;
+      void observe() {
+        notifications++;
+      }
+
+      vm.addListener(observe);
+      // Real retained Element updates exercise didUpdateWidget without allowing
+      // either queued post-frame admission to execute between B and A.
+      late GeoMapMode b;
+      late GeoMapMode a;
+      element.owner!.buildScope(element, () {
+        element.update(
+          GeoMapScreen(
+            routeSelection: (id: 2, type: ContentType.event),
+            viewModel: vm,
+            searchViewModel: searches,
+            weatherViewModel: weather,
+          ),
+        );
+        b = vm.mode;
+        element.update(
+          GeoMapScreen(
+            routeSelection: ending == 'default'
+                ? null
+                : (id: 1, type: ContentType.event),
+            viewModel: vm,
+            searchViewModel: searches,
+            weatherViewModel: weather,
+          ),
+        );
+        a = vm.mode;
+      });
+      expect(a, isNot(same(b)));
+      expect(notifications, 0);
+      expect(vm.resolvedContent, isNull);
+      expect(vm.nearbyTerminal, isNull);
+      expect(weather.currentTarget, isNull);
+      expect(find.byType(GeoMapModalPost), findsNothing);
+      expect(find.byType(GeoMapModalSearchResults), findsNothing);
+      expect(events.getByIdCallCount, 1);
+      old.complete(Result.error(TestException('superseded before frame')));
+      await tester.idle();
+      expect(vm.mode, same(a));
+      expect(vm.resolvedContent, isNull);
+      expect(notifications, 0);
+      expect(find.text('Contenuto non trovato'), findsNothing);
+      if (ending == 'route') {
+        events.pendingGetById[1] = next;
+      } else if (ending == 'local') {
+        vm.showContent(makePlace(remoteId: 3));
+      } else if (ending == 'unmount') {
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+      await pumpCommandTurns(tester);
+      expect(events.getByIdCallCount, ending == 'route' ? 2 : 1);
+      if (ending == 'route') {
+        next.complete(Result.success(makeEvent(name: 'Final A')));
+        await pumpCommandTurns(tester);
+        expect(vm.resolvedContent?.name, 'Final A');
+      } else if (ending == 'local') {
+        expect(vm.resolvedContent?.remoteId, 3);
+      } else if (ending == 'default') {
+        expect(vm.mode, isA<GeoMapExplore>());
+      }
+      expect(find.text('Contenuto non trovato'), findsNothing);
+      expect(tester.takeException(), isNull);
+      vm.removeListener(observe);
+      await tester.pumpWidget(const SizedBox.shrink());
+      vm.dispose();
+      searches.dispose();
+      await tester.pump(const Duration(milliseconds: 50));
+      await pumpCommandTurns(tester);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final invalidPayload in <ContentBase?>[makePlace(), null]) {
     testWidgets('invalid ${invalidPayload == null ? 'null' : 'type'} payload '
         'never commits and produces one terminal feedback', (tester) async {
@@ -91,8 +694,7 @@ void main() {
         _buildApp(
           favouriteViewModel: _buildFavouriteViewModel(),
           child: GeoMapScreen(
-            initialContentId: 1,
-            initialContentType: ContentType.event,
+            routeSelection: (id: 1, type: ContentType.event),
             viewModel: vm,
             searchViewModel: searches,
             weatherViewModel: _buildWeatherViewModel(),
@@ -109,8 +711,10 @@ void main() {
       }
 
       vm.addListener(observeCommit);
-      // Typed repositories cannot return these values. Inject the public
-      // terminal snapshot to prove the shared VM/Screen validation pipeline.
+      // Typed repositories cannot return these values. Establish a terminal
+      // coordination state before injecting the malformed public snapshot.
+      (vm.selectContent.isRunningSync as ValueNotifier<bool>).value = false;
+      // This fault injection proves the shared VM/Screen validation pipeline.
       (vm.selectContent.results
               as ValueNotifier<
                 command_it.CommandResult<
@@ -177,10 +781,9 @@ void main() {
             child: ValueListenableBuilder<WeatherViewModel>(
               valueListenable: weatherOwner,
               builder: (_, weather, _) => GeoMapScreen(
-                initialContentId: state == 'default_local' ? null : 1,
-                initialContentType: state == 'default_local'
+                routeSelection: state == 'default_local'
                     ? null
-                    : ContentType.event,
+                    : (id: 1, type: ContentType.event),
                 viewModel: vm,
                 searchViewModel: searches,
                 weatherViewModel: weather,
@@ -232,7 +835,7 @@ void main() {
         }
         await tester.pumpAndSettle();
         await pumpCommandTurns(tester);
-        expect(newWeather.loadCurrentForecast.completed, isTrue);
+        expect(newWeather.loadCurrentForecast.results.value.completed, isTrue);
         expect(newWeatherClient.getCombinedWeatherForecastCallCount, 1);
         expect(
           oldWeatherClient.getCombinedWeatherForecastCallCount,
@@ -277,8 +880,7 @@ void main() {
           child: ValueListenableBuilder<int>(
             valueListenable: id,
             builder: (_, requested, _) => GeoMapScreen(
-              initialContentId: requested,
-              initialContentType: ContentType.event,
+              routeSelection: (id: requested, type: ContentType.event),
               viewModel: vm,
               searchViewModel: searches,
               weatherViewModel: weather,
@@ -329,8 +931,7 @@ void main() {
           _buildApp(
             favouriteViewModel: _buildFavouriteViewModel(),
             child: GeoMapScreen(
-              initialContentId: 1,
-              initialContentType: ContentType.event,
+              routeSelection: (id: 1, type: ContentType.event),
               viewModel: vm,
               searchViewModel: searches,
               weatherViewModel: _buildWeatherViewModel(),
@@ -356,7 +957,11 @@ void main() {
         }
         pending.complete(Result.success(makeEvent()));
         await tester.pumpAndSettle();
-        expect(vm.selectedContent, isNull);
+        if (transition == 'local_content') {
+          expect(vm.resolvedContent?.remoteId, 2);
+        } else {
+          expect(vm.resolvedContent, isNull);
+        }
         expect(find.text('Contenuto non trovato'), findsNothing);
         if (transition == 'local_content') {
           expect(
@@ -414,8 +1019,7 @@ void main() {
         child: ValueListenableBuilder<GeoMapViewModel>(
           valueListenable: owner,
           builder: (_, vm, _) => GeoMapScreen(
-            initialContentId: 1,
-            initialContentType: ContentType.event,
+            routeSelection: (id: 1, type: ContentType.event),
             viewModel: vm,
             searchViewModel: searches,
             weatherViewModel: weather,
@@ -485,8 +1089,7 @@ void main() {
                 ValueListenableBuilder<({int id, ContentType type})?>(
                   valueListenable: contentIdentity,
                   builder: (_, identity, _) => GeoMapScreen(
-                    initialContentId: identity?.id,
-                    initialContentType: identity?.type,
+                    routeSelection: identity,
                     viewModel: geoMapViewModel,
                     searchViewModel: searchViewModel,
                     weatherViewModel: weatherViewModel,
@@ -555,8 +1158,7 @@ void main() {
           GoRoute(
             path: '/',
             builder: (_, _) => GeoMapScreen(
-              initialContentId: event.remoteId,
-              initialContentType: ContentType.event,
+              routeSelection: (id: event.remoteId, type: ContentType.event),
               viewModel: geoMapViewModel,
               searchViewModel: searchViewModel,
               weatherViewModel: weatherViewModel,
@@ -603,23 +1205,22 @@ void main() {
         final sheetController = DraggableScrollableController();
         addTearDown(sheetController.dispose);
 
-        final geoMapViewModel = _buildGeoMapViewModel();
+        final geoMapViewModel = _buildGeoMapViewModel()..showContent(content);
 
         await tester.pumpWidget(
           _buildBottomSheetApp(
             favouriteViewModel: _buildFavouriteViewModel(),
             child: GeoMapBottomSheet(
-              content: content,
-              isResolvingRequestedSelection: false,
+              searchAdmission: null,
+              onSearchResultPressed: (_) {},
+              onSearchRetryPressed: () {},
               controller: sheetController,
-              currentCenter: content.coordinates,
               onCloseButtonPressed: () {},
               onContentPressed: (_) {},
               onVerticalDragUpdate: (_) {},
               viewModel: geoMapViewModel,
               searchViewModel: _buildSearchViewModel(),
               weatherViewModel: _buildWeatherViewModel(),
-              searchQuery: content.name,
             ),
           ),
         );
@@ -649,17 +1250,19 @@ void main() {
   testWidgets('resolving selection hides stale content', (tester) async {
     final staleContent = makeEvent();
     final sheetController = DraggableScrollableController();
-    final geoMapViewModel = _buildGeoMapViewModel();
+    final geoMapViewModel = _buildGeoMapViewModel()
+      ..showContent(staleContent)
+      ..requestSelection(const EventSelection(99));
     addTearDown(sheetController.dispose);
 
     await tester.pumpWidget(
       _buildBottomSheetApp(
         favouriteViewModel: _buildFavouriteViewModel(),
         child: GeoMapBottomSheet(
-          content: staleContent,
-          isResolvingRequestedSelection: true,
+          searchAdmission: null,
+          onSearchResultPressed: (_) {},
+          onSearchRetryPressed: () {},
           controller: sheetController,
-          currentCenter: staleContent.coordinates,
           onCloseButtonPressed: () {},
           onContentPressed: (_) {},
           onVerticalDragUpdate: (_) {},
@@ -671,9 +1274,17 @@ void main() {
     );
     await pumpCommandTurns(tester);
 
-    expect(geoMapViewModel.selectContent.results.value.idle, isTrue);
+    expect(geoMapViewModel.resolvedContent, isNull);
     expect(find.byType(SliverSkeletonizer), findsOneWidget);
     expect(find.byType(GeoMapModalPost), findsNothing);
+    final sheet = tester.widget<GeoMapBottomSheet>(
+      find.byType(GeoMapBottomSheet),
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    geoMapViewModel.dispose();
+    sheet.searchViewModel.dispose();
+    sheet.weatherViewModel.dispose();
+    await tester.pump(const Duration(milliseconds: 50));
   });
 
   testWidgets('recreates the post when the selected identity changes', (
@@ -683,7 +1294,7 @@ void main() {
     final second = makeEvent(remoteId: 2, name: 'Evento 2');
     final selectedContent = ValueNotifier<ContentBase>(first);
     final sheetController = DraggableScrollableController();
-    final geoMapViewModel = _buildGeoMapViewModel();
+    final geoMapViewModel = _buildGeoMapViewModel()..showContent(first);
     final searchViewModel = _buildSearchViewModel();
     final weatherViewModel = _buildWeatherViewModel();
     addTearDown(selectedContent.dispose);
@@ -695,10 +1306,10 @@ void main() {
         child: ValueListenableBuilder<ContentBase>(
           valueListenable: selectedContent,
           builder: (_, content, _) => GeoMapBottomSheet(
-            content: content,
-            isResolvingRequestedSelection: false,
+            searchAdmission: null,
+            onSearchResultPressed: (_) {},
+            onSearchRetryPressed: () {},
             controller: sheetController,
-            currentCenter: content.coordinates,
             onCloseButtonPressed: () {},
             onContentPressed: (_) {},
             onVerticalDragUpdate: (_) {},
@@ -715,6 +1326,7 @@ void main() {
     expect(firstPost, findsOneWidget);
     final firstElement = tester.element(firstPost);
 
+    geoMapViewModel.showContent(second);
     selectedContent.value = second;
     await pumpCommandTurns(tester);
 
@@ -724,6 +1336,11 @@ void main() {
     expect(firstPost, findsNothing);
     expect(secondPost, findsOneWidget);
     expect(tester.element(secondPost), isNot(same(firstElement)));
+    await tester.pumpWidget(const SizedBox.shrink());
+    geoMapViewModel.dispose();
+    searchViewModel.dispose();
+    weatherViewModel.dispose();
+    await tester.pump(const Duration(milliseconds: 50));
   });
 
   testWidgets('explicit close from selected content resets the sheet', (
@@ -740,8 +1357,7 @@ void main() {
       _buildApp(
         favouriteViewModel: favouriteViewModel,
         child: GeoMapScreen(
-          initialContentId: event.remoteId,
-          initialContentType: ContentType.event,
+          routeSelection: (id: event.remoteId, type: ContentType.event),
           viewModel: _buildGeoMapViewModel(event: event),
           searchViewModel: _buildSearchViewModel(),
           weatherViewModel: weatherViewModel,
@@ -776,8 +1392,7 @@ void main() {
       _buildApp(
         favouriteViewModel: favouriteViewModel,
         child: GeoMapScreen(
-          initialContentId: null,
-          initialContentType: null,
+          routeSelection: null,
           viewModel: _buildGeoMapViewModel(),
           searchViewModel: _buildSearchViewModel(),
           weatherViewModel: weatherViewModel,
@@ -815,8 +1430,7 @@ void main() {
       _buildApp(
         favouriteViewModel: favouriteViewModel,
         child: GeoMapScreen(
-          initialContentId: event.remoteId,
-          initialContentType: ContentType.event,
+          routeSelection: (id: event.remoteId, type: ContentType.event),
           viewModel: _buildGeoMapViewModel(event: event),
           searchViewModel: _buildSearchViewModel(),
           weatherViewModel: weatherViewModel,
@@ -856,8 +1470,7 @@ void main() {
         _buildApp(
           favouriteViewModel: _buildFavouriteViewModel(),
           child: GeoMapScreen(
-            initialContentId: event.remoteId,
-            initialContentType: ContentType.event,
+            routeSelection: (id: event.remoteId, type: ContentType.event),
             viewModel: geoMapViewModel,
             searchViewModel: _buildSearchViewModel(),
             weatherViewModel: _buildWeatherViewModel(),
@@ -913,8 +1526,7 @@ void main() {
         _buildApp(
           favouriteViewModel: _buildFavouriteViewModel(),
           child: GeoMapScreen(
-            initialContentId: event.remoteId,
-            initialContentType: ContentType.event,
+            routeSelection: (id: event.remoteId, type: ContentType.event),
             viewModel: geoMapViewModel,
             searchViewModel: _buildSearchViewModel(),
             weatherViewModel: _buildWeatherViewModel(),
@@ -964,8 +1576,7 @@ void main() {
         _buildApp(
           favouriteViewModel: favouriteViewModel,
           child: GeoMapScreen(
-            initialContentId: 1,
-            initialContentType: ContentType.event,
+            routeSelection: (id: 1, type: ContentType.event),
             viewModel: geoMapViewModel,
             searchViewModel: _buildSearchViewModel(),
             weatherViewModel: weatherViewModel,
@@ -1017,8 +1628,7 @@ void main() {
         child: ValueListenableBuilder<({int id, ContentType type})?>(
           valueListenable: contentIdentity,
           builder: (_, identity, _) => GeoMapScreen(
-            initialContentId: identity?.id,
-            initialContentType: identity?.type,
+            routeSelection: identity,
             viewModel: geoMapViewModel,
             searchViewModel: _buildSearchViewModel(),
             weatherViewModel: weatherViewModel,
@@ -1079,8 +1689,10 @@ void main() {
                     await Navigator.of(context).push<void>(
                       MaterialPageRoute<void>(
                         builder: (_) => GeoMapScreen(
-                          initialContentId: event.remoteId,
-                          initialContentType: ContentType.event,
+                          routeSelection: (
+                            id: event.remoteId,
+                            type: ContentType.event,
+                          ),
                           viewModel: _buildGeoMapViewModel(event: event),
                           searchViewModel: _buildSearchViewModel(),
                           weatherViewModel: weatherViewModel,

@@ -50,8 +50,8 @@ void main() {
       Uri.parse('/map?contentId=5&type=event'),
     );
     final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
-    expect(map.initialContentId, 5);
-    expect(map.initialContentType, ContentType.event);
+    expect(map.routeSelection?.id, 5);
+    expect(map.routeSelection?.type, ContentType.event);
     expect(map.viewModel.selectedContent, same(event));
     expect(map.viewModel.selectedContent!.remoteId, 5);
     expect(find.byType(GeoMapModalPost), findsOneWidget);

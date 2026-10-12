@@ -1,10 +1,10 @@
-import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_drag_handle.dart';
 import 'package:moliseis/ui/core/ui/app_bottom_sheet_surface.dart';
 import 'package:moliseis/ui/core/ui/skeletons/app_pulse_effect.dart';
+import 'package:moliseis/ui/geo_map/view_models/geo_map_mode.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_explore.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_post.dart';
@@ -16,40 +16,30 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 class GeoMapBottomSheet extends StatefulWidget {
   const GeoMapBottomSheet({
-    required this.content,
-    required this.isResolvingRequestedSelection,
     required this.controller,
-    required this.currentCenter,
     required this.onCloseButtonPressed,
     required this.onContentPressed,
     required this.onVerticalDragUpdate,
     required this.viewModel,
     required this.searchViewModel,
     required this.weatherViewModel,
-    this.searchQuery = '',
+    required this.searchAdmission,
+    required this.onSearchResultPressed,
+    required this.onSearchRetryPressed,
     super.key,
   });
 
-  /// Fully resolved content to display, or null when the sheet should show
-  /// search results or nearby content.
-  final ContentBase? content;
-
-  /// True while the screen resolves a requested deep-link selection.
-  ///
-  /// A resolving selection takes precedence over previously displayed content
-  /// so a stale post is never rendered for a newly requested identity.
-  final bool isResolvingRequestedSelection;
-
   final DraggableScrollableController controller;
+  final GeoMapSearchAdmission? searchAdmission;
+  final void Function(ContentBase content) onSearchResultPressed;
+  final VoidCallback onSearchRetryPressed;
 
-  /// The current map center.
-  ///
-  /// Used by the nearby-content view when [content] is null.
-  final LatLng currentCenter;
+  /// Resolved materialization derives only from the authoritative model.
+  ContentBase? get content => viewModel.resolvedContent;
+
   final VoidCallback onCloseButtonPressed;
   final void Function(ContentBase content) onContentPressed;
   final void Function(double size) onVerticalDragUpdate;
-  final String searchQuery;
   final GeoMapViewModel viewModel;
   final SearchViewModel searchViewModel;
   final WeatherViewModel weatherViewModel;
@@ -108,7 +98,8 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
       controller: _controller,
       builder: (context, scrollController) {
         final content = widget.content;
-        final isResolving = widget.isResolvingRequestedSelection;
+        final mode = widget.viewModel.mode;
+        final isResolving = mode is GeoMapPostDetail && content == null;
         final showPost = !isResolving && content != null;
         late final Widget child;
 
@@ -147,16 +138,17 @@ class _GeoMapBottomSheetState extends State<GeoMapBottomSheet>
             weatherViewModel: widget.weatherViewModel,
             scrollController: scrollController,
           );
-        } else if (widget.searchQuery.isNotEmpty) {
+        } else if (mode is GeoMapSearchResults) {
           child = GeoMapModalSearchResults(
-            widget.searchQuery,
-            onResultPressed: widget.onContentPressed,
+            admission: widget.searchAdmission,
+            geoMapOwner: widget.viewModel,
+            onRetryPressed: widget.onSearchRetryPressed,
+            onResultPressed: widget.onSearchResultPressed,
             onBackPressed: widget.onCloseButtonPressed,
             viewModel: widget.searchViewModel,
           );
         } else {
           child = GeoMapModalExplore(
-            currentMapCenter: widget.currentCenter,
             onNearContentPressed: widget.onContentPressed,
             viewModel: widget.viewModel,
           );

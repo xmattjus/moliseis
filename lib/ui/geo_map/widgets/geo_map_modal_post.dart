@@ -11,6 +11,7 @@ import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.
 import 'package:moliseis/ui/post/widgets/components/post_section_slideshow.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/utils/extensions/build_context_extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 const double _mediaSlideshowHeight = 450;
 
@@ -64,6 +65,14 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
 
   @override
   Widget build(BuildContext context) {
+    final owner = widget.viewModel;
+    final content = widget.content;
+    final target = owner.nearbyTarget;
+    bool ownsNearby() =>
+        mounted &&
+        identical(widget.viewModel, owner) &&
+        identical(widget.content, content) &&
+        target == owner.nearbyTarget;
     return NotificationListener<ScrollNotification>(
       onNotification: _onScrollNotification,
       child: CustomScrollView(
@@ -90,10 +99,36 @@ class _GeoMapModalPostState extends State<GeoMapModalPost> {
             ),
           PostSectionDescription(content: widget.content),
           PostSectionNearbyContent(
-            coordinates: widget.content.coordinates,
             onContentPressed: widget.onContentPressed,
-            loadNearContentCommand: widget.viewModel.loadNearContent,
-            nearContent: widget.viewModel.nearContent,
+            loadListenable: owner,
+            loadKey: (owner, target),
+            onLoad: () {
+              if (ownsNearby() && target != null) owner.requestNearby(target);
+            },
+            onRetry: () {
+              if (ownsNearby() && target != null) {
+                owner.requestNearby(target, retry: true);
+              }
+            },
+            readState: () {
+              final terminal = owner.nearbyTerminal;
+              if (!ownsNearby() || terminal == null) {
+                return (
+                  pending: true,
+                  items: const <ContentBase>[],
+                  error: null,
+                );
+              }
+              final outcome = terminal.data?.getOrNull();
+              return (
+                pending: false,
+                items: outcome?.items ?? const <ContentBase>[],
+                error:
+                    outcome?.firstError ??
+                    terminal.domainError ??
+                    terminal.unexpectedError,
+              );
+            },
           ),
           SliverPadding(
             padding: EdgeInsets.only(bottom: context.bottomPadding),

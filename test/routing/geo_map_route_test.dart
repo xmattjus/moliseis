@@ -56,6 +56,7 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
@@ -983,8 +984,11 @@ void main() {
             expect(current.viewModel.selectedContent, isNull);
             expect(
               tester
-                  .widget<GeoMapBottomSheet>(find.byType(GeoMapBottomSheet))
-                  .searchQuery,
+                      .widget<GeoMapBottomSheet>(find.byType(GeoMapBottomSheet))
+                      .searchAdmission
+                      ?.mode
+                      .query ??
+                  '',
               isEmpty,
             );
           } else {
@@ -1117,7 +1121,12 @@ void main() {
           expect(find.byType(GeoMapModalPost), findsOneWidget);
           await pumpCommandTurns(tester);
           expect(
-            refreshed.weatherViewModel.loadCurrentForecast.completed,
+            refreshed
+                .weatherViewModel
+                .loadCurrentForecast
+                .results
+                .value
+                .completed,
             isTrue,
           );
           expect(weather.getCombinedWeatherForecastCallCount, 1);
@@ -1172,8 +1181,8 @@ void main() {
       expect(uri.path, RoutePaths.geoMap);
       expect(uri.queryParameters['key'], 'legacy');
       final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
-      expect(map.initialContentId, isNull);
-      expect(map.initialContentType, isNull);
+      expect(map.routeSelection?.id, isNull);
+      expect(map.routeSelection?.type, isNull);
       expect(map.viewModel.selectedContent, isNull);
       expect(find.byType(GeoMapModalPost), findsNothing);
       expect(uri.queryParameters['source'], 'restored');
@@ -1187,8 +1196,8 @@ void main() {
       final selectedMap = tester.widget<GeoMapScreen>(
         find.byType(GeoMapScreen),
       );
-      expect(selectedMap.initialContentId, 1);
-      expect(selectedMap.initialContentType, ContentType.event);
+      expect(selectedMap.routeSelection?.id, 1);
+      expect(selectedMap.routeSelection?.type, ContentType.event);
       expect(selectedMap.viewModel.selectedContent?.remoteId, 1);
       expect(find.byType(GeoMapModalPost), findsOneWidget);
     });
@@ -1216,13 +1225,17 @@ void main() {
       final mapContext = tester.element(find.byType(GeoMapScreen));
       expect(GoRouterState.of(mapContext).extra, isNull);
       expect(
-        tester.widget<GeoMapScreen>(find.byType(GeoMapScreen)).initialContentId,
+        tester
+            .widget<GeoMapScreen>(find.byType(GeoMapScreen))
+            .routeSelection
+            ?.id,
         1,
       );
       expect(
         tester
             .widget<GeoMapScreen>(find.byType(GeoMapScreen))
-            .initialContentType,
+            .routeSelection
+            ?.type,
         ContentType.event,
       );
 

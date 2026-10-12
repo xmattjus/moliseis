@@ -34,3 +34,13 @@ final class PlaceSelection extends GeoMapSelectionIntent {
 final class ClearSelection extends GeoMapSelectionIntent {
   const ClearSelection();
 }
+
+/// A repository payload failed the requested event/place identity contract.
+final class GeoMapSelectionIdentityException implements Exception {
+  const GeoMapSelectionIdentityException(this.intent);
+
+  final GeoMapSelectionIntent intent;
+
+  @override
+  String toString() => 'GeoMap content does not match requested identity';
+}

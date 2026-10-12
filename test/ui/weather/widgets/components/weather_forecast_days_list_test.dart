@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/combined_weather_forecast_response.dart';
@@ -8,6 +7,7 @@ import 'package:moliseis/data/services/api/weather/model/current_forecast/curren
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/widgets/components/weather_forecast_days_list.dart';
@@ -16,6 +16,7 @@ import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../../../support/command_test_support.dart';
 import '../../../../support/fake_repositories.dart';
 import '../../../../support/mock_logger.dart';
 
@@ -24,7 +25,12 @@ void main() {
     await initializeDateFormatting('it');
   });
 
-  const testCoordinates = LatLng(41.56, 14.66);
+  const testTarget = (
+    id: 1,
+    type: ContentType.event,
+    latitude: 41.56,
+    longitude: 14.66,
+  );
 
   late CombinedWeatherForecastResponse successResponse;
 
@@ -96,7 +102,7 @@ void main() {
       ),
       weatherDescriptionMapper: const WmoWeatherDescriptionMapper(),
       weatherCodeIconMapper: const WmoWeatherIconMapper(),
-    );
+    )..setTarget(testTarget);
   }
 
   Widget buildTestWidget(WeatherViewModel viewModel) {
@@ -134,26 +140,29 @@ void main() {
       final viewModel = buildViewModel(
         mockLogger,
         Result.success(successResponse),
-      );
-      await viewModel.loadDailyForecast.execute(testCoordinates);
+      )..requestDaily(testTarget);
+      await pumpCommandTurns(tester);
 
       await tester.pumpWidget(buildTestWidget(viewModel));
+      await pumpCommandTurns(tester);
       await tester.pumpAndSettle();
 
       expect(find.byType(ListView), findsOneWidget);
       expect(find.byType(EmptyBox), findsNothing);
     });
 
-    testWidgets('shows EmptyBox after failed load', (tester) async {
+    testWidgets('shows retry after failed load', (tester) async {
       final viewModel = buildViewModel(
         mockLogger,
         Result.error(Exception('network error')),
-      );
-      await viewModel.loadDailyForecast.execute(testCoordinates);
+      )..requestDaily(testTarget);
+      await pumpCommandTurns(tester);
 
       await tester.pumpWidget(buildTestWidget(viewModel));
+      await tester.pumpAndSettle();
 
-      expect(find.byType(EmptyBox), findsOneWidget);
+      expect(find.text('Riprova'), findsOneWidget);
+      expect(find.byType(EmptyBox), findsNothing);
       expect(find.byType(ListView), findsNothing);
     });
   });

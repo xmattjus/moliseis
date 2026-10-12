@@ -1,14 +1,23 @@
-import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/api/weather/cached_weather_api_client.dart';
 import 'package:moliseis/data/services/api/weather/model/current_forecast/current_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
-import 'package:moliseis/utils/command.dart';
+import 'package:moliseis/utils/restartable_command.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
+
+/// The content identity and coordinates shared by all forecast lanes.
+typedef WeatherTarget = ({
+  int id,
+  ContentType type,
+  double latitude,
+  double longitude,
+});
 
 class WeatherViewModel extends ChangeNotifier {
   WeatherViewModel({
@@ -18,9 +27,21 @@ class WeatherViewModel extends ChangeNotifier {
   }) : _weatherApiClient = weatherApiClient,
        _weatherDescriptionMapper = weatherDescriptionMapper,
        _weatherCodeIconMapper = weatherCodeIconMapper {
-    loadCurrentForecast = Command1(_loadCurrentWeatherForecast);
-    loadHourlyForecast = Command1(_loadHourlyWeatherForecast);
-    loadDailyForecast = Command1(_loadDailyWeatherForecast);
+    loadCurrentForecast = RestartableCommand(
+      _loadCurrentWeatherForecast,
+      debugName: 'weather.current',
+    );
+    loadHourlyForecast = RestartableCommand(
+      _loadHourlyWeatherForecast,
+      debugName: 'weather.hourly',
+    );
+    loadDailyForecast = RestartableCommand(
+      _loadDailyWeatherForecast,
+      debugName: 'weather.daily',
+    );
+    loadCurrentForecast.results.addListener(_commitCurrent);
+    loadHourlyForecast.results.addListener(_commitHourly);
+    loadDailyForecast.results.addListener(_commitDaily);
   }
 
   final CachedWeatherApiClient _weatherApiClient;
@@ -28,15 +49,69 @@ class WeatherViewModel extends ChangeNotifier {
   final WmoWeatherIconMapper _weatherCodeIconMapper;
   bool _disposed = false;
 
+  WeatherTarget? _currentTarget;
+  WeatherTarget? get currentTarget => _currentTarget;
+  bool get isDisposed => _disposed;
+
+  /// Binds all lanes synchronously; only the containing screen writes this.
+  void setTarget(WeatherTarget? target) {
+    if (_disposed || _currentTarget == target) return;
+    _currentTarget = target;
+    _currentTemperatureCelsius = '--.-';
+    _currentWeatherCodeIcon = Symbols.question_mark;
+    _currentWeatherDescription = 'Meteo sconosciuto';
+    _isDay = false;
+    _hourlyForecastData = null;
+    _dailyForecastData = null;
+    loadCurrentForecast.invalidate();
+    if (_disposed || _currentTarget != target) return;
+    loadHourlyForecast.invalidate();
+    if (_disposed || _currentTarget != target) return;
+    loadDailyForecast.invalidate();
+  }
+
+  bool _accepts(WeatherTarget target) => !_disposed && _currentTarget == target;
+
+  void requestCurrent(WeatherTarget target, {bool retry = false}) {
+    if (!_accepts(target) || loadCurrentForecast.isRunningSync.value) return;
+    final snapshot = loadCurrentForecast.results.value;
+    if (!retry && snapshot.paramData == target && !snapshot.idle) return;
+    loadCurrentForecast.run(target);
+  }
+
+  void requestHourly(WeatherTarget target, {bool retry = false}) {
+    if (!_accepts(target) || loadHourlyForecast.isRunningSync.value) return;
+    final snapshot = loadHourlyForecast.results.value;
+    if (!retry && snapshot.paramData == target && !snapshot.idle) return;
+    loadHourlyForecast.run(target);
+  }
+
+  void requestDaily(WeatherTarget target, {bool retry = false}) {
+    if (!_accepts(target) || loadDailyForecast.isRunningSync.value) return;
+    final snapshot = loadDailyForecast.results.value;
+    if (!retry && snapshot.paramData == target && !snapshot.idle) return;
+    loadDailyForecast.run(target);
+  }
+
   @override
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
+    loadCurrentForecast.results.removeListener(_commitCurrent);
+    loadHourlyForecast.results.removeListener(_commitHourly);
+    loadDailyForecast.results.removeListener(_commitDaily);
+    loadCurrentForecast.dispose();
+    loadHourlyForecast.dispose();
+    loadDailyForecast.dispose();
     super.dispose();
   }
 
-  late Command1<CurrentWeatherForecastData, LatLng> loadCurrentForecast;
-  late Command1<HourlyWeatherForecastData, LatLng> loadHourlyForecast;
-  late Command1<DailyWeatherForecastData, LatLng> loadDailyForecast;
+  late final RestartableCommand<WeatherTarget, CurrentWeatherForecastData>
+  loadCurrentForecast;
+  late final RestartableCommand<WeatherTarget, HourlyWeatherForecastData>
+  loadHourlyForecast;
+  late final RestartableCommand<WeatherTarget, DailyWeatherForecastData>
+  loadDailyForecast;
 
   var _currentTemperatureCelsius = '--.-';
   IconData _currentWeatherCodeIcon = Symbols.question_mark;
@@ -59,66 +134,66 @@ class WeatherViewModel extends ChangeNotifier {
   /// completed yet (i.e. before [loadDailyForecast] succeeds).
   DailyWeatherForecastData? get getDailyForecastData => _dailyForecastData;
 
-  /// Fetches current weather for [coordinates] and updates the current
-  /// conditions state. Returns the raw [Result] so callers can surface errors.
-  Future<Result<CurrentWeatherForecastData>> _loadCurrentWeatherForecast(
-    LatLng coordinates,
-  ) async {
-    final result = await _weatherApiClient.getCurrentWeatherByCoordinates(
-      coordinates.latitude,
-      coordinates.longitude,
-    );
-    if (_disposed) return result;
-
-    final data = result.getOrNull();
-    if (data != null) {
-      _currentTemperatureCelsius = data.temperature2m.toStringAsFixed(1);
-      _currentWeatherDescription = _weatherDescriptionMapper.descriptionForCode(
-        data.weatherCode,
-      );
-      _currentWeatherCodeIcon = _weatherCodeIconMapper.iconForCode(
-        data.weatherCode,
-        data.isDay == 1,
-      );
-      _isDay = data.isDay == 1;
+  void _commitCurrent() {
+    final snapshot = loadCurrentForecast.results.value;
+    if (_disposed ||
+        snapshot.paramData != _currentTarget ||
+        !snapshot.completed ||
+        loadCurrentForecast.isRunningSync.value) {
+      return;
     }
-
-    return result;
+    final data = snapshot.data!.getOrNull()!;
+    _currentTemperatureCelsius = data.temperature2m.toStringAsFixed(1);
+    _currentWeatherDescription = _weatherDescriptionMapper.descriptionForCode(
+      data.weatherCode,
+    );
+    _currentWeatherCodeIcon = _weatherCodeIconMapper.iconForCode(
+      data.weatherCode,
+      data.isDay == 1,
+    );
+    _isDay = data.isDay == 1;
   }
 
-  /// Fetches hourly forecast for [coordinates] and stores it in
-  /// [getHourlyForecastData]. Returns the raw [Result] so callers can surface
-  /// errors.
+  void _commitHourly() {
+    final snapshot = loadHourlyForecast.results.value;
+    if (_disposed ||
+        snapshot.paramData != _currentTarget ||
+        !snapshot.completed ||
+        loadHourlyForecast.isRunningSync.value) {
+      return;
+    }
+    _hourlyForecastData = snapshot.data!.getOrNull();
+  }
+
+  void _commitDaily() {
+    final snapshot = loadDailyForecast.results.value;
+    if (_disposed ||
+        snapshot.paramData != _currentTarget ||
+        !snapshot.completed ||
+        loadDailyForecast.isRunningSync.value) {
+      return;
+    }
+    _dailyForecastData = snapshot.data!.getOrNull();
+  }
+
+  Future<Result<CurrentWeatherForecastData>> _loadCurrentWeatherForecast(
+    WeatherTarget target,
+  ) => _weatherApiClient.getCurrentWeatherByCoordinates(
+    target.latitude,
+    target.longitude,
+  );
+
   Future<Result<HourlyWeatherForecastData>> _loadHourlyWeatherForecast(
-    LatLng coordinates,
-  ) async {
-    final result = await _weatherApiClient.getHourlyWeatherByCoordinates(
-      coordinates.latitude,
-      coordinates.longitude,
-    );
-    if (_disposed) return result;
+    WeatherTarget target,
+  ) => _weatherApiClient.getHourlyWeatherByCoordinates(
+    target.latitude,
+    target.longitude,
+  );
 
-    final data = result.getOrNull();
-    if (data != null) _hourlyForecastData = data;
-
-    return result;
-  }
-
-  /// Fetches daily forecast for [coordinates] and stores it in
-  /// [getDailyForecastData]. Returns the raw [Result] so callers can surface
-  /// errors.
   Future<Result<DailyWeatherForecastData>> _loadDailyWeatherForecast(
-    LatLng coordinates,
-  ) async {
-    final result = await _weatherApiClient.getDailyWeatherByCoordinates(
-      coordinates.latitude,
-      coordinates.longitude,
-    );
-    if (_disposed) return result;
-
-    final data = result.getOrNull();
-    if (data != null) _dailyForecastData = data;
-
-    return result;
-  }
+    WeatherTarget target,
+  ) => _weatherApiClient.getDailyWeatherByCoordinates(
+    target.latitude,
+    target.longitude,
+  );
 }

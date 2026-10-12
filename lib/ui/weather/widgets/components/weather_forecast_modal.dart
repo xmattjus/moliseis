@@ -16,11 +16,13 @@ class WeatherForecastModal extends StatefulWidget {
   const WeatherForecastModal({
     required this.content,
     required this.viewModel,
+    required this.expectedTarget,
     super.key,
   });
 
   final ContentBase content;
   final WeatherViewModel viewModel;
+  final WeatherTarget expectedTarget;
 
   @override
   State<WeatherForecastModal> createState() => _WeatherForecastModalState();
@@ -33,63 +35,78 @@ class _WeatherForecastModalState extends State<WeatherForecastModal> {
     final appColors = context.appColors;
     final appEffects = context.appEffects;
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            const Align(child: AppBottomSheetDragHandle()),
-            AppBottomSheetTitle(
-              title: 'Previsioni meteo per ${widget.content.city?.name}',
-              onClose: () => context.pop(),
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        viewModel.loadCurrentForecast.results,
+        viewModel.loadHourlyForecast.results,
+        viewModel.loadDailyForecast.results,
+      ]),
+      builder: (context, _) {
+        if (viewModel.isDisposed ||
+            viewModel.currentTarget != widget.expectedTarget) {
+          return const SizedBox.shrink();
+        }
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Align(child: AppBottomSheetDragHandle()),
+                AppBottomSheetTitle(
+                  title: 'Previsioni meteo per ${widget.content.city?.name}',
+                  onClose: () => context.pop(),
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  '${viewModel.currentTemperatureCelsius}°',
+                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  viewModel.currentWeatherDescription,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 16),
+                WeatherForecastHourlyList(
+                  borderColor: appColors.modalBorderColor,
+                  backgroundColor: appEffects.containerColor(
+                    context.colorScheme.primary,
+                    context.colorScheme.surfaceContainer,
+                  ),
+                  viewModel: viewModel,
+                  expectedTarget: widget.expectedTarget,
+                ),
+                const SizedBox(height: 8),
+                WeatherForecastDaysList(
+                  borderColor: appColors.modalBorderColor,
+                  backgroundColor: appEffects.containerColor(
+                    context.colorScheme.primary,
+                    context.colorScheme.surfaceContainer,
+                  ),
+                  viewModel: viewModel,
+                  expectedTarget: widget.expectedTarget,
+                ),
+                const SizedBox(height: 16),
+                LinkTextButton(
+                  label: const Text('Dati meteo forniti da Open-Meteo.com'),
+                  onPressed: () async {
+                    final launched = await context
+                        .read<UrlLaunchService>()
+                        .launchGenericUrl('https://open-meteo.com/');
+                    if (context.mounted && !launched) {
+                      showSnackBarGenericError(context: context);
+                    }
+                  },
+                ),
+                SizedBox(height: context.bottomPadding),
+              ],
             ),
-            const SizedBox(height: 32),
-            Text(
-              '${viewModel.currentTemperatureCelsius}°',
-              style: Theme.of(
-                context,
-              ).textTheme.displayMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              viewModel.currentWeatherDescription,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 16),
-            WeatherForecastHourlyList(
-              borderColor: appColors.modalBorderColor,
-              backgroundColor: appEffects.containerColor(
-                context.colorScheme.primary,
-                context.colorScheme.surfaceContainer,
-              ),
-              viewModel: viewModel,
-            ),
-            const SizedBox(height: 8),
-            WeatherForecastDaysList(
-              borderColor: appColors.modalBorderColor,
-              backgroundColor: appEffects.containerColor(
-                context.colorScheme.primary,
-                context.colorScheme.surfaceContainer,
-              ),
-              viewModel: viewModel,
-            ),
-            const SizedBox(height: 16),
-            LinkTextButton(
-              label: const Text('Dati meteo forniti da Open-Meteo.com'),
-              onPressed: () async {
-                final launched = await context
-                    .read<UrlLaunchService>()
-                    .launchGenericUrl('https://open-meteo.com/');
-                if (context.mounted && !launched) {
-                  showSnackBarGenericError(context: context);
-                }
-              },
-            ),
-            SizedBox(height: context.bottomPadding),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

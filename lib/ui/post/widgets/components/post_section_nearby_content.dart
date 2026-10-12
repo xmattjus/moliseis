@@ -1,8 +1,6 @@
-import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/ui/core/ui/content/nearby_content_horizontal_list.dart';
-import 'package:moliseis/utils/command.dart';
 
 /// Displays nearby content in a horizontal scrollable list.
 ///
@@ -11,26 +9,32 @@ import 'package:moliseis/utils/command.dart';
 /// command and list parameters.
 class PostSectionNearbyContent extends StatelessWidget {
   const PostSectionNearbyContent({
-    required this.coordinates,
+    required this.loadListenable,
+    required this.loadKey,
+    required this.onLoad,
+    required this.readState,
     required this.onContentPressed,
-    required this.loadNearContentCommand,
-    required this.nearContent,
+    this.onRetry,
     super.key,
   });
 
-  final LatLng coordinates;
+  final Listenable loadListenable;
+  final Object loadKey;
+  final VoidCallback onLoad;
+  final NearbyContentPresentation Function() readState;
+  final VoidCallback? onRetry;
   final void Function(ContentBase content) onContentPressed;
-  final Command1<void, LatLng> loadNearContentCommand;
-  final List<ContentBase> nearContent;
 
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: NearbyContentHorizontalList(
-        coordinates: coordinates,
+        loadListenable: loadListenable,
+        loadKey: loadKey,
+        onLoad: onLoad,
+        readState: readState,
+        onRetry: onRetry,
         onPressed: onContentPressed,
-        loadNearContentCommand: loadNearContentCommand,
-        nearContent: nearContent,
       ),
     );
   }

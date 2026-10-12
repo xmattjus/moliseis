@@ -1,6 +1,3 @@
-import 'dart:async' show unawaited;
-
-import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event.dart';
@@ -12,36 +9,35 @@ import 'package:moliseis/ui/core/ui/skeletons/app_pulse_effect.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_grid_item.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
-import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
-/// A reusable horizontal list widget that displays nearby content.
-///
-/// This widget can work with different view models as long as they provide:
-/// - A [Command1] for loading nearby content by coordinates
-/// - A list of nearby content items
+/// Coherent, command-independent presentation of a Nearby retrieval.
+typedef NearbyContentPresentation = ({
+  bool pending,
+  List<ContentBase> items,
+  Object? error,
+});
+
+/// Displays Nearby content from the owning surface's presentation projection.
 class NearbyContentHorizontalList extends StatefulWidget {
   const NearbyContentHorizontalList({
-    required this.coordinates,
+    required this.loadListenable,
+    required this.loadKey,
+    required this.onLoad,
+    required this.readState,
     required this.onPressed,
-    required this.loadNearContentCommand,
-    required this.nearContent,
+    this.onRetry,
     super.key,
   });
 
-  /// The coordinates to search nearby content from.
-  final LatLng coordinates;
-
-  /// Callback when a content item is pressed.
+  final Listenable loadListenable;
+  final Object loadKey;
+  final VoidCallback onLoad;
+  final NearbyContentPresentation Function() readState;
+  final VoidCallback? onRetry;
   final void Function(ContentBase content) onPressed;
-
-  /// The command to execute for loading nearby content.
-  final Command1<void, LatLng> loadNearContentCommand;
-
-  /// The list of nearby content items.
-  final List<ContentBase> nearContent;
 
   @override
   State<NearbyContentHorizontalList> createState() =>
@@ -50,6 +46,9 @@ class NearbyContentHorizontalList extends StatefulWidget {
 
 class _NearbyContentHorizontalListState
     extends State<NearbyContentHorizontalList> {
+  bool _loadScheduled = false;
+  Object? _pendingLoadKey;
+
   @override
   void initState() {
     super.initState();
@@ -59,31 +58,29 @@ class _NearbyContentHorizontalListState
   @override
   void didUpdateWidget(covariant NearbyContentHorizontalList oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    final commandChanged = !identical(
-      oldWidget.loadNearContentCommand,
-      widget.loadNearContentCommand,
-    );
-    if (commandChanged || oldWidget.coordinates != widget.coordinates) {
+    if (oldWidget.loadKey != widget.loadKey ||
+        !identical(oldWidget.loadListenable, widget.loadListenable)) {
       _scheduleLoad();
     }
   }
 
   void _scheduleLoad() {
-    final command = widget.loadNearContentCommand;
-    final coordinates = widget.coordinates;
-    if (!coordinates.isValid) return;
-
+    _pendingLoadKey = widget.loadKey;
+    if (_loadScheduled) return;
+    _loadScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          !identical(widget.loadNearContentCommand, command) ||
-          widget.coordinates != coordinates) {
-        return;
-      }
-
-      unawaited(command.execute(coordinates));
+      if (!mounted) return;
+      _loadScheduled = false;
+      if (_pendingLoadKey == widget.loadKey) widget.onLoad();
     });
   }
+
+  Widget _buildError() => EmptyView.error(
+    text: const Text('Si è verificato un errore durante il caricamento.'),
+    action: widget.onRetry == null
+        ? null
+        : TextButton(onPressed: widget.onRetry, child: const Text('Riprova')),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -103,18 +100,21 @@ class _NearbyContentHorizontalListState
         SizedBox(
           height: kGridViewCardHeight,
           child: ListenableBuilder(
-            listenable: widget.loadNearContentCommand,
+            listenable: widget.loadListenable,
             builder: (context, child) {
-              if (widget.loadNearContentCommand.completed) {
-                final nearContent = widget.nearContent;
-
+              final state = widget.readState();
+              if (!state.pending) {
+                final nearContent = state.items;
+                if (state.error != null && nearContent.isEmpty) {
+                  return _buildError();
+                }
                 if (nearContent.isEmpty) {
                   return const EmptyView(
                     text: Text('Nessun luogo trovato nelle vicinanze.'),
                   );
                 }
 
-                return ListView.separated(
+                final list = ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: padding,
                   itemBuilder: (_, index) {
@@ -152,13 +152,25 @@ class _NearbyContentHorizontalListState
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemCount: nearContent.length,
                 );
-              }
-
-              if (widget.loadNearContentCommand.error) {
-                return const EmptyView.error(
-                  text: Text(
-                    'Si è verificato un errore durante il caricamento.',
-                  ),
+                if (state.error == null) return list;
+                return Column(
+                  children: [
+                    Expanded(child: list),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Si è verificato un errore durante il caricamento.',
+                          ),
+                        ),
+                        if (widget.onRetry != null)
+                          TextButton(
+                            onPressed: widget.onRetry,
+                            child: const Text('Riprova'),
+                          ),
+                      ],
+                    ),
+                  ],
                 );
               }
 
