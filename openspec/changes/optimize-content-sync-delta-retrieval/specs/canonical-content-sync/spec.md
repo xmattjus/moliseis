@@ -148,6 +148,28 @@ A successful sync-state persistence SHALL save cursor and completion timestamp t
 - **WHEN** writing the two sync timestamps fails
 - **THEN** neither the in-memory settings nor the authoritative persisted cursor advances
 
+### Requirement: Cursor authority is projection-version dependent
+
+An existing contentSyncCursorAt SHALL be authoritative only for the projection/materialization contract under which it was advanced. When a future release requires canonical state that may have changed before the stored cursor, it SHALL make every required historical row observable and materialize that state completely before treating the existing cursor as authoritative for the expanded contract. This applies to newly materialized or previously ignored fields, new canonical tables and mapping semantics that require historical remote inputs.
+
+The release SHALL force a complete bootstrap or provide an equivalent deterministic migration/backfill with evidence of completeness. A targeted backend modified_at backfill/bump or a deterministic local migration when all required inputs already exist locally MAY satisfy this obligation. Retrieval alone SHALL NOT count as reconciliation if freshness checks skip required rematerialization of unchanged/equal-marker rows. The release SHALL NOT retain cursor authority by waiting for another remote mutation, assuming future deltas will supply historical state, or selectively clearing local data without reconciling cursor authority. Compatible local-only changes needing no historical remote input MAY retain the cursor.
+
+The current projection SHALL remain unchanged by this requirement: cities.description_delta remains intentionally outside the current CityDto/CityEntity model, and cursor authority remains valid for the fields the current client uses. This change SHALL NOT introduce schema/cursor version fields, new Settings properties, per-table cursors, migration infrastructure or new backend markers to enforce future evolution.
+
+#### Scenario: Previously ignored field becomes materialized
+- **WHEN** a future client begins materializing cities.description_delta after its stored cursor was advanced while ignoring that field
+- **THEN** it SHALL reconcile and materialize every required historical City state before reusing the cursor as authoritative for the expanded projection
+- **AND** an unchanged remote marker SHALL NOT cause required materialization to be skipped
+
+#### Scenario: New canonical table joins the sync
+- **WHEN** a future release adds a canonical table whose rows were never materialized under the stored cursor's contract
+- **THEN** it SHALL bootstrap or equivalently reconcile every required historical row of that table before using the cursor as authoritative for the expanded contract
+- **AND** the old cursor alone SHALL NOT prove the new table has been materialized
+
+#### Scenario: Compatible local-only change
+- **WHEN** a client change needs no historical remote state and preserves completeness of the current projection
+- **THEN** the existing cursor MAY remain authoritative without additional remote bootstrap or backfill
+
 ### Requirement: Content commit precedes durable cursor advancement
 
 Each sync SHALL read local C, obtain server U before content fetches, prepare all four repositories concurrently, atomically commit their content across repositories, and only then persist cursor U and completion time. Success SHALL require successful settings persistence. Cursor fetch failure SHALL cause no prepare or commit; any prepare failure SHALL cause no content commit; commit failure SHALL roll back all repositories. Settings failure after content commit SHALL return sync error while allowing committed content to remain and preserving the old cursor for retry. Success SHALL persist exactly U in UTC, even if fetched rows have markers greater than U. Cursor SHALL never advance before content commit.
@@ -194,7 +216,7 @@ A null content cursor SHALL require immediate bootstrap even if lastSyncedAt is 
 
 ### Requirement: Backend-first rollout preserves installed clients
 
-The backend migration and invariant, ACL and existing Event/concurrency/promotion/external provenance/moderation regression gates SHALL pass before releasing a delta-aware client. Installed clients SHALL continue full retrieval and parsing against the unchanged canonical row shape, observing the corrected markers for deletion/restoration. A new client against an old backend SHALL explicitly fail cursor acquisition rather than silently approximate a successful sync.
+The backend migration and invariant, ACL and existing Event/concurrency/promotion/external provenance/moderation regression gates SHALL pass before releasing a delta-aware client. Installed clients SHALL continue full retrieval and parsing against the unchanged canonical row shape, observing the corrected markers for deletion/restoration. A new client against an old backend SHALL explicitly fail cursor acquisition rather than silently approximate a successful sync. Compatibility of an installed pre-upgrade full-sync client with the migrated backend SHALL NOT imply reverse local-cache compatibility after ObjectBox upgrade. Any subsequent full-sync operational rollback release SHALL retain the current local model/UID compatibility and contentSyncCursorAt, without requiring schema downgrade or revoking the forward-only backend migration. No concrete rollback release SHALL be implemented by this change.
 
 #### Scenario: Old client uses migrated backend
 - **WHEN** an installed full-sync client retrieves canonical content after backend migration
@@ -203,3 +225,9 @@ The backend migration and invariant, ACL and existing Event/concurrency/promotio
 #### Scenario: Release ordering
 - **WHEN** preparing the new Flutter release
 - **THEN** backend migration deployment and regression evidence are prerequisites to release approval
+
+#### Scenario: Operational rollback after local cache upgrade
+- **WHEN** a device has opened its cache with the newer ObjectBox model and an application rollback is needed
+- **THEN** rollback SHALL NOT require installing the exact pre-change binary/model or downgrading the local schema; reverse compatibility SHALL NOT be assumed
+- **AND** any full-sync rollback hotfix/release SHALL retain the current ObjectBox model, UIDs and at least contentSyncCursorAt, while it MAY bypass delta retrieval
+- **AND** the backend migration SHALL remain forward-only and SHALL NOT be revoked

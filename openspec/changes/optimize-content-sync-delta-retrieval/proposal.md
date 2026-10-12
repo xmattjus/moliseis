@@ -11,7 +11,8 @@ Canonical content sync currently fetches entire Supabase tables without paginati
 - Replace the special deletion merge branch with full mapper merges gated by freshness; fix City deletion mapping and retain Event/Place saved state, batching and cross-repository rollback.
 - Preserve three-day scheduling, existing first-sync fatal classification, Result boundaries and Provider wiring. Return sync failure on settings-save failure after content commit and support harmless replay.
 - Clarify the external provenance restore boundary: canonical persistence/sync remains restore-capable with low-level regression coverage, while no supported Event restore operation or provenance restore producer is introduced.
-- Require backend-first rollout and deterministic DB/client compatibility, failure and concurrency regression gates. No production implementation is part of this proposal.
+- Require backend-first rollout and deterministic DB/client compatibility, failure and concurrency regression gates. After local ObjectBox upgrade, any operational full-sync rollback release must preserve the current model/UIDs and contentSyncCursorAt; compatibility with the exact pre-change binary/model is not promised. No rollback implementation is introduced.
+- Bind cursor authority to the projection/materialization contract that advanced it. Future projection expansion requiring historical remote state must reconcile that state before reusing the cursor; no runtime versioning or infrastructure is added. No production implementation is part of this proposal.
 
 ## Capabilities
 

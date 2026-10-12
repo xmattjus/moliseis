@@ -169,9 +169,17 @@ Production rollout remains a separate authorized operation:
 - [ ] Smoke anon/authenticated cursor access and installed full-sync compatibility.
 - [ ] Only then approve/release the delta-aware Flutter client.
 
-Any backend rollout failure blocks client release. A client rollback can return
-to the old full-sync build while retaining the migrated backend; do not revert
-marker semantics under installed delta clients. No Event restore RPC/UI/command/
+Any backend rollout failure blocks client release. Pre-upgrade installed full-sync
+clients remain supported against the migrated backend. The verified ObjectBox
+migration is old store → new model only; reverse compatibility has not been tested
+and must not be assumed. After a device opens the cache with the new model,
+rollback to the exact pre-change binary/model is not promised safe. Any necessary
+application rollback must be a forward-compatible full-sync hotfix/release that
+retains the current ObjectBox model, UIDs and at least contentSyncCursorAt. It may
+bypass delta retrieval but must not require local schema downgrade or revoke the
+forward-only backend migration. This is an operational constraint; no rollback
+release is implemented or tested by this change. Do not revert marker semantics
+under installed delta clients. No Event restore RPC/UI/command/
 workflow/producer, hard-delete propagation, counters/sequences, CDC/WAL/Realtime,
 new dependency/framework/cache/background sync or unrelated marker changes were
 introduced. Delta specs have not been synced and the change has not been archived.
@@ -188,3 +196,39 @@ original model exactly. No dependency, Supabase configuration, Envied or main-sp
 diff is retained. The rollout checklist above deliberately leaves future
 production deployment/release unchecked; delivering it and passing local rollout
 compatibility gates completes Task 4.6, not a production deployment.
+
+## Post-implementation documentation remediation
+
+Initial local and remote main HEAD for this remediation was implementation commit
+`9e2f49ed2956ff641423610d56b68b6217535dce`, with a clean working tree/index and no
+intervening commits. Only this change's proposal, design, tasks, canonical delta
+spec and evidence are revised. The provenance delta remains unchanged.
+
+The rollout text now distinguishes pre-upgrade full-sync clients using the
+migrated backend from application rollback after ObjectBox upgrade. Forward
+cache migration evidence remains valid; no inverse migration claim is made.
+
+The new requirement, Cursor authority is projection-version dependent, constrains
+future projection/materialization changes. An existing cursor is authoritative
+only for the contract that advanced it. Historical remote inputs required by an
+expanded projection must be reconciled completely before cursor reuse; merely
+fetching full rows without materializing them is insufficient. Complete bootstrap,
+targeted backend marker backfill/bump, deterministic local migration with all
+inputs present, or an equivalent proven strategy can satisfy future changes.
+Compatible local-only changes may retain authority. The current projection is
+complete for fields the current client uses; cities.description_delta remains
+intentionally absent from CityDto/CityEntity. No current code is needed.
+
+Implementation, forward ObjectBox model migration and prior runtime test/gate
+evidence are unchanged. No runtime tests are rerun by this documentation-only
+remediation, and no new infrastructure, version fields, migration, RPC, dependency
+or rollback implementation is introduced. M1–M4 remain completed.
+
+Remediation validation: `openspec validate optimize-content-sync-delta-retrieval
+--strict --no-interactive` exited 0 with
+`Change 'optimize-content-sync-delta-retrieval' is valid`.
+`git diff --check` passed; `git status --short` showed exactly the five artifact
+changes named above, with no production/index/untracked changes. Joint artifact
+review confirmed the old-client/migrated-backend scenario and provenance delta
+are unchanged, the unsafe rollback wording is removed, and the three evolution
+scenarios impose no current runtime work. No sync/archive/deployment occurred.
