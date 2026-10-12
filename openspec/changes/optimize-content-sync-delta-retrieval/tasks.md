@@ -1,0 +1,71 @@
+Implementation checklist only: no task is executed by this planning change. Design decisions D1–D7 are frozen. At apply start recheck main/working-tree changes against the audited HEAD; preserve unrelated work and resolve material contradictions before affected implementation. Load applicable test-support/ObjectBox/Result/static-analysis skills before editing those surfaces. Do not broaden scope into command migration or unrelated cleanup.
+
+## 1. M1 — Canonical modified_at contract and server cursor
+
+- [ ] 1.1 Create one new migration via the repository's Supabase migration workflow implementing D1's ordered drop-old-triggers → normalize all deleted rows → change only modified_at defaults → install four explicit unconditional semantic UPDATE triggers → four plain marker indexes. Verify SQL review against the exact semantic-field table, DB-owned marker-only behavior and unchanged created_at/submission/source definitions; never edit historical migrations.
+- [ ] 1.2 Include D2's parameterless SQL VOLATILE invoker cursor RPC, empty search_path, qualified clock_timestamp, PostgREST reload and explicit EXECUTE ACL (anon/authenticated only besides owner). Verify catalog function metadata and indexes (non-partial, single modified_at column), role calls, no PUBLIC/service_role EXECUTE grant and unchanged canonical RLS/SELECT tombstone visibility.
+- [ ] 1.3 Add `supabase/tests/canonical_content_sync_db_test.ts` and its wrapper following the existing DB-test runner pattern. With deterministic fixtures and no sleeps, verify each table's semantic-field changes/null transitions, soft-delete, restore, changed deleted state, no-op, metadata/marker-only UPDATE, two immediate mutations and a future OLD marker forcing +1us. Assert Event semantic edit and all_day edit explicitly, expected INSERT defaults and unchanged created_at; run the new wrapper on a clean migration replay.
+- [ ] 1.4 Add a genuine upgrade regression runner/fixture: create an isolated database from historical migrations through the pre-change HEAD, seed tombstones under legacy triggers for deleted_at >, = and < modified_at on all four tables and active rows, record original markers, then apply the new migration once. Verify exact greatest(deleted_at, original+1us), strict growth, active/created_at preservation and replacement trigger behavior. Do not simulate upgrade solely by executing the backfill expression after new triggers or by mutating old migration files; ensure the runner never targets production and cleans its isolated DB.
+- [ ] 1.5 Run backend regression gates listed below, including Event tokens, promotion/idempotency and all external provenance/moderation/concurrency suites. Verify no assertion is weakened to accommodate marker changes, and confirm audited production writers still use request-scoped RPCs with soft-delete as the propagation invariant; record the 24-hour uncommitted-transaction assumption, not a claimed DB guarantee.
+
+## 2. M2 — Local cursor and ObjectBox compatibility
+
+- [ ] 2.1 **Before changing AppSettings or regenerating bindings**, capture the real prior-model settings/content cache described in D3 using unchanged bindings and a temporary producer. Deliver `test/fixtures/objectbox/pre_content_sync_cursor/{data.mdb.gz,objectbox-model.json,README.md}` with producer HEAD/hash, non-default settings/recent lastSyncedAt, known identities and Event/Place saved rows. Verify producer closes the real store, document values and remove producer from ordinary suite; preserve the existing pre_all_day fixture.
+- [ ] 2.2 Add nullable default-null dateNano contentSyncCursorAt to AppSettings constructor/property/copyWith, preserving existing fields. Run `dart run build_runner build --delete-conflicting-outputs` and inspect generated diff: AppSettings entity UID `6:8898619296747710534` and every existing property UID remain, one cursor property is appended and no unrelated generator drift is kept. Verify fresh settings cursor null and copyWith retains the cursor on unrelated edits.
+- [ ] 2.3 Replace SettingsRepository.setModifiedAt with checked `setSyncState` and expose cursor getter in the contract/implementation and central fake. Use one copyWith/save and success-only cache publication. Extend `test/data/repositories/settings_repository_impl_test.dart` to assert single save of both dates, exact values, preservation of other settings and unchanged in-memory dates/cursor on failure; update affected callers/tests without changing other settings APIs.
+- [ ] 2.4 Add `test/data/content_sync_previous_store_test.dart` using the existing real-store harness to reopen the immutable M2.1 fixture with new bindings, assert all settings/content/UID/saved-state preservation and cursor null, then write/read/reopen both timestamps. Run this test, the existing pre_all_day migration test and settings local-data-source tests. A new-model seeded store is not sufficient migration evidence.
+
+## 3. M3 — Paginated bootstrap/delta retrieval and merge semantics
+
+- [ ] 3.1 Extend Synchronizable/BaseSyncRepository prepareSync and fetchRemote with optional named modifiedAtOrAfter, and forward it without repository overlap logic. Add the single focused `fetch_paginated_sync_dtos.dart` helper and delegate from all four repositories with existing decoders (D4). Verify full/null and delta signatures compile, full rows including tombstones are retained, fresh queries use ascending id/limit 500, optional inclusive marker filter and id continuation only after nonempty pages; no offset, upper bound or compound cursor.
+- [ ] 3.2 Extend shared `test/support/mock_supabase.dart` with pagination-aware scripted/filter-aware responses, URI recording, terminating empty pages, page-specific errors and scalar cursor RPC responses. Update central repository fakes' signatures and existing select fixtures. Verify existing fixture APIs terminate with keyset queries and do not repeatedly return identical nonempty rows; keep support shared rather than duplicating HTTP clients per repository.
+- [ ] 3.3 Add `test/data/core/fetch_paginated_sync_dtos_test.dart` using real SupabaseClient plus recorded HTTP transport. Verify null-cursor full retrieval; lower-bound equality; tombstones/newer-than-U inclusion; multiple pages; short page followed by more rows; first-page empty and final-page empty termination; exact gte/gt/order/limit URI parameters on all pages; no first-page gt, upper bound or offset; mid-page/decode failure rejects the whole retrieval. Verify all four existing repository tests show prepare failure yields no partial commit and delegate their own decoder/table correctly.
+- [ ] 3.4 Remove the audited-unused markEntityDeleted/supportsSoftDelete API and four overrides, keeping pendingById/putMany and replacing special tombstone handling with D5's freshness table. Fix both City mapper paths to derive isDeleted from deletedAt. Update `test/data/core/base_sync_repository_test.dart` to verify active→active/delete, deleted→restore/newer deleted, equal/older no-op (including tombstones), absent-active create/absent-tombstone ignore, duplicate DTO freshness and one batched putMany.
+- [ ] 3.5 Add City mapper tests and extend Event/Place/Media mapper/repository regressions for complete newer remote state, deletion/restoration, remote marker propagation, local identity/relation semantics and Event/Place isSaved preservation in every merge transition. Run base-sync, mapper and four repository tests against real ObjectBox stores where persistence is exercised; retain existing relation-null/exactly-one-parent behavior.
+
+## 4. M4 — Integration, failure semantics, regression and rollout gates
+
+- [ ] 4.1 Add required inward-facing SyncCursorSource and Supabase data-layer implementation (D2), with UTC scalar parsing/Result handling. Construct it inline in existing SyncUseCase wiring beside the coordinator, without a separate Provider or Supabase dependency in domain orchestration. Add cursor-source HTTP tests for valid offset timestamp→UTC, RPC/network error, malformed/null response and missing RPC, and verify no request/fallback after failure.
+- [ ] 4.2 Implement D6's SyncUseCase sequence C → U → four concurrent prepares → atomic content commit → checked setSyncState(U, completion), overlap constant and minimal now seam. Update shared sync/events harnesses, central fakes and all constructor sites. Extend `test/domain/use_cases/sync_use_case_test.dart` with controlled Completers to prove all four prepares start before any completes and no commit begins early; verify one shared inclusive lower bound, bootstrap null bound and exact UTC U persisted even with greater DTO markers or U==C (no early exit).
+- [ ] 4.3 Verify cursor error short-circuits without prepare/commit/settings; any prepare error prevents commits; a late commit failure rolls back writes in **all four real boxes**; settings error after commit returns Result.error and leaves previous persisted/in-memory cursor and completion time authoritative while content may remain. Add a retry test that first fails cursor persistence then replays the same DTOs harmlessly and later saves U; run coordinator/base-sync/settings/use-case integration tests. Preserve failed Sentry status on all error Results and success only after settings save.
+- [ ] 4.4 Update scheduling tests using deterministic now: null cursor with recent lastSyncedAt immediately bootstraps, non-null cursor is not due before three days and is due at/after boundary, absent completion is due, forced sync ignores scheduling but respects bootstrap/delta. Extend SyncViewModel and sync redirect/widget tests for upgraded cached bootstrap failure remaining nonfatal and new installation retaining fatal-first-sync retry behavior; verify current offline/cache navigation and legacy Command remain unchanged.
+- [ ] 4.5 Run the focused Flutter gates below, then `flutter analyze` and `flutter test` once integration is complete. Verify generated output is limited to the cursor model addition, no new dependency/DI/Command/caching framework, no banned backend infrastructure, and no changes to unrelated marker contracts. Re-read proposal/design/spec/tasks together, map all requirements to passing evidence and run `openspec validate optimize-content-sync-delta-retrieval --strict`.
+- [ ] 4.6 Deliver backend-first rollout evidence/checklist: deploy migration, verify DB invariant/upgrade/ACL/regression gates, smoke RPC as anon/authenticated and representative **old** full-sync DTO parsing/merge against unchanged row shape, then permit new-client release. Confirm new client against missing RPC explicitly errors with no fallback. Backend rollout failure blocks client release; rollback Flutter to old full sync if needed while retaining migrated backend, never revert marker semantics under installed delta clients. Actual production deployment/release requires its own authorization; do not claim it occurred from local tests.
+
+## Gate commands and coverage
+
+New proposed DB runners are `bash supabase/tests/run_canonical_content_sync_db_test.sh` and `bash supabase/tests/run_canonical_content_sync_migration_db_test.sh` (created in M1). Local Supabase/PostgreSQL 17 and Deno must be available; start/reset the disposable local environment according to installed CLI help, never reset a linked production database. Preserve existing runner credentials handling without printing secrets.
+
+Existing backend gates (all required):
+
+```sh
+bash supabase/tests/run_event_temporal_invariants_db_test.sh
+bash supabase/tests/run_submission_promotion_db_test.sh
+bash supabase/tests/run_submission_idempotency_db_test.sh
+bash supabase/tests/run_external_event_token_e2e_fixture.sh
+bash supabase/tests/run_external_event_resolution_db_test.sh
+bash supabase/tests/run_external_event_ingest_db_test.sh
+bash supabase/tests/run_external_event_moderation_db_test.sh
+bash supabase/tests/run_external_event_provenance_db_test.sh
+bash supabase/tests/run_external_event_assets_db_test.sh
+bash supabase/tests/run_external_event_migration_db_test.sh
+bash supabase/tests/run_external_event_rollout_db_test.sh
+```
+
+Format/type-check new or changed Deno tests following their current imports and runner environment before those gates; use `deno fmt --check <changed-files>` and `deno check <changed-files>`. Run changed Edge Function tests only if implementation needs a justified caller-contract adjustment; no Edge Function change is anticipated.
+
+Focused Flutter gates (new paths are explicitly proposed):
+
+```sh
+flutter test test/data/content_sync_previous_store_test.dart test/data/all_day_previous_store_test.dart
+flutter test test/data/sources/settings_local_data_source_test.dart test/data/repositories/settings_repository_impl_test.dart
+flutter test test/data/core/fetch_paginated_sync_dtos_test.dart test/data/core/supabase_sync_cursor_source_test.dart
+flutter test test/data/core/base_sync_repository_test.dart test/data/core/objectbox_sync_transaction_coordinator_test.dart
+flutter test test/data/mappers test/data/repositories/city_repository_impl_test.dart test/data/repositories/place_repository_impl_test.dart test/data/repositories/event_repository_impl_test.dart test/data/repositories/media_repository_impl_test.dart
+flutter test test/domain/use_cases/sync_use_case_test.dart test/ui/sync test/routing/sync_redirect_test.dart
+flutter analyze
+flutter test
+openspec validate optimize-content-sync-delta-retrieval --strict
+```
+
+Coverage mapping: semantic markers/legacy repair/ACL/rollout → M1 + 4.6; previous cache/two-date authority → M2 + 4.3; paging/merge/replay/saved state → M3 + 4.3; server-before-fetch/concurrency/atomicity/failure/high-water semantics → 4.1–4.3; bootstrap precedence/three-day boundary/fatal classification → 4.4; consistency/out-of-scope/regression audit → 4.5. No task authorizes new counters/sequences, CDC/WAL/Realtime/logs, per-table cursors, patches, hard-delete propagation, Event restore workflow, locks, caching/background sync, new frameworks/dependencies or frequency changes.

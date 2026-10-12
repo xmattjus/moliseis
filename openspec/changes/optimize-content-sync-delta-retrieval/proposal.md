@@ -1,0 +1,31 @@
+## Why
+
+Canonical content sync currently fetches entire Supabase tables without pagination, even when almost nothing changed, and can silently stop at the server row cap. Reusing the existing semantic modification marker with paginated bootstrap/delta retrieval reduces remote transfer while retaining the two-phase, concurrent-fetch, atomic local-commit and offline-cache behavior.
+
+## What Changes
+
+- Define table-specific semantic `modified_at` contracts for cities, places, events and media, including deletion/restoration, strict per-row growth and DB-owned UPDATE markers. Normalize legacy tombstones before activating replacement triggers; change only canonical INSERT marker defaults to `clock_timestamp()` and add four ordinary B-tree marker indexes.
+- Add stateless invoker RPC `get_content_sync_cursor()` and a minimal inward-facing cursor source; capture its server timestamp before retrieval without imposing a query upper bound.
+- Add nullable ObjectBox `AppSettings.contentSyncCursorAt`, separately from device completion/scheduling `lastSyncedAt`; preserve existing UIDs and prove genuine previous-store compatibility. Persist both timestamps through one checked `setSyncState` operation.
+- Force full paginated bootstrap when the cursor is absent, then retrieve inclusive deltas from cursor minus 24 hours. Share one focused ID-keyset pagination helper with page size 500, terminating only on an empty page.
+- Replace the special deletion merge branch with full mapper merges gated by freshness; fix City deletion mapping and retain Event/Place saved state, batching and cross-repository rollback.
+- Preserve three-day scheduling, existing first-sync fatal classification, Result boundaries and Provider wiring. Return sync failure on settings-save failure after content commit and support harmless replay.
+- Require backend-first rollout and deterministic DB/client compatibility, failure and concurrency regression gates. No production implementation is part of this proposal.
+
+## Capabilities
+
+### New Capabilities
+
+- `canonical-content-sync`: Semantic canonical markers, legacy normalization, server cursor, paginated bootstrap/delta retrieval, idempotent local merge, atomic commit, durable local cursor and compatibility/failure behavior. Existing specs contain no canonical sync capability; `local-content-retrieval` governs local discovery and must not be broadened into replication.
+
+### Modified Capabilities
+
+None. Existing Event temporal/all-day, submission promotion, external provenance/moderation and Command contracts remain in force and are regression gates.
+
+## Impact
+
+Analyzed local and remote `main`: `8d7724960889a4224c11f8a2c58d31d8c1c945c7` (remote verified during planning; no advancement from supplied baseline). The working tree was clean before this change.
+
+Apply will affect a new Supabase migration and DB tests; `Synchronizable`, `BaseSyncRepository`, four repository implementations and the City mapper; `AppSettings` and generated ObjectBox bindings/model; Settings repository; `SyncUseCase` and its composition in `config/dependencies.dart`; shared fakes/HTTP test support and focused regressions. Add only one pagination helper and one cursor interface/implementation, with no package or DI framework changes. Backend migration is compatible with installed full-sync clients; a new client requires the cursor RPC and fails explicitly if it is missing.
+
+Out of scope: new marker columns, counters/sequences, CDC/WAL/Realtime/change logs, per-table cursors, patches, hard-delete propagation, Event restore UI/workflow, locks, caching layers, background sync, frequency changes, new dependencies, general refactors, or changes to `content_submissions.modified_at` and `external_event_records.modified_at`.
