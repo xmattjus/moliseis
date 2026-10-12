@@ -8,7 +8,21 @@ Synchronize canonical Supabase cities, places, events and media into the existin
 
 For the four canonical tables, `modified_at` SHALL represent the last semantically relevant resource change, with relevance defined per table, rather than every SQL UPDATE. Semantic columns SHALL be cities: name, description_delta, deleted_at; events: name, description, description_delta, start_date, end_date, all_day, latitude, longitude, city_id, category, deleted_at; places: name, description, description_delta, latitude, longitude, city_id, category, deleted_at; media: url, description, author, license, license_url, width, height, event_id, place_id, deleted_at. Null transitions SHALL be compared safely. id, created_at and modified_at SHALL NOT decide semantic mutation.
 
-On a semantic UPDATE the DB-owned marker SHALL be `greatest(clock_timestamp(), OLD.modified_at + interval '1 microsecond')`, strictly greater than its previous value. On an UPDATE with no semantic difference the marker SHALL remain OLD.modified_at, regardless of an attempted caller-supplied marker. Canonical INSERT marker defaults SHALL use clock_timestamp(), with created_at defaults unchanged. The distinct modification/token/workflow contracts of content_submissions and external_event_records SHALL remain unchanged.
+On a semantic UPDATE the DB-owned marker SHALL be `greatest(clock_timestamp(), OLD.modified_at + interval '1 microsecond')`, strictly greater than its previous value. On an UPDATE with no semantic difference the marker SHALL remain OLD.modified_at, regardless of an attempted caller-supplied marker. Canonical INSERT marker defaults SHALL use clock_timestamp(), with created_at defaults unchanged. The migration SHALL persist the table-specific semantic marker principle and deleted_at lifecycle relevance as column documentation on exactly the four canonical modified_at columns; inline SQL comments alone SHALL NOT substitute for persistent DB metadata. created_at SHALL be immutable metadata for all supported canonical runtime writers and SHALL NOT participate in the semantic predicate. Manual/privileged created_at corrections outside supported runtime paths SHALL be outside the replication contract; no new created_at guard infrastructure SHALL be introduced. The distinct modification/token/workflow contracts of content_submissions and external_event_records SHALL remain unchanged.
+
+Canonical sync SHALL remain restore-capable as clarified by external-event-provenance-moderation: generic marker behavior, local state mapping and low-level DB/mapper/sync regressions SHALL cover deleted_at non-null → null, without introducing a supported Event restore RPC, Admin command/UI, moderation workflow, runtime producer or provenance enqueue change. A future supported Event restore operation SHALL retain the linked-source enqueue obligation defined by that capability.
+
+#### Scenario: Persistent semantic documentation
+- **WHEN** the migrated canonical column metadata is inspected
+- **THEN** all four modified_at columns document table-specific semantic change and deleted_at lifecycle relevance, without imposing that contract on submission or source-record columns
+
+#### Scenario: Supported writers preserve creation metadata
+- **WHEN** a supported canonical runtime writer updates a row
+- **THEN** created_at remains unchanged, is absent from the semantic-change predicate and gains no new guard infrastructure
+
+#### Scenario: Generic lifecycle coverage adds no restore operation
+- **WHEN** low-level tests exercise a canonical Event deleted_at non-null → null transition
+- **THEN** the marker and local active state follow generic sync semantics without adding a supported Event restore operation or changing provenance enqueue behavior
 
 #### Scenario: Semantic Event edit
 - **WHEN** any Event semantic field changes, including all_day alone or a nullable field transition
