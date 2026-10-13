@@ -17,23 +17,14 @@ import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../support/recording_sentry_transport.dart';
+
 class MockTalker extends Mock implements Talker {}
-
-/// A minimal [Transport] that records envelopes for test assertions.
-class FakeTransport implements Transport {
-  final List<SentryEnvelope> envelopes = [];
-
-  @override
-  Future<SentryId> send(SentryEnvelope envelope) async {
-    envelopes.add(envelope);
-    return envelope.header.eventId ?? SentryId.newId();
-  }
-}
 
 void main() {
   late MockTalker mockTalker;
   late SentryLoggingFlag sentryFlag;
-  late FakeTransport fakeTransport;
+  late RecordingSentryTransport fakeTransport;
 
   setUpAll(() {
     registerFallbackValue(LogLevel.debug);
@@ -43,7 +34,7 @@ void main() {
   setUp(() async {
     mockTalker = MockTalker();
     sentryFlag = SentryLoggingFlag(initialValue: false);
-    fakeTransport = FakeTransport();
+    fakeTransport = RecordingSentryTransport();
 
     await Sentry.init((options) {
       options
@@ -51,6 +42,7 @@ void main() {
         ..automatedTestMode = true
         ..transport = fakeTransport;
     });
+    Sentry.currentHub.scope.addEventProcessor(fakeTransport);
   });
 
   tearDown(() async {
@@ -290,8 +282,7 @@ void main() {
 
         logger.log(const ImageLoadFailed(url: ''));
 
-        // Allow microtask queue to flush.
-        await Future<void>.delayed(Duration.zero);
+        await fakeTransport.settleCaptures();
 
         final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
         expect(breadcrumbs, isEmpty);
@@ -306,9 +297,9 @@ void main() {
           error: Exception('should not be captured'),
         );
 
-        // Allow microtask queue to flush.
-        await Future<void>.delayed(Duration.zero);
+        await fakeTransport.settleCaptures();
 
+        expect(fakeTransport.events, isEmpty);
         expect(fakeTransport.envelopes, isEmpty);
       });
 
@@ -318,8 +309,7 @@ void main() {
 
         logger.log(const SentryLoggingEnabled());
 
-        // Allow microtask queue to flush.
-        await Future<void>.delayed(Duration.zero);
+        await fakeTransport.settleCaptures();
 
         final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
         expect(breadcrumbs, isEmpty);
@@ -331,8 +321,7 @@ void main() {
 
         logger.log(const RepositorySyncStarted('cities'));
 
-        // Allow microtask queue to flush.
-        await Future<void>.delayed(Duration.zero);
+        await fakeTransport.settleCaptures();
 
         final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
         expect(breadcrumbs, hasLength(1));
@@ -351,8 +340,7 @@ void main() {
 
         logger.log(const NetworkRequestTimeout());
 
-        // Allow microtask queue to flush.
-        await Future<void>.delayed(Duration.zero);
+        await fakeTransport.settleCaptures();
 
         final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
         expect(breadcrumbs, hasLength(1));
@@ -368,8 +356,7 @@ void main() {
           error: Exception('captured'),
         );
 
-        // Allow microtask queue to flush.
-        await Future<void>.delayed(Duration.zero);
+        await fakeTransport.settleCaptures();
 
         expect(fakeTransport.envelopes, hasLength(1));
       });
@@ -385,8 +372,7 @@ void main() {
             error: Exception('fatal'),
           );
 
-          // Allow microtask queue to flush.
-          await Future<void>.delayed(Duration.zero);
+          await fakeTransport.settleCaptures();
 
           expect(fakeTransport.envelopes, hasLength(1));
         },
@@ -400,9 +386,9 @@ void main() {
 
           logger.log(const ImageLoadFailed(url: ''));
 
-          // Allow microtask queue to flush.
-          await Future<void>.delayed(Duration.zero);
+          await fakeTransport.settleCaptures();
 
+          expect(fakeTransport.events, isEmpty);
           expect(fakeTransport.envelopes, isEmpty);
         },
       );
@@ -418,9 +404,9 @@ void main() {
             error: Exception('not captured'),
           );
 
-          // Allow microtask queue to flush.
-          await Future<void>.delayed(Duration.zero);
+          await fakeTransport.settleCaptures();
 
+          expect(fakeTransport.events, isEmpty);
           expect(fakeTransport.envelopes, isEmpty);
         },
       );
@@ -434,8 +420,7 @@ void main() {
           extra: {'retries': 2},
         );
 
-        // Allow microtask queue to flush.
-        await Future<void>.delayed(Duration.zero);
+        await fakeTransport.settleCaptures();
 
         final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
         expect(breadcrumbs, hasLength(1));
@@ -460,7 +445,7 @@ void main() {
             error: error,
             stackTrace: stack,
           );
-          await Future<void>.delayed(Duration.zero);
+          await fakeTransport.settleCaptures();
 
           verify(
             () => mockTalker.log(
@@ -473,6 +458,7 @@ void main() {
               stackTrace: stack,
             ),
           ).called(1);
+          expect(fakeTransport.events, hasLength(enabled ? 1 : 0));
           expect(fakeTransport.envelopes, hasLength(enabled ? 1 : 0));
           expect(
             Sentry.currentHub.scope.breadcrumbs,
