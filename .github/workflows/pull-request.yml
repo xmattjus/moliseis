@@ -45,6 +45,9 @@ jobs:
     name: Autonomous Flutter tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Existing DateTime(local) fixtures expect the application's Rome timezone.
+    env:
+      TZ: Europe/Rome
     steps:
       - name: Checkout
         uses: actions/checkout@v6

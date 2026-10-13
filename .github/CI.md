@@ -29,6 +29,13 @@ locale), senza un'installazione indipendente. Le dipendenze vengono installate c
 risolvere nuove versioni. Java e Xcode del workflow release non servono a questi
 controlli. `build-release.yml` rimane invariato.
 
+Il job test imposta `TZ=Europe/Rome`: alcune fixture esistenti costruiscono
+`DateTime` locali e li confrontano con istanti/orari della policy Roma. Sul runner
+UTC predefinito il primo run ha mostrato sette fallimenti di queste aspettative,
+riprodotti localmente con `TZ=UTC`. Il fuso è quindi un prerequisito esplicito
+della suite attuale; questa prima CI non verifica la portabilità dei test a fusi
+diversi e non cambia la policy applicativa o le aspettative dei test.
+
 I test ObjectBox richiedono la libreria nativa anche se non richiedono servizi:
 `flutter test` non compila il plugin Linux. Il job scarica l'archivio ufficiale
 Linux x64 di ObjectBox C **5.3.2**, coerente con `objectbox` e
