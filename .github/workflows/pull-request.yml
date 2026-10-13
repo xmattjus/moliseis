@@ -1,0 +1,97 @@
+name: Pull request checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.47.5"
+
+jobs:
+  analyze:
+    name: Flutter analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter version
+        run: flutter --version
+
+      - name: Install locked Flutter dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Analyze
+        run: flutter analyze --no-pub
+
+  test:
+    name: Autonomous Flutter tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Verify Flutter version
+        run: flutter --version
+
+      - name: Install locked Flutter dependencies
+        run: flutter pub get --enforce-lockfile
+
+      # flutter test does not build the Linux plugin that downloads this library.
+      # Match objectbox/objectbox_flutter_libs 5.3.2 in pubspec.lock.
+      - name: Install ObjectBox test runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/objectbox-linux-x64.tar.gz"
+          curl --fail --location --retry 3 \
+            https://github.com/objectbox/objectbox-c/releases/download/v5.3.2/objectbox-linux-x64.tar.gz \
+            --output "$archive"
+          echo "6dbb5450c36dd11ee9074f16ecc61e79b45ff43c2082934601f3166b39c8a613  $archive" \
+            | sha256sum --check --strict
+          tar -xzf "$archive" -C "$GITHUB_WORKSPACE" lib/libobjectbox.so
+          test -s lib/libobjectbox.so
+
+      - name: Run autonomous tests (local service tests excluded)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # test/integration is reserved for the Supabase/Deno local-stack tests.
+          # See .github/CI.md; do not rely on their environment-driven skip flags.
+          mapfile -d '' test_files < <(
+            find test -type f -name '*_test.dart' \
+              -not -path 'test/integration/*' -print0 | sort -z
+          )
+          if (( ${#test_files[@]} == 0 )); then
+            echo "No autonomous Flutter tests found."
+            exit 1
+          fi
+          printf 'Running %s autonomous test files.\n' "${#test_files[@]}"
+          flutter test --no-pub --reporter expanded "${test_files[@]}"
