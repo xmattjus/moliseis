@@ -7,18 +7,20 @@ del branch: gli eventuali required checks vanno impostati separatamente su GitHu
 
 ## Controlli automatici
 
-- **Flutter analyze**: `flutter analyze --no-pub` sull'intero progetto, con le
-  opzioni già presenti in `analysis_options.yaml`. Errori, warning e info conservano
-  il comportamento di fallimento predefinito; nessuna diagnostica viene soppressa.
+- **Flutter analyze incrementale**: esegue `flutter analyze --no-pub` sia sul
+  commit base esatto della PR sia sul candidato. Tutti gli errori sono bloccanti;
+  warning e info già presenti costituiscono debito visibile, mentre nuove
+  diagnostiche fanno fallire il job. Non usa `--no-fatal-warnings` o
+  `--no-fatal-infos` e non sopprime diagnostiche.
 - **Autonomous Flutter tests**: `flutter test --no-pub --reporter expanded` con
   tutti i file `test/**/*_test.dart`, tranne quelli in `test/integration/`.
   Alla preparazione della CI sono 144 file: unit test, widget test, repository e
   persistenza con store ObjectBox temporanei reali. I nuovi test fuori da
   `test/integration/` vengono inclusi automaticamente. Una selezione vuota fallisce.
 
-I job sono indipendenti: un fallimento di analyze non impedisce l'esecuzione dei
-test. Nessun `continue-on-error`, esclusione per nome di test fallito o neutralizzazione
-degli exit code. Gli skip già dichiarati nei test restano visibili nel reporter;
+I job sono indipendenti: un fallimento del gate analyze non impedisce l'esecuzione
+dei test. Nessun `continue-on-error` o esclusione per nome di test fallito.
+Gli skip già dichiarati nei test restano visibili nel reporter;
 questa CI non li rimuove e non equivale a copertura di quei casi.
 
 Entrambi usano `ubuntu-latest`, `permissions: contents: read`, checkout v6 e
@@ -35,6 +37,53 @@ UTC predefinito il primo run ha mostrato sette fallimenti di queste aspettative,
 riprodotti localmente con `TZ=UTC`. Il fuso è quindi un prerequisito esplicito
 della suite attuale; questa prima CI non verifica la portabilità dei test a fusi
 diversi e non cambia la policy applicativa o le aspettative dei test.
+
+### Baseline verificata dell'analyzer
+
+Il finding CodeRabbit sul fallimento delle 291 diagnostiche preesistenti è
+corretto. Disabilitare globalmente la fatalità di warning e info consentirebbe
+però nuove regressioni: la remediation usa invece uno script Python con sola
+libreria standard, `.github/scripts/analyzer_baseline.py`.
+
+La baseline viene ricalcolata da `github.event.pull_request.base.sha`, recuperato
+dal remoto in un worktree isolato fuori dal candidato. Entrambi i checkout usano
+Flutter 3.47.5/Dart incluso e le proprie dipendenze bloccate installate con
+`--enforce-lockfile`. Il candidato è il merge ref della PR, come per i test.
+Log completi e SHA di entrambe le revisioni restano visibili; non si mantiene un
+file di allowance che una PR possa aggiornare con le proprie nuove diagnostiche.
+La base iniziale verificata ha 4 warning e 287 info; non è un tetto numerico.
+
+L'identità di una diagnostica comprende percorso relativo, severità, codice,
+messaggio, riga e colonna. Git `diff --no-index --diff-algorithm=patience`
+mappa le righe sorgenti invariate dalla base al candidato, usando dichiarazioni
+e altre righe uniche come ancore. Il confronto usa un multinsieme delle occorrenze
+mappate: una diagnostica nuova non può essere pagata dalla rimozione di un'altra
+altrove, anche con codice/messaggio identici e totale invariato. Inserire righe
+sopra il debito esistente non genera falsi positivi. Errori anche già presenti
+sulla base fanno sempre fallire il controllo; gli errori non hanno allowance.
+
+Lo script interpreta l'exit 1 di `flutter analyze` solo quando il report è
+completo, il riepilogo corrisponde alle diagnostiche lette e contiene
+esclusivamente warning/info. Crash, report mancante/incompleto, formato inatteso,
+SDK diverso, problemi di checkout/pub get e qualsiasi errore analyzer bloccano
+il job. I regression test del gate verificano nuovi codici/occorrenze,
+cambiamenti di severità, spostamenti di riga, rimozione e aggiunta di una riga
+identica in scope diversi, debito rimosso e fallimenti del tool.
+Una modifica ai file tracciati `analysis_options.yaml` richiede una revisione
+esplicita della policy/baseline e viene bloccata, per evitare di ridurre le regole
+implicitamente insieme al codice.
+
+Tradeoff: servono due analisi complete e un secondo pub get. Il parser è
+deliberatamente limitato al formato Flutter 3.47.5 e va rivalutato con l'SDK.
+Modificare una riga sorgente con debito la rende nuova, scelta conservativa.
+La mappatura Git è testuale, non semantica: blocchi di codice identici spostati o
+duplicati possono essere allineati come invariate dal diff. Non dimostra l'identità
+di un nodo AST e non costituisce una protezione contro modifiche intenzionalmente
+ostili alla CI. Cambiamenti al lockfile possono produrre nuove diagnostiche attraverso
+le dipendenze e saranno bloccati come le altre; la baseline usa il lockfile della
+base, non quello fornito dalla PR. Questo controllo rileva regressioni rispetto
+alla base, non impedisce da solo commenti `ignore` o cambiamenti alla CI, che
+restano oggetto della review. Non risolve le 291 diagnostiche pregresse.
 
 I test ObjectBox richiedono la libreria nativa anche se non richiedono servizi:
 `flutter test` non compila il plugin Linux. Il job scarica l'archivio ufficiale
@@ -82,9 +131,11 @@ deploy. Nessuno di questi controlli è dichiarato coperto dalla prima CI.
 
 La base verificata è `origin/main` al commit
 `05b0f9e3432462a2fbf86c84dc4b6f80e0ed4ab9`. La PR documenta gli esiti delle
-verifiche locali e del primo run GitHub Actions. Un fallimento preesistente resta
-un fallimento: questa modifica introduce la CI, senza correggere codice,
-dipendenze o migration e senza rendere artificialmente verdi i controlli.
+verifiche locali e GitHub Actions. Il debito analyzer è confrontato esplicitamente;
+i fallimenti dei test restano bloccanti. La correzione della sincronizzazione dei
+test AppLogger/Sentry viene proposta in una PR separata: il job test della PR CI
+resta rosso finché quella correzione non è inclusa nel candidato. Nessun test viene
+escluso o modificato dal workflow per ottenere un risultato verde.
 
 Riferimenti: [sintassi GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax),
 [Flutter action](https://github.com/subosito/flutter-action),

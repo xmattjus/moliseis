@@ -38,8 +38,22 @@ jobs:
       - name: Install locked Flutter dependencies
         run: flutter pub get --enforce-lockfile
 
-      - name: Analyze
-        run: flutter analyze --no-pub
+      - name: Verify incremental analyzer gate
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
+      - name: Prepare verified analyzer baseline
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git worktree add --detach "$RUNNER_TEMP/analyzer-base" "$BASE_SHA"
+          cd "$RUNNER_TEMP/analyzer-base"
+          flutter pub get --enforce-lockfile
+
+      - name: Analyze against PR base (errors and new diagnostics block)
+        run: python3 .github/scripts/analyzer_baseline.py "$RUNNER_TEMP/analyzer-base" "$GITHUB_WORKSPACE"
 
   test:
     name: Autonomous Flutter tests
