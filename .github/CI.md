@@ -80,6 +80,18 @@ deploy. Nessuno di questi controlli è dichiarato coperto dalla prima CI.
 
 ## Verifica iniziale
 
+Questa è la prima fase dell'introduzione della CI automatica, non la configurazione
+definitiva. La baseline verificata contiene **0 error, 4 warning e 287 info**:
+`Flutter analyze` resta inizialmente rosso con il comportamento nativo e non sarà
+un required status check per il merge su `main`. Le diagnostiche saranno affrontate
+in successive PR dedicate, senza un gate incrementale o tolleranze dell'analyzer.
+
+I tre fallimenti Sentry preesistenti in `test/utils/logging/app_logger_test.dart`
+sono affrontati nella [PR #2](https://github.com/xmattjus/moliseis/pull/2).
+Il primo check destinato a diventare obbligatorio è `Autonomous Flutter tests`,
+soltanto dopo l'integrazione della PR #2 e la verifica su `main`. Questa operazione
+non configura branch protection o required status checks.
+
 La base verificata è `origin/main` al commit
 `05b0f9e3432462a2fbf86c84dc4b6f80e0ed4ab9`. La PR documenta gli esiti delle
 verifiche locali e del primo run GitHub Actions. Un fallimento preesistente resta
