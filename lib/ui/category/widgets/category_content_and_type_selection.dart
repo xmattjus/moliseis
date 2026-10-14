@@ -217,7 +217,7 @@ class _CategoryContentAndTypeSelectionState
     required String label,
     required Key itemKey,
     required bool isSelected,
-    required void Function(bool?) onChanged,
+    required ValueChanged<bool?> onChanged,
   }) {
     var selected = isSelected;
     return Row(

@@ -181,7 +181,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                               icon: Icon(
                                 iconMapper.iconForCode(
                                   hourlyData.weatherCode[index],
-                                  hourlyData.isDay?[index] == 1,
+                                  isDay: hourlyData.isDay?[index] == 1,
                                 ),
                               ),
                               label: Text(

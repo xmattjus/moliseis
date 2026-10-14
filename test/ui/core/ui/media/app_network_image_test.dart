@@ -18,7 +18,7 @@ Widget _buildTestApp({
   bool fullResolution = false,
   double width = 200,
   double height = 200,
-  void Function(bool isLoading)? onImageLoading,
+  ValueChanged<bool>? onImageLoading,
 }) {
   return MultiProvider(
     providers: [

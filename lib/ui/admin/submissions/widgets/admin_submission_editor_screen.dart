@@ -540,7 +540,8 @@ class _AdminSubmissionEditorScreenState
                             onCityChanged: viewModel.setCity,
                             onNameChanged: viewModel.setName,
                             onDescriptionChanged: viewModel.setDescription,
-                            onEventChanged: viewModel.setEventEnabled,
+                            onEventChanged: (enabled) =>
+                                viewModel.setEventEnabled(enabled: enabled),
                             onStartDateChanged: viewModel.setStartCalendarDate,
                             onStartTimeChanged: viewModel.setStartClockTime,
                             onEndDateChanged: viewModel.setEndCalendarDate,

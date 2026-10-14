@@ -26,9 +26,9 @@ class FavouriteGetIdsUseCase {
   Future<Result<Place>> getPlaceById(int id) async =>
       _placeRepository.getById(id);
 
-  Future<Result<void>> setFavouriteEvent(int id, bool save) =>
-      _eventRepository.setFavouriteEvent(id, save);
+  Future<Result<void>> setFavouriteEvent(int id, {required bool save}) =>
+      _eventRepository.setFavouriteEvent(id, save: save);
 
-  Future<Result<void>> setFavouritePlace(int id, bool save) =>
-      _placeRepository.setFavouritePlace(id, save);
+  Future<Result<void>> setFavouritePlace(int id, {required bool save}) =>
+      _placeRepository.setFavouritePlace(id, save: save);
 }

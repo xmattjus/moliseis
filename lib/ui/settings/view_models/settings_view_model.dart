@@ -29,7 +29,7 @@ class SettingsViewModel extends ChangeNotifier {
 
     notifyListeners();
 
-    final result = await _settingsRepository.setCrashReporting(enable);
+    final result = await _settingsRepository.setCrashReporting(enable: enable);
 
     if (result.isError) {
       _crashReporting = !_crashReporting; // Revert the change on error.

@@ -75,7 +75,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   @override
-  Future<Result<void>> setCrashReporting(bool enable) {
+  Future<Result<void>> setCrashReporting({required bool enable}) {
     final newSettings = _cache.copyWith(crashReporting: enable);
     return _persistNewSettings(newSettings);
   }

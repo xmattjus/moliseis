@@ -635,7 +635,7 @@ void main() {
             .onChanged,
         isNull,
       );
-      viewModel.setEventEnabled(false);
+      viewModel.setEventEnabled(enabled: false);
       expect(viewModel.startDate, isNotNull);
       expect(viewModel.isDirty, isFalse);
     });
@@ -2290,7 +2290,7 @@ void main() {
             )
             ..setCity('Isernia')
             ..setName('Sagra del Tartufo')
-            ..setEventEnabled(true);
+            ..setEventEnabled(enabled: true);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();

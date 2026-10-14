@@ -226,7 +226,7 @@ void main() {
 
         await tester.pumpWidget(buildApp(vm));
         await fillValidForm(tester);
-        vm.setEventEnabled(true);
+        vm.setEventEnabled(enabled: true);
         await tester.pump();
 
         final submitButton = find.widgetWithText(FilledButton, 'Invia');
@@ -417,7 +417,7 @@ void main() {
         ),
       );
       await fillValidForm(tester);
-      viewModel.setEventEnabled(true);
+      viewModel.setEventEnabled(enabled: true);
       await tester.pump();
       await scrollToAndTap(tester, find.widgetWithText(FilledButton, 'Invia'));
 

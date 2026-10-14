@@ -98,7 +98,7 @@ void main() {
   ) async {
     final event = makeEvent();
     final eventRepository = FakeEventRepository(
-      setFavouriteEventHandler: (_, save) => Future.value(
+      setFavouriteEventHandler: (_, {required save}) => Future.value(
         save
             ? const Result.success(null)
             : Result.error(TestException('undo failed')),
@@ -212,7 +212,8 @@ void main() {
       final firstEvent = makeEvent();
       final secondEvent = makeEvent(remoteId: 2);
       final eventRepository = FakeEventRepository(
-        setFavouriteEventHandler: (id, _) => id == secondEvent.remoteId
+        setFavouriteEventHandler: (id, {required save}) =>
+            id == secondEvent.remoteId
             ? pendingSecondWrite.future
             : Future.value(const Result<void>.success(null)),
       );
@@ -286,7 +287,8 @@ void main() {
       final firstEvent = makeEvent();
       final secondEvent = makeEvent(remoteId: 2);
       final eventRepository = FakeEventRepository(
-        setFavouriteEventHandler: (id, _) => id == secondEvent.remoteId
+        setFavouriteEventHandler: (id, {required save}) =>
+            id == secondEvent.remoteId
             ? pendingSecondWrite.future
             : Future.value(const Result<void>.success(null)),
       );
@@ -359,7 +361,7 @@ void main() {
     final viewModel = FavouriteViewModel(
       favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
         eventRepository: FakeEventRepository(
-          setFavouriteEventHandler: (_, _) => pendingWrite.future,
+          setFavouriteEventHandler: (_, {required save}) => pendingWrite.future,
         ),
         placeRepository: FakePlaceRepository(),
       ),

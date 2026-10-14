@@ -149,7 +149,7 @@ class WeatherViewModel extends ChangeNotifier {
     );
     _currentWeatherCodeIcon = _weatherCodeIconMapper.iconForCode(
       data.weatherCode,
-      data.isDay == 1,
+      isDay: data.isDay == 1,
     );
     _isDay = data.isDay == 1;
   }

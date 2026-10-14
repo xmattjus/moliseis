@@ -489,7 +489,7 @@ void main() {
     test('setFavouritePlace saves a place', () async {
       placeBox.put(makePlaceEntity(remoteId: 1));
 
-      final result = await repository.setFavouritePlace(1, true);
+      final result = await repository.setFavouritePlace(1, save: true);
 
       expect(result, isA<Success<void>>());
       expect(placeBox.get(1)?.isSaved, isTrue);
@@ -498,7 +498,7 @@ void main() {
     test('setFavouritePlace unsaves a place', () async {
       placeBox.put(makePlaceEntity(remoteId: 1, isSaved: true));
 
-      final result = await repository.setFavouritePlace(1, false);
+      final result = await repository.setFavouritePlace(1, save: false);
 
       expect(result, isA<Success<void>>());
       expect(placeBox.get(1)?.isSaved, isFalse);
@@ -507,7 +507,7 @@ void main() {
     test(
       'setFavouritePlace returns Error when the place does not exist',
       () async {
-        final result = await repository.setFavouritePlace(999, true);
+        final result = await repository.setFavouritePlace(999, save: true);
 
         expect(result, isA<Error<void>>());
       },
@@ -1057,7 +1057,10 @@ void main() {
           ),
         );
 
-        final favouriteResult = await repository.setFavouritePlace(1, true);
+        final favouriteResult = await repository.setFavouritePlace(
+          1,
+          save: true,
+        );
 
         expect(favouriteResult, isA<Success<void>>());
         expect(placeBox.get(1)?.cityToOneId, 7);

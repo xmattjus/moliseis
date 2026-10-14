@@ -295,7 +295,8 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                               onNameChanged: widget.viewModel.setName,
                               onDescriptionChanged:
                                   widget.viewModel.setDescription,
-                              onEventChanged: widget.viewModel.setEventEnabled,
+                              onEventChanged: (enabled) => widget.viewModel
+                                  .setEventEnabled(enabled: enabled),
                               onStartDateChanged:
                                   widget.viewModel.setStartCalendarDate,
                               onStartTimeChanged:
@@ -398,7 +399,7 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                         widget.viewModel.state.acceptedTerms ??
                                         false,
                                     onChanged: (value) => widget.viewModel
-                                        .setAcceptedTerms(value),
+                                        .setAcceptedTerms(value: value),
                                     title: MergeSemantics(
                                       child: RichText(
                                         text: TextSpan(

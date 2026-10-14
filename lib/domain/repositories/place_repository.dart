@@ -42,5 +42,5 @@ abstract class PlaceRepository with Synchronizable<PlaceDto> {
   ///
   /// Pass [save] as `true` to add the place to favourites, or `false` to
   /// remove it.
-  Future<Result<void>> setFavouritePlace(int id, bool save);
+  Future<Result<void>> setFavouritePlace(int id, {required bool save});
 }

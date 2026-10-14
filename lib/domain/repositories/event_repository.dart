@@ -64,5 +64,5 @@ abstract class EventRepository with Synchronizable<EventDto> {
   ///
   /// Pass [save] as `true` to add the event to favourites, or `false` to
   /// remove it.
-  Future<Result<void>> setFavouriteEvent(int id, bool save);
+  Future<Result<void>> setFavouriteEvent(int id, {required bool save});
 }

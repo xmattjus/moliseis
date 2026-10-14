@@ -63,7 +63,7 @@ class WmoWeatherIconMapper {
   ///
   /// The [isDay] parameter determines whether to use day or night variants.
   /// Returns [Symbols.help_outline] if the code is not recognized.
-  IconData iconForCode(int weatherCode, bool isDay) {
+  IconData iconForCode(int weatherCode, {required bool isDay}) {
     return () {
           if (isDay) {
             return _dayWeatherCodeMap[weatherCode];

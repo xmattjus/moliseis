@@ -149,7 +149,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                                 Icon(
                                   iconMapper.iconForCode(
                                     dailyData.weatherCode[index],
-                                    true,
+                                    isDay: true,
                                   ),
                                   size: 24,
                                 ),

@@ -627,7 +627,7 @@ void main() {
       vm
         ..setCity('Campobasso')
         ..setName('Event')
-        ..setEventEnabled(true)
+        ..setEventEnabled(enabled: true)
         ..setAllDay(allDay: true)
         ..setStartCalendarDate(EventCalendarDate(2026, 3, 29));
       expect(vm.startClockTime, isNull);
@@ -1321,7 +1321,7 @@ void main() {
           viewModel
             ..setCity('Isernia')
             ..setName('Sagra')
-            ..setEventEnabled(true)
+            ..setEventEnabled(enabled: true)
             ..setStartCalendarDate(EventCalendarDate(2026, 3, 29));
 
           await viewModel.save.execute();

@@ -66,7 +66,7 @@ void main() {
             ..setUserName('Local E2E')
             ..setUserEmail('all-day-e2e-$nonce@example.test')
             ..setCategory(ContentCategory.history)
-            ..setEventEnabled(true)
+            ..setEventEnabled(enabled: true)
             ..setAllDay(allDay: fixture.allDay)
             ..setStartCalendarDate(fixture.date);
           if (fixture.clock != null) vm.setStartClockTime(fixture.clock!);
