@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/utils/command.dart';
@@ -13,7 +15,7 @@ class SyncViewModel extends ChangeNotifier {
     sync = Command1(_sync);
 
     if (_useCase.isSyncRequired) {
-      sync.execute(false);
+      unawaited(sync.execute(false));
     }
   }
 

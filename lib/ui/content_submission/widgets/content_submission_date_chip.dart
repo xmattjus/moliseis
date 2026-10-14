@@ -12,11 +12,11 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 class ContentSubmissionDateChip extends StatefulWidget {
   /// Creates a chip that selects an event calendar day.
   const ContentSubmissionDateChip.date({
+    required this.label,
+    required this.onDatePicked,
     this.firstDate,
     this.selectedDate,
-    required this.label,
     this.leading,
-    required this.onDatePicked,
     this.nowUtc,
     super.key,
   }) : _mode = _ContentSubmissionDateChipMode.date,
@@ -25,10 +25,10 @@ class ContentSubmissionDateChip extends StatefulWidget {
 
   /// Creates a chip that selects an event clock time.
   const ContentSubmissionDateChip.time({
-    this.selectedTime,
     required this.label,
-    this.leading,
     required this.onTimePicked,
+    this.selectedTime,
+    this.leading,
     this.nowUtc,
     super.key,
   }) : _mode = _ContentSubmissionDateChipMode.time,

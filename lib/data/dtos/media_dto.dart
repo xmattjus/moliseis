@@ -17,17 +17,17 @@ part 'generated/media_dto.mapper.dart';
 class MediaDto with MediaDtoMappable implements SyncDto {
   const MediaDto({
     required this.id,
+    required this.url,
+    required this.width,
+    required this.height,
+    required this.createdAt,
+    required this.modifiedAt,
     this.title,
     this.author,
     this.license,
     this.licenseUrl,
-    required this.url,
-    required this.width,
-    required this.height,
     this.placeId = const Keep<int>(),
     this.eventId = const Keep<int>(),
-    required this.createdAt,
-    required this.modifiedAt,
     this.deletedAt,
   });
 

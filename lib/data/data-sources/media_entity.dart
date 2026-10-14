@@ -7,19 +7,19 @@ import 'package:objectbox/objectbox.dart';
 class MediaEntity implements SyncEntity {
   const MediaEntity({
     required this.remoteId,
-    this.title,
-    this.author,
-    this.license,
-    this.licenseUrl,
     required this.url,
     required this.width,
     required this.height,
-    this.eventToOneId,
-    this.placeToOneId,
     required this.createdAt,
     required this.modifiedAt,
     required this.place,
     required this.event,
+    this.title,
+    this.author,
+    this.license,
+    this.licenseUrl,
+    this.eventToOneId,
+    this.placeToOneId,
     this.isDeleted = false,
   });
 

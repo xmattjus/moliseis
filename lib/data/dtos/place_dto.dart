@@ -22,13 +22,13 @@ class PlaceDto with PlaceDtoMappable implements SyncDto {
     required this.id,
     required this.name,
     required this.description,
-    this.descriptionDelta,
     required this.latitude,
     required this.longitude,
     required this.category,
-    this.cityId = const Keep<int>(),
     required this.createdAt,
     required this.modifiedAt,
+    this.descriptionDelta,
+    this.cityId = const Keep<int>(),
     this.deletedAt,
   });
 

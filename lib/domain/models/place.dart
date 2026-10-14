@@ -10,11 +10,11 @@ class Place extends ContentBase {
     required super.coordinates,
     required super.createdAt,
     required super.description,
-    super.descriptionDelta,
     required super.media,
     required super.modifiedAt,
     required super.name,
     required super.remoteId,
     required super.isSaved,
+    super.descriptionDelta,
   });
 }

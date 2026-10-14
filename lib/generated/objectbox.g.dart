@@ -1014,18 +1014,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
           4,
           0,
         );
-        final titleParam = const fb.StringReader(
-          asciiOptimization: true,
-        ).vTableGetNullable(buffer, rootOffset, 6);
-        final authorParam = const fb.StringReader(
-          asciiOptimization: true,
-        ).vTableGetNullable(buffer, rootOffset, 8);
-        final licenseParam = const fb.StringReader(
-          asciiOptimization: true,
-        ).vTableGetNullable(buffer, rootOffset, 10);
-        final licenseUrlParam = const fb.StringReader(
-          asciiOptimization: true,
-        ).vTableGetNullable(buffer, rootOffset, 12);
         final urlParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGet(buffer, rootOffset, 14, '');
@@ -1041,16 +1029,6 @@ obx_int.ModelDefinition getObjectBoxModel() {
           18,
           0,
         );
-        final eventToOneIdParam = const fb.Int64Reader().vTableGetNullable(
-          buffer,
-          rootOffset,
-          22,
-        );
-        final placeToOneIdParam = const fb.Int64Reader().vTableGetNullable(
-          buffer,
-          rootOffset,
-          20,
-        );
         final createdAtParam = DateTime.fromMicrosecondsSinceEpoch(
           (const fb.Int64Reader().vTableGet(buffer, rootOffset, 24, 0) / 1000)
               .round(),
@@ -1065,6 +1043,28 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final eventParam = obx.ToOne<EventEntity>(
           targetId: const fb.Int64Reader().vTableGet(buffer, rootOffset, 30, 0),
         );
+        final titleParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGetNullable(buffer, rootOffset, 6);
+        final authorParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGetNullable(buffer, rootOffset, 8);
+        final licenseParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGetNullable(buffer, rootOffset, 10);
+        final licenseUrlParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGetNullable(buffer, rootOffset, 12);
+        final eventToOneIdParam = const fb.Int64Reader().vTableGetNullable(
+          buffer,
+          rootOffset,
+          22,
+        );
+        final placeToOneIdParam = const fb.Int64Reader().vTableGetNullable(
+          buffer,
+          rootOffset,
+          20,
+        );
         final isDeletedParam = const fb.BoolReader().vTableGet(
           buffer,
           rootOffset,
@@ -1073,19 +1073,19 @@ obx_int.ModelDefinition getObjectBoxModel() {
         );
         final object = MediaEntity(
           remoteId: remoteIdParam,
-          title: titleParam,
-          author: authorParam,
-          license: licenseParam,
-          licenseUrl: licenseUrlParam,
           url: urlParam,
           width: widthParam,
           height: heightParam,
-          eventToOneId: eventToOneIdParam,
-          placeToOneId: placeToOneIdParam,
           createdAt: createdAtParam,
           modifiedAt: modifiedAtParam,
           place: placeParam,
           event: eventParam,
+          title: titleParam,
+          author: authorParam,
+          license: licenseParam,
+          licenseUrl: licenseUrlParam,
+          eventToOneId: eventToOneIdParam,
+          placeToOneId: placeToOneIdParam,
           isDeleted: isDeletedParam,
         );
         object.place.attach(store);
@@ -1271,6 +1271,24 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final nameParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGet(buffer, rootOffset, 6, '');
+        final contentCategoryIndexParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          30,
+          0,
+        );
+        final createdAtParam = DateTime.fromMicrosecondsSinceEpoch(
+          (const fb.Int64Reader().vTableGet(buffer, rootOffset, 18, 0) / 1000)
+              .round(),
+        );
+        final modifiedAtParam = DateTime.fromMicrosecondsSinceEpoch(
+          (const fb.Int64Reader().vTableGet(buffer, rootOffset, 20, 0) / 1000)
+              .round(),
+        );
+        final cityParam = obx.ToOne<CityEntity>(
+          targetId: const fb.Int64Reader().vTableGet(buffer, rootOffset, 24, 0),
+        );
+        final mediaParam = obx.ToMany<MediaEntity>();
         final descriptionParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGetNullable(buffer, rootOffset, 8);
@@ -1299,29 +1317,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
           fb.Float32Reader(),
           lazy: false,
         ).vTableGet(buffer, rootOffset, 14, []);
-        final contentCategoryIndexParam = const fb.Int64Reader().vTableGet(
-          buffer,
-          rootOffset,
-          30,
-          0,
-        );
         final cityToOneIdParam = const fb.Int64Reader().vTableGetNullable(
           buffer,
           rootOffset,
           16,
         );
-        final createdAtParam = DateTime.fromMicrosecondsSinceEpoch(
-          (const fb.Int64Reader().vTableGet(buffer, rootOffset, 18, 0) / 1000)
-              .round(),
-        );
-        final modifiedAtParam = DateTime.fromMicrosecondsSinceEpoch(
-          (const fb.Int64Reader().vTableGet(buffer, rootOffset, 20, 0) / 1000)
-              .round(),
-        );
-        final cityParam = obx.ToOne<CityEntity>(
-          targetId: const fb.Int64Reader().vTableGet(buffer, rootOffset, 24, 0),
-        );
-        final mediaParam = obx.ToMany<MediaEntity>();
         final isSavedParam = const fb.BoolReader().vTableGet(
           buffer,
           rootOffset,
@@ -1337,18 +1337,18 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final object = EventEntity(
           remoteId: remoteIdParam,
           name: nameParam,
+          contentCategoryIndex: contentCategoryIndexParam,
+          createdAt: createdAtParam,
+          modifiedAt: modifiedAtParam,
+          city: cityParam,
+          media: mediaParam,
           description: descriptionParam,
           descriptionDelta: descriptionDeltaParam,
           startDate: startDateParam,
           endDate: endDateParam,
           allDay: allDayParam,
           coordinates: coordinatesParam,
-          contentCategoryIndex: contentCategoryIndexParam,
           cityToOneId: cityToOneIdParam,
-          createdAt: createdAtParam,
-          modifiedAt: modifiedAtParam,
-          city: cityParam,
-          media: mediaParam,
           isSaved: isSavedParam,
           isDeleted: isDeletedParam,
         );
@@ -1424,28 +1424,11 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final nameParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGet(buffer, rootOffset, 6, '');
-        final descriptionParam = const fb.StringReader(
-          asciiOptimization: true,
-        ).vTableGetNullable(buffer, rootOffset, 8);
-        final descriptionDeltaParam = obx_int.flexBufferToListOfMaps(
-          buffer,
-          rootOffset,
-          28,
-        );
-        final coordinatesParam = const fb.ListReader<double>(
-          fb.Float32Reader(),
-          lazy: false,
-        ).vTableGet(buffer, rootOffset, 10, []);
         final contentCategoryIndexParam = const fb.Int64Reader().vTableGet(
           buffer,
           rootOffset,
           26,
           0,
-        );
-        final cityToOneIdParam = const fb.Int64Reader().vTableGetNullable(
-          buffer,
-          rootOffset,
-          12,
         );
         final createdAtParam = DateTime.fromMicrosecondsSinceEpoch(
           (const fb.Int64Reader().vTableGet(buffer, rootOffset, 14, 0) / 1000)
@@ -1459,6 +1442,23 @@ obx_int.ModelDefinition getObjectBoxModel() {
           targetId: const fb.Int64Reader().vTableGet(buffer, rootOffset, 20, 0),
         );
         final mediaParam = obx.ToMany<MediaEntity>();
+        final descriptionParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGetNullable(buffer, rootOffset, 8);
+        final descriptionDeltaParam = obx_int.flexBufferToListOfMaps(
+          buffer,
+          rootOffset,
+          28,
+        );
+        final coordinatesParam = const fb.ListReader<double>(
+          fb.Float32Reader(),
+          lazy: false,
+        ).vTableGet(buffer, rootOffset, 10, []);
+        final cityToOneIdParam = const fb.Int64Reader().vTableGetNullable(
+          buffer,
+          rootOffset,
+          12,
+        );
         final isSavedParam = const fb.BoolReader().vTableGet(
           buffer,
           rootOffset,
@@ -1474,15 +1474,15 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final object = PlaceEntity(
           remoteId: remoteIdParam,
           name: nameParam,
-          description: descriptionParam,
-          descriptionDelta: descriptionDeltaParam,
-          coordinates: coordinatesParam,
           contentCategoryIndex: contentCategoryIndexParam,
-          cityToOneId: cityToOneIdParam,
           createdAt: createdAtParam,
           modifiedAt: modifiedAtParam,
           city: cityParam,
           media: mediaParam,
+          description: descriptionParam,
+          descriptionDelta: descriptionDeltaParam,
+          coordinates: coordinatesParam,
+          cityToOneId: cityToOneIdParam,
           isSaved: isSavedParam,
           isDeleted: isDeletedParam,
         );
