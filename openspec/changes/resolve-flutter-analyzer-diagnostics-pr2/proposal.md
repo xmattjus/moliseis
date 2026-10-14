@@ -4,14 +4,14 @@ PR2 removes 76 analyzer info diagnostics after PR1, keeping the cleanup reviewab
 
 ## What Changes
 
-Future authorized implementation will:
+The planned implementation was:
 
 - Stable-partition named parameters in the 16 files enumerated in design.md: required first, optional second, preserving relative order within each group (73 diagnostics).
 - Add only `@immutable` to `AppPulseEffect`, using its existing foundation import (2 diagnostics).
 - Add `dart:async` and wrap only the automatic constructor call with `unawaited(sync.execute(false))` in `SyncViewModel` (1 diagnostic).
 - Reuse existing tests and run the standard build_runner workflow after changing the six generator inputs. Audit every generated diff and verify reproduction from final sources; compatible old outputs alone do not satisfy this gate. No new tests are justified solely by lint removal.
 
-This request creates planning artifacts only. No production or test fix is authorized.
+During the planning phase, this request created planning artifacts only. No production or test fix was authorized at that stage.
 
 ## Capabilities
 
@@ -25,7 +25,7 @@ None. Public contracts, canonical sync, event temporal semantics, moderation, lo
 
 ## Impact
 
-Manual production edits remain limited to the original 18 Dart files: 16 parameter-order files, one painting effect and one existing legacy-command consumer. Additionally, include only verified, attributed generated outputs needed to synchronize the three DTO mappers and ObjectBox bindings with the final inputs (D2); their exact diff is established by generation, not assumed in advance. No dependency, schema, API contract, call-site or CI change. Details, exact occurrence positions and existing test paths are in design.md. The current delivery contains only four planning files.
+The planned manual production edits were limited to the original 18 Dart files: 16 parameter-order files, one painting effect and one existing legacy-command consumer. Generated outputs were permitted only when verified and attributed under gate D2 to synchronize the three DTO mappers and ObjectBox bindings with the final inputs; their exact diff was established by generation, not assumed in advance. No dependency, schema, API contract, call-site or CI change. Details, exact occurrence positions and existing test paths are in design.md. The planning delivery contained only four planning artifacts. PR #5 now contains the verified implementation and its completed apply report.
 
 ## Baseline verified
 
@@ -37,4 +37,4 @@ Observed `flutter analyze --no-pub`: exit 1, 0 errors / 4 warnings / 274 info / 
 
 ## Scope and Non-goals
 
-Only the three named rules are in scope. D1–D10 in design govern execution. Excluded: all other diagnostics, including `async_return_with_no_await`, `avoid_positional_boolean_parameters`, `unawaited_return_in_try_block`, `avoid_catching_errors`, `experimental_member_use` and legacy deprecations; Command migration or command_it refactoring; changes to equality/hash semantics, painting or sync behavior/lifecycle; new abstractions/dependencies or version updates; opportunistic cleanup, naming changes, mass formatting; suppressions/ignore_for_file; analyzer options/rules/exclusions, CI workflows or required checks; AGENTS.md; Supabase/SQL/RPC/Edge Functions/RLS; database migrations/ObjectBox schema; unrelated generated drift or manual generated-code edits; main specs or the PR1 archive. The only controlled generated-output exception is the synchronized, contract-preserving, reproducible output described in D2. No implementation, commit, push, PR, merge, spec sync or archive in this request. External adversarial review and explicit authorization must precede apply.
+Only the three named rules are in scope. D1–D10 in design govern execution. Excluded: all other diagnostics, including `async_return_with_no_await`, `avoid_positional_boolean_parameters`, `unawaited_return_in_try_block`, `avoid_catching_errors`, `experimental_member_use` and legacy deprecations; Command migration or command_it refactoring; changes to equality/hash semantics, painting or sync behavior/lifecycle; new abstractions/dependencies or version updates; opportunistic cleanup, naming changes, mass formatting; suppressions/ignore_for_file; analyzer options/rules/exclusions, CI workflows or required checks; AGENTS.md; Supabase/SQL/RPC/Edge Functions/RLS; database migrations/ObjectBox schema; unrelated generated drift or manual generated-code edits; main specs or the PR1 archive. The only controlled generated-output exception is the synchronized, contract-preserving, reproducible output described in D2. The planning request did not authorize implementation, commit, push, PR, merge, spec sync or archive. External adversarial review and explicit authorization were required before apply.
