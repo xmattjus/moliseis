@@ -32,15 +32,6 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     'description',
     _$description,
   );
-  static List<Map<String, dynamic>>? _$descriptionDelta(EventDto v) =>
-      v.descriptionDelta;
-  static const Field<EventDto, List<Map<String, dynamic>>> _f$descriptionDelta =
-      Field(
-        'descriptionDelta',
-        _$descriptionDelta,
-        key: r'description_delta',
-        opt: true,
-      );
   static DateTime _$startDate(EventDto v) => v.startDate;
   static const Field<EventDto, DateTime> _f$startDate = Field(
     'startDate',
@@ -74,6 +65,15 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     _$modifiedAt,
     key: r'modified_at',
   );
+  static List<Map<String, dynamic>>? _$descriptionDelta(EventDto v) =>
+      v.descriptionDelta;
+  static const Field<EventDto, List<Map<String, dynamic>>> _f$descriptionDelta =
+      Field(
+        'descriptionDelta',
+        _$descriptionDelta,
+        key: r'description_delta',
+        opt: true,
+      );
   static RelationUpdate<int> _$cityId(EventDto v) => v.cityId;
   static const Field<EventDto, RelationUpdate<int>> _f$cityId = Field(
     'cityId',
@@ -111,13 +111,13 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
     #id: _f$id,
     #name: _f$name,
     #description: _f$description,
-    #descriptionDelta: _f$descriptionDelta,
     #startDate: _f$startDate,
     #latitude: _f$latitude,
     #longitude: _f$longitude,
     #category: _f$category,
     #createdAt: _f$createdAt,
     #modifiedAt: _f$modifiedAt,
+    #descriptionDelta: _f$descriptionDelta,
     #cityId: _f$cityId,
     #deletedAt: _f$deletedAt,
     #endDate: _f$endDate,
@@ -131,13 +131,13 @@ class EventDtoMapper extends ClassMapperBase<EventDto> {
       id: data.dec(_f$id),
       name: data.dec(_f$name),
       description: data.dec(_f$description),
-      descriptionDelta: data.dec(_f$descriptionDelta),
       startDate: data.dec(_f$startDate),
       latitude: data.dec(_f$latitude),
       longitude: data.dec(_f$longitude),
       category: data.dec(_f$category),
       createdAt: data.dec(_f$createdAt),
       modifiedAt: data.dec(_f$modifiedAt),
+      descriptionDelta: data.dec(_f$descriptionDelta),
       cityId: data.dec(_f$cityId),
       deletedAt: data.dec(_f$deletedAt),
       endDate: data.dec(_f$endDate),

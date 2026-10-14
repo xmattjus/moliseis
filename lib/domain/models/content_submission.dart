@@ -10,6 +10,8 @@ class ContentSubmission {
   ContentSubmission({
     required this.city,
     required this.name,
+    required this.userEmail,
+    required this.userName,
     this.description,
     List<Map<String, dynamic>>? descriptionDelta,
     this.latitude,
@@ -19,8 +21,6 @@ class ContentSubmission {
     this.endDate,
     this.allDay = false,
     this.category,
-    required this.userEmail,
-    required this.userName,
     this.createdAt,
     this.modifiedAt,
   }) : descriptionDelta = freezeDescriptionDelta(descriptionDelta);

@@ -7,11 +7,11 @@ class AnimatedGeoMapSearchBar extends StatelessWidget {
   const AnimatedGeoMapSearchBar({
     required this.searchController,
     required this.animation,
+    required this.onSuggestionPressed,
+    required this.viewModel,
     this.onSubmitted,
     this.onBackPressed,
-    required this.onSuggestionPressed,
     this.trailing = const <Widget>[],
-    required this.viewModel,
     super.key,
   });
 

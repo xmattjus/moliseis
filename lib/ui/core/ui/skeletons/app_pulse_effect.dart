@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+@immutable
 class AppPulseEffect extends PaintingEffect {
   const AppPulseEffect({
     this.from,

@@ -5,14 +5,14 @@ part of 'gallery_preview_modal_overlay.dart';
 class _GalleryPreviewModalOverlayContent extends StatelessWidget {
   const _GalleryPreviewModalOverlayContent({
     required this.eventOrPlaceName,
+    required this.cityName,
+    required this.index,
+    required this.itemCount,
     this.title = '',
     this.author = '',
     this.license = '',
     this.licenseUrl = '',
-    required this.cityName,
     this.onSharePressed,
-    required this.index,
-    required this.itemCount,
   });
 
   final String eventOrPlaceName;

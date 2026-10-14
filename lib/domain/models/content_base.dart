@@ -63,11 +63,11 @@ abstract class ContentBase {
     required this.coordinates,
     required this.createdAt,
     required this.description,
-    this.descriptionDelta,
     required this.modifiedAt,
     required this.media,
     required this.name,
     required this.remoteId,
+    this.descriptionDelta,
     this.isSaved = false,
   });
 

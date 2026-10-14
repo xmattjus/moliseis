@@ -161,8 +161,8 @@ class _ContentSubmissionProgressScreenState
 
   Widget _primaryActionButton({
     required ColorScheme colorScheme,
-    void Function()? onPressed,
     required Widget child,
+    void Function()? onPressed,
   }) => OutlinedButton(
     style: OutlinedButton.styleFrom(
       foregroundColor: colorScheme.tertiary,

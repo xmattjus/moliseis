@@ -32,15 +32,6 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
     'description',
     _$description,
   );
-  static List<Map<String, dynamic>>? _$descriptionDelta(PlaceDto v) =>
-      v.descriptionDelta;
-  static const Field<PlaceDto, List<Map<String, dynamic>>> _f$descriptionDelta =
-      Field(
-        'descriptionDelta',
-        _$descriptionDelta,
-        key: r'description_delta',
-        opt: true,
-      );
   static double _$latitude(PlaceDto v) => v.latitude;
   static const Field<PlaceDto, double> _f$latitude = Field(
     'latitude',
@@ -56,15 +47,6 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
     'category',
     _$category,
   );
-  static RelationUpdate<int> _$cityId(PlaceDto v) => v.cityId;
-  static const Field<PlaceDto, RelationUpdate<int>> _f$cityId = Field(
-    'cityId',
-    _$cityId,
-    key: r'city_id',
-    opt: true,
-    def: const Keep<int>(),
-    hook: RelationUpdateHook<int>(decoder: relationUpdateDecodeInt),
-  );
   static DateTime _$createdAt(PlaceDto v) => v.createdAt;
   static const Field<PlaceDto, DateTime> _f$createdAt = Field(
     'createdAt',
@@ -76,6 +58,24 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
     'modifiedAt',
     _$modifiedAt,
     key: r'modified_at',
+  );
+  static List<Map<String, dynamic>>? _$descriptionDelta(PlaceDto v) =>
+      v.descriptionDelta;
+  static const Field<PlaceDto, List<Map<String, dynamic>>> _f$descriptionDelta =
+      Field(
+        'descriptionDelta',
+        _$descriptionDelta,
+        key: r'description_delta',
+        opt: true,
+      );
+  static RelationUpdate<int> _$cityId(PlaceDto v) => v.cityId;
+  static const Field<PlaceDto, RelationUpdate<int>> _f$cityId = Field(
+    'cityId',
+    _$cityId,
+    key: r'city_id',
+    opt: true,
+    def: const Keep<int>(),
+    hook: RelationUpdateHook<int>(decoder: relationUpdateDecodeInt),
   );
   static DateTime? _$deletedAt(PlaceDto v) => v.deletedAt;
   static const Field<PlaceDto, DateTime> _f$deletedAt = Field(
@@ -90,13 +90,13 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
     #id: _f$id,
     #name: _f$name,
     #description: _f$description,
-    #descriptionDelta: _f$descriptionDelta,
     #latitude: _f$latitude,
     #longitude: _f$longitude,
     #category: _f$category,
-    #cityId: _f$cityId,
     #createdAt: _f$createdAt,
     #modifiedAt: _f$modifiedAt,
+    #descriptionDelta: _f$descriptionDelta,
+    #cityId: _f$cityId,
     #deletedAt: _f$deletedAt,
   };
 
@@ -107,13 +107,13 @@ class PlaceDtoMapper extends ClassMapperBase<PlaceDto> {
       id: data.dec(_f$id),
       name: data.dec(_f$name),
       description: data.dec(_f$description),
-      descriptionDelta: data.dec(_f$descriptionDelta),
       latitude: data.dec(_f$latitude),
       longitude: data.dec(_f$longitude),
       category: data.dec(_f$category),
-      cityId: data.dec(_f$cityId),
       createdAt: data.dec(_f$createdAt),
       modifiedAt: data.dec(_f$modifiedAt),
+      descriptionDelta: data.dec(_f$descriptionDelta),
+      cityId: data.dec(_f$cityId),
       deletedAt: data.dec(_f$deletedAt),
     );
   }

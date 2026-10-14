@@ -8,10 +8,6 @@ import 'package:moliseis/domain/models/place.dart';
 class Media {
   const Media({
     required this.remoteId,
-    this.title,
-    this.author,
-    this.license,
-    this.licenseUrl,
     required this.url,
     required this.width,
     required this.height,
@@ -19,6 +15,10 @@ class Media {
     required this.modifiedAt,
     required this.areaName,
     required this.cityName,
+    this.title,
+    this.author,
+    this.license,
+    this.licenseUrl,
   });
 
   final int remoteId;
