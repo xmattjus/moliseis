@@ -302,8 +302,9 @@ void main() {
             }
           },
           skip: scenario == 'StateError'
-              ? 'command_it 9.5.2: late StateError after dispose causes upstream '
-                    'notifier use-after-dispose. Re-enable after an upstream fix.'
+              ? 'command_it 9.5.2: late StateError after dispose causes '
+                    'upstream notifier use-after-dispose. '
+                    'Re-enable after an upstream fix.'
               : false,
         );
       }

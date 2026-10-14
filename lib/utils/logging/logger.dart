@@ -5,7 +5,6 @@ import 'package:moliseis/utils/logging/log_event.dart';
 /// Implementations decide how events are rendered (console, file, remote
 /// service).
 // Interface is used to allow logging implementations change.
-// ignore: one_member_abstracts
 abstract interface class Logger {
   /// Writes [event] to the underlying log destination.
   ///
