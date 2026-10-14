@@ -105,7 +105,7 @@ void main() {
         final result = await repository.reconcileAndLoad(sessionA);
 
         expect(result, isA<Success<List<ContentSubmissionStagedAsset>>>());
-        expect(await Link('${root.path}/$sessionA').exists(), isFalse);
+        expect(Link('${root.path}/$sessionA').existsSync(), isFalse);
         expect(await outsideFile.readAsString(), 'outside');
       },
     );

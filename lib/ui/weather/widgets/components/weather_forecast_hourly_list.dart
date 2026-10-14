@@ -165,6 +165,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                           return '$index';
                         }();
                         return () {
+                          final celsius = hourlyData.temperature2m;
                           final child = Padding(
                             padding: const EdgeInsets.symmetric(
                               vertical: 16,
@@ -186,7 +187,7 @@ class _WeatherForecastHourlyListState extends State<WeatherForecastHourlyList> {
                               label: Text(
                                 index == currentHour
                                     ? viewModel.currentTemperatureCelsius
-                                    : '${hourlyData.temperature2m[index].toStringAsFixed(1)}°',
+                                    : '${celsius[index].toStringAsFixed(1)}°',
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),

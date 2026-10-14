@@ -106,6 +106,8 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                           .shift(1);
 
                       final weekday = weekDays[date.weekday - 1];
+                      final precipitationProbabilities =
+                          dailyData.precipitationProbabilityMax;
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -137,7 +139,7 @@ class _WeatherForecastDaysListState extends State<WeatherForecastDaysList> {
                                       fill: 1,
                                     ),
                                     Text(
-                                      ' ${dailyData.precipitationProbabilityMax[index]}%',
+                                      ' ${precipitationProbabilities[index]}%',
                                       style: Theme.of(
                                         context,
                                       ).textTheme.bodySmall,
