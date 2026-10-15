@@ -147,7 +147,7 @@ void main() {
       final pendingWrite = Completer<Result<void>>();
       final event = makeEvent();
       final eventRepository = FakeEventRepository(
-        setFavouriteEventHandler: (_, _) => pendingWrite.future,
+        setFavouriteEventHandler: (_, {required save}) => pendingWrite.future,
       );
       final viewModel = FavouriteViewModel(
         favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
@@ -158,7 +158,7 @@ void main() {
       addTearDown(viewModel.dispose);
       await pumpEventQueue(times: 10);
 
-      final result = viewModel.setFavourite(event, true);
+      final result = viewModel.setFavourite(event, save: true);
 
       expect(viewModel.isFavourite(event), isTrue);
       expect(viewModel.isUpdating, isTrue);
@@ -182,7 +182,7 @@ void main() {
         final eventRepository = FakeEventRepository(
           getFavouriteEventIdsResult: const Result.success([1]),
           getByIdResults: {1: Result.success(event)},
-          setFavouriteEventHandler: (_, _) => pendingWrite.future,
+          setFavouriteEventHandler: (_, {required save}) => pendingWrite.future,
         );
         final viewModel = FavouriteViewModel(
           favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
@@ -193,7 +193,7 @@ void main() {
         addTearDown(viewModel.dispose);
         await pumpEventQueue(times: 10);
 
-        final result = viewModel.setFavourite(event, false);
+        final result = viewModel.setFavourite(event, save: false);
 
         expect(viewModel.isFavourite(event), isFalse);
         expect(viewModel.isUpdating, isTrue);
@@ -226,8 +226,8 @@ void main() {
         addTearDown(viewModel.dispose);
         await pumpEventQueue(times: 10);
 
-        await viewModel.setFavourite(event, true);
-        await viewModel.setFavourite(place, true);
+        await viewModel.setFavourite(event, save: true);
+        await viewModel.setFavourite(place, save: true);
 
         expect(
           eventRepository.setFavouriteEventCalls,
@@ -255,7 +255,7 @@ void main() {
       addTearDown(viewModel.dispose);
       await pumpEventQueue(times: 10);
 
-      final result = await viewModel.setFavourite(event, true);
+      final result = await viewModel.setFavourite(event, save: true);
 
       expect(result, isA<Error<void>>());
       expect(viewModel.favouriteEventIds, isEmpty);
@@ -277,7 +277,7 @@ void main() {
       addTearDown(viewModel.dispose);
       await pumpEventQueue(times: 10);
 
-      final result = await viewModel.setFavourite(place, true);
+      final result = await viewModel.setFavourite(place, save: true);
 
       expect(result, isA<Error<void>>());
       expect(viewModel.favouritePlaceIds, isEmpty);
@@ -307,7 +307,7 @@ void main() {
       addTearDown(viewModel.dispose);
       await pumpEventQueue(times: 10);
 
-      final result = await viewModel.setFavourite(events[1], false);
+      final result = await viewModel.setFavourite(events[1], save: false);
 
       expect(result, isA<Error<void>>());
       expect(viewModel.favouriteEventIds, equals([1, 2, 3]));
@@ -340,7 +340,7 @@ void main() {
         addTearDown(viewModel.dispose);
         await pumpEventQueue(times: 10);
 
-        final result = await viewModel.setFavourite(places[1], false);
+        final result = await viewModel.setFavourite(places[1], save: false);
 
         expect(result, isA<Error<void>>());
         expect(viewModel.favouritePlaceIds, equals([10, 20, 30]));
@@ -362,7 +362,7 @@ void main() {
       );
       addTearDown(viewModel.dispose);
 
-      final result = await viewModel.setFavourite(event, true);
+      final result = await viewModel.setFavourite(event, save: true);
 
       expect(viewModel.load.running, isTrue);
       expect(viewModel.isUpdating, isTrue);
@@ -378,7 +378,7 @@ void main() {
       final event = makeEvent();
       final place = makePlace(remoteId: 2);
       final eventRepository = FakeEventRepository(
-        setFavouriteEventHandler: (_, _) => pendingWrite.future,
+        setFavouriteEventHandler: (_, {required save}) => pendingWrite.future,
       );
       final placeRepository = FakePlaceRepository();
       final viewModel = FavouriteViewModel(
@@ -390,8 +390,8 @@ void main() {
       addTearDown(viewModel.dispose);
       await pumpEventQueue(times: 10);
 
-      final firstResult = viewModel.setFavourite(event, true);
-      final secondResult = await viewModel.setFavourite(place, true);
+      final firstResult = viewModel.setFavourite(event, save: true);
+      final secondResult = await viewModel.setFavourite(place, save: true);
 
       expect(secondResult, isA<Error<void>>());
       expect(
@@ -442,14 +442,15 @@ void main() {
         final viewModel = FavouriteViewModel(
           favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
             eventRepository: FakeEventRepository(
-              setFavouriteEventHandler: (_, _) => pendingWrite.future,
+              setFavouriteEventHandler: (_, {required save}) =>
+                  pendingWrite.future,
             ),
             placeRepository: FakePlaceRepository(),
           ),
         );
         await tester.pump();
 
-        final write = viewModel.setFavourite(event, true);
+        final write = viewModel.setFavourite(event, save: true);
         expect(viewModel.isUpdating, isTrue);
         viewModel.dispose();
         pendingWrite.complete(persistenceResult);

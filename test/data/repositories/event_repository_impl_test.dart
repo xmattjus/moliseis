@@ -1229,7 +1229,10 @@ void main() {
           ),
         );
 
-        final favouriteResult = await repository.setFavouriteEvent(1, true);
+        final favouriteResult = await repository.setFavouriteEvent(
+          1,
+          save: true,
+        );
 
         expect(favouriteResult, isA<Success<void>>());
         expect(eventBox.get(1)?.cityToOneId, 7);

@@ -656,7 +656,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     );
   }
 
-  void setEventEnabled(bool enabled) {
+  void setEventEnabled({required bool enabled}) {
     _state = _state.copyWith(
       eventDates: enabled
           ? _eventTimePolicy.enable(_state.eventDates)
@@ -723,7 +723,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     _emit();
   }
 
-  void setAcceptedTerms(bool? value) {
+  void setAcceptedTerms({required bool? value}) {
     _state = _state.copyWith(acceptedTerms: value);
     _emit();
   }
@@ -796,7 +796,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
 
       _submissionFinalizationPending = true;
       acknowledged = true;
-      return _finalizeSubmittedSession(draft.clientSubmissionId);
+      return await _finalizeSubmittedSession(draft.clientSubmissionId);
     } finally {
       if (!acknowledged) {
         await _releaseSubmissionOwnership(draft.clientSubmissionId);

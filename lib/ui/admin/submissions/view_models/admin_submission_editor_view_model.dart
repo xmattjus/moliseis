@@ -318,7 +318,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     );
   }
 
-  void setEventEnabled(bool enabled) {
+  void setEventEnabled({required bool enabled}) {
     if (_externalEvent != null && !enabled) return;
     _eventDates = enabled
         ? _eventTimePolicy.enable(_eventDates)

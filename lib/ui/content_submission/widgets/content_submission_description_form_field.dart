@@ -147,6 +147,8 @@ class _ContentSubmissionDescriptionFormFieldState
       document: document,
       selection: const TextSelection.collapsed(offset: 0),
       config: const QuillControllerConfig(
+        // Quill's experimental API is required to disable external rich paste.
+        // ignore: experimental_member_use
         clipboardConfig: QuillClipboardConfig(enableExternalRichPaste: false),
       ),
     );

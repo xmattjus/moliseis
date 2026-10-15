@@ -158,7 +158,7 @@ class FavouriteButton extends StatelessWidget {
     unawaited(HapticFeedback.lightImpact());
 
     final wasFavourite = viewModel.isFavourite(content);
-    final result = await viewModel.setFavourite(content, !wasFavourite);
+    final result = await viewModel.setFavourite(content, save: !wasFavourite);
     if (!context.mounted) return;
     if (result.isError) {
       showSnackBarGenericError(context: context);
@@ -185,7 +185,7 @@ class FavouriteButton extends StatelessWidget {
     bool previousState,
     FavouriteViewModel viewModel,
   ) async {
-    final result = await viewModel.setFavourite(content, previousState);
+    final result = await viewModel.setFavourite(content, save: previousState);
     if (result.isError && context.mounted) {
       showSnackBarGenericError(context: context);
     }

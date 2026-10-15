@@ -410,7 +410,10 @@ class EventRepositoryImpl extends BaseSyncRepository<EventDto, EventEntity>
   }
 
   @override
-  Future<Result<void>> setFavouriteEvent(int remoteId, bool save) async {
+  Future<Result<void>> setFavouriteEvent(
+    int remoteId, {
+    required bool save,
+  }) async {
     try {
       final condition = EventEntity_.remoteId
           .equals(remoteId)

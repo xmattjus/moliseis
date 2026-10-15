@@ -153,17 +153,19 @@ void main() {
     }
 
     test('accepts boundary timestamps', () {
-      for (final timestamp in const <int>[
-        -8640000000000000,
-        8640000000000000,
-      ]) {
-        final encoded = _encodedMedia()..['createdAt'] = timestamp;
+      for (final field in const ['createdAt', 'modifiedAt']) {
+        for (final timestamp in const <int>[
+          -8640000000000000,
+          8640000000000000,
+        ]) {
+          final encoded = _encodedMedia()..[field] = timestamp;
 
-        expect(
-          GalleryPreviewRouteData.tryParse(_extraWith([encoded])),
-          isNotNull,
-          reason: 'createdAt = $timestamp',
-        );
+          expect(
+            GalleryPreviewRouteData.tryParse(_extraWith([encoded])),
+            isNotNull,
+            reason: '$field = $timestamp',
+          );
+        }
       }
     });
 

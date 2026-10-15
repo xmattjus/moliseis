@@ -42,7 +42,7 @@ abstract class SettingsRepository implements Initializable {
   @override
   Future<Result<void>> initialize();
 
-  Future<Result<void>> setCrashReporting(bool enable);
+  Future<Result<void>> setCrashReporting({required bool enable});
   Future<Result<void>> setContentSort(ContentSort sort);
 
   /// Persists completion time and covered server cursor in one settings save.

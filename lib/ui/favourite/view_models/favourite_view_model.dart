@@ -59,7 +59,10 @@ class FavouriteViewModel extends ChangeNotifier {
   /// Calls made during the initial load or another favourite write are
   /// rejected.
   /// Expected persistence failures restore the exact pre-call local state.
-  Future<Result<void>> setFavourite(ContentBase content, bool save) async {
+  Future<Result<void>> setFavourite(
+    ContentBase content, {
+    required bool save,
+  }) async {
     if (isUpdating) return Result.error(_updateUnavailableException());
     if (content is! Event && content is! Place) {
       return Result.error(_unsupportedContentException(content));
@@ -180,11 +183,11 @@ class FavouriteViewModel extends ChangeNotifier {
       final result = switch (content) {
         Event(:final remoteId) => _favouriteGetIdsUseCase.setFavouriteEvent(
           remoteId,
-          save,
+          save: save,
         ),
         Place(:final remoteId) => _favouriteGetIdsUseCase.setFavouritePlace(
           remoteId,
-          save,
+          save: save,
         ),
         _ => Future.value(
           Result<void>.error(_unsupportedContentException(content)),

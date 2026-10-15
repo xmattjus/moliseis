@@ -38,7 +38,7 @@ class AppNetworkImage extends StatefulWidget {
   /// How to inscribe the image into the space allocated during layout.
   final BoxFit fit;
 
-  final void Function(bool isLoading)? onImageLoading;
+  final ValueChanged<bool>? onImageLoading;
 
   /// Whether to load the image at its full resolution, ignoring the device
   /// pixel ratio and logical dimensions.

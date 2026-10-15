@@ -62,7 +62,7 @@ void main() {
         ..setName('Event')
         ..setUserName('Anna')
         ..setUserEmail('anna@example.test')
-        ..setEventEnabled(true)
+        ..setEventEnabled(enabled: true)
         ..setAllDay(allDay: true)
         ..setStartCalendarDate(EventCalendarDate(2026, 3, 29))
         ..setEndCalendarDate(EventCalendarDate(2026, 3, 30));
@@ -3063,7 +3063,7 @@ void main() {
         );
 
         vm
-          ..setEventEnabled(true)
+          ..setEventEnabled(enabled: true)
           ..setStartCalendarDate(EventCalendarDate(2026, 7, 25));
         await vm.checkpointDraft();
 
@@ -3540,7 +3540,7 @@ void main() {
                 ..setName('Colosseum')
                 ..setUserEmail('jane@example.com')
                 ..setUserName('Jane')
-                ..setEventEnabled(true)
+                ..setEventEnabled(enabled: true)
                 ..setStartCalendarDate(EventCalendarDate(2026, 7, 25));
 
           await vm.submit.execute();
@@ -4500,7 +4500,7 @@ void main() {
       test('stores the value on the state and emits it to listeners', () {
         final draftRepo = FakeContentSubmissionDraftRepository();
         final vm = buildViewModel(draftRepository: draftRepo)
-          ..setAcceptedTerms(true);
+          ..setAcceptedTerms(value: true);
 
         expect(vm.state.acceptedTerms, isTrue);
       });
@@ -4508,17 +4508,17 @@ void main() {
       test('does not save accepted terms implicitly', () {
         final draftRepo = FakeContentSubmissionDraftRepository();
         final vm = buildViewModel(draftRepository: draftRepo)
-          ..setAcceptedTerms(true);
+          ..setAcceptedTerms(value: true);
 
         expect(draftRepo.saveDraftCalled, isFalse);
         expect(vm.hasUnsavedChanges, isTrue);
       });
 
       test('passing null resets the field to null', () {
-        final vm = buildViewModel()..setAcceptedTerms(true);
+        final vm = buildViewModel()..setAcceptedTerms(value: true);
         expect(vm.state.acceptedTerms, isTrue);
 
-        vm.setAcceptedTerms(null);
+        vm.setAcceptedTerms(value: null);
         expect(vm.state.acceptedTerms, isNull);
       });
     });

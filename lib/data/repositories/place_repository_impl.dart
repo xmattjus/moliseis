@@ -267,7 +267,10 @@ class PlaceRepositoryImpl extends BaseSyncRepository<PlaceDto, PlaceEntity>
   }
 
   @override
-  Future<Result<void>> setFavouritePlace(int remoteId, bool save) async {
+  Future<Result<void>> setFavouritePlace(
+    int remoteId, {
+    required bool save,
+  }) async {
     try {
       final condition = PlaceEntity_.remoteId
           .equals(remoteId)

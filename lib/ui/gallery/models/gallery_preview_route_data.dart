@@ -71,9 +71,8 @@ final class GalleryPreviewRouteData {
   ///
   /// Returns `null` for any payload whose shape does not match [_encodeMedia]:
   /// missing keys, wrong value types, or timestamps outside the range accepted
-  /// by [DateTime.fromMillisecondsSinceEpoch] (which throws [RangeError] for
-  /// out-of-range milliseconds — the validation the manual bounds checks used
-  /// to duplicate).
+  /// by [DateTime.fromMillisecondsSinceEpoch]. Explicit bounds checks prevent
+  /// its [RangeError] for out-of-range milliseconds.
   static Media? _tryParseMedia(Object? encoded) {
     if (encoded is! Map<Object?, Object?>) return null;
 
@@ -97,6 +96,16 @@ final class GalleryPreviewRouteData {
     final modifiedAt = encoded['modifiedAt'];
     if (modifiedAt is! int) return null;
 
+    // DateTime accepts both endpoints; direct comparisons also handle extreme
+    // integers without arithmetic overflow.
+    const maxMillisecondsSinceEpoch = 8640000000000000;
+    if (createdAt < -maxMillisecondsSinceEpoch ||
+        createdAt > maxMillisecondsSinceEpoch ||
+        modifiedAt < -maxMillisecondsSinceEpoch ||
+        modifiedAt > maxMillisecondsSinceEpoch) {
+      return null;
+    }
+
     final areaName = encoded['areaName'];
     if (areaName is! String) return null;
 
@@ -119,27 +128,19 @@ final class GalleryPreviewRouteData {
     final licenseUrl = encoded['licenseUrl'];
     if (licenseUrl != null && licenseUrl is! String) return null;
 
-    try {
-      return Media(
-        remoteId: remoteId,
-        title: title as String?,
-        author: author as String?,
-        license: license as String?,
-        licenseUrl: licenseUrl as String?,
-        url: url,
-        width: width,
-        height: height,
-        // DateTime.fromMillisecondsSinceEpoch throws RangeError when the
-        // absolute value exceeds 8640000000000000 — the built-in check
-        // replaces the manual timestamp bounds. RangeError is an
-        // ArgumentError, so the catch below covers it.
-        createdAt: DateTime.fromMillisecondsSinceEpoch(createdAt),
-        modifiedAt: DateTime.fromMillisecondsSinceEpoch(modifiedAt),
-        areaName: areaName,
-        cityName: cityName,
-      );
-    } on ArgumentError {
-      return null;
-    }
+    return Media(
+      remoteId: remoteId,
+      title: title as String?,
+      author: author as String?,
+      license: license as String?,
+      licenseUrl: licenseUrl as String?,
+      url: url,
+      width: width,
+      height: height,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(createdAt),
+      modifiedAt: DateTime.fromMillisecondsSinceEpoch(modifiedAt),
+      areaName: areaName,
+      cityName: cityName,
+    );
   }
 }

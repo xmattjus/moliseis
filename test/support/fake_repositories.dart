@@ -516,7 +516,8 @@ final class FakeEventRepository extends EventRepository {
   Result<void> setFavouriteEventResult;
   Completer<Result<List<Event>>>? pendingGetByCurrentYear;
   Completer<Result<List<Event>>>? pendingGetByDate;
-  Future<Result<void>> Function(int id, bool save)? setFavouriteEventHandler;
+  Future<Result<void>> Function(int id, {required bool save})?
+  setFavouriteEventHandler;
   Map<int, Result<Event>> getByIdResults;
   final pendingGetById = <int, Completer<Result<Event>>>{};
 
@@ -621,9 +622,10 @@ final class FakeEventRepository extends EventRepository {
       getFavouriteEventIdsResult;
 
   @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async {
+  Future<Result<void>> setFavouriteEvent(int id, {required bool save}) async {
     setFavouriteEventCalls.add((id: id, save: save));
-    return setFavouriteEventHandler?.call(id, save) ?? setFavouriteEventResult;
+    return setFavouriteEventHandler?.call(id, save: save) ??
+        setFavouriteEventResult;
   }
 }
 
@@ -708,7 +710,7 @@ final class ControllableEventRepository extends EventRepository {
       const Result.success([]);
 
   @override
-  Future<Result<void>> setFavouriteEvent(int id, bool save) async =>
+  Future<Result<void>> setFavouriteEvent(int id, {required bool save}) async =>
       const Result.success(null);
 }
 
@@ -814,7 +816,8 @@ final class FakePlaceRepository extends PlaceRepository {
   Result<List<Place>> getSuggestedPlacesResult;
   Future<Result<List<Place>>> Function()? getSuggestionsHandler;
   Result<void> setFavouritePlaceResult;
-  Future<Result<void>> Function(int id, bool save)? setFavouritePlaceHandler;
+  Future<Result<void>> Function(int id, {required bool save})?
+  setFavouritePlaceHandler;
   Map<int, Result<Place>> getByIdResults;
   final pendingGetById = <int, Completer<Result<Place>>>{};
 
@@ -897,9 +900,10 @@ final class FakePlaceRepository extends PlaceRepository {
   }
 
   @override
-  Future<Result<void>> setFavouritePlace(int id, bool save) async {
+  Future<Result<void>> setFavouritePlace(int id, {required bool save}) async {
     setFavouritePlaceCalls.add((id: id, save: save));
-    return setFavouritePlaceHandler?.call(id, save) ?? setFavouritePlaceResult;
+    return setFavouritePlaceHandler?.call(id, save: save) ??
+        setFavouritePlaceResult;
   }
 }
 
@@ -953,7 +957,7 @@ final class FakeSettingsRepository implements SettingsRepository {
   Future<Result<void>> initialize() async => initializeResult;
 
   @override
-  Future<Result<void>> setCrashReporting(bool enable) async {
+  Future<Result<void>> setCrashReporting({required bool enable}) async {
     if (setCrashReportingResult is Success<void>) crashReporting = enable;
     return setCrashReportingResult;
   }
