@@ -7,12 +7,6 @@
       "skillPath": "skills/dart-add-unit-test/SKILL.md",
       "computedHash": "55dabb37175bc8091a02b7d78d405f7e33173698c48a649ea29748f1186ac9c0"
     },
-    "dart-build-cli-app": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-build-cli-app/SKILL.md",
-      "computedHash": "2c693ba718e23155fd9acd8d2e14f5c311258ed900131b2ad12fda46ae5eebfa"
-    },
     "dart-collect-coverage": {
       "source": "dart-lang/skills",
       "sourceType": "github",
@@ -49,23 +43,11 @@
       "skillPath": "skills/dart-run-static-analysis/SKILL.md",
       "computedHash": "e64ea092e216ecdc9b4a8b49b06d0b9a0b49f680c1116ada1d247b2de3fa6fe1"
     },
-    "dart-setup-ffi-assets": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-setup-ffi-assets/SKILL.md",
-      "computedHash": "c27f5a4e79a4f291e09a9cfeab2842bb04d3570bb64c56bf309e573c3f244ef8"
-    },
-    "dart-use-ffigen": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-use-ffigen/SKILL.md",
-      "computedHash": "688ec3e0218b3a96437916be5bdcaea87fe4f90ba869c3deec2f3392f1c6b626"
-    },
     "dart-use-pattern-matching": {
       "source": "dart-lang/skills",
       "sourceType": "github",
       "skillPath": "skills/dart-use-pattern-matching/SKILL.md",
-      "computedHash": "86ea49e8f82ebcdbfd00579c0bcaca16d3f33839c96f9d3875bee95c553daa4b"
+      "computedHash": "da0a45f77ffc8e8ff29ed24c099af5d1debbbfbd21987f8a93add1a0d5c17ad8"
     },
     "dart-use-primary-constructors": {
       "source": "dart-lang/skills",
@@ -107,7 +89,7 @@
       "source": "affaan-m/everything-claude-code",
       "sourceType": "github",
       "skillPath": "skills/flutter-dart-code-review/SKILL.md",
-      "computedHash": "87ac583f7e370bb3869cae02a4cf0a4cb94aa91d6e16160da89d91ad3714165b"
+      "computedHash": "a5bbf2fda0e54df51e75e9316e8f341a64a1be9473137408f60244b6d0d777b7"
     },
     "flutter-fix-layout-issues": {
       "source": "flutter/agent-plugins",
@@ -115,41 +97,17 @@
       "skillPath": "skills/flutter-fix-layout-issues/SKILL.md",
       "computedHash": "1aaba922c951159118f9b141788f7bb7b8167bdc0bd5c6f0738ebb90c29b9532"
     },
-    "flutter-implement-json-serialization": {
-      "source": "flutter/agent-plugins",
-      "sourceType": "github",
-      "skillPath": "skills/flutter-implement-json-serialization/SKILL.md",
-      "computedHash": "0eed26f25308d78c6a9036ec936db93342f064d64f2cbac5e0e8648ba6b9db3f"
-    },
-    "flutter-setup-declarative-routing": {
-      "source": "flutter/agent-plugins",
-      "sourceType": "github",
-      "skillPath": "skills/flutter-setup-declarative-routing/SKILL.md",
-      "computedHash": "2341440c8bce0f176663695eaa71f9f7d7c967772a1dcd0d833c9778504b227e"
-    },
     "flutter-setup-localization": {
       "source": "flutter/agent-plugins",
       "sourceType": "github",
       "skillPath": "skills/flutter-setup-localization/SKILL.md",
       "computedHash": "671bf254ca8f3172b6bda5287d9e756e9fd5b49165a815f710c5b707ebaa38f8"
     },
-    "flutter-use-http-package": {
-      "source": "flutter/agent-plugins",
-      "sourceType": "github",
-      "skillPath": "skills/flutter-use-http-package/SKILL.md",
-      "computedHash": "17efcf4da9933afaf9c1d41940bd6b92f1ae73dcae4bf6c59cfe24f7e487ee9f"
-    },
-    "security-and-hardening": {
-      "source": "addyosmani/agent-skills",
-      "sourceType": "github",
-      "skillPath": "skills/security-and-hardening/SKILL.md",
-      "computedHash": "47d027526d7e0be784a19a034f18cba328009b3c8fe483f16e4b12530cf82183"
-    },
     "sentry-create-alert": {
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-create-alert/SKILL.md",
-      "computedHash": "c94c836eb7ad92225e64bcbdaa5610a7ed1a6115653584464ef46a1c12707e34"
+      "computedHash": "f79afca3f52e96374f3bcefb49c5e6f8834a77f6a664369f777f4e9ea9c0d492"
     },
     "sentry-debug-issue": {
       "source": "getsentry/sentry-for-ai",
@@ -167,7 +125,7 @@
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-fix-stack-traces/SKILL.md",
-      "computedHash": "a74e5a7f57b6b56c1349ed75d5afb9fe586e512a1f6134a7040443a41e93d16e"
+      "computedHash": "be2c5020ae1774a704e9a631460eac7fb112fbf201667fe6209680add41d3f97"
     },
     "sentry-flutter-sdk": {
       "source": "getsentry/sentry-for-ai",
@@ -179,13 +137,13 @@
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-get-started/SKILL.md",
-      "computedHash": "5f23e1a6932bac26b0ba2773176d3b425eff1d9133c54ea957c2028ac2705f3d"
+      "computedHash": "c5727e02ec59cf31272d979e5d4b15cebef64dfa6269dec6aecf878511197a62"
     },
     "sentry-instrument": {
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-instrument/SKILL.md",
-      "computedHash": "da7c916895d081746619a13ec7d47d105fce07a8704e20b6b3b5ca5e2c16cf1e"
+      "computedHash": "1993e79cf7f22eff732d2c78e00271c333b528a82b2fb52dbcf8eefb7ea82765"
     },
     "sentry-instrument-logging": {
       "source": "getsentry/sentry-for-ai",
@@ -199,23 +157,17 @@
       "skillPath": "skills-legacy/sentry-instrumentation-guide/SKILL.md",
       "computedHash": "757bf2bf8453182517125a882b9b66b49e246e006170949a5a4310cd5a931efa"
     },
-    "sentry-setup-ai-monitoring": {
-      "source": "getsentry/sentry-for-ai",
-      "sourceType": "github",
-      "skillPath": "skills-legacy/sentry-setup-ai-monitoring/SKILL.md",
-      "computedHash": "fd763e7d5cada2ed0ea56a27dbe54c9faacb2c361cb525a06bf7c214072fb4a7"
-    },
     "sentry-setup-releases": {
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-setup-releases/SKILL.md",
-      "computedHash": "6e0f3d08baec1642429aa6625480b57575036ba05d6bd875ccd2a42058e751ef"
+      "computedHash": "9ac81bf09cc5ca420ae08bc5c1c6180c2026b16a50db00facbec3587910b2457"
     },
     "supabase": {
       "source": "supabase/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/supabase/SKILL.md",
-      "computedHash": "583344c20e90f3654dbb0632f088d89fd9f1dde8ac85e8a644dd12eee59b1380"
+      "computedHash": "211141fd078b4b3645803868528d54221bc7755d24d5c8af45a366785c151dba"
     },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",
