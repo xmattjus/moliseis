@@ -455,7 +455,7 @@ class ContentSubmissionStagedAssetRepositoryImpl
     if (file.lengthSync() > kCloudinaryMaxUploadBytes) {
       return false;
     }
-    return _hasDigest(file, expectedDigest);
+    return await _hasDigest(file, expectedDigest);
   }
 
   bool _isTemporaryName(String value) =>

@@ -17,9 +17,9 @@ class CategoryUseCase {
 
   Future<Result<List<Event>>> getEventsByCategories(
     Set<ContentCategory> categories,
-  ) async => _eventRepository.getByCategories(categories);
+  ) async => await _eventRepository.getByCategories(categories);
 
   Future<Result<List<Place>>> getPlacesByCategories(
     Set<ContentCategory> categories,
-  ) async => _placeRepository.getByCategories(categories);
+  ) async => await _placeRepository.getByCategories(categories);
 }

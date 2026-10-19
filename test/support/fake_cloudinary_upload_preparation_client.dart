@@ -34,7 +34,7 @@ final class FakeCloudinaryUploadPreparationClient
   }) async {
     calls.add((publicId: publicId, options: options));
     if (!_preparationStarted.isCompleted) _preparationStarted.complete();
-    if (_pending.isNotEmpty) return _pending.removeFirst().future;
+    if (_pending.isNotEmpty) return await _pending.removeFirst().future;
     if (_results.isEmpty) {
       return Result.success(
         CloudinaryAuthorizedUploadPreparation({

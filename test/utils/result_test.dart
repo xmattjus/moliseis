@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -315,6 +317,142 @@ void main() {
       });
     });
 
+    group('FutureOr callback boundaries', () {
+      final originalError = TestException('original');
+      final branches =
+          <
+            String,
+            Future<Result<int>> Function(FutureOr<Result<int>> Function())
+          >{
+            'fold success': (callback) => const Result.success(42).asyncFold(
+              (_) => callback(),
+              (_) => throw StateError('opposite branch'),
+            ),
+            'fold error': (callback) => Result<int>.error(originalError)
+                .asyncFold((_) => throw StateError('opposite branch'), (error) {
+                  expect(error, same(originalError));
+                  return callback();
+                }),
+            'flatMap success': (callback) =>
+                const Result.success(42).asyncFlatMap((_) => callback()),
+            'flatMapError error': (callback) => Result<int>.error(
+              originalError,
+            ).asyncFlatMapError((_) => callback()),
+            'getOrElse error': (callback) => Result<Result<int>>.error(
+              originalError,
+            ).asyncGetOrElse(callback),
+          };
+
+      for (final branch in branches.entries) {
+        test('${branch.key} preserves a pending callback result', () async {
+          final started = Completer<void>();
+          final pending = Completer<Result<int>>();
+          const callbackResult = Result.success(42);
+          var calls = 0;
+          var completed = false;
+
+          final result = branch.value(() {
+            calls++;
+            started.complete();
+            return pending.future;
+          });
+          final observed = result.then((value) {
+            completed = true;
+            return value;
+          });
+          await started.future;
+          expect(calls, 1);
+          expect(completed, isFalse);
+
+          pending.complete(callbackResult);
+          expect(await observed, same(callbackResult));
+          expect(calls, 1);
+        });
+
+        for (final error in <Object>[
+          TestException('callback failed'),
+          StateError('callback failed'),
+        ]) {
+          test(
+            '${branch.key} wraps sync ${error.runtimeType} in Future',
+            () async {
+              var calls = 0;
+              late Future<Result<int>> result;
+              expect(() {
+                result = branch.value(() {
+                  calls++;
+                  if (error is Exception) throw error;
+                  throw error as StateError;
+                });
+              }, returnsNormally);
+
+              await expectLater(result, throwsA(same(error)));
+              expect(calls, 1);
+            },
+          );
+
+          test(
+            '${branch.key} propagates deferred ${error.runtimeType}',
+            () async {
+              final started = Completer<void>();
+              final pending = Completer<Result<int>>();
+              var calls = 0;
+              final result = branch.value(() {
+                calls++;
+                started.complete();
+                return pending.future;
+              });
+              final observed = expectLater(result, throwsA(same(error)));
+              await started.future;
+              expect(calls, 1);
+
+              pending.completeError(error);
+              await observed;
+              expect(calls, 1);
+            },
+          );
+        }
+      }
+
+      test(
+        'fold error accepts an immediate value without success callback',
+        () async {
+          final result = await Result<int>.error(originalError).asyncFold(
+            (_) => throw StateError('opposite branch'),
+            (error) {
+              expect(error, same(originalError));
+              return 42;
+            },
+          );
+
+          expect(result, 42);
+        },
+      );
+
+      test('flatMap preserves immediate callback Result identity', () async {
+        const callbackResult = Result.success(42);
+        final result = await const Result.success(
+          1,
+        ).asyncFlatMap((_) => callbackResult);
+
+        expect(result, same(callbackResult));
+      });
+
+      test(
+        'flatMapError preserves immediate callback Result identity',
+        () async {
+          final callbackResult = Result<int>.error(
+            TestException('replacement'),
+          );
+          final result = await Result<int>.error(
+            originalError,
+          ).asyncFlatMapError((_) => callbackResult);
+
+          expect(result, same(callbackResult));
+        },
+      );
+    });
+
     group('asyncMap', () {
       test('transforms a successful value asynchronously', () async {
         final result = await const Result.success(
@@ -372,7 +510,7 @@ void main() {
         ).asyncFlatMap((value) => Future.value(Result.success(value * 4)));
 
         expect(result, isA<Error<int>>());
-        expect((result as Error<int>).error, error);
+        expect((result as Error<int>).error, same(error));
       });
 
       test('can transform a success into an error', () async {
@@ -445,10 +583,12 @@ void main() {
 
     group('asyncFlatMapError', () {
       test('leaves success unchanged', () async {
-        final result = await const Result.success(
-          42,
-        ).asyncFlatMapError((_) => Future.value(const Result.success(0)));
+        const original = Result.success(42);
+        final result = await original.asyncFlatMapError(
+          (_) => Future.value(const Result.success(0)),
+        );
 
+        expect(result, same(original));
         expect(result, isA<Success<int>>());
         expect((result as Success<int>).value, 42);
       });

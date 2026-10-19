@@ -79,7 +79,7 @@ class AppLogger implements Logger {
     String message,
     Map<String, Object?> data,
     AppLogLevel level,
-  ) async => Sentry.addBreadcrumb(
+  ) async => await Sentry.addBreadcrumb(
     Breadcrumb(
       message: message,
       data: data,

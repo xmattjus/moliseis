@@ -72,7 +72,7 @@ class GalleryPreviewModalOverlay extends StatelessWidget {
           license: media.license ?? '',
           licenseUrl: media.licenseUrl ?? '',
           cityName: media.cityName,
-          onSharePressed: () async => _onSharePressed(context),
+          onSharePressed: () async => await _onSharePressed(context),
           index: index,
           itemCount: itemCount,
         ),

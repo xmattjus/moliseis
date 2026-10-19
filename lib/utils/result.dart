@@ -84,9 +84,9 @@ sealed class Result<T> {
   ) async {
     switch (this) {
       case Success<T>(:final value):
-        return onSuccess(value);
+        return await onSuccess(value);
       case Error<T>(:final error):
-        return onError(error);
+        return await onError(error);
     }
   }
 
@@ -107,7 +107,7 @@ sealed class Result<T> {
     FutureOr<Result<R>> Function(T value) mapper,
   ) async {
     return switch (this) {
-      Success<T>(:final value) => mapper(value),
+      Success<T>(:final value) => await mapper(value),
       Error<T>(:final error) => Result.error(error),
     };
   }
@@ -133,7 +133,7 @@ sealed class Result<T> {
   ) async {
     return switch (this) {
       Success<T>() => this,
-      Error<T>(:final error) => mapper(error),
+      Error<T>(:final error) => await mapper(error),
     };
   }
 
@@ -142,7 +142,7 @@ sealed class Result<T> {
   Future<T> asyncGetOrElse(FutureOr<T> Function() defaultValue) async {
     return switch (this) {
       Success<T>(:final value) => value,
-      Error<T>() => defaultValue(),
+      Error<T>() => await defaultValue(),
     };
   }
 

@@ -161,12 +161,12 @@ class _CategoryContentAndTypeSelectionState
     required List<Widget> children,
   }) async {
     if (context.windowSizeClass.isAtMost(WindowSizeClass.medium)) {
-      return _showGenericSelectionBottomSheet<T>(
+      return await _showGenericSelectionBottomSheet<T>(
         title: title,
         children: children,
       );
     } else {
-      return showDialog<T?>(
+      return await showDialog<T?>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(title, style: context.textTheme.bodyLarge),

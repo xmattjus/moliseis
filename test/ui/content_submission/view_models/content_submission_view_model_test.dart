@@ -3155,7 +3155,7 @@ void main() {
                     ),
                   ];
                 }
-                return secondPickerResult.future;
+                return await secondPickerResult.future;
               },
             ),
           );

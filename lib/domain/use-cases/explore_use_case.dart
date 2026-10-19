@@ -23,18 +23,19 @@ class ExploreUseCase implements ExploreGetByIdUseCase {
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<List<Event>>> getAllEvents() async =>
-      _eventRepository.getByCurrentYear();
+      await _eventRepository.getByCurrentYear();
 
   /// Returns places mapped to content models using the given [sort].
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<List<Place>>> getAllPlaces([
     ContentSort sort = ContentSort.byName,
-  ]) async => _placeRepository.getAll(sort: sort);
+  ]) async => await _placeRepository.getAll(sort: sort);
 
   /// Returns one place by [id], mapped to a content model.
   ///
   /// Repository failures are propagated as `Result.error`.
   @override
-  Future<Result<Place>> getById(int id) async => _placeRepository.getById(id);
+  Future<Result<Place>> getById(int id) async =>
+      await _placeRepository.getById(id);
 }
