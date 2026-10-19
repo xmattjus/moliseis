@@ -233,7 +233,7 @@ final class FakeAdminContentSubmissionRepository
   Future<Result<List<AdminSubmission>>> list() async {
     listCallCount++;
     final pending = pendingList;
-    if (pending != null) return pending.future;
+    if (pending != null) return await pending.future;
     return listResult;
   }
 
@@ -248,7 +248,7 @@ final class FakeAdminContentSubmissionRepository
   Future<Result<AdminSubmission>> create(AdminSubmissionInput input) async {
     createInputs.add(input);
     final pending = pendingCreate;
-    if (pending != null) return pending.future;
+    if (pending != null) return await pending.future;
     return createResult;
   }
 
@@ -260,7 +260,7 @@ final class FakeAdminContentSubmissionRepository
     updateIds.add(id);
     updateInputs.add(input);
     final pending = pendingUpdate;
-    if (pending != null) return pending.future;
+    if (pending != null) return await pending.future;
     return updateResult;
   }
 
@@ -301,7 +301,7 @@ final class FakeAdminContentSubmissionRepository
       expectedSourceHash,
     ));
     final pending = pendingPromote;
-    if (pending != null) return pending.future;
+    if (pending != null) return await pending.future;
     if (promoteResults.isEmpty) {
       return Result.error(TestException('No queued promote result'));
     }
@@ -406,7 +406,7 @@ final class FakeAdminContentSubmissionRepository
   ) async {
     addAssetCalls.add((submissionId, asset));
     final pending = pendingAddAsset;
-    if (pending != null) return pending.future;
+    if (pending != null) return await pending.future;
     return addAssetResult;
   }
 
@@ -414,7 +414,7 @@ final class FakeAdminContentSubmissionRepository
   Future<Result<void>> deleteAsset(int submissionId, int assetId) async {
     deleteAssetCalls.add((submissionId, assetId));
     final pending = pendingDeleteAsset;
-    if (pending != null) return pending.future;
+    if (pending != null) return await pending.future;
     return deleteAssetResult;
   }
 }
@@ -554,14 +554,18 @@ final class FakeEventRepository extends EventRepository {
   @override
   Future<Result<List<Event>>> getByCurrentYear() async {
     getByCurrentYearCallCount++;
-    return pendingGetByCurrentYear?.future ?? getByCurrentYearResult;
+    final pending = pendingGetByCurrentYear;
+    if (pending != null) return await pending.future;
+    return getByCurrentYearResult;
   }
 
   @override
   Future<Result<List<Event>>> getByDate(EventCalendarDate date) async {
     getByDateCallCount++;
     lastGetByDate = date;
-    return pendingGetByDate?.future ?? getByDateResult;
+    final pending = pendingGetByDate;
+    if (pending != null) return await pending.future;
+    return getByDateResult;
   }
 
   @override
@@ -624,8 +628,9 @@ final class FakeEventRepository extends EventRepository {
   @override
   Future<Result<void>> setFavouriteEvent(int id, {required bool save}) async {
     setFavouriteEventCalls.add((id: id, save: save));
-    return setFavouriteEventHandler?.call(id, save: save) ??
-        setFavouriteEventResult;
+    final handler = setFavouriteEventHandler;
+    if (handler != null) return await handler(id, save: save);
+    return setFavouriteEventResult;
   }
 }
 
@@ -853,7 +858,9 @@ final class FakePlaceRepository extends PlaceRepository {
   }) async {
     getAllCallCount++;
     lastGetAllSort = sort;
-    return pendingGetAll?.future ?? getAllResult;
+    final pending = pendingGetAll;
+    if (pending != null) return await pending.future;
+    return getAllResult;
   }
 
   @override
@@ -883,8 +890,11 @@ final class FakePlaceRepository extends PlaceRepository {
   }
 
   @override
-  Future<Result<List<int>>> getFavouritePlaceIds() async =>
-      getFavouritePlaceIdsHandler?.call() ?? getFavouritePlaceIdsResult;
+  Future<Result<List<int>>> getFavouritePlaceIds() async {
+    final handler = getFavouritePlaceIdsHandler;
+    if (handler != null) return await handler();
+    return getFavouritePlaceIdsResult;
+  }
 
   @override
   Future<Result<List<Place>>> getLatest() {
@@ -902,8 +912,9 @@ final class FakePlaceRepository extends PlaceRepository {
   @override
   Future<Result<void>> setFavouritePlace(int id, {required bool save}) async {
     setFavouritePlaceCalls.add((id: id, save: save));
-    return setFavouritePlaceHandler?.call(id, save: save) ??
-        setFavouritePlaceResult;
+    final handler = setFavouritePlaceHandler;
+    if (handler != null) return await handler(id, save: save);
+    return setFavouritePlaceResult;
   }
 }
 
@@ -1146,7 +1157,7 @@ final class ControllableSubmissionRepository
     submittedContentSubmissions.add(contentSubmission);
     submittedSubmissionAssets.add(List.unmodifiable(submissionAssets));
     _pending = Completer<Result<void>>();
-    return _pending!.future;
+    return await _pending!.future;
   }
 
   /// Resolves the in-flight [submit] call (if any) with [result]. Safe to
@@ -1217,7 +1228,7 @@ final class FakeContentSubmissionStagedAssetRepository
     ));
     final pending = pendingAcquire;
     pendingAcquire = null;
-    if (pending != null) return pending.future;
+    if (pending != null) return await pending.future;
     final relativePath = '$clientSubmissionId/$digest';
     final root = stagingDirectory;
     if (root != null) {
@@ -1239,7 +1250,8 @@ final class FakeContentSubmissionStagedAssetRepository
     clearedSessions.add(clientSubmissionId);
     final pending = pendingClearSession;
     pendingClearSession = null;
-    return pending?.future ?? clearSessionResult;
+    if (pending != null) return await pending.future;
+    return clearSessionResult;
   }
 
   @override
@@ -1249,7 +1261,8 @@ final class FakeContentSubmissionStagedAssetRepository
     reconcileCallCount++;
     final pending = pendingReconcile;
     pendingReconcile = null;
-    return pending?.future ?? reconcileResult;
+    if (pending != null) return await pending.future;
+    return reconcileResult;
   }
 
   @override
@@ -1260,7 +1273,8 @@ final class FakeContentSubmissionStagedAssetRepository
     removed.add((clientSubmissionId: clientSubmissionId, digest: digest));
     final pending = pendingRemove;
     pendingRemove = null;
-    return pending?.future ?? removeResult;
+    if (pending != null) return await pending.future;
+    return removeResult;
   }
 
   @override
@@ -1312,7 +1326,8 @@ final class FakeContentSubmissionDraftRepository
     loadDraftCallCount++;
     final pending = pendingLoadDraft;
     pendingLoadDraft = null;
-    return pending?.future ?? loadDraftResult;
+    if (pending != null) return await pending.future;
+    return loadDraftResult;
   }
 
   @override
@@ -1322,7 +1337,8 @@ final class FakeContentSubmissionDraftRepository
     lastSavedState = state;
     final pending = pendingSaveDraft;
     pendingSaveDraft = null;
-    return pending?.future ?? saveDraftResult;
+    if (pending != null) return await pending.future;
+    return saveDraftResult;
   }
 
   @override
@@ -1331,7 +1347,8 @@ final class FakeContentSubmissionDraftRepository
     clearDraftCallCount++;
     final pending = pendingClearDraft;
     pendingClearDraft = null;
-    return pending?.future ?? clearDraftResult;
+    if (pending != null) return await pending.future;
+    return clearDraftResult;
   }
 }
 
@@ -1423,9 +1440,11 @@ final class FakeWeatherApiClient extends WeatherApiClient {
   }) async {
     getCombinedWeatherForecastCallCount++;
     combinedForecastCoordinates.add((latitude, longitude));
-    return combinedForecastHandler?.call(latitude, longitude) ??
-        pendingCombinedForecast?.future ??
-        result ??
+    final handler = combinedForecastHandler;
+    if (handler != null) return await handler(latitude, longitude);
+    final pending = pendingCombinedForecast;
+    if (pending != null) return await pending.future;
+    return result ??
         Result.error(Exception('Weather not configured for this test'));
   }
 }

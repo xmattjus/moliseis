@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -76,6 +78,41 @@ void main() {
       expect(content.first.remoteId, 20);
       expect(placeRepository.lastGetAllSort, ContentSort.byDate);
     });
+
+    test(
+      'getAllPlaces preserves pending requests, results and errors',
+      () async {
+        final pending = Completer<Result<List<Place>>>();
+        final placeRepository = FakePlaceRepository()..pendingGetAll = pending;
+        final useCase = ExploreUseCase(
+          eventRepository: FakeEventRepository(),
+          placeRepository: placeRepository,
+        );
+        var completed = false;
+        final result = useCase.getAllPlaces(ContentSort.byDate);
+        final observed = result.then((value) {
+          completed = true;
+          return value;
+        });
+
+        expect(placeRepository.getAllCallCount, 1);
+        expect(placeRepository.lastGetAllSort, ContentSort.byDate);
+        expect(completed, isFalse);
+        final repositoryResult = Result.success([makePlace(remoteId: 22)]);
+        pending.complete(repositoryResult);
+        expect(await observed, same(repositoryResult));
+
+        final failed = Completer<Result<List<Place>>>();
+        placeRepository.pendingGetAll = failed;
+        final error = StateError('deferred repository failure');
+        final failure = useCase.getAllPlaces();
+        final observedFailure = expectLater(failure, throwsA(same(error)));
+        expect(placeRepository.getAllCallCount, 2);
+        expect(placeRepository.lastGetAllSort, ContentSort.byName);
+        failed.completeError(error);
+        await observedFailure;
+      },
+    );
 
     test('getAllPlaces propagates repository errors', () async {
       final error = TestException('places failed');

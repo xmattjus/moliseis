@@ -14,6 +14,8 @@ final class FakeExternalUrlService extends ExternalUrlService {
   @override
   Future<Result<void>> launchGenericUrl(String url) async {
     launchedUrls.add(url);
-    return pendingLaunch?.future ?? result;
+    final pending = pendingLaunch;
+    if (pending != null) return await pending.future;
+    return result;
   }
 }

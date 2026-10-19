@@ -23,26 +23,26 @@ class GeoMapUseCase {
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<List<Event>>> getAllEvents() async =>
-      _eventRepository.getByCurrentYear();
+      await _eventRepository.getByCurrentYear();
 
   /// Returns places mapped to content models using the given [sort].
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<List<Place>>> getAllPlaces([
     ContentSort sort = ContentSort.byName,
-  ]) async => _placeRepository.getAll(sort: sort);
+  ]) async => await _placeRepository.getAll(sort: sort);
 
   /// Returns one event by [id], mapped to a content model.
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<ContentBase>> getEventById(int id) async =>
-      _eventRepository.getById(id);
+      await _eventRepository.getById(id);
 
   /// Returns one place by [id], mapped to a content model.
   ///
   /// Repository failures are propagated as `Result.error`.
   Future<Result<ContentBase>> getPlaceById(int id) async =>
-      _placeRepository.getById(id);
+      await _placeRepository.getById(id);
 
   /// Returns nearby events for the given coordinates.
   ///
@@ -50,7 +50,7 @@ class GeoMapUseCase {
   Future<Result<List<ContentBase>>> getNearEventsByCoords(
     double latitude,
     double longitude,
-  ) async => _eventRepository.getByCoordinates([latitude, longitude]);
+  ) async => await _eventRepository.getByCoordinates([latitude, longitude]);
 
   /// Returns nearby places for the given coordinates.
   ///
@@ -58,5 +58,5 @@ class GeoMapUseCase {
   Future<Result<List<ContentBase>>> getNearPlacesByCoords(
     double latitude,
     double longitude,
-  ) async => _placeRepository.getByCoordinates([latitude, longitude]);
+  ) async => await _placeRepository.getByCoordinates([latitude, longitude]);
 }

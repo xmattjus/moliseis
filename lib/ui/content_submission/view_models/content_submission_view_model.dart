@@ -540,7 +540,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     if (_disposed) return const Result.success(null);
     await initialize();
     if (_disposed) return const Result.success(null);
-    return _serialize(_checkpointDraftInsideBoundary);
+    return await _serialize(_checkpointDraftInsideBoundary);
   }
 
   /// Restores the current draft fields to their last durable checkpoint.
@@ -551,7 +551,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     if (_disposed) return const Result.success(null);
     await initialize();
     if (_disposed) return const Result.success(null);
-    return _serialize(() async {
+    return await _serialize(() async {
       if (_persistedDraftState == _PersistedDraftState.unknown) {
         return Result.error(
           _draftLoadError ??
@@ -570,7 +570,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _checkpointDraftInsideBoundary() async {
-    return _checkpointDraftSnapshotInsideBoundary(_state);
+    return await _checkpointDraftSnapshotInsideBoundary(_state);
   }
 
   Future<Result<void>> _checkpointDraftSnapshotInsideBoundary(
@@ -745,7 +745,9 @@ class ContentSubmissionViewModel extends ChangeNotifier {
     if (_disposed) return const Result.success(null);
     await initialize();
     if (_disposed) return const Result.success(null);
-    if (_submissionFinalizationPending) return _finalizeSubmittedSession();
+    if (_submissionFinalizationPending) {
+      return await _finalizeSubmittedSession();
+    }
     final prepared = await _prepareSubmissionAttempt();
     if (prepared case Error<_SubmissionAttempt>(:final error)) {
       return Result.error(error);
@@ -899,7 +901,7 @@ class ContentSubmissionViewModel extends ChangeNotifier {
           Exception('Cannot clear while a submission session is active.'),
         );
       }
-      return _retireCurrentSessionInsideBoundary();
+      return await _retireCurrentSessionInsideBoundary();
     });
     if (result is Error<void>) return result;
 

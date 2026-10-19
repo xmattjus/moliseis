@@ -62,7 +62,7 @@ class Debounced<S, T> {
     _debounceTimer = timer;
     await timer.future;
     if (timer.isCancelled) return null;
-    return function(parameter);
+    return await function(parameter);
   }
 
   /// Cancels the pending delay, if any.
