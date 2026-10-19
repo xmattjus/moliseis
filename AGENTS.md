@@ -124,6 +124,34 @@ Operationally:
   change.
 - Do not invent files, symbols, APIs, schemas, behavior, or verification results.
 
+## GitHub Contribution Workflow
+
+- `main` is an integration branch. Agents must not push
+  commits directly to `main`.
+- All agent-authored changes intended for `main` must be
+  integrated through a GitHub pull request.
+- Use one pull request per cohesive, independently
+  reviewable change, not per commit, file, or agent task.
+- An OpenSpec change should normally correspond to one
+  pull request.
+- Keep related implementation, tests, documentation,
+  generated artifacts, and review fixes in the same PR.
+- Address review findings with additional commits to the
+  existing PR while it remains open.
+- Do not bundle unrelated changes merely to reduce the
+  number of pull requests.
+- Local experiments, read-only analysis, and uncommitted
+  work do not require a pull request.
+- Agents may create and update pull requests as part of
+  authorized repository-changing work.
+- Agents must not merge a pull request unless the user
+  explicitly authorizes the merge.
+- Direct pushes to `main` require an explicit user
+  exception and must not be inferred from task scope,
+  change size, or urgency.
+- Never bypass GitHub branch protections or required
+  checks without explicit authorization.
+
 ## Architecture
 
 The current high-level structure is:
