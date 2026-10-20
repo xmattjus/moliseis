@@ -25,6 +25,7 @@ import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -350,9 +351,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
               ListenableBuilder(
-                listenable: widget.exploreViewModel.loadLatest,
+                listenable: widget.exploreViewModel.loadLatest.results,
                 builder: (context, _) {
-                  if (widget.exploreViewModel.loadLatest.completed) {
+                  final snapshot =
+                      widget.exploreViewModel.loadLatest.results.value;
+                  if (snapshot.completed) {
                     return ContentSliverGrid(
                       widget.exploreViewModel.latest,
                       onPressed: (content) {
@@ -371,7 +374,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     );
                   }
 
-                  if (widget.exploreViewModel.loadLatest.error) {
+                  if (snapshot.hasFailure) {
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       sliver: SliverToBoxAdapter(
@@ -380,9 +383,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             'Si è verificato un errore durante il caricamento.',
                           ),
                           action: TextButton(
-                            onPressed: () => unawaited(
-                              widget.exploreViewModel.loadLatest.execute(),
-                            ),
+                            onPressed: () =>
+                                widget.exploreViewModel.loadLatest.run(),
                             child: const Text('Riprova'),
                           ),
                         ),

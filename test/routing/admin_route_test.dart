@@ -27,6 +27,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../support/command_test_support.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/mock_gotrue_client.dart';
@@ -153,7 +154,7 @@ void main() {
       expect(find.byType(AdminDashboardScreen), findsOneWidget);
     });
 
-    testWidgets('keeps an anonymous user on settings', (tester) async {
+    testOwnerUI('keeps an anonymous user on settings', (tester) async {
       final harness = _AdminRouteHarness();
       addTearDown(harness.router.dispose);
       addTearDown(harness.auth.dispose);
@@ -169,7 +170,7 @@ void main() {
       expect(find.byType(SettingsScreen), findsOneWidget);
     });
 
-    testWidgets('keeps an admin user on settings', (tester) async {
+    testOwnerUI('keeps an admin user on settings', (tester) async {
       final harness = _AdminRouteHarness(
         initialUser: makeAuthUser(isAdmin: true),
       );
@@ -239,7 +240,7 @@ void main() {
       expect(find.byType(AdminLoginScreen), findsOneWidget);
     });
 
-    testWidgets('settings entry preserves back navigation after login', (
+    testOwnerUI('settings entry preserves back navigation after login', (
       tester,
     ) async {
       final harness = _AdminRouteHarness();

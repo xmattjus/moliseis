@@ -9,13 +9,14 @@ import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/ui/search/widgets/search_result_screen.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
 import '../support/predictive_back.dart';
 import '../support/sync_harness.dart';
 
 void main() {
-  testWidgets('production Map selection is reconstructed after restoration', (
+  testOwnerUI('production Map selection is reconstructed after restoration', (
     tester,
   ) async {
     final event = makeEvent(remoteId: 5);
@@ -61,7 +62,7 @@ void main() {
   });
 
   for (final predictive in [false, true]) {
-    testWidgets('production Search Post restoration retains ancestry and '
+    testOwnerUI('production Search Post restoration retains ancestry and '
         '${predictive ? 'predictive' : 'normal'} Back parent', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       try {

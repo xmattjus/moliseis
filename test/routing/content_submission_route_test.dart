@@ -27,6 +27,7 @@ import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
 
+import '../support/command_test_support.dart';
 import '../support/fake_external_url_service.dart';
 import '../support/fake_image_picker.dart';
 import '../support/fake_repositories.dart';
@@ -204,7 +205,7 @@ void main() {
     }
 
     for (final action in ['Torna alla home', 'Back', 'Nuovo suggerimento']) {
-      testWidgets(
+      testOwnerUI(
         action == 'Torna alla home'
             ? 'successful Home performs no additional lifecycle work'
             : 'RED 3 recovered contacts stay retired through $action',
@@ -1429,7 +1430,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets(
+    testOwnerUI(
       'failed progress Home uses the parent exit policy and releases the '
       'form handoff',
       (tester) async {

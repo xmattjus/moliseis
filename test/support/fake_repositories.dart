@@ -512,6 +512,8 @@ final class FakeEventRepository extends EventRepository {
   int getNextEventsCallCount = 0;
   int getByIdCallCount = 0;
   Result<List<int>> getFavouriteEventIdsResult;
+  int getFavouriteEventIdsCallCount = 0;
+  Future<Result<List<int>>> Function()? getFavouriteEventIdsHandler;
   Result<Iterable<Event>> getFavouritesResult;
   Result<void> setFavouriteEventResult;
   Completer<Result<List<Event>>>? pendingGetByCurrentYear;
@@ -622,8 +624,12 @@ final class FakeEventRepository extends EventRepository {
   }
 
   @override
-  Future<Result<List<int>>> getFavouriteEventIds() async =>
-      getFavouriteEventIdsResult;
+  Future<Result<List<int>>> getFavouriteEventIds() async {
+    getFavouriteEventIdsCallCount++;
+    final handler = getFavouriteEventIdsHandler;
+    if (handler != null) return await handler();
+    return getFavouriteEventIdsResult;
+  }
 
   @override
   Future<Result<void>> setFavouriteEvent(int id, {required bool save}) async {
@@ -812,6 +818,7 @@ final class FakePlaceRepository extends PlaceRepository {
   int getByCoordinatesCallCount = 0;
   Result<List<int>> getFavouritePlaceIdsResult;
   Future<Result<List<int>>> Function()? getFavouritePlaceIdsHandler;
+  int getFavouritePlaceIdsCallCount = 0;
   Result<Iterable<Place>> getFavouritesResult;
   Result<List<Place>> getLatestResult;
   Completer<Result<List<Place>>>? pendingGetLatest;
@@ -891,6 +898,7 @@ final class FakePlaceRepository extends PlaceRepository {
 
   @override
   Future<Result<List<int>>> getFavouritePlaceIds() async {
+    getFavouritePlaceIdsCallCount++;
     final handler = getFavouritePlaceIdsHandler;
     if (handler != null) return await handler();
     return getFavouritePlaceIdsResult;
@@ -961,6 +969,12 @@ final class FakeSettingsRepository implements SettingsRepository {
   Result<void> setThemeBrightnessResult;
   Result<void> setThemeTypeResult;
 
+  // Mirrors the positional command input for controlled preference writes.
+  // ignore: avoid_positional_boolean_parameters
+  Future<Result<void>> Function(bool)? onSetCrashReporting;
+  Future<Result<void>> Function(ThemeBrightness)? onSetThemeBrightness;
+  Future<Result<void>> Function(ThemeType)? onSetThemeType;
+
   // Call tracking
   bool setSyncStateCalled = false;
 
@@ -969,8 +983,11 @@ final class FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<Result<void>> setCrashReporting({required bool enable}) async {
-    if (setCrashReportingResult is Success<void>) crashReporting = enable;
-    return setCrashReportingResult;
+    final result =
+        await (onSetCrashReporting?.call(enable) ??
+            Future.value(setCrashReportingResult));
+    if (result is Success<void>) crashReporting = enable;
+    return result;
   }
 
   @override
@@ -994,14 +1011,19 @@ final class FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<Result<void>> setThemeBrightness(ThemeBrightness brightness) async {
-    if (setThemeBrightnessResult is Success<void>) themeBrightness = brightness;
-    return setThemeBrightnessResult;
+    final result =
+        await (onSetThemeBrightness?.call(brightness) ??
+            Future.value(setThemeBrightnessResult));
+    if (result is Success<void>) themeBrightness = brightness;
+    return result;
   }
 
   @override
   Future<Result<void>> setThemeType(ThemeType type) async {
-    if (setThemeTypeResult is Success<void>) themeType = type;
-    return setThemeTypeResult;
+    final result =
+        await (onSetThemeType?.call(type) ?? Future.value(setThemeTypeResult));
+    if (result is Success<void>) themeType = type;
+    return result;
   }
 }
 

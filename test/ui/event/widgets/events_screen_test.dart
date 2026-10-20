@@ -8,6 +8,7 @@ import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:paged_vertical_calendar/paged_vertical_calendar.dart';
 
+import '../../../support/command_test_support.dart';
 import '../../../support/events_harness.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
@@ -45,7 +46,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testOwnerUI(
     'provider initialization uses the current Europe/Rome calendar day',
     (tester) async {
       final event = makeEvent(startDate: DateTime.utc(2026, 1, 10, 23, 30));

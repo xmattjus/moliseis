@@ -4,6 +4,7 @@ import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
 
+import '../support/command_test_support.dart';
 import '../support/route_ownership_fixture.dart';
 
 void main() {
@@ -88,7 +89,7 @@ void main() {
         });
       }
 
-      testWidgets('$branch preserves canonical all and its child place Post', (
+      testOwnerUI('$branch preserves canonical all and its child place Post', (
         tester,
       ) async {
         final location = '/$branch/category/all/posts/2?type=place';
@@ -134,7 +135,7 @@ void main() {
 
     for (final (id, type) in <(int, String)>[(1, 'event'), (2, 'place')]) {
       for (final stale in <String?>[null, 'true', 'false', 'unknown']) {
-        testWidgets('canonical $type accepts stale isEvent=$stale unchanged', (
+        testOwnerUI('canonical $type accepts stale isEvent=$stale unchanged', (
           tester,
         ) async {
           final location =
@@ -209,7 +210,7 @@ void main() {
       });
     }
 
-    testWidgets('cold Search Post reconstructs its Search parent', (
+    testOwnerUI('cold Search Post reconstructs its Search parent', (
       tester,
     ) async {
       final fixture = RouteOwnershipFixture(
@@ -253,7 +254,7 @@ void main() {
       'a+b?c=1',
       'emoji 😀',
     ]) {
-      testWidgets('search text "$text" round-trips through q', (tester) async {
+      testOwnerUI('search text "$text" round-trips through q', (tester) async {
         final fixture = RouteOwnershipFixture();
         addTearDown(fixture.dispose);
         await tester.pumpWidget(fixture.app);

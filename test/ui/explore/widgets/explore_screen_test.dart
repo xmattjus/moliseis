@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/content/content_event_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
@@ -11,14 +12,44 @@ import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart'
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../../support/command_test_support.dart';
 import '../../../support/events_harness.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
+import '../../../support/mock_logger.dart';
 import '../../../support/sync_harness.dart';
 
 void main() {
   setUpAll(() => initializeDateFormatting('en'));
-  testWidgets('Home shows direct discovery errors and retries both queries', (
+  testOwnerUI('latest runtime failure renders retry and recovers', (
+    tester,
+  ) async {
+    final logger = MockLogger();
+    addTearDown(installCommandTestReporting(logger));
+    await tester.binding.setSurfaceSize(const Size(1000, 2400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final gate = Completer<Result<List<Place>>>();
+    final places = FakePlaceRepository()..pendingGetLatest = gate;
+    final harness = EventsRouteHarness(
+      eventRepository: FakeEventRepository(),
+      placeRepository: places,
+    );
+    addTearDown(harness.dispose);
+    await tester.pumpWidget(harness.app);
+    await pumpCommandTurns(tester);
+    gate.completeError(StateError('latest runtime'));
+    await tester.pumpAndSettle();
+    expect(find.text('Riprova'), findsOneWidget);
+    places.pendingGetLatest = null;
+    await tester.ensureVisible(find.text('Riprova'));
+    await tester.tap(find.text('Riprova'));
+    await tester.pumpAndSettle();
+    expect(find.text('Riprova'), findsNothing);
+    expect(places.getLatestCallCount, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  testOwnerUI('Home shows direct discovery errors and retries both queries', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 2400));
@@ -67,7 +98,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
+  testOwnerUI(
     'distinct Home sections consume disjoint collections for a fixed snapshot',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1000, 2400));
@@ -136,7 +167,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testOwnerUI(
     'successful empty temporal sections differ from discovery errors',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1000, 2400));
@@ -159,7 +190,7 @@ void main() {
   );
 
   for (final failure in ['ongoing', 'upcoming']) {
-    testWidgets(
+    testOwnerUI(
       '$failure error retry requests both classifications through coordinator',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(1000, 2400));
@@ -202,7 +233,7 @@ void main() {
     );
   }
 
-  testWidgets('each temporal section observes its own pending command', (
+  testOwnerUI('each temporal section observes its own pending command', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(1000, 2400));
@@ -242,7 +273,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
+  testOwnerUI(
     'ongoing content opens the existing production event detail route',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(1000, 2400));

@@ -16,6 +16,7 @@ import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
 
+import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
 import '../support/mock_gotrue_client.dart';
@@ -23,7 +24,7 @@ import '../support/sync_harness.dart';
 
 void main() {
   group('buildAppRouter sync redirect', () {
-    testWidgets('unknown route renders the route error screen', (tester) async {
+    testOwnerUI('unknown route renders the route error screen', (tester) async {
       final harness = SyncHarness();
       final router = buildSyncRouterApp(harness);
 
@@ -40,7 +41,7 @@ void main() {
       );
     });
 
-    testWidgets('cold start without a due sync stays on /home', (tester) async {
+    testOwnerUI('cold start without a due sync stays on /home', (tester) async {
       final harness = SyncHarness();
       final router = buildSyncRouterApp(harness);
 
@@ -51,7 +52,7 @@ void main() {
       expect(find.byType(SyncScreen), findsNothing);
     });
 
-    testWidgets('automatic sync from /home preserves /home and returns', (
+    testOwnerUI('automatic sync from /home preserves /home and returns', (
       tester,
     ) async {
       final harness = SyncHarness(autoSync: true);
@@ -74,7 +75,7 @@ void main() {
       expect(find.byType(SyncScreen), findsNothing);
     });
 
-    testWidgets('manual sync from /home preserves /home and returns', (
+    testOwnerUI('manual sync from /home preserves /home and returns', (
       tester,
     ) async {
       final harness = SyncHarness();
@@ -100,7 +101,7 @@ void main() {
       );
     });
 
-    testWidgets('sync from a detail URI preserves and restores it', (
+    testOwnerUI('sync from a detail URI preserves and restores it', (
       tester,
     ) async {
       final event = makeEvent();
@@ -142,7 +143,7 @@ void main() {
       expect(uri.queryParameters['type'], 'event');
     });
 
-    testWidgets('non-fatal error returns to the preserved URI', (tester) async {
+    testOwnerUI('non-fatal error returns to the preserved URI', (tester) async {
       final harness = SyncHarness(
         cityResult: Result.error(TestException('sync failed')),
       );
@@ -173,7 +174,7 @@ void main() {
       );
     });
 
-    testWidgets(
+    testOwnerUI(
       'upgraded cursor-less cache bootstraps and offline failure returns home',
       (tester) async {
         final settings = FakeSettingsRepository(lastSyncedAt: DateTime.now());
@@ -224,7 +225,7 @@ void main() {
     });
 
     for (final from in _invalidFromValues) {
-      testWidgets(
+      testOwnerUI(
         'rejects invalid from value "$from" and falls back to /home',
         (tester) async {
           final harness = SyncHarness();
@@ -313,7 +314,7 @@ void main() {
 
   group('Home temporal discovery after sync', () {
     for (final trigger in ['menu', 'pull-to-refresh']) {
-      testWidgets(
+      testOwnerUI(
         '$trigger refreshes both collections after the cache commit',
         (tester) async {
           if (trigger == 'pull-to-refresh') {
@@ -380,7 +381,7 @@ void main() {
       );
     }
 
-    testWidgets('non-fatal sync error reloads valid cached discovery', (
+    testOwnerUI('non-fatal sync error reloads valid cached discovery', (
       tester,
     ) async {
       final active = makeEvent(remoteId: 61);
@@ -419,7 +420,7 @@ void main() {
   });
 
   group('buildAppRouter sync restoration', () {
-    testWidgets('restored idle /sync returns to the preserved settings URI', (
+    testOwnerUI('restored idle /sync returns to the preserved settings URI', (
       tester,
     ) async {
       // Persist a recent timestamp so the fresh view model skips auto-sync.
@@ -471,7 +472,7 @@ void main() {
       expect(find.byType(SettingsScreen), findsOneWidget);
     });
 
-    testWidgets('restored due sync remains on /sync until it completes', (
+    testOwnerUI('restored due sync remains on /sync until it completes', (
       tester,
     ) async {
       final holder = SyncRestorationHolder(
@@ -526,7 +527,7 @@ void main() {
   });
 
   group('MoliseIsApp router lifecycle', () {
-    testWidgets('theme rebuild keeps the same router and URI', (tester) async {
+    testOwnerUI('theme rebuild keeps the same router and URI', (tester) async {
       final harness = SyncHarness();
       await tester.pumpWidget(buildRealSyncApp(harness));
       await tester.pumpAndSettle();
@@ -543,9 +544,12 @@ void main() {
         RoutePaths.settings,
       );
 
-      await settingsContext.read<ThemeViewModel>().setThemeType.execute(
-        ThemeType.app,
-      );
+      final execution = settingsContext
+          .read<ThemeViewModel>()
+          .setThemeType
+          .runAsync(ThemeType.app);
+      await pumpCommandTurns(tester);
+      expect(await execution, isA<Success<void>>());
       await tester.pumpAndSettle();
 
       expect(GoRouter.of(settingsContext), same(routerBefore));

@@ -162,7 +162,7 @@ void main() {
     final usesBottomNavigation =
         windowClass == WindowSizeClass.compact ||
         windowClass == WindowSizeClass.medium;
-    testWidgets('NAV-02 Map/Gallery chrome in ${windowClass.name} at $size', (
+    testOwnerUI('NAV-02 Map/Gallery chrome in ${windowClass.name} at $size', (
       tester,
     ) async {
       tester.view.devicePixelRatio = 1;
@@ -241,7 +241,7 @@ void main() {
     });
   }
 
-  testWidgets(
+  testOwnerUI(
     'NAV-02 Explore detail retains persistent chrome beneath opaque Gallery',
     (tester) async {
       final harness = _MapHarness();
@@ -313,7 +313,7 @@ void main() {
     final usesBottomNavigation =
         windowClass == WindowSizeClass.compact ||
         windowClass == WindowSizeClass.medium;
-    testWidgets('shell chrome and selection in ${windowClass.name} at $size', (
+    testOwnerUI('shell chrome and selection in ${windowClass.name} at $size', (
       tester,
     ) async {
       tester.view.devicePixelRatio = 1;
@@ -413,7 +413,7 @@ void main() {
     final usesBottomNavigation =
         windowClass == WindowSizeClass.compact ||
         windowClass == WindowSizeClass.medium;
-    testWidgets('shell Semantics in ${windowClass.name} at $size', (
+    testOwnerUI('shell Semantics in ${windowClass.name} at $size', (
       tester,
     ) async {
       final semantics = tester.ensureSemantics();
@@ -515,7 +515,7 @@ void main() {
       ('/home/category/nature', CategoryScreen),
       ('/home/search_results?q=molise', SearchResultScreen),
     ]) {
-      testWidgets('final $screen content reachable in ${windowClass.name} '
+      testOwnerUI('final $screen content reachable in ${windowClass.name} '
           'at $size', (tester) async {
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = size;
@@ -638,7 +638,7 @@ void main() {
   }
 
   group('buildAppRouter geoMap selection', () {
-    testWidgets(
+    testOwnerUI(
       'NAV-06 each selected content owns its pending weather request',
       (tester) async {
         const firstCoordinates = LatLng(41.56, 14.66);
@@ -701,7 +701,7 @@ void main() {
 
     for (final type in <String>['event', 'place']) {
       for (final firstFails in <bool>[false, true]) {
-        testWidgets('NAV-06 rapid $type A to B resolves B when A '
+        testOwnerUI('NAV-06 rapid $type A to B resolves B when A '
             '${firstFails ? 'fails' : 'succeeds'}', (tester) async {
           final events = FakeEventRepository();
           final places = FakePlaceRepository();
@@ -772,7 +772,7 @@ void main() {
       }
     }
 
-    testWidgets('NAV-06 a late event cannot replace a newer place selection', (
+    testOwnerUI('NAV-06 a late event cannot replace a newer place selection', (
       tester,
     ) async {
       final events = FakeEventRepository();
@@ -825,7 +825,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('NAV-06 map root invalidates an in-flight selection', (
+    testOwnerUI('NAV-06 map root invalidates an in-flight selection', (
       tester,
     ) async {
       final events = FakeEventRepository();
@@ -907,7 +907,7 @@ void main() {
       },
     );
 
-    testWidgets(
+    testOwnerUI(
       'NAV-06 Map retains GeoMap/Search VMs and replaces content Weather VM',
       (tester) async {
         final events = FakeEventRepository(
@@ -1053,7 +1053,7 @@ void main() {
 
     for (final refreshSource in ['sync', 'admin_auth']) {
       for (final pendingSelection in [false, true]) {
-        testWidgets('same URI ${pendingSelection ? 'pending' : 'successful'} '
+        testOwnerUI('same URI ${pendingSelection ? 'pending' : 'successful'} '
             'preserves selection across $refreshSource refresh', (
           tester,
         ) async {
@@ -1160,7 +1160,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('former Map key stays in the URI without selecting content', (
+    testOwnerUI('former Map key stays in the URI without selecting content', (
       tester,
     ) async {
       final harness = _MapHarness();
@@ -1202,7 +1202,7 @@ void main() {
       expect(find.byType(GeoMapModalPost), findsOneWidget);
     });
 
-    testWidgets('/map?contentId=<event>&type=event selects the event', (
+    testOwnerUI('/map?contentId=<event>&type=event selects the event', (
       tester,
     ) async {
       final event = makeEvent(name: 'Evento 1');
@@ -1252,7 +1252,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('/map?contentId=<place>&type=place selects the place', (
+    testOwnerUI('/map?contentId=<place>&type=place selects the place', (
       tester,
     ) async {
       final place = makePlace(remoteId: 3, name: 'Luogo 3');
@@ -1288,7 +1288,7 @@ void main() {
       ('invalid type', <String, String>{'contentId': '1', 'type': 'bogus'}),
       ('missing id', <String, String>{'type': 'event'}),
     ]) {
-      testWidgets(
+      testOwnerUI(
         'malformed or missing parameters ($label) render the default map',
         (tester) async {
           final harness = _MapHarness();
@@ -1313,7 +1313,7 @@ void main() {
       );
     }
 
-    testWidgets(
+    testOwnerUI(
       'missing repository item keeps the default map and shows feedback',
       (tester) async {
         final harness = _MapHarness();
@@ -1339,7 +1339,7 @@ void main() {
       },
     );
 
-    testWidgets(
+    testOwnerUI(
       'repeated navigation to different content ids updates URI and screen',
       (tester) async {
         final first = makeEvent(name: 'Evento 1');
@@ -1393,7 +1393,7 @@ void main() {
       },
     );
 
-    testWidgets(
+    testOwnerUI(
       'returning to /map clears selection and restores sheet extent',
       (tester) async {
         final event = makeEvent(name: 'Evento 1');
@@ -1433,7 +1433,7 @@ void main() {
       },
     );
 
-    testWidgets(
+    testOwnerUI(
       'reparsing the selected location retains the selected identity',
       (tester) async {
         final event = makeEvent(name: 'Evento 1');

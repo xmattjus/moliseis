@@ -17,6 +17,7 @@ import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../support/command_test_support.dart';
 import '../support/fixtures.dart';
 import '../support/predictive_back.dart';
 import '../support/route_ownership_fixture.dart';
@@ -26,7 +27,7 @@ void main() {
     '/home/category/nature/posts/1?type=event',
     '/home/search_results?q=molise',
   ]) {
-    testWidgets('active Explore chrome resets $location to its branch root', (
+    testOwnerUI('active Explore chrome resets $location to its branch root', (
       tester,
     ) async {
       final fixture = RouteOwnershipFixture(initialLocation: location);
@@ -55,7 +56,7 @@ void main() {
     });
   }
 
-  testWidgets(
+  testOwnerUI(
     'chrome cross-tab return preserves the Post URI, State and ViewModel',
     (tester) async {
       final fixture = RouteOwnershipFixture(
@@ -128,7 +129,7 @@ void main() {
           'Search molise root',
         ),
       ]) {
-    testWidgets('Android predictive commit removes one level from $location', (
+    testOwnerUI('Android predictive commit removes one level from $location', (
       tester,
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -173,7 +174,7 @@ void main() {
     });
   }
 
-  testWidgets(
+  testOwnerUI(
     'Android predictive cancel preserves Category Post identity and pages',
     (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -212,7 +213,7 @@ void main() {
     },
   );
 
-  testWidgets('NAV-07 Post A completion cannot affect replacement Post B', (
+  testOwnerUI('NAV-07 Post A completion cannot affect replacement Post B', (
     tester,
   ) async {
     final fixture = RouteOwnershipFixture();
@@ -319,7 +320,7 @@ void main() {
     );
   });
 
-  testWidgets('post page belongs to its branch', (tester) async {
+  testOwnerUI('post page belongs to its branch', (tester) async {
     final fixture = RouteOwnershipFixture(
       initialLocation: '/home/posts/1?type=event',
     );
@@ -355,7 +356,7 @@ void main() {
     );
   });
 
-  testWidgets('back from a branch post returns to its declarative parent', (
+  testOwnerUI('back from a branch post returns to its declarative parent', (
     tester,
   ) async {
     final fixture = RouteOwnershipFixture();
@@ -380,7 +381,7 @@ void main() {
     );
   });
 
-  testWidgets('back from a category post returns to its category parent', (
+  testOwnerUI('back from a category post returns to its category parent', (
     tester,
   ) async {
     final fixture = RouteOwnershipFixture(
@@ -405,7 +406,7 @@ void main() {
     );
   });
 
-  testWidgets('the active branch owns the poppable detail route', (
+  testOwnerUI('the active branch owns the poppable detail route', (
     tester,
   ) async {
     final fixture = RouteOwnershipFixture();
@@ -486,7 +487,7 @@ void main() {
     );
   });
 
-  testWidgets('gallery push keeps the post ViewModel and map mounted', (
+  testOwnerUI('gallery push keeps the post ViewModel and map mounted', (
     tester,
   ) async {
     final fixture = RouteOwnershipFixture();
@@ -565,7 +566,7 @@ void main() {
     ('/home/category/nature/posts/1?type=event', 'Esplora'),
     ('/home/search_results/posts/1?q=molise&type=event', 'Esplora'),
   ]) {
-    testWidgets('map expansion preserves $source in its branch', (
+    testOwnerUI('map expansion preserves $source in its branch', (
       tester,
     ) async {
       final fixture = RouteOwnershipFixture();
@@ -610,7 +611,7 @@ void main() {
     });
   }
 
-  testWidgets('map predictive back preserves the hidden post route', (
+  testOwnerUI('map predictive back preserves the hidden post route', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -650,7 +651,7 @@ void main() {
     }
   });
 
-  testWidgets(
+  testOwnerUI(
     'nearby post navigation updates URL, identity, and search parent',
     (tester) async {
       final fixture = RouteOwnershipFixture();
