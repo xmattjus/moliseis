@@ -1,14 +1,69 @@
+import 'dart:async' show Completer;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/ui/category/widgets/category_screen.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
+import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
+import 'package:moliseis/utils/result.dart';
 
 import '../support/command_test_support.dart';
 import '../support/route_ownership_fixture.dart';
 
 void main() {
   group('category route parameters', () {
+    for (final slug in ['nature', 'all']) {
+      testOwnerUI('$slug is seeded before the first pending route frame', (
+        tester,
+      ) async {
+        final fixture = RouteOwnershipFixture(
+          initialLocation: '/home/category/$slug',
+        );
+        addTearDown(fixture.dispose);
+        final pending = Completer<Result<List<Place>>>();
+        fixture.placeRepository.getByCategoriesHandler = (_) => pending.future;
+        fixture.placeRepository.pendingGetAll = pending;
+        await tester.pumpWidget(fixture.app);
+
+        final owner = tester
+            .widget<CategoryScreen>(find.byType(CategoryScreen))
+            .viewModel;
+        expect(
+          owner.selectedCategories,
+          slug == 'all'
+              ? ContentCategory.values
+                    .where((value) => value != ContentCategory.unknown)
+                    .toSet()
+              : {ContentCategory.nature},
+        );
+        expect(
+          find.text(slug == 'all' ? 'Categoria' : 'Natura'),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await pumpCommandTurns(tester);
+        expect(find.byType(SkeletonContentSliverGrid), findsOneWidget);
+        expect(
+          fixture.placeRepository.getByCategoriesCallCount +
+              fixture.placeRepository.getAllCallCount,
+          1,
+        );
+        expect(
+          fixture.eventRepository.getByCategoriesCallCount +
+              fixture.eventRepository.getByCurrentYearCallCount,
+          0,
+        );
+
+        pending.complete(const Result.success([]));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      });
+    }
+
     for (final slug in <String>[
       'nature',
       'history',
@@ -18,7 +73,7 @@ void main() {
       'experience',
       'all',
     ]) {
-      testWidgets('canonical category $slug stays unchanged', (tester) async {
+      testOwnerUI('canonical category $slug stays unchanged', (tester) async {
         final fixture = RouteOwnershipFixture(
           initialLocation: '/home/category/$slug',
         );
@@ -44,7 +99,7 @@ void main() {
       '6',
       '-2',
     ]) {
-      testWidgets('invalid category "$slug" errors without rewriting', (
+      testOwnerUI('invalid category "$slug" errors without rewriting', (
         tester,
       ) async {
         final fixture = RouteOwnershipFixture(
@@ -56,6 +111,10 @@ void main() {
 
         expect(fixture.uri.path, '/home/category/$slug');
         expect(find.byType(RouteErrorScreen), findsOneWidget);
+        expect(fixture.placeRepository.getByCategoriesCallCount, 0);
+        expect(fixture.placeRepository.getAllCallCount, 0);
+        expect(fixture.eventRepository.getByCategoriesCallCount, 0);
+        expect(fixture.eventRepository.getByCurrentYearCallCount, 0);
         expect(
           fixture.exploreNavigatorKey.currentState!.widget.pages.length,
           2,

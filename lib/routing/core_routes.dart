@@ -51,6 +51,9 @@ GoRoute categoryRoute({
           key: ValueKey(slug),
           create: (context) {
             final viewModel = CategoryViewModel(
+              initialCategories: category == null
+                  ? {...allCategories}
+                  : {category},
               categoryUseCase: CategoryUseCase(
                 eventRepository: context.read(),
                 placeRepository: context.read(),
@@ -60,12 +63,6 @@ GoRoute categoryRoute({
                 placeRepository: context.read(),
               ),
               settingsRepository: context.read(),
-            );
-
-            unawaited(
-              viewModel.setSelectedCategories.execute(
-                category == null ? {...allCategories} : {category},
-              ),
             );
 
             return viewModel;

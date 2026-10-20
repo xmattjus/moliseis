@@ -4,10 +4,16 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, debugDefaultTargetPlatformOverride;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/media.dart';
+import 'package:moliseis/domain/models/place.dart';
+import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
+import 'package:moliseis/ui/category/widgets/category_screen.dart';
 import 'package:moliseis/ui/core/ui/responsive_navigation_bar.dart';
 import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
@@ -16,13 +22,114 @@ import 'package:moliseis/ui/post/widgets/components/post_section_map_preview.dar
 import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:provider/provider.dart';
 
 import '../support/command_test_support.dart';
+import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
 import '../support/predictive_back.dart';
 import '../support/route_ownership_fixture.dart';
 
 void main() {
+  testOwnerUI('Category survives Post, branch return and same-route rebuild '
+      'without refetch', (tester) async {
+    final fixture = RouteOwnershipFixture(
+      initialLocation: '/home/category/nature',
+    );
+    addTearDown(fixture.dispose);
+    await tester.pumpWidget(fixture.app);
+    await tester.pumpAndSettle();
+    final owner =
+        tester.widget<CategoryScreen>(find.byType(CategoryScreen)).viewModel
+          ..setSelectedTypes({ContentType.place});
+    await tester.pumpAndSettle();
+    final calls = fixture.placeRepository.getByCategoriesCallCount;
+    final state = tester.state(find.byType(CategoryScreen));
+
+    fixture.router.go('/home/category/nature/posts/1?type=event');
+    await tester.pumpAndSettle();
+    fixture.router.pop();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Preferiti'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Esplora'));
+    await tester.pumpAndSettle();
+    fixture.router.refresh();
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<CategoryScreen>(find.byType(CategoryScreen)).viewModel,
+      same(owner),
+    );
+    expect(tester.state(find.byType(CategoryScreen)), same(state));
+    expect(owner.selectedTypes, {ContentType.place});
+    expect(fixture.placeRepository.getByCategoriesCallCount, calls);
+    expect(tester.takeException(), isNull);
+  });
+
+  testOwnerUI('Category slug replacement and pop revoke pending owners', (
+    tester,
+  ) async {
+    final fixture = RouteOwnershipFixture(
+      initialLocation: '/home/category/nature',
+    );
+    addTearDown(fixture.dispose);
+    final first = Completer<Result<List<Place>>>();
+    final second = Completer<Result<List<Place>>>();
+    fixture.placeRepository.getByCategoriesHandler = (categories) =>
+        categories.contains(ContentCategory.nature)
+        ? first.future
+        : second.future;
+    await tester.pumpWidget(fixture.app);
+    await pumpCommandTurns(tester);
+    final oldScreen = tester.widget<CategoryScreen>(
+      find.byType(CategoryScreen),
+    );
+    final oldState = tester.state(find.byType(CategoryScreen));
+    var lateNotifications = 0;
+    oldScreen.viewModel.addListener(() => lateNotifications++);
+
+    fixture.router.go('/home/category/history');
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await pumpCommandTurns(tester);
+    final replacement = tester
+        .widget<CategoryScreen>(find.byType(CategoryScreen))
+        .viewModel;
+    expect(replacement, isNot(same(oldScreen.viewModel)));
+    expect(replacement.selectedCategories, {ContentCategory.history});
+    expect(oldState.mounted, isFalse);
+    replacement.addListener(() => lateNotifications++);
+    final settings =
+        tester.element(find.byType(CategoryScreen)).read<SettingsRepository>()
+            as FakeSettingsRepository;
+    final pendingSort = Completer<Result<void>>();
+    settings.onSetContentSort = (_) => pendingSort.future;
+    replacement.setSort.run(ContentSort.byDate);
+    await pumpCommandTurns(tester);
+    expect(settings.contentSortCalls, [ContentSort.byDate]);
+    final route = ModalRoute.of(tester.element(find.byType(CategoryScreen)))!;
+    fixture.router.pop();
+    await tester.pump();
+    await tester.pump(
+      route.reverseTransitionDuration + const Duration(milliseconds: 1),
+    );
+    await pumpCommandTurns(tester);
+    expect(find.byType(CategoryScreen), findsNothing);
+    final countAfterPop = lateNotifications;
+    first.complete(Result.success([makePlace(name: 'Old route')]));
+    second.complete(Result.success([makePlace(name: 'Removed route')]));
+    pendingSort.complete(const Result.success(null));
+    await pumpCommandTurns(tester);
+    await tester.pump(const Duration(milliseconds: 100));
+    await pumpCommandTurns(tester);
+    expect(lateNotifications, countAfterPop);
+    expect(oldScreen.viewModel.content, isEmpty);
+    expect(replacement.content, isEmpty);
+    expect(fixture.eventRepository.getByCategoriesCallCount, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final location in <String>[
     '/home/category/nature/posts/1?type=event',
     '/home/search_results?q=molise',
@@ -302,7 +409,7 @@ void main() {
     }
   });
 
-  testWidgets('category page belongs to its branch', (tester) async {
+  testOwnerUI('category page belongs to its branch', (tester) async {
     final fixture = RouteOwnershipFixture(
       initialLocation: '/home/category/nature',
     );

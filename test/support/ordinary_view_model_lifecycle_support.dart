@@ -3,10 +3,15 @@ import 'dart:async';
 import 'package:command_it/command_it.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/domain/models/content_category.dart';
+import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
+import 'package:moliseis/domain/use-cases/category_use_case.dart';
+import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
+import 'package:moliseis/ui/category/view_models/category_view_model.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
 import 'package:moliseis/ui/explore/view_models/suggestion_view_model.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
@@ -27,6 +32,7 @@ enum OrdinaryOwnerLane {
   explore,
   suggestion,
   favourite,
+  categorySort,
 }
 
 /// Repository gates retain real commands and expose observable owner state.
@@ -51,7 +57,8 @@ class OrdinaryOwnerHarness {
     final preferences = FakeSettingsRepository()
       ..onSetCrashReporting = ((_) => write())
       ..onSetThemeBrightness = ((_) => write())
-      ..onSetThemeType = ((_) => write());
+      ..onSetThemeType = ((_) => write())
+      ..onSetContentSort = ((_) => write());
     final places = FakePlaceRepository(
       getByIdResults: {1: Result.success(makePlace())},
       getSuggestionsHandler: read,
@@ -66,6 +73,24 @@ class OrdinaryOwnerHarness {
     repositoryCalls = () =>
         _repositoryCalls + places.getLatestCallCount + places.getByIdCallCount;
     switch (lane) {
+      case OrdinaryOwnerLane.categorySort:
+        final events = FakeEventRepository();
+        final vm = CategoryViewModel(
+          initialCategories: {ContentCategory.history},
+          categoryUseCase: CategoryUseCase(
+            eventRepository: events,
+            placeRepository: places,
+          ),
+          exploreGetByIdUseCase: ExploreUseCase(
+            eventRepository: events,
+            placeRepository: places,
+          ),
+          settingsRepository: preferences,
+        );
+        owner = vm;
+        command = vm.setSort;
+        start = () => vm.setSort.run(ContentSort.byDate);
+        state = () => vm.sort;
       case OrdinaryOwnerLane.settings:
         final sentryFlag = SentryLoggingFlag(initialValue: false);
         final vm = SettingsViewModel(

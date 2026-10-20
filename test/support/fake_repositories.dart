@@ -531,6 +531,8 @@ final class FakeEventRepository extends EventRepository {
   int getByDateCallCount = 0;
   int getByCurrentYearCallCount = 0;
   int getByCategoriesCallCount = 0;
+  Future<Result<List<Event>>> Function(Set<ContentCategory>)?
+  getByCategoriesHandler;
   int getByCoordinatesCallCount = 0;
 
   // Argument captures (only where existing tests inspect them)
@@ -582,6 +584,8 @@ final class FakeEventRepository extends EventRepository {
     ContentSort sort = ContentSort.byName,
   }) async {
     getByCategoriesCallCount++;
+    final handler = getByCategoriesHandler;
+    if (handler != null) return await handler(categories);
     return getByCategoriesResult;
   }
 
@@ -812,6 +816,9 @@ final class FakePlaceRepository extends PlaceRepository {
   Result<List<Place>> getAllResult;
   Completer<Result<List<Place>>>? pendingGetAll;
   Result<List<Place>> getByCategoriesResult;
+  int getByCategoriesCallCount = 0;
+  Future<Result<List<Place>>> Function(Set<ContentCategory>)?
+  getByCategoriesHandler;
   Result<List<Place>> getByCoordinatesResult;
   Completer<Result<List<Place>>>? pendingGetByCoordinates;
   Completer<void>? getByCoordinatesCalled;
@@ -874,7 +881,12 @@ final class FakePlaceRepository extends PlaceRepository {
   Future<Result<List<Place>>> getByCategories(
     Set<ContentCategory> categories, {
     ContentSort sort = ContentSort.byName,
-  }) async => getByCategoriesResult;
+  }) async {
+    getByCategoriesCallCount++;
+    final handler = getByCategoriesHandler;
+    if (handler != null) return await handler(categories);
+    return getByCategoriesResult;
+  }
 
   @override
   Future<Result<List<Place>>> getByCoordinates(List<double> coordinates) {
@@ -974,6 +986,8 @@ final class FakeSettingsRepository implements SettingsRepository {
   Future<Result<void>> Function(bool)? onSetCrashReporting;
   Future<Result<void>> Function(ThemeBrightness)? onSetThemeBrightness;
   Future<Result<void>> Function(ThemeType)? onSetThemeType;
+  Future<Result<void>> Function(ContentSort)? onSetContentSort;
+  final contentSortCalls = <ContentSort>[];
 
   // Call tracking
   bool setSyncStateCalled = false;
@@ -992,8 +1006,12 @@ final class FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<Result<void>> setContentSort(ContentSort sort) async {
-    if (setContentSortResult is Success<void>) contentSort = sort;
-    return setContentSortResult;
+    contentSortCalls.add(sort);
+    final result =
+        await (onSetContentSort?.call(sort) ??
+            Future.value(setContentSortResult));
+    if (result is Success<void>) contentSort = sort;
+    return result;
   }
 
   @override

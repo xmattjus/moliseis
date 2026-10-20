@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
+import 'package:moliseis/ui/category/widgets/category_screen.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_modal_post.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_screen.dart';
@@ -16,6 +18,64 @@ import '../support/predictive_back.dart';
 import '../support/sync_harness.dart';
 
 void main() {
+  for (final slug in ['nature', 'all']) {
+    testOwnerUI('production Category $slug restores its selection and parent', (
+      tester,
+    ) async {
+      final holder = SyncRestorationHolder(
+        settingsFactory: () => FakeSettingsRepository(
+          lastSyncedAt: DateTime.now(),
+          contentSyncCursorAt: DateTime.utc(2026, 10, 12),
+        ),
+      );
+      await tester.pumpWidget(RestorableSyncHarness(holder: holder));
+      await tester.pumpAndSettle();
+      holder.fixture!.router.go('/home/category/$slug');
+      await tester.pumpAndSettle();
+      final before = holder.fixture!;
+      final oldOwner = tester
+          .widget<CategoryScreen>(find.byType(CategoryScreen))
+          .viewModel;
+      final oldState = tester.state(find.byType(CategoryScreen));
+      await tester.restartAndRestore();
+      await tester.pumpAndSettle();
+
+      expect(holder.fixture!.router, isNot(same(before.router)));
+      expect(
+        holder.fixture!.router.routeInformationProvider.value.uri.path,
+        '/home/category/$slug',
+      );
+      final screen = tester.widget<CategoryScreen>(find.byType(CategoryScreen));
+      expect(screen.viewModel, isNot(same(oldOwner)));
+      expect(oldState.mounted, isFalse);
+      expect(
+        screen.viewModel.selectedCategories,
+        slug == 'all'
+            ? ContentCategory.values
+                  .where((value) => value != ContentCategory.unknown)
+                  .toSet()
+            : {ContentCategory.nature},
+      );
+      final branch = Navigator.of(tester.element(find.byType(CategoryScreen)));
+      expect(branch.widget.pages.length, 2);
+      expect(
+        Navigator.of(
+          tester.element(find.byType(CategoryScreen)),
+          rootNavigator: true,
+        ).widget.pages.length,
+        1,
+      );
+      holder.fixture!.router.pop();
+      await tester.pumpAndSettle();
+      expect(
+        holder.fixture!.router.routeInformationProvider.value.uri.path,
+        '/home',
+      );
+      expect(find.byType(ExploreScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testOwnerUI('production Map selection is reconstructed after restoration', (
     tester,
   ) async {

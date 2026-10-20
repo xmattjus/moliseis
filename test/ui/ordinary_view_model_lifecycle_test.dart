@@ -238,6 +238,7 @@ void main() {
       );
 
       if ([
+        OrdinaryOwnerLane.categorySort,
         OrdinaryOwnerLane.settings,
         OrdinaryOwnerLane.brightness,
         OrdinaryOwnerLane.themeType,

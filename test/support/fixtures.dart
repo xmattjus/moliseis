@@ -72,6 +72,7 @@ Place makePlace({
   List<Map<String, dynamic>>? descriptionDelta,
   ContentCategory category = ContentCategory.unknown,
   LatLng coordinates = const LatLng(41.56, 14.66),
+  DateTime? modifiedAt,
   City? city,
   bool isSaved = false,
 }) => Place(
@@ -82,7 +83,7 @@ Place makePlace({
   category: category,
   coordinates: coordinates,
   createdAt: _defaultDate,
-  modifiedAt: _defaultDate,
+  modifiedAt: modifiedAt ?? _defaultDate,
   city: city ?? testCity(),
   media: const [],
   isSaved: isSaved,

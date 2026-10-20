@@ -523,6 +523,7 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
               viewModel: search,
               trailing: <Widget>[
                 CategoryContentAndTypeSelection(
+                  key: ObjectKey(owner),
                   selectedCategories: owner.selectedCategories,
                   selectedTypes: owner.selectedTypes,
                   onCategorySelectionChanged: (categories) =>
