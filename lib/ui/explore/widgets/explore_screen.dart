@@ -220,9 +220,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               ),
               ListenableBuilder(
-                listenable: widget.eventViewModel.loadOngoing,
+                listenable: widget.eventViewModel.loadOngoing.results,
                 builder: (context, _) {
-                  if (widget.eventViewModel.loadOngoing.completed) {
+                  if (widget
+                      .eventViewModel
+                      .loadOngoing
+                      .results
+                      .value
+                      .completed) {
                     return SliverPadding(
                       padding: const EdgeInsets.only(top: 8, bottom: 16),
                       sliver: ContentSliverGrid(
@@ -244,7 +249,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     );
                   }
 
-                  if (widget.eventViewModel.loadOngoing.error) {
+                  if (widget
+                      .eventViewModel
+                      .loadOngoing
+                      .results
+                      .value
+                      .hasFailure) {
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       sliver: SliverToBoxAdapter(
@@ -273,9 +283,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               ),
               ListenableBuilder(
-                listenable: widget.eventViewModel.loadNext,
+                listenable: widget.eventViewModel.loadNext.results,
                 builder: (context, _) {
-                  if (widget.eventViewModel.loadNext.completed) {
+                  if (widget.eventViewModel.loadNext.results.value.completed) {
                     return SliverPadding(
                       padding: const EdgeInsets.only(top: 8, bottom: 16),
                       sliver: ContentSliverGrid(
@@ -297,7 +307,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     );
                   }
 
-                  if (widget.eventViewModel.loadNext.error) {
+                  if (widget.eventViewModel.loadNext.results.value.hasFailure) {
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       sliver: SliverToBoxAdapter(
@@ -406,7 +416,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _startSync() {
     final syncViewModel = context.read<SyncViewModel>();
-    unawaited(syncViewModel.sync.execute(true));
+    syncViewModel.sync.run(true);
   }
 
   void _showSearchResults(String text) {

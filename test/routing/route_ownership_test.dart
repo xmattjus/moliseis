@@ -22,11 +22,13 @@ import 'package:moliseis/ui/post/widgets/components/post_section_map_preview.dar
 import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
 import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
+import '../support/mock_logger.dart';
 import '../support/predictive_back.dart';
 import '../support/route_ownership_fixture.dart';
 
@@ -339,7 +341,7 @@ void main() {
     final oldViewModel = tester
         .widget<PostScreen>(find.byType(PostScreen))
         .viewModel;
-    expect(oldViewModel.loadEvent.running, isTrue);
+    expect(oldViewModel.loadEvent.isRunningSync.value, isTrue);
 
     fixture.router.go('/home/posts/2?type=event');
     await tester.pumpAndSettle();
@@ -348,7 +350,7 @@ void main() {
         .viewModel;
     expect(currentViewModel, isNot(same(oldViewModel)));
     expect(currentViewModel.content.remoteId, 2);
-    expect(currentViewModel.loadEvent.completed, isTrue);
+    expect(currentViewModel.loadEvent.results.value.completed, isTrue);
     expect(find.text('Post B'), findsOneWidget);
 
     pendingA.complete(Result.success(makeEvent(name: 'Post A')));
@@ -361,11 +363,65 @@ void main() {
       same(currentViewModel),
     );
     expect(currentViewModel.content.remoteId, 2);
-    expect(currentViewModel.loadEvent.completed, isTrue);
-    expect(oldViewModel.loadEvent.completed, isTrue);
+    expect(currentViewModel.loadEvent.results.value.completed, isTrue);
+    expect(oldViewModel.loadEvent.results.value.completed, isTrue);
     expect(find.text('Post B'), findsOneWidget);
     expect(find.text('Post A'), findsNothing);
   });
+
+  for (final outcome in ['success', 'domain', 'runtime']) {
+    testOwnerUI('same Post id with new type replaces owner; '
+        'late $outcome cannot contaminate Place', (tester) async {
+      final fixture = RouteOwnershipFixture(
+        initialLocation: '/home/posts/1?type=event',
+      );
+      addTearDown(fixture.dispose);
+      final pending = Completer<Result<Event>>();
+      fixture.eventRepository.pendingGetById[1] = pending;
+      final place = makePlace(name: 'Current Place');
+      fixture.placeRepository.getByIdResults[1] = Result.success(place);
+      final logger = MockLogger();
+      final restore = installCommandTestReporting(logger);
+      addTearDown(restore);
+      await tester.pumpWidget(fixture.app);
+      await pumpCommandTurns(tester);
+      final old = tester.widget<PostScreen>(find.byType(PostScreen)).viewModel;
+      expect(old.loadEvent.isRunningSync.value, isTrue);
+      expect(fixture.eventRepository.getByIdCallCount, 1);
+      expect(fixture.placeRepository.getByIdCallCount, 0);
+      fixture.router.go('/home/posts/1?type=place');
+      await tester.pumpAndSettle();
+      final screen = tester.widget<PostScreen>(find.byType(PostScreen));
+      final current = screen.viewModel;
+      expect(current, isNot(same(old)));
+      expect(screen.isEvent, isFalse);
+      expect(current.content, same(place));
+      expect(current.loadEvent.results.value.idle, isTrue);
+      expect(current.loadPlace.results.value.completed, isTrue);
+      expect(screen.weatherViewModel.currentTarget?.type, ContentType.place);
+      if (outcome == 'runtime') {
+        pending.completeError(StateError('stale Event'));
+      } else if (outcome == 'success') {
+        pending.complete(Result.success(makeEvent(name: 'Old Event')));
+      } else {
+        pending.complete(Result.error(TestException('stale Event')));
+      }
+      await pumpCommandTurns(tester);
+      expect(current.content, same(place));
+      expect(find.text('Current Place'), findsOneWidget);
+      expect(screen.weatherViewModel.currentTarget?.type, ContentType.place);
+      expect(logger.calls, outcome == 'runtime' ? hasLength(1) : isEmpty);
+      expect(tester.takeException(), isNull);
+      final calls = fixture.placeRepository.getByIdCallCount;
+      fixture.router.go('/home/posts/1?type=place');
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<PostScreen>(find.byType(PostScreen)).viewModel,
+        same(current),
+      );
+      expect(fixture.placeRepository.getByIdCallCount, calls);
+    });
+  }
 
   testWidgets('each tab root stays on its branch Navigator with one page', (
     tester,

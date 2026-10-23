@@ -188,6 +188,8 @@ void main() {
         expect(fixture.uri.toString(), location);
         expect(fixture.uri.queryParameters.containsKey('type'), isFalse);
         expect(find.byType(RouteErrorScreen), findsOneWidget);
+        expect(fixture.eventRepository.getByIdCallCount, 0);
+        expect(fixture.placeRepository.getByIdCallCount, 0);
         expect(find.byType(PostScreen), findsNothing);
       });
     }
@@ -225,6 +227,8 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(RouteErrorScreen), findsOneWidget);
+        expect(fixture.eventRepository.getByIdCallCount, 0);
+        expect(fixture.placeRepository.getByIdCallCount, 0);
       });
     }
 
@@ -241,6 +245,8 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(find.byType(RouteErrorScreen), findsOneWidget);
+        expect(fixture.eventRepository.getByIdCallCount, 0);
+        expect(fixture.placeRepository.getByIdCallCount, 0);
       });
     }
   });

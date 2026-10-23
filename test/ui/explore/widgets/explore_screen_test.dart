@@ -11,6 +11,7 @@ import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 import '../../../support/command_test_support.dart';
 import '../../../support/events_harness.dart';
@@ -141,8 +142,10 @@ void main() {
       final vm = tester
           .widget<ExploreScreen>(find.byType(ExploreScreen))
           .eventViewModel;
-      await vm.loadOngoing.execute(snapshot);
-      await vm.loadNext.execute(snapshot);
+      vm.loadOngoing.run(snapshot);
+      await pumpCommandTurns(tester);
+      vm.loadNext.run(snapshot);
+      await pumpCommandTurns(tester);
       await tester.pumpAndSettle();
       expect(find.text('Eventi in corso'), findsOneWidget);
       expect(find.text('Prossimi eventi'), findsOneWidget);
@@ -253,17 +256,16 @@ void main() {
     final vm = tester
         .widget<ExploreScreen>(find.byType(ExploreScreen))
         .eventViewModel;
-    expect(vm.loadOngoing.running, isTrue);
-    expect(vm.loadNext.idle, isTrue);
+    expect(vm.loadOngoing.isRunningSync.value, isTrue);
+    expect(vm.loadNext.results.value.idle, isTrue);
     // The reused skeleton sliver fills available space until its query
     // completes; the later section becomes visible after ongoing publishes.
     expect(find.byType(SkeletonContentSliverGrid), findsOneWidget);
     ongoing.complete(Result.success([active]));
-    await tester.pump();
-    await tester.pump();
+    await pumpCommandTurns(tester);
     expect(find.text('Ongoing loaded'), findsOneWidget);
-    expect(vm.loadOngoing.completed, isTrue);
-    expect(vm.loadNext.running, isTrue);
+    expect(vm.loadOngoing.results.value.completed, isTrue);
+    expect(vm.loadNext.isRunningSync.value, isTrue);
     expect(find.byType(SkeletonContentSliverGrid), findsOneWidget);
     expect(repository.getNextEventsCallCount, 1);
     upcoming.complete(const Result.success([]));

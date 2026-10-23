@@ -43,6 +43,7 @@ import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -85,7 +86,8 @@ GoRouter buildAppRouter({
     initialLocation: RoutePaths.home,
     restorationScopeId: 'router',
     refreshListenable: Listenable.merge([
-      syncViewModel.sync,
+      syncViewModel.sync.results,
+      syncViewModel.sync.isRunning,
       adminAuthViewModel,
     ]),
     redirect: (context, state) =>
@@ -428,13 +430,7 @@ GoRouter buildAppRouter({
                       final viewModel = EventViewModel(
                         repository: context.read(),
                       );
-                      // loadByDate synchronously notifies the ViewModel. Start
-                      // it before Provider attaches any framework listeners.
-                      unawaited(
-                        viewModel.loadByDate.execute(
-                          viewModel.currentCalendarDate,
-                        ),
-                      );
+                      viewModel.selectDate(viewModel.currentCalendarDate);
                       return viewModel;
                     },
                     child: Consumer<EventViewModel>(
@@ -544,11 +540,13 @@ String? _redirectForSync(
   final sync = syncViewModel.sync;
   final onSync = state.matchedLocation == RoutePaths.sync;
 
-  if (sync.running) {
+  if (sync.isRunningSync.value) {
     return onSync ? null : RoutePaths.syncFor(state.uri);
   }
 
-  if (!onSync || (sync.error && syncViewModel.fatalError)) return null;
+  if (!onSync || (sync.results.value.hasFailure && syncViewModel.fatalError)) {
+    return null;
+  }
 
   return _validatedFrom(context, state.uri.queryParameters['from']) ??
       RoutePaths.home;

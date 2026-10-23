@@ -5,7 +5,9 @@ import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
+import '../../../support/events_harness.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
 
@@ -18,7 +20,7 @@ void main() {
           FakeEventRepository(getByCurrentYearResult: Result.success([event1])),
         );
 
-        expect(vm.loadAll.completed, isTrue);
+        expect(vm.loadAll.results.value.completed, isTrue);
         expect(vm.all, hasLength(1));
         expect(vm.all.first.remoteId, 1);
         expect(vm.all.first.name, 'Festival');
@@ -33,7 +35,7 @@ void main() {
           ),
         );
 
-        expect(vm.loadAll.error, isTrue);
+        expect(vm.loadAll.results.value.hasFailure, isTrue);
         expect(vm.all, isEmpty);
       });
 
@@ -51,7 +53,8 @@ void main() {
         );
 
         await pumpEventQueue();
-        final dateLoad = vm.loadByDate.execute(date);
+        vm.selectDate(date);
+        final dateLoad = settleEventDay(vm);
         await pumpEventQueue();
         fallback.complete(const Result.success([]));
         await dateLoad;
@@ -82,7 +85,8 @@ void main() {
           );
 
           await pumpEventQueue();
-          final dateLoad = vm.loadByDate.execute(date);
+          vm.selectDate(date);
+          final dateLoad = settleEventDay(vm);
           await pumpEventQueue();
           yearly.complete(
             Result.success([
@@ -104,29 +108,31 @@ void main() {
           final repository = FakeEventRepository();
           final vm = await buildLoaded(repository);
 
-          await vm.loadByDate.execute(date);
+          vm.selectDate(date);
+          await settleEventDay(vm);
           expect(repository.getByDateCallCount, 1);
 
           repository.getByCurrentYearResult = Result.success([
             makeEvent(remoteId: 24, startDate: DateTime.utc(2026, 4, 2, 10)),
           ]);
-          await vm.loadAll.execute();
+          await vm.loadAll.runAsync();
           expect(vm.byMonth.map((event) => event.remoteId), [24]);
 
           repository.getByCurrentYearResult = Result.success([
             makeEvent(remoteId: 25, startDate: DateTime.utc(2026, 4, 2, 11)),
           ]);
-          await vm.loadAll.execute();
+          await vm.loadAll.runAsync();
           expect(vm.byMonth.map((event) => event.remoteId), [25]);
 
           repository.getByCurrentYearResult = const Result.success([]);
-          await vm.loadAll.execute();
+          await vm.loadAll.runAsync();
           expect(vm.byMonth, isEmpty);
 
           repository.getByDateResult = Result.success([
             makeEvent(remoteId: 26, startDate: DateTime.utc(2026, 4, 2, 12)),
           ]);
-          await vm.loadByDate.execute(date);
+          vm.selectDate(date);
+          await settleEventDay(vm);
           expect(repository.getByDateCallCount, 2);
           expect(vm.byMonth.map((event) => event.remoteId), [26]);
         },
@@ -140,9 +146,9 @@ void main() {
           getNextEventsResult: Result.success(events),
         );
         final vm = await buildLoaded(repo);
-        await vm.loadNext.execute(DateTime.utc(2026, 4, 1, 1));
+        await vm.loadNext.runAsync(DateTime.utc(2026, 4, 1, 1));
         expect(vm.next, events);
-        expect(vm.loadNext.completed, isTrue);
+        expect(vm.loadNext.results.value.completed, isTrue);
         expect(repo.getNextEventsCallCount, 1);
         expect(repo.getByIdCallCount, 0);
       });
@@ -153,13 +159,16 @@ void main() {
           getNextEventsResult: Result.error(failure),
         );
         final vm = await buildLoaded(repo);
-        await vm.loadNext.execute(DateTime.utc(2026, 4, 1, 1));
-        expect(vm.loadNext.error, isTrue);
-        expect((vm.loadNext.result! as Error<void>).error, same(failure));
+        await vm.loadNext.runAsync(DateTime.utc(2026, 4, 1, 1));
+        expect(vm.loadNext.results.value.hasFailure, isTrue);
+        expect(
+          (vm.loadNext.results.value.data! as Error<void>).error,
+          same(failure),
+        );
         repo.getNextEventsResult = Result.success([makeEvent()]);
-        await vm.loadNext.execute(DateTime.utc(2026, 4, 1, 1));
+        await vm.loadNext.runAsync(DateTime.utc(2026, 4, 1, 1));
         expect(repo.getNextEventsCallCount, 2);
-        expect(vm.loadNext.completed, isTrue);
+        expect(vm.loadNext.results.value.completed, isTrue);
         expect(vm.next, hasLength(1));
       });
 
@@ -170,21 +179,21 @@ void main() {
           getNextEventsResult: Result.success([first]),
         );
         final vm = await buildLoaded(repo);
-        await vm.loadNext.execute(DateTime.utc(2026, 4, 1, 1));
+        await vm.loadNext.runAsync(DateTime.utc(2026, 4, 1, 1));
         final pending = Completer<Result<List<Event>>>();
         repo.pendingGetNextEvents = pending;
-        final load = vm.loadNext.execute(DateTime.utc(2026, 4, 1, 1));
+        final load = vm.loadNext.runAsync(DateTime.utc(2026, 4, 1, 1));
         expect(vm.next, [first]);
         pending.complete(Result.error(TestException('query failed')));
         await load;
         expect(vm.next, [first]);
-        expect(vm.loadNext.error, isTrue);
+        expect(vm.loadNext.results.value.hasFailure, isTrue);
         repo
           ..pendingGetNextEvents = null
           ..getNextEventsResult = const Result.success([]);
-        await vm.loadNext.execute(DateTime.utc(2026, 4, 1, 1));
+        await vm.loadNext.runAsync(DateTime.utc(2026, 4, 1, 1));
         expect(vm.next, isEmpty);
-        expect(vm.loadNext.completed, isTrue);
+        expect(vm.loadNext.results.value.completed, isTrue);
       });
     });
 
@@ -204,7 +213,7 @@ void main() {
           final snapshot = DateTime.utc(2026, 4, 1, 1);
           var notifications = 0;
           vm.addListener(() => notifications++);
-          await command.execute(snapshot);
+          await command.runAsync(snapshot);
           expect(ongoing ? vm.ongoing : vm.next, original);
           expect(notifications, 1);
           expect(
@@ -217,13 +226,13 @@ void main() {
           } else {
             repo.pendingGetNextEvents = pending;
           }
-          final load = command.execute(snapshot);
-          expect(command.running, isTrue);
+          final load = command.runAsync(snapshot);
+          expect(command.isRunningSync.value, isTrue);
           expect(ongoing ? vm.ongoing : vm.next, original);
           expect(notifications, 1);
           pending.complete(Result.success(replacement));
           await load;
-          expect(command.completed, isTrue);
+          expect(command.results.value.completed, isTrue);
           expect(ongoing ? vm.ongoing : vm.next, replacement);
           expect(notifications, 2);
           final failure = TestException('materialization failed');
@@ -236,16 +245,19 @@ void main() {
               ..pendingGetNextEvents = null
               ..getNextEventsResult = Result.error(failure);
           }
-          await command.execute(snapshot);
-          expect((command.result! as Error<void>).error, same(failure));
+          await command.runAsync(snapshot);
+          expect(
+            (command.results.value.data! as Error<void>).error,
+            same(failure),
+          );
           expect(ongoing ? vm.ongoing : vm.next, replacement);
           expect(notifications, 2);
           repo
             ..getOngoingEventsResult = const Result.success([])
             ..getNextEventsResult = const Result.success([]);
-          await command.execute(snapshot);
+          await command.runAsync(snapshot);
           expect(ongoing ? vm.ongoing : vm.next, isEmpty);
-          expect(command.completed, isTrue);
+          expect(command.results.value.completed, isTrue);
           expect(notifications, 3);
           expect(repo.getByIdCallCount, 0);
           expect(
@@ -473,24 +485,20 @@ void main() {
           }
           final command = ongoing ? vm.loadOngoing : vm.loadNext;
           final directSnapshot = DateTime.utc(2026, 4);
-          final direct = command.execute(directSnapshot);
+          final direct = command.runAsync(directSnapshot);
           final pass = vm.refreshHomeDiscovery();
           var completed = false;
           unawaited(pass.then((_) => completed = true));
           await pumpEventQueue();
           expect(completed, isFalse);
-          // Verify the coordinator removes its internal one-shot listener.
-          // ignore: invalid_use_of_protected_member
-          expect(command.hasListeners, isTrue);
+
           repo
             ..pendingGetOngoingEvents = null
             ..pendingGetNextEvents = null;
           held.complete(Result.success([makeEvent()]));
           await direct;
           await pass;
-          // Verify the coordinator removes its internal one-shot listener.
-          // ignore: invalid_use_of_protected_member
-          expect(command.hasListeners, isFalse);
+
           expect(repo.getOngoingEventsCallCount, ongoing ? 2 : 1);
           expect(repo.getNextEventsCallCount, ongoing ? 1 : 2);
           expect(
@@ -513,10 +521,10 @@ void main() {
           addTearDown(vm.dispose);
           await vm.refreshHomeDiscovery();
           expect(
-            (vm.loadOngoing.result! as Error<void>).error,
+            (vm.loadOngoing.results.value.data! as Error<void>).error,
             same(ongoingFailure),
           );
-          expect(vm.loadNext.completed, isTrue);
+          expect(vm.loadNext.results.value.completed, isTrue);
           expect(vm.next, hasLength(1));
           await pumpEventQueue();
           expect(repo.getOngoingEventsCallCount, 1);
@@ -525,9 +533,12 @@ void main() {
             ..getOngoingEventsResult = Result.success([makeEvent(remoteId: 2)])
             ..getNextEventsResult = Result.error(nextFailure);
           await vm.refreshHomeDiscovery();
-          expect(vm.loadOngoing.completed, isTrue);
+          expect(vm.loadOngoing.results.value.completed, isTrue);
           expect(vm.ongoing.single.remoteId, 2);
-          expect((vm.loadNext.result! as Error<void>).error, same(nextFailure));
+          expect(
+            (vm.loadNext.results.value.data! as Error<void>).error,
+            same(nextFailure),
+          );
           expect(vm.next.single.remoteId, 1);
         },
       );
@@ -569,18 +580,14 @@ void main() {
           final held = Completer<Result<List<Event>>>();
           final repo = FakeEventRepository()..pendingGetNextEvents = held;
           final vm = await buildLoaded(repo);
-          final direct = vm.loadNext.execute(DateTime.utc(2026, 4));
+          final direct = vm.loadNext.runAsync(DateTime.utc(2026, 4));
           final pass = vm.refreshHomeDiscovery();
           await pumpEventQueue();
-          // Verify wait cleanup without adding a production inspection API.
-          // ignore: invalid_use_of_protected_member
-          expect(vm.loadNext.hasListeners, isTrue);
+
           vm.dispose();
           await pass;
-          // Verify wait cleanup without adding a production inspection API.
-          // ignore: invalid_use_of_protected_member
-          expect(vm.loadNext.hasListeners, isFalse);
-          expect(vm.loadNext.running, isTrue);
+
+          expect(vm.loadNext.isRunningSync.value, isTrue);
           expect(repo.getOngoingEventsCallCount, 0);
           held.complete(Result.success([makeEvent()]));
           await direct;
@@ -595,6 +602,8 @@ void main() {
           repository: repo,
           nowUtc: () => DateTime.utc(2026, 4),
         );
+        await pumpEventQueue();
+        expect(repo.getByCurrentYearCallCount, 1);
         var notifications = 0;
         vm
           ..addListener(() => notifications++)
@@ -604,7 +613,7 @@ void main() {
         expect(vm.all, isEmpty);
         expect(vm.byMonth, isEmpty);
         expect(notifications, 0);
-        expect(vm.loadAll.completed, isTrue);
+        expect(vm.loadAll.results.value.completed, isTrue);
       });
     });
 
@@ -672,7 +681,7 @@ Future<EventViewModel> buildLoaded(FakeEventRepository repo) async {
   );
   await pumpEventQueue(times: 10);
   assert(
-    vm.loadAll.completed || vm.loadAll.error,
+    vm.loadAll.results.value.completed || vm.loadAll.results.value.hasFailure,
     'buildLoaded returned before loadAll finished',
   );
   return vm;

@@ -1,9 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/routing/route_names.dart';
@@ -14,16 +13,75 @@ import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
 import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
 import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
 import '../support/mock_gotrue_client.dart';
+import '../support/mock_logger.dart';
 import '../support/sync_harness.dart';
 
 void main() {
   group('buildAppRouter sync redirect', () {
+    testOwnerUI('F2 runtime nonfatal feedback survives ordinary return once', (
+      tester,
+    ) async {
+      final failure = StateError('sync commit runtime');
+      final logger = MockLogger();
+      addTearDown(installCommandTestReporting(logger));
+      final harness = SyncHarness(onCommit: () => throw failure);
+      final fixture = buildSyncRouterApp(harness);
+      await tester.pumpWidget(fixture.app);
+      await pumpSyncRedirects(tester);
+      harness.viewModel.sync.run(true);
+      await pumpSyncRedirects(tester);
+      expect(fixture.router.state.matchedLocation, RoutePaths.sync);
+      harness.release();
+      await pumpSyncRedirects(tester);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(fixture.router.state.matchedLocation, RoutePaths.home);
+      expect(
+        find.text(
+          "Si è verificato un errore durante l'aggiornamento dei contenuti",
+        ),
+        findsOneWidget,
+      );
+      expect(
+        harness.viewModel.sync.results.value.unexpectedError,
+        same(failure),
+      );
+      expect(logger.calls, hasLength(1));
+      expect(logger.calls.single.error, same(failure));
+    });
+
+    testOwnerUI(
+      'S3 fatal first sync retries on the same router owner and returns',
+      (tester) async {
+        var outcome = Result<List<CityDto>>.error(TestException('offline'));
+        final harness = SyncHarness(
+          autoSync: true,
+          prepareCity: () async => outcome,
+        );
+        final fixture = buildSyncRouterApp(harness);
+        await tester.pumpWidget(fixture.app);
+        await pumpSyncRedirects(tester);
+        harness.release();
+        await pumpSyncRedirects(tester);
+        expect(fixture.router.state.matchedLocation, RoutePaths.sync);
+        expect(find.text('Riprova'), findsOneWidget);
+        outcome = const Result.success([]);
+        await tester.tap(find.text('Riprova'));
+        expect(harness.viewModel.sync.isRunningSync.value, isTrue);
+        expect(harness.viewModel.fatalError, isFalse);
+        await pumpSyncRedirects(tester);
+        await tester.pumpAndSettle();
+        expect(fixture.router.state.matchedLocation, RoutePaths.home);
+        expect(harness.prepareCalls, 2);
+      },
+    );
+
     testOwnerUI('unknown route renders the route error screen', (tester) async {
       final harness = SyncHarness();
       final router = buildSyncRouterApp(harness);
@@ -85,7 +143,7 @@ void main() {
       await pumpSyncRedirects(tester);
       expect(router.router.routeInformationProvider.value.uri.path, '/home');
 
-      unawaited(harness.viewModel.sync.execute(true));
+      harness.viewModel.sync.run(true);
       await pumpSyncRedirects(tester);
 
       final uri = router.router.routeInformationProvider.value.uri;
@@ -128,7 +186,7 @@ void main() {
       expect(uri.path, '/home/posts/1');
       expect(uri.queryParameters['type'], 'event');
 
-      unawaited(harness.viewModel.sync.execute(true));
+      harness.viewModel.sync.run(true);
       await pumpSyncRedirects(tester);
 
       uri = router.router.routeInformationProvider.value.uri;
@@ -152,7 +210,7 @@ void main() {
       await tester.pumpWidget(router.app);
       await pumpSyncRedirects(tester);
 
-      unawaited(harness.viewModel.sync.execute(true));
+      harness.viewModel.sync.run(true);
       await pumpSyncRedirects(tester);
       expect(router.router.routeInformationProvider.value.uri.path, '/sync');
 
@@ -198,7 +256,7 @@ void main() {
       },
     );
 
-    testWidgets('fatal first-sync error remains on /sync', (tester) async {
+    testOwnerUI('fatal first-sync error remains on /sync', (tester) async {
       final harness = SyncHarness(
         autoSync: true,
         cityResult: Result.error(TestException('sync failed')),
@@ -235,7 +293,7 @@ void main() {
           await pumpSyncRedirects(tester);
 
           // Keep the command running while substituting the crafted value.
-          unawaited(harness.viewModel.sync.execute(true));
+          harness.viewModel.sync.run(true);
           await pumpSyncRedirects(tester);
 
           router.router.go(
@@ -258,7 +316,7 @@ void main() {
       );
     }
 
-    testWidgets('sync restores an admin user to /admin after completing', (
+    testOwnerUI('sync restores an admin user to /admin after completing', (
       tester,
     ) async {
       final auth = ControllableAdminAuth(
@@ -268,7 +326,7 @@ void main() {
       final router = buildSyncRouterApp(harness, auth: auth);
 
       router.router.go(RoutePaths.admin);
-      unawaited(harness.viewModel.sync.execute(true));
+      harness.viewModel.sync.run(true);
       await tester.pumpWidget(router.app);
       await pumpSyncRedirects(tester);
 
@@ -285,7 +343,7 @@ void main() {
       );
     });
 
-    testWidgets(
+    testOwnerUI(
       'sync restores an anonymous user to /admin/login after completing',
       (tester) async {
         final auth = ControllableAdminAuth();
@@ -293,7 +351,7 @@ void main() {
         final router = buildSyncRouterApp(harness, auth: auth);
 
         router.router.go(RoutePaths.admin);
-        unawaited(harness.viewModel.sync.execute(true));
+        harness.viewModel.sync.run(true);
         await tester.pumpWidget(router.app);
         await pumpSyncRedirects(tester);
 
@@ -395,7 +453,7 @@ void main() {
       final fixture = buildSyncRouterApp(harness, eventRepository: repository);
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
-      unawaited(harness.viewModel.sync.execute(true));
+      harness.viewModel.sync.run(true);
       await pumpSyncRedirects(tester);
       harness.release();
       await pumpSyncRedirects(tester);
@@ -441,7 +499,7 @@ void main() {
         RoutePaths.settings,
       );
 
-      unawaited(before.harness.viewModel.sync.execute(true));
+      before.harness.viewModel.sync.run(true);
       await pumpSyncRedirects(tester);
       expect(
         before.router.routeInformationProvider.value.uri.path,
@@ -463,7 +521,7 @@ void main() {
       final after = holder.fixture!;
       expect(after, isNot(same(before)));
       expect(after.harness.viewModel, isNot(same(before.harness.viewModel)));
-      expect(after.harness.viewModel.sync.idle, isTrue);
+      expect(after.harness.viewModel.sync.results.value.idle, isTrue);
       expect(
         after.router.routeInformationProvider.value.uri.path,
         RoutePaths.settings,
@@ -484,7 +542,7 @@ void main() {
       await tester.pumpWidget(RestorableSyncHarness(holder: holder));
       await pumpSyncRedirects(tester);
       final before = holder.fixture!;
-      expect(before.harness.viewModel.sync.running, isTrue);
+      expect(before.harness.viewModel.sync.isRunningSync.value, isTrue);
       expect(
         before.router.routeInformationProvider.value.uri.path,
         RoutePaths.sync,
@@ -504,7 +562,7 @@ void main() {
 
       final after = holder.fixture!;
       expect(after, isNot(same(before)));
-      expect(after.harness.viewModel.sync.running, isTrue);
+      expect(after.harness.viewModel.sync.isRunningSync.value, isTrue);
       expect(
         after.router.routeInformationProvider.value.uri.path,
         RoutePaths.sync,

@@ -3,26 +3,33 @@ import 'dart:async';
 import 'package:command_it/command_it.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
+import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/domain/use-cases/category_use_case.dart';
 import 'package:moliseis/domain/use-cases/explore_use_case.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
+import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/ui/category/view_models/category_view_model.dart';
+import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
 import 'package:moliseis/ui/explore/view_models/suggestion_view_model.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
+import 'package:moliseis/ui/post/view_models/post_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
+import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 
 import 'command_test_support.dart';
 import 'fake_repositories.dart';
 import 'fixtures.dart';
+import 'sync_use_case_test_support.dart';
 
 /// Ordinary command owners sharing the reviewed lifecycle contract.
 enum OrdinaryOwnerLane {
@@ -33,6 +40,13 @@ enum OrdinaryOwnerLane {
   suggestion,
   favourite,
   categorySort,
+  eventAnnual,
+  eventOngoing,
+  eventNext,
+  postEvent,
+  postPlace,
+  postNearby,
+  sync,
 }
 
 /// Repository gates retain real commands and expose observable owner state.
@@ -72,7 +86,127 @@ class OrdinaryOwnerHarness {
     );
     repositoryCalls = () =>
         _repositoryCalls + places.getLatestCallCount + places.getByIdCallCount;
+    void bindGate<T>(Completer<Result<T>> pending, T value) {
+      unawaited(
+        gate.future.then<void>(
+          (_) => pending.complete(
+            expectedError == null
+                ? Result.success(value)
+                : Result.error(expectedError!),
+          ),
+          onError: pending.completeError,
+        ),
+      );
+    }
+
     switch (lane) {
+      case OrdinaryOwnerLane.sync:
+        final now = DateTime.utc(2026, 10, 23);
+        preferences
+          ..lastSyncedAt = now
+          ..contentSyncCursorAt = now;
+        final cursor = FakeSyncCursorSource();
+        final pending = Completer<Result<DateTime>>();
+        cursor.pendingCursor = pending;
+        bindGate(pending, now);
+        final deps = buildSyncUseCase(
+          settings: preferences,
+          cursorSource: cursor,
+          now: () => now,
+        );
+        final vm = SyncViewModel(syncUseCase: deps.useCase);
+        owner = vm;
+        command = vm.sync;
+        start = () => vm.sync.run(true);
+        state = () => vm.fatalError;
+        repositoryCalls = () => cursor.calls;
+
+      case OrdinaryOwnerLane.postEvent:
+      case OrdinaryOwnerLane.postPlace:
+      case OrdinaryOwnerLane.postNearby:
+        final events = FakeEventRepository();
+        final postPlaces = FakePlaceRepository();
+        if (lane == OrdinaryOwnerLane.postEvent) {
+          final pending = Completer<Result<Event>>();
+          events.pendingGetById[1] = pending;
+          bindGate(pending, makeEvent());
+        } else if (lane == OrdinaryOwnerLane.postPlace) {
+          final pending = Completer<Result<Place>>();
+          postPlaces.pendingGetById[1] = pending;
+          bindGate(pending, makePlace());
+        } else {
+          final pending = Completer<Result<List<Event>>>();
+          events.pendingGetByCoordinates = pending;
+          bindGate(pending, [makeEvent()]);
+        }
+        final vm = PostViewModel(
+          postUseCase: PostUseCase(
+            eventRepository: events,
+            placeRepository: postPlaces,
+          ),
+        );
+        owner = vm;
+        repositoryCalls = () =>
+            events.getByIdCallCount +
+            postPlaces.getByIdCallCount +
+            events.getByCoordinatesCallCount +
+            postPlaces.getByCoordinatesCallCount;
+        if (lane == OrdinaryOwnerLane.postNearby) {
+          command = vm.loadNearContent;
+          start = () => vm.loadNearContent.run(const LatLng(41, 14));
+          state = () => vm.nearContent.toList();
+        } else {
+          if (lane == OrdinaryOwnerLane.postEvent) {
+            command = vm.loadEvent;
+            start = () => vm.loadEvent.run(1);
+          } else {
+            command = vm.loadPlace;
+            start = () => vm.loadPlace.run(1);
+          }
+          // Observe whether the public late slot initialized after revocation.
+          // The sentinel catches its initial LateInitializationError.
+          state = () {
+            try {
+              return vm.content;
+            } on Object {
+              return 'unresolved content';
+            }
+          };
+        }
+
+      case OrdinaryOwnerLane.eventAnnual:
+      case OrdinaryOwnerLane.eventOngoing:
+      case OrdinaryOwnerLane.eventNext:
+        final events = FakeEventRepository();
+        final pending = Completer<Result<List<Event>>>();
+        bindGate(pending, [makeEvent()]);
+        if (lane == OrdinaryOwnerLane.eventAnnual) {
+          events.pendingGetByCurrentYear = pending;
+        } else if (lane == OrdinaryOwnerLane.eventOngoing) {
+          events.pendingGetOngoingEvents = pending;
+        } else {
+          events.pendingGetNextEvents = pending;
+        }
+        final vm = EventViewModel(repository: events);
+        owner = vm;
+        if (lane == OrdinaryOwnerLane.eventAnnual) {
+          command = vm.loadAll;
+          start = vm.loadAll.run;
+          state = () => vm.all.toList();
+          repositoryCalls = () => events.getByCurrentYearCallCount;
+          autoStarted = true;
+        } else if (lane == OrdinaryOwnerLane.eventOngoing) {
+          command = vm.loadOngoing;
+          start = () => vm.loadOngoing.run(DateTime.utc(2026));
+          state = () => vm.ongoing.toList();
+          repositoryCalls = () => events.getOngoingEventsCallCount;
+        } else {
+          command = vm.loadNext;
+          start = () => vm.loadNext.run(DateTime.utc(2026));
+          state = () => vm.next.toList();
+          repositoryCalls = () => events.getNextEventsCallCount;
+        }
+
       case OrdinaryOwnerLane.categorySort:
         final events = FakeEventRepository();
         final vm = CategoryViewModel(
@@ -176,7 +310,7 @@ class OrdinaryOwnerHarness {
   late final Object Function() state;
   bool autoStarted = false;
   int _repositoryCalls = 0;
-  late final int Function() repositoryCalls;
+  late int Function() repositoryCalls;
   int notifications = 0;
 
   void begin() {

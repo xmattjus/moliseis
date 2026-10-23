@@ -26,10 +26,12 @@ import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/main.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
+import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
+import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
@@ -47,7 +49,7 @@ import 'recording_tile_http_client.dart';
 /// without settling on the indeterminate loading spinner.
 Future<void> pumpSyncRedirects(WidgetTester tester) async {
   for (var i = 0; i < 12; i++) {
-    await tester.pump();
+    await tester.pump(Duration.zero);
   }
 }
 
@@ -59,6 +61,7 @@ final class SyncHarness {
     FakeSettingsRepository? settings,
     Result<List<CityDto>> cityResult = const Result.success(<CityDto>[]),
     void Function()? onCommit,
+    Future<Result<List<CityDto>>> Function()? prepareCity,
   }) {
     gate = gated ? Completer<void>() : null;
     this.settings =
@@ -72,6 +75,8 @@ final class SyncHarness {
         gate: gate,
         prepareResult: cityResult,
         onCommit: onCommit,
+        prepare: prepareCity,
+        onPrepare: () => prepareCalls++,
       ),
       eventRepository: FakeEventRepository(),
       mediaRepository: FakeMediaRepository(),
@@ -83,6 +88,7 @@ final class SyncHarness {
     viewModel = SyncViewModel(syncUseCase: useCase);
   }
 
+  int prepareCalls = 0;
   Completer<void>? gate;
   late final FakeSettingsRepository settings;
   late final SyncViewModel viewModel;
@@ -98,20 +104,25 @@ final class _GatedCityRepository extends CityRepository {
     required this.gate,
     required this.prepareResult,
     this.onCommit,
+    this.prepare,
+    this.onPrepare,
   });
 
   final Completer<void>? gate;
   final Result<List<CityDto>> prepareResult;
   final void Function()? onCommit;
+  final Future<Result<List<CityDto>>> Function()? prepare;
+  final void Function()? onPrepare;
 
   @override
   Future<Result<List<CityDto>>> prepareSync({
     DateTime? modifiedAtOrAfter,
   }) async {
+    onPrepare?.call();
     if (gate != null) {
       await gate!.future;
     }
-    return prepareResult;
+    return prepare == null ? prepareResult : await prepare!();
   }
 
   @override
@@ -148,7 +159,11 @@ final class _GatedCityRepository extends CityRepository {
     ),
   );
 
-  return (router: router, app: app, auth: authHarness);
+  return (
+    router: router,
+    app: _OwnedSyncApp(harness: harness, child: app),
+    auth: authHarness,
+  );
 }
 
 /// Builds the production app root so the router lifecycle under theme rebuilds
@@ -159,7 +174,7 @@ Widget buildRealSyncApp(SyncHarness harness) {
 
   return MultiProvider(
     providers: buildSyncProviders(harness, auth: auth),
-    child: const MoliseIsApp(),
+    child: _OwnedSyncApp(harness: harness, child: const MoliseIsApp()),
   );
 }
 
@@ -275,22 +290,7 @@ final class SyncRestorationFixture {
     router.dispose();
     auth.dispose();
 
-    final sync = harness.viewModel.sync;
-    if (!sync.running) {
-      harness.viewModel.dispose();
-      return;
-    }
-
-    void disposeWhenComplete() {
-      if (sync.running) return;
-
-      sync.removeListener(disposeWhenComplete);
-      scheduleMicrotask(harness.viewModel.dispose);
-    }
-
-    // Detach the router before unblocking the command. It may notify while
-    // completing, so dispose the view model only after that notification.
-    sync.addListener(disposeWhenComplete);
+    harness.viewModel.dispose();
     final gate = harness.gate;
     if (gate != null && !gate.isCompleted) gate.complete();
   }
@@ -344,4 +344,56 @@ class _RestorableSyncHarnessState extends State<RestorableSyncHarness> {
 
   @override
   Widget build(BuildContext context) => fixture.app;
+}
+
+/// Local screen lifecycle harness: this deliberately has no routing claim.
+/// Rebuilding with another owner retains the same SyncScreen State.
+Widget buildLocalSyncScreen(SyncViewModel owner, {Widget? child}) =>
+    ChangeNotifierProvider<SyncViewModel>.value(
+      value: owner,
+      child: Builder(
+        builder: (context) => MaterialApp(
+          scaffoldMessengerKey: $scaffoldMessengerKey,
+          theme: AppThemeData.light(context: context),
+          home: child ?? const SyncScreen(),
+        ),
+      ),
+    );
+
+/// Revokes local owners and drains their real command teardown virtually.
+Future<void> disposeSyncHarnesses(
+  WidgetTester tester,
+  Iterable<SyncHarness> harnesses,
+) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  for (final harness in harnesses) {
+    harness.viewModel.dispose();
+    final gate = harness.gate;
+    if (gate != null && !gate.isCompleted) gate.complete();
+  }
+  await pumpSyncRedirects(tester);
+  await tester.pump(const Duration(milliseconds: 50));
+  await pumpSyncRedirects(tester);
+}
+
+/// Owns the test Sync owner for the app lifetime, matching production Provider.
+class _OwnedSyncApp extends StatefulWidget {
+  const _OwnedSyncApp({required this.harness, required this.child});
+  final SyncHarness harness;
+  final Widget child;
+  @override
+  State<_OwnedSyncApp> createState() => _OwnedSyncAppState();
+}
+
+class _OwnedSyncAppState extends State<_OwnedSyncApp> {
+  @override
+  void dispose() {
+    widget.harness.viewModel.dispose();
+    final gate = widget.harness.gate;
+    if (gate != null && !gate.isCompleted) gate.complete();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

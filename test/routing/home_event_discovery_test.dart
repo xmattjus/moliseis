@@ -142,11 +142,13 @@ void main() {
     );
     await tester.pumpWidget(fixture.app);
     await pumpSyncRedirects(tester);
+    await pumpCommandTurns(tester);
     expect(repository.getOngoingEventsCallCount, 1);
     unawaited(fixture.router.pushNamed<void>(RouteNames.settings));
     await tester.pumpAndSettle();
     fixture.router.pop();
     await pumpSyncRedirects(tester);
+    await pumpCommandTurns(tester);
     expect(repository.getOngoingEventsCallCount, 1);
     repository.pendingGetOngoingEvents = null;
     pending.complete(const Result.success([]));
@@ -182,7 +184,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testOwnerUI(
     'unmount removes return listener and stops pending continuation',
     (tester) async {
       final pending = Completer<Result<List<Event>>>();
@@ -194,6 +196,7 @@ void main() {
       );
       await tester.pumpWidget(fixture.app);
       await pumpSyncRedirects(tester);
+      await pumpCommandTurns(tester);
       final vm = tester
           .widget<ExploreScreen>(find.byType(ExploreScreen))
           .eventViewModel;

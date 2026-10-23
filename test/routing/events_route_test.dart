@@ -37,7 +37,7 @@ void main() {
     );
 
     await tester.tap(find.text('Eventi'));
-    await tester.pump();
+    await pumpCommandTurns(tester);
 
     final dateAfterNavigation = policy.currentCalendarDate(
       DateTime.now().toUtc(),
@@ -55,7 +55,7 @@ void main() {
     expect(find.byType(EventsScreen), findsNothing);
 
     await tester.tap(find.text('Eventi'));
-    await tester.pump();
+    await pumpCommandTurns(tester);
 
     expect(find.byType(EventsScreen), findsOneWidget);
     expect(repository.getByDateCallCount, 1);

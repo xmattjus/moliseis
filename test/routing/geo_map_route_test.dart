@@ -1093,7 +1093,8 @@ void main() {
             await animation;
           }
           if (refreshSource == 'sync') {
-            await harness.viewModel.sync.execute(false);
+            harness.viewModel.sync.run(false);
+            await pumpCommandTurns(tester);
           } else {
             fixture.auth.setUser(makeAuthUser());
             fixture.auth.emit(AuthChangeEvent.tokenRefreshed);

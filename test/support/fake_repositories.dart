@@ -1497,12 +1497,15 @@ final class FakeSyncCursorSource implements SyncCursorSource {
   /// The response returned by the next cursor observation.
   Result<DateTime> result;
 
+  /// Gates cursor settlement and raw failures before parallel preparation.
+  Completer<Result<DateTime>>? pendingCursor;
+
   /// Number of cursor observations.
   int calls = 0;
 
   @override
   Future<Result<DateTime>> getCurrentCursor() {
     calls++;
-    return Future.value(result);
+    return pendingCursor?.future ?? Future.value(result);
   }
 }

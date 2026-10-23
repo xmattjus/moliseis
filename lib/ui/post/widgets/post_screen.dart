@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -21,6 +19,7 @@ import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.
 import 'package:moliseis/ui/post/widgets/components/post_section_slideshow.dart';
 import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 const double _mediaSlideshowHeight = 450;
 
@@ -45,12 +44,12 @@ class _PostScreenState extends State<PostScreen> {
   late final SlideshowVisibilityNotifier _slideshowVisibilityNotifier =
       SlideshowVisibilityNotifier(threshold: _mediaSlideshowHeight * 0.6);
 
-  Listenable get _contentLoad =>
+  ResultCommand<int, void> get _contentCommand =>
       widget.isEvent ? widget.viewModel.loadEvent : widget.viewModel.loadPlace;
 
-  bool get _contentCompleted => widget.isEvent
-      ? widget.viewModel.loadEvent.completed
-      : widget.viewModel.loadPlace.completed;
+  Listenable get _contentLoad => _contentCommand.results;
+
+  bool get _contentCompleted => _contentCommand.results.value.completed;
 
   @override
   void initState() {
@@ -68,6 +67,7 @@ class _PostScreenState extends State<PostScreen> {
       (oldWidget.isEvent
               ? oldWidget.viewModel.loadEvent
               : oldWidget.viewModel.loadPlace)
+          .results
           .removeListener(_bindWeatherTarget);
       oldWidget.weatherViewModel.setTarget(null);
       _contentLoad.addListener(_bindWeatherTarget);
@@ -117,11 +117,12 @@ class _PostScreenState extends State<PostScreen> {
       body: SafeArea(
         child: ListenableBuilder(
           listenable: Listenable.merge([
-            widget.viewModel.loadEvent,
-            widget.viewModel.loadPlace,
+            widget.viewModel.loadEvent.results,
+            widget.viewModel.loadPlace.results,
           ]),
           builder: (context, child) {
-            if (_contentCompleted) {
+            final detail = _contentCommand.results.value;
+            if (detail.completed) {
               final owner = widget.viewModel;
               final content = owner.content;
               bool ownsContent() =>
@@ -175,7 +176,7 @@ class _PostScreenState extends State<PostScreen> {
                     ),
                     PostSectionNearbyContent(
                       onContentPressed: _buildPostRoute,
-                      loadListenable: owner.loadNearContent,
+                      loadListenable: owner.loadNearContent.results,
                       loadKey: (
                         owner,
                         content.remoteId,
@@ -186,9 +187,7 @@ class _PostScreenState extends State<PostScreen> {
                       ),
                       onLoad: () {
                         if (ownsContent() && content.coordinates.isValid) {
-                          unawaited(
-                            owner.loadNearContent.execute(content.coordinates),
-                          );
+                          owner.loadNearContent.run(content.coordinates);
                         }
                       },
                       readState: () {
@@ -199,20 +198,14 @@ class _PostScreenState extends State<PostScreen> {
                             error: null,
                           );
                         }
-                        final command = owner.loadNearContent;
+                        final snapshot = owner.loadNearContent.results.value;
                         return (
-                          pending:
-                              command.running ||
-                              (!command.completed && !command.error),
-                          items: command.completed
+                          pending: snapshot.idle || snapshot.isRunning,
+                          items: snapshot.completed
                               ? owner.nearContent
                               : const <ContentBase>[],
-                          error: command.error
-                              ? command.result?.fold<Object?>(
-                                  (_) => null,
-                                  (error) => error,
-                                )
-                              : null,
+                          error:
+                              snapshot.domainError ?? snapshot.unexpectedError,
                         );
                       },
                     ),
@@ -224,6 +217,15 @@ class _PostScreenState extends State<PostScreen> {
               );
             }
 
+            if (detail.hasFailure) {
+              return const Center(
+                child: EmptyView.error(
+                  text: Text(
+                    'Si è verificato un errore durante il caricamento.',
+                  ),
+                ),
+              );
+            }
             return const Center(
               child: EmptyView.loading(text: Text('Caricamento in corso...')),
             );
