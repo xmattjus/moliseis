@@ -1,13 +1,15 @@
 # Tasks
 
-Questo checklist riguarda il **futuro apply**, non il planning. Tutte le caselle restano aperte. Serve una nuova autorizzazione dopo review indipendente del piano. Ogni gruppo dipende dal gate del precedente; un gate fallito impedisce di proseguire. Scenari S/G/U/R e conteggi sono definiti in design.md e nei due delta.
+Questa checklist registra l’apply completato e verificato. Il planning e la review indipendente del piano sono conclusi, la remediation F1–F5 è stata incorporata e l’apply è stato autorizzato ed eseguito. Anche la code review indipendente è stata completata; il checkpoint 4 è stato pubblicato nella [Draft PR #12](https://github.com/xmattjus/moliseis/pull/12) con commit `da7c426fb799a26094f043319b47e63b98728f92`.
+
+I 27 task `[x]` rappresentano attività implementate e verificate: le evidenze sono nelle sezioni Apply di `design.md`, con i relativi test e risultati. La numerazione e i gate documentano la sequenza richiesta: ogni gruppo dipende dal gate del precedente e un gate fallito impedisce di proseguire; lo scostamento procedurale del draft UI anticipato è registrato nel design. Scenari S/G/U/R e conteggi restano definiti in `design.md` e nei due delta.
 
 ## 1. Preflight e caratterizzazione
 
 - [x] 1.1 Riconfermare PR #12 open/Draft e checkpoint cumulativo, worktree/branch/index e istruzioni applicabili; verificare con metadata PR, log e status che non esista divergenza non riconciliata da `1f3753b10c18061c6655cb32d078bf93aff1b05e`, preservando tutti gli altri checkout.
 - [x] 1.2 Rileggere proposal/design/delta approvati e skill Result, mounted-context-safety, unit/widget test e test-support-reuse prima degli edit; verificare manifest ammesso, command_it 9.5.2 e ordine di riconciliazione canonical + delta 1–3 registrati nel design.
 - [x] 1.3 Rigenerare analyzer machine B0 con `dart analyze --format machine`; salvare identità/molteplicità e verificare 87 INFO, zero WARNING/ERROR e 21 target, documentando differenze senza soppressioni.
-- [x] 1.4 Estendere soltanto supporti esistenti per queue di Completer, contatori e notifiche necessari a S1–S18/G1–G9; verificare test di caratterizzazione bootstrap/ordine/errors attuali e che i test discriminanti delle race falliscano per la ragione attesa prima della correzione, senza test Dart in questa fase di planning.
+- [x] 1.4 Estendere soltanto supporti esistenti per queue di Completer, contatori e notifiche necessari a S1–S18/G1–G9; verificare test di caratterizzazione bootstrap/ordine/errors attuali e che i test discriminanti delle race falliscano per la ragione attesa prima della correzione. La precedente fase di planning era rimasta esclusivamente documentale.
 - [x] 1.5 Gate preflight: registrare nel design evidenze effettive e review delle decisioni corrette D1–D6 e finding F1–F5; verificare assenza di decisioni materiali demandate all'executor e nessun cambiamento foundation/repository/dependency.
 
 ## 2. Search history e SearchAnchor — remediation F1–F4
@@ -42,9 +44,11 @@ Questo checklist riguarda il **futuro apply**, non il planning. Tutte le caselle
 - [x] 5.1 Formattare soltanto file Dart intenzionalmente modificati e rigenerare analyzer machine B1; verificare rimozione delle 21 target, atteso 66 INFO senza WARNING/ERROR o nuove identità/molteplicità non-target, preservando configurazione e output completo per confronto B0/B1.
 - [x] 5.2 Eseguire suite Flutter completa con `flutter test --no-pub` dopo gate mirati; registrare pass/fail/skip reali e ogni limite ObjectBox/runtime, senza equiparare risultati storici o CI a nuove esecuzioni.
 - [x] 5.3 Aggiornare esclusivamente artifact della presente change con evidenze apply e scostamenti approvati, poi eseguire `openspec validate migrate-search-map-commands --strict`; verificare schema/delta e niente canonical sync o archive.
-- [x] 5.4 Verificare manifest diff/whitespace inclusi nuovi file, HEAD/index e integrità di tutti gli altri checkout; richiedere review indipendente dell'implementazione con inventario completo e stato inequivocabile. Nessun commit/push/update PR/merge senza autorizzazione specifica successiva.
+- [x] 5.4 Verificare manifest diff/whitespace inclusi nuovi file, HEAD/index e integrità di tutti gli altri checkout; richiedere review indipendente dell'implementazione con inventario completo e stato inequivocabile. Il vincolo originale richiedeva autorizzazione specifica successiva per commit/push/update PR: tale autorizzazione è poi intervenuta per la pubblicazione del checkpoint 4; il merge resta non autorizzato.
 
 ## Workflow follow-up
 
-- PR cumulativa #12 resta Draft per OpenSpec 4–7 e consolidamento; questo piano non autorizza pubblicazione o merge.
+- Pubblicazione del checkpoint 4: **completata**, con commit `da7c426fb799a26094f043319b47e63b98728f92`.
+- PR cumulativa #12: **4/7 implemented and published — ancora Draft, do not merge**. OpenSpec **5–7** e consolidamento finale restano pendenti.
+- Merge della PR: **non autorizzato**; richiede autorizzazione esplicita dell’utente dopo i gate finali.
 - Sync canonical e archive appartengono al consolidamento futuro: applicare prima il MODIFIED ordinary del primo OpenSpec e conservare i contratti semantic/Nearby della change precedente. Nessuna modifica a tali fonti in questo lavoro.
