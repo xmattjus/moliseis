@@ -167,7 +167,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     controller: _searchController,
                     onSubmitted: _showSearchResults,
                     onSuggestionPressed: (content) {
-                      _searchController.closeView(null);
                       _showSearchResults(content.name);
                     },
                     viewModel: widget.searchViewModel,

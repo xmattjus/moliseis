@@ -9,7 +9,6 @@ import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/category/widgets/category_content_and_type_selection.dart';
 import 'package:moliseis/ui/core/ui/custom_appbar.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
-import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_mode.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_selection_intent.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
@@ -406,11 +405,23 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: widget.viewModel,
+    listenable: Listenable.merge([
+      widget.viewModel,
+      widget.viewModel.loadMarkers.results,
+    ]),
     builder: (context, _) {
       final owner = widget.viewModel;
       final search = widget.searchViewModel;
       final admission = _searchAdmission;
+      final markerRequest = owner.markerRequest;
+      final markerTerminal = owner.markerTerminal;
+      final markerOutcome = owner.markerOutcome;
+      bool ownsMarkers() =>
+          mounted &&
+          !owner.isDisposed &&
+          identical(widget.viewModel, owner) &&
+          identical(owner.markerRequest, markerRequest) &&
+          identical(owner.markerTerminal, markerTerminal);
       return Scaffold(
         appBar: const CustomAppBar.hidden(),
         body: Stack(
@@ -423,30 +434,21 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
                 if (mounted) _mapReady = true;
               },
               children: <Widget>[
-                ListenableBuilder(
-                  listenable: Listenable.merge([
-                    owner.loadEvents,
-                    owner.loadPlaces,
-                  ]),
-                  builder: (_, _) {
-                    if (!owner.loadEvents.completed ||
-                        !owner.loadPlaces.completed) {
-                      return const EmptyBox();
-                    }
-                    return MarkerLayer(
-                      markers: [
-                        for (final content in [
-                          ...owner.allEvents,
-                          ...owner.allPlaces,
-                        ])
-                          generateMapMarker(
-                            content,
-                            onPressed: () => _showContent(content),
-                          ),
-                      ],
-                    );
-                  },
-                ),
+                if (markerOutcome != null)
+                  MarkerLayer(
+                    markers: [
+                      for (final content in [
+                        ...markerOutcome.events,
+                        ...markerOutcome.places,
+                      ])
+                        generateMapMarker(
+                          content,
+                          onPressed: () {
+                            if (ownsMarkers()) _showContent(content);
+                          },
+                        ),
+                    ],
+                  ),
               ],
               onPressed: (_, _) {
                 if (!mounted || !_sheetController.isAttached) return;
@@ -526,13 +528,56 @@ class _GeoMapScreenState extends State<GeoMapScreen> {
                   key: ObjectKey(owner),
                   selectedCategories: owner.selectedCategories,
                   selectedTypes: owner.selectedTypes,
-                  onCategorySelectionChanged: (categories) =>
-                      owner.setSelectedCategories.execute(categories),
-                  onTypeSelectionChanged: (types) =>
-                      owner.setSelectedTypes.execute(types),
+                  onCategorySelectionChanged: owner.setSelectedCategories,
+                  onTypeSelectionChanged: owner.setSelectedTypes,
                 ),
               ],
             ),
+            if (owner.markerStatus != GeoMapMarkerStatus.successData)
+              Positioned(
+                top: 128,
+                left: 16,
+                right: 16,
+                child: SafeArea(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: Material(
+                      key: const ValueKey('geo-map-marker-status'),
+                      color: context.colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: switch (owner.markerStatus) {
+                          GeoMapMarkerStatus.loading =>
+                            const CircularProgressIndicator(
+                              semanticsLabel:
+                                  'Caricamento contenuti della mappa',
+                            ),
+                          GeoMapMarkerStatus.successEmpty => const Text(
+                            'Nessun contenuto per i filtri selezionati',
+                          ),
+                          GeoMapMarkerStatus.failure => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'Si è verificato un problema, riprova.',
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  if (ownsMarkers()) owner.retryMarkers();
+                                },
+                                child: const Text('Riprova'),
+                              ),
+                            ],
+                          ),
+                          GeoMapMarkerStatus.successData =>
+                            const SizedBox.shrink(),
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         resizeToAvoidBottomInset: false,

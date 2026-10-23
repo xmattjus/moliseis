@@ -517,6 +517,7 @@ final class FakeEventRepository extends EventRepository {
   Result<Iterable<Event>> getFavouritesResult;
   Result<void> setFavouriteEventResult;
   Completer<Result<List<Event>>>? pendingGetByCurrentYear;
+  Future<Result<List<Event>>> Function()? getByCurrentYearHandler;
   Completer<Result<List<Event>>>? pendingGetByDate;
   Future<Result<void>> Function(int id, {required bool save})?
   setFavouriteEventHandler;
@@ -558,6 +559,8 @@ final class FakeEventRepository extends EventRepository {
   @override
   Future<Result<List<Event>>> getByCurrentYear() async {
     getByCurrentYearCallCount++;
+    final handler = getByCurrentYearHandler;
+    if (handler != null) return await handler();
     final pending = pendingGetByCurrentYear;
     if (pending != null) return await pending.future;
     return getByCurrentYearResult;
@@ -815,6 +818,7 @@ final class FakePlaceRepository extends PlaceRepository {
 
   Result<List<Place>> getAllResult;
   Completer<Result<List<Place>>>? pendingGetAll;
+  Future<Result<List<Place>>> Function(ContentSort)? getAllHandler;
   Result<List<Place>> getByCategoriesResult;
   int getByCategoriesCallCount = 0;
   Future<Result<List<Place>>> Function(Set<ContentCategory>)?
@@ -872,6 +876,8 @@ final class FakePlaceRepository extends PlaceRepository {
   }) async {
     getAllCallCount++;
     lastGetAllSort = sort;
+    final handler = getAllHandler;
+    if (handler != null) return await handler(sort);
     final pending = pendingGetAll;
     if (pending != null) return await pending.future;
     return getAllResult;
@@ -1413,6 +1419,12 @@ final class FakeSearchRepository implements SearchRepository {
 
   /// Optional per-query execution control; defaults preserve existing behavior.
   Future<Result<List<ContentBase>>> Function(String)? resultsByQueryHandler;
+
+  /// Optional history operations retain existing fake defaults when unset.
+  Future<Result<List<String>>> Function()? historyReadHandler;
+  Future<Result<void>> Function(String)? historyAddHandler;
+  Future<Result<void>> Function(String)? historyRemoveHandler;
+  final List<({String operation, String query})> historyWrites = [];
   final List<String> capturedQueries = [];
   int getPastSearchesCallCount = 0;
   int getResultsByQueryCallCount = 0;
@@ -1423,8 +1435,12 @@ final class FakeSearchRepository implements SearchRepository {
   Completer<Result<List<ContentBase>>>? pendingGetResultsByQuery;
 
   @override
-  Future<Result<void>> addToPastSearches(String text) =>
-      pendingAddToPastSearches?.future ?? Future.value(addToHistoryResult);
+  Future<Result<void>> addToPastSearches(String text) {
+    historyWrites.add((operation: 'add', query: text));
+    return historyAddHandler?.call(text) ??
+        pendingAddToPastSearches?.future ??
+        Future.value(addToHistoryResult);
+  }
 
   @override
   Future<Result<List<ContentBase>>> getResultsByQuery(String text) {
@@ -1440,15 +1456,19 @@ final class FakeSearchRepository implements SearchRepository {
   Future<Result<List<String>>> getPastSearches() async {
     getPastSearchesCallCount++;
     final result =
-        await (pendingGetPastSearches?.future ??
+        await (historyReadHandler?.call() ??
+            pendingGetPastSearches?.future ??
             Future.value(pastSearchesResult));
     return result.map(List.of);
   }
 
   @override
-  Future<Result<void>> removeFromPastSearches(String text) =>
-      pendingRemoveFromPastSearches?.future ??
-      Future.value(removeFromHistoryResult);
+  Future<Result<void>> removeFromPastSearches(String text) {
+    historyWrites.add((operation: 'remove', query: text));
+    return historyRemoveHandler?.call(text) ??
+        pendingRemoveFromPastSearches?.future ??
+        Future.value(removeFromHistoryResult);
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -879,9 +879,8 @@ void main() {
         await pumpCommandTurns(tester);
 
         final map = tester.widget<GeoMapScreen>(find.byType(GeoMapScreen));
-        expect(map.viewModel.loadEvents.running, isTrue);
-        expect(map.viewModel.loadPlaces.running, isTrue);
-        expect(map.searchViewModel.loadPastSearches.running, isTrue);
+        expect(map.viewModel.loadMarkers.isRunningSync.value, isTrue);
+        expect(map.searchViewModel.pastSearchesState.value.isRunning, isTrue);
         await tester.pumpWidget(const SizedBox.shrink());
         expect(() => map.viewModel.addListener(() {}), throwsFlutterError);
         expect(
@@ -1137,7 +1136,7 @@ void main() {
       }
     }
 
-    testWidgets('direct /map renders the default map without selection', (
+    testOwnerUI('direct /map renders the default map without selection', (
       tester,
     ) async {
       tester.binding.platformDispatcher.defaultRouteNameTestValue = '/map';

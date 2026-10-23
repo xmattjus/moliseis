@@ -99,7 +99,6 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                     ),
                     onSubmitted: _showSearchResults,
                     onSuggestionPressed: (content) {
-                      _controller.closeView(content.name);
                       _showSearchResults(content.name);
                     },
                     viewModel: widget.viewModel,
