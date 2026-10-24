@@ -198,6 +198,15 @@ final class FakeAdminContentSubmissionRepository
   Result<void> deleteAssetResult;
 
   int listCallCount = 0;
+
+  /// Remote dashboard phase order, including reads following a mutation.
+  final dashboardCalls = <String>[];
+
+  /// Optional entry barriers; invoked only after the call has been counted.
+  void Function()? onListEntry;
+  void Function()? onIgnoredListEntry;
+  void Function(int recordId)? onUnIgnoreEntry;
+
   final getByIdIds = <int>[];
   final createInputs = <AdminSubmissionInput>[];
   final updateIds = <int>[];
@@ -232,6 +241,8 @@ final class FakeAdminContentSubmissionRepository
   @override
   Future<Result<List<AdminSubmission>>> list() async {
     listCallCount++;
+    dashboardCalls.add('list');
+    onListEntry?.call();
     final pending = pendingList;
     if (pending != null) return await pending.future;
     return listResult;
@@ -315,17 +326,25 @@ final class FakeAdminContentSubmissionRepository
   );
   Result<AdminEventResolution>? unIgnoreResult;
   Completer<Result<AdminEventResolution>>? pendingUnIgnore;
+
+  /// Holds ignored-source reads independently from submissions reads.
+  Completer<Result<List<AdminIgnoredSource>>>? pendingIgnoredList;
   int ignoredListCalls = 0;
   final unIgnoreCalls = <int>[];
   @override
   Future<Result<List<AdminIgnoredSource>>> listIgnoredSources() async {
     ignoredListCalls++;
+    dashboardCalls.add('listIgnoredSources');
+    onIgnoredListEntry?.call();
+    if (pendingIgnoredList case final pending?) return await pending.future;
     return ignoredSourcesResult;
   }
 
   @override
   Future<Result<AdminEventResolution>> unIgnoreSource(int recordId) async {
     unIgnoreCalls.add(recordId);
+    dashboardCalls.add('unIgnoreSource:$recordId');
+    onUnIgnoreEntry?.call(recordId);
     if (pendingUnIgnore case final pending?) return await pending.future;
     return unIgnoreResult ??
         Result.error(TestException('No un-ignore configured'));

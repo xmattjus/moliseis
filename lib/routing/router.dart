@@ -258,7 +258,7 @@ GoRouter buildAppRouter({
               final viewModel = AdminSubmissionsViewModel(
                 repository: context.read(),
               );
-              unawaited(viewModel.load.execute());
+              unawaited(viewModel.refreshSubmissions());
               return viewModel;
             },
             builder: (context, _) => AdminDashboardScreen(

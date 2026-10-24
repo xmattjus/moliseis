@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
 import 'package:flutter_quill/flutter_quill.dart';
@@ -36,304 +38,475 @@ import '../support/recording_tile_http_client.dart';
 
 void main() {
   group('buildAppRouter admin auth guard', () {
-    testWidgets('NAV-03 direct anonymous login Back cannot expose dashboard', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness();
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    late _AdminRouteHarness harness;
+    testOwnerUI(
+      'NAV-03 direct anonymous login Back cannot expose dashboard',
+      (tester) async {
+        harness = _AdminRouteHarness();
 
-      harness.router.go(RoutePaths.adminLoginLocation);
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
-      expect(find.byType(AdminLoginScreen), findsOneWidget);
-      expect(find.byType(AdminDashboardScreen), findsNothing);
-      expect(harness.repository.listCallCount, 0);
+        harness.router.go(RoutePaths.adminLoginLocation);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(find.byType(AdminDashboardScreen), findsNothing);
+        expect(harness.repository.listCallCount, 0);
 
-      expect(await tester.binding.handlePopRoute(), isFalse);
-      await tester.pumpAndSettle();
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.adminLoginLocation,
-      );
-      expect(find.byType(AdminLoginScreen), findsOneWidget);
-      expect(find.byType(AdminDashboardScreen), findsNothing);
-      expect(harness.repository.listCallCount, 0);
-    });
+        expect(await tester.binding.handlePopRoute(), isFalse);
+        await tester.pumpAndSettle();
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.adminLoginLocation,
+        );
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(find.byType(AdminDashboardScreen), findsNothing);
+        expect(harness.repository.listCallCount, 0);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testWidgets('redirects an anonymous user from /admin to the login', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness();
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'redirects an anonymous user from /admin to the login',
+      (tester) async {
+        harness = _AdminRouteHarness();
 
-      harness.router.go(RoutePaths.admin);
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
+        harness.router.go(RoutePaths.admin);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.adminLoginLocation,
-      );
-      expect(find.byType(AdminLoginScreen), findsOneWidget);
-      expect(harness.repository.listCallCount, 0);
-    });
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.adminLoginLocation,
+        );
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(harness.repository.listCallCount, 0);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testWidgets('redirects an anonymous user from an admin child to login', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness();
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'redirects an anonymous user from an admin child to login',
+      (tester) async {
+        harness = _AdminRouteHarness();
 
-      harness.router.go('/admin/submissions/12');
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
+        harness.router.go('/admin/submissions/12');
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.adminLoginLocation,
-      );
-      expect(harness.repository.listCallCount, 0);
-    });
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.adminLoginLocation,
+        );
+        expect(harness.repository.listCallCount, 0);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testWidgets('redirects a permanent non-admin user from /admin to login', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness(initialUser: makeAuthUser());
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'redirects a permanent non-admin user from /admin to login',
+      (tester) async {
+        harness = _AdminRouteHarness(initialUser: makeAuthUser());
 
-      harness.router.go(RoutePaths.admin);
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
+        harness.router.go(RoutePaths.admin);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.adminLoginLocation,
-      );
-      expect(harness.repository.listCallCount, 0);
-    });
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.adminLoginLocation,
+        );
+        expect(harness.repository.listCallCount, 0);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testWidgets('keeps an admin user on the dashboard', (tester) async {
-      final harness = _AdminRouteHarness(
-        initialUser: makeAuthUser(isAdmin: true),
-      );
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'keeps an admin user on the dashboard',
+      (tester) async {
+        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
 
-      harness.router.go(RoutePaths.admin);
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
+        harness.router.go(RoutePaths.admin);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.admin,
-      );
-      expect(find.byType(AdminDashboardScreen), findsOneWidget);
-    });
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.admin,
+        );
+        expect(find.byType(AdminDashboardScreen), findsOneWidget);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testWidgets('redirects an admin user from the login to the dashboard', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness(
-        initialUser: makeAuthUser(isAdmin: true),
-      );
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'redirects an admin user from the login to the dashboard',
+      (tester) async {
+        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
 
-      harness.router.go(RoutePaths.adminLoginLocation);
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
+        harness.router.go(RoutePaths.adminLoginLocation);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.admin,
-      );
-      expect(find.byType(AdminDashboardScreen), findsOneWidget);
-    });
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.admin,
+        );
+        expect(find.byType(AdminDashboardScreen), findsOneWidget);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testOwnerUI('keeps an anonymous user on settings', (tester) async {
-      final harness = _AdminRouteHarness();
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'keeps an anonymous user on settings',
+      (tester) async {
+        harness = _AdminRouteHarness();
 
-      harness.router.go(RoutePaths.settings);
-      await tester.pumpWidget(harness.app(withSettingsProviders: true));
-      await tester.pumpAndSettle();
+        harness.router.go(RoutePaths.settings);
+        await tester.pumpWidget(harness.app(withSettingsProviders: true));
+        await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.settings,
-      );
-      expect(find.byType(SettingsScreen), findsOneWidget);
-    });
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.settings,
+        );
+        expect(find.byType(SettingsScreen), findsOneWidget);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testOwnerUI('keeps an admin user on settings', (tester) async {
-      final harness = _AdminRouteHarness(
-        initialUser: makeAuthUser(isAdmin: true),
-      );
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'keeps an admin user on settings',
+      (tester) async {
+        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
 
-      harness.router.go(RoutePaths.settings);
-      await tester.pumpWidget(harness.app(withSettingsProviders: true));
-      await tester.pumpAndSettle();
+        harness.router.go(RoutePaths.settings);
+        await tester.pumpWidget(harness.app(withSettingsProviders: true));
+        await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.settings,
-      );
-      expect(find.byType(SettingsScreen), findsOneWidget);
-    });
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.settings,
+        );
+        expect(find.byType(SettingsScreen), findsOneWidget);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testWidgets('refreshes from login to dashboard after an auth event', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness();
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'refreshes from login to dashboard after an auth event',
+      (tester) async {
+        harness = _AdminRouteHarness();
 
-      harness.router.go(RoutePaths.adminLoginLocation);
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
-      expect(find.byType(AdminLoginScreen), findsOneWidget);
-      expect(harness.repository.listCallCount, 0);
+        harness.router.go(RoutePaths.adminLoginLocation);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(harness.repository.listCallCount, 0);
 
-      harness.auth
-        ..setUser(makeAuthUser(isAdmin: true))
-        ..emit(AuthChangeEvent.signedIn);
-      await tester.pumpAndSettle();
-
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.admin,
-      );
-      expect(find.byType(AdminLoginScreen), findsNothing);
-      expect(harness.repository.listCallCount, 1);
-    });
-
-    testWidgets('refreshes from dashboard to login after a sign-out event', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness(
-        initialUser: makeAuthUser(isAdmin: true),
-      );
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
-
-      harness.router.go(RoutePaths.admin);
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
-      expect(find.byType(AdminDashboardScreen), findsOneWidget);
-
-      harness.auth
-        ..setUser(null)
-        ..emit(AuthChangeEvent.signedOut);
-      await tester.pumpAndSettle();
-
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        RoutePaths.adminLoginLocation,
-      );
-      expect(find.byType(AdminLoginScreen), findsOneWidget);
-    });
-
-    testOwnerUI('settings entry preserves back navigation after login', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness();
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
-      when(
-        () => harness.auth.client.signInWithPassword(
-          email: 'redazione@example.com',
-          password: 'password-sicura',
-        ),
-      ).thenAnswer((_) async {
         harness.auth
           ..setUser(makeAuthUser(isAdmin: true))
           ..emit(AuthChangeEvent.signedIn);
-        return MockAuthResponse();
-      });
+        await tester.pumpAndSettle();
 
-      harness.router.go(RoutePaths.settings);
-      await tester.pumpWidget(harness.app(withSettingsProviders: true));
-      await tester.pumpAndSettle();
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.admin,
+        );
+        expect(find.byType(AdminLoginScreen), findsNothing);
+        expect(harness.repository.listCallCount, 1);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-      await tester.tap(find.text('Area redazione'));
-      await tester.pumpAndSettle();
+    testOwnerUI(
+      'refreshes from dashboard to login after a sign-out event',
+      (tester) async {
+        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
 
-      expect(
-        harness.router.routerDelegate.state.uri.path,
-        RoutePaths.adminLoginLocation,
+        harness.router.go(RoutePaths.admin);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminDashboardScreen), findsOneWidget);
+
+        harness.auth
+          ..setUser(null)
+          ..emit(AuthChangeEvent.signedOut);
+        await tester.pumpAndSettle();
+
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          RoutePaths.adminLoginLocation,
+        );
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
+
+    testOwnerUI(
+      'settings entry preserves back navigation after login',
+      (tester) async {
+        harness = _AdminRouteHarness();
+        when(
+          () => harness.auth.client.signInWithPassword(
+            email: 'redazione@example.com',
+            password: 'password-sicura',
+          ),
+        ).thenAnswer((_) async {
+          harness.auth
+            ..setUser(makeAuthUser(isAdmin: true))
+            ..emit(AuthChangeEvent.signedIn);
+          return AuthResponse(
+            user: harness.auth.client.currentUser,
+            session: harness.auth.client.currentSession,
+          );
+        });
+
+        harness.router.go(RoutePaths.settings);
+        await tester.pumpWidget(harness.app(withSettingsProviders: true));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Area redazione'));
+        await tester.pumpAndSettle();
+
+        expect(
+          harness.router.routerDelegate.state.uri.path,
+          RoutePaths.adminLoginLocation,
+        );
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(harness.repository.listCallCount, 0);
+
+        await tester.enterText(
+          find.byType(TextFormField).first,
+          'redazione@example.com',
+        );
+        await tester.enterText(
+          find.byType(TextFormField).last,
+          'password-sicura',
+        );
+        await tester.tap(find.text('Accedi'));
+        await tester.pumpAndSettle();
+
+        verify(
+          () => harness.auth.client.signInWithPassword(
+            email: 'redazione@example.com',
+            password: 'password-sicura',
+          ),
+        ).called(1);
+        expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
+        expect(harness.repository.listCallCount, 1);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+
+        expect(
+          harness.router.routerDelegate.state.uri.path,
+          RoutePaths.settings,
+        );
+        expect(find.byType(SettingsScreen), findsOneWidget);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
+
+    for (final fromSettings in [false, true]) {
+      testOwnerUI(
+        'R2/R3 event plus pending login completion navigates once settings=$fromSettings',
+        (tester) async {
+          harness = _AdminRouteHarness();
+          final gate = Completer<AuthResponse>();
+          harness.auth.onPassword = () => gate.future;
+          harness.router.go(
+            fromSettings ? RoutePaths.settings : RoutePaths.adminLoginLocation,
+          );
+          await tester.pumpWidget(
+            harness.app(withSettingsProviders: fromSettings),
+          );
+          await tester.pumpAndSettle();
+          if (fromSettings) {
+            await tester.tap(find.text('Area redazione'));
+            await tester.pumpAndSettle();
+          }
+          await tester.enterText(
+            find.byType(TextFormField).first,
+            'staff@example.com',
+          );
+          await tester.enterText(find.byType(TextFormField).last, 'secret');
+          await tester.tap(find.text('Accedi'));
+          await pumpCommandTurns(tester);
+          expect(harness.auth.passwordCalls, 1);
+          harness.auth
+            ..setUser(makeAuthUser(isAdmin: true))
+            ..emit(AuthChangeEvent.signedIn);
+          final response = AuthResponse(
+            user: harness.auth.client.currentUser,
+            session: harness.auth.client.currentSession,
+          );
+          await tester.pumpAndSettle();
+          expect(find.byType(AdminDashboardScreen), findsOneWidget);
+          expect(harness.auth.viewModel.canLogout, isFalse);
+          expect(harness.repository.listCallCount, 1);
+          expect(
+            tester
+                .widget<IconButton>(
+                  find.byWidgetPredicate(
+                    (widget) =>
+                        widget is IconButton &&
+                        widget.tooltip == 'Esegui il logout',
+                  ),
+                )
+                .onPressed,
+            isNull,
+          );
+          harness.auth.emit(AuthChangeEvent.signedIn);
+          gate.complete(response);
+          await tester.pumpAndSettle();
+          expect(
+            harness.router.routerDelegate.state.uri.path,
+            RoutePaths.admin,
+          );
+          expect(harness.repository.listCallCount, 1);
+          expect(harness.auth.viewModel.canLogout, isTrue);
+          if (fromSettings) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(
+              harness.router.routerDelegate.state.uri.path,
+              RoutePaths.settings,
+            );
+            expect(find.byType(SettingsScreen), findsOneWidget);
+          } else {
+            expect(await tester.binding.handlePopRoute(), isFalse);
+            expect(find.byType(AdminDashboardScreen), findsOneWidget);
+          }
+        },
+        disposeOwners: () {
+          harness.auth.dispose();
+          harness.syncViewModel.dispose();
+          harness.router.dispose();
+        },
       );
-      expect(find.byType(AdminLoginScreen), findsOneWidget);
-      expect(harness.repository.listCallCount, 0);
+    }
 
-      await tester.enterText(
-        find.byType(TextFormField).first,
-        'redazione@example.com',
-      );
-      await tester.enterText(
-        find.byType(TextFormField).last,
-        'password-sicura',
-      );
-      await tester.tap(find.text('Accedi'));
-      await tester.pumpAndSettle();
+    testOwnerUI(
+      'R2 logout auth event and completion leave a single protected redirect',
+      (tester) async {
+        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        final gate = Completer<void>();
+        harness.auth.onSignOut = () async {
+          harness.auth
+            ..setUser(null)
+            ..emit(AuthChangeEvent.signedOut);
+          await gate.future;
+        };
+        harness.router.go(RoutePaths.admin);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+        expect(harness.repository.listCallCount, 1);
+        expect(harness.auth.viewModel.requestLogout(), isTrue);
+        await pumpCommandTurns(tester);
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(harness.auth.viewModel.canLogin, isFalse);
+        gate.complete();
+        await tester.pumpAndSettle();
+        harness.auth.emit(AuthChangeEvent.signedOut);
+        await tester.pumpAndSettle();
+        expect(
+          harness.router.routerDelegate.state.uri.path,
+          RoutePaths.adminLoginLocation,
+        );
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(harness.repository.listCallCount, 1);
+        expect(harness.auth.signOutCalls, 1);
+        expect(harness.auth.anonymousCalls, 1);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-      verify(
-        () => harness.auth.client.signInWithPassword(
-          email: 'redazione@example.com',
-          password: 'password-sicura',
-        ),
-      ).called(1);
-      expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
-      expect(harness.repository.listCallCount, 1);
+    testOwnerUI(
+      'builds the real create editor route for an admin',
+      (tester) async {
+        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
 
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+        harness.router.go('/admin/submissions/new');
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
 
-      expect(harness.router.routerDelegate.state.uri.path, RoutePaths.settings);
-      expect(find.byType(SettingsScreen), findsOneWidget);
-    });
+        expect(
+          harness.router.routeInformationProvider.value.uri.path,
+          '/admin/submissions/new',
+        );
+        expect(find.text('Nuovo contributo'), findsOneWidget);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
 
-    testWidgets('builds the real create editor route for an admin', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness(
-        initialUser: makeAuthUser(isAdmin: true),
-      );
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
+    testOwnerUI(
+      'shows the route error screen for an invalid submission id',
+      (tester) async {
+        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
 
-      harness.router.go('/admin/submissions/new');
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
+        harness.router.go('/admin/submissions/abc');
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
 
-      expect(
-        harness.router.routeInformationProvider.value.uri.path,
-        '/admin/submissions/new',
-      );
-      expect(find.text('Nuovo contributo'), findsOneWidget);
-    });
-
-    testWidgets('shows the route error screen for an invalid submission id', (
-      tester,
-    ) async {
-      final harness = _AdminRouteHarness(
-        initialUser: makeAuthUser(isAdmin: true),
-      );
-      addTearDown(harness.router.dispose);
-      addTearDown(harness.auth.dispose);
-
-      harness.router.go('/admin/submissions/abc');
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
-
-      expect(find.byType(RouteErrorScreen), findsOneWidget);
-    });
+        expect(find.byType(RouteErrorScreen), findsOneWidget);
+      },
+      disposeOwners: () {
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
   });
 }
 
