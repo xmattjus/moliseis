@@ -20,18 +20,18 @@ void main() {
       final repository = FakeSearchRepository();
       final vm = SearchViewModel(searchRepository: repository);
       await pumpEventQueue();
-      expect(vm.loadPastSearches.completed, isTrue);
+      expect(vm.pastSearchesState.value.completed, isTrue);
 
       final pendingAdd = Completer<Result<void>>();
       repository.pendingAddToPastSearches = pendingAdd;
-      final add = vm.addToPastSearches.execute('campobasso');
+      vm.addToPastSearches('campobasso');
+      await pumpEventQueue();
       expect(vm.pastSearches, ['campobasso']);
       vm.dispose();
       pendingAdd.complete(Result.error(TestException('db error')));
-      await add;
+      await pumpEventQueue();
 
       expect(vm.pastSearches, ['campobasso']);
-      expect(vm.addToPastSearches.error, isTrue);
     });
 
     test(
@@ -40,19 +40,20 @@ void main() {
         final repository = FakeSearchRepository();
         final vm = SearchViewModel(searchRepository: repository);
         await pumpEventQueue();
-        await vm.addToPastSearches.execute('campobasso');
+        vm.addToPastSearches('campobasso');
+        await pumpEventQueue();
         expect(vm.pastSearches, ['campobasso']);
 
         final pendingRemove = Completer<Result<void>>();
         repository.pendingRemoveFromPastSearches = pendingRemove;
-        final remove = vm.removeFromPastSearches.execute('campobasso');
+        vm.removeFromPastSearches('campobasso');
+        await pumpEventQueue();
         expect(vm.pastSearches, isEmpty);
         vm.dispose();
         pendingRemove.complete(Result.error(TestException('db error')));
-        await remove;
+        await pumpEventQueue();
 
         expect(vm.pastSearches, isEmpty);
-        expect(vm.removeFromPastSearches.error, isTrue);
       },
     );
 
@@ -66,7 +67,7 @@ void main() {
 
         await pumpEventQueue();
 
-        expect(vm.loadPastSearches.completed, isTrue);
+        expect(vm.pastSearchesState.value.completed, isTrue);
         expect(vm.pastSearches, equals(['molise', 'campobasso']));
       });
 
@@ -79,7 +80,7 @@ void main() {
 
         await pumpEventQueue();
 
-        expect(vm.loadPastSearches.error, isTrue);
+        expect(vm.pastSearchesState.value.hasFailure, isTrue);
         expect(vm.pastSearches, isEmpty);
       });
     });
@@ -88,9 +89,8 @@ void main() {
       test('does nothing for empty query', () async {
         final vm = await _buildLoaded(searchRepository: FakeSearchRepository());
 
-        await vm.addToPastSearches.execute('');
-
-        expect(vm.addToPastSearches.completed, isTrue);
+        vm.addToPastSearches('');
+        await pumpEventQueue();
         expect(vm.pastSearches, isEmpty);
       });
 
@@ -98,9 +98,8 @@ void main() {
         final vm = await _buildLoaded(searchRepository: FakeSearchRepository());
 
         // 'Natura' is a category label.
-        await vm.addToPastSearches.execute('Natura');
-
-        expect(vm.addToPastSearches.completed, isTrue);
+        vm.addToPastSearches('Natura');
+        await pumpEventQueue();
         expect(vm.pastSearches, isEmpty);
       });
 
@@ -111,9 +110,8 @@ void main() {
           ),
         );
 
-        await vm.addToPastSearches.execute('molise');
-
-        expect(vm.addToPastSearches.completed, isTrue);
+        vm.addToPastSearches('molise');
+        await pumpEventQueue();
         expect(vm.pastSearches, equals(['molise']));
       });
 
@@ -124,18 +122,16 @@ void main() {
           ),
         );
 
-        await vm.addToPastSearches.execute('molise');
-
-        expect(vm.addToPastSearches.completed, isTrue);
+        vm.addToPastSearches('molise');
+        await pumpEventQueue();
         expect(vm.pastSearches, hasLength(1));
       });
 
       test('optimistically adds query and persists on success', () async {
         final vm = await _buildLoaded(searchRepository: FakeSearchRepository());
 
-        await vm.addToPastSearches.execute('campobasso');
-
-        expect(vm.addToPastSearches.completed, isTrue);
+        vm.addToPastSearches('campobasso');
+        await pumpEventQueue();
         expect(vm.pastSearches, contains('campobasso'));
       });
 
@@ -146,9 +142,8 @@ void main() {
           ),
         );
 
-        await vm.addToPastSearches.execute('campobasso');
-
-        expect(vm.addToPastSearches.error, isTrue);
+        vm.addToPastSearches('campobasso');
+        await pumpEventQueue();
         expect(vm.pastSearches, isNot(contains('campobasso')));
       });
     });
@@ -161,9 +156,8 @@ void main() {
           ),
         );
 
-        await vm.removeFromPastSearches.execute('molise');
-
-        expect(vm.removeFromPastSearches.completed, isTrue);
+        vm.removeFromPastSearches('molise');
+        await pumpEventQueue();
         expect(vm.pastSearches, isNot(contains('molise')));
       });
 
@@ -177,9 +171,8 @@ void main() {
           ),
         );
 
-        await vm.removeFromPastSearches.execute('molise');
-
-        expect(vm.removeFromPastSearches.error, isTrue);
+        vm.removeFromPastSearches('molise');
+        await pumpEventQueue();
         expect(vm.pastSearches, contains('molise'));
       });
     });

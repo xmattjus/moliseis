@@ -41,15 +41,16 @@ void main() {
 
       final pending = Completer<Result<List<Event>>>();
       events.pendingGetByCurrentYear = pending;
-      final filter = vm.setSelectedCategories.execute({ContentCategory.nature});
+      vm.setSelectedCategories({ContentCategory.nature});
+      await pumpEventQueue();
       expect(events.getByCurrentYearCallCount, 2);
       vm.dispose();
       pending.complete(Result.success(<Event>[makeEvent()]));
-      await filter;
+      await pumpEventQueue();
 
       expect(places.getAllCallCount, 1);
       expect(vm.allEvents, isEmpty);
-      expect(vm.setSelectedCategories.completed, isTrue);
+      expect(vm.isDisposed, isTrue);
     },
   );
 
@@ -315,7 +316,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
   });
 
-  testWidgets('semantic transitions are atomic, valid-only and '
+  testOwnerUI('semantic transitions are atomic, valid-only and '
       'materialized selection is lookup-free', (tester) async {
     final events = FakeEventRepository();
     final places = FakePlaceRepository();

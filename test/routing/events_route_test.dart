@@ -7,13 +7,14 @@ import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/ui/event/widgets/events_screen.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../support/command_test_support.dart';
 import '../support/events_harness.dart';
 import '../support/fake_repositories.dart';
 
 void main() {
   setUpAll(() => initializeDateFormatting('en'));
 
-  testWidgets('Eventi navigation initializes its retained production branch', (
+  testOwnerUI('Eventi navigation initializes its retained production branch', (
     tester,
   ) async {
     final loadAll = Completer<Result<List<Event>>>();
@@ -36,7 +37,7 @@ void main() {
     );
 
     await tester.tap(find.text('Eventi'));
-    await tester.pump();
+    await pumpCommandTurns(tester);
 
     final dateAfterNavigation = policy.currentCalendarDate(
       DateTime.now().toUtc(),
@@ -54,7 +55,7 @@ void main() {
     expect(find.byType(EventsScreen), findsNothing);
 
     await tester.tap(find.text('Eventi'));
-    await tester.pump();
+    await pumpCommandTurns(tester);
 
     expect(find.byType(EventsScreen), findsOneWidget);
     expect(repository.getByDateCallCount, 1);

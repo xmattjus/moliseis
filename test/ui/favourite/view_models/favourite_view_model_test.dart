@@ -1,14 +1,245 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
+import '../../../support/command_test_support.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
+import '../../../support/mock_logger.dart';
 
 void main() {
+  test(
+    'load requested during a write remains unavailable after write settles',
+    () async {
+      final write = Completer<Result<void>>();
+      var queries = 0;
+      final places = FakePlaceRepository(
+        getFavouritePlaceIdsHandler: () async {
+          queries++;
+          return const Result.success([]);
+        },
+        setFavouritePlaceHandler: (_, {required save}) => write.future,
+      );
+      final vm = FavouriteViewModel(
+        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+          eventRepository: FakeEventRepository(),
+          placeRepository: places,
+        ),
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      final mutation = vm.setFavourite(makePlace(), save: true);
+      final loading = vm.load.runAsync();
+      vm.load.run();
+      expect(vm.load.runAsync(), same(loading));
+      write.complete(const Result.success(null));
+      await mutation;
+      await loading;
+      expect(vm.load.results.value.hasFailure, isTrue);
+      expect(queries, 1);
+      expect(
+        vm.load.results.value.domainError.toString(),
+        contains('another update'),
+      );
+      expect(await vm.load.runAsync(), isA<Success<void>>());
+      expect(queries, 2);
+    },
+  );
+
+  test('load admission rejects write before the first notification', () async {
+    final places = FakePlaceRepository();
+    final vm = FavouriteViewModel(
+      favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+        eventRepository: FakeEventRepository(),
+        placeRepository: places,
+      ),
+    );
+    addTearDown(vm.dispose);
+    expect(vm.load.isRunningSync.value, isTrue);
+    expect(await vm.setFavourite(makePlace(), save: true), isA<Error<void>>());
+    expect(places.setFavouritePlaceCalls, isEmpty);
+    expect(vm.favouritePlaceIds, isEmpty);
+    await pumpEventQueue();
+  });
+
+  test(
+    'places publish progressively before pending events and first failure wins',
+    () async {
+      final gate = Completer<Result<List<int>>>();
+      final places = FakePlaceRepository(
+        getFavouritePlaceIdsResult: const Result.success([1, 1, 2]),
+        getByIdResults: {
+          1: Result.success(makePlace()),
+          2: Result.error(TestException('missing')),
+        },
+      );
+      final events = FakeEventRepository()
+        ..getFavouriteEventIdsHandler = () => gate.future;
+      final vm = FavouriteViewModel(
+        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+          eventRepository: events,
+          placeRepository: places,
+        ),
+      );
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      expect(vm.load.isRunningSync.value, isTrue);
+      expect(vm.favouritePlaceIds, [1, 2]);
+      expect(vm.favouritePlaces.map((p) => p.remoteId), [1]);
+      expect(vm.isFavourite(makePlace(remoteId: 2)), isTrue);
+      final failure = TestException('events failed');
+      gate.complete(Result.error(failure));
+      await pumpEventQueue();
+      expect(vm.load.results.value.domainError, same(failure));
+      expect(vm.favouritePlaceIds, [1, 2]);
+      final first = TestException('places failed');
+      places.getFavouritePlaceIdsResult = Result.error(first);
+      events
+        ..getFavouriteEventIdsHandler = null
+        ..getFavouriteEventIdsResult = Result.error(TestException('second'));
+      await vm.load.runAsync();
+      expect(vm.load.results.value.domainError, same(first));
+      expect(vm.favouritePlaceIds, [1, 2]);
+    },
+  );
+
+  test(
+    'reentrant optimistic disposal starts no write and rejects future writes',
+    () async {
+      final places = FakePlaceRepository();
+      final vm = FavouriteViewModel(
+        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+          eventRepository: FakeEventRepository(),
+          placeRepository: places,
+        ),
+      );
+      await pumpEventQueue();
+      vm.addListener(vm.dispose);
+      expect(
+        await vm.setFavourite(makePlace(), save: true),
+        isA<Error<void>>(),
+      );
+      expect(places.setFavouritePlaceCalls, isEmpty);
+      expect(
+        await vm.setFavourite(makePlace(remoteId: 2), save: true),
+        isA<Error<void>>(),
+      );
+      expect(vm.favouritePlaceIds, [1]);
+    },
+  );
+
+  test(
+    'reentrant partial publication disposal starts no events phase',
+    () async {
+      final places = FakePlaceRepository(
+        getFavouritePlaceIdsResult: const Result.success([1]),
+        getByIdResults: {1: Result.success(makePlace())},
+      );
+      final events = FakeEventRepository();
+      final vm = FavouriteViewModel(
+        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+          eventRepository: events,
+          placeRepository: places,
+        ),
+      );
+      vm.addListener(() {
+        if (vm.favouritePlaceIds.isNotEmpty) vm.dispose();
+      });
+      await pumpEventQueue();
+      expect(events.getFavouriteEventIdsCallCount, 0);
+      expect(vm.favouritePlaceIds, [1]);
+    },
+  );
+
+  test(
+    'disposal during place lookup prevents publication and all subsequent I/O',
+    () async {
+      final gate = Completer<Result<Place>>();
+      final places = FakePlaceRepository(
+        getFavouritePlaceIdsResult: const Result.success([1, 2]),
+      );
+      places.pendingGetById[1] = gate;
+      final events = FakeEventRepository();
+      final vm = FavouriteViewModel(
+        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+          eventRepository: events,
+          placeRepository: places,
+        ),
+      );
+      await pumpEventQueue();
+      expect(places.getByIdCallCount, 1);
+      vm.dispose();
+      gate.complete(Result.success(makePlace()));
+      await pumpEventQueue();
+      expect(places.getByIdCallCount, 1);
+      expect(events.getFavouriteEventIdsCallCount, 0);
+      expect(vm.favouritePlaceIds, isEmpty);
+    },
+  );
+
+  test(
+    'direct write preserves a late unexpected throw without global reporting',
+    () async {
+      final logger = MockLogger();
+      addTearDown(installCommandTestReporting(logger));
+      final gate = Completer<Result<void>>();
+      final places = FakePlaceRepository(
+        setFavouritePlaceHandler: (_, {required save}) => gate.future,
+      );
+      final vm = FavouriteViewModel(
+        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+          eventRepository: FakeEventRepository(),
+          placeRepository: places,
+        ),
+      );
+      await pumpEventQueue();
+      final write = vm.setFavourite(makePlace(), save: true);
+      final original = StateError('direct write failed late');
+      final observed = expectLater(write, throwsA(same(original)));
+      vm.dispose();
+      gate.completeError(original);
+      await observed;
+      expect(vm.favouritePlaceIds, [1]);
+      expect(logger.calls, isEmpty);
+    },
+  );
+
+  test(
+    'dispose during event lookup retains published places and skips next event',
+    () async {
+      final gate = Completer<Result<Event>>();
+      final places = FakePlaceRepository(
+        getFavouritePlaceIdsResult: const Result.success([1]),
+        getByIdResults: {1: Result.success(makePlace())},
+      );
+      final events = FakeEventRepository(
+        getFavouriteEventIdsResult: const Result.success([1, 2]),
+      );
+      events.pendingGetById[1] = gate;
+      final vm = FavouriteViewModel(
+        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+          eventRepository: events,
+          placeRepository: places,
+        ),
+      );
+      await pumpEventQueue();
+      expect(vm.favouritePlaceIds, [1]);
+      expect(events.getByIdCallCount, 1);
+      vm.dispose();
+      gate.complete(Result.success(makeEvent()));
+      await pumpEventQueue();
+      expect(vm.favouritePlaceIds, [1]);
+      expect(vm.favouriteEventIds, isEmpty);
+      expect(events.getByIdCallCount, 1);
+    },
+  );
+
   group('FavouriteViewModel load', () {
     test('populates both lists on full success', () async {
       final event = makeEvent();
@@ -29,7 +260,7 @@ void main() {
 
       await pumpEventQueue(times: 10);
 
-      expect(viewModel.load.completed, isTrue);
+      expect(viewModel.load.results.value.completed, isTrue);
       expect(viewModel.favouriteEventIds, equals([1]));
       expect(viewModel.favouriteEvents, equals([event]));
       expect(viewModel.favouritePlaceIds, equals([10]));
@@ -55,7 +286,7 @@ void main() {
 
       await pumpEventQueue(times: 10);
 
-      expect(viewModel.load.error, isTrue);
+      expect(viewModel.load.results.value.hasFailure, isTrue);
       expect(viewModel.favouritePlaceIds, isEmpty);
       expect(viewModel.favouriteEvents, equals([event]));
     });
@@ -79,7 +310,7 @@ void main() {
 
       await pumpEventQueue(times: 10);
 
-      expect(viewModel.load.error, isTrue);
+      expect(viewModel.load.results.value.hasFailure, isTrue);
       expect(viewModel.favouriteEventIds, isEmpty);
       expect(viewModel.favouritePlaces, equals([place]));
     });
@@ -113,9 +344,9 @@ void main() {
         ..getFavouritePlaceIdsResult = const Result.success([20])
         ..getByIdResults = {20: Result.success(secondPlace)};
 
-      await viewModel.load.execute();
+      await viewModel.load.runAsync();
 
-      expect(viewModel.load.completed, isTrue);
+      expect(viewModel.load.results.value.completed, isTrue);
       expect(viewModel.favouriteEventIds, equals([2]));
       expect(viewModel.favouriteEvents, equals([secondEvent]));
       expect(viewModel.favouritePlaceIds, equals([20]));
@@ -136,7 +367,7 @@ void main() {
 
       await pumpEventQueue(times: 10);
 
-      expect(viewModel.load.completed, isTrue);
+      expect(viewModel.load.results.value.completed, isTrue);
       expect(viewModel.favouriteEventIds, equals([1]));
       expect(viewModel.favouriteEvents, isEmpty);
     });
@@ -364,7 +595,7 @@ void main() {
 
       final result = await viewModel.setFavourite(event, save: true);
 
-      expect(viewModel.load.running, isTrue);
+      expect(viewModel.load.isRunningSync.value, isTrue);
       expect(viewModel.isUpdating, isTrue);
       expect(result, isA<Error<void>>());
       expect(eventRepository.setFavouriteEventCalls, isEmpty);
@@ -406,7 +637,7 @@ void main() {
   });
 
   group('FavouriteViewModel disposal', () {
-    testWidgets(
+    testOwnerUI(
       'is safe when a pending initial load completes after disposal',
       (tester) async {
         final pendingPlaceIds = Completer<Result<List<int>>>();
@@ -419,13 +650,13 @@ void main() {
           ),
         );
 
-        expect(viewModel.load.running, isTrue);
+        expect(viewModel.load.isRunningSync.value, isTrue);
         viewModel.dispose();
         pendingPlaceIds.complete(const Result.success([]));
-        await tester.pump();
-        await tester.pump();
+        await pumpCommandTurns(tester);
+        await pumpCommandTurns(tester);
 
-        expect(viewModel.load.running, isFalse);
+        expect(viewModel.load.isRunningSync.value, isFalse);
         expect(tester.takeException(), isNull);
       },
     );
@@ -434,7 +665,7 @@ void main() {
       const Result<void>.success(null),
       Result<void>.error(TestException('write failed')),
     ]) {
-      testWidgets('is safe when a pending write completes with '
+      testOwnerUI('is safe when a pending write completes with '
           '${persistenceResult.isSuccess ? 'success' : 'an error'}'
           ' after disposal', (tester) async {
         final pendingWrite = Completer<Result<void>>();
@@ -448,7 +679,7 @@ void main() {
             placeRepository: FakePlaceRepository(),
           ),
         );
-        await tester.pump();
+        await pumpCommandTurns(tester);
 
         final write = viewModel.setFavourite(event, save: true);
         expect(viewModel.isUpdating, isTrue);
@@ -456,8 +687,10 @@ void main() {
         pendingWrite.complete(persistenceResult);
 
         expect((await write).isSuccess, persistenceResult.isSuccess);
-        await tester.pump();
+        await pumpCommandTurns(tester);
 
+        expect(viewModel.favouriteEventIds, [event.remoteId]);
+        expect(viewModel.favouriteEvents, [event]);
         expect(tester.takeException(), isNull);
       });
     }

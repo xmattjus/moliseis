@@ -83,12 +83,62 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
       widget.controller ?? (_internalSearchController ??= SearchController());
 
   late bool _isFullScreen;
+  Object _popupSession = Object();
+  Object? _confirmationToken;
+  bool _popupOpen = false;
+  bool _closingConfirmation = false;
+
+  bool _owns(SearchViewModel owner, SearchController controller) {
+    if (!mounted) return false;
+    return identical(widget.viewModel, owner) &&
+        identical(_searchController, controller);
+  }
+
+  bool _admits(
+    SearchViewModel owner,
+    SearchController controller,
+    Object session,
+  ) =>
+      _owns(owner, controller) &&
+      _popupOpen &&
+      identical(_popupSession, session) &&
+      _confirmationToken == null &&
+      controller.isOpen;
+
+  void _confirm(
+    SearchViewModel owner,
+    SearchController controller,
+    Object session,
+    String query,
+    VoidCallback navigate,
+  ) {
+    if (!_admits(owner, controller, session)) return;
+    final token = Object();
+    _confirmationToken = token;
+    owner.addToPastSearches(query);
+    if (!_owns(owner, controller) ||
+        !identical(_confirmationToken, token) ||
+        !controller.isOpen) {
+      return;
+    }
+    _closingConfirmation = true;
+    controller.closeView(query);
+    _closingConfirmation = false;
+    // Our own close consumes admission, preserving this follow-through.
+    if (!_owns(owner, controller) || !identical(_confirmationToken, token)) {
+      return;
+    }
+    navigate();
+  }
 
   @override
   void didUpdateWidget(covariant AppSearchAnchor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.viewModel, widget.viewModel) ||
         !identical(oldWidget.controller, widget.controller)) {
+      _popupSession = Object();
+      _popupOpen = false;
+      _confirmationToken = null;
       _suggestionTimer?.cancel();
       _lastSuggestionInput = null;
       _lastOptions = [];
@@ -112,6 +162,12 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
   @override
   Widget build(BuildContext context) {
     final appSizes = context.appSizes;
+    final owner = widget.viewModel;
+    final searchController = _searchController;
+    final session = _popupSession;
+    final onSubmitted = widget.onSubmitted;
+    final onSuggestionPressed = widget.onSuggestionPressed;
+    final onBackPressed = widget.onBackPressed;
     // Imposes constraints to the search bar dimensions to respect Material3
     // guidelines.
     //
@@ -127,7 +183,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
 
         child: SearchAnchor(
           isFullScreen: _isFullScreen,
-          searchController: _searchController,
+          searchController: searchController,
           viewBuilder: _buildViewBuilder,
           builder: (context, controller) {
             return Padding(
@@ -159,20 +215,42 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
           // controller; the resulting popup `didPop` fires [viewOnClose],
           // which runs the host's close-state cleanup.
           viewLeading: BackButton(
-            onPressed: () => _searchController.closeView(null),
+            onPressed: () {
+              if (!_admits(owner, searchController, session)) return;
+              searchController.closeView(null);
+            },
           ),
           // Fires on every dismissal of the search view, including system
           // back, barrier dismissal, the leading close button, and
           // programmatic `closeView`.
-          viewOnClose: widget.onBackPressed != null ? _handleOnClose : null,
           viewHintText: widget.hintText,
-          viewOnSubmitted: (query) {
-            unawaited(widget.viewModel.addToPastSearches.execute(query));
-
-            _searchController.closeView(query);
-
-            widget.onSubmitted?.call(query);
+          viewOnOpen: () {
+            if (!_owns(owner, searchController) ||
+                !identical(session, _popupSession)) {
+              return;
+            }
+            _popupOpen = true;
+            _confirmationToken = null;
           },
+          viewOnClose: () {
+            if (!_owns(owner, searchController) ||
+                !identical(session, _popupSession)) {
+              return;
+            }
+            _popupOpen = false;
+            if (!_closingConfirmation) _confirmationToken = null;
+            _suggestionTimer?.cancel();
+            _lastSuggestionInput = null;
+            setState(() => _popupSession = Object());
+            onBackPressed?.call();
+          },
+          viewOnSubmitted: (query) => _confirm(
+            owner,
+            searchController,
+            session,
+            query,
+            () => onSubmitted?.call(query),
+          ),
           suggestionsBuilder: (context, controller) {
             // The popup view route outlives this anchor State: it stays
             // alive during its exit transition and remains a listener on
@@ -183,8 +261,11 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
             if (!mounted) return _lastHistory;
 
             // Capture owner references for popup callbacks.
-            final viewModel = widget.viewModel;
-            final onSuggestionPressed = widget.onSuggestionPressed;
+            if (!_owns(owner, searchController) ||
+                !identical(session, _popupSession)) {
+              return _lastHistory;
+            }
+            final viewModel = owner;
 
             _admitSuggestions(viewModel, controller.text);
 
@@ -193,6 +274,8 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
 
               return _lastHistory = _buildChips(
                 viewModel: viewModel,
+                controller: controller,
+                session: session,
                 texts: history,
                 showDeleteIcon: true,
               );
@@ -207,6 +290,10 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
               ListenableBuilder(
                 listenable: viewModel.loadSuggestions.results,
                 builder: (context, _) {
+                  if (!_owns(viewModel, controller) ||
+                      !identical(session, _popupSession)) {
+                    return const SizedBox.shrink();
+                  }
                   final snapshot = viewModel.loadSuggestions.results.value;
                   if (snapshot.completed) {
                     if (viewModel.suggestions.isEmpty) {
@@ -221,11 +308,13 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                     return SearchAnchorSuggestionList(
                       suggestions: viewModel.suggestions,
                       onSuggestionPressed: (content) {
-                        unawaited(
-                          viewModel.addToPastSearches.execute(content.name),
+                        _confirm(
+                          viewModel,
+                          controller,
+                          session,
+                          content.name,
+                          () => onSuggestionPressed(content),
                         );
-
-                        onSuggestionPressed(content);
                       },
                     );
                   }
@@ -248,30 +337,33 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
 
   List<Widget> _buildChips({
     required SearchViewModel viewModel,
+    required SearchController controller,
+    required Object session,
     List<String> texts = const [],
     bool showDeleteIcon = false,
   }) {
-    // The caller (suggestionsBuilder) guarantees `mounted` is true when
-    // it reaches here. The tap callbacks below fire while the view is
-    // open and the anchor is mounted; only the Future.delayed reset
-    // can fire after unmount, and it has its own guard.
+    // Cached chips can outlive their popup; each callback checks its session.
 
     return UnmodifiableListView(
       texts.map((e) {
         return RawChip(
           label: Text(e),
           onPressed: () {
-            _searchController.text = e;
-
-            unawaited(viewModel.addToPastSearches.execute(e));
+            if (!_admits(viewModel, controller, session)) return;
+            controller.text = e;
+            if (!_admits(viewModel, controller, session)) return;
+            viewModel.addToPastSearches(e);
           },
           deleteIcon: const Icon(Symbols.close),
           onDeleted: showDeleteIcon
               ? () async {
-                  unawaited(viewModel.removeFromPastSearches.execute(e));
+                  if (!_admits(viewModel, controller, session)) return;
+                  viewModel.removeFromPastSearches(e);
+                  if (!_admits(viewModel, controller, session)) return;
                   // Workaround to refresh the past searches list after
                   // removing a suggestion chip from the list.
-                  _searchController.text = '\u200B';
+                  controller.text = '\u200B';
+                  final resetValue = controller.value;
                   await Future.delayed(Durations.medium1, () {
                     // The anchor may have been unmounted (host navigated
                     // away) during the delay. Writing to a disposed
@@ -279,7 +371,11 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
                     // an external controller re-triggers suggestionsBuilder
                     // on the dead State. Either way, bail out.
                     if (!mounted) return;
-                    _searchController.text = '';
+                    if (!_admits(viewModel, controller, session) ||
+                        controller.value != resetValue) {
+                      return;
+                    }
+                    controller.text = '';
                   });
                 }
               : null,
@@ -300,6 +396,9 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
       return const SizedBox.shrink();
     }
 
+    final owner = widget.viewModel;
+    final controller = _searchController;
+    final session = _popupSession;
     final children = <Widget>[];
     if (_searchController.text.isEmpty) {
       children.addAll([
@@ -309,11 +408,10 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
           child: CategoryContentWrap(
             chipBackgroundColor: context.colorScheme.surfaceContainerLow,
             onCategorySelected: (category) {
-              _searchController.text = category.label;
-
-              unawaited(
-                widget.viewModel.addToPastSearches.execute(category.label),
-              );
+              if (!_admits(owner, controller, session)) return;
+              controller.text = category.label;
+              if (!_admits(owner, controller, session)) return;
+              owner.addToPastSearches(category.label);
             },
           ),
         ),
@@ -344,17 +442,6 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
         child: ListView(children: children),
       ),
     );
-  }
-
-  /// Runs the host's close-state cleanup once the search view has been
-  /// dismissed. The popup route is already popped by the time this runs, so
-  /// no additional close is needed here.
-  void _handleOnClose() {
-    // viewOnClose fires from the popup route's didPop, which may run after
-    // the anchor has been unmounted by a concurrent goNamed. Guard before
-    // reading widget.
-    if (!mounted) return;
-    widget.onBackPressed?.call();
   }
 
   /// Debounces admission only; execution authority is revoked on every edit.

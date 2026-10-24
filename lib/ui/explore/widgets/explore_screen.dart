@@ -25,6 +25,7 @@ import 'package:moliseis/ui/search/view_models/search_view_model.dart';
 import 'package:moliseis/ui/search/widgets/components/app_search_anchor.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -166,7 +167,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     controller: _searchController,
                     onSubmitted: _showSearchResults,
                     onSuggestionPressed: (content) {
-                      _searchController.closeView(null);
                       _showSearchResults(content.name);
                     },
                     viewModel: widget.searchViewModel,
@@ -219,9 +219,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               ),
               ListenableBuilder(
-                listenable: widget.eventViewModel.loadOngoing,
+                listenable: widget.eventViewModel.loadOngoing.results,
                 builder: (context, _) {
-                  if (widget.eventViewModel.loadOngoing.completed) {
+                  if (widget
+                      .eventViewModel
+                      .loadOngoing
+                      .results
+                      .value
+                      .completed) {
                     return SliverPadding(
                       padding: const EdgeInsets.only(top: 8, bottom: 16),
                       sliver: ContentSliverGrid(
@@ -243,7 +248,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     );
                   }
 
-                  if (widget.eventViewModel.loadOngoing.error) {
+                  if (widget
+                      .eventViewModel
+                      .loadOngoing
+                      .results
+                      .value
+                      .hasFailure) {
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       sliver: SliverToBoxAdapter(
@@ -272,9 +282,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 ),
               ),
               ListenableBuilder(
-                listenable: widget.eventViewModel.loadNext,
+                listenable: widget.eventViewModel.loadNext.results,
                 builder: (context, _) {
-                  if (widget.eventViewModel.loadNext.completed) {
+                  if (widget.eventViewModel.loadNext.results.value.completed) {
                     return SliverPadding(
                       padding: const EdgeInsets.only(top: 8, bottom: 16),
                       sliver: ContentSliverGrid(
@@ -296,7 +306,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     );
                   }
 
-                  if (widget.eventViewModel.loadNext.error) {
+                  if (widget.eventViewModel.loadNext.results.value.hasFailure) {
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       sliver: SliverToBoxAdapter(
@@ -350,9 +360,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
               ListenableBuilder(
-                listenable: widget.exploreViewModel.loadLatest,
+                listenable: widget.exploreViewModel.loadLatest.results,
                 builder: (context, _) {
-                  if (widget.exploreViewModel.loadLatest.completed) {
+                  final snapshot =
+                      widget.exploreViewModel.loadLatest.results.value;
+                  if (snapshot.completed) {
                     return ContentSliverGrid(
                       widget.exploreViewModel.latest,
                       onPressed: (content) {
@@ -371,7 +383,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     );
                   }
 
-                  if (widget.exploreViewModel.loadLatest.error) {
+                  if (snapshot.hasFailure) {
                     return SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       sliver: SliverToBoxAdapter(
@@ -380,9 +392,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             'Si è verificato un errore durante il caricamento.',
                           ),
                           action: TextButton(
-                            onPressed: () => unawaited(
-                              widget.exploreViewModel.loadLatest.execute(),
-                            ),
+                            onPressed: () =>
+                                widget.exploreViewModel.loadLatest.run(),
                             child: const Text('Riprova'),
                           ),
                         ),
@@ -404,7 +415,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _startSync() {
     final syncViewModel = context.read<SyncViewModel>();
-    unawaited(syncViewModel.sync.execute(true));
+    syncViewModel.sync.run(true);
   }
 
   void _showSearchResults(String text) {

@@ -43,6 +43,7 @@ import 'package:moliseis/ui/weather/view_models/weather_view_model.dart';
 import 'package:moliseis/ui/weather/wmo_weather_description_mapper.dart';
 import 'package:moliseis/ui/weather/wmo_weather_icon_mapper.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -85,7 +86,8 @@ GoRouter buildAppRouter({
     initialLocation: RoutePaths.home,
     restorationScopeId: 'router',
     refreshListenable: Listenable.merge([
-      syncViewModel.sync,
+      syncViewModel.sync.results,
+      syncViewModel.sync.isRunning,
       adminAuthViewModel,
     ]),
     redirect: (context, state) =>
@@ -109,14 +111,34 @@ GoRouter buildAppRouter({
         onExit: (context, _) async {
           final token = acquireContentSubmissionTransition();
           if (token == null) return false;
+          ContentSubmissionViewModel? owner;
+          String? identity;
+          var exiting = false;
+          bool current() {
+            if (!context.mounted) return false;
+            final captured = owner;
+            return captured != null &&
+                identical(
+                  context.read<ContentSubmissionViewModel?>(),
+                  captured,
+                ) &&
+                captured.state.clientSubmissionId == identity;
+          }
 
           try {
+            if (!context.mounted) return false;
             final viewModel = context.read<ContentSubmissionViewModel>();
+            owner = viewModel;
+            identity = viewModel.state.clientSubmissionId;
+            if (viewModel.isSubmitting ||
+                viewModel.submissionFinalizationPending) {
+              return false;
+            }
             if (!viewModel.hasUnsavedChanges) {
               releaseAfterRouteRemoval(token);
+              exiting = true;
               return true;
             }
-
             final choice = await showDialog<_ContentSubmissionExitChoice>(
               context: context,
               builder: (context) => AlertDialog(
@@ -146,7 +168,12 @@ GoRouter buildAppRouter({
                 ],
               ),
             );
-
+            if (!context.mounted) return false;
+            if (!current() ||
+                viewModel.isSubmitting ||
+                viewModel.submissionFinalizationPending) {
+              return false;
+            }
             final result = switch (choice) {
               _ContentSubmissionExitChoice.save =>
                 await viewModel.checkpointDraft(),
@@ -154,27 +181,40 @@ GoRouter buildAppRouter({
                 await viewModel.restoreCheckpointDraft(),
               _ContentSubmissionExitChoice.cancel || null => null,
             };
-
-            if (result == null) {
-              releaseContentSubmissionTransition(token);
+            if (!context.mounted) return false;
+            if (!current() ||
+                viewModel.isSubmitting ||
+                viewModel.submissionFinalizationPending) {
               return false;
             }
+            if (result == null) return false;
             if (result is Error<void>) {
-              releaseContentSubmissionTransition(token);
-              if (context.mounted) showSnackBarGenericError(context: context);
+              showSnackBarGenericError(context: context);
               return false;
             }
-
             releaseAfterRouteRemoval(token);
+            exiting = true;
             return true;
-          } on Object {
-            releaseContentSubmissionTransition(token);
-            if (context.mounted) showSnackBarGenericError(context: context);
+          } on Object catch (error, stack) {
+            if (error is AssertionError) rethrow;
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                stack: stack,
+                context: ErrorDescription('leaving a content submission form'),
+              ),
+            );
+            if (current()) showSnackBarGenericError(context: context);
             return false;
+          } finally {
+            if (!exiting) releaseContentSubmissionTransition(token);
           }
         },
         builder: (context, _) {
-          final viewModel = context.read<ContentSubmissionViewModel>();
+          final viewModel = context
+              .select<ContentSubmissionViewModel, ContentSubmissionViewModel>(
+                (owner) => owner,
+              );
           return ContentSubmissionScreen(
             viewModel: viewModel,
             acquireTransition: acquireContentSubmissionTransition,
@@ -186,7 +226,11 @@ GoRouter buildAppRouter({
             path: RoutePaths.contentSubmissionUploadProgress,
             name: RouteNames.contentSubmissionUploadProgress,
             builder: (context, _) {
-              final viewModel = context.read<ContentSubmissionViewModel>();
+              final viewModel = context
+                  .select<
+                    ContentSubmissionViewModel,
+                    ContentSubmissionViewModel
+                  >((owner) => owner);
               return ContentSubmissionProgressScreen(viewModel: viewModel);
             },
           ),
@@ -214,7 +258,7 @@ GoRouter buildAppRouter({
               final viewModel = AdminSubmissionsViewModel(
                 repository: context.read(),
               );
-              unawaited(viewModel.load.execute());
+              unawaited(viewModel.refreshSubmissions());
               return viewModel;
             },
             builder: (context, _) => AdminDashboardScreen(
@@ -428,13 +472,7 @@ GoRouter buildAppRouter({
                       final viewModel = EventViewModel(
                         repository: context.read(),
                       );
-                      // loadByDate synchronously notifies the ViewModel. Start
-                      // it before Provider attaches any framework listeners.
-                      unawaited(
-                        viewModel.loadByDate.execute(
-                          viewModel.currentCalendarDate,
-                        ),
-                      );
+                      viewModel.selectDate(viewModel.currentCalendarDate);
                       return viewModel;
                     },
                     child: Consumer<EventViewModel>(
@@ -544,11 +582,13 @@ String? _redirectForSync(
   final sync = syncViewModel.sync;
   final onSync = state.matchedLocation == RoutePaths.sync;
 
-  if (sync.running) {
+  if (sync.isRunningSync.value) {
     return onSync ? null : RoutePaths.syncFor(state.uri);
   }
 
-  if (!onSync || (sync.error && syncViewModel.fatalError)) return null;
+  if (!onSync || (sync.results.value.hasFailure && syncViewModel.fatalError)) {
+    return null;
+  }
 
   return _validatedFrom(context, state.uri.queryParameters['from']) ??
       RoutePaths.home;

@@ -9,6 +9,7 @@ import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 class FavouriteScreen extends StatelessWidget {
   const FavouriteScreen({required this.viewModel, super.key});
@@ -29,7 +30,8 @@ class FavouriteScreen extends StatelessWidget {
             ListenableBuilder(
               listenable: viewModel,
               builder: (context, _) {
-                if (viewModel.load.completed) {
+                final snapshot = viewModel.load.results.value;
+                if (snapshot.completed) {
                   if (viewModel.favouriteEventIds.isEmpty &&
                       viewModel.favouritePlaceIds.isEmpty) {
                     return const SliverFillRemaining(
@@ -65,7 +67,7 @@ class FavouriteScreen extends StatelessWidget {
                   }
                 }
 
-                if (viewModel.load.error) {
+                if (snapshot.hasFailure) {
                   return SliverFillRemaining(
                     hasScrollBody: false,
                     child: EmptyView(
@@ -73,7 +75,7 @@ class FavouriteScreen extends StatelessWidget {
                         'Si è verificato un errore durante il caricamento.',
                       ),
                       action: TextButton(
-                        onPressed: () => viewModel.load.execute(),
+                        onPressed: () => viewModel.load.run(),
                         child: const Text('Riprova'),
                       ),
                     ),

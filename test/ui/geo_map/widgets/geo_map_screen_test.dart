@@ -15,11 +15,13 @@ import 'package:moliseis/data/services/api/weather/model/daily_forecast/daily_we
 import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_weather_forecast_data.dart';
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/domain/models/content_base.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/content_type.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
+import 'package:moliseis/ui/category/widgets/category_content_and_type_selection.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_mode.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_selection_intent.dart';
@@ -49,6 +51,594 @@ import '../../../support/recording_tile_http_client.dart';
 import '../../../support/weather_harness.dart';
 
 void main() {
+  for (final category in [true, false]) {
+    for (final emptyDraft in [false, true]) {
+      testOwnerUI(
+        'Map selector owner replacement category=$category empty=$emptyDraft',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(1280, 1600));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final oldPending = Completer<Result<Event>>();
+          final newPending = Completer<Result<Event>>();
+          final oldEvents = FakeEventRepository()
+            ..pendingGetById[1] = oldPending;
+          final newEvents = FakeEventRepository()
+            ..pendingGetById[1] = newPending;
+          final oldOwner = GeoMapViewModel(
+            geoMapUseCase: GeoMapUseCase(
+              eventRepository: oldEvents,
+              placeRepository: FakePlaceRepository(),
+            ),
+          );
+          final newOwner = GeoMapViewModel(
+            geoMapUseCase: GeoMapUseCase(
+              eventRepository: newEvents,
+              placeRepository: FakePlaceRepository(),
+            ),
+          );
+          final owner = ValueNotifier(oldOwner);
+          final searches = _buildSearchViewModel();
+          final weather = _buildWeatherViewModel();
+          final favourites = _buildFavouriteViewModel();
+          var oldPublications = 0;
+          var newPublications = 0;
+          var oldRequest = oldOwner.markerRequest;
+          var newRequest = newOwner.markerRequest;
+          void observeOld() {
+            if (identical(oldRequest, oldOwner.markerRequest)) return;
+            oldRequest = oldOwner.markerRequest;
+            oldPublications++;
+          }
+
+          void observeNew() {
+            if (identical(newRequest, newOwner.markerRequest)) return;
+            newRequest = newOwner.markerRequest;
+            newPublications++;
+          }
+
+          oldOwner.addListener(observeOld);
+          newOwner.addListener(observeNew);
+          try {
+            await tester.pumpWidget(
+              _buildApp(
+                favouriteViewModel: favourites,
+                child: ValueListenableBuilder<GeoMapViewModel>(
+                  valueListenable: owner,
+                  builder: (_, current, _) => GeoMapScreen(
+                    routeSelection: (id: 1, type: ContentType.event),
+                    viewModel: current,
+                    searchViewModel: searches,
+                    weatherViewModel: weather,
+                  ),
+                ),
+              ),
+            );
+            await pumpCommandTurns(tester);
+            final screen = tester.state(find.byType(GeoMapScreen));
+            final selector = find.byType(
+              CategoryContentAndTypeSelection,
+              skipOffstage: false,
+            );
+            final oldState = tester.state(selector);
+            final categories = Set.of(oldOwner.selectedCategories);
+            final types = Set.of(oldOwner.selectedTypes);
+            expect(newOwner.selectedCategories, categories);
+            expect(newOwner.selectedTypes, types);
+            expect(oldOwner.selectContent.isRunningSync.value, isTrue);
+            await tester.tap(
+              find.byTooltip(
+                category ? 'Seleziona per categoria' : 'Seleziona per tipo',
+              ),
+            );
+            await tester.pump();
+            await tester.pump(Durations.long4);
+            await pumpCommandTurns(tester);
+            final options = <Key>[
+              if (category)
+                ...categories.map(ValueKey<ContentCategory>.new)
+              else
+                ...types.map(ValueKey<ContentType>.new),
+            ];
+            for (final option in emptyDraft ? options : options.take(1)) {
+              final checkbox = find.byKey(option);
+              await tester.ensureVisible(checkbox);
+              await tester.tap(checkbox);
+              await tester.pump();
+            }
+            expect(oldPublications, 0);
+            expect(newPublications, 0);
+            owner.value = newOwner;
+            await pumpCommandTurns(tester);
+            // The screen survives via its production didUpdateWidget path.
+            expect(tester.state(find.byType(GeoMapScreen)), same(screen));
+            expect(
+              screen.widget,
+              isA<GeoMapScreen>().having(
+                (widget) => widget.viewModel,
+                'owner',
+                same(newOwner),
+              ),
+            );
+            final oldStateStillMounted = oldState.mounted;
+            final replacementState = tester.state(selector);
+            expect(
+              find.text(
+                category ? 'Seleziona per categoria' : 'Seleziona per tipo',
+              ),
+              findsOneWidget,
+            );
+            // Old modal rows remain visible while the new owner is mounted.
+            for (final option in emptyDraft ? options : options.take(1)) {
+              expect(
+                tester.widget<Checkbox>(find.byKey(option)).value,
+                isFalse,
+              );
+            }
+            await tester.tap(find.byTooltip('Salva'));
+            await tester.pump();
+            await tester.pump(Durations.long4);
+            await pumpCommandTurns(tester);
+            // A stale modal cannot admit a marker request on either owner.
+            expect(oldPublications, 0);
+            expect(newPublications, 0);
+            expect(oldStateStillMounted, isFalse);
+            expect(oldState.mounted, isFalse);
+            expect(replacementState, isNot(same(oldState)));
+            expect(replacementState.mounted, isTrue);
+            expect(oldOwner.selectedCategories, categories);
+            expect(oldOwner.selectedTypes, types);
+            expect(newOwner.selectedCategories, categories);
+            expect(newOwner.selectedTypes, types);
+            final current = tester.widget<CategoryContentAndTypeSelection>(
+              selector,
+            );
+            expect(current.selectedCategories, categories);
+            expect(current.selectedTypes, types);
+            expect(find.text('Categoria'), findsOneWidget);
+            expect(find.text('Tipo'), findsOneWidget);
+            expect(oldEvents.getByIdCallCount, 1);
+            expect(newEvents.getByIdCallCount, 1);
+            // Dispose the detached owner with both lookups still pending.
+            var lateNotifications = 0;
+            oldOwner
+              ..addListener(() => lateNotifications++)
+              ..dispose();
+            await tester.pump(const Duration(milliseconds: 100));
+            oldPending.complete(Result.success(makeEvent(name: 'Obsolete')));
+            newPending.complete(Result.success(makeEvent(name: 'Current')));
+            await tester.pumpAndSettle();
+            expect(lateNotifications, 0);
+            expect(oldOwner.resolvedContent, isNull);
+            expect(newOwner.resolvedContent?.name, 'Current');
+            expect(oldPublications, 0);
+            expect(newPublications, 0);
+            expect(tester.takeException(), isNull);
+          } finally {
+            if (!oldPending.isCompleted) {
+              oldPending.complete(Result.error(TestException('test cleanup')));
+            }
+            if (!newPending.isCompleted) {
+              newPending.complete(Result.error(TestException('test cleanup')));
+            }
+            await tester.pumpWidget(const SizedBox.shrink());
+            if (!oldOwner.isDisposed) oldOwner.dispose();
+            if (!newOwner.isDisposed) newOwner.dispose();
+            searches.dispose();
+            favourites.dispose();
+            owner.dispose();
+            await tester.pump(const Duration(milliseconds: 100));
+            await pumpCommandTurns(tester);
+          }
+        },
+      );
+    }
+  }
+
+  testOwnerUI(
+    'Map shared selector preserves an empty category draft across owner notify',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final owner = _buildGeoMapViewModel();
+      final searches = _buildSearchViewModel();
+      final weather = _buildWeatherViewModel();
+      await tester.pumpWidget(
+        _buildApp(
+          favouriteViewModel: _buildFavouriteViewModel(),
+          child: GeoMapScreen(
+            routeSelection: null,
+            viewModel: owner,
+            searchViewModel: searches,
+            weatherViewModel: weather,
+          ),
+        ),
+      );
+      await pumpCommandTurns(tester);
+      owner.setSelectedCategories({
+        ContentCategory.nature,
+        ContentCategory.history,
+      });
+      await tester.pumpAndSettle();
+      final selectorState = tester.state(
+        find.byType(CategoryContentAndTypeSelection),
+      );
+      var publications = 0;
+      var markerRequest = owner.markerRequest;
+      void observePublication() {
+        if (identical(markerRequest, owner.markerRequest)) return;
+        markerRequest = owner.markerRequest;
+        publications++;
+      }
+
+      owner.addListener(observePublication);
+
+      await tester.tap(find.byTooltip('Seleziona per categoria'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey(ContentCategory.history)));
+      await tester.tap(find.byKey(const ValueKey(ContentCategory.nature)));
+      owner.showContent(makePlace());
+      await pumpCommandTurns(tester);
+      expect(
+        tester.state(find.byType(CategoryContentAndTypeSelection)),
+        same(selectorState),
+      );
+      expect(
+        find.text('Nessuna categoria', skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Checkbox>(
+              find.byKey(const ValueKey(ContentCategory.nature)),
+            )
+            .value,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<Checkbox>(
+              find.byKey(const ValueKey(ContentCategory.history)),
+            )
+            .value,
+        isFalse,
+      );
+      expect(owner.selectedCategories, {
+        ContentCategory.nature,
+        ContentCategory.history,
+      });
+      expect(publications, 0);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Salva'));
+      await tester.pumpAndSettle();
+      expect(publications, 1);
+      expect(
+        owner.selectedCategories,
+        ContentCategory.values
+            .where((value) => value != ContentCategory.unknown)
+            .toSet(),
+      );
+      expect(owner.selectedTypes, ContentType.values.toSet());
+      expect(find.text('Categoria'), findsOneWidget);
+      owner.removeListener(observePublication);
+      await tester.pumpWidget(const SizedBox.shrink());
+      owner.dispose();
+      searches.dispose();
+      weather.dispose();
+      await tester.pump(const Duration(milliseconds: 100));
+      await pumpCommandTurns(tester);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testOwnerUI('marker loading, partial failure, empty and fresh data are '
+      'distinct; obsolete retry and marker callbacks are inert', (
+    tester,
+  ) async {
+    final pending = Completer<Result<List<Event>>>();
+    final event = makeEvent(
+      name: 'Fresh event',
+      category: ContentCategory.nature,
+    );
+    final place = makePlace(
+      name: 'Partial place',
+      category: ContentCategory.nature,
+    );
+    final events = FakeEventRepository()
+      ..getByCurrentYearHandler = () => pending.future;
+    final places = FakePlaceRepository(getAllResult: Result.success([place]));
+    final owner = GeoMapViewModel(
+      geoMapUseCase: GeoMapUseCase(
+        eventRepository: events,
+        placeRepository: places,
+      ),
+    );
+    final searches = _buildSearchViewModel();
+    await tester.pumpWidget(
+      _buildApp(
+        favouriteViewModel: _buildFavouriteViewModel(),
+        child: GeoMapScreen(
+          routeSelection: null,
+          viewModel: owner,
+          searchViewModel: searches,
+          weatherViewModel: _buildWeatherViewModel(),
+        ),
+      ),
+    );
+    await pumpCommandTurns(tester);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CircularProgressIndicator &&
+            widget.semanticsLabel == 'Caricamento contenuti della mappa',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byTooltip(place.name), findsNothing);
+    expect(places.getAllCallCount, 0);
+    pending.complete(Result.error(TestException('events unavailable')));
+    await pumpCommandTurns(tester);
+    await tester.pumpAndSettle();
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is CircularProgressIndicator &&
+            widget.semanticsLabel == 'Caricamento contenuti della mappa',
+      ),
+      findsNothing,
+    );
+    expect(find.text('Si è verificato un problema, riprova.'), findsOneWidget);
+    final oldRetry = tester
+        .widget<TextButton>(find.widgetWithText(TextButton, 'Riprova'))
+        .onPressed!;
+    final oldMarker = tester
+        .widget<IconButton>(
+          find.byWidgetPredicate(
+            (widget) => widget is IconButton && widget.tooltip == place.name,
+          ),
+        )
+        .onPressed!;
+    expect(places.getAllCallCount, 1);
+    owner.setSelectedCategories({});
+    oldRetry();
+    oldMarker();
+    expect(owner.mode, isA<GeoMapExplore>());
+    expect(owner.resolvedContent, isNull);
+    await pumpCommandTurns(tester);
+    expect(find.byTooltip(place.name), findsNothing);
+    expect(
+      find.text('Nessun contenuto per i filtri selezionati'),
+      findsOneWidget,
+    );
+    expect(events.getByCurrentYearCallCount, 1);
+    expect(places.getAllCallCount, 1);
+    events
+      ..getByCurrentYearHandler = null
+      ..getByCurrentYearResult = Result.success([event]);
+    owner.setSelectedCategories({event.category});
+    await pumpCommandTurns(tester);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('geo-map-marker-status')), findsNothing);
+    expect(find.byTooltip(event.name), findsOneWidget);
+    expect(owner.mode, isA<GeoMapExplore>());
+    await tester.pumpWidget(const SizedBox.shrink());
+    owner.dispose();
+    searches.dispose();
+  });
+
+  testOwnerUI('marker and retry callbacks cannot cross presentation owners', (
+    tester,
+  ) async {
+    final oldEvents = FakeEventRepository(
+      getByCurrentYearResult: Result.error(TestException('old event failure')),
+    );
+    final oldOwner = GeoMapViewModel(
+      geoMapUseCase: GeoMapUseCase(
+        eventRepository: oldEvents,
+        placeRepository: FakePlaceRepository(
+          getAllResult: Result.success([
+            makePlace(name: 'Old marker', category: ContentCategory.nature),
+          ]),
+        ),
+      ),
+    );
+    final newEvents = FakeEventRepository();
+    final newOwner = GeoMapViewModel(
+      geoMapUseCase: GeoMapUseCase(
+        eventRepository: newEvents,
+        placeRepository: FakePlaceRepository(),
+      ),
+    );
+    final current = ValueNotifier(oldOwner);
+    final searches = _buildSearchViewModel();
+    final weather = _buildWeatherViewModel();
+    await tester.pumpWidget(
+      _buildApp(
+        favouriteViewModel: _buildFavouriteViewModel(),
+        child: ValueListenableBuilder<GeoMapViewModel>(
+          valueListenable: current,
+          builder: (_, owner, _) => GeoMapScreen(
+            routeSelection: null,
+            viewModel: owner,
+            searchViewModel: searches,
+            weatherViewModel: weather,
+          ),
+        ),
+      ),
+    );
+    await pumpCommandTurns(tester);
+    await tester.pumpAndSettle();
+    final oldMarker = tester
+        .widget<IconButton>(
+          find.byWidgetPredicate(
+            (widget) => widget is IconButton && widget.tooltip == 'Old marker',
+          ),
+        )
+        .onPressed!;
+    final oldRetry = tester
+        .widget<TextButton>(find.widgetWithText(TextButton, 'Riprova'))
+        .onPressed!;
+    current.value = newOwner;
+    await pumpCommandTurns(tester);
+    await tester.pumpAndSettle();
+    oldMarker();
+    oldRetry();
+    expect(oldEvents.getByCurrentYearCallCount, 1);
+    expect(newEvents.getByCurrentYearCallCount, 1);
+    expect(oldOwner.resolvedContent, isNull);
+    expect(newOwner.resolvedContent, isNull);
+    expect(newOwner.mode, isA<GeoMapExplore>());
+    await tester.pumpWidget(const SizedBox.shrink());
+    oldMarker();
+    oldRetry();
+    oldOwner.dispose();
+    newOwner.dispose();
+    searches.dispose();
+    current.dispose();
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final mode in ['Explore', 'Search', 'Post']) {
+    testOwnerUI(
+      'marker failure retry stays hit-testable over full $mode sheet',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(1280, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final events = FakeEventRepository(
+          getByCurrentYearResult: Result.error(
+            TestException('events unavailable'),
+          ),
+        );
+        final places = FakePlaceRepository(
+          getAllResult: Result.error(TestException('places unavailable')),
+        );
+        final owner = GeoMapViewModel(
+          geoMapUseCase: GeoMapUseCase(
+            eventRepository: events,
+            placeRepository: places,
+          ),
+        );
+        final searches = _buildSearchViewModel();
+        await tester.pumpWidget(
+          _buildApp(
+            favouriteViewModel: _buildFavouriteViewModel(),
+            child: GeoMapScreen(
+              routeSelection: null,
+              viewModel: owner,
+              searchViewModel: searches,
+              weatherViewModel: _buildWeatherViewModel(),
+            ),
+          ),
+        );
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        if (mode == 'Search') {
+          tester
+              .widget<AnimatedGeoMapSearchBar>(
+                find.byType(AnimatedGeoMapSearchBar),
+              )
+              .onSubmitted!('festival');
+        } else if (mode == 'Post') {
+          owner.showContent(makeEvent());
+        }
+        await tester.pumpAndSettle();
+        tester
+            .widget<GeoMapBottomSheet>(find.byType(GeoMapBottomSheet))
+            .controller
+            .jumpTo(1);
+        await tester.pumpAndSettle();
+        final beforeMode = owner.mode;
+        final retry = find.widgetWithText(TextButton, 'Riprova');
+        expect(retry.hitTestable(), findsOneWidget);
+        final next = Completer<Result<List<Event>>>();
+        events.getByCurrentYearHandler = () => next.future;
+        await tester.tap(retry);
+        await pumpCommandTurns(tester);
+        expect(owner.markerStatus, GeoMapMarkerStatus.loading);
+        expect(events.getByCurrentYearCallCount, 2);
+        expect(identical(owner.mode, beforeMode), isTrue);
+        next.complete(const Result.success([]));
+        places.getAllResult = const Result.success([]);
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Nessun contenuto per i filtri selezionati'),
+          findsOneWidget,
+        );
+        expect(owner.mode, same(beforeMode));
+        await tester.pumpWidget(const SizedBox.shrink());
+        owner.dispose();
+        searches.dispose();
+      },
+    );
+  }
+
+  for (final category in [true, false]) {
+    for (final dismissal in ['Save', 'Back', 'barrier', 'drag']) {
+      testOwnerUI('current $category filter draft applies on $dismissal', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(
+          dismissal == 'drag' ? const Size(390, 844) : const Size(1280, 1600),
+        );
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final owner = _buildGeoMapViewModel();
+        final searches = _buildSearchViewModel();
+        await tester.pumpWidget(
+          _buildApp(
+            favouriteViewModel: _buildFavouriteViewModel(),
+            child: GeoMapScreen(
+              routeSelection: null,
+              viewModel: owner,
+              searchViewModel: searches,
+              weatherViewModel: _buildWeatherViewModel(),
+            ),
+          ),
+        );
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        final before = owner.markerRequest;
+        await tester.tap(
+          find.byTooltip(
+            category ? 'Seleziona per categoria' : 'Seleziona per tipo',
+          ),
+        );
+        await tester.pumpAndSettle();
+        final removedCategory = owner.selectedCategories.first;
+        final removedType = owner.selectedTypes.first;
+        await tester.tap(
+          find.byKey(
+            category ? ValueKey(removedCategory) : ValueKey(removedType),
+          ),
+        );
+        await tester.pump();
+        expect(owner.markerRequest, same(before));
+        if (dismissal == 'Save') {
+          await tester.tap(
+            find.text('Salva').evaluate().isNotEmpty
+                ? find.text('Salva')
+                : find.byTooltip('Salva'),
+          );
+        } else if (dismissal == 'Back') {
+          await tester.binding.handlePopRoute();
+        } else if (dismissal == 'drag') {
+          await tester.drag(find.byTooltip('Salva'), const Offset(0, 1000));
+        } else {
+          await tester.tapAt(const Offset(5, 5));
+        }
+        await tester.pumpAndSettle();
+        expect(owner.markerRequest, isNot(same(before)));
+        if (category) {
+          expect(owner.selectedCategories, isNot(contains(removedCategory)));
+        } else {
+          expect(owner.selectedTypes, isNot(contains(removedType)));
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        owner.dispose();
+        searches.dispose();
+      });
+    }
+  }
+
   final response = CombinedWeatherForecastResponse(
     latitude: 41.56,
     longitude: 14.66,

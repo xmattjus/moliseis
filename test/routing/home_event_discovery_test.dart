@@ -9,6 +9,7 @@ import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
 import '../support/sync_harness.dart';
@@ -16,7 +17,7 @@ import '../support/sync_harness.dart';
 void main() {
   setUpAll(() => initializeDateFormatting('en'));
 
-  testWidgets('production Home bootstraps once and rebuilds keep its owner', (
+  testOwnerUI('production Home bootstraps once and rebuilds keep its owner', (
     tester,
   ) async {
     final repository = FakeEventRepository();
@@ -47,7 +48,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
+  testOwnerUI(
     'retained Home reloads both final collections after another tab',
     (tester) async {
       final repository = FakeEventRepository();
@@ -82,7 +83,7 @@ void main() {
   );
 
   for (final destination in ['detail', 'search', 'category', 'settings']) {
-    testWidgets('Home refreshes after $destination return', (tester) async {
+    testOwnerUI('Home refreshes after $destination return', (tester) async {
       final repository = FakeEventRepository(
         getByIdResults: {1: Result.success(makeEvent())},
       );
@@ -130,7 +131,7 @@ void main() {
     });
   }
 
-  testWidgets('return during pending discovery coalesces a subsequent pass', (
+  testOwnerUI('return during pending discovery coalesces a subsequent pass', (
     tester,
   ) async {
     final pending = Completer<Result<List<Event>>>();
@@ -141,11 +142,13 @@ void main() {
     );
     await tester.pumpWidget(fixture.app);
     await pumpSyncRedirects(tester);
+    await pumpCommandTurns(tester);
     expect(repository.getOngoingEventsCallCount, 1);
     unawaited(fixture.router.pushNamed<void>(RouteNames.settings));
     await tester.pumpAndSettle();
     fixture.router.pop();
     await pumpSyncRedirects(tester);
+    await pumpCommandTurns(tester);
     expect(repository.getOngoingEventsCallCount, 1);
     repository.pendingGetOngoingEvents = null;
     pending.complete(const Result.success([]));
@@ -159,7 +162,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
+  testOwnerUI(
     'SearchAnchor popup without GoRouter navigation does not refresh',
     (tester) async {
       final repository = FakeEventRepository();
@@ -181,7 +184,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testOwnerUI(
     'unmount removes return listener and stops pending continuation',
     (tester) async {
       final pending = Completer<Result<List<Event>>>();
@@ -193,6 +196,7 @@ void main() {
       );
       await tester.pumpWidget(fixture.app);
       await pumpSyncRedirects(tester);
+      await pumpCommandTurns(tester);
       final vm = tester
           .widget<ExploreScreen>(find.byType(ExploreScreen))
           .eventViewModel;

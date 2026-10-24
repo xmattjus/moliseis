@@ -7,9 +7,10 @@ import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_calendar.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day_markers.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_month.dart';
-import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
+import '../../../../support/events_harness.dart';
 import '../../../../support/fake_repositories.dart';
 import '../../../../support/fixtures.dart';
 
@@ -83,9 +84,9 @@ void main() {
       );
       final viewModel = EventViewModel(repository: repository);
 
-      await _waitForCommand(viewModel.loadAll);
-      await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
-      await _waitForCommand(viewModel.loadByDate);
+      await pumpEventQueue();
+      viewModel.selectDate(EventCalendarDate(2026, 3, 11));
+      await settleEventDay(viewModel);
 
       expect(viewModel.byMonth, hasLength(1));
       expect(viewModel.byMonth.first.remoteId, 42);
@@ -99,8 +100,9 @@ void main() {
         nowUtc: () => DateTime.utc(2026, 3, 1, 1),
       );
 
-      await _waitForCommand(viewModel.loadAll);
-      await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
+      await pumpEventQueue();
+      viewModel.selectDate(EventCalendarDate(2026, 3, 11));
+      await settleEventDay(viewModel);
 
       expect(repository.lastGetByDate, EventCalendarDate(2026, 3, 11));
     });
@@ -112,14 +114,14 @@ void main() {
       );
       final viewModel = EventViewModel(repository: repository);
 
-      await _waitForCommand(viewModel.loadAll);
-      await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
-      await _waitForCommand(viewModel.loadByDate);
+      await pumpEventQueue();
+      viewModel.selectDate(EventCalendarDate(2026, 3, 11));
+      await settleEventDay(viewModel);
 
       expect(repository.getByDateCallCount, 0);
 
-      await viewModel.loadByDate.execute(EventCalendarDate(2026, 3, 11));
-      await _waitForCommand(viewModel.loadByDate);
+      viewModel.selectDate(EventCalendarDate(2026, 3, 11));
+      await settleEventDay(viewModel);
 
       expect(repository.getByDateCallCount, 0);
     });
@@ -130,27 +132,27 @@ void main() {
       final loadedDate = EventCalendarDate(2026, 3, 11);
       final failedDate = EventCalendarDate(2026, 3, 12);
 
-      await _waitForCommand(viewModel.loadAll);
-      await viewModel.loadByDate.execute(loadedDate);
-      await _waitForCommand(viewModel.loadByDate);
+      await pumpEventQueue();
+      viewModel.selectDate(loadedDate);
+      await settleEventDay(viewModel);
 
       expect(repository.getByDateCallCount, 1);
 
       repository.getByDateResult = Result.error(
         TestException('temporary failure'),
       );
-      await viewModel.loadByDate.execute(failedDate);
-      await _waitForCommand(viewModel.loadByDate);
+      viewModel.selectDate(failedDate);
+      await settleEventDay(viewModel);
 
       expect(repository.getByDateCallCount, 2);
-      expect(viewModel.loadByDate.error, isTrue);
+      expect(viewModel.loadByDate.results.value.hasFailure, isTrue);
 
       repository.getByDateResult = const Result.success([]);
-      await viewModel.loadByDate.execute(failedDate);
-      await _waitForCommand(viewModel.loadByDate);
+      viewModel.selectDate(failedDate);
+      await settleEventDay(viewModel);
 
       expect(repository.getByDateCallCount, 3);
-      expect(viewModel.loadByDate.completed, isTrue);
+      expect(viewModel.loadByDate.results.value.completed, isTrue);
     });
   });
 
@@ -167,7 +169,7 @@ void main() {
       );
       final viewModel = EventViewModel(repository: repository);
 
-      await _waitForCommand(viewModel.loadAll);
+      await pumpEventQueue();
 
       expect(
         viewModel
@@ -229,10 +231,4 @@ void main() {
       expect(bounds.initialDate, DateTime.utc(2027));
     },
   );
-}
-
-Future<void> _waitForCommand(Command<void> command) async {
-  while (command.running) {
-    await Future<void>.delayed(Duration.zero);
-  }
 }

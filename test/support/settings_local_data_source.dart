@@ -16,6 +16,9 @@ final class FakeSettingsLocalDataSource implements ISettingsLocalDataSource {
   /// Result returned by [save], including when testing failure then retry.
   Result<void> saveResult;
 
+  /// Optional controlled persistence, preserving the default immediate result.
+  Future<Result<void>> Function(AppSettings settings)? onSave;
+
   /// Complete settings snapshots passed to [save].
   final savedSettings = <AppSettings>[];
 
@@ -25,6 +28,7 @@ final class FakeSettingsLocalDataSource implements ISettingsLocalDataSource {
   @override
   Future<Result<void>> save(AppSettings settings) async {
     savedSettings.add(settings);
-    return saveResult;
+    final handler = onSave;
+    return handler == null ? saveResult : await handler(settings);
   }
 }

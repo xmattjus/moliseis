@@ -1,4 +1,6 @@
 import 'dart:async' show unawaited;
+import 'dart:core' hide Error;
+import 'dart:core' as core show Error;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -44,140 +46,287 @@ class ContentSubmissionScreen extends StatefulWidget {
 class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
   var _form1Key = GlobalKey<FormState>();
   var _form2Key = GlobalKey<FormState>();
+  late ContentSubmissionViewModel _owner;
   late String _sessionIdentity;
-  var _boundaryPending = false;
+  Object _ownerGeneration = Object();
+  Object? _pendingBoundary;
   var _allowIosExplicitPop = false;
+
+  bool get _boundaryPending => _pendingBoundary != null;
 
   @override
   void initState() {
     super.initState();
-    _sessionIdentity = widget.viewModel.state.clientSubmissionId;
-    widget.viewModel.addListener(_handleSessionIdentityChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      unawaited(widget.viewModel.retrieveLostAssets.execute());
-    });
+    _owner = widget.viewModel;
+    _sessionIdentity = _owner.state.clientSubmissionId;
+    _owner.addListener(_handleSessionIdentityChanged);
+    _scheduleRecovery();
+  }
+
+  @override
+  void didUpdateWidget(covariant ContentSubmissionScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.viewModel, widget.viewModel)) return;
+    _owner.removeListener(_handleSessionIdentityChanged);
+    _owner = widget.viewModel;
+    _ownerGeneration = Object();
+    _resetPresentation();
+    _owner.addListener(_handleSessionIdentityChanged);
+    _scheduleRecovery();
   }
 
   @override
   void dispose() {
-    widget.viewModel.removeListener(_handleSessionIdentityChanged);
+    _owner.removeListener(_handleSessionIdentityChanged);
     super.dispose();
   }
 
-  /// Replaces both forms when recovery or retirement changes the session.
-  ///
-  /// Fresh Form states present the authoritative draft without replaying old
-  /// initial values or invoking user-edit callbacks through a form reset.
-  void _handleSessionIdentityChanged() {
-    if (!mounted) return;
-    final nextIdentity = widget.viewModel.state.clientSubmissionId;
-    if (_sessionIdentity == nextIdentity) return;
-    setState(() {
-      _sessionIdentity = nextIdentity;
-      _form1Key = GlobalKey<FormState>();
-      _form2Key = GlobalKey<FormState>();
+  void _resetPresentation() {
+    _sessionIdentity = _owner.state.clientSubmissionId;
+    _form1Key = GlobalKey<FormState>();
+    _form2Key = GlobalKey<FormState>();
+    _pendingBoundary = null;
+    _allowIosExplicitPop = false;
+  }
+
+  /// The Provider check also closes the window before didUpdateWidget rebinds.
+  bool _ownsPresentation(ContentSubmissionViewModel owner, Object generation) {
+    if (!mounted) return false;
+    if (!identical(widget.viewModel, owner) ||
+        !identical(_ownerGeneration, generation)) {
+      return false;
+    }
+    final provided = context.read<ContentSubmissionViewModel?>();
+    return provided == null || identical(provided, owner);
+  }
+
+  bool _isCurrent(
+    ContentSubmissionViewModel owner,
+    Object generation,
+    String identity,
+  ) =>
+      _ownsPresentation(owner, generation) &&
+      owner.state.clientSubmissionId == identity;
+
+  bool get _formRouteIsCurrent {
+    if (!mounted) return false;
+    return ModalRoute.of(context)?.isCurrent ?? true;
+  }
+
+  void _reportBoundaryFailure(
+    Object error,
+    StackTrace stack,
+    String description,
+  ) {
+    if (error is AssertionError) core.Error.throwWithStackTrace(error, stack);
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stack,
+        context: ErrorDescription(description),
+      ),
+    );
+  }
+
+  void _scheduleRecovery() {
+    final owner = _owner;
+    final generation = _ownerGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_ownsPresentation(owner, generation)) return;
+      owner.requestRetrieveLostAssets();
     });
   }
 
-  void _setBoundaryPending(bool value) {
-    if (mounted) setState(() => _boundaryPending = value);
+  /// New keys present authoritative fields without replaying old form edits.
+  void _handleSessionIdentityChanged() {
+    if (!mounted) return;
+    if (_sessionIdentity == _owner.state.clientSubmissionId) return;
+    setState(_resetPresentation);
   }
 
-  void _requestAppBarBack() {
+  void _finishBoundary(Object boundary) {
+    if (!mounted) return;
+    if (!identical(_pendingBoundary, boundary)) return;
+    setState(() => _pendingBoundary = null);
+  }
+
+  void _requestAppBarBack(
+    ContentSubmissionViewModel owner,
+    Object generation,
+    String identity,
+  ) {
+    if (!mounted) return;
+    if (!_isCurrent(owner, generation, identity) ||
+        !_formRouteIsCurrent ||
+        _boundaryPending ||
+        owner.isSubmitting ||
+        owner.submissionFinalizationPending) {
+      return;
+    }
     final isDirtyIos =
-        defaultTargetPlatform == TargetPlatform.iOS &&
-        widget.viewModel.hasUnsavedChanges;
+        defaultTargetPlatform == TargetPlatform.iOS && owner.hasUnsavedChanges;
     if (!isDirtyIos) {
       context.pop();
       return;
     }
-
     setState(() => _allowIosExplicitPop = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!_isCurrent(owner, generation, identity)) return;
+      if (!_formRouteIsCurrent ||
+          _boundaryPending ||
+          owner.isSubmitting ||
+          owner.submissionFinalizationPending) {
+        setState(() => _allowIosExplicitPop = false);
+        return;
+      }
       context.pop();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _allowIosExplicitPop = false);
+        if (!mounted) return;
+        if (!_isCurrent(owner, generation, identity)) return;
+        setState(() => _allowIosExplicitPop = false);
       });
     });
   }
 
-  Future<void> _openExternalLink(Future<bool> Function() open) async {
-    final token = widget.acquireTransition();
+  Future<void> _openExternalLink(
+    ContentSubmissionViewModel owner,
+    Object generation,
+    String identity,
+    Future<bool> Function() open,
+  ) async {
+    if (!mounted) return;
+    if (!_isCurrent(owner, generation, identity) ||
+        !_formRouteIsCurrent ||
+        _boundaryPending ||
+        owner.isSubmitting ||
+        owner.submissionFinalizationPending) {
+      return;
+    }
+    final acquire = widget.acquireTransition;
+    final release = widget.releaseTransition;
+    final token = acquire();
     if (token == null) return;
-
-    final viewModel = widget.viewModel;
-    final releaseTransition = widget.releaseTransition;
-    _setBoundaryPending(true);
+    final boundary = Object();
     try {
-      if (viewModel.hasUnsavedChanges) {
-        final checkpoint = await viewModel.checkpointDraft();
+      if (!_isCurrent(owner, generation, identity)) return;
+      setState(() => _pendingBoundary = boundary);
+      if (owner.hasUnsavedChanges) {
+        final checkpoint = await owner.checkpointDraft();
         if (!mounted) return;
+        if (!_isCurrent(owner, generation, identity)) return;
         if (checkpoint is Error<void>) {
           showSnackBarGenericError(context: context);
           return;
         }
       }
-
-      if (!mounted) return;
+      if (!_isCurrent(owner, generation, identity) || !_formRouteIsCurrent) {
+        return;
+      }
       final launched = await open();
       if (!mounted) return;
+      if (!_isCurrent(owner, generation, identity)) return;
       if (!launched) showSnackBarGenericError(context: context);
+    } on Object catch (error, stack) {
+      _reportBoundaryFailure(
+        error,
+        stack,
+        'opening a content submission external link',
+      );
+      if (!mounted) return;
+      if (_isCurrent(owner, generation, identity)) {
+        showSnackBarGenericError(context: context);
+      }
     } finally {
-      releaseTransition(token);
-      _setBoundaryPending(false);
+      release(token);
+      _finishBoundary(boundary);
     }
   }
 
-  Future<void> _submit() async {
+  Future<void> _submit(
+    ContentSubmissionViewModel owner,
+    Object generation,
+    String identity,
+  ) async {
     if (!mounted) return;
-
-    // The form keys are only attached once the form widgets have been built.
-    // Guard against the null case rather than forcing an unwrap, which would
-    // crash if the button were ever enabled before the forms were mounted.
-    final viewModel = widget.viewModel;
-    final acquireTransition = widget.acquireTransition;
-    final releaseTransition = widget.releaseTransition;
+    if (!_isCurrent(owner, generation, identity) ||
+        !_formRouteIsCurrent ||
+        _boundaryPending ||
+        owner.isSubmitting ||
+        owner.submissionFinalizationPending) {
+      return;
+    }
+    final acquire = widget.acquireTransition;
+    final release = widget.releaseTransition;
     final form1State = _form1Key.currentState;
     final form2State = _form2Key.currentState;
-    final isForm1Valid = form1State?.validate() ?? false;
-    final isForm2Valid = form2State?.validate() ?? false;
-    final eventTimeValid = viewModel.validateEventTimeForSubmission();
-    if (!isForm1Valid || !isForm2Valid || !eventTimeValid) return;
-
-    final token = acquireTransition();
+    final valid1 = form1State?.validate() ?? false;
+    final valid2 = form2State?.validate() ?? false;
+    final temporalValid = owner.validateEventTimeForSubmission();
+    if (!valid1 ||
+        !valid2 ||
+        !temporalValid ||
+        !_isCurrent(owner, generation, identity)) {
+      return;
+    }
+    final token = acquire();
     if (token == null) return;
-
-    _setBoundaryPending(true);
-    var handedOffToProgress = false;
+    final boundary = Object();
+    var handedOff = false;
     try {
-      final checkpoint = await viewModel.checkpointDraft();
+      if (!_isCurrent(owner, generation, identity)) return;
+      setState(() => _pendingBoundary = boundary);
+      final checkpoint = await owner.checkpointDraft();
       if (!mounted) return;
+      if (!_isCurrent(owner, generation, identity)) return;
       if (checkpoint is Error<void>) {
         showSnackBarGenericError(context: context);
         return;
       }
-
-      unawaited(viewModel.submit.execute());
-      try {
-        unawaited(
-          context.pushNamed(RouteNames.contentSubmissionUploadProgress),
-        );
-      } on Object {
-        if (mounted) showSnackBarGenericError(context: context);
+      if (!_formRouteIsCurrent || !owner.requestSubmit()) return;
+      if (!_isCurrent(owner, generation, identity) || !_formRouteIsCurrent) {
         return;
       }
-
-      releaseTransition(token);
-      handedOffToProgress = true;
+      unawaited(
+        context
+            .pushNamed(RouteNames.contentSubmissionUploadProgress)
+            .then<void>(
+              (_) {},
+              onError: (Object error, StackTrace stack) {
+                _reportBoundaryFailure(
+                  error,
+                  stack,
+                  'navigating to content submission progress',
+                );
+                if (!mounted) return;
+                if (_isCurrent(owner, generation, identity)) {
+                  showSnackBarGenericError(context: context);
+                }
+              },
+            ),
+      );
+      release(token);
+      handedOff = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _setBoundaryPending(false);
+        if (!mounted) return;
+        if (!_isCurrent(owner, generation, identity)) return;
+        _finishBoundary(boundary);
       });
+    } on Object catch (error, stack) {
+      _reportBoundaryFailure(
+        error,
+        stack,
+        'submitting a content submission form',
+      );
+      if (!mounted) return;
+      if (_isCurrent(owner, generation, identity)) {
+        showSnackBarGenericError(context: context);
+      }
     } finally {
-      if (!handedOffToProgress) {
-        releaseTransition(token);
-        _setBoundaryPending(false);
+      if (!handedOff) {
+        release(token);
+        _finishBoundary(boundary);
       }
     }
   }
@@ -202,20 +351,26 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
       child: Scaffold(
         body: SafeArea(
           child: ListenableBuilder(
-            listenable: Listenable.merge([
-              widget.viewModel,
-              widget.viewModel.clear,
-            ]),
+            listenable: widget.viewModel,
             builder: (context, child) {
-              if (widget.viewModel.loadState ==
+              final viewModel = widget.viewModel;
+              final generation = _ownerGeneration;
+              final identity = viewModel.state.clientSubmissionId;
+              void edit(VoidCallback action) {
+                if (!mounted) return;
+                if (!_isCurrent(viewModel, generation, identity)) return;
+                action();
+              }
+
+              if (viewModel.loadState ==
                       ContentSubmissionDraftLoadState.loading ||
-                  widget.viewModel.clear.running) {
+                  viewModel.isClearing) {
                 return const EmptyView.loading(
                   text: Text('Caricamento in corso...'),
                 );
               }
 
-              final isDirty = widget.viewModel.hasUnsavedChanges;
+              final isDirty = viewModel.hasUnsavedChanges;
               final blocksIosGesture =
                   defaultTargetPlatform == TargetPlatform.iOS &&
                   (isDirty || _boundaryPending) &&
@@ -230,7 +385,13 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                       SliverAppBar(
                         automaticallyImplyLeading: false,
                         leading: Navigator.canPop(context)
-                            ? BackButton(onPressed: _requestAppBarBack)
+                            ? BackButton(
+                                onPressed: () => _requestAppBarBack(
+                                  viewModel,
+                                  generation,
+                                  identity,
+                                ),
+                              )
                             : null,
                         title: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -273,45 +434,59 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                           children: [
                             ContentSubmissionFields(
                               formKey: _form1Key,
-                              category: widget.viewModel.state.category,
-                              city: widget.viewModel.state.city,
-                              name: widget.viewModel.state.name,
-                              description: widget.viewModel.state.description,
+                              category: viewModel.state.category,
+                              city: viewModel.state.city,
+                              name: viewModel.state.name,
+                              description: viewModel.state.description,
                               descriptionDelta:
-                                  widget.viewModel.state.descriptionDelta,
-                              isEvent: widget.viewModel.isEvent,
-                              allDay: widget.viewModel.allDay,
-                              onAllDayChanged: (allDay) =>
-                                  widget.viewModel.setAllDay(allDay: allDay),
-                              startCalendarDate:
-                                  widget.viewModel.startCalendarDate,
-                              startClockTime: widget.viewModel.startClockTime,
-                              endCalendarDate: widget.viewModel.endCalendarDate,
-                              eventTimeIssue: widget.viewModel.eventTimeIssue,
-                              onCategorySelected: widget.viewModel.setCategory,
+                                  viewModel.state.descriptionDelta,
+                              isEvent: viewModel.isEvent,
+                              allDay: viewModel.allDay,
+                              onAllDayChanged: (allDay) => edit(
+                                () => viewModel.setAllDay(allDay: allDay),
+                              ),
+                              startCalendarDate: viewModel.startCalendarDate,
+                              startClockTime: viewModel.startClockTime,
+                              endCalendarDate: viewModel.endCalendarDate,
+                              eventTimeIssue: viewModel.eventTimeIssue,
+                              onCategorySelected: (value) =>
+                                  edit(() => viewModel.setCategory(value)),
                               onCategoryDeleted: () =>
-                                  widget.viewModel.setCategory(null),
-                              onCityChanged: widget.viewModel.setCity,
-                              onNameChanged: widget.viewModel.setName,
+                                  edit(() => viewModel.setCategory(null)),
+                              onCityChanged: (value) =>
+                                  edit(() => viewModel.setCity(value)),
+                              onNameChanged: (value) =>
+                                  edit(() => viewModel.setName(value)),
                               onDescriptionChanged:
-                                  widget.viewModel.setDescription,
-                              onEventChanged: (enabled) => widget.viewModel
-                                  .setEventEnabled(enabled: enabled),
-                              onStartDateChanged:
-                                  widget.viewModel.setStartCalendarDate,
-                              onStartTimeChanged:
-                                  widget.viewModel.setStartClockTime,
-                              onEndDateChanged:
-                                  widget.viewModel.setEndCalendarDate,
+                                  ({
+                                    required description,
+                                    required descriptionDelta,
+                                  }) => edit(
+                                    () => viewModel.setDescription(
+                                      description: description,
+                                      descriptionDelta: descriptionDelta,
+                                    ),
+                                  ),
+                              onEventChanged: (enabled) => edit(
+                                () =>
+                                    viewModel.setEventEnabled(enabled: enabled),
+                              ),
+                              onStartDateChanged: (value) => edit(
+                                () => viewModel.setStartCalendarDate(value),
+                              ),
+                              onStartTimeChanged: (value) => edit(
+                                () => viewModel.setStartClockTime(value),
+                              ),
+                              onEndDateChanged: (value) => edit(
+                                () => viewModel.setEndCalendarDate(value),
+                              ),
                             ),
                           ],
                         ),
                       ),
                       SliverList.list(
                         children: [
-                          ContentSubmissionAssetList(
-                            viewModel: widget.viewModel,
-                          ),
+                          ContentSubmissionAssetList(viewModel: viewModel),
                           const SizedBox(height: 32),
                           const Padding(
                             padding: EdgeInsets.symmetric(horizontal: 16),
@@ -343,19 +518,17 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                     TextFormField(
                                       autovalidateMode:
                                           AutovalidateMode.onUserInteraction,
-                                      initialValue:
-                                          widget.viewModel.state.userEmail,
+                                      initialValue: viewModel.state.userEmail,
                                       decoration: const InputDecoration(
                                         labelText: 'E-mail',
                                         hintText: 'mario.rossi@gmail.com',
                                       ),
-                                      onChanged: (value) =>
-                                          widget.viewModel.setUserEmail(value),
+                                      onChanged: (value) => edit(
+                                        () => viewModel.setUserEmail(value),
+                                      ),
                                       validator: (value) {
                                         if (value != null) {
-                                          if (!widget.viewModel.validateEmail(
-                                            value,
-                                          )) {
+                                          if (!viewModel.validateEmail(value)) {
                                             return 'Inserisci un '
                                                 'indirizzo e-mail valido';
                                           } else if (value.length > 320) {
@@ -370,14 +543,14 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                   const SizedBox(height: 12),
                                   SentryMask(
                                     TextFormField(
-                                      initialValue:
-                                          widget.viewModel.state.userName,
+                                      initialValue: viewModel.state.userName,
                                       decoration: const InputDecoration(
                                         labelText: 'Autore',
                                         hintText: 'Mario Rossi',
                                       ),
-                                      onChanged: (value) =>
-                                          widget.viewModel.setUserName(value),
+                                      onChanged: (value) => edit(
+                                        () => viewModel.setUserName(value),
+                                      ),
                                       validator: (value) {
                                         if (value != null) {
                                           if (value.isEmpty) {
@@ -396,10 +569,12 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                   const SizedBox(height: 16),
                                   CheckboxFormField(
                                     initialValue:
-                                        widget.viewModel.state.acceptedTerms ??
-                                        false,
-                                    onChanged: (value) => widget.viewModel
-                                        .setAcceptedTerms(value: value),
+                                        viewModel.state.acceptedTerms ?? false,
+                                    onChanged: (value) => edit(
+                                      () => viewModel.setAcceptedTerms(
+                                        value: value,
+                                      ),
+                                    ),
                                     title: MergeSemantics(
                                       child: RichText(
                                         text: TextSpan(
@@ -417,6 +592,14 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                                 excludeSemantics: true,
                                                 child: InkWell(
                                                   onTap: () {
+                                                    if (!mounted) return;
+                                                    if (!_isCurrent(
+                                                      viewModel,
+                                                      generation,
+                                                      identity,
+                                                    )) {
+                                                      return;
+                                                    }
                                                     final urlLaunchService =
                                                         context
                                                             .read<
@@ -424,6 +607,9 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                                             >();
                                                     unawaited(
                                                       _openExternalLink(
+                                                        viewModel,
+                                                        generation,
+                                                        identity,
                                                         urlLaunchService
                                                             .openTermsOfService,
                                                       ),
@@ -446,6 +632,14 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                                 excludeSemantics: true,
                                                 child: InkWell(
                                                   onTap: () {
+                                                    if (!mounted) return;
+                                                    if (!_isCurrent(
+                                                      viewModel,
+                                                      generation,
+                                                      identity,
+                                                    )) {
+                                                      return;
+                                                    }
                                                     final urlLaunchService =
                                                         context
                                                             .read<
@@ -453,6 +647,9 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                                             >();
                                                     unawaited(
                                                       _openExternalLink(
+                                                        viewModel,
+                                                        generation,
+                                                        identity,
                                                         urlLaunchService
                                                             .openPrivacyPolicy,
                                                       ),
@@ -493,7 +690,9 @@ class _ContentSubmissionScreenState extends State<ContentSubmissionScreen> {
                                 horizontal: 16,
                               ),
                               child: FilledButton.tonalIcon(
-                                onPressed: () => unawaited(_submit()),
+                                onPressed: () => unawaited(
+                                  _submit(viewModel, generation, identity),
+                                ),
                                 label: const Text('Invia'),
                                 icon: const Icon(Symbols.upload),
                               ),

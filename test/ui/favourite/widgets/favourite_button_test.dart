@@ -6,13 +6,79 @@ import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
+import '../../../support/command_test_support.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/favourite_button_harness.dart';
 import '../../../support/fixtures.dart';
 
 void main() {
-  testWidgets('favourite success and Undo persist true then false', (
+  testOwnerUI(
+    'Provider forwards load admission, failure and retry membership to buttons',
+    (tester) async {
+      final event = makeEvent();
+      final eventRepository = FakeEventRepository(
+        getByIdResults: {event.remoteId: Result.success(event)},
+      );
+      var pending = Completer<Result<List<int>>>();
+      final places = FakePlaceRepository(
+        getFavouritePlaceIdsHandler: () => pending.future,
+      );
+      final vm = FavouriteViewModel(
+        favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+          eventRepository: eventRepository,
+          placeRepository: places,
+        ),
+      );
+      addTearDown(vm.dispose);
+      await tester.pumpWidget(
+        favouriteButtonHarness(
+          viewModel: vm,
+          ownsViewModel: true,
+          child: FavouriteButton(content: event),
+        ),
+      );
+      await pumpCommandTurns(tester);
+      expect(vm.load.results.value.isRunning, isTrue);
+      expect(
+        tester.widget<IconButton>(find.byType(IconButton)).onPressed,
+        isNull,
+      );
+      final error = TestException('read failed');
+      pending.complete(Result.error(error));
+      await pumpCommandTurns(tester);
+      await tester.pumpAndSettle();
+      expect(vm.load.results.value.domainError, same(error));
+      expect(
+        tester.widget<IconButton>(find.byType(IconButton)).onPressed,
+        isNotNull,
+      );
+      expect(find.byTooltip('Salva nei preferiti'), findsOneWidget);
+      pending = Completer<Result<List<int>>>();
+      eventRepository.getFavouriteEventIdsResult = Result.success([
+        event.remoteId,
+      ]);
+      vm.load.run();
+      await tester.pump();
+      expect(
+        tester.widget<IconButton>(find.byType(IconButton)).onPressed,
+        isNull,
+      );
+      pending.complete(const Result.success([]));
+      await pumpCommandTurns(tester);
+      await tester.pumpAndSettle();
+      expect(vm.load.results.value.completed, isTrue);
+      expect(
+        tester.widget<IconButton>(find.byType(IconButton)).onPressed,
+        isNotNull,
+      );
+      expect(find.byTooltip('Rimuovi dai preferiti'), findsOneWidget);
+      expect(vm.favouriteEventIds, [event.remoteId]);
+    },
+  );
+
+  testOwnerUI('favourite success and Undo persist true then false', (
     tester,
   ) async {
     final event = makeEvent();
@@ -28,6 +94,7 @@ void main() {
     await tester.pumpWidget(
       favouriteButtonHarness(
         viewModel: viewModel,
+        ownsViewModel: true,
         child: FavouriteButton(content: event),
       ),
     );
@@ -55,7 +122,7 @@ void main() {
     );
   });
 
-  testWidgets(
+  testOwnerUI(
     'a failed forward action rolls back and shows only generic error',
     (tester) async {
       final event = makeEvent();
@@ -74,6 +141,7 @@ void main() {
       await tester.pumpWidget(
         favouriteButtonHarness(
           viewModel: viewModel,
+          ownsViewModel: true,
           child: FavouriteButton(content: event),
         ),
       );
@@ -93,7 +161,7 @@ void main() {
     },
   );
 
-  testWidgets('a failed Undo restores the successfully persisted state', (
+  testOwnerUI('a failed Undo restores the successfully persisted state', (
     tester,
   ) async {
     final event = makeEvent();
@@ -115,6 +183,7 @@ void main() {
     await tester.pumpWidget(
       favouriteButtonHarness(
         viewModel: viewModel,
+        ownsViewModel: true,
         child: FavouriteButton(content: event),
       ),
     );
@@ -141,7 +210,7 @@ void main() {
     );
   });
 
-  testWidgets('a later favourite action replaces the prior Undo action', (
+  testOwnerUI('a later favourite action replaces the prior Undo action', (
     tester,
   ) async {
     final firstEvent = makeEvent();
@@ -158,6 +227,7 @@ void main() {
     await tester.pumpWidget(
       favouriteButtonHarness(
         viewModel: viewModel,
+        ownsViewModel: true,
         child: Column(
           children: [
             KeyedSubtree(
@@ -205,7 +275,7 @@ void main() {
     );
   });
 
-  testWidgets(
+  testOwnerUI(
     'a pending later action revokes prior Undo until its write succeeds',
     (tester) async {
       final pendingSecondWrite = Completer<Result<void>>();
@@ -228,6 +298,7 @@ void main() {
       await tester.pumpWidget(
         favouriteButtonHarness(
           viewModel: viewModel,
+          ownsViewModel: true,
           child: Column(
             children: [
               KeyedSubtree(
@@ -280,7 +351,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testOwnerUI(
     'a failed later action shows an error without reviving prior Undo',
     (tester) async {
       final pendingSecondWrite = Completer<Result<void>>();
@@ -303,6 +374,7 @@ void main() {
       await tester.pumpWidget(
         favouriteButtonHarness(
           viewModel: viewModel,
+          ownsViewModel: true,
           child: Column(
             children: [
               KeyedSubtree(
@@ -353,7 +425,7 @@ void main() {
     },
   );
 
-  testWidgets('unmounting before delayed feedback is context-safe', (
+  testOwnerUI('unmounting before delayed feedback is context-safe', (
     tester,
   ) async {
     final pendingWrite = Completer<Result<void>>();
@@ -371,6 +443,7 @@ void main() {
     await tester.pumpWidget(
       favouriteButtonHarness(
         viewModel: viewModel,
+        ownsViewModel: true,
         child: FavouriteButton(content: event),
       ),
     );

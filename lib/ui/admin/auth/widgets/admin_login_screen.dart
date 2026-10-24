@@ -6,6 +6,7 @@ import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:moliseis/utils/string_validator.dart';
 
 /// Staff sign-in form for the protected editorial area.
@@ -29,22 +30,52 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  late AdminAuthViewModel _observedAuth;
+  bool _replacingLogin = false;
+
   @override
   void initState() {
     super.initState();
-    widget.viewModel.addListener(_replacePushedLoginWithDashboard);
+    _bindAuth(widget.viewModel);
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminLoginScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.viewModel, widget.viewModel)) {
+      _observedAuth.removeListener(_replacePushedLoginWithDashboard);
+      _bindAuth(widget.viewModel);
+    }
+  }
+
+  void _bindAuth(AdminAuthViewModel owner) {
+    _observedAuth = owner;
+    _replacingLogin = false;
+    owner.addListener(_replacePushedLoginWithDashboard);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!identical(widget.viewModel, owner)) return;
+      _replacePushedLoginWithDashboard();
+    });
   }
 
   @override
   void dispose() {
-    widget.viewModel.removeListener(_replacePushedLoginWithDashboard);
+    _observedAuth.removeListener(_replacePushedLoginWithDashboard);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   void _replacePushedLoginWithDashboard() {
-    if (!mounted || !widget.viewModel.isAdmin) return;
+    if (!mounted) return;
+    final owner = _observedAuth;
+    if (_replacingLogin ||
+        owner.isDisposed ||
+        !identical(widget.viewModel, owner) ||
+        !owner.isAdmin) {
+      return;
+    }
 
     final router = GoRouter.maybeOf(context);
     if (router == null ||
@@ -57,24 +88,26 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     // preserve the Settings route below it.
     if (router.routerDelegate.currentConfiguration.uri.path !=
         RoutePaths.adminLoginLocation) {
+      _replacingLogin = true;
       unawaited(router.pushReplacement(RoutePaths.admin));
     }
   }
 
   void _login() {
+    if (!mounted) return;
+    final owner = _observedAuth;
+    if (!identical(widget.viewModel, owner)) return;
     if (_formKey.currentState!.validate()) {
-      unawaited(
-        widget.viewModel.login.execute((
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        )),
-      );
+      owner.requestLogin((
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      ));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final login = widget.viewModel.login;
+    final owner = widget.viewModel;
 
     return Scaffold(
       appBar: AppBar(
@@ -113,20 +146,20 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                     },
                   ),
                   ListenableBuilder(
-                    listenable: login,
+                    listenable: owner,
                     builder: (_, _) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
                           FilledButton(
-                            onPressed: login.running ? null : _login,
-                            child: login.running
+                            onPressed: owner.canLogin ? _login : null,
+                            child: owner.isAuthenticating
                                 ? const CustomCircularProgressIndicator(
                                     size: 20,
                                   )
                                 : const Text('Accedi'),
                           ),
-                          if (login.error)
+                          if (owner.loginSnapshot.hasFailure)
                             const Padding(
                               padding: EdgeInsets.only(top: 8),
                               child: Text(

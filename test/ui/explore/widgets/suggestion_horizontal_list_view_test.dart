@@ -16,14 +16,45 @@ import 'package:moliseis/ui/explore/widgets/suggestion_horizontal_list_view.dart
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../support/command_test_support.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
+import '../../../support/mock_logger.dart';
 
 void main() {
   group('SuggestiondHorizontalListView', () {
+    testWidgets('runtime failure ends skeleton and retry shows new data', (
+      tester,
+    ) async {
+      final logger = MockLogger();
+      addTearDown(installCommandTestReporting(logger));
+      final repository = FakePlaceRepository(
+        getSuggestionsHandler: () async =>
+            throw StateError('suggestions runtime'),
+      );
+      final vm = SuggestionViewModel(placeRepository: repository);
+      final fixture = _buildFixture(vm);
+      addTearDown(fixture.dispose);
+      await tester.pumpWidget(fixture.app);
+      await tester.pumpAndSettle();
+      expect(vm.load.results.value.unexpectedError, isA<StateError>());
+      expect(find.text('Riprova'), findsOneWidget);
+      expect(find.byType(Skeletonizer), findsNothing);
+      repository
+        ..getSuggestionsHandler = null
+        ..getSuggestedPlacesResult = Result.success([
+          makePlace(name: 'Recovered'),
+        ]);
+      await tester.tap(find.text('Riprova'));
+      await tester.pumpAndSettle();
+      expect(find.text('Recovered'), findsOneWidget);
+      expect(find.text('Riprova'), findsNothing);
+    });
+
     testWidgets(
       'carousel viewport ignores line-height ratios and text scaling',
       (tester) async {
@@ -56,6 +87,8 @@ void main() {
               expect(tester.takeException(), isNull);
               await tester.pumpWidget(const SizedBox.shrink());
               fixture.dispose();
+              await pumpCommandTurns(tester);
+              await tester.pump(const Duration(milliseconds: 50));
             }
           }
         }
@@ -76,13 +109,14 @@ void main() {
 
       await tester.pumpWidget(fixture.app);
 
-      expect(viewModel.load.running, isTrue);
+      expect(viewModel.load.results.value.isRunning, isTrue);
       expect(find.text('Suggeriti'), findsOneWidget);
       final listView = tester.widget<ListView>(find.byType(ListView));
       final delegate = listView.childrenDelegate as SliverChildListDelegate;
 
       // A horizontal ListView lazily materializes only visible children. Its
-      // delegate retains the complete placeholder set, independent of viewport
+      // delegate retains the complete placeholder set, independent of
+      // viewport
       // and cache extent.
       expect(delegate.children, hasLength(5));
       expect(find.byType(ClipRRect), findsWidgets);
@@ -117,7 +151,7 @@ void main() {
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
 
-      expect(viewModel.load.completed, isTrue);
+      expect(viewModel.load.results.value.completed, isTrue);
       expect(find.byType(TextSectionDivider), findsOneWidget);
       expect(find.text('Suggeriti'), findsOneWidget);
       expect(find.text('Castello'), findsOneWidget);
@@ -137,7 +171,7 @@ void main() {
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
 
-      expect(viewModel.load.completed, isTrue);
+      expect(viewModel.load.results.value.completed, isTrue);
       expect(find.text('Nessun luogo suggerito per ora'), findsOneWidget);
       expect(find.byType(EmptyView), findsOneWidget);
       expect(find.byType(FavouriteButton), findsNothing);
@@ -159,7 +193,7 @@ void main() {
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
 
-      expect(viewModel.load.error, isTrue);
+      expect(viewModel.load.results.value.hasFailure, isTrue);
       expect(
         find.text('Si è verificato un errore durante il caricamento'),
         findsOneWidget,
@@ -174,7 +208,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.getSuggestionsCallCount, 2);
-      expect(viewModel.load.completed, isTrue);
+      expect(viewModel.load.results.value.completed, isTrue);
       expect(find.text('Abbazia'), findsOneWidget);
       expect(find.text('Riprova'), findsNothing);
     });

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
@@ -17,7 +18,7 @@ void main() {
       final vm = ExploreViewModel(placeRepository: repo);
       addTearDown(vm.dispose);
       await pumpEventQueue();
-      expect(vm.loadLatest.completed, isTrue);
+      expect(vm.loadLatest.results.value.completed, isTrue);
       expect(vm.latest, places);
       expect(repo.getLatestCallCount, 1);
       expect(repo.getByIdCallCount, 0);
@@ -29,12 +30,15 @@ void main() {
       final vm = ExploreViewModel(placeRepository: repo);
       addTearDown(vm.dispose);
       await pumpEventQueue();
-      expect(vm.loadLatest.error, isTrue);
-      expect((vm.loadLatest.result! as Error<void>).error, same(failure));
+      expect(vm.loadLatest.results.value.hasFailure, isTrue);
+      expect(
+        (vm.loadLatest.results.value.data! as Error<void>).error,
+        same(failure),
+      );
       repo.getLatestResult = Result.success([makePlace()]);
-      await vm.loadLatest.execute();
+      await vm.loadLatest.runAsync();
       expect(repo.getLatestCallCount, 2);
-      expect(vm.loadLatest.completed, isTrue);
+      expect(vm.loadLatest.results.value.completed, isTrue);
       expect(vm.latest, hasLength(1));
     });
 
@@ -49,18 +53,18 @@ void main() {
       await pumpEventQueue();
       final pending = Completer<Result<List<Place>>>();
       repo.pendingGetLatest = pending;
-      final load = vm.loadLatest.execute();
+      final load = vm.loadLatest.runAsync();
       expect(vm.latest, [first]);
       pending.complete(Result.error(TestException('query failed')));
       await load;
       expect(vm.latest, [first]);
-      expect(vm.loadLatest.error, isTrue);
+      expect(vm.loadLatest.results.value.hasFailure, isTrue);
       repo
         ..pendingGetLatest = null
         ..getLatestResult = const Result.success([]);
-      await vm.loadLatest.execute();
+      await vm.loadLatest.runAsync();
       expect(vm.latest, isEmpty);
-      expect(vm.loadLatest.completed, isTrue);
+      expect(vm.loadLatest.results.value.completed, isTrue);
     });
 
     test(
@@ -75,7 +79,7 @@ void main() {
         await pumpEventQueue();
         final pending = Completer<Result<List<Place>>>();
         repo.pendingGetLatest = pending;
-        final load = vm.loadLatest.execute();
+        final load = vm.loadLatest.runAsync();
         expect(vm.latest, [first]);
         final replacement = [makePlace(remoteId: 3), makePlace(remoteId: 2)];
         pending.complete(Result.success(replacement));

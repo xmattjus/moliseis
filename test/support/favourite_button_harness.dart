@@ -9,13 +9,23 @@ import 'package:provider/provider.dart';
 Widget favouriteButtonHarness({
   required FavouriteViewModel viewModel,
   required Widget child,
+  bool ownsViewModel = false,
 }) => Builder(
-  builder: (context) => ChangeNotifierProvider<FavouriteViewModel>.value(
-    value: viewModel,
-    child: MaterialApp(
+  builder: (context) {
+    final app = MaterialApp(
       scaffoldMessengerKey: $scaffoldMessengerKey,
       theme: AppThemeData.light(context: context),
       home: Scaffold(body: child),
-    ),
-  ),
+    );
+    return ownsViewModel
+        ? ChangeNotifierProvider<FavouriteViewModel>(
+            create: (_) => viewModel,
+            lazy: false,
+            child: app,
+          )
+        : ChangeNotifierProvider<FavouriteViewModel>.value(
+            value: viewModel,
+            child: app,
+          );
+  },
 );

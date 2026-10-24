@@ -81,7 +81,7 @@ class _EventsScreenState extends State<EventsScreen> {
       },
       child: _CalendarWidget(
         viewModel: widget.viewModel,
-        onDayPressed: (date) => widget.viewModel.loadByDate.execute(
+        onDayPressed: (date) => widget.viewModel.selectDate(
           EventCalendarDate(date.year, date.month, date.day),
         ),
       ),

@@ -10,8 +10,9 @@ import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submissions_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_list_item.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/explore/widgets/responsive_overflow_menu.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
+import 'package:provider/provider.dart';
 
 /// Moderation dashboard for loading, filtering, and opening submissions.
 class AdminDashboardScreen extends StatefulWidget {
@@ -40,28 +41,128 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     AdminSubmissionStatus.rejected,
   ];
 
-  Future<void> _openEditor({int? submissionId}) async {
+  bool _owns(AdminSubmissionsViewModel owner) {
+    if (!mounted) return false;
+    if (!identical(widget.viewModel, owner) || owner.isDisposed) return false;
+    final provided = context.read<AdminSubmissionsViewModel?>();
+    return provided == null || identical(provided, owner);
+  }
+
+  Future<void> _openEditor(
+    AdminSubmissionsViewModel owner, {
+    int? submissionId,
+    bool pending = false,
+  }) async {
+    if (!mounted) return;
+    if (!_owns(owner)) return;
+    if (pending &&
+        (!owner.canOpenPendingSubmission ||
+            owner.unignoredPendingId != submissionId)) {
+      return;
+    }
     final router = GoRouter.of(context);
-    final viewModel = widget.viewModel;
     final changed = submissionId == null
         ? await router.pushNamed<bool>(RouteNames.adminSubmissionNew)
         : await router.pushNamed<bool>(
             RouteNames.adminSubmissionEditor,
             pathParameters: <String, String>{'id': submissionId.toString()},
           );
-    if (!mounted || changed != true) return;
-    await viewModel.load.execute();
     if (!mounted) return;
-    if (viewModel.showIgnored) await viewModel.loadIgnored.execute();
+    if (changed != true || !_owns(owner)) return;
+    await owner.refreshAfterEditorChange();
   }
 
-  void _logout() {
-    // Sign-out emits an auth event synchronously, which can
-    // unmount this screen while the anonymous-session
-    // restoration is awaited. Navigating first keeps the
-    // later redirect on a public route.
-    context.go(RoutePaths.home);
-    unawaited(widget.authViewModel.logout.execute());
+  Future<void> _refreshSubmissions(AdminSubmissionsViewModel owner) {
+    if (!mounted) return Future<void>.value();
+    if (!_owns(owner)) return Future<void>.value();
+    return owner.refreshSubmissions();
+  }
+
+  Future<void> _refreshIgnoredSources(AdminSubmissionsViewModel owner) {
+    if (!mounted) return Future<void>.value();
+    if (!_owns(owner)) return Future<void>.value();
+    return owner.refreshIgnoredSources();
+  }
+
+  Future<void> _refreshVisible(AdminSubmissionsViewModel owner) {
+    if (!mounted) return Future<void>.value();
+    if (!_owns(owner)) return Future<void>.value();
+    return owner.showIgnored
+        ? owner.refreshIgnoredSources()
+        : owner.refreshSubmissions();
+  }
+
+  void _logout(AdminAuthViewModel auth, AdminSubmissionsViewModel owner) {
+    if (!mounted) return;
+    if (!_owns(owner) || !identical(widget.authViewModel, auth)) return;
+    final provided = context.read<AdminAuthViewModel?>();
+    if (provided != null && !identical(provided, auth)) return;
+    final router = GoRouter.of(context);
+    final route = ModalRoute.of(context);
+    if (route?.isCurrent == false) return;
+    final location = router.state.uri;
+    if (!auth.requestLogout()) return;
+    // Admission notifications may reenter routing or replace either owner.
+    if (!mounted) return;
+    if (!_owns(owner) ||
+        auth.isDisposed ||
+        !identical(widget.authViewModel, auth) ||
+        route?.isCurrent == false ||
+        router.state.uri != location) {
+      return;
+    }
+    final currentAuth = context.read<AdminAuthViewModel?>();
+    if (currentAuth != null && !identical(currentAuth, auth)) return;
+    router.go(RoutePaths.home);
+  }
+
+  Widget _actions(
+    BuildContext context,
+    AdminSubmissionsViewModel owner,
+    AdminAuthViewModel auth,
+  ) {
+    void refresh() => unawaited(_refreshVisible(owner));
+    final logout = auth.canLogout ? () => _logout(auth, owner) : null;
+    if (context.windowSizeClass.isCompact) {
+      return MenuAnchor(
+        menuChildren: [
+          MenuItemButton(
+            onPressed: refresh,
+            leadingIcon: const Icon(Symbols.sync, weight: 500),
+            child: const Text('Aggiorna'),
+          ),
+          MenuItemButton(
+            onPressed: logout,
+            leadingIcon: const Icon(Symbols.logout),
+            child: const Text('Logout'),
+          ),
+        ],
+        builder: (_, controller, _) => IconButton(
+          onPressed: () {
+            if (!mounted) return;
+            if (!_owns(owner)) return;
+            controller.isOpen ? controller.close() : controller.open();
+          },
+          tooltip: 'Altro',
+          icon: const Icon(Symbols.more_vert, weight: 900),
+        ),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: refresh,
+          tooltip: 'Aggiorna i contenuti',
+          icon: const Icon(Symbols.sync, weight: 500),
+        ),
+        IconButton(
+          onPressed: logout,
+          tooltip: 'Esegui il logout',
+          icon: const Icon(Symbols.logout),
+        ),
+      ],
+    );
   }
 
   @override
@@ -72,9 +173,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       body: RefreshIndicator(
         displacement: 64,
         edgeOffset: 106,
-        onRefresh: () => viewModel.showIgnored
-            ? viewModel.loadIgnored.execute()
-            : viewModel.load.execute(),
+        onRefresh: () => _refreshVisible(viewModel),
         notificationPredicate: (notification) {
           return notification.depth == 1;
         },
@@ -88,23 +187,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 sliver: SliverAppBar(
                   title: const Text('Area redazione'),
                   actions: <Widget>[
-                    ResponsiveOverflowMenu(
-                      items: [
-                        MenuItem(
-                          title: const Text('Aggiorna'),
-                          icon: const Icon(Symbols.sync, weight: 500),
-                          tooltip: 'Aggiorna i contenuti',
-                          onPressed: () => viewModel.showIgnored
-                              ? viewModel.loadIgnored.execute()
-                              : viewModel.load.execute(),
-                        ),
-                        MenuItem(
-                          title: const Text('Logout'),
-                          icon: const Icon(Symbols.logout),
-                          tooltip: 'Esegui il logout',
-                          onPressed: _logout,
-                        ),
-                      ],
+                    ListenableBuilder(
+                      listenable: widget.authViewModel,
+                      builder: (context, _) =>
+                          _actions(context, viewModel, widget.authViewModel),
                     ),
                   ],
                   floating: true,
@@ -136,9 +222,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               viewModel.showIgnored,
                             ],
                             onPressed: (index) {
+                              if (!mounted) return;
+                              if (!_owns(viewModel)) return;
                               if (index == _filters.length) {
                                 viewModel.setIgnoredFilter();
-                                unawaited(viewModel.loadIgnored.execute());
+                                unawaited(_refreshIgnoredSources(viewModel));
                               } else {
                                 viewModel.setFilter(_filters[index]);
                               }
@@ -183,15 +271,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               ListenableBuilder(
-                listenable: Listenable.merge(<Listenable>[
-                  viewModel,
-                  viewModel.load,
-                  viewModel.loadIgnored,
-                  viewModel.unIgnore,
-                ]),
+                listenable: viewModel,
                 builder: (context, _) {
                   if (viewModel.showIgnored) {
-                    if (viewModel.loadIgnored.running &&
+                    if (viewModel.loadIgnoredSnapshot.isRunning &&
                         viewModel.ignoredSources.isEmpty) {
                       return const SliverFillRemaining(
                         child: EmptyView.loading(
@@ -203,35 +286,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       children: [
                         // Keep the action below the pinned filter.
                         const SizedBox(height: kToolbarHeight + 16),
-                        if (viewModel.loadIgnored.error)
+                        if (viewModel.loadIgnoredSnapshot.hasFailure)
                           ListTile(
                             title: const Text(
                               'Impossibile caricare le fonti ignorate',
                             ),
                             trailing: TextButton(
-                              onPressed: viewModel.loadIgnored.execute,
+                              onPressed: () =>
+                                  _refreshIgnoredSources(viewModel),
                               child: const Text('Riprova'),
                             ),
                           ),
-                        if (viewModel.unIgnore.error)
+                        if (viewModel.unIgnoreSnapshot.hasFailure)
                           const Padding(
                             padding: EdgeInsets.all(16),
                             child: Text(
                               'Impossibile riattivare la fonte. Riprova.',
                             ),
                           ),
-                        if (viewModel.unIgnore.completed)
+                        if (viewModel.unIgnoreSnapshot.completed)
                           const Padding(
                             padding: EdgeInsets.all(16),
                             child: Text('Fonte riattivata'),
                           ),
-                        if (viewModel.unignoredPendingId case final pending?)
+                        if (viewModel.unignoredPendingId case final pending?
+                            when viewModel.canOpenPendingSubmission)
                           TextButton(
-                            onPressed: () => _openEditor(submissionId: pending),
+                            onPressed: () => _openEditor(
+                              viewModel,
+                              submissionId: pending,
+                              pending: true,
+                            ),
                             child: const Text('Apri revisione in attesa'),
                           ),
                         if (viewModel.ignoredSources.isEmpty &&
-                            !viewModel.loadIgnored.error)
+                            !viewModel.loadIgnoredSnapshot.hasFailure)
                           const Padding(
                             padding: EdgeInsets.all(16),
                             child: Text('Nessuna fonte ignorata'),
@@ -250,14 +339,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               ].join(' · '),
                             ),
                             trailing: TextButton(
-                              onPressed:
-                                  viewModel.unIgnore.running ||
-                                      viewModel.loadIgnored.running ||
-                                      viewModel.load.running
-                                  ? null
-                                  : () => unawaited(
-                                      viewModel.unIgnore.execute(source.id),
-                                    ),
+                              onPressed: viewModel.canUnIgnore
+                                  ? () {
+                                      if (!mounted) return;
+                                      if (!_owns(viewModel)) return;
+                                      viewModel.requestUnIgnore(source.id);
+                                    }
+                                  : null,
                               child: const Text('Riattiva fonte'),
                             ),
                           ),
@@ -280,7 +368,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         action: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           child: FilledButton(
-                            onPressed: viewModel.load.execute,
+                            onPressed: () => _refreshSubmissions(viewModel),
                             child: const Text('Riprova'),
                           ),
                         ),
@@ -324,7 +412,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                         child: AdminSubmissionListItem(
                           summary: item,
-                          onTap: () => _openEditor(submissionId: item.id),
+                          onTap: () =>
+                              _openEditor(viewModel, submissionId: item.id),
                         ),
                       );
                     },
@@ -336,7 +425,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openEditor,
+        onPressed: () => _openEditor(viewModel),
         foregroundColor: context.colorScheme.onTertiaryContainer,
         backgroundColor: context.colorScheme.tertiaryContainer,
         icon: const Icon(Symbols.add),
