@@ -312,8 +312,7 @@ GoRouter buildAppRouter({
                     contentSubmissionRepository: context
                         .read<ContentSubmissionRepository>(),
                     submissionId: id,
-                  );
-                  unawaited(viewModel.load.execute());
+                  )..requestLoad();
                   return viewModel;
                 },
                 builder: (context, _) => AdminSubmissionEditorScreen(

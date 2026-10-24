@@ -40,7 +40,6 @@ import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
-import 'package:moliseis/utils/command.dart' show Command;
 import 'package:moliseis/utils/result.dart';
 
 import 'mock_logger.dart';
@@ -207,6 +206,22 @@ final class FakeAdminContentSubmissionRepository
   void Function()? onIgnoredListEntry;
   void Function(int recordId)? onUnIgnoreEntry;
 
+  /// Per-call async overrides preserve the ordinary configured-result defaults.
+  Future<Result<AdminSubmission>> Function(int id)? onGetById;
+  Future<Result<AdminEventCandidates>> Function(
+    int id,
+    String? searchName,
+    int? targetEventId,
+  )?
+  onEventCandidates;
+  Future<Result<AdminEventResolution>> Function(
+    int id,
+    int targetEventId, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  })?
+  onLink;
+
   final getByIdIds = <int>[];
   final createInputs = <AdminSubmissionInput>[];
   final updateIds = <int>[];
@@ -251,6 +266,7 @@ final class FakeAdminContentSubmissionRepository
   @override
   Future<Result<AdminSubmission>> getById(int id) async {
     getByIdIds.add(id);
+    if (onGetById case final handler?) return await handler(id);
     return getByIdResults[id] ??
         Result.error(TestException('Admin submission $id not configured'));
   }
@@ -368,6 +384,9 @@ final class FakeAdminContentSubmissionRepository
     int? targetEventId,
   }) async {
     candidateCalls.add((id, searchName, targetEventId));
+    if (onEventCandidates case final handler?) {
+      return await handler(id, searchName, targetEventId);
+    }
     return candidatesResult ??
         Result.error(TestException('No candidates configured'));
   }
@@ -397,6 +416,14 @@ final class FakeAdminContentSubmissionRepository
       acknowledgeCurrentSource,
       expectedSourceHash,
     ));
+    if (onLink case final handler?) {
+      return await handler(
+        id,
+        targetEventId,
+        acknowledgeCurrentSource: acknowledgeCurrentSource,
+        expectedSourceHash: expectedSourceHash,
+      );
+    }
     return linkResult ?? Result.error(TestException('No link configured'));
   }
 
@@ -672,7 +699,7 @@ final class FakeEventRepository extends EventRepository {
 
 /// An [EventRepository] fake whose [getById] result is gated by a fresh
 /// [Completer] per call. Used by widget tests that need to hold the
-/// resolution [Command] in the running state and complete the repository
+/// resolution command in the running state and complete the repository
 /// calls in a controlled order (e.g. rapid-navigation races).
 ///
 /// Every non-`getById` method mirrors the successful no-op defaults of
@@ -1185,7 +1212,7 @@ final class FakeImageUploadTask implements ImageUploadTask {
 
 /// A [ContentSubmissionRepository] fake whose [submit] result is gated by a
 /// fresh [Completer] per call. Used by widget tests that need to hold the
-/// submit [Command] in the running state until the test resolves it to
+/// submit command in the running state until the test resolves it to
 /// success or error.
 ///
 /// [uploadImageTask] throws by default: the widget tests that consume this

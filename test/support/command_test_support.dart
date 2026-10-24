@@ -24,6 +24,16 @@ Future<void> pumpCommandTurns(WidgetTester tester) async {
   }
 }
 
+/// Drains deferred command entry and microtask/event settlement after admission.
+///
+/// Advances four event turns, matching [pumpCommandTurns]. This does not
+/// complete or wait for repository futures held by a test. Controlled pending
+/// work must still be released explicitly before asserting terminal outcomes.
+Future<void> settleEditorRequest({required bool admitted}) async {
+  if (!admitted) return;
+  await pumpEventQueue(times: 4);
+}
+
 /// Unmounts Provider owners before Flutter verifies pending timer invariants.
 ///
 /// Owners revoke synchronously and release commands across event turns;
