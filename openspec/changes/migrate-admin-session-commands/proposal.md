@@ -1,6 +1,10 @@
 # Proposal
 
-## Why
+## Published checkpoint
+
+This migration was published in Draft [PR #12](https://github.com/xmattjus/moliseis/pull/12) as commit [`0cdb764a7586f85180a802fafcf2b485791cb5ff`](https://github.com/xmattjus/moliseis/commit/0cdb764a7586f85180a802fafcf2b485791cb5ff), whose parent is `e80dfbaf472ef1cc15b220a48df966509a9ee8a1` (verified from Git history). All seven migrations are now published. The historical analyzer transition for this checkpoint was **52 → 37 INFO**; these are recorded checkpoint results, not analyzer runs performed during reconciliation. Planning assumptions, local-only authorization and uncommitted-work statements below describe their original phases. Subsequent publication supersedes those status statements without changing the historical evidence. Canonical synchronization, archival, legacy compatibility deletion and merge remain outside this reconciliation.
+
+## Planning history — Why
 
 Five legacy admin Commands remain at the authorized fifth-migration checkpoint. Migrating them requires explicit cross-command admission, credential privacy and post-commit refresh ownership; replacing their types alone would retain credentials and risk losing refreshes.
 

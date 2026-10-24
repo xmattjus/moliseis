@@ -2,36 +2,38 @@
 
 ## Why
 
-La quarta change della migrazione cumulativa della Draft PR #12 elimina i sette Command legacy residui di cronologia Search e filtri/marker GeoMap. Una sostituzione meccanica lascerebbe race tra bootstrap e cronologia, snapshot marker incoerenti e fallimenti non distinguibili da caricamento o risultato vuoto.
+The fourth change in Draft PR #12's cumulative migration replaces seven remaining legacy Commands in Search history and GeoMap filters/markers. A mechanical substitution would leave bootstrap/history races, inconsistent marker snapshots and failures indistinguishable from loading or empty results.
 
 ## What Changes
 
-- Migrati add/load/remove della cronologia alle factory ResultCommand esistenti: un caricamento e un writer privato con FIFO locale ordinata. Il writer accetta sincronicamente gli intenti validi anche mentre una write è pendente, preserva ottimismo e rollback per operazione e completa gli obblighi già accettati anche dopo navigation/disposal della UI. Nessuna infrastruttura globale.
-- Sostituiti quattro Command GeoMap con due setter sincroni e un unico caricamento restartable dei marker con snapshot immutabili, commit atomico, esiti parziali espliciti e retry corrente.
-- Aggiornati i consumer reali e implementate/verificate regressioni deterministiche per concorrenza, errori, disposal, popup SearchAnchor, filtri, navigazione e owner replacement.
-- **BREAKING** (solo API Dart interne): rimossi loadEvents/loadPlaces e la firma Command dei setter GeoMap; adattati tutti i chiamanti. Add/remove diventano dispatch di intenti alla FIFO locale: duplicati realmente rappresentati possono essere no-op, intenti opposti o su voci diverse sono preservati in ordine. La serializzazione è limitata alla sessione, senza cambiare ObjectBox o promettere ordine cross-owner.
+- Migrate history add/load/remove to the existing ResultCommand factories: one reader and a private writer with a feature-local ordered FIFO. The writer synchronously accepts valid intentions during pending writes, preserves per-operation optimism/rollback and settles accepted obligations after UI navigation/disposal.
+- Replace four GeoMap Commands with two synchronous setters and one restartable marker load using immutable snapshots, atomic commits, explicit partial outcomes and current-filter retry.
+- Adapt actual consumers and verify deterministic concurrency, error, disposal, SearchAnchor popup, filter, navigation and owner-replacement regressions.
+- **BREAKING** (internal Dart APIs): remove loadEvents/loadPlaces and Command-shaped GeoMap setters; adapt all callers. History add/remove dispatch intentions to the local FIFO. Proven duplicates may be no-ops; opposite intentions and different entries retain acceptance order. Serialization is session-local, without ObjectBox changes or cross-owner ordering guarantees.
 
 ## Capabilities
 
 ### New Capabilities
 
-Nessuna.
+None.
 
 ### Modified Capabilities
 
-- `command-execution-concurrency`: ammissione, persistenza ordinata indipendente dal lifecycle UI e riconciliazione revisionata della cronologia; autorità, snapshot, vuoto e retry del caricamento marker.
-- `local-content-retrieval`: esiti atomici dei marker, ordine e risultati parziali con errore, distinti dai contratti Nearby esistenti.
+- `command-execution-concurrency`: history admission, ordered persistence independent of UI lifecycle and revision-aware reconciliation; marker authority, snapshots, empty state and retry.
+- `local-content-retrieval`: atomic marker outcomes, ordering and partial results with errors, distinct from existing Nearby contracts.
 
 ## Impact
 
-Apply eseguito su SearchViewModel, GeoMapViewModel, AppSearchAnchor, GeoMapScreen e test/supporti pertinenti, con adattamento dei consumer ExploreScreen e SearchResultScreen per evitare la chiusura ridondante della popup. GeoMapBottomSheet è una superficie di regression, non una nuova ownership di stato. GeoMapUseCase e SearchRepository restano confini esistenti: nessuna modifica a persistenza, backend, dipendenze o foundation.
+Implementation covered SearchViewModel, GeoMapViewModel, AppSearchAnchor, GeoMapScreen and relevant tests/support. ExploreScreen and SearchResultScreen consumers stopped redundantly closing the popup. GeoMapBottomSheet remained a regression surface with its existing state ownership. GeoMapUseCase and SearchRepository remained existing boundaries; persistence, backend, dependencies and foundation were unchanged. Search loadResults/loadSuggestions, GeoMap loadNearContent/selectContent, mode, Post, Weather, Search admission fence and route ownership remained outside migration.
 
-Baseline dell’apply autorizzato: `1f3753b10c18061c6655cb32d078bf93aff1b05e`, con tre OpenSpec già implementati sulla PR cumulativa. Dopo il planning, la remediation F1–F5 e la review indipendente del piano, l’apply è stato autorizzato ed eseguito. La code review indipendente è stata completata e il checkpoint 4 è stato pubblicato nella [Draft PR #12](https://github.com/xmattjus/moliseis/pull/12) con commit `da7c426fb799a26094f043319b47e63b98728f92`. Le evidenze dell’implementazione e delle verifiche sono registrate nelle sezioni Apply di `design.md`; `tasks.md` riporta le 27 attività completate e verificate. Search loadResults/loadSuggestions, GeoMap loadNearContent/selectContent, mode, Post, Weather, admission fence Search e route ownership rimangono fuori migrazione.
+## Planning history and implementation evidence
 
-## Remediation F1–F5
+The authorized baseline was `1f3753b10c18061c6655cb32d078bf93aff1b05e`, with three migrations already implemented. Planning, F1–F5 remediation, independent plan review, authorization, implementation and independent code review were completed. The Apply sections of `design.md` record historical implementation checks; `tasks.md` records 27 verified tasks.
 
-La remediation del piano, completata prima dell’apply e incorporata nell’implementazione, ha sostituito le decisioni iniziali che perdevano submit prima dell’action entry, scartavano mutazioni opposte e invalidavano il bootstrap troppo tardi. Il protocollo unico nel design risolve anche la riconciliazione dopo runtime failure. I dialog mantengono l’applicazione del draft alla conclusione consentita della route (Salva, Back, barrier/drag), solo con State e sessione ancora correnti: nessuna nuova semantica di annullamento. Durante il planning i task erano rimasti unchecked in attesa della review indipendente del piano corretto e dell’autorizzazione all’apply; entrambe sono poi intervenute. Le checkbox attuali rappresentano l’apply verificato, non il solo completamento del planning.
+F1–F5 superseded initial decisions that lost submissions before deferred action entry, dropped opposite mutations or invalidated bootstrap too late. The corrected protocol also reconciles runtime failures. Dialog drafts still apply on permitted route completion (Save, Back, barrier/drag), only for mounted/current State and session; no cancellation semantics were added. Historically unchecked planning tasks were checked after implementation verification.
 
-## Stato corrente e follow-up
+## Published checkpoint and current cumulative status
 
-Planning, review indipendente del piano, remediation F1–F5, apply e code review indipendente sono completati; il checkpoint 4 è pubblicato. La PR #12 resta **4/7 implemented and published — Draft, do not merge**. OpenSpec 5–7 e consolidamento finale restano pendenti; l’analyzer non è globalmente green. Canonical sync e archive sono rinviati e il merge non è autorizzato. Le dichiarazioni di solo planning appartengono alla fase storica precedente all’apply.
+Git records checkpoint 4 as `da7c426fb799a26094f043319b47e63b98728f92`, parent `1f3753b10c18061c6655cb32d078bf93aff1b05e`. Documentation reconciliation `f48a08946c9ac40146104a0157556243ad433c92` followed directly and corrected its publication status. Both are published in [Draft PR #12](https://github.com/xmattjus/moliseis/pull/12).
+
+The checkpoint-4 status was historically **4/7 implemented and published**, with 66 INFO remaining. The cumulative PR now contains **seven published migrations**; that later status does not make checkpoint 4 analyzer-clean. Canonical synchronization, archival, legacy compatibility deletion and merge require separate authorization. PR #12 remains Draft; merge is not authorized.

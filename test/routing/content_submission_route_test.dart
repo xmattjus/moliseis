@@ -532,6 +532,7 @@ void main() {
           expect(harness.submissionRepository.submitCallCount, 1);
           expect(tester.takeException(), isNull);
         },
+        disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
       );
     }
 
@@ -1661,6 +1662,7 @@ void main() {
         );
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
   });
 }

@@ -1,65 +1,59 @@
 ## Why
 
-All’inizio del planning sei operazioni ordinarie dipendevano ancora dai Command legacy deprecati, mentre il repository disponeva già di factory Result-aware command_it. Questa prima migrazione conserva i comportamenti delle feature e rende espliciti ammissione, esiti e lifecycle, senza riprodurre l’API legacy.
+At the start of planning, six ordinary operations still depended on deprecated legacy Commands although Result-aware command_it factories already existed. This first migration preserves feature behavior and makes admission, outcomes and lifecycle explicit without reproducing the legacy API.
 
-## Stato corrente — remediation post-apply
+## Published checkpoint
 
-L’apply è stato autorizzato ed eseguito il 2026-10-20 nel worktree dedicato:
-cinque ViewModel, sei Command, quattro consumer e relativi test/support sono
-implementati, senza commit o PR. Le evidenze dell’apply sono in design.md,
-sezione “Apply evidence — 2026-10-20”. La successiva code review indipendente
-ha individuato CR-F1 (consenso Sentry dopo dispose), CR-F2 (stato documentale)
-e CR-F3 (wrapper test troppo estesi). La remediation corrente riconcilia il
-consenso dalla cache repository e riduce i wrapper sulla base di prove mirate;
-la validazione post-remediation e il relativo verdetto sono registrati nella
-sezione finale di design.md e nei task 7.1–7.3. Non è un’approvazione al merge.
+Implementation and post-apply remediation were published in commit `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, parent `ee60777c7fdfc5c16daa1151050c134fbb7cde29` (2026-10-20). Git history verifies this relationship. The checkpoint is included in [Draft PR #12](https://github.com/xmattjus/moliseis/pull/12). All seven migrations are now published; this record was added after publication and does not claim that the commit recorded its own SHA. Historical planning and local apply records below and in design.md retain their original temporal scope. The legacy compatibility implementation remains; removal, canonical synchronization, archival and merge require separate authorization.
 
-Le sezioni di planning sotto mantengono baseline, motivazioni e review del piano.
-I loro F1–F6/R1–R3 sono identificatori storici distinti da CR-F1–CR-F3 della
-code review post-apply. Nessuna delle altre sei change è stata avviata.
+## Implementation evidence
+
+The authorized apply ran on 2026-10-20: five ViewModels, six Commands, four consumers and related tests/support. Independent review then identified CR-F1 (Sentry consent after disposal), CR-F2 (document status) and CR-F3 (overbroad test wrappers). Remediation reconciled consent from the repository cache and removed wrappers without a reproduced need. The final historical validation and verdict are in design.md and tasks 7.1–7.3. These records do not authorize merge.
+
+The planning findings F1–F6/R1–R3 below are distinct from post-apply CR-F1–CR-F3. At that planning checkpoint none of the other six changes had started.
 
 ## What Changes
 
-- Migrare soltanto SettingsViewModel.setCrashReporting; ThemeViewModel.setThemeBrightness e setThemeType; ExploreViewModel.loadLatest; SuggestionViewModel.load; FavouriteViewModel.load: **5 ViewModel, 6 Command**.
-- Adattare consumer e test strettamente necessari; osservare command.results tramite ResultCommandSnapshot e usare run/runAsync secondo la reale necessità di attesa. Nessuna latest-intent implicita.
-- Conservare aggiornamenti ottimistici e rollback Settings/Theme, retention specifica Explore/Suggestion, pubblicazione progressiva e membership Favourite. setFavourite resta Future<Result<void>>, senza nuovo Command.
-- Proteggere ogni commit locale, notifica, rollback e nuova fase repository dopo dispose; programmare sempre il cleanup fuori dispatch, anche per Command già idle, e rilasciare quelli attivi solo dopo settlement sicuro e ricontrollo, mantenendo il reporting globale.
-- Correggere esplicitamente il feedback Settings: una scrittura fallita non deve più produrre il messaggio di successo. Nessun altro cambiamento UX intenzionale.
+- Migrate only SettingsViewModel.setCrashReporting; ThemeViewModel.setThemeBrightness/setThemeType; ExploreViewModel.loadLatest; SuggestionViewModel.load; FavouriteViewModel.load: **5 ViewModels, 6 Commands**.
+- Adapt necessary consumers/tests; observe command.results through ResultCommandSnapshot and use run/runAsync according to actual waiting needs. No implicit latest-intent behavior.
+- Preserve Settings/Theme optimism and rollback, feature-specific Explore/Suggestion retention, progressive Favourite publication and membership. setFavourite remains Future<Result<void>> without another Command.
+- Guard local commits, notifications, rollback and new repository phases after disposal. Always schedule cleanup outside dispatch, including idle Commands; retain active Commands until safe settlement and recheck, preserving global reporting.
+- Correct Settings feedback: a failed write must not show success. No other intentional UX change.
 
 ## Capabilities
 
 ### New Capabilities
 
-Nessuna.
+None.
 
 ### Modified Capabilities
 
-- `command-execution-concurrency`: delta **MODIFIED** del requisito `Only authoritative completion can commit asynchronous data`, autorizzata dalla remediation, per distinguere lane restartable da operazioni ordinarie single-flight. Aggiungere i soli contratti osservabili pertinenti alle sei operazioni, feedback, ammissione Favourite e lifecycle.
+- `command-execution-concurrency`: authorized **MODIFIED** delta for `Only authoritative completion can commit asynchronous data`, distinguishing restartable lanes from ordinary single-flight operations; add observable contracts for these operations, feedback, Favourite admission and lifecycle.
 
-Search/GeoMap conservano retrieval separato dal commit sincrono autoritativo e divieto di pubblicazione obsoleta. Le operazioni ordinarie possono conservare continuazioni ottimistiche/progressive vive e autoritative. Nessuna modifica diretta alle canonical in questa fase. `local-content-retrieval`, routing e navigation-shell restano vincolanti e invariati; nessuna nuova capability artificiale per preferenze/preferiti.
+Search/GeoMap retain separate retrieval and synchronous authoritative commit, with no stale publication. Ordinary operations may retain live authoritative optimistic/progressive continuations. Canonical specifications are not directly changed; `local-content-retrieval`, routing and navigation-shell remain binding. No artificial preferences/favourites capability.
 
 ## Impact
 
-Perimetro di produzione approvato e implementato: cinque ViewModel, SettingsScreen, sezione latest di ExploreScreen, SuggestionHorizontalListView e FavouriteScreen; verificare FavouriteButton come consumer Provider di isUpdating/membership, senza cambiarne il contratto diretto. Non cambiare scope o composizione dei Provider. Test: cinque suite ViewModel, widget pertinenti, integrazioni Provider/router che consumano questi owner (incluso sync_redirect_test).
+Implemented production scope: five ViewModels, SettingsScreen, ExploreScreen latest section, SuggestionHorizontalListView and FavouriteScreen. FavouriteButton remains a Provider consumer of isUpdating/membership with its direct API unchanged. Provider scope/composition is unchanged. Tests cover the five ViewModel suites, relevant widgets and Provider/router consumers including sync_redirect_test.
 
-### Baseline e diagnostiche — planning storico del 2026-10-19
+### Historical planning baseline and diagnostics — 2026-10-19
 
-Preflight iniziale e remediation del 2026-10-19: repository xmattjus/moliseis; HEAD `556c62b0d1e57dbebc24d2fb2e19da1785aeab09`, branch `codex/resolve-flutter-analyzer-diagnostics-pr3`; fetch conferma origin/main `d16f73714fcbb58d1ee4ed91a45e61be1072667e`, identico alla baseline richiesta. L’HEAD di quel preflight era 0 ahead/7 behind. Fonte di implementazione futura: l’ultimo origin/main verificato, non questo vecchio checkout PR3.
+Initial preflight/remediation: repository xmattjus/moliseis; HEAD `556c62b0d1e57dbebc24d2fb2e19da1785aeab09`, branch `codex/resolve-flutter-analyzer-diagnostics-pr3`; fetched origin/main `d16f73714fcbb58d1ee4ed91a45e61be1072667e`, matching the requested baseline. That checkout was 0 ahead/7 behind and was not the future implementation base.
 
-La precedente analisi realmente eseguita sullo snapshot main ha rilevato 125 info legacy, zero warning/errori. R3 in design.md registra comando esatto Dart diretto `analyze --format machine`, cwd, flag/default, SDK, adattamento temporaneo del package_config e exit storico 0; un nuovo replay separato ha misurato exit grezzo 0 e output identico al log originale. Non attribuire tale exit al wrapper flutter analyze né dedurlo dai conteggi. Il perimetro ridotto comprende **12 diagnostiche target**: Theme 4; Settings, Explore, Suggestion e Favourite 2 ciascuno. Dopo apply sono attese **113 residue**, incluse le otto di Category. Confrontare le identità, non soltanto il saldo; riconciliare qualsiasi drift prima degli edit. Pubspec/lock/package_config confermano command_it 9.5.2, listen_it 6.0.0 e Flutter 3.47.5, Dart effettivo 3.13.4; nessun aggiornamento dipendenze.
+Analysis of that main snapshot actually produced 125 legacy INFO, zero warnings/errors. R3 in design.md records the direct Dart `analyze --format machine` command, cwd, defaults, SDK, temporary package_config adaptation and historical exit 0; a separate replay measured raw exit 0 and byte-identical output. This exit does not belong to flutter analyze and is not inferred from counts. Scope: **12 target diagnostics** (Theme 4; Settings, Explore, Suggestion, Favourite 2 each), leaving **113**, including eight Category diagnostics. Identity/multiplicity comparison, rather than balance alone, was required. Resolved versions: command_it 9.5.2, listen_it 6.0.0, Flutter 3.47.5, effective Dart 3.13.4; no dependency upgrade.
 
-Working tree della remediation già conteneva AGENTS.md modificato e le directory untracked di questa change e PR4; index vuoto. Preservare integralmente questi lavori e tutti i file estranei. .openspec.yaml resta invariato, spec-driven senza skip_specs.
+The remediation checkout already contained modified AGENTS.md and untracked directories for this change and PR4, with an empty index. These unrelated changes were preserved. .openspec.yaml remained spec-driven without skip_specs.
 
-### Risoluzione F1 e sequenza complessiva
+### Historical F1 resolution and migration sequence
 
-Category e tutte le sue quattro operazioni, consumer, test e attività esclusive sono **fuori perimetro**. Le factory asincrone differiscono l’ingresso nell’action; conservarne le esatte interleaving semantics richiederebbe coordinamento specifico non giustificato qui. Saranno affrontate dalla futura change indipendente **migrate-category-view-model-commands**, che non viene creata ora. Nessun adapter, scheduler, wrapper o nuova factory preparatoria.
+Category and its four operations/consumers/tests were excluded: deferred factory action entry needed feature-specific coordination. They were reserved for the independent `migrate-category-view-model-commands` change, without a preparatory adapter, scheduler, wrapper or factory here.
 
-La migrazione complessiva comprende ora **sette OpenSpec sequenziali nello stesso branch e una sola PR finale**, secondo la richiesta esplicita dell’utente. Questa prima change non dipende dall’implementazione delle altre sei. Non creare una change di coordinamento. Rimozione command.dart e zero deprecazioni globali restano obiettivi della PR finale.
+The user requested **seven sequential OpenSpec changes on one branch and one integration PR**, without a coordination change. This first change did not depend on implementing the others. The original plan associated global zero deprecations and command.dart removal with final integration; the later authorized scope retained compatibility code and requires separate authorization for deletion.
 
-### Gate, rischi e non-obiettivi — planning storico
+### Historical gates, risks and non-goals
 
-Sei Command migrati; cinque ViewModel senza legacy; dodici identità eliminate, 113 preservate salvo drift; nessuna nuova diagnostica; contratti di dominio/persistenza invariati; nessun redesign UX oltre alla correzione del falso feedback Settings; errori applicativi/runtime distinti e terminali; single-flight preservato; zero commit/notify post-dispose; test ViewModel/widget/Provider/router e suite Flutter completa verdi.
+Acceptance required six migrated Commands, five legacy-free ViewModels, 12 removed identities and 113 preserved, no new diagnostics, unchanged domain/persistence contracts, only the declared Settings feedback correction, preserved single-flight and distinct application/runtime outcomes, no post-dispose presentation commits/notifications, and passing focused plus full Flutter tests.
 
-Rischi concreti e mitigazioni sono nel design: ingresso differito Settings/Theme senza vincolo same-stack nei consumer attuali; ammissione Favourite sincrona, inclusa cattura del rifiuto se una write termina prima dell’ingresso load; guardie anche dopo notify rientrante; cleanup privato sempre fuori dispatch con rilascio exactly-once (R1). Le lane Theme restano indipendenti ma condividono SettingsRepositoryImpl: il rischio preesistente di lost update tra snapshot concorrenti è documentato (R2). Questa change non garantisce persistenza atomica/serializzata o assenza di quel rischio, e non modifica il repository né introduce mutex/queue/coordinator; un’eventuale correzione appartiene a intervento separato. I test PREF garantiscono stato e rollback locali per lane, non fusione delle scritture persistite. Questa era la valutazione del planning; i risultati realmente eseguiti e le successive correzioni sono nelle sezioni apply e post-apply di design.md.
+Design risks include deferred preference action entry without a same-stack consumer requirement, synchronous Favourite admission including a write that finishes before load entry, guards after reentrant notify, and always-deferred exactly-once cleanup (R1). Independent Theme lanes share SettingsRepositoryImpl and retain its pre-existing concurrent-snapshot lost-update risk (R2). No persistence atomicity/serialization guarantee, mutex, queue or coordinator was added; PREF tests establish local state/rollback per lane, not persisted merging. Apply and post-apply results are separate design records.
 
-**Stato storico della remediation documentale del 2026-10-19:** quella fase modificava esclusivamente i quattro artifact documentali esistenti. Nessun codice/test/support, dipendenza, analyzer, CI, backend, generato, logging globale, canonical diretta o altro piano; nessun apply, commit, push, PR, merge o archivio. F1 è risolto per esclusione autorizzata, F3 mediante delta MODIFIED; F2 ha strategia concreta e regression gate. Lo stato di allora era **READY FOR INDEPENDENT REVIEW**, non approvazione né autorizzazione apply. L’autorizzazione e l’implementazione successive sono descritte nello stato corrente sopra.
+The 2026-10-19 documentation remediation changed only four artifacts, leaving metadata, code/tests/support, dependencies/analyzer/CI/backend/generated files, global logging, canonical specifications and unrelated plans untouched. There was no apply/commit/push/PR/merge/archive in that phase. F1 was resolved by authorized exclusion, F3 by the MODIFIED delta and F2 by a concrete strategy/regression gate. Its **READY FOR INDEPENDENT REVIEW** verdict was neither plan approval nor apply authorization; later implementation is recorded separately.

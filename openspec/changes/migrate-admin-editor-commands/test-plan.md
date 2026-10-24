@@ -1,6 +1,6 @@
 # Deterministic regression and verification plan
 
-This is the approved acceptance plan. Actual authorized-apply execution, coverage mapping and limitations are recorded separately in validation.md and apply-verification.json. Every scenario below states the admission/observation point and Future release order. `tick` means controlled microtask/zero-event processing (`pumpCommandTurns`, WidgetTester.pump or existing fake-async support), never real sleep. Advance the known upstream 50ms disposal window with the test clock only in late-failure/cleanup tests; this is characterization, not an arbitrary readiness delay. Keep physical calls held by Completer, assert phase entry before releasing, observe safe settlement before another ordinary admission.
+This is the historical approved acceptance plan for the subsequently published editor migration at `52d4e448d010d2d13c13a4d3d665cdf5b1b0103b` (parent `0cdb764a7586f85180a802fafcf2b485791cb5ff`). Actual authorized-apply execution, coverage mapping and limitations are recorded separately in validation.md and apply-verification.json. Every scenario below states the admission/observation point and Future release order. `tick` means controlled microtask/zero-event processing (`pumpCommandTurns`, WidgetTester.pump or existing fake-async support), never real sleep. Advance the known upstream 50ms disposal window with the test clock only in late-failure/cleanup tests; this is characterization, not an arbitrary readiness delay. Keep physical calls held by Completer, assert phase entry before releasing, observe safe settlement before another ordinary admission.
 
 ## Existing coverage to preserve and adapt
 
@@ -99,7 +99,7 @@ The original **35 scenario families above remain**; these subcases refine their 
 
 F1 is protected by RF1.1–RF1.4 and RF3.1; F2 by RF2.1–RF2.3 plus the original directed matrix; F3 by RF3.1/RF3.2 and equal-payload RF1.2. All release order is controlled; no runtime test has been run during remediation.
 
-## Future apply execution gates
+## Historical apply execution gates
 
 Use `TZ=Europe/Rome` as required by `.github/CI.md`; do not copy its historical file count or analyzer totals as the current baseline.
 

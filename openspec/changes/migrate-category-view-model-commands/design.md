@@ -1,472 +1,474 @@
 # Design
 
-## Context
+## Context — historical planning and later evidence
 
-Vedere proposal.md per problema e perimetro. Questo documento distingue **FATTO** (sorgenti, output effettivi), **INFERENZA** (interleaving ricostruite, non prove runtime già eseguite) e **PROPOSTA** (contratto del futuro apply). Planning autorizzato esplicitamente il 2026-10-20; successiva remediation documentale F1/F2 richiesta dalla review indipendente. Questa introduzione e le sezioni iniziali descrivono il piano e le sue evidenze storiche. **Stato corrente: apply autorizzato il 2026-10-20, successivo alla remediation F1/F2/RF3**; implementazione, precisazioni e gate effettivi nella sezione finale «Evidenze dell’apply». Nessuna autorizzazione a commit/push/PR/merge/archive/sync canonical.
+See proposal.md for problem/scope. **FACT** denotes source/actual output, **INFERENCE** reconstructed interleavings rather than already-executed runtime proof, and **PROPOSAL** the future apply contract. Planning was explicitly authorized on 2026-10-20; independent review then requested F1/F2 documentation remediation. Initial sections retain that history. Apply was authorized later on 2026-10-20 after F1/F2/RF3. Actual implementation/gates and final code-review remediation follow separately. Publication, which did not occur during those local phases, is recorded at the end.
 
-### Baseline e provenienza verificate — planning iniziale
+### Verified baseline and provenance — initial planning
 
-- Repository `xmattjus/moliseis`, origin fetch/push `https://github.com/xmattjus/moliseis.git`.
-- Worktree esclusivo: `/Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-category-view-model-commands`.
-- Branch locale: `codex/plan-migrate-category-view-model-commands`.
-- HEAD: `9d17d224d5094c5b043128113d9aba6a1ce69f0a`. Creato nel turno precedente con `git worktree add -b <branch> <path> <checkpoint>`, senza merge/cherry-pick. Il percorso già presente in questo turno è proprio il worktree autorizzato appena creato, non una collisione con lavoro estraneo: identità, branch e stato pulito riconfermati prima di scrivere.
-- `git fetch origin` ripetuto dal worktree dedicato: exit 0. `origin/codex/migrate-legacy-commands` e metadata GitHub della Draft PR #12 (`draft=true`, `state=open`, `head=codex/migrate-legacy-commands`) hanno lo stesso SHA. La richiesta corrente autorizza direttamente il planning; il precedente testo storico dei gate nella PR non autorizza apply e non viene modificato.
-- `git merge-base --is-ancestor <checkpoint> HEAD`: exit 0; `rev-list <checkpoint>..HEAD` conta zero commit. Il branch nasce esattamente sul checkpoint, pronto a discenderne; non si inventa un commit figlio durante il planning.
-- Stato iniziale: working tree e index vuoti. Tre worktree preesistenti preservati: principale su main `ee60777c7fdfc5c16daa1151050c134fbb7cde29`, checkout Codex `27f4` detached sul medesimo SHA, primo OpenSpec su `migrate-simple-view-model-commands` al checkpoint. Nessun checkout del cumulativo duplicato. Main non è baseline.
-- I soli file scritti sono i cinque artifact di questa change. Il fetch aggiorna i riferimenti condivisi Git come richiesto; nessun contenuto/index/branch degli altri worktree viene modificato. Le letture di dipendenze e metadata risolti esterni sono read-only; tutti i comandi successivi hanno cwd nel nuovo worktree.
+- Repository `xmattjus/moliseis`; fetch/push origin `https://github.com/xmattjus/moliseis.git`.
+- Dedicated `<worktree>`; local branch `codex/plan-migrate-category-view-model-commands`.
+- HEAD `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, created in the preceding turn with `git worktree add -b <branch> <path> <checkpoint>`, no merge/cherry-pick. This was the newly authorized existing checkout, not an unrelated collision; identity/branch/clean state rechecked before writes.
+- Dedicated-worktree `git fetch origin`: exit 0. origin/codex/migrate-legacy-commands and Draft PR #12 metadata (`draft=true`, `state=open`, `head=codex/migrate-legacy-commands`) matched checkpoint. The planning request did not authorize apply through older PR gate text, which remained unchanged.
+- `git merge-base --is-ancestor <checkpoint> HEAD`: exit 0; rev-list beyond checkpoint zero. No invented child commit during planning.
+- Initial working tree/index empty. Three existing worktrees preserved: main at `ee60777c7fdfc5c16daa1151050c134fbb7cde29`, a Codex detached checkout at that SHA and first OpenSpec branch at checkpoint. No duplicate cumulative checkout; main was not baseline.
+- Only five change artifacts written. Requested fetch updated shared refs but no other checkout contents/index/branch. External resolved-dependency/metadata reads were read-only; later commands used dedicated-worktree cwd.
 
-### Istruzioni, schema e dipendenze
+### Instructions, schema and dependencies
 
-FATTO: letto `AGENTS.md`, nessun AGENTS annidato trovato. Applicata skill `openspec-propose`; `openspec context --json` e `list --json` risolvono questa root repo-local. CLI **1.14.3**, schema **spec-driven**, config senza context/rules aggiuntivi; istruzioni proposal/specs/design/tasks lette. `.openspec.yaml`: schema spec-driven, created 2026-10-20, nessun skip_specs. Non si usano le versioni storiche dei CLI come se fossero quelle correnti.
+FACT: AGENTS.md read; no nested AGENTS. openspec-propose skill used; `openspec context --json`/`list --json` resolved repository-local root. CLI **1.14.3**, **spec-driven**, no added config context/rules; proposal/specs/design/tasks instructions read. .openspec.yaml: spec-driven, created 2026-10-20, no skip_specs. Historical CLI versions were not treated as current ones.
 
-`pubspec.yaml`/`pubspec.lock` e package_config già risolto: **command_it 9.5.2**, **listen_it 6.0.0**, **go_router 18.0.2**; Flutter **3.47.5**, framework `6a19cca56475dbfba1478ee68d7bd0c2ef891da1`; eseguibile Dart **3.13.4 stable macos_arm64**. Nessun pub get, upgrade, generazione o dipendenza nuova. Fonte primaria per il timing: `~/.pub-cache/hosted/pub.dev/command_it-9.5.2/lib/command_it.dart`, soprattutto run 312–413, dispose 799–825, runAsync 859–870. Consultati anche [API ufficiale](https://pub.dev/documentation/command_it/9.5.2/command_it/Command-class.html) e [changelog 9.5.2](https://pub.dev/packages/command_it/changelog). Il tentativo Context7 non ha restituito dati prima dell’interruzione; non è fonte di conclusioni.
+Resolved pubspec/lock/package_config: **command_it 9.5.2**, **listen_it 6.0.0**, **go_router 18.0.2**, Flutter **3.47.5**, framework `6a19cca56475dbfba1478ee68d7bd0c2ef891da1`, Dart **3.13.4 stable macos_arm64**. No pub get/upgrade/generation/new dependency. Timing authority: `<pub-cache>/hosted/pub.dev/command_it-9.5.2/lib/command_it.dart`, run 312–413/dispose 799–825/runAsync 859–870. Also consulted [versioned official API](https://pub.dev/documentation/command_it/9.5.2/command_it/Command-class.html) and [changelog](https://pub.dev/packages/command_it/changelog). Context7 returned no data before interruption and supported no conclusion.
 
-### Baseline diagnostica rigenerata — evidenza storica del planning iniziale
+### Regenerated diagnostic baseline — historical initial planning evidence
 
-FATTO: nuova esecuzione di analisi sul contenuto Git del checkpoint, senza modificare il checkout. `git archive <checkpoint>` estratto in `/private/tmp/category-plan-baseline-xvhh0wl7`; tutti i file tracked provengono da quel commit. Solo nella copia temporanea è stato aggiunto `.dart_tool/package_config.json`, derivato da quello già risolto del checkout principale: modificato esclusivamente moliseis.rootUri alla URI assoluta reale dello snapshot, verificate le destinazioni degli altri package. Nessuna analisi del codice di un altro branch; nessuna modifica ai metadata del checkout principale.
-
-Cwd: questo worktree. Argv esatto:
+FACT: analysis ran on Git checkpoint content, not another branch. `git archive <checkpoint>` extracted to `<snapshot>`; only temporary .dart_tool/package_config.json was added from already-resolved main metadata, changing only moliseis.rootUri to resolved snapshot URI and verifying other targets. Main metadata was untouched. Cwd dedicated worktree; portable historical command:
 
 ```text
-/opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart analyze --format machine /private/tmp/category-plan-baseline-xvhh0wl7
+<flutter-sdk>/bin/cache/dart-sdk/bin/dart analyze --format machine <snapshot>
 ```
 
-Nessun flag fatal-infos; default Dart: warning fatal, info non fatal. `subprocess.run` ha misurato **returncode grezzo 0**, stderr vuoto, **113 INFO / 0 WARNING / 0 ERROR**, tutte `DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE`. Non attribuire exit 0 al diverso wrapper `flutter analyze`. Output `/private/tmp/category-plan-analyzer.log`, stderr `.stderr`, metadati `.json`; stdout SHA-256 `a542fd96198de78a678731293b66ccd6b1ff01dde1726ff597a6ae69b964d6c0`. Questi file sono evidenze effimere, non dipendenze dell’apply.
+Portable placeholders replace historical workstation/snapshot paths; flags are unchanged. No fatal-infos flag; Dart defaults fatal warnings/nonfatal INFO. subprocess.run measured **raw returncode 0**, empty stderr, **113 INFO / 0 WARNING / 0 ERROR**, all `DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE`. Do not attribute exit to flutter analyze. Historical output category-plan-analyzer.log/.stderr/.json under `<evidence-dir>`; stdout SHA-256 `a542fd96198de78a678731293b66ccd6b1ff01dde1726ff597a6ae69b964d6c0`. Temporary evidence was available then; present accessibility is not asserted.
 
-Le otto identità correnti, tutte nello stesso file `lib/ui/category/view_models/category_view_model.dart`, sono:
+Eight identities in `lib/ui/category/view_models/category_view_model.dart`:
 
-| Linea:colonna | Simbolo | Contesto | Molteplicità |
+| Line:column | Symbol | Context | Multiplicity |
 | --- | --- | --- | ---: |
-| 22:12 | Command0 | costruzione load | 1 |
-| 23:29 | Command1 | costruzione setSelectedCategories | 1 |
-| 24:15 | Command1 | costruzione setSort | 1 |
-| 25:24 | Command1 | costruzione setSelectedTypes | 1 |
-| 35:8 | Command0 | dichiarazione load | 1 |
-| 36:8 | Command1 | dichiarazione setSelectedCategories | 1 |
-| 37:8 | Command1 | dichiarazione setSort | 1 |
-| 38:8 | Command1 | dichiarazione setSelectedTypes | 1 |
+| 22:12 | Command0 | load construction | 1 |
+| 23:29 | Command1 | setSelectedCategories construction | 1 |
+| 24:15 | Command1 | setSort construction | 1 |
+| 25:24 | Command1 | setSelectedTypes construction | 1 |
+| 35:8 | Command0 | load declaration | 1 |
+| 36:8 | Command1 | setSelectedCategories declaration | 1 |
+| 37:8 | Command1 | setSort declaration | 1 |
+| 38:8 | Command1 | setSelectedTypes declaration | 1 |
 
-L’appendice PR4 `archive/2026-10-19-resolve-flutter-analyzer-diagnostics-pr4/design.md` contiene il ledger durevole 125. Un confronto automatico del ledger meno le dodici occorrenze eliminate da OpenSpec 1 coincide con questa nuova analisi per file/simbolo/molteplicità: **113**. Il futuro apply deve confrontare anche regola, contesto e molteplicità, normalizzando root/linee mosse: otto identità target eliminate, **105 residue immutate e zero nuove**, non un semplice saldo. Il planning non riduce alcuna diagnostica. L’analisi non è stata rieseguita nella remediation documentale F1/F2; i conteggi restano evidenza storica invariata.
+Durable ledger 125: `openspec/changes/archive/2026-10-19-resolve-flutter-analyzer-diagnostics-pr4/design.md`. Automated ledger comparison after subtracting OpenSpec 1’s 12 occurrences matched all **113** by file/symbol/multiplicity. Future apply required rule/context/multiplicity comparison with root/shifted-line normalization: eight targets removed/**105 unchanged residual identities/zero new**, not count alone. Planning removed no diagnostics. F1/F2 remediation reran no analyzer; baseline remained historical evidence.
 
-### Fonti lette e mappa dei consumer
+### Sources read and consumer map
 
-| Superficie letta | Evidenza e responsabilità |
+| Surface read | Evidence/responsibility |
 | --- | --- |
-| `lib/utils/{command,result_command,restartable_command,command_configuration,result}.dart` | Contratti reali legacy/foundation, Result, reporting e ownership |
-| `test/utils/{result_command,restartable_command,command_configuration,command_it_disposal_behavior}_test.dart` | Deferred entry, single-flight/join, neutral/void/error, stale work, rientranza, assertion, limiti upstream |
-| `openspec/changes/migrate-simple-view-model-commands/` (metadata, proposal, design, tasks, delta) | Esclusione Category, D5/R1 e remediation; progressive Favourite è specifico e non impone progressive Category |
-| `openspec/specs/command-execution-concurrency/spec.md`, canonical routing/navigation e local-content-retrieval | Autorità restartable, bootstrap/routing invariati; retrieval locale non include automaticamente Category nei target storici |
-| `category_view_model.dart:15–151` | Quattro Command, lista condivisa, filtri mutabili, sort e nessun dispose override |
-| `core_routes.dart:23–75` | Unica creazione production Category; Provider key slug; setter bootstrap unawaited; invalid slug prima del Provider |
-| `category_screen.dart:45–124` | Menu osserva setSort; filtri passano callback; body osserva solo VM e usa load.completed OR setSort.completed |
-| `category_content_and_type_selection.dart:34–157` | Copie modificabili; didUpdateWidget confronta identità wrapper (F1); first senza guard su draft vuoto e tipi vuoti etichettati Luoghi (F2); reset all solo alla chiusura e mounted dopo modal |
-| `category_use_case.dart:18–24`, `explore_use_case.dart:25–33` | Delega Result a getByCategories, getAllPlaces e getByCurrentYear; conservare sequenza e significato temporale eventi |
-| `settings_repository.dart`, `settings_repository_impl.dart:43–50,72–75` | Write Result; cache modificata solo su save riuscita; sort locale e cache persistita possono differire |
-| `test/ui/category/view_models/category_view_model_test.dart` | Cinque test attuali: entrambi i lati, primo/secondo errore, selezione uguale, solo places; helper locale presume categorie vuote |
-| `test/ui/category/widgets/category_content_and_type_selection_test.dart` | Sheet/dialog, reset e unmount del selettore; non prova primo frame route né owner replacement |
-| `test/routing/{route_parameter_redirect,route_ownership,back_navigation_integration,geo_map_route,main_navigation_restoration,restoration_behavior}_test.dart` | Slug/all/invalid, branch/Post parent, chrome, restoration shell/Search/Map/Gallery; mancano regressioni Category con Future pending e primo frame |
-| `test/support/{command_test_support,ordinary_view_model_lifecycle_support,route_ownership_fixture,sync_harness,fake_repositories,fixtures}.dart`, `test/ui/ordinary_view_model_lifecycle_test.dart` | Riuso fixture reali, fake, reporting e tempo virtuale; produzione Category è usata dalla fixture route |
+| lib/utils/{command,result_command,restartable_command,command_configuration,result}.dart | Real legacy/foundation/Result/reporting/ownership contracts |
+| test/utils/{result_command,restartable_command,command_configuration,command_it_disposal_behavior}_test.dart | Deferred entry/single-flight/join/neutral/void/errors/stale/reentrancy/assertions/upstream limits |
+| First migration’s metadata/proposal/design/tasks/delta | Category exclusion/D5/R1/remediation; Favourite progression does not imply Category progression |
+| Canonical command-execution-concurrency/routing/navigation/local-content-retrieval | Restartable authority/unchanged route bootstrap; local retrieval historical targets do not automatically include Category |
+| category_view_model.dart:15–151 | Four Commands/shared list/mutable filters/sort/no dispose override |
+| core_routes.dart:23–75 | Sole production Category creation/slug Provider key/unawaited bootstrap/invalid slug before Provider |
+| category_screen.dart:45–124 | Menu observes setSort; filter callbacks; body observes ViewModel and load.completed OR setSort.completed |
+| category_content_and_type_selection.dart:34–157 | Mutable drafts/wrapper-identity comparison F1/unsafe empty first and empty types labeled Luoghi F2/close-only all reset/post-modal mounted |
+| category_use_case.dart:18–24; explore_use_case.dart:25–33 | Result delegation to getByCategories/getAllPlaces/getByCurrentYear; preserve sequence/event temporal semantics |
+| settings_repository.dart; settings_repository_impl.dart:43–50,72–75 | Real write Result/cache only on successful save; session/persisted sort may differ |
+| Category ViewModel tests | Five existing cases: both sides/first-second failure/equal selection/places only; local builder assumes empty categories |
+| Shared selector tests | Sheet/dialog/reset/unmount; not first route frame/replacement |
+| test/routing/{route_parameter_redirect,route_ownership,back_navigation_integration,geo_map_route,main_navigation_restoration,restoration_behavior}_test.dart | Slug/all/invalid/branch/Post parent/chrome/shell-Search-Map-Gallery restoration; pending-first-frame Category regressions absent |
+| test/support/{command_test_support,ordinary_view_model_lifecycle_support,route_ownership_fixture,sync_harness,fake_repositories,fixtures}.dart; ordinary lifecycle test | Existing real fixtures/fakes/reporting/virtual time; production Category used by route fixture |
 
-La ricerca repo-wide dei tipi/proprietà trova come consumer production diretti solo route e CategoryScreen. Il selettore è indiretto tramite callback; ContentSliverGrid e callback story usano solo content, Provider/ChangeNotifier osservano il VM. Test Category e fixture route sono consumer aggiuntivi. Gli omonimi Command in GeoMap sono di un altro owner e restano esclusi. Audit read-only F1/F2: `GeoMapScreen` usa lo stesso `CategoryContentAndTypeSelection` in `geo_map_screen.dart:525–532`, con callback ai suoi Command legacy. I getter GeoMap (`geo_map_view_model.dart:130–141`) ricreano UnmodifiableSetView e i setter (`:230–258`) sostituiscono i backing set. La correzione condivisa deve conservarne firma, timing di conferma e mounted guard. Sede minima: test componente parametrizzato esistente; una sola integrazione distinta in `test/ui/geo_map/widgets/geo_map_screen_test.dart` verifica il wiring reale e rebuild da owner, senza duplicare tutta la matrice sheet/dialog. Nessun consumer production attende il risultato dei due setter filtro, legge i loro stati o richiede di conservarli come Command.
+Repository-wide reference search found only route/CategoryScreen direct production consumers. Selector is callback-driven; ContentSliverGrid/story callbacks read content, Provider/ChangeNotifier observe ViewModel. Tests/route fixture also consume it. Same-named GeoMap Commands have another owner/excluded scope.
 
-## Goals / Non-Goals
+Read-only F1/F2 audit: GeoMapScreen uses shared CategoryContentAndTypeSelection at geo_map_screen.dart:525–532 with legacy callbacks; getters geo_map_view_model.dart:130–141 recreate UnmodifiableSetView, setters :230–258 replace backing sets. Shared fix must preserve callback signatures/confirmation timing/mounted checks. Extend existing parameterized component test; one distinct real GeoMapScreen test verifies wiring/owner rebuild without duplicating sheet/dialog matrix. No production consumer awaits filter-setter outcomes/reads their Command state/requires Commands.
 
-Garantire stato coerente prima del build, un solo dominio latest-intent per entrambi i filtri, commit atomico autoritativo, ordine corrente e zero effetti di presentazione post-dispose. Mantenere dominio/repository e Provider, evitando di ricostruire la vecchia API. Non promettere cancellazione fisica, serializzazione delle impostazioni tra owner, recupero automatico di write fallite o persistenza dei filtri di sessione durante process restoration. Nessuna migrazione delle altre sei aree della migrazione cumulativa; sola correzione del selettore condiviso F1/F2 e regressione di compatibilità del consumer GeoMap effettivo.
+## Goals / Non-Goals — historical plan
 
-## Decisions
+Coherent pre-build selection; one combined-filter latest-intent domain; atomic authoritative commit/current sort; no post-dispose presentation. Keep domain/repository/Provider without reconstructing legacy API. No physical cancellation/cross-owner settings serialization/automatic write recovery/session-filter process restoration promise. Do not migrate later areas; shared F1/F2 selector correction and real GeoMap compatibility only.
 
-### D1 — Matrice dei quattro Command
+## Decisions — historical plan
 
-| Command | Semantica attuale verificata | Alternativa proposta | Motivazione | Test futuri |
+### D1 — Four-Command matrix
+
+| Command | Verified legacy | Proposed alternative | Reason | Future gates |
 | --- | --- | --- | --- | --- |
-| load | Single-flight awaitable; clear condiviso; places→events; Error anticipato; notify solo al successo completo | `RestartableCommand<CategoryLoadRequest, List<ContentBase>>`, `refresh()` cattura filtri; observer VM committa | Filtri richiedono sostituzione immediata; foundation offre già autorità e cleanup | C1–C4, P1–P4, L1–L4 |
-| setSelectedCategories | Command1 single-flight; equality no-op; update/clear inline; await load ignorando il suo Result | Metodo VM sincrono void, copia/normalizza input, equality no-op, aggiorna intent e dispatch latest load | Non è un’operazione async autonoma né ha consumer del suo stato; evita wrapper e nested await falsamente significativo | B1–B3, C1–C3, U2 |
-| setSelectedTypes | Lane legacy separata; modifica anche con load occupato, annidata respinta, successo setter fittizio | Metodo VM sincrono void con identica policy di coordinamento e snapshot combinato | Nessuna esclusione artificiale tra i due campi e nessun cambiamento perso | C2–C4, P4 |
-| setSort | Single-flight; no-op uguale; sort/notify ottimistici; attende write ma ignora Result, sempre Success | `createResultCommand<ContentSort, void>`; sort sincrono, notify, write esistente, restituisce Result reale | È una vera azione persistente async; conserva lane e ordine locale senza nuova infrastruttura | S1–S4, L2–L4 |
+| load | Awaitable single-flight/shared clear/places→events/early error/notify only full success | RestartableCommand<CategoryLoadRequest, List<ContentBase>>; refresh captures filters; ViewModel observer commits | Immediate filter replacement/existing authority-cleanup | C1–C4/P1–P4/L1–L4 |
+| setSelectedCategories | Command1 single-flight/equal no-op/inline update-clear/await ignores load Result | Synchronous void method/copy-normalize/equal no-op/update intent/latest dispatch | No independent async operation/state consumer; remove fake nested waits | B1–B3/C1–C3/U2 |
+| setSelectedTypes | Separate legacy lane changes during occupied load/nested rejection/false setter success | Synchronous void method/same coordination/combined snapshot | No artificial field exclusion/lost intent | C2–C4/P4 |
+| setSort | Single-flight/equal no-op/optimistic sort-notify/ignores write Result/always Success | createResultCommand<ContentSort, void>; sync sort/notify/existing write/real Result | Actual asynchronous persistence, preserve lane/local ordering | S1–S4/L2–L4 |
 
-`CategoryLoadRequest` è soltanto un typedef locale nel file VM per un record con `Set<ContentCategory> categories` e `Set<ContentType> types`, copiati non modificabili a ogni dispatch. Il nome rende leggibile il tipo della lane, non crea un layer, una factory o un framework. Sort non fa parte dell’input query: si applica al commit. Conservare `load` come oggetto osservabile; `refresh()` è l’azione VM che cattura un nuovo snapshot della selezione corrente, usata per bootstrap e retry. UI non costruisce record e non chiama una query direttamente. Nessuna interfaccia repository nuova.
+CategoryLoadRequest is a local typedef record (`Set<ContentCategory> categories`, `Set<ContentType> types`) copied unmodifiable at each dispatch. It improves lane-type readability without layer/factory/framework. Sort is applied at commit, not captured in query. Keep observable load; refresh() captures a new current-selection snapshot for bootstrap/retry. UI neither builds query records nor directly queries repositories. No new repository interface.
 
-### D2 — Bootstrap sincrono e normalizzazione della selezione
+### D2 — Synchronous bootstrap and selection normalization
 
-FATTO: legacy execute invoca l’action inline fino al primo await; il setter route aggiorna le categorie prima del rendering. La route valida slug/all prima del Provider, ma il VM parte vuoto. Il selettore chiama `.first` quando length non è quella di tutte le categorie. INFERENZA fondata sul sorgente: convertire solo execute→run lascia una finestra vuota perché command_it attende uno zero-event prima dell’action.
+FACT: legacy execute enters action inline until first await, so route setter seeds categories before rendering. Route validates slug/all before Provider but legacy ViewModel starts empty; selector accesses first unless all selected. Source INFERENCE: execute→run alone opens empty-window failure because command_it defers action through zero-event.
 
-FATTO aggiuntivo: una chiamata diretta legacy con tipi vuoti può produrre successo vuoto senza query; categorie vuote seguono il path filtrato con un insieme vuoto. Il selettore production invece ripristina già tutti i valori alla chiusura. La normalizzazione proposta sotto sposta questa policy al boundary VM e cambia intenzionalmente soltanto questi input diretti anomali, coperti da C3.
+Direct legacy empty types can succeed empty without query; empty categories query an empty filtered set. Production selector already resets all on close. Proposed boundary normalization intentionally changes only anomalous direct inputs (C3), not slug parsing.
 
-PROPOSTA: costruttore con `required Set<ContentCategory> initialCategories`; route passa il singleton validato o l’insieme minusUnknown. Copiare prima di esporre il VM; difendere il boundary: categorie vuote vengono normalizzate a tutte le categorie note, rimuovendo unknown; tipi vuoti diventano tutti i tipi, come già fa il selettore al salvataggio. Questi sono cambiamenti espliciti per caller diretti anomali, non una modifica allo slug parser. Selezione iniziale tipi = tutti; sort iniziale = settings.contentSort. Installare observer e comandi, poi ammettere un solo refresh nel costruttore, **senza notifyListeners nel costruttore**. Rimuovere il setter bootstrap unawaited dalla route. Il run restartable pubblica deferred; nessun listener UI è notificato sincronicamente durante creazione Provider.
+Require constructor initialCategories (validated singleton or minusUnknown from route); copy before exposure. Remove unknown; empty categories become all known, empty types all types, matching selector confirmation. Initial types all/sort settings.contentSort. Install observer/Commands, admit one constructor refresh **without constructor notifyListeners**. Remove unawaited bootstrap setter. Restartable publication is deferred; no synchronous widget notification during Provider creation.
 
-F2 corregge l’affermazione precedente: **l’invariante VM nonempty riguarda solo la selezione confermata** e il bootstrap; non garantisce la sicurezza del draft locale. **L’invariante widget è distinto**: durante editing categorie e tipi temporanei possono diventare vuoti. Rendering sicuro senza normalizzazione anticipata: categorie vuote → `Nessuna categoria`, tipi vuoti → `Nessun tipo`, distinti da `Categoria`/`Tipo` per tutte le opzioni. `.first` è ammesso solo nel ramo esplicitamente nonempty. Il reset a tutte le opzioni resta alla normale chiusura/conferma mounted di una sessione ancora corrente (D7/RF3), prima dell’unica callback. Nessuna semantica persistente empty e nessun altro cambiamento ai filtri VM già decisi. Il route error per invalid/numeric/unknown rimane prima di qualsiasi creazione/query. Stesso slug/stesso Provider conservato: non reseed, non ricaricare da build. Slug diverso o nuovo owner: inizializzazione indipendente. Restoration ricrea dall’URI; non si aggiungono campi restorable per filtri non serializzati.
+F2 distinguishes **nonempty confirmed ViewModel selection** from **possibly empty widget draft**. Safe draft labels: `Nessuna categoria`/`Nessun tipo`, distinct from all-options `Categoria`/`Tipo`; first only in explicit nonempty branch. Do not normalize mid-edit; only normal mounted/current close (D7/RF3) resets all before one callback. No persistent empty semantics. Invalid/numeric/unknown slug errors remain before creation/query. Same slug/retained owner never reseeds/refetches on build; new slug/owner initializes independently. Restoration seeds URI only, without new restorable session-filter fields.
 
-### D3 — Eliminare la chiamata annidata e fissare admission/outcome
+### D3 — Remove nested execution; distinguish admission and outcome
 
-FATTO: il legacy rifiuta una seconda execute mentre running e restituisce subito Future<void>; la prima execute è attendibile ma non restituisce il Result. I setter attendono load.execute, poi riportano Success anche su load.error o rifiuto. I loro propri duplicati possono essere respinti prima di applicare il nuovo filtro. I filtri sono letti nuovamente dopo await, quindi lo stesso job può interrogare places con A e events con B.
+Legacy second execute is rejected while running with immediately completed Future<void>; accepted execute is awaitable but returns no Result. Setters await load then report Success despite error/rejection; their own single-flight can reject new filters. Re-reading filters after await mixes places A/events B.
 
-FATTO upstream: `run` ritorna void, admission/runningSync sono immediati ma action differita; `runAsync` con completer esistente fa join senza una nuova admission. Anche chiamando runAsync dopo run può osservare il lavoro già attivo; dispose può completare waiter col valore corrente. Non usarlo per provare che un’intenzione filtro sia stata accettata o caricata. Test foundation già descrivono queste differenze.
+Upstream run returns void with immediate runningSync admission/deferred entry. runAsync joins existing completer, even after run; disposal may complete waiters with current value. Neither proves accepted/loaded filter intent (foundation tests cover differences).
 
-PROPOSTA: setter filtro sincrono non promette un risultato async. Se vivo e diverso, copia la selezione, svuota `_content`, ammette **prima della notify** uno snapshot di entrambi i campi su load, poi notifica se ancora vivo. run revoca subito l’intent precedente; non c’è await tra intent e revoca. Reentrancy da observer running/notify può ammettere un altro filtro o disporre il VM: dopo dispatch non fare altre mutazioni e dopo notify non iniziare I/O. Il callback UI si limita a invocare il metodo VM. Uguaglianza per valore dei set, non identità; nessun alias modificabile dal chiamante. A ogni cambiamento confermato sostituire il backing set con una nuova copia indipendente, senza clear/add in place sul precedente: i vecchi parametri Widget e gli UnmodifiableSetView esposti conservano i valori precedenti. In alternativa un getter può fornire una copia snapshot indipendente; preferire la sostituzione già naturale ai setter senza ulteriore wrapper. UnmodifiableSetView da solo non protegge dalla mutazione del backing. Le copie draft non mutano i parametri confermati; C3/U3 verificano l’indipendenza degli snapshot. `refresh()` non deduplica: retry di stessi filtri è nuovo intent.
+Live changed-filter setter synchronously copies selection, clears _content and dispatches combined snapshot **before notify**, revoking old intent without await. Running/notify observers may reenter/dispose: no later mutation after dispatch/phase after notify. UI calls ViewModel method only. Set equality is semantic, not wrapper identity; copy caller input. Replace backing sets rather than in-place clear/add, keeping old widget parameters/UnmodifiableSetViews independently comparable. UnmodifiableSetView alone cannot prevent backing mutation. Draft does not mutate confirmed parameters; C3/U3 verify snapshots. refresh() deliberately starts a fresh equal-filter intent.
 
-| Evento | Nuovo contratto |
+| Event | Contract |
 | --- | --- |
-| Setter uguale | Nessuna query, clear o notify; nessuna falsa attestazione di caricamento |
-| Intent filtro cambiato | Accettato senza single-flight dei setter; load immediatamente authoritative |
-| Refresh uguale | Nuova esecuzione latest-intent; non join |
-| Sort duplicato pending | Rifiutato single-flight; nessuna queue o seconda write |
-| Load Success completo | Observer vivo copia/ordina/committa e notifica |
-| Load Result.error | Snapshot terminale domainError originale; nessun commit candidato |
-| Raw throw | Runtime snapshot/reporting globale once; nessun catch Object→Result |
-| AssertionError | Policy upstream fail-loud; non normale UI failure |
-| Completamento post-dispose | Nessun commit/notify/fase nuova; settlement/reporting privati |
+| Equal setter | No query/clear/notify or false load confirmation |
+| Changed filter | Not rejected by setter single-flight; load immediately authoritative |
+| Equal refresh | New latest-intent execution, no join |
+| Busy sort duplicate | Rejected, no queue/second write |
+| Complete load Success | Live observer copies/sorts/commits/notifies |
+| Load Result.error | Original terminal domainError; no candidate commit |
+| Raw throw | Runtime snapshot/original global report once; no Object→Result |
+| AssertionError | Original fail-loud path, not ordinary UI failure |
+| Post-dispose completion | No new commit/notify/phase; private settlement/reporting |
 
-### D4 — Concorrenza e retrieval puro
+### D4 — Concurrency and pure retrieval
 
-PROPOSTA: action load usa **solo il record catturato** per scegliere CategoryUseCase contro ExploreUseCase e i lati place/event. I metodi getByCategories delle implementazioni Event/Place mappano gli indici del set senza mutarlo: le copie non modificabili sono compatibili. Preservare places prima di events, short-circuit sul primo Result.error e semantica all-events=current-year. Accumulare in una lista locale, restituire Result<List<ContentBase>>; nessuna scrittura a `_content`, filtri o sort nell’action. Il solo accesso owner permesso è guard `_disposed` all’ingresso e dopo await, prima di un’ulteriore fase. Non avviare events dopo dispose durante places. La fase già iniziata può finire/throw; per interruzione multistage restituire privatamente Result.error owner unavailable, non successo completo inventato. Non catturare runtime per farne unavailable.
+Action reads **captured record only** to choose CategoryUseCase/ExploreUseCase and place/event sides. Existing getByCategories maps set indices without mutation, compatible with unmodifiable copies. Keep places→events/first Result.error short-circuit/all-events=current-year. Assemble local List<ContentBase>/return Result without _content/filter/sort writes. Owner access is only _disposed entry/post-await guard before next phase; disposed during places means no events. A started phase may settle/throw; owner-unavailable Result privately interrupts multistage work rather than fake complete success, without catching runtime as unavailable.
 
-Un observer sincrono su load.results, registrato prima dell’autoload e rimosso al dispose, è l’unico commit di retrieval. Su Success attuale: creare una copia della lista, ordinarla con `_sort` corrente, assegnare `_content`, notify, poi nessun altro effetto. Su running/failure non mutare contenuto: i relativi rebuild sono guidati direttamente da results. La foundation non consegna snapshot obsoleti dopo una nuova admission: **nessun generation counter/token aggiunto**, e il caso A→B→A non si risolve confrontando solo i valori dei filtri.
+One synchronous load.results observer installed before autoload/removed on disposal commits retrieval. Current Success copies list/sorts with current _sort/assigns/notifies with no later effect. Running/failure does not mutate content; results drive rebuild. Foundation suppresses stale snapshots after admission: no generation token/counter; equal A values alone cannot distinguish A→B→A.
 
-| Sequenza | Esito atteso |
+| Sequence | Outcome |
 | --- | --- |
-| A→B con A pendente | B parte senza attendere A; solo B committa, A non abbassa running di B |
-| A→B→A | L’ultimo A è un’esecuzione nuova, primo A sempre obsoleto |
-| Tipi cambiano durante places | Nuovo snapshot completo; vecchi dati non entrano nel nuovo output |
-| Categoria e tipi nello stesso turno | Ultimo record include entrambi; la foundation può evitare di iniziare i record già superati in coda |
-| Cambio durante events/partial privato | Nessuna parte vecchia visibile; latest Success intero |
-| Uguale durante query | Nessuna supersession/query inutile |
-| Input iniziale route | Un solo snapshot con categorie già valide, nessun passaggio empty |
+| A→B, A pending | B starts without waiting; only B commits, A cannot end B running |
+| A→B→A | Last A new execution, first A obsolete |
+| Type changes during places | New complete snapshot, no mixed old data |
+| Category/types same turn | Latest record includes both; queued superseded records may never enter |
+| Change during events/private partial | Old part remains private; latest complete success only |
+| Equal during query | No unnecessary query/supersession |
+| Initial route | One already-valid snapshot, no empty step |
 
-Il lavoro fisico superseded può proseguire sui filtri catturati, anche col secondo lato se il VM è ancora vivo: pubblicazione comunque revocata. Non introdurre cancellazione cooperativa, token di fase o nuova API foundation per evitare I/O obsoleto. Dopo dispose, invece, nessuna fase ulteriore. Limite di risorse noto per Future che non termina.
+Physically superseded work may continue captured phases while owner lives, without publication. No cooperative cancellation/phase tokens/new foundation API to save stale I/O. After disposal no later phase. Nonterminating Future may retain private resources.
 
-### D5 — Pubblicazione atomica e stato dati
+### D5 — Atomic publication and data state
 
-FATTO legacy: clear all’ingresso; append places, poi events; Error primo lato lascia vuoto e salta il secondo; Error secondo lato lascia places **non necessariamente ordinati**; notify VM solo sul successo completo. La collezione parziale è osservabile dal getter o da altre notifiche (per esempio sort), ma non viene notificata sistematicamente né rappresentata da uno stato partial. Sort può inoltre rendere la grid visibile mentre un job muta la lista. Queste non sono garanzie da preservare implicitamente.
+Verified legacy: clears first, appends places then events, first failure leaves empty/skips events, second failure leaves places **not necessarily sorted**. ViewModel notify only on full success, but partial getter data can surface through sort/other notifications; no explicit partial state. Sort can expose grid while load mutates list. These are not implicit guarantees to retain.
 
-PROPOSTA: commit atomico al successo completo, per evitare qualsiasi provenienza mista. Nuovo filtro: clear immediato perché i dati vecchi non descrivono la selezione nuova. Refresh stesso filtro: conservare l’ultimo successo internamente; durante loading/errore non presentarlo come esito corrente. Non creare una seconda cache per filtro. Nessuna partial publication e nessun modello partial-success.
+Complete-success atomic commit prevents mixed provenance. Changed filter clears immediately (old data describes another selection); same-filter refresh keeps previous success internally while loading/error govern UI. No per-filter cache/partial-success model.
 
-| Caso | Contenuto dopo esito | Stato UI |
+| Case | Stored content | UI |
 | --- | --- | --- |
-| Successo completo | Sostituzione unica, ordinata al commit | Grid, oppure empty esplicito |
-| Prima query Error | Nessun candidato; clear se nuovo filtro, ultimo successo se refresh | Errore + retry |
-| Seconda query Error | Come sopra; candidate places scartate | Errore + retry, non grid parziale |
-| Zero risultati completo | Lista vuota committata | Empty, non skeleton |
-| Retry dopo errore | Nuovo intent; sostituzione solo al successo completo | Loading→esito corrente |
-| Cambio filtro dopo places | Lista visibile subito svuotata; vecchio partial resta privato | Loading nuovo→esito nuovo |
+| Complete success | One replacement/current sort | Grid or explicit empty |
+| First query error | No candidate; cleared new filter/retained same-filter success | Error/retry |
+| Second query error | Same; candidate places discarded | Error/retry, no partial grid |
+| Complete zero results | Commit [] | Empty, not skeleton |
+| Retry | New intent/replace only complete success | Loading→actual outcome |
+| Filter change after places | Clear exposed list/old partial private | New loading→new outcome |
 
-Questa scelta **cambia intenzionalmente** la retention di partial legacy e non altera Favourite progressive del primo OpenSpec. Non parallelizzare le query: mantenere ordine e short-circuit riduce variabili e preserva chiamate repository.
+This intentionally changes legacy partial retention and leaves OpenSpec 1 Favourite progression untouched. Preserve sequential query order/short-circuit rather than introducing parallelism.
 
-### D6 — Ordinamento e persistenza
+### D6 — Sorting and persistence
 
-FATTO legacy: `_sortContent` è async senza await; assegna sort e ordina sincronicamente name.compareTo asc / modifiedAt desc. `_setSort` attende quel Future, notify, attende setContentSort, ignora il suo Result e torna Success. La repository salva uno snapshot copyWith e cambia cache solo su Success.
+Legacy _sortContent was async without await, synchronously assigned/sorted name.compareTo asc or modifiedAt desc. _setSort awaited it, notified, awaited setContentSort, discarded Result and returned Success. Repository saves copyWith snapshot/cache only after Success.
 
-PROPOSTA: helper di ordinamento **sincrono** sulle liste del VM/candidato; nessun Future fittizio. setSort resta factory ordinaria single-flight. Se uguale: Success no-op, nessuna write/notify. Altrimenti, se vivo, assegnare `_sort`, riordinare contenuto corrente, notify; ricontrollare `_disposed` prima della write (un listener può disporre). Se già revocato, unavailable senza write. Se write iniziata, restituire **l’originale Result**; nessun commit/notifica dopo await e nessun rollback, anche su runtime throw. Rimuovere il falso Success è un cambiamento intenzionale al risultato dell’action, non al contratto repository.
+Use synchronous helper for current/candidate lists. Ordinary setSort remains single-flight: equal returns no-op Success without write/notify. Accepted live change sets _sort/sorts/notifies, then rechecks _disposed before write (reentrant observer may dispose). Revoked means unavailable/no write. Started write returns **original Result**, without post-await commit/notify/rollback, including runtime throw. Correcting false success changes action outcome intentionally, not repository contract.
 
-Sessione e persistenza sono distinte: su Result.error l’ordine locale rimane quello scelto come legacy; la cache repository rimane precedente e un nuovo owner riparte da essa. Ripetere lo stesso sort resta no-op anche dopo failure: nessun nuovo protocollo retry persistence. La UI non mostra conferme di salvataggio o snackbar non richiesti. Un observer può comunque distinguere il vero Result.error della write. Eventuali concorrenti write da altri owner mantengono il rischio preesistente di snapshot/lost update; non si introduce serializzazione cross-owner o modifica storage.
+On Result.error session sort stays chosen, repository cache stays previous and new owner starts from cache. Equal post-failure remains no-op, no persistence-retry protocol/snackbar/save confirmation. Observers can read real failure. Other-owner whole-snapshot/lost-update risk remains without storage/cross-owner serialization changes.
 
-Ogni load committa ordinando **in quel momento** secondo `_sort`; non usare un sort catturato prima degli await e non refetch a ogni sort. Se il load finisce prima dell’action sort differita, il sort successivo riordina la lista; se finisce dopo, l’observer usa il nuovo sort. Un obsoleto non committa mai. Menu e body si aggiornano dal VM durante la write, non soltanto dal terminale del Command. Nessun legame tra setSort.completed e successo load.
+Load sorts at **commit time**, not using pre-await sort or refetch on every sort. Load before deferred sort gets reordered by later sort; load after uses new sort. Obsolete never commits. Menu/body follow ViewModel during write, not merely Command terminal. setSort.completed cannot imply load success.
 
-### D7 — Osservazioni UI e owner replacement
+### D7 — UI observation and replacement owners
 
-PROPOSTA: `ListenableBuilder` sulle porzioni interessate con listenable composto dal VM e load.results, più setSort.results solo dove serve lo stato della write. Rebind automatico al cambiare di widget.viewModel; evitare forwarder load→VM usato solo per duplicare rebuild, mentre l’observer load→commit è necessario. `ResultCommandSnapshot` distingue idle/isRunning/completed/domainError/unexpectedError; non usare command.value o completed per dedurre possesso dati.
+Use affected ListenableBuilders with combined ViewModel/load.results; add setSort.results only where write state needed. Widget owner replacement rebinds; avoid redundant load→ViewModel rebuild forwarder, retain necessary load→commit observer. ResultCommandSnapshot distinguishes idle/isRunning/completed/domainError/unexpectedError; value/completed alone does not establish stored-data authority.
 
-Body: neutral o running → SkeletonContentSliverGrid; completed + content nonempty → ContentSliverGrid; completed + content empty → EmptyView esplicita; hasFailure → EmptyView errore e pulsante `Riprova` che invoca VM.refresh. Usare i pattern EmptyView/SliverFillRemaining già presenti in Favourite/Explore, senza un nuovo componente framework. I filtri restano azionabili durante query; il menu segue `vm.sort`. Una write sort pending non altera loading/error load. Le notifiche results sono differite: constructor neutro rende skeleton e admission di nuovo filtro revoca immediatamente la vecchia pubblicazione. **Precisazione verificata nell’apply:** anche il refresh dello stesso filtro deve nascondere il precedente terminale già al primo frame. Il body legge `load.isRunningSync.value` come barriera di admission prima dello snapshot; non vi installa listener sincroni. `refresh()` notifica il VM dopo l’admission, con guard alive; il costruttore usa il solo `_startLoad()` privato e non notifica. Lo snapshot continua a definire successo/errore/empty e il VM/results resta l’unica osservazione UI. Testare primo frame dopo refresh e cambio filtro, escludendo vecchia grid/empty. Non leggere isRunning asincrono come fatto di admission né aggiungere un flag loading parallelo.
+Body: neutral/running SkeletonContentSliverGrid; completed+nonempty ContentSliverGrid; completed+empty explicit EmptyView; failure existing EmptyView/SliverFillRemaining plus `Riprova`→refresh. Reuse Favourite/Explore patterns without framework component. Filters remain usable pending; menu follows vm.sort; pending sort does not change load surface.
 
-**F1 — Confronto semantico per campo.** I getter VM creano nuovi UnmodifiableSetView a ogni accesso; `!=` in didUpdateWidget confronta identità dei wrapper. Il parent può ricostruire per fine query, sort o altro evento senza cambiare filtri: riassegnare allora le copie locali perde il draft. Usare `setEquals(oldWidget.selectedCategories, widget.selectedCategories)` e l’equivalente per i tipi, disponibile in Flutter foundation. Confrontare **vecchi e nuovi valori confermati**, non draft e nuovo confermato: quest’ultimo confronto cancellerebbe proprio l’editing non confermato. Su valori confermati uguali non assegnare né modificare il set locale; ordine d’iterazione e identità wrapper non sono cambiamenti. Su valori realmente diversi sostituire solo la copia locale del campo cambiato con Set.of del nuovo parametro, senza resettare il draft dell’altro campo o invocare callback da didUpdateWidget. Verificare label e selezione alla successiva apertura; un confermato cambiato durante modal ritira il vecchio draft con la policy di sessione sotto, senza ripubblicarlo. Vecchi e nuovi parametri restano confrontabili grazie a D3. Fonte API locale verificata: Flutter SDK `foundation/collections.dart:25–41`, setEquals confronta cardinalità e membership.
+**Apply-verified clarification:** deferred public results can still show old terminal on the first frame of equal-filter refresh. Body checks `load.isRunningSync.value` as admission barrier before snapshot, with no sync listener. refresh notifies live ViewModel after admission; constructor calls private _startLoad without notify. VM/results remain only observation and snapshots define terminal outcome. Test first frame after refresh/filter change excludes old grid/empty. No async isRunning admission assumption/parallel loading flag.
 
-**RF3 — Sessione draft e cambiamento reale durante modal aperto.** Il controllo critico indipendente della remediation ha rilevato che `_showAdaptiveSelectionWidget` riceve children materializzati una volta e ogni checkbox conserva un bool `selected`. Sostituire il campo State non aggiorna quelle righe: lasciare le callback leggere il nuovo campo mescolerebbe checkbox vecchie e nuovo confermato. La soluzione locale è catturare il riferimento al set draft del campo prima dell’apertura. Le callback delle righe mutano solo quel set catturato, mai un campo State riletto dopo un cambiamento esterno. Su vero cambiamento confermato didUpdateWidget sostituisce il relativo campo con una copia nuova: le vecchie righe restano una vista della sessione precedente, non controllano il nuovo set. Dopo await, controllare **prima mounted e poi identical(draftCatturato, campoCorrente)**. Se differiscono, la sessione è superseded: terminare senza setState, reset empty o callback; la prossima apertura usa i nuovi valori. Il nuovo confermato vince quando didUpdateWidget **osserva** il cambiamento di valore. A→B→A ritira il vecchio draft se B e poi A vengono consegnati in rebuild distinti. Se Flutter coalesca gli update e il widget osserva soltanto A→A, si tratta invece di uguaglianza semantica F1: conservare il draft, senza revision/token per ricostruire eventi non osservati. Confronto semantico F1 sui parametri e confronto identità del draft hanno responsabilità diverse: il primo evita invalidazioni spurie; il secondo prova l’ownership della sessione concreta. Un cambiamento solo dell’altro campo non ritira il modal corrente. Non aggiornare live le righe con notifier/controller nuovi, non chiudere route da didUpdateWidget e non ripristinare draft obsoleti. Nessun token aggiunto: basta l’identità dei set locali già presenti.
+**F1 semantic per-field comparison.** New UnmodifiableSetView wrappers make identity-based didUpdateWidget reset drafts on harmless query/sort/other rebuilds. Compare old/new **confirmed** sets via setEquals, never draft/new confirmed. Equal wrappers/order preserve local set/State; actual value changes replace only changed field with Set.of, without callback/resetting other field. D3 independent backing keeps old/new values comparable. Changed confirmed during modal retires old draft per RF3; reopened labels/selection use new values. Local Flutter foundation/collections.dart:25–41 setEquals compares cardinality/membership.
 
-**F2 — Draft vuoto ammesso, label totale.** Le copie temporanee mutabili sono distinte dal confermato. Deselezionare l’ultima checkbox non deve ripristinare all né emettere callback: l’utente può continuare a editare. Su ogni rebuild, anche del parent mentre il modal è aperto, il ramo empty precede `.first` e il fallback singleton: `Nessuna categoria` / `Nessun tipo`. Conservare gli altri rami: `Categoria`/`Tipo` per tutte, nome categoria e conteggio, `Eventi`/`Luoghi` per singleton. Empty non significa all né Luoghi. Alla normale chiusura mounted **della sessione ancora corrente** secondo RF3, conservare il reset a minusUnknown per categorie e ContentType.values per tipi, poi pubblicare una sola copia con la callback relativa. Nessun reset in build, didUpdateWidget o toggle e nessuna notifica VM durante editing. F1 deve preservare anche il draft esattamente vuoto: la label safe non deve mascherare perdita delle modifiche.
+**RF3 draft-session ownership.** Modal receives materialized children/checkbox selected bool once. Replacing State field but letting old row callbacks mutate its new value mixes sessions. Capture draft-set reference before opening; row callbacks mutate only it. Real confirmed-value change replaces field with new copy, leaving old rows tied to old draft. After await check **mounted first, then identical(capturedDraft,currentField)**; mismatch returns without setState/normalization/callback. Reopen uses new confirmed values. Observed A→B→A across separate rebuilds invalidates old session; coalesced updates observed only A→A preserve F1 draft (no revision/token for unobserved events). Semantic comparison avoids spurious invalidation; identity tests concrete session authority. Other-field changes do not retire current modal. No live-row controller/notifier/route close from didUpdateWidget/stale-draft restore/new token.
 
-**Owner distinto dalla semantica dei set.** Conservare **ObjectKey(viewModel)** in CategoryScreen: anche se i set confermati coincidono, il cambio owner smonta il vecchio State. **Precisazione della remediation finale della code review:** applicare la stessa separazione con `ObjectKey(owner)` al selettore nel trailing di GeoMapScreen, che può cambiare owner attraverso didUpdateWidget senza cambiare lo State dello screen. Il confronto semantico del confermato non sostituisce l’identità dell’owner. Il guard mounted precede ogni accesso post-await a State.widget/context, setState, normalizzazione e callback. Il vecchio modal, anche con draft vuoto, non aggiorna né vecchio né nuovo VM; stesso owner mantiene State e draft su rebuild innocui. Nessuna business logic domain spostata nella View. Prima di edit State applicare la skill async-mounted-context.
+**F2 empty draft/total labels.** Mutable draft differs from confirmed. Deselecting last checkbox neither resets all nor calls parent, allowing continued editing. Empty branch precedes first/singleton fallback every build, including parent rebuild while open: `Nessuna categoria`/`Nessun tipo`. Preserve all-options `Categoria`/`Tipo`, category name/count, singleton `Eventi`/`Luoghi`. Empty is not all/place. Only mounted/current normal close restores minusUnknown/categories or ContentType.values/types if empty, then emits one copied-set callback. Never reset in build/didUpdateWidget/toggle or notify ViewModel during edit; safe labels do not excuse draft loss.
 
-La modifica al selettore condiviso è ora **necessaria**, anche per il consumer reale GeoMap. Preservare firma callback, pubblicazione solo alla chiusura e reset empty su entrambi i layout. Nessun edit a GeoMapViewModel, Command o sua concorrenza. Testare il componente in `test/ui/category/widgets/category_content_and_type_selection_test.dart` per width 400/1000 × categoria/tipo; usare CategoryScreen per owner replacement e una regressione GeoMapScreen per il wiring reale. Nessun controller modal, wrapper di stato o notifica anticipata per risolvere F1/F2.
+**Owner identity differs from set equality.** ObjectKey(viewModel) in CategoryScreen unmounts previous selector even for equal sets. Final code-review remediation applies same ObjectKey(owner) to GeoMapScreen trailing selector because screen didUpdateWidget can replace owner while preserving screen State. Mounted guard precedes all post-await widget/context/setState/normalization/callback access. Old modal, empty or otherwise, cannot update either owner; same owner preserves draft/State on harmless rebuild. No domain behavior in View; apply async-mounted skill before State edits.
 
-### D8 — Lifecycle e cleanup
+Shared selector fix is necessary for real GeoMap too. Preserve callback signatures/close-only publication/empty reset in both layouts, without GeoMapViewModel/Command/concurrency edits. Component tests width 400/1000 × category/type; real CategoryScreen replacement and one GeoMap wiring regression. No modal controller/state wrapper/early notification.
 
-PROPOSTA: `_disposed` idempotente; tutti i metodi VM e callback commit rifiutano lavoro dopo revoca. `dispose`: prima marcare revocato, rimuovere observer load→commit e qualsiasi forwarding pubblico posseduto, poi disporre RestartableCommand. La foundation revoca authority, differisce teardown dei propri notifier fuori dispatch e trattiene i figli fino al settlement/reporting; non duplicare il suo tracker o disporre manualmente i child.
+### D8 — Lifecycle and cleanup
 
-Per l’unico Command ordinario setSort, applicare **localmente** la policy D5 già implementata in Explore/Theme del primo OpenSpec: trattenerlo mentre isRunningSync è true, poi cleanup microtask→event fuori dispatch, anche per never-run/idle; invalidare la barriera se si osserva una transizione successiva; ricontrollare live running/barriera, marcare released e staccare listener privato prima dell’unico dispose. Nessun polling, timeout, timer di sicurezza arbitrario o nuovo helper di produzione. Il solo listener dopo revoca serve a cleanup privato. Il timer upstream 50ms non è una prova di settlement.
+Idempotent _disposed; all ViewModel methods/commit callbacks reject revoked work. dispose first revokes/detaches load commit/public forwarding, then disposes RestartableCommand. Existing foundation revokes authority/defers notifier teardown/retains children for settlement/reporting; duplicate no tracker/manual child disposal.
 
-Anche `super.dispose` del VM va programmato fuori dalla sua notify (microtask), senza aspettare il Future repository; la revoca blocca intanto ogni notifica nuova. Rientranza da notify, result terminale e running listener deve rimanere sicura. Un notify già iniziato può finire lo stack; non promettere cancellazione di listener già entrati. Non leggere State.widget/context del widget smontato per controllare owner.
+Only ordinary setSort uses local OpenSpec 1 D5: retain while isRunningSync; cleanup microtask→event outside dispatch, including never-run/idle; invalidate barrier on new observed transition/recheck running+barrier/detach private listener/mark release before one dispose. No polling/timeout/arbitrary timer/new helper; retained listener private only. Upstream 50 ms is not settlement proof.
 
-FATTO noto command_it 9.5.2: dispose anticipato del Command con raw throw tardivo può fallire nei notifier già distrutti prima del reporting globale. Non basta un guard solo al notify né attendere runAsync né considerare false sync isolato prova di fine dispatch. Trattenere setSort vivo fino al settlement sicuro mantiene originale Object/stack al reporting; restartable fa già lo stesso per i child. Non cambiare gli skip upstream esistenti o normalizzare StateError/TypeError/AssertionError. Nessuna nuova fase repository dopo revoca; write già avviata non è cancellata né annullata remotamente.
+Schedule owner super.dispose outside own notify in microtask without awaiting repository; revocation already blocks new notify. Reentrant owner/terminal/running listeners remain safe; entered notify stack may finish. Do not access unmounted State.widget/context to check owner.
 
-### D9 — Alternative e simplification paths
+Known command_it 9.5.2 limitation: early disposal followed by late raw throw can fail in destroyed notifiers before global report. notify-only guard/runAsync wait/false-sync alone insufficient. Retain sort for original object/stack report; restartable already does so for children. Preserve upstream skips/StateError-TypeError-AssertionError distinctions. No new post-revoke repository phase; started persistence is not remotely cancelled/rolled back.
 
-| Alternativa | Valutazione |
+### D9 — Alternatives and simplification
+
+| Alternative | Decision |
 | --- | --- |
-| Sostituzione quattro tipi + execute→run | REJECT: bootstrap vuoto, nested run non awaitable, richieste perse e stale commit restano |
-| Factory ordinarie per i due setter filtro | REJECT: nessun consumer dei loro stati e ingresso differito/single-flight aggiungono due lane, cleanup e rischio intent perso; non serve un wrapper async per un cambio sincrono |
-| Un solo load single-flight, rifiutare filtri pending | REJECT: viola filtri correnti e requirement cambio durante query |
-| Single-flight + latest desired snapshot + rerun su settlement | Credibile ma REJECT: necessita coda/coalescing, revoca delle vecchie pubblicazioni e distinzione A→B→A oltre a lifecycle; più coordinamento locale della foundation già esistente |
-| Un solo RestartableCommand load e setter sincroni | ADOPT: autorità esistente, due Command totali invece di quattro; nessun token ridondante |
-| Generation token/generic scheduler/adapter execute awaitable | REJECT: duplica ownership o vecchia API senza beneficio concreto |
-| Preservare partial pubblicando progress/eventi | REJECT: richiede semantica partial nuova e autorità per ogni emissione; nessun consumer Category la richiede; atomic è più semplice e dichiarato |
-| Trasformare anche sort in latest-intent | REJECT: write persistenti non cancellabili e rischio riordino storage; non necessario |
-| Rollback o retry automatico sort failure | DEFER: cambierebbe policy UX/persistenza; preservare scelta sessione e restituire il Result reale è sufficiente |
-| Nuovo stato UI/cache per filtro/factory lifecycle globale | REJECT: snapshot esistente, lista committata e guard owner bastano; niente state manager o layer aggiunti |
-| Rimozione defensive lifecycle foundation | REJECT: source review e test mostrano bug risolto dagli owner; non opportunistica |
-| Confronto identità wrapper o draft→nuovo confermato | REJECT F1: può cancellare editing su rebuild innocuo; setEquals vecchio→nuovo confermato e backing indipendenti |
-| Reset all non appena il draft è vuoto | REJECT F2: impedisce editing progressivo; label empty e reset solo alla chiusura |
-| Controller modal, stato parallelo o nuovo package per F1/F2 | REJECT: confronto semantico e branch label locali risolvono i due finding senza nuovi layer |
+| Four type substitutions/execute→run | REJECT: empty bootstrap/nested nonawaitable run/lost requests/stale commit |
+| Ordinary filter setter factories | REJECT: no state consumers; deferred single-flight adds lanes/cleanup/lost-intent risk for synchronous mutation |
+| Single-flight load rejecting filters while pending | REJECT: violates current-filter/latest-intent contract |
+| Single-flight + desired snapshot + settlement rerun | Credible but REJECT: queue/coalescing/revocation/A→B→A/lifecycle exceeds existing foundation coordination |
+| Restartable load/sync filter setters | ADOPT: existing authority, two Commands rather than four/no redundant token |
+| Generation token/generic scheduler/awaitable execute adapter | REJECT: duplicates authority/legacy API |
+| Progressive Category partials | REJECT: new emission-authority/partial semantics no consumer requires; declared atomic simpler |
+| Restartable sort | REJECT: uncancellable persistence/storage ordering risk, unnecessary |
+| Sort error rollback/automatic retry | DEFER: changes UX/persistence; session choice/real Result suffice |
+| Parallel UI state/per-filter cache/global lifecycle factory | REJECT: existing snapshots/committed list/owner guard suffice |
+| Remove defensive foundation lifecycle | REJECT: verified owner defenses avoid actual upstream problem; no opportunistic removal |
+| Wrapper identity or draft→new confirmed compare | REJECT F1: loses edits; use old/new confirmed setEquals/independent backing |
+| Reset all immediately on empty draft | REJECT F2: prevents editing; safe labels/close-only reset |
+| F1/F2 modal controller/parallel state/package | REJECT: local comparison/label branches suffice |
 
-La semplificazione non consiste nel mantenere quattro wrapper per simmetria: due setter diventano normali mutazioni VM sincrone, una lane di lettura usa la foundation latest-intent e una write rimane ordinaria. Non rinominare o migrare gli omonimi di altre feature.
+Do not preserve four wrappers for symmetry: two synchronous ViewModel methods, one existing latest-intent read lane, one ordinary write. Do not rename/migrate other features’ same-named operations.
 
-### D10 — Delta e consolidamento con OpenSpec 1
+### D10 — Delta and later OpenSpec 1 consolidation
 
-Canonical `Only authoritative completion can commit asynchronous data` descrive ancora il contratto generale pre-consolidamento. La delta MODIFIED del primo OpenSpec distingue correttamente ordinary/restartable e preserva progressive Favourite, rollback e riconciliazione consenso. Questa change aggiunge **sette requisiti Category con nomi distinti**, senza una seconda MODIFIED dello stesso blocco: il load Category rispetta il ramo restartable, setSort quello ordinario. Nessuna contraddizione con newest intent (refresh uguale è nuovo intent; setter equal non invoca la lane). Dati parziali Category vietati non impongono terminal-only a Favourite.
+Canonical `Only authoritative completion can commit asynchronous data` still reflects preconsolidation general text. First delta distinguishes ordinary/restartable and preserves Favourite progression/rollback/consent. Add **seven distinctly named Category requirements**, no second MODIFIED; load follows restartable, setSort ordinary. Equal refresh is new intent/equal setter never invokes lane. Category atomicity does not impose terminal-only Favourite.
 
-Alla fase finale autorizzata della PR cumulativa riconciliare la MODIFIED OpenSpec 1 e gli ADDED Category sullo stesso canonical, preservando tutti gli scenari Search/Map/Favourite/consent e senza duplicate headers. Adesso nessuna sync/archive/canonical edit. Routing e navigation-shell restano vincolanti senza delta perché la struttura URI/branch/restoration non cambia. Nessuna modifica a local-content-retrieval o backend.
+A separately authorized canonical reconciliation must combine first MODIFIED/Category ADDED without duplicate headers or lost Search/Map/Favourite/consent scenarios. No sync/archive/canonical edit here. Routing/navigation-shell remain binding without delta (URI/branch/restoration unchanged); local-content-retrieval/backend unchanged.
 
-## Regression plan
+## Regression plan — historical future gates
 
-Tutti i casi sotto sono **gate futuri**, non test già eseguiti durante questo planning. Caricare prima dell’edit test le skill dart-add-unit-test e molise-is-test-support-reuse; per widget flutter-add-widget-test, per State/callback async molise-is-async-mounted-context-safety, per verifiche statiche dart-run-static-analysis. Cercare e riusare test/support prima di estenderlo.
+These were **future gates**, not planning test passes. Before test edits load dart-add-unit-test/test-support-reuse, widget skill where applicable, async-mounted-context for State/callbacks and static-analysis; search/reuse test/support before extension.
 
-| ID | Casi e osservazioni necessarie | Sede/riuso |
+| ID | Required cases/observations | Location/reuse |
 | --- | --- | --- |
-| B1 | Primo frame singleton e all con query pending: selezione nonempty già prima di pump terminale, label corretto, una admission, nessun first/notify-during-build error | Category VM e route_parameter_redirect, production categoryRoute |
-| B2 | Invalid/numeric/unknown slug: error screen, zero query Category; stesso owner/slug rebuild senza reseed/refetch; nuovo owner stessa URI riparte una volta | RouteOwnershipFixture e routing test esistenti |
-| B3 | Back da Post conserva Category owner/filtri; branch retention; cambio slug ricrea owner; restoration canonica Category inizializza da URI e preserva parentage | route_ownership e main_navigation_restoration; riusare harness restorable reale |
-| C1 | A→B e A→B→A, future completati in entrambi gli ordini, anche stessi valori A: solo ultima esecuzione committa; old domain/runtime non cambiano current failure/running | Category VM con query fake controllabili, Completer |
-| C2 | Tipi durante places/event pending, category e tipi nello stesso turno e in turni diversi: snapshot coerente e output finale corretto | Estendere il minimo fake condiviso per getByCategories/getAll/getByCurrentYear se necessario |
-| C3 | Equal set con nuova identità oggetto è no-op durante/after load; mutare set caller dopo dispatch non cambia request; input empty/unknown normalizzato; retry stesso filtro è nuovo intent | Category VM |
-| C4 | Vecchio load parzialmente recuperato, nuovo load successo/errore; nuovo in coda superseded prima d’ingresso; nessuna query del record già superato quando foundation la sopprime | Foundation esistente + integrazione VM senza duplicare tutte le sue prove |
-| P1 | Filtered e all path: places→events, prima failure salta secondo, seconda failure scarta places; query di un solo tipo; non chiamare repository fuori tipi selezionati | Category VM, fake esistenti |
-| P2 | Candidate places non osservabili durante events pending; zero risultati = Success empty; successi con dati = singolo commit intero | Category VM e widget |
-| P3 | Refresh fallito conserva ultimo successo internamente, mostra error; retry sostituisce intero; filtro cambiato svuota subito e failure non riesuma vecchio contenuto | Category VM/screen |
-| P4 | Nessun Result.error convertito a throw; raw StateError/TypeError originale al global handler once anche stale; assertion fail-loud | installCommandTestReporting, MockLogger, foundation |
-| S1 | Name asc, modifiedAt desc, uguale no write; ordinamento e menu osservabili prima di write settlement; no refetch | Category VM/screen |
-| S2 | Query finisce prima/dopo sort action/write; entrambi gli ordini, vecchio obsolete rientra dopo sort recente: output sempre sort corrente | Completer di query e write separati |
-| S3 | Write success/Result.error/raw throw: Result reale e identità Exception, local sort conservato, cache fake segue contratto; nuovo owner usa preferenza cache; uguale post-failure non scrive | FakeSettingsRepository e controlli repository esistenti, nessuna modifica storage |
-| S4 | Sort doppio prima primo pump/durante write/rientrante da notify: una sola admission/write, nessuna queue; filtri rimangono indipendenti | VM, Command reale |
-| U1 | Neutral/loading/grid/empty/domain error/runtime error/retry; sort.completed non sblocca skeleton/error; header e menu seguono stato corrente | Nuovo test screen Category se manca, harness material/Provider condivisi |
-| U2 | Modal con draft nonempty/empty, owner sostituito (anche con set uguali) o pop: chiusura senza reset/pubblicazione al vecchio o nuovo VM; chiusura normale con esattamente una callback relativa, mai durante editing | Parametri width 400/1000 del test selettore; CategoryScreen reale ObjectKey(owner) |
-| U3 — F1/RF3 | Categoria/tipo: edit non confermato e rebuild stesso owner/wrapper nuovi di uguali valori preserva State/draft/esito. Cambio confermato osservato, incluso A→B→A con pump distinti, aggiorna campo/label e supersede il modal: per quella sessione i toggle restano sul draft catturato e close non resetta/pubblica; riapertura usa nuovo confermato. A→B→A coalescato visto solo A→A mantiene invece draft F1 e conferma normalmente (reset empty/callback una volta). Altro campo non invalida il modal; vecchio snapshot VM immutato | Test selettore sheet/dialog, Category VM C3; includere ordine set diverso senza duplicare le cause rebuild |
-| U4 — F2 + F1 | Deselezionare tutto, modal ancora aperto, rebuild parent con wrapper uguali: draft vuoto e checkbox deselezionate persistono, label Nessuna categoria/Nessun tipo, zero callback/exception. Proseguire con una voce prova assenza di reset prematuro; variante conferma empty ripristina all una volta. U2 copre unmount/replacement con empty | Test esistente width 400/1000 × categoria/tipo: estendere reset/unmount già presenti con rebuild e osservazioni intermedie senza duplicazione |
-| U5 — Consumer condiviso | GeoMapScreen reale: draft modificato/empty e rebuild stesso owner da notify non causano reset/errori; conferma una sola volta aggiorna il filtro giusto con callback esistente, senza toccare altro filtro o lane legacy | Una regressione distinta in test/ui/geo_map/widgets/geo_map_screen_test.dart col suo harness; matrice completa dei due layout solo nel test componente |
-| L1 | Dispose prima entry, durante places, durante events, callback terminale; no mutazioni/notify/fasi nuove, late success/domain/runtime/assertion | Command reali + reporting support + clock virtuale |
-| L2 | setSort dispose never-run/idle/pending/notify prima write/terminal/value callback; settlement/dispose stesso turno nei due ordini e transizione durante barriera | Riuso matrice ordinary_view_model_lifecycle_support, adattatore test scoped |
-| L3 | Pending oltre 50ms virtuali dopo owner disposal, poi late throw originale una volta senza notifier error; assertions in percorso previsto; exact-once cleanup | pumpCommandTurns, testOwnerUI dove serve, FlutterMemoryAllocations per sort e debug child count restartable |
-| L4 | Pop/cambio owner con query e sort pendenti, staccare listener pubblici, nessun update al sostituto; dispose ripetuto idempotente | Production route fixture; non MockCommand come prova lifecycle |
+| B1 | Singleton/all pending first frame: nonempty selection/correct labels/one admission/no first or notify-during-build error | Category ViewModel/production categoryRoute/route_parameter_redirect |
+| B2 | Invalid/numeric/unknown: error/zero Category query; same slug-owner rebuild no reseed/refetch; new owner same URI once | RouteOwnershipFixture/existing routing |
+| B3 | Post Back retains Category/filters/branch; slug changes recreate; canonical restoration URI seed/parentage | route_ownership/main_navigation_restoration/real restorable harness |
+| C1 | A→B/A→B→A both completion orders/identical A values: latest only; old domain/runtime cannot change current failure/running | Existing controlled fake queries/Completers |
+| C2 | Types while places/events pending; categories/types same and separate turns: coherent snapshot/final output | Minimal shared getByCategories/getAll/getByCurrentYear hooks |
+| C3 | Equal new-wrapper sets no-op during/after load; caller mutation cannot alter request; empty/unknown normalize; same-filter retry new intent | ViewModel |
+| C4 | Old partial→new success/error; queued already-superseded records suppressed where foundation does so | Existing foundation + ViewModel integration without duplicated matrix |
+| P1 | Filtered/all places→events; first failure skips second/second discards places; selected types only | ViewModel/existing fakes |
+| P2 | Private places while events pending; complete empty success; whole single commit for nonempty success | ViewModel/widget |
+| P3 | Refresh failure retains internally/shows error; retry full replacement; changed filter clear/no stale resurrection | ViewModel/screen |
+| P4 | Result.error never becomes throw; original StateError/TypeError object/stack once globally even stale; fail-loud assertion | installCommandTestReporting/MockLogger/foundation |
+| S1 | Name asc/modifiedAt desc/equal no write; session order/menu before persistence settlement/no refetch | ViewModel/screen |
+| S2 | Query before/after sort action/write, both orders/obsolete later return: current sort | Separate query/write Completers |
+| S3 | Success/Result.error/raw throw: real Result/original Exception/session retained/cache contract/new owner cached preference/equal after failure no write | FakeSettingsRepository/existing real repository checks, no storage change |
+| S4 | Duplicate pre-pump/during write/reentrant notify: one admission/write/no queue; independent filters | Real Command/ViewModel |
+| U1 | Neutral/loading/grid/empty/domain/runtime/retry; sort completion never unlocks loading/error; current header/menu | Existing Material/Provider screen harnesses |
+| U2 | Nonempty/empty modal plus replacement (even equal selections)/pop: no old-new publication/reset; normal close one callback/no edit-time callback | Existing width 400/1000 selector tests/real CategoryScreen ObjectKey |
+| U3 F1/RF3 | Category/type draft preserved on equal same-owner wrappers/order; observed changed-confirmed updates field/label and retires old captured draft, including separately delivered A→B→A; later toggle/close cannot reset/publish, reopen new values. Coalesced observed A→A preserves/confirms normally (empty reset/one callback). Other field does not invalidate; old ViewModel snapshot immutable | Sheet/dialog tests/ViewModel C3 without duplicating rebuild causes |
+| U4 F2+F1 | Deselect all/open modal/equal parent rebuild preserves empty/unchecked draft, safe labels/zero callback-error; later select proves no premature reset; empty normal close resets once; U2 covers revoke | Existing width 400/1000 × field reset/unmount extensions |
+| U5 shared consumer | Real GeoMapScreen edited/empty draft survives same-owner notify; close once updates correct filter/existing callback without other-field/lane effects | One distinct real GeoMap test; full layout matrix remains component test |
+| L1 | Disposal pre-entry/places/events/terminal; late success/domain/runtime/assertion, no commit-notify-new phase | Real Commands/reporting/virtual clock |
+| L2 | Sort never-run/idle/pending/owner notify before write/terminal-value dispose; both same-turn orders/transition during barrier | Existing ordinary lifecycle support/test adapter |
+| L3 | Pending beyond 50 ms virtual after revoke then original throw once/no notifier error/assertion path/exactly-once cleanup | pumpCommandTurns/testOwnerUI where needed/FlutterMemoryAllocations sort/restartable debug child count |
+| L4 | Pop/replacement with pending query/sort, public detach/no replacement contamination/idempotent dispose | Production route fixture, never MockCommand as lifecycle proof |
 
-I fake correnti getByCategories non espongono tutti gli hook pending necessari: estendere in `test/support/fake_repositories.dart` soltanto i metodi richiesti con callback/call recording coerenti con i pending già presenti, mantenendo i default. Non inventare fakes duplicati dentro i test Category. Trasferire/riusare l’attuale builder locale secondo policy support; nessun MockCommand per verificare concorrenza reale. Non aggiungere test per il mero nome del tipo o uno per ogni diagnostica.
+Existing getByCategories fakes lacked pending hooks: extend only required test/support/fake_repositories.dart methods/call records consistent with existing defaults. Reuse/move local builder according to support policy, not duplicate Category fakes. No tests of mere type names/per-diagnostic repetition. New concurrency/lifecycle cases use Completer/testWidgets virtual clock/pumpCommandTurns/testOwnerUI only where teardown timers require it. No real sleep/arbitrary delay/microtask-count assertions. Restore handlers/zones/memory probes; explicit unmount/virtual upstream drain. Existing real-wait/upstream skips document limitations, not new-test patterns.
 
-Nuovi casi concurrency/lifecycle: Completer, `testWidgets` clock virtuale, `pumpCommandTurns`, `testOwnerUI` quando owner teardown crea timer; niente sleep reale, delay arbitrario o assertion sul numero microtask. Handler globali/zone/memory probe ripristinati; unmount esplicito e drain teardown upstream nel clock virtuale. Gli attuali test upstream con attese reali e skip documentati sono prove storiche della limitazione, non un modello per nuovi test.
+## Risks / Trade-offs — historical plan
 
-## Risks / Trade-offs
+Atomic changes partial retention intentionally (D5/P1–P3). Removed setter Commands have no state consumers; callbacks sync/tests await load, no adapter. Constructor seed/deferred UI B1/U1 closes build window without notify during build. Dispatch before notify/guards prevent reentrant new phases (L1/L2).
 
-- [Atomic cambia partial legacy] → decisione intenzionale D5 e P1–P3; nessuna falsa equivalenza col comportamento precedente.
-- [Due setter non sono più Command] → audit consumer verificato, callback diretti e test aspettano esiti load; nessun adapter transitorio.
-- [Window di admission/build] → constructor seed, deferred snapshot UI e B1/U1; non risolvere con notify durante build.
-- [Reentrancy] → load.run prima di notify, nessun effetto dopo notify, guard owner prima write; L1/L2.
-- [F1 wrapper identità/snapshot aliasati] → setEquals vecchio/nuovo confermato per campo e backing sostituiti D3; U3 prova anche cambiamento reale.
-- [RF3 righe modal vecchie su nuovo confermato] → callback sul set catturato, mounted prima del controllo identità sessione, mismatch termina senza reset/callback; U3 include toggle post-update e distingue A→B→A osservato da quello coalescato.
-- [F2 draft vuoto scambiato per confermato/all] → D2/D7 distinguono invarianti, label esplicite e reset solo alla chiusura; U4 combinato F1 e U2 copre conferma/revoca.
-- [Modal migra tra owner] → chiave owner e U2 anche con set uguali e draft vuoto, senza lifecycle state holder.
-- [Regressione componente condiviso GeoMap] → U5 prova wiring reale; nessun edit ai suoi Command/owner e nessuna matrice duplicata.
-- [Obsoleto continua I/O] → consentito finché live ma senza commit; no nuove fasi dopo disposal; memoria privata fino settlement.
-- [Sort sessione diverso da storage su errore/lost update tra owner] → contratto esplicito, Result reale, nessun rollback/serializzazione inventato; S3.
-- [Cleanup command_it 9.5.2] → foundation restartable invariata e D5 locale del primo OpenSpec per ordinary; no early dispose di lavoro live.
-- [Drift branch/SDK] → ripetere preflight mirato prima apply e fermare affected work se cambia il checkpoint o contratto, senza rebase/reset automatico.
+F1 wrapper/aliased snapshot risk uses per-field confirmed setEquals/backing replacement (D3/U3). RF3 stale rows use captured draft/mounted then identity, no reset/callback on mismatch; U3 distinguishes observed/coalesced A→B→A. F2 empty draft is not all/confirmed; explicit label/close-only reset (U4/U2). Owner keys handle equal-set replacement without state holders. U5 covers real shared GeoMap wiring without its Command migration/duplicate matrix.
 
-## Migration Plan
+Obsolete I/O may continue while live/no publication; disposed owner starts no phase/private resources await settlement. Sort session may differ from storage after error or cross-owner lost update; expose real Result without invented rollback/serialization (S3). Preserve resolved foundation/local ordinary cleanup; no early disposal. Recheck branch/SDK before apply; material drift requires reconciliation, no automatic reset/rebase.
 
-Dopo review indipendente e autorizzazione separata: rifare preflight su questo checkpoint/cumulativo autorizzato, rigenerare ledger; implementare VM e route bootstrap con test dedicati, poi sort/lifecycle e UI con test per ogni gruppo, quindi integrazione/analyzer/suite completa. Nessun main baseline sostitutivo e nessuna modifica di altri Command. L’ordine esatto è in tasks.md. Eventuale rollback futuro è il solo diff attribuibile a questa change, preservando il primo checkpoint e lavoro esterno; nessun reset/clean globale.
+## Migration plan — historical
 
-Gate apply: zero legacy Category, zero nuove diagnostiche, 113→105 solo dopo implementazione e confronto delle altre identità; snapshot/coerenza filtri/bootstrap/sort/lifecycle soddisfatti; test deterministici, nessuna dipendenza/abstraction nuova senza beneficio. Nessun gate zero deprecazioni globale in OpenSpec 2. PR cumulativa e merge restano una fase successiva con autorizzazioni proprie.
+After independent review/separate apply authorization: recheck this authorized checkpoint/cumulative branch, rebuild ledger; implement ViewModel/route/bootstrap tests then sort/lifecycle/UI tests, integration/analyzers/full suite. No substitute main baseline/other Commands. Rollback only attributable diff, preserving first checkpoint/others; no reset/clean.
 
-## Evidenze, incertezze e readiness
+Acceptance: no Category legacy/new diagnostics, **113→105 only after implementation/identity comparison**; coherent snapshots/bootstrap/sort/lifecycle/deterministic tests/no unjustified dependency/abstraction. Global zero was not OpenSpec 2 gate. Cumulative PR/merge required later authorization.
 
-Verificati: identità Git/remoto/PR, sorgenti sopra, versioni risolte, nuova analisi baseline e confronto ledger PR4. I test di comportamento nuovi **non sono stati scritti né eseguiti**; nessuna suite Flutter viene dichiarata verde ora. Le interleaving problematiche legacy sono inferenze dal codice e dalle prove foundation esistenti, non output di nuove caratterizzazioni Category.
+## Evidence, uncertainty and historical readiness
 
-Non restano decisioni sospese su bootstrap, concorrenza, pubblicazione, sort o lifecycle. Le limitazioni residue sono deliberate: non cancellazione fisica, risorse private con Future infinito, perdita del salvataggio sort senza rollback locale e rischio snapshot write già esistente. Una divergenza dei test dall’evidenza fonte va riconciliata prima di affected apply, senza redesign silenzioso. La validazione strict e l’audit documentale sono registrati dopo la loro esecuzione; non equivalgono a review indipendente o prova d’implementazione.
+Verified Git/remote/PR/sources/versions/new baseline analysis/PR4 ledger comparison. New behavior tests **not yet written or run** at planning; no claimed Flutter pass. Legacy interleavings were source/foundation-derived inferences, not new runtime characterization. Bootstrap/concurrency/publication/sort/lifecycle decisions were settled. Explicit limits: no physical cancellation, indefinite private retention, failed sort save without local rollback, existing snapshot risk. Any source/test divergence required reconciliation before affected execution. Strict/document audit did not substitute independent review/implementation proof.
 
+## Initial document validation — 2026-10-20 (historical, before F1/F2)
 
-## Validazione documentale iniziale — 2026-10-20 (storica, precedente a F1/F2)
+- Strict validate: **exit 0**, valid change; status 4/4 planning artifacts complete (metadata plus four artifacts), not apply completion.
+- Five files (.openspec.yaml/proposal/design/tasks/delta), **21 unique unchecked tasks; 7 ADDED requirements/27 scenarios**, no first-delta header overlap. Added descriptions ≤500 characters/internal resolved paths.
+- `git diff --check`/cached: exit 0; five untracked files explicitly checked for final newline/trailing whitespace/tabs. **1.073 tracked files** matched HEAD, including production/tests/support/canonical/first change/dependencies/AGENTS. Only five nonignored untracked artifacts.
+- Final only `?? openspec/changes/migrate-category-view-model-commands/`, empty index/unchanged branch-HEAD/positive ancestry/zero commits beyond checkpoint. Read-only GitHub: open Draft/checkpoint head/updated_at `2026-10-20T12:18:05Z` unchanged. No mutation.
+- Self-review distinguished no-op/refresh/A→B→A/raw throw-Result/atomic partial/session-storage/pending-reentrant cleanup/modal replacement/delta integration. Existing ViewModel test count corrected to five; no known material plan blocker.
 
-- `openspec validate migrate-category-view-model-commands --strict --no-interactive`: eseguito, **exit 0**, change valida. Status mostra 4/4 artifact planning completi (metadata più quattro artifact); non significa completamento apply.
-- Cinque file presenti: `.openspec.yaml`, proposal, design, tasks e una delta spec. **21 task univoci tutti unchecked; 7 requisiti ADDED e 27 scenari**, nessun header sovrapposto alla delta del primo OpenSpec. Tutte le descrizioni normative aggiunte entro 500 caratteri, percorsi risolti interni alla change.
-- `git diff --check` e `git diff --cached --check`: exit 0. Controllo esplicito dei cinque untracked: newline finale, nessun trailing whitespace/tab. Confronto Git blob di **1.073 file tracked** contro HEAD: tutti identici, incluse produzione, test/support, canonical, primo OpenSpec, dipendenze e AGENTS. Untracked non ignorati esclusivamente i cinque artifact di questa change.
-- Stato finale: solo `?? openspec/changes/migrate-category-view-model-commands/`; index vuoto. Branch e HEAD invariati, ancestry positiva e zero commit oltre checkpoint. Controllo finale GitHub read-only: PR #12 ancora open/draft, head al checkpoint, updated_at `2026-10-20T12:18:05Z` identico al preflight. Nessuna mutation GitHub effettuata.
-- Autocontrollo documentale: esplicitati no-op vs refresh, A→B→A, raw throw vs Result, partial atomico, session sort vs storage, cleanup pending e rientranza, modal owner replacement e consolidamento delta senza sovrascrivere OpenSpec 1. Corretto il censimento dei test VM esistenti a cinque. Nessun blocker materiale noto rimane aperto nel piano.
+Historical **READY FOR INDEPENDENT PLAN REVIEW** preceded later F1/F2 findings and did not resolve them. No apply/production-test edit/commit/push/PR/merge/sync/archive then.
 
-Il verdetto iniziale era **READY FOR INDEPENDENT PLAN REVIEW**. La successiva review indipendente ha rilevato F1/F2: questa nota storica non li dichiara risolti né vale come readiness della remediation corrente. Nessun apply, edit produzione/test, commit, push, PR, merge, sync canonical o archive era stato effettuato.
+## F1/F2 document remediation and independent review — 2026-10-20
 
+### Baseline and scope
 
-## Remediation documentale F1/F2 e riesame indipendente — 2026-10-20
+Same dedicated branch/checkpoint `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, ancestry exit 0/zero later commits. Start/end only five untracked artifacts/empty index/no tracked diff. Reused authorized checkout without worktree creation/checkout/fetch/reset/clean/merge/rebase/cherry-pick.
 
-### Baseline e perimetro della remediation
+Read AGENTS/openspec-update-change/config/status/context/five artifacts and real CategoryScreen/GeoMapScreen/backing sets/selector/tests/local setEquals/first delta. User directly authorized four document edits; no per-artifact gate. Only proposal/design/tasks/delta changed; metadata unchanged/no new files. Baseline **113 INFO/eight Category** stayed historical: **no analyzer/Flutter test/build in this remediation**, no 105 claim. Compared initial texts/1.073 tracked hashes; no unknown existing work overwritten.
 
-Worktree, branch e HEAD sono quelli attesi nel preflight: `codex/plan-migrate-category-view-model-commands`, `9d17d224d5094c5b043128113d9aba6a1ce69f0a`. Ancestry verificata con exit 0 e zero commit oltre checkpoint. Stato iniziale e finale: soltanto i cinque artifact non tracciati della change, index vuoto, nessun diff tracked. Il worktree già autorizzato è stato riutilizzato; nessun nuovo worktree, checkout, fetch, reset, clean, merge, rebase o cherry-pick in questa remediation.
-
-Letti AGENTS, skill openspec-update-change, config/status/context e tutti i cinque artifact; verificati i consumer reali CategoryScreen/GeoMapScreen, i backing set di entrambi i VM, il selettore e i widget test pertinenti, API Flutter setEquals locale e delta OpenSpec 1. La richiesta dell’utente autorizza direttamente i quattro edit documentali, senza un ulteriore gate di conferma per artifact. Modificati esclusivamente proposal.md, design.md, tasks.md e specs/command-execution-concurrency/spec.md; `.openspec.yaml` invariato. Nessun file creato nella change o altrove nel repository.
-
-La baseline diagnostica 113 INFO / otto Category resta l’evidenza storica del planning. **Nessun analyzer, test Flutter o build eseguito nella remediation**; nessuna riduzione a 105 rivendicata. Fonte per il confronto documentale: snapshot iniziale dei cinque testi e hash dei 1.073 tracked; nessun lavoro preesistente sconosciuto sovrascritto.
-
-### Finding e decisioni riconciliate
-
-| ID | Root cause / evidenza | Remediation del piano | Gate futuri e stato |
-| --- | --- | --- | --- |
-| F1 — MEDIUM | Nuovi wrapper UnmodifiableSetView a ogni getter e confronto identità in didUpdateWidget: un rebuild innocuo può cancellare il draft | D3 garantisce vecchi snapshot indipendenti tramite backing sostituiti; D7 usa setEquals vecchio/nuovo confermato per campo, mai confronto draft/confermato; equal preserva State/draft, vero cambio osservato aggiorna solo quel campo | U3 e task 2.2/4.2; scenari Equal confirmed categories/types e Changed confirmed selection. RISOLTO NEL PIANO; codice non modificato |
-| F2 — MEDIUM | Nonempty confermato VM non implica nonempty della copia locale durante editing; `.first` può fallire, tipi empty appaiono Luoghi | D2/D7 distinguono i due invarianti; label Nessuna categoria/Nessun tipo, first solo dopo guard, nessun reset durante editing; all soltanto alla chiusura mounted della sessione corrente | U4 combinato F1, U2 owner/empty, U5 consumer condiviso; scenari Empty drafts/confirmation. RISOLTO NEL PIANO; codice non modificato |
-| RF3 — MEDIUM, emerso dal controllo indipendente della remediation | Righe modal materializzate una volta e Checkbox con bool catturato; sostituire il campo su un vero confermato ma lasciare callback sul nuovo campo mescola due sessioni | D7 cattura il set draft usato dalle righe; mounted prima del confronto identità col campo corrente. Una sessione sostituita non normalizza né pubblica. Distinguere cambiamenti A→B→A consegnati con rebuild distinti (invalida) da update coalescati osservati solo A→A (F1, conserva e conferma normalmente) | U3/task 4.2 e scenario Confirmed changes supersede the open draft session; altro campo non invalida il modal. RISOLTO NEL PIANO senza controller, notifier o token nuovo |
-
-Sono correzioni funzionali e contrattuali, non preferenze stilistiche. Il riesame indipendente read-only ha verificato i quattro artifact contro i sorgenti e il diff iniziale, segnalato RF3 e il limite degli update coalescati, poi verificato le correzioni e la formulazione degli esiti U3. **Esito conclusivo: nessun finding materiale residuo nella remediation documentale.** Questo non è una review dell’implementazione né una prova dei test futuri.
-
-### Invarianti e architettura preservata
-
-- Confermato VM: normalizzato, esposto senza alias mutabili; un cambio sostituisce il backing, i parametri widget precedenti conservano i valori. Questa policy non impone una nuova semantica persistente empty.
-- Draft widget/sessione: può essere vuoto, non viene ripristinato da rebuild semanticamente uguali o toggle; label totali. Le righe editano il set catturato e solo una sessione ancora corrente può normalizzare e confermare una volta.
-- Owner: ObjectKey(viewModel) in CategoryScreen separa gli State anche con set uguali. Mounted precede ogni accesso post-await: rientro di vecchio modal dopo unmount non aggiorna vecchio o nuovo VM. Il confronto semantico non sostituisce la verifica owner/sessione.
-- Compatibilità condivisa: stesse callback e reset alla chiusura in sheet/dialog; correzione nel componente condiviso e sola regressione wiring GeoMap, senza modificarne Command o orchestrazione.
-- Le sezioni D1/D4/D5/D6/D8/D10 sono state confrontate col testo iniziale e restano identiche: matrice comandi, retrieval latest-intent, commit atomico, sort/Result, cleanup e consolidamento delta non sono ridisegnati. Nessun nuovo layer, controller, dipendenza o state manager.
-
-### Validazione documentale della remediation
-
-- `openspec validate migrate-category-view-model-commands --strict --no-interactive`: **exit 0**. Sette requisiti ADDED, **34 scenari**, nessun header sovrapposto a OpenSpec 1 e nessuna seconda MODIFIED. Descrizioni normative entro 500 caratteri.
-- **21 task**, ID univoci, tutti unchecked. Task 4.2 esteso senza aggiungere attività estranee; U2–U5 includono sheet/dialog (width 400/1000), categoria/tipo, casi combinati e la sola regressione condivisa distinta.
-- Markdown dei quattro documenti analizzato con il parser GFM marked già disponibile: heading, tabelle e code fence verificati. Metadata YAML letto con Psych.safe_load consentendo Date: schema spec-driven e data invariati; exit 0. Nessun package installato per questi controlli.
-- `git diff --check`, `git diff --cached --check`, `git diff --quiet` e `git diff --cached --quiet`: **exit 0**. Questi comandi non controllano gli untracked: whitespace/tab/newline finale verificati separatamente e positivamente su tutti i cinque artifact.
-- Confronto hash iniziali/finali: tutti i **1.073 tracked invariati**; soli quattro documenti esistenti modificati, metadata invariato. Inventario esatto dei cinque untracked preservato; nessun artifact primo OpenSpec/canonical/codice/test/support/dipendenze/config cambiato. HEAD, refs di tutti i branch e registrazioni di tutti i worktree identici al preflight.
-- Verifica GitHub read-only: PR #12 ancora open/draft con head al checkpoint e updated_at `2026-10-20T12:18:05Z`, come nel planning iniziale. Nessuna mutation GitHub effettuata.
-
-**READY FOR INDEPENDENT PLAN REVIEW**. F1/F2/RF3 risultano risolti documentalmente; nessun blocker materiale noto rimane aperto nel piano. I bug di produzione restano da implementare e verificare dopo review conclusiva e autorizzazione separata. Nessun apply, commit, push, PR, merge, archive o sync canonical in questa fase.
-
-
-## Evidenze dell’apply — 2026-10-20
-
-Questa sezione descrive l’implementazione autorizzata dopo il verdetto READY FOR APPLY. Le sezioni precedenti conservano planning e remediation: le frasi «nessun apply» e i conteggi storici si riferiscono a quelle fasi. Questa implementazione non autorizza consolidamento Git o canonical.
-
-### Preflight, provenienza e ambiente
-
-Tutti i comandi di implementazione e verifica hanno cwd `/Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-category-view-model-commands`; branch `codex/plan-migrate-category-view-model-commands`, HEAD iniziale `9d17d224d5094c5b043128113d9aba6a1ce69f0a`. `git fetch origin`: exit 0; riferimento remoto cumulativo e HEAD della PR #12 open/draft corrispondono al checkpoint. Ancestry positiva, nessun commit oltre checkpoint, index vuoto. Inventario iniziale: solo i cinque artifact approvati untracked, preservati e letti integralmente prima degli edit. Manifest iniziale dei tracked, testi degli artifact e registrazioni worktree acquisiti in `/private/tmp/category-apply-lfqm6rs2/initial.json`. Gli altri tre worktree non sono superfici di scrittura. Nessun nuovo worktree, checkout, reset, clean, merge, rebase o cherry-pick.
-
-Skill apply e skill test/unit/widget/reuse/async-mounted/static-analysis applicate. Riutilizzati supporti command reporting/turns/disposal, fake repository, routing production e matrice ordinary del primo OpenSpec. Dipendenze e lock invariati: command_it 9.5.2, listen_it 6.0.0, go_router 18.0.2; Flutter 3.47.5, Dart 3.13.4. Nessun pub get/upgrade. Package metadata locali ignorati derivati dal package_config già risolto, senza cambiare i package esterni.
-
-### Caratterizzazione prima degli edit produttivi — task 1.4
-
-Comando `/opt/homebrew/bin/flutter test --no-pub test/ui/category/view_models/category_view_model_test.dart test/ui/category/widgets/category_content_and_type_selection_test.dart test/routing/route_parameter_redirect_test.dart --reporter expanded`: **exit 0, 78 passed**. Test legacy temporanei, conservati fuori repository nel log della sessione, hanno verificato bootstrap inline, sequenza places→events, rifiuto del load annidato occupato, errore prima query, contenuto parziale al secondo errore e falso Success del sort con persistence Error. In seguito sono stati sostituiti dalle aspettative approvate; nessun test mantiene il partial o il falso successo come requisito futuro. Evidenze: `legacy-characterization.log`, `.json` e `legacy-characterization-test.dart` nella directory temporanea della sessione.
-
-### Implementazione e precisazioni
-
-- **D2/D3:** initialCategories obbligatorie e normalizzate prima dell’esposizione; tipi completi e sort dalla cache. Observer installato prima dell’unico autoload. La route passa direttamente il seed; invalid resta fuori dalla creazione. Setter sincroni confrontano per valore, sostituiscono backing immutabili, preservano vecchi snapshot e acquisiscono entrambi i filtri. Uguale è no-op; refresh esplicito ammette invece nuovo lavoro.
-- **D4/D5:** `RestartableCommand<CategoryLoadRequest, List<ContentBase>>` conserva l’unica autorità. L’action legge snapshot non modificabili, assembla candidate private, preserva all/filtered, eventi current-year, places→events e primo errore originale; non committa. Il listener installato prima dell’autoload pubblica solo Success autorevole, con sort corrente. Filtro nuovo clear immediato, refresh mantiene internamente ultimo successo. Nessun progressive commit, token aggiuntivo o cancellazione fittizia.
-- **D6:** setSort usa createResultCommand, conserva single-flight e no-op, aggiorna ordine locale e menu prima della write, controlla revoca dopo notify rientrante e restituisce il Result originale. Failure conserva sort di sessione senza fingere cache persistita; nessun refetch o rollback. Test con nomi e date in ordini opposti distinguono realmente i due sort.
-- **D7, precisazione emersa da regressione:** al primo frame di un refresh la notifica results differita può ancora contenere il vecchio terminale. Il body usa la lettura immediata `load.isRunningSync.value` prima dello snapshot; non osserva quel notifier. `refresh()` notifica il VM dopo admission, il costruttore usa `_startLoad()` senza notify. Questo evita vecchia grid/empty senza aggiungere uno stato loading o un forwarder. Il risultato corrente continua a distinguere skeleton, grid, empty e failure/retry; setSort non sblocca il caricamento.
-- **F1:** setEquals confronta vecchi/nuovi confermati per campo; wrapper equivalenti preservano draft, cambiamenti reali aggiornano solo il campo interessato. Snapshot VM precedenti restano indipendenti.
-- **F2:** draft vuoti ammessi durante editing, label Nessuna categoria/Nessun tipo, guard prima di first; reset completo soltanto alla normale chiusura corrente. Nessuna semantica persistente empty.
-- **RF3:** righe chiudono sul draft e callback catturati all’apertura. Dopo await: mounted, poi identità della sessione; una sessione sostituita non normalizza né pubblica. ObjectKey(viewModel) separa owner anche con selezioni uguali. A→B→A osservato invalida; A→A coalescato conserva secondo F1. Nessun controller/notifier/token nuovo.
-- **D8:** revoca idempotente sincrona e detach del commit prima di dispose restartable; super.dispose differito fuori notify. Cleanup ordinary locale di setSort riprende la barriera microtask→event del primo OpenSpec, invalidabile e once, trattenendo il Command reale fino a settlement/reporting. Nessuna modifica della foundation globale o conversione di raw throw in Result.error.
-
-### Gate mirati eseguiti
-
-Tutti i comandi test usano `/opt/homebrew/bin/flutter test --no-pub` nel worktree Category; reporting expanded. Non si sommano run sovrapposti come test distinti.
-
-| Gate | Evidenza e sede | Esito |
+| ID | Root cause | Plan correction/future gates |
 | --- | --- | --- |
-| B1–B3 | route_parameter_redirect, route_ownership, main_navigation_restoration: singleton/all primo frame pending, invalid zero query, stesso owner/Back/branch, nuovo slug e restoration production | Pass nel run aggregato |
-| C1–C4/P1–P3/S1–S4 | Category VM: 26 casi, Completer, snapshot caller/esposti, sequenziale atomico, primo/secondo errore e retry, A→B/A→B→A, tipologie, sort e query nei due ordini, single-flight e Result identico | Pass nel run aggregato |
-| U1 | CategoryScreen: 11 casi, skeleton iniziale, runtime/domain retry empty, refresh retained primo frame, filtro pending e menu ottimistico | Pass nel run aggregato |
-| U2–U4/F1/F2/RF3 | Selettore: 41 casi, 400/1000 × categoria/tipo, draft modificato/vuoto, confermato reale/altro campo/coalescato, sessione stale con toggle e riapertura; screen con owner replacement | Pass nel run aggregato |
-| U5 | Un caso GeoMapScreen reale: draft vuoto, notify parent, retention e conferma attraverso callback esistente; nessuna migrazione GeoMap | Pass nel run aggregato |
-| L1/L3/L4/P4 | Category lifecycle: 15 casi, before-entry, places/events, late Success/Result.error/StateError/TypeError/assertion oltre 50 ms virtuali, original stack/reporting, revoca rientrante, child cleanup once | 15 passed, exit 0 |
-| L2/L3 | Lane categorySort nella matrice ordinary esistente, +14 casi; foundation Result/restartable/reporting e disposal upstream | Pass nel run aggregato, soli skip upstream preesistenti |
+| F1 MEDIUM | Fresh wrapper identity resets harmless-rebuild drafts | D3 independent old backing/D7 confirmed setEquals per field; equal preserves, actual change updates only field. U3/tasks 2.2/4.2/scenarios Equal confirmed categories-types/Changed confirmed selection. RESOLVED IN PLAN, code unchanged. |
+| F2 MEDIUM | Confirmed nonempty does not imply nonempty draft; first crash/empty types Luoghi | D2/D7 separate invariants/explicit labels/nonempty first/close-only current-mounted reset. U4+F1/U2/U5/Empty drafts-confirmation scenarios. RESOLVED IN PLAN, code unchanged. |
+| RF3 MEDIUM (independent review) | Materialized row bool/old callback/new State field mixes sessions | Capture draft; mounted before identity; superseded session no normalize/publish. Observed A→B→A invalidates, coalesced A→A preserves/confirms; other field independent. U3/task4.2/Confirmed changes supersede scenario. RESOLVED IN PLAN, no controller/notifier/token. |
 
-Run aggregato finale: `/opt/homebrew/bin/flutter test --no-pub test/ui/category test/ui/ordinary_view_model_lifecycle_test.dart test/routing/route_parameter_redirect_test.dart test/routing/route_ownership_test.dart test/routing/main_navigation_restoration_test.dart test/ui/geo_map/widgets/geo_map_screen_test.dart test/utils/result_command_test.dart test/utils/restartable_command_test.dart test/utils/command_configuration_test.dart test/utils/command_it_disposal_behavior_test.dart --reporter expanded`: **exit 0, 375 passed, 3 skipped preesistenti**. Log/metadati `targeted-tests-final.log/.json` nella directory della sessione.
+Functional/contractual corrections, not style. Separate read-only reviewer found RF3/coalescing limit, then verified four artifacts/source/diff/corrected U3: **no remaining material document finding**, not implementation review/test evidence.
 
-Correzioni durante sviluppo: prima compilazione VM usava erroneamente un copyWith inesistente su Place; sostituito con il parametro opzionale modifiedAt nella fixture condivisa. Prime prove lifecycle avevano Completer creati fuori dalla Zone che li attendeva: raw error attraversava un diverso error-zone boundary; creazione spostata nella stessa Zone, mantenendo le asserzioni original error/stack e fail-loud. La prima prova screen ha individuato il vecchio terminale al primo frame refresh, risolto con la precisazione D7 sopra. Import e lints corretti nei soli file interessati. Nessuna aspettativa indebolita, nuovo skip o seam produttivo per ottenere verde.
+Preserved invariants: confirmed ViewModel normalized/no alias/backing replacement; widget draft possibly empty/equal rebuild retention/captured session/current-only confirmation once; ObjectKey owner separation/mounted before post-await access/no old-new contamination. Shared callbacks/sheet-dialog close behavior preserved, no GeoMap Commands/orchestration change. D1/D4/D5/D6/D8/D10 compared identical to initial text: command matrix/latest retrieval/atomic/sort-Result/cleanup/delta unchanged; no layer/controller/dependency/state manager.
 
-### Analyzer e formatter dell’apply
+### Document validation
 
-Baseline analizzata: git archive del checkpoint in `/private/tmp/category-apply-lfqm6rs2/baseline`; package_config risolto con sola root del package locale adeguata allo snapshot. Comando `/opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart analyze --format machine /private/tmp/category-apply-lfqm6rs2/baseline`: **returncode grezzo 0, 113 INFO, 0 warning/errori**, tutte DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE. Metadati/output `baseline-analyzer.json/.log/.stderr`.
+Strict validate **exit 0**: seven ADDED/**34 scenarios**, disjoint headers/no second MODIFIED/≤500-character descriptions. **21 unique unchecked tasks**, 4.2 expanded only within scope; U2–U5 cover 400/1000 sheet-dialog/category-type/combined cases/one shared wiring regression.
 
-Finale: snapshot dei file effettivi non ignorati, con verifica byte a byte, in `/private/tmp/category-apply-lfqm6rs2/final-snapshot`; stessi metadata risolti. Comando `/opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart analyze --format machine /private/tmp/category-apply-lfqm6rs2/final-snapshot`: **returncode grezzo 0, 105 INFO, 0 warning/errori**. Confronto Counter per severity/regola/file/messaggio/molteplicità, normalizzando root e linee spostate: **esattamente le otto Category rimosse, altre 105 identiche, zero nuove**. Metadati `final-analyzer.json`, stdout/stderr associati; manifest SHA256 `cd14356fd692252f8a3c95997371b1e574ae02ef59031737dda488674279c34a`. Le successive sole modifiche documentali non alterano il codice analizzato. Non si attribuisce questo exit al wrapper Flutter: flutter analyze non è stato eseguito separatamente. Nessuna soppressione o config analyzer modificata.
+Existing marked GFM lexer/parser checked four Markdown headings/tables/fences; Psych.safe_load with Date read unchanged schema/date YAML, exit 0/no package install. Diff-check/cached/quiet/cached-quiet **exit 0**, with separate successful untracked whitespace/tab/newline checks. Hashes: all **1.073 tracked unchanged**, only four documents changed/metadata and exact five-untracked inventory preserved; other change/canonical/code/tests/support/dependency/config untouched. HEAD/all branch refs/worktree registrations identical. GitHub read-only open Draft/checkpoint/updated_at `2026-10-20T12:18:05Z`, no mutation.
 
-`dart format` sui soli 19 Dart intenzionalmente modificati: **exit 0, 19 files, 0 changed** nell’ultimo passaggio. Nessun import/tipo/uso Command legacy rimane in lib/ui/category. Nessuna modifica a dipendenze, UseCase, repository produttivi, foundation, altri Command o canonical.
+Historical **READY FOR INDEPENDENT PLAN REVIEW**: F1/F2/RF3 resolved in documents/no known material blocker; production still needed authorized implementation/testing. No apply/commit/push/PR/merge/archive/sync in this phase.
 
-### Limiti conservati e review locale
+## Apply evidence — 2026-10-20
 
-Una query fisica obsoleta può finire e, mentre l’owner è vivo, completare le fasi previste dal suo snapshot: non ha autorità di commit. Dopo dispose non parte una nuova fase. Un Future che non termina trattiene il relativo cleanup privato secondo il contratto upstream: nessun timeout inventato. Errori inattesi mantengono originale e stack; AssertionError resta fail-loud. Session sort può divergere dalla cache dopo persistence Error; nessun nuovo protocollo retry o serializzazione cross-owner. Filtri di sessione non serializzati non vengono promessi come restaurabili.
+Authorized after READY FOR APPLY. Earlier no-apply/count statements retain their phase; implementation itself did not authorize Git/canonical consolidation.
 
-Autocontrollo adversariale del diff e review locale indipendente read-only: nessun finding materiale residuo su bootstrap, snapshot/latest-intent, atomicità, sort, F1/F2/RF3, reporting, cleanup e scope. Il reviewer ha richiesto di rendere esplicita la barriera del primo frame e aggiornare lo stato degli artifact: precisazione inserita in D7 e qui. Questa review locale non sostituisce la successiva review indipendente di codice richiesta prima dell’integrazione cumulativa.
+### Preflight, provenance and environment
 
+Cwd `<worktree>`, branch `codex/plan-migrate-category-view-model-commands`, initial HEAD `9d17d224d5094c5b043128113d9aba6a1ce69f0a`. Fetch exit 0; cumulative ref/open Draft PR head matched checkpoint; positive ancestry/zero later commits/empty index. Only five reviewed untracked artifacts initially. Initial tracked/artifact/worktree manifest was `<evidence-dir>/category-apply/initial.json`. Other three worktrees not writable surfaces; no new worktree/checkout/reset/clean/merge/rebase/cherry-pick.
 
-### Suite completa, validazione e integrità finale
+Apply/test-unit-widget-reuse/async-mounted/static-analysis skills used. Reused reporting/turns/disposal/fakes/production routing/OpenSpec 1 ordinary matrix. command_it 9.5.2/listen_it 6.0.0/go_router 18.0.2/Flutter 3.47.5/Dart 3.13.4, unchanged dependencies/lock; no pub get/upgrade. Ignored local metadata derived from resolved package_config without changing external packages.
 
-`/opt/homebrew/bin/flutter test --no-pub --reporter expanded`: run finale **exit 0, 2.476 passed, 6 skipped, 0 failed**, durata 90,85 s. Log `full-tests-final.log` e metadati `full-tests-final.json` in `/private/tmp/category-apply-lfqm6rs2/`. Sei skip già nel checkpoint: tre scenari StateError di command_it_disposal_behavior (limitazione upstream documentata), un caso GeoMap route già skipped, due integrazioni E2E locali condizionate dalle variabili MOLISE_ALL_DAY_LOCAL_E2E e MOLISE_EXTERNAL_TOKEN_LOCAL_E2E. Nessun nuovo skip.
+### Characterization before production edits — task 1.4
 
-I primi due run completi erano falliti con exit 1 (**2.254 passed, 6 skipped, 222 failed**) per ObjectBox nativo assente nel nuovo worktree, con errori di setup/teardown conseguenti. Il secondo tentativo con solo DYLD_LIBRARY_PATH non aveva risolto la ricerca della libreria. Correzione d’ambiente: copia byte-identica del binario già disponibile nel checkout principale, letto soltanto, nel percorso `lib/libobjectbox.dylib` già ignorato dal Git del worktree Category; SHA256 `1af2e266e523dbcc33b3682eebf297f2f4f23ade6ab706dab794f7a6f8108751`. Nessun download, modifica a manifest/lock o codice ObjectBox. Il run finale usa il comando ordinario senza override DYLD. Sono runtime locali ignorati, come i metadata risolti/build, non nuovi sorgenti di produzione. Log dei tentativi falliti mantenuti come `full-tests.log/.json` e `full-tests-native.log/.json`.
+```text
+flutter test --no-pub test/ui/category/view_models/category_view_model_test.dart test/ui/category/widgets/category_content_and_type_selection_test.dart test/routing/route_parameter_redirect_test.dart --reporter expanded
+```
 
-Controlli documentali: `openspec validate migrate-category-view-model-commands --strict --no-interactive`, **exit 0**. Quattro Markdown passati da marked lexer/parser; YAML safe_load con Psych, **exit 0**, schema spec-driven/data valida. Primo tentativo Psych.safe_load_file non disponibile nella versione Ruby locale (exit 1), corretto usando safe_load del contenuto; nessun package installato. Controllati fence, whitespace e newline finali esplicitamente su tutti i 24 file del diff, inclusi i dieci untracked: nessuna anomalia. `git diff --check` e `git diff --cached --check`: exit 0; non usati come sostituto del controllo untracked.
+**Exit 0, 78 passed**. Temporary legacy cases established inline bootstrap/places→events/busy nested rejection/first error/second-error partial/false sort Success on persistence Error. Later replaced with approved expectations, not preserved as future partial/false-success requirements. Historical local legacy-characterization.log/.json/legacy-characterization-test.dart were outside repository in the temporary evidence directory; current availability not claimed.
 
-Inventario finale: **14 tracked modificati e 10 file untracked**, nessun staged. Quattro superfici produttive: `lib/routing/core_routes.dart` (solo bootstrap Category), `lib/ui/category/view_models/category_view_model.dart`, `lib/ui/category/widgets/category_screen.dart`, `lib/ui/category/widgets/category_content_and_type_selection.dart`. Quindici Dart di test/support:
+### Implementation and clarifications
 
-- `test/routing/main_navigation_restoration_test.dart`, `test/routing/route_ownership_test.dart`, `test/routing/route_parameter_redirect_test.dart`;
-- `test/support/fake_repositories.dart`, `test/support/fixtures.dart`, `test/support/ordinary_view_model_lifecycle_support.dart`;
-- `test/support/category_screen_test_support.dart`, `test/support/category_selection_test_support.dart`, `test/support/category_view_model_test_support.dart`;
-- `test/ui/category/view_models/category_view_model_test.dart`, `test/ui/category/view_models/category_view_model_lifecycle_test.dart`;
-- `test/ui/category/widgets/category_content_and_type_selection_test.dart`, `test/ui/category/widgets/category_screen_test.dart`;
-- `test/ui/geo_map/widgets/geo_map_screen_test.dart`, `test/ui/ordinary_view_model_lifecycle_test.dart`.
+D2/D3: required normalized initial categories/full types/cached sort before exposure; observer before one autoload/direct route seed; invalid route excluded. Sync setters compare values/replace immutable backing/preserve exposed snapshots/capture both fields; equal no-op versus explicit fresh refresh.
 
-I cinque artifact OpenSpec preesistenti restano untracked. Proposal/design/tasks aggiornati; `.openspec.yaml` e delta approvata invariati. Delta: **7 requisiti, 34 scenari**, nomi disgiunti dal primo OpenSpec e nessuna seconda MODIFIED. Primo OpenSpec e canonical invariati; nessuna sync/archive. Tutti i **21 task verificati**, inclusa la review locale indipendente che ha riletto gli artifact dopo la precisazione D7, senza finding materiali residui.
+D4/D5: sole RestartableCommand authority; action uses immutable snapshot/private candidates/all-filtered/current-year/places→events/first original error without commits. Pre-autoload listener publishes only authoritative Success with current sort. New filter clears; refresh internally retains. No progression/token/fake cancellation.
 
-Verifica automatica contro il manifest iniziale: ogni tracked esterno all’allowlist conserva lo SHA256 originale; registrazioni dei quattro worktree identiche, index vuoto, branch invariato, HEAD finale ancora `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, ancestry positiva e zero commit oltre checkpoint. Nessun altro checkout o branch modificato. Nessun commit/push/PR/merge/archive/sync eseguito. I comandi dei log hanno cwd Category; i percorsi temporanei contengono prove/snapshot, non baseline alternative.
+D6: createResultCommand preserves single-flight/no-op, updates menu/order before write/rechecks after notify/returns original Result; failure retains session without false cache claim/refetch/rollback. Tests with opposite name/date ordering distinguish sorting policies.
 
-**READY FOR INDEPENDENT CODE REVIEW**. Gate B/C/P/S/U/L coperti, suite completa verde, 105 INFO residue esattamente riconciliate, strict verde. Nessun blocker materiale noto. Le limitazioni upstream e di persistenza sopra descritte restano esplicite; la consegna non autorizza integrazione nella PR cumulativa.
+D7 regression found stale terminal on first refresh frame: immediate isRunningSync read precedes snapshot without observing that notifier; public refresh notifies post-admission, constructor _startLoad never notifies. No parallel loading state/forwarder; snapshots still distinguish skeleton/grid/empty/failure-retry, independent of sort completion.
 
+F1 confirmed setEquals per field/equal-wrapper draft retention/changed-field-only update/old snapshot independence. F2 safe empty labels/first guard/normal-close-only reset/no persistent empty semantics. RF3 rows capture opening draft/callback, mounted→identity after await/no superseded publication, ObjectKey for equal-selection different owners; observed A→B→A invalidates/coalesced A→A preserves. No new controller/notifier/token.
 
-## Remediation finale della code review — F1 callback owner GeoMap
+D8: sync idempotent revoke/detach before restartable dispose/deferred super.dispose; local invalidatable microtask→event setSort cleanup retains actual Command to settlement/reporting. No global foundation change/runtime conversion.
 
-Questa sezione supera il precedente verdetto dell’apply solo rispetto al finding emerso nella successiva review indipendente. **F1 della code review (MEDIUM)** è distinto da F1 del planning: qui il difetto è ownership del consumer GeoMap, non il confronto semantico dei set. Planning, F1/F2/RF3 documentali e risultati storici dell’apply restano conservati.
+### Focused gates executed
 
-### Baseline incrementale e supporti
+All historical tests used `flutter test --no-pub` with expanded reporter from dedicated Category worktree. Overlapping runs are not summed as distinct tests.
 
-Worktree Category, branch e HEAD ancora `codex/plan-migrate-category-view-model-commands` / `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, ancestry positiva, index vuoto. Inventario iniziale identico alla consegna apply: 14 tracked modificati, 10 untracked, cinque artifact presenti e 21/21 task completati. Verificati byte/hash dei 19 Dart dell’apply contro lo snapshot analizzato precedente; nessuna modifica sconosciuta. Nessun checkout/fetch/reset/clean/merge/rebase/cherry-pick o nuovo worktree in questa remediation. Manifest e diff iniziali in `/private/var/folders/c3/zqb0crmd579dm8qdg8cyfhsr0000gn/T/category-final-remediation-2huxf73t/initial.json` e `initial.diff`.
+| Gate | Evidence | Outcome |
+| --- | --- | --- |
+| B1–B3 | route_parameter_redirect/route_ownership/main_navigation_restoration: pending singleton-all first frame/invalid zero query/same-owner Back-branch/new slug/production restoration | Pass in aggregate |
+| C1–C4/P1–P3/S1–S4 | Category ViewModel **26 cases**: controlled snapshots/atomic sequential/first-second errors/retry/A→B/A→B→A/types/sort-query orders/single-flight/identical Result | Pass in aggregate |
+| U1 | CategoryScreen **11 cases**: initial skeleton/domain-runtime retry-empty/first retained-refresh frame/pending filter/optimistic menu | Pass in aggregate |
+| U2–U4/F1/F2/RF3 | Selector **41 cases**, 400/1000 × field, edited-empty draft/real-other-coalesced confirmed changes/stale toggle/reopen/replacement | Pass in aggregate |
+| U5 | One real GeoMap draft-empty/parent-notify/retention/existing callback case, no migration | Pass in aggregate |
+| L1/L3/L4/P4 | Category lifecycle **15 cases**, before-entry/places-events/late success-error-StateError-TypeError-assertion beyond 50 ms virtual/original stack/report/reentrancy/child cleanup once | **15 passed, exit 0** |
+| L2/L3 | categorySort ordinary matrix **+14 cases** and foundation Result/restartable/reporting/upstream disposal | Pass in aggregate, existing upstream skips only |
 
-Supporti cercati e riutilizzati: builder privati già presenti nello stesso geo_map_screen_test, ValueListenableBuilder del test production owner replacement esistente, FakeEventRepository.pendingGetById/getByIdCallCount, makeEvent, testOwnerUI e pumpCommandTurns. Nessun nuovo helper, fake o supporto. Skill test/reuse/async-mounted/static-analysis lette prima delle modifiche pertinenti.
+Final aggregated command:
 
-### Root cause verificata e correzione minima
+```text
+flutter test --no-pub test/ui/category test/ui/ordinary_view_model_lifecycle_test.dart test/routing/route_parameter_redirect_test.dart test/routing/route_ownership_test.dart test/routing/main_navigation_restoration_test.dart test/ui/geo_map/widgets/geo_map_screen_test.dart test/utils/result_command_test.dart test/utils/restartable_command_test.dart test/utils/command_configuration_test.dart test/utils/command_it_disposal_behavior_test.dart --reporter expanded
+```
 
-GeoMapScreen.didUpdateWidget già scollega il precedente ViewModel e revoca le query selection/nearby. Tuttavia il trailing di AnimatedGeoMapSearchBar montava CategoryContentAndTypeSelection senza chiave dell’owner. Con A→B e confermati uguali, Flutter conservava lo State del selettore; setEquals preservava correttamente il draft ma il callback catturato all’apertura apparteneva ancora ad A. Mounted e identità draft rimanevano veri, consentendo la callback obsoleta.
+**Exit 0, 375 passed, 3 pre-existing skipped** (targeted-tests-final.log/.json, temporary historical evidence).
 
-Unica modifica produttiva: `key: ObjectKey(owner)` sul CategoryContentAndTypeSelection effettivamente restituito dal builder GeoMapScreen. Il riferimento owner è lo stesso passato a selezioni e callback in quel build. Alla sostituzione del ViewModel cambia la chiave: GeoMapScreen mantiene lo State e attraversa didUpdateWidget, il vecchio selettore viene smontato e il nuovo monta da B. Il vecchio modal può rimanere visibile, ma il mounted guard già presente termina prima di normalizzazione/callback. Con stesso owner la chiave resta equivalente e il draft non viene perso.
+Development corrections: nonexistent Place.copyWith in first test compile replaced with optional modifiedAt fixture parameter. Lifecycle Completers initially constructed outside awaiting error Zone; moved into same Zone without weakening original object/stack/fail-loud assertions. First screen regression exposed stale first-frame terminal, fixed D7. Imports/lints corrected only affected files; no weakened expectation/new skip/production seam for green tests.
 
-Minima estensione autorizzata di compatibilità del componente condiviso: quinto file produttivo rispetto ai quattro dell’apply, solo una riga in GeoMapScreen. Nessun edit a GeoMapViewModel/Command, selettore condiviso, CategoryViewModel, factory/foundation, repository, UseCase o dipendenze. Nessun token/controller/notifier e nessuna duplicazione del guard RF3. Il contratto normativo già richiede scarto dei callback owner obsoleti; delta invariata (sette requisiti, 34 scenari), nessuna duplicazione o modifica canonical.
+### Apply analyzer and formatter
 
-### Nuove regressioni R1–R5 e prova red/green
+Baseline checkpoint Git archive at `<evidence-dir>/category-apply/baseline`; resolved package_config only local root adapted. Direct Dart:
 
-Quattro test parametrizzati in geo_map_screen_test: categorie/tipi × draft non vuoto/vuoto. Usano GeoMapScreen reale mantenendo il suo State; ValueListenableBuilder sostituisce il ViewModel A con B distinto e filtri uguali. Prima della chiusura, provano vecchie righe ancora visibili con checkbox modificate, vecchio State già non mounted, nuovo selettore montato. Dopo close provano zero admission di entrambi i Command filtro su A e B, anche nel caso empty→all che sarebbe un no-op semantico: i listener rilevano comunque l’eventuale esecuzione. Selezioni di entrambi gli owner invariate e nuovo selettore inizializzato da B.
+```text
+<flutter-sdk>/bin/cache/dart-sdk/bin/dart analyze --format machine <evidence-dir>/category-apply/baseline
+```
 
-Tutti e quattro i casi includono lookup fisici pendenti tramite Completer per A e B; didUpdateWidget revoca A senza trasferirne l’autorità. Dopo chiusura si dispone A con Future ancora pending, si avanza oltre 50 ms virtuali, poi completano A obsoleto e B corrente. Nessuna notifica post-dispose, nessuna mutazione di A, solo il contenuto proprio di B, nessuna seconda azione o eccezione lifecycle. Nessun sleep reale o dipendenza dal numero di microtask.
+**Raw returncode 0, 113 INFO, 0 warnings/errors**, all DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE; baseline-analyzer.json/.log/.stderr.
 
-R4 riusa il test GeoMap preesistente di draft empty mantenuto su owner notify e normalizzazione alla singola conferma; la matrice Category condivisa già copre draft nonempty, altro campo, sheet/dialog e chiusure normali senza duplicarla in GeoMap. R1/R2/R3 provano entrambe le tipologie; R5 aggiunge query pendenti e settlement post-dispose al medesimo scenario reale.
+Final byte-verified nonignored-file snapshot `<evidence-dir>/category-apply/final-snapshot`, equivalent metadata/direct command with that argument: **raw returncode 0, 105 INFO, 0 warnings/errors**. Counter by severity/rule/file/message/multiplicity after root/line normalization: **exactly eight Category removed/105 unchanged/zero new**. final-analyzer.json/associated stdout-stderr; SHA256 manifest `cd14356fd692252f8a3c95997371b1e574ae02ef59031737dda488674279c34a`. Later document-only edits did not alter analyzed code. No separate flutter analyze/no inferred wrapper exit/no suppression/config change.
 
-**Prova discriminante prima dell’edit produttivo:** `/opt/homebrew/bin/flutter test --no-pub test/ui/geo_map/widgets/geo_map_screen_test.dart --plain-name 'Map selector owner replacement' --reporter expanded`: **exit 1, 0 passati / 4 falliti**, tutti su oldPublications: atteso 0, effettivo 2 (start/terminale del setter causato dal callback obsoleto). Dopo la sola chiave: **exit 0, 4 passati**, stessi test/aspettative. Log `red.log/.json` e `green.log/.json` nella directory della remediation. Le correzioni successive ai test sono soltanto lint/format (cascade, braces e commenti), senza cambiamento delle aspettative.
+Last dart format: **exit 0, 19 files, 0 changed**, intentional Dart only. No Category legacy import/type/use; no dependency/UseCase/production repository/foundation/other Command/canonical change.
 
-Primi tentativi di setup dei nuovi test non costituiscono questa prova red: pumpAndSettle non terminava con skeleton intenzionalmente animato e un finder usava ValueKey<Object> anziché la reale ValueKey tipizzata. Corretto guidando l’animazione modal con Durations.long4 e clock virtuale e usando le chiavi tipizzate; nessuna modifica produttiva prima della prova red effettiva.
+### Preserved limitations and local review
 
+Obsolete physical query may finish captured phases while live, never publish; no new phase after disposal. Nonterminating work retains private cleanup without invented timeout. Original runtime object/stack/assertion fail-loud retained. Session sort may diverge from cache after write failure; no new retry/cross-owner serialization. Unserialized filters are not promised restorable.
 
-### Gate della remediation e confronto diagnostico
+Self-review plus separate local read-only reviewer found no material bootstrap/snapshot/latest-intent/atomic/sort/F1-F2-RF3/reporting/cleanup/scope issue. Reviewer requested explicit first-frame barrier/current artifact status; D7/evidence updated. This local review did not replace later independent cumulative code review.
 
-Tutti i comandi sotto hanno cwd nel worktree Category autorizzato. Log e metadati grezzi nella directory `category-final-remediation-2huxf73t` indicata sopra. Nessun risultato dell’apply storico viene riattribuito a questa remediation.
+### Full suite, validation and integrity
 
-- **Mirati:** `/opt/homebrew/bin/flutter test --no-pub test/ui/geo_map/widgets/geo_map_screen_test.dart test/ui/category test/routing/route_ownership_test.dart test/ui/ordinary_view_model_lifecycle_test.dart --reporter expanded`: **exit 0, 264 passati, zero falliti/skipped** (`targeted.log/.json`).
-- **Aggregati finali:** `/opt/homebrew/bin/flutter test --no-pub test/ui/category test/ui/ordinary_view_model_lifecycle_test.dart test/routing/route_parameter_redirect_test.dart test/routing/route_ownership_test.dart test/routing/main_navigation_restoration_test.dart test/ui/geo_map/widgets/geo_map_screen_test.dart test/utils/result_command_test.dart test/utils/restartable_command_test.dart test/utils/command_configuration_test.dart test/utils/command_it_disposal_behavior_test.dart --reporter expanded`: **exit 0, 379 passati, 3 skip upstream preesistenti**, zero fallimenti (`aggregate-final.log/.json`). B/C/P/S/U/L rimangono soddisfatti; +4 casi rispetto ai 375 dell’apply.
-- **Suite completa:** `/opt/homebrew/bin/flutter test --no-pub --reporter expanded`: **exit 0, 2.480 passati, 6 skip preesistenti, zero fallimenti** nel primo run della remediation (`full.log/.json`). Sono gli stessi sei skip identificati nell’apply; nessun nuovo skip. Runtime ObjectBox locale già predisposto riutilizzato senza modifiche, hash invariato. Dopo i soli lint finali dei nuovi test sono stati riconfermati gli aggregati; risultato dell’ulteriore run completo sui file definitivi registrato nel paragrafo conclusivo sotto.
-- **Formatter:** `/opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart format lib/ui/geo_map/widgets/geo_map_screen.dart test/ui/geo_map/widgets/geo_map_screen_test.dart`: **exit 0, 2 file, zero modifiche residue** nell’ultimo passaggio. Nessun formatter su altre superfici.
-- **Analyzer:** `/opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart analyze --format machine /private/var/folders/c3/zqb0crmd579dm8qdg8cyfhsr0000gn/T/category-final-remediation-2huxf73t/analyzer-snapshot`: **returncode grezzo 0, 105 INFO / zero warning / zero errori**, tutte DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE. Snapshot byte-identico dei sorgenti non ignorati; metadata risolti copiati, sola root del package locale adeguata al percorso fisico canonico. Counter per severity/tipo/regola/file/messaggio/molteplicità contro `category-apply-lfqm6rs2/final-analyzer.log`, normalizzando root e posizioni spostate: **105 identità invariate, zero aggiunte/rimosse** (`analyzer.log/.stderr/.json`). Nessuna nuova dipendenza legacy in Category, nessuna modifica ai Command GeoMap. Non eseguito un diverso flutter analyze; il suo exit non è inferito dal Dart.
+`flutter test --no-pub --reporter expanded`: final **exit 0, 2.476 passed, 6 skipped, 0 failed**, **90,85 s** (full-tests-final.log/.json in temporary historical evidence). Same checkpoint skips: three upstream StateError disposal cases, one existing GeoMap route skip and local E2E gates MOLISE_ALL_DAY_LOCAL_E2E/MOLISE_EXTERNAL_TOKEN_LOCAL_E2E. No new skip.
 
-Un primo tentativo analyzer usava il percorso `/var/folders` non risolto nella rootUri mentre l’analyzer vedeva `/private/var/folders`: diagnosticava erroneamente sorgenti dello stesso package come root diverse (exit 3). Scartato come errore di preparazione dello snapshot, corretto con Path.resolve senza toccare il checkout. L’analisi valida intermedia rilevava tre soli lint nuovi (due commenti oltre 80 caratteri e un cascade): corretti nei nuovi test e rieseguita l’analisi, producendo il confronto identico sopra. Log intermedi conservati; nessuna soppressione o modifica analyzer.
+First two full runs failed **exit 1, 2.254 passed, 6 skipped, 222 failed** because native ObjectBox unavailable, with cascading setup/teardown failures. Second DYLD_LIBRARY_PATH-only attempt did not fix search. Environment correction: byte-identical already-available main-checkout binary copied read-only into ignored Category `lib/libobjectbox.dylib`, SHA256 `1af2e266e523dbcc33b3682eebf297f2f4f23ade6ab706dab794f7a6f8108751`. No download/manifest-lock/ObjectBox-code change. Final ordinary command needed no DYLD override. Ignored runtime/build/resolved metadata are not production sources. Failed logs retained then as full-tests.log/.json/full-tests-native.log/.json; availability now not guaranteed.
 
-### Riesame adversariale e confini invariati
+Strict validate **exit 0**. Four Markdown parsed through marked; YAML Psych safe_load **exit 0**. Initial safe_load_file unavailable in local Ruby (**exit 1**), corrected to safe_load(contents), no package installation. Explicit fence/whitespace/newline checks on all **24 diff files including ten untracked** succeeded; git diff --check/cached exit 0, not substitutes for untracked checks.
 
-Autocontrollo più review locale indipendente read-only del diff incrementale e dei log red/green: **nessun finding materiale residuo**. Verificati punto corretto della chiave, sopravvivenza dello State screen, remount per owner distinti anche con set uguali, mounted guard prima della callback, vecchio modal ancora visibile, draft vuoto/nonvuoto e query pending. Nessuna nuova responsabilità di ownership nel selettore e nessun mutamento della semantica legacy GeoMap. La review resta locale, non sostituisce la successiva verifica indipendente conclusiva.
+Historical final inventory: **14 tracked modified/10 untracked/none staged**. Four production files: lib/routing/core_routes.dart (Category seed only), Category ViewModel/screen/shared selector. Fifteen Dart test/support files:
 
-L’inventario incrementale contiene esattamente **cinque file**: `lib/ui/geo_map/widgets/geo_map_screen.dart`, `test/ui/geo_map/widgets/geo_map_screen_test.dart`, proposal.md, design.md e tasks.md della change Category. Il diff produttivo è una sola riga; rimuoverla riproduce byte per byte lo stato iniziale del file. Il suffisso originale di tutti i test GeoMap preesistenti è byte-identico; le quattro prove sono aggiunte all’inizio, nessuna aspettativa preesistente alterata. Tutti gli altri sorgenti/supporti/artifact conservano l’hash iniziale, inclusi `.openspec.yaml`, delta, primo OpenSpec e canonical. Il diff complessivo apply + remediation conta ora **15 tracked modificati e 10 file untracked**; index vuoto. I 21 task originali restano completati, sette requisiti/34 scenari normativi invariati.
+- test/routing/main_navigation_restoration_test.dart, route_ownership_test.dart, route_parameter_redirect_test.dart;
+- test/support/fake_repositories.dart, fixtures.dart, ordinary_view_model_lifecycle_support.dart;
+- test/support/category_screen_test_support.dart, category_selection_test_support.dart, category_view_model_test_support.dart;
+- test/ui/category/view_models/category_view_model_test.dart, category_view_model_lifecycle_test.dart;
+- test/ui/category/widgets/category_content_and_type_selection_test.dart, category_screen_test.dart;
+- test/ui/geo_map/widgets/geo_map_screen_test.dart and test/ui/ordinary_view_model_lifecycle_test.dart.
 
-Verifica GitHub read-only: PR #12 ancora open/draft, head `codex/migrate-legacy-commands` al checkpoint, updated_at `2026-10-20T12:18:05Z`, invariato dalla consegna precedente. Nessuna mutation PR. Branch e HEAD Category invariati, ancestry positiva, registrazioni worktree identiche; nessuna scrittura negli altri checkout. Nessun commit, push, merge, rebase, archive o sync canonical. La nuova riga della View non modifica i Command GeoMap o l’ordine delle query; le limitazioni e decisioni Category documentate nell’apply restano invariate.
+Five existing OpenSpec artifacts still untracked then; proposal/design/tasks updated, metadata/approved delta unchanged. **7 requirements/34 scenarios**, disjoint names/no second MODIFIED. First change/canonical unchanged/no sync/archive. **All 21 tasks verified**, including reviewer’s post-D7 artifact reread without material finding.
 
+Initial-manifest comparison confirmed outside-allowlist tracked hashes unchanged/four worktree registrations identical/empty index/unchanged branch-final HEAD `9d17d224d5094c5b043128113d9aba6a1ce69f0a`/positive ancestry/zero later commits. No other checkout/branch modified/commit-push-PR-merge-archive-sync. Temporary paths held evidence/snapshots, not alternative bases.
 
-### Esito conclusivo della remediation
+Historical **READY FOR INDEPENDENT CODE REVIEW**: B/C/P/S/U/L covered/full suite green/105 reconciled/strict green/no known material blocker. Existing upstream/persistence limits explicit; no implicit cumulative publication authorization.
 
-Ultimo run completo sui file definitivi, dopo i lint: `/opt/homebrew/bin/flutter test --no-pub --reporter expanded`, **exit 0, 2.480 passati, 6 skip preesistenti, zero fallimenti**, 91,99 s (`full-final.log/.json`). Hash dei due Dart registrati nei metadati e coincidenti con l’analyzer e i file consegnati. Nessuna modifica di codice dopo questo run.
+## Final code-review remediation — F1 GeoMap callback owner
 
-`openspec validate migrate-category-view-model-commands --strict --no-interactive`: **exit 0**; Markdown parse dei quattro artifact e YAML safe-load pertinenti validi. `git diff --check` e `git diff --cached --check`: exit 0; whitespace/newline controllati separatamente e senza anomalie su tutti i 25 file del diff complessivo, inclusi i dieci untracked. Index vuoto, branch/HEAD invariati, ancestry positiva e zero commit oltre checkpoint; altri worktree preservati. Manifest finale `integrity-final.json` attesta i cinque soli file incrementali e gli hash inalterati del resto dell’apply. Nessun nuovo artifact richiesto o non richiesto; `.openspec.yaml`, delta, canonical e primo OpenSpec invariati.
+This supersedes prior local verdict only for later independent finding. Code-review **F1 MEDIUM** differs from planning F1: consumer ownership, not set semantics. Earlier planning/F1-F2-RF3/apply results stay historical.
 
-**F1 della code review chiuso con evidenza red/green e gate completi. Nessun finding materiale residuo noto. READY FOR INDEPENDENT CODE REVIEW.** Restano le limitazioni documentate dell’apply, non nuovi blocker di questa remediation. Nessuna autorizzazione a integrazione o pubblicazione è implicita nella readiness.
+### Incremental baseline and reused support
+
+Same branch/head `codex/plan-migrate-category-view-model-commands` / `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, positive ancestry/empty index. Initial apply inventory unchanged: 14 tracked modified/10 untracked/five artifacts/**21/21 tasks**. All 19 apply Dart hashes matched previously analyzed snapshot; no unknown changes. No checkout/fetch/reset/clean/merge/rebase/cherry-pick/new worktree. Initial.json/initial.diff under `<evidence-dir>/category-final-remediation/` recorded then; ephemeral provenance, not guaranteed accessible now.
+
+Reused existing private geo_map_screen_test builders/production-owner-replacement ValueListenableBuilder/FakeEventRepository.pendingGetById/getByIdCallCount/makeEvent/testOwnerUI/pumpCommandTurns. No new helper/fake/support. Relevant test/reuse/async-mounted/static-analysis skills read before edits.
+
+### Verified root cause and minimal correction
+
+GeoMapScreen.didUpdateWidget already detaches old ViewModel/revokes selection-nearby work. AnimatedGeoMapSearchBar trailing selector lacked owner key. A→B with equal confirmed filters preserved selector State/draft legitimately via setEquals, but opening callback belonged to A. Mounted/draft identity stayed true, authorizing obsolete callback.
+
+Only production change: `key: ObjectKey(owner)` on actual built selector, same owner used by selection/callbacks. Replacing ViewModel preserves GeoMapScreen State/didUpdateWidget but unmounts old selector/mounts B. Old modal may stay visible; existing mounted guard returns before normalization/callback. Same-owner key equality preserves drafts.
+
+Authorized minimal shared-compatibility extension: fifth production file versus original four, one GeoMapScreen line. No GeoMapViewModel/Command/shared-selector/CategoryViewModel/factory-foundation/repository/UseCase/dependency edit, token/controller/notifier/duplicate RF3 guard. Existing requirement already discards obsolete-owner callbacks; delta unchanged **seven requirements/34 scenarios**, no canonical duplication/change.
+
+### New R1–R5 regressions and red/green
+
+Four parameterized real-GeoMapScreen tests: category/type × nonempty/empty draft. Preserve screen State; ValueListenableBuilder replaces distinct A→B with equal filters. Before close assert modified old rows still visible/old State unmounted/new selector mounted. After close assert zero admission to either owner’s filter Commands, including empty→all semantic no-op (listeners still detect executions); both selections unchanged/new selector seeded B.
+
+All four include actual pending A/B lookup Completers. didUpdateWidget revokes A without transferring authority. After close dispose A while pending/advance beyond 50 ms virtual/complete stale A and current B: no post-dispose notify/A mutation/extra action/lifecycle exception, only B’s content. No real sleep/microtask-count dependency.
+
+R4 reuses existing same-owner empty-draft/notify/one-confirmation GeoMap regression and shared Category nonempty/other-field/sheet-dialog/normal-close matrix, avoiding duplication. R1/R2/R3 cover both fields; R5 adds pending/post-dispose settlement in that real scenario.
+
+Discriminating pre-production-edit command:
+
+```text
+flutter test --no-pub test/ui/geo_map/widgets/geo_map_screen_test.dart --plain-name 'Map selector owner replacement' --reporter expanded
+```
+
+**Exit 1, 0 passed / 4 failed**, all oldPublications expected 0/actual 2 (stale setter start/terminal). After key alone **exit 0, 4 passed**, same tests/expectations. Historical red.log/.json/green.log/.json temporary evidence. Later test changes lint/format only (cascade/braces/comments), no weakened expectations.
+
+Earlier setup attempts were not red proof: pumpAndSettle could not finish intentionally animated skeleton; finder used ValueKey<Object> instead of real typed key. Corrected modal animation through Durations.long4/virtual clock/typed keys; no production edit before real red run.
+
+### Remediation gates and diagnostic comparison
+
+Dedicated Category cwd; logs/raw metadata under temporary category-final-remediation evidence. No old apply result reattributed to remediation.
+
+- Focused: `flutter test --no-pub test/ui/geo_map/widgets/geo_map_screen_test.dart test/ui/category test/routing/route_ownership_test.dart test/ui/ordinary_view_model_lifecycle_test.dart --reporter expanded`: **exit 0, 264 passed, zero failed/skipped** (targeted.log/.json).
+- Final aggregate: same full aggregated command as apply above: **exit 0, 379 passed, 3 pre-existing upstream skips, zero failures** (aggregate-final.log/.json). B/C/P/S/U/L remain covered; +4 versus apply 375.
+- First remediation full suite `flutter test --no-pub --reporter expanded`: **exit 0, 2.480 passed, 6 pre-existing skips, zero failures** (full.log/.json), same skip identities. Existing ignored ObjectBox runtime reused/hash unchanged. Final lint-only tests were followed by aggregate/final full run below.
+- Formatter `dart format lib/ui/geo_map/widgets/geo_map_screen.dart test/ui/geo_map/widgets/geo_map_screen_test.dart`: **exit 0, 2 files, zero residual changes**, no other surfaces.
+- Direct Dart `analyze --format machine <evidence-dir>/category-final-remediation/analyzer-snapshot`: **raw returncode 0, 105 INFO / zero warnings / zero errors**, all DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE. Byte-identical nonignored-source snapshot/resolved metadata with local root adapted to canonical physical path. Counter by severity/type/rule/file/message/multiplicity versus prior final-analyzer.log, root/shifted-position normalization: **105 unchanged identities, zero added/removed** (analyzer.log/.stderr/.json). No Category legacy/GeoMap Command changes. No separate flutter analyze/inferred wrapper exit.
+
+First analyzer preparation used unresolved temporary-directory alias while analyzer resolved its physical path, splitting one package into two roots (**exit 3**). Discarded/corrected with Path.resolve without checkout changes. Intermediate valid run found three new test lints (two >80-character comments/one cascade), corrected/rerun to identical 105. Intermediate logs preserved then; no suppression/config change.
+
+### Adversarial review and unchanged boundaries
+
+Self-review plus independent local read-only diff/red-green review: **no remaining material finding**. Verified correct key site/retained screen State/distinct-owner remount even equal sets/mounted before callback/still-visible old modal/empty-nonempty drafts/pending queries. No new selector ownership responsibility or changed legacy GeoMap semantics. Local review did not replace final independent review.
+
+Exactly **five incremental files**: GeoMapScreen, its test and Category proposal/design/tasks. Production diff one line; removing it reproduces initial file byte-for-byte. Original GeoMap test suffix byte-identical/four new tests prepended/no original expectation changed. All other source/support/artifact hashes unchanged, including metadata/delta/first change/canonical. Overall apply+remediation **15 tracked modified/10 untracked**, empty index; **21 original tasks**, seven requirements/34 scenarios unchanged.
+
+Read-only GitHub open Draft/checkpoint branch head/updated_at `2026-10-20T12:18:05Z` unchanged. No PR mutation/other-checkout write/commit/push/merge/rebase/archive/canonical sync. Same branch/HEAD/positive ancestry/worktree registrations. View key neither changes GeoMap Commands nor query order; earlier Category limits/decisions unchanged.
+
+### Final historical remediation result
+
+Final post-lint full suite: `flutter test --no-pub --reporter expanded`, **exit 0, 2.480 passed, 6 pre-existing skips, zero failures**, **91,99 s** (full-final.log/.json). Both Dart hashes matched analyzer/delivered files; no later code changes.
+
+Strict validate **exit 0**; four Markdown/YAML safe-load valid; git diff --check/cached exit 0; separate whitespace/newline checks on **25 overall files including ten untracked** clean. Empty index/unchanged branch-HEAD/positive ancestry/zero later commits/other worktrees preserved. integrity-final.json recorded only five incremental files/rest unchanged hashes. No new artifact/metadata-delta-canonical-first-change edit.
+
+**Code-review F1 closed with red/green and complete gates; no known remaining material finding. READY FOR INDEPENDENT CODE REVIEW.** Existing apply limitations remain, not new blockers. Readiness did not itself authorize publication.
+
+## Published checkpoint — later reconciliation
+
+Git verifies `e3d9d891c5b560524e66b35f0bf70f9108cacb7e`, parent `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, committed 2026-10-20 and included in [Draft PR #12](https://github.com/xmattjus/moliseis/pull/12). This later record distinguishes published status from original local closeouts and does not invent self-referential commit metadata. Next checkpoint Content `1f3753b10c18061c6655cb32d078bf93aff1b05e` has this parent. All seven implementations are now published; historical INFO progression **125 → 113 → 105 → 87 → 66 → 52 → 37 → 0** describes successive checkpoints, not reconciliation runs. Category had 105 INFO, not zero.
+
+Tracked sources/tests/docs and Git history are persistent evidence. Temporary logs/snapshots above document historical provenance/results without claiming current access. Historical local tests do not establish exact-SHA GitHub Actions success; use actual workflow records separately. PR remains Draft. Legacy compatibility removal/canonical synchronization/archival/merge require separate authorization.
+
+Historical remote CI is separate from the local passes above: the [GitHub Actions run](https://github.com/xmattjus/moliseis/actions/runs/39501097232) associated with `e3d9d891c5b560524e66b35f0bf70f9108cacb7e` concluded **failure**. This publication record does not relabel that checkpoint as CI-clean or infer the failure cause from local results. Later-head workflow results belong to their own exact SHAs.

@@ -1,47 +1,42 @@
-> **Tracciabilità:** le sezioni prima di “Apply evidence — 2026-10-20” sono
-> il registro storico del planning e delle sue remediation. L’apply seguente è
-> a sua volta il resoconto precedente alla code review CR-F1–CR-F3. La sezione
-> “Remediation post-apply — CR-F1–CR-F3” definisce la decisione corrente: corregge
-> esplicitamente l’ipotesi storica che vietava anche la riconciliazione del flag
-> Sentry dopo dispose, senza ripristinare autorità di presentazione all’owner.
+> **Traceability:** Sections before “Apply evidence — 2026-10-20” record historical planning/remediation. Apply evidence precedes the independent CR-F1–CR-F3 review. Post-apply remediation explicitly supersedes the historical prohibition on reconciling Sentry consent after disposal, without restoring presentation authority. Publication is recorded separately at the end.
 
-## Context
+## Context — historical planning
 
-Vedere proposal.md per motivazione e perimetro. **VERIFICATO** indica codice/documenti letti o comandi realmente eseguiti; **PROPOSTO** indica strategia futura; **INFERENZA** indica conseguenze del sorgente da confermare nei regression test. La remediation modifica solo quattro artifact esistenti, senza apply.
+See proposal.md for motivation/scope. **VERIFIED** means inspected code/documents or executed commands; **PROPOSED** means planned strategy; **INFERENCE** means source-derived consequences requiring regression tests. This documentation-remediation phase changed four existing artifacts without apply.
 
-### Preflight e provenienza
+### Preflight and provenance
 
-Nel preflight F1–F6 furono riletti AGENTS.md, i cinque artifact, i sei ViewModel del precedente perimetro e la canonical. Nel nuovo preflight R1–R3 sono stati riletti AGENTS.md, tutti i cinque artifact, la canonical command-execution-concurrency e i sorgenti/test richiesti per cleanup, Favourite, Theme, repository e reporting, confrontandoli con origin/main e con i pacchetti risolti. Nessun AGENTS annidato; istruzioni OpenSpec e ruoli locali applicabili. La richiesta di remediation autorizza direttamente le modifiche documentali indicate, senza un ulteriore giro di conferma per ciascun artifact. Root repo-local, schema spec-driven; .openspec.yaml invariato (`created: 2026-10-19`, senza skip_specs).
+F1–F6 preflight re-read AGENTS.md, five artifacts, six ViewModels in the earlier scope and the canonical specification. R1–R3 re-read those instructions/artifacts, canonical command-execution-concurrency and relevant cleanup/Favourite/Theme/repository/reporting sources/tests against origin/main and resolved packages. No nested AGENTS applied. The remediation request authorized the document changes without per-artifact confirmation. Repository-local root, spec-driven schema; .openspec.yaml unchanged (`created: 2026-10-19`, no skip_specs).
 
-Fetch origin/main riuscito nella remediation: `d16f73714fcbb58d1ee4ed91a45e61be1072667e`, uguale alla baseline richiesta. HEAD `556c62b0d1e57dbebc24d2fb2e19da1785aeab09`, branch `codex/resolve-flutter-analyzer-diagnostics-pr3`, 0 ahead/7 behind. Il checkout vecchio non è base di implementazione. Prima di apply usare l’ultimo origin/main verificato e riconciliare drift. Nessun checkout, reset, merge o worktree creato ora.
+Fetched origin/main was `d16f73714fcbb58d1ee4ed91a45e61be1072667e`, matching the requested baseline. HEAD was `556c62b0d1e57dbebc24d2fb2e19da1785aeab09` on `codex/resolve-flutter-analyzer-diagnostics-pr3`, 0 ahead/7 behind. This old checkout was not the implementation base: apply required the latest verified origin/main and reconciled drift. No checkout/reset/merge/worktree creation occurred in that phase.
 
-Working tree iniziale della remediation: ` M AGENTS.md`, `?? openspec/changes/migrate-simple-view-model-commands/`, `?? openspec/changes/resolve-flutter-analyzer-diagnostics-pr4/`; index vuoto. Hash iniziali dei file tracked/untracked non ignorati acquisiti per verificare che soltanto i quattro artifact autorizzati cambino. Tutto il resto va preservato.
+Initial state: ` M AGENTS.md`, `?? openspec/changes/migrate-simple-view-model-commands/`, `?? openspec/changes/resolve-flutter-analyzer-diagnostics-pr4/`; empty index. Initial tracked/nonignored-untracked hashes were captured to verify only four authorized artifacts changed; all other work was preserved.
 
-Confronto mirato HEAD↔origin/main: i sei ViewModel riletti, foundation, canonical e dipendenze sono identici. Main include però PR4: await espliciti nei UseCase, Result e fake/test; la differenza nel widget selezione Category è ormai esclusa. Si usano codice e archivio PR4 su main come fonte, non il piano PR4 untracked o i vecchi fake di PR3. Il precedente audit ha letto gli archivi foundation 2026-10-12-adopt-command-it-restartable-foundation e PR4 2026-10-19-resolve-flutter-analyzer-diagnostics-pr4, incluso ledger 125; non sostituiscono il codice corrente.
+Targeted HEAD↔origin/main comparison found the six ViewModels, foundation, canonical and dependencies identical. Main also included PR4 explicit awaits in UseCases/Result/fakes/tests; the Category selector difference was excluded. Main code and archived PR4, rather than untracked planning or old PR3 fakes, were authoritative. Foundation archive `2026-10-12-adopt-command-it-restartable-foundation` and PR4 archive `2026-10-19-resolve-flutter-analyzer-diagnostics-pr4` (including ledger 125) were inspected as history, not substitutes for current code.
 
-Foundation riletta: lib/utils/{command,result_command,restartable_command,command_configuration}.dart; test/utils/{result_command_test,command_it_disposal_behavior_test}.dart. Sorgente autoritativo della versione risolta: `~/.pub-cache/hosted/pub.dev/command_it-9.5.2/lib/command_it.dart`, in particolare run 312–413, dispose 799–825, runAsync 859–870. Pubspec ^9.5.2/lock/package_config risolvono command_it 9.5.2 e listen_it 6.0.0; Flutter 3.47.5 e Dart effettivo 3.13.4. Nessun pub get/upgrade. Le limitazioni di lifecycle non sono inferite dalla versione latest online.
+Foundation: lib/utils/{command,result_command,restartable_command,command_configuration}.dart and test/utils/{result_command_test,command_it_disposal_behavior_test}.dart. Resolved source: `<pub-cache>/hosted/pub.dev/command_it-9.5.2/lib/command_it.dart`, especially run 312–413, dispose 799–825, runAsync 859–870. Pubspec ^9.5.2/lock/package_config resolved command_it 9.5.2 and listen_it 6.0.0; Flutter 3.47.5/effective Dart 3.13.4. No pub get/upgrade. Lifecycle conclusions used this source, not an online latest version.
 
-### Baseline e diagnostiche — R3
+### Baseline and diagnostics — R3
 
-**Risultato storico verificato.** Nella prima fase, sullo snapshot di origin/main `d16f73714fcbb58d1ee4ed91a45e61be1072667e`, il comando analyzer è stato eseguito dalla directory `/Users/benitomatteobercini/Developer/Progetti/moliseis_v2`:
+**Verified historical result.** The first analysis used origin/main snapshot `d16f73714fcbb58d1ee4ed91a45e61be1072667e`, from `<worktree>`, with the direct Dart SDK:
 
 ```sh
-/opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart analyze --format machine /private/tmp/molise-command-planning-main > /tmp/molise-command-planning-analyze.log
+<flutter-sdk>/bin/cache/dart-sdk/bin/dart analyze --format machine <snapshot> > <evidence-dir>/molise-command-planning-analyze.log
 ```
 
-È il Dart SDK eseguito direttamente, non il wrapper `flutter analyze`. I soli argomenti analyzer erano `--format machine` e la directory assoluta; nessun `--fatal-infos`, nessuna disattivazione esplicita di fatal-warnings. L’help del Dart risolto conferma warning fatal di default e info non fatal di default: questo spiega la compatibilità di **125 INFO, 0 WARNING, 0 ERROR ed exit grezzo 0**, ma l’exit non viene dedotto da tale conteggio. L’exit 0 è riportato dal risultato del processo nel transcript della prima esecuzione; il solo log machine non registra argv, cwd o exit.
+These are portable placeholders for the historical executable/cwd/snapshot/output locations, not verbatim path evidence. Arguments were `--format machine` and one absolute snapshot directory: no --fatal-infos or explicit fatal-warning override. Resolved Dart help confirmed warnings fatal by default and INFO nonfatal. The process transcript recorded **125 INFO, 0 WARNING, 0 ERROR, raw exit 0**; counts alone do not establish exit, and the machine log alone lacks argv/cwd/exit. This was not flutter analyze.
 
-**Evidenze ritrovate e nuova verifica distinta.** Il log originale esiste ed è stato riletto nella remediation R1–R3: SHA-256 `aa6b5d4f212e9a0305ff5c8526c1b2ff6b2f6ba74ed378944ad28f23a7a87f11`. Il replay non mutativo della remediation ha rieseguito lo stesso argv dalla stessa cwd tramite subprocess, salvando stdout in `/tmp/molise-r123-analyzer-replay.log`, stderr in `/tmp/molise-r123-analyzer-replay.stderr` e metadati in `/tmp/molise-r123-analyzer-replay.json`. **Nuovo exit grezzo misurato: 0; 125 INFO, 0 WARNING, 0 ERROR; stderr vuoto.** Il nuovo stdout è identico byte per byte al log storico, con lo stesso SHA-256. Questa è una nuova esecuzione di controllo, non viene presentata come il processo storico.
+**Historical independent replay.** R1–R3 re-read the original log (SHA-256 `aa6b5d4f212e9a0305ff5c8526c1b2ff6b2f6ba74ed378944ad28f23a7a87f11`). A nonmutating subprocess replay used the same argv/cwd, saving stdout/stderr/metadata as `<evidence-dir>/molise-r123-analyzer-replay.log`, `.stderr` and `.json`. Measured **raw exit 0; 125 INFO, 0 WARNING, 0 ERROR; empty stderr**. Stdout was byte-identical with the same SHA-256. This was a distinct verification run, not the original process.
 
-Prima del replay sono stati confrontati tutti i 1.072 file regolari dell’archivio Git della base con lo snapshot: identici. Il package_config temporaneo ha SHA-256 `081b825b3c18f33193decbd1ad6c94f0b69c3a6510ec84d6298d8a8315ae1356`. Versioni verificate: eseguibile Dart **3.13.4 stable macos_arm64**; metadata SDK Flutter **3.47.5 stable**, framework `6a19cca56475dbfba1478ee68d7bd0c2ef891da1`; command_it 9.5.2 e listen_it 6.0.0 da lock/package_config. Non è stata eseguita la suite Flutter.
+All 1.072 regular Git-archive files matched the snapshot before replay. Temporary package_config SHA-256: `081b825b3c18f33193decbd1ad6c94f0b69c3a6510ec84d6298d8a8315ae1356`. Versions: Dart **3.13.4 stable macos_arm64**, Flutter SDK metadata **3.47.5 stable**, framework `6a19cca56475dbfba1478ee68d7bd0c2ef891da1`; command_it 9.5.2/listen_it 6.0.0 from lock/package_config. No Flutter suite ran in this planning replay.
 
-**Preparazione riproducibile proposta.** Dalla root del progetto: estrarre `git archive <SHA-origin/main-verificato>` in una nuova directory temporanea vuota, senza checkout; copiare soltanto il package_config già risolto in `<snapshot>/.dart_tool/package_config.json`. Nella copia, cambiare esclusivamente `rootUri` del package moliseis da `../` alla URI assoluta della directory temporanea **risolta** (`Path(snapshot).resolve().as_uri() + '/'`); mantenere tutte le altre voci SDK/dipendenze e verificare che le relative destinazioni esistano. Nel caso storico la URI è `file:///private/tmp/molise-command-planning-main/`: usare /tmp invece del percorso reale /private/tmp aveva causato diagnostiche part-of artificiali in un tentativo precedente scartato. Nessun adattamento del package_config del checkout, nessun pub get/generazione/upgrade.
+**Proposed reproduction.** From project root, extract `git archive <verified-origin/main-SHA>` into a new empty temporary directory without checkout. Copy only resolved package_config to `<snapshot>/.dart_tool/package_config.json`; in that copy change only moliseis.rootUri from `../` to the resolved snapshot absolute URI (`Path(snapshot).resolve().as_uri() + '/'`). Preserve SDK/dependency entries and verify targets exist. A discarded attempt used a temporary-directory alias rather than its resolved location and produced artificial part-of diagnostics. Do not adapt checkout package_config or run pub get/generation/upgrade.
 
-Il comando riproducibile è quello sopra con la nuova directory come unico argomento posizionale e un nuovo log. Acquisire sempre cwd, SHA base, versioni, argv completo, modifiche temporanee, stdout/stderr, conteggi per severity e **returncode del processo analyzer**; con subprocess usare returncode, con shell acquisire `$?` subito, senza pipeline che mascherino l’exit. Verificare gli stessi metadati prima e dopo l’apply; non trattare le opzioni default di un wrapper diverso come equivalenti. Se occorre anche `flutter analyze --no-pub`, registrarne separatamente comando/flag/exits: non attribuirgli l’exit del Dart diretto. I file /tmp sono evidenze effimere, non prerequisiti permanenti dell’apply.
+Use the command above with the new snapshot as sole positional argument/new log. Capture cwd/base SHA/versions/full argv/temporary adaptations/stdout/stderr/severity counts and **analyzer process returncode**; read subprocess.returncode or immediate shell `$?`, without masking pipelines. Compare metadata before/after apply. Record `flutter analyze --no-pub` independently if used; wrapper defaults/exits are not interchangeable. Temporary logs are historical ephemeral evidence, not current accessible prerequisites. Their existence was verified then; this reconciliation does not claim they remain available.
 
-**Ledger.** Le 125 righe machine, tutte `DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE`, provengono dal log originale e sono riconfermate dal replay; l’inventario durevole di tutte le 125 identità/multiplicità è nell’appendice di `openspec/changes/archive/2026-10-19-resolve-flutter-analyzer-diagnostics-pr4/design.md` su origin/main. Il ledger di preflight va comunque rigenerato sull’execution head. La tabella sotto identifica le 12 posizioni target della prima change, senza confondere rimozione di identità con un saldo numerico.
+**Ledger.** All 125 machine rows were `DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE`. The durable full identity/multiplicity inventory is the appendix of `openspec/changes/archive/2026-10-19-resolve-flutter-analyzer-diagnostics-pr4/design.md`. Apply required regeneration on its execution head. First-change targets:
 
-| File sotto lib/ui | Target su origin/main, linea:colonna | Totale |
+| File under lib/ui | Baseline origin/main line:column | Total |
 | --- | --- | ---: |
 | settings/view_models/settings_view_model.dart | 13:25, 21:8 | 2 |
 | settings/view_models/theme_view_model.dart | 11:26, 12:20, 25:8, 27:8 | 4 |
@@ -49,552 +44,377 @@ Il comando riproducibile è quello sopra con la nuova directory come unico argom
 | explore/view_models/suggestion_view_model.dart | 13:12, 21:8 | 2 |
 | favourite/view_models/favourite_view_model.dart | 20:12, 29:14 | 2 |
 
-Gate ridotto: **12 target**, sei costruzioni e sei dichiarazioni; **113 residue attese**, comprese le otto Category escluse. Confrontare identità per file/regola/simbolo/contesto e molteplicità, normalizzando root e linee spostate: zero nuove diagnostiche, non solo saldo 125−12. Registrare exit grezzo di flutter analyze, che può restare non-zero per info. Nessun lint/soppressione/config modificato.
+Gate: **12 targets** (six constructions/six declarations), **113 remaining**, including eight excluded Category diagnostics. Compare file/rule/symbol/context identities and multiplicity with root/shifted-line normalization, not merely 125−12. Record raw flutter analyze exit separately (INFO may make it nonzero); no lint/suppression/config changes.
 
-## Goals / Non-Goals
+## Goals / Non-Goals — historical plan
 
-Cinque ViewModel e sei lane ordinarie; dipendenze di dominio e persistenza invariate. Command gestisce esecuzione/stato; ViewModel orchestrazione/ottimismo/pubblicazione; repository dominio/persistenza; View rendering/feedback. Conservare Provider/ChangeNotifier, KISS/YAGNI/DRY/SRP/DIP, minimal change e Rule of Three; nessun nuovo package, nuova interfaccia o infrastruttura preventiva.
+Five ViewModels/six ordinary lanes; unchanged domain/persistence dependencies. Command owns execution/state; ViewModel owns orchestration/optimism/publication; repository owns domain/persistence; View owns rendering/feedback. Keep Provider/ChangeNotifier, KISS/YAGNI/DRY/SRP/DIP, minimal changes/Rule of Three. No package/interface/speculative infrastructure.
 
-### F1 risolto per esclusione autorizzata
+### F1 resolved by authorized exclusion
 
-CategoryViewModel e load/setSelectedCategories/setSelectedTypes/setSort, consumer, test e task esclusivi sono fuori da questa change. Le factory differiscono l’handler e non conservano automaticamente l’ingresso inline e le query annidate legacy. Il problema appartiene alla futura change indipendente **migrate-category-view-model-commands**, non creata ora. Nessuna correzione dei suoi error branch, sort, router seed, lifecycle o test è autorizzata qui. Nessun adapter, scheduler, wrapper o factory viene preparato per quella migrazione.
+CategoryViewModel load/setSelectedCategories/setSelectedTypes/setSort and exclusive consumers/tests/tasks were outside this change. Deferred factories do not automatically preserve inline legacy entry/nested queries. Category was reserved for its independent `migrate-category-view-model-commands` change, without incidental error/sort/router-seed/lifecycle fixes or preparatory adapter/scheduler/wrapper/factory here.
 
-La sequenza complessiva è ora sette OpenSpec nello stesso branch e una sola PR finale, nessuna change di coordinamento. Le altre sei non sono dipendenze implementative della prima; non modificare i loro Command. La rimozione di command.dart e zero deprecazioni globali appartengono alla PR finale.
+Historical sequence: seven OpenSpec changes on one branch/one integration PR, no coordination change or implementation dependency on later migrations. The original plan associated command.dart removal/global zero deprecations with final integration. Publication later retained compatibility code; deletion is separately authorized work.
 
-## Audit corrente e matrice dei sei Command
+## Historical audit and six-Command matrix
 
-Tutte le azioni mantengono Result<void>, con `ResultCommand<P, void>`; i no-param usano P=void. La delta F3 rende superfluo cambiare payload o aggiungere completion observer solo per spostare mutazioni già legittimamente feature-owned.
+All actions retain Result<void> via `ResultCommand<P, void>` (P=void for no-param). F3 removes any need for payload changes/completion observers merely to relocate legitimate feature-owned mutations.
 
-| ViewModel / Command | VERIFICATO | PROPOSTO |
+| ViewModel / Command | Verified legacy behavior | Proposed migration |
 | --- | --- | --- |
-| Settings / setCrashReporting | Ottimismo e notify; repository; su Result.error inversione/notify; SentryLoggingFlag sincronizzato al valore finale. | createResultCommand<bool, void>; runAsync nel callback che richiede feedback, con ammissione verificata e Result della propria esecuzione; guard lifecycle. |
-| Theme / setThemeBrightness | Ottimismo, oldBrightness locale, rollback su Result.error; SettingsScreen attende senza continuazione significativa. | createResultCommand<ThemeBrightness, void>; run nel trigger UI; runAsync solo per attese esplicite/test; lane separata. |
-| Theme / setThemeType | Come brightness su campo distinto; selettore colori commentato; test e sync_redirect_test attivi. | createResultCommand<ThemeType, void>; stessa policy; non riattivare UI commentata. |
-| Explore / loadLatest | Autoload; getLatest diretto; successo sostituisce lista e notify; Result.error conserva dati precedenti. | createResultCommandNoParam<void>; run nel costruttore/retry; commit live nella continuazione esistente. |
-| Suggestion / load | Autoload; getSuggestions; su Result.error assegna []; notify; dispose attuale immediato. | createResultCommandNoParam<void>; run; conservare retention diversa da Explore, guard continuazione e cleanup sicuro. |
-| Favourite / load | Autoload; place IDs/oggetti e commit, poi event IDs/oggetti e commit; primo errore; forwarding al VM. | createResultCommandNoParam<void>; run; ammissione sync, cattura locale del rifiuto durante write, forwarding results e cleanup post-settlement. |
+| Settings / setCrashReporting | Optimism/notify, repository write, Result.error inversion/notify, SentryLoggingFlag follows final value | createResultCommand<bool, void>; runAsync only for required feedback, verified admission/own Result; lifecycle guards |
+| Theme / setThemeBrightness | Optimism/local oldBrightness/error rollback; screen wait has no meaningful continuation | createResultCommand<ThemeBrightness, void>; UI run, runAsync for explicit waits/tests; independent lane |
+| Theme / setThemeType | Separate field, same policy; commented color selector; active tests/sync_redirect_test | createResultCommand<ThemeType, void>; same policy without reactivating UI |
+| Explore / loadLatest | Autoload/direct getLatest; success replaces list/notify, error retains | createResultCommandNoParam<void>; constructor/retry run; live continuation commit |
+| Suggestion / load | Autoload/getSuggestions; error assigns []; notify; immediate legacy disposal | createResultCommandNoParam<void>; preserve distinct retention, guard continuation/safe cleanup |
+| Favourite / load | Place IDs/objects/commit, then events/commit; first failure; ViewModel forwarding | createResultCommandNoParam<void>; sync admission, capture load rejection during writes, results forwarding/post-settlement cleanup |
 
-### Consumer e test nel perimetro
+### Consumers and tests
 
-SettingsScreen usa Consumer dei due VM; main.dart Consumer<ThemeViewModel> legge themeMode al notify. ExploreScreen osserva loadLatest: cambiare solo sezione latest, non EventViewModel/coordinator temporale. SuggestionHorizontalListView osserva load, skeleton/error/retry/empty-state. FavouriteScreen osserva **il ViewModel**; FavouriteButton legge isUpdating/membership e attende direttamente setFavourite. Non cambiare lo scope dei Provider in dependencies.dart/router.dart.
+SettingsScreen consumes both preference owners; main.dart Consumer<ThemeViewModel> reads themeMode on notify. Change only ExploreScreen latest, not Event/coordinator. SuggestionHorizontalListView observes load/skeleton/error/retry/empty. FavouriteScreen observes **the ViewModel**; FavouriteButton reads isUpdating/membership and directly awaits setFavourite. Preserve Provider scopes in dependencies.dart/router.dart.
 
-Cinque suite: test/ui/settings/view_models/{settings_view_model_test,theme_view_model_test}.dart; test/ui/explore/view_models/{explore_view_model_test,suggestion_view_model_test}.dart; test/ui/favourite/view_models/favourite_view_model_test.dart. Consumer da validare: settings_screen_test, favourite_button_test e widget latest/suggestion/screen pertinenti; routing sync_redirect_test e altri test Provider che istanziano questi cinque owner, senza nuovi test esclusivi di feature escluse. Riutilizzare test/support/{fake_repositories,fixtures,command_test_support,favourite_button_harness,sync_harness} verificati sull’execution head.
+Five suites: test/ui/settings/view_models/{settings_view_model_test,theme_view_model_test}.dart, test/ui/explore/view_models/{explore_view_model_test,suggestion_view_model_test}.dart and test/ui/favourite/view_models/favourite_view_model_test.dart. Relevant consumers: settings_screen_test, favourite_button_test, latest/suggestion/screen widgets, sync_redirect_test and Provider tests instantiating these owners. Reuse execution-head test/support/{fake_repositories,fixtures,command_test_support,favourite_button_harness,sync_harness}; add no tests exclusive to excluded features.
 
-## Decisions
+## Decisions — historical planning
 
-### D1 — Foundation e F3 risolto mediante MODIFIED
+### D1 — Foundation and F3 MODIFIED resolution
 
-Usare createResultCommand/createResultCommandNoParam e ResultCommandSnapshot. Non usare RestartableCommand, nuove factory o adapter legacy; non imporre staging terminale o nuovi observer di commit alle azioni ordinarie. L’owner vivo e la singola esecuzione ammessa mantengono l’autorità: nessun generation token necessario quando non esiste superseding nella stessa lane. Theme ha due campi/lane indipendenti; Favourite ha una mutazione diretta indipendente dal Command di lettura, coordinata esplicitamente.
+Use existing createResultCommand/createResultCommandNoParam/ResultCommandSnapshot, not RestartableCommand/new factories/legacy adapters or forced terminal staging. Live owner plus accepted single-flight execution retains authority; no generation token is needed without supersession. Theme fields remain independent; Favourite direct mutation is coordinated explicitly with its read Command.
 
-La remediation autorizza una delta **MODIFIED** completa di `Only authoritative completion can commit asynchronous data`, con il nome canonico e lo scenario precedente conservati. Per restartable/latest-intent rimangono retrieval puro e commit sincrono nel completion observer autoritativo, senza eccezioni per Search/GeoMap. Per ordinary single-flight sono consentiti ottimismo, pubblicazioni progressive e rollback nelle continuazioni, soltanto se owner vivo ed esecuzione ancora autoritativa. Dispose revoca commit, rollback, notify e nuove fasi repository; non annulla fisicamente una write già avviata. Non forzare lo staging terminale di Favourite.
+Authorized MODIFIED delta preserves canonical requirement name `Only authoritative completion can commit asynchronous data` and its existing scenario. Restartable/latest-intent retrieval remains pure with synchronous authoritative completion commits, including Search/GeoMap. Ordinary single-flight may retain optimism/progressive publication/rollback inside live authoritative continuations. Disposal revokes presentation commit/rollback/notify/new repository phases; it does not physically cancel already-started persistence. Do not force Favourite terminal staging.
 
-**Verifica compatibilità della capability:** execution states e failure kinds restano invariati; Result.error non diventa throw; reporting privacy-aware exactly-once e policy assertion invariati. Newest intent, cross-type Map ownership e late stale error reporting non cambiano. Lifecycle continua a distinguere revoca pubblica e lavoro privato fino a settlement. I completion/forwarding observer pubblici sono staccati prima del notifier dell’owner; il Command trattenuto serve soltanto a completamento/reporting/cleanup privati. Forecast e le lane non migrate non ricevono nuove semantiche. Questa delta non viene sincronizzata alle canonical durante il planning.
+Capability compatibility: execution states/failure kinds unchanged; Result.error is not a throw; privacy-aware reporting once/assertion policy unchanged. Newest intent/cross-type Map ownership/late stale-error reporting unchanged. Public completion/forwarding observers detach before owner notifier disposal; retained Commands serve private settlement/reporting/cleanup only. Forecast/unmigrated lanes receive no semantics. No canonical synchronization during planning.
 
-### D2 — Snapshot e rendering
+### D2 — Snapshots and rendering
 
-Osservare command.results, catturando un solo snapshot per build e usando le extension esistenti. Non usare Command.value come prova di esito: può conservare un Result precedente. La factory non include last-result negli snapshot di loading/failure.
+Observe command.results once per build through existing extensions. Command.value may retain an old Result and is not current-outcome proof; factories exclude last-result data from loading/failure snapshots.
 
-| Snapshot | Contratto consumer |
+| Snapshot | Consumer contract |
 | --- | --- |
-| idle/never-run: data=null e nessun errore | Nessun falso successo o empty-success; discovery può mostrare skeleton previsto per bootstrap. |
-| isRunning | Loading/shimmer; dati del VM seguono la retention feature; ammissione separata sync. |
-| completed: Success<void>(null) | Successo reale distinto da null iniziale; lista/griglia o empty-state. |
-| domainError | Exception applicativa originale, errore/retry previsto. |
-| unexpectedError | Failure runtime terminale, UI errore e reporting globale originale; nessun Result.error fabbricato. |
-| nuova run dopo esito | Loading e poi nuovo esito; non promuovere value precedente a successo corrente. |
+| idle/never-run: data=null, no error | No false success/empty success; expected discovery bootstrap skeleton permitted |
+| isRunning | Loading/shimmer; feature-specific ViewModel retention; sync admission separate |
+| completed: Success<void>(null) | Actual success distinct from initial null; list/grid or empty state |
+| domainError | Original application Exception and expected error/retry |
+| unexpectedError | Terminal runtime failure/error UI and original global reporting; no fabricated Result.error |
+| next run | New loading/outcome, never old value promoted to current success |
 
-Explore mantiene lista su Result.error, Suggestion la svuota; Favourite mantiene progressione dei lati. Assertions restano fail-loud di sviluppo e non sono normalizzate in normale UI failure. Forwarding Favourite parte da results e copre anche esiti senza nuovo valore Command.
+Explore retains on Result.error, Suggestion clears and Favourite preserves progressive sides. Assertions remain fail-loud development failures. Favourite results forwarding includes outcomes without a new Command value.
 
-### D3 — run, runAsync e feedback Settings
+### D3 — run, runAsync and Settings feedback
 
-VERIFICATO: run ammette sincronicamente, alza isRunningSync, pubblica loading e poi attende Duration.zero prima dell’handler. run duplicata viene ignorata. runAsync può restituire il completer pendente e agganciarsi anche a lavoro avviato da run; restrizioni/no-start possono lasciare attesa pendente. Dispose completa il waiter col value corrente, non col successo dell’operazione. Raw throw gestito completa runAsync con errore oltre al reporting globale; Result.error è invece un normale valore.
+Verified resolved source: run synchronously admits/raises isRunningSync/publishes loading, then awaits Duration.zero before handler entry. Duplicate run is ignored. runAsync can join a pending completer, including work started by run; restrictions/no-start can leave waiting pending. Dispose completes waiters with current value, not operation success. Handled raw throws fail runAsync as well as global reporting; Result.error is an ordinary value.
 
-Usare run per costruttori/retry e callback UI senza continuazioni. Non avvolgerlo in async/unawaited. Usare runAsync nei test e nel feedback Settings soltanto da un owner live e per una richiesta nuova ammissibile (`!isRunningSync.value && canRun.value`), senza await fra check e chiamata. Nessun controllo del notifier asincrono per ammissione. I call site di feedback sono eventi UI, non listener rientranti del terminale Command; non richiamare runAsync da quei listener per attribuirgli una nuova esecuzione.
+Use run for constructors/retry/UI callbacks without continuations, without async/unawaited wrappers. Use runAsync for explicit test waits and Settings feedback only from a live owner with a new admissible request (`!isRunningSync.value && canRun.value`), no await between check/call. Async notifier state is not admission. Feedback call sites are UI events, not reentrant terminal listeners; runAsync from such listeners does not establish a new execution.
 
-SettingsScreen cattura VM/input prima dell’attesa, ignora il callback duplicato non ammesso e osserva **il Result ritornato dalla propria esecuzione**, non command.value o uno snapshot successivo di un’altra run. Snackbar solo se richiesta enable=true, Result è Success<void>, context ancora mounted e Provider riferisce ancora allo stesso owner. Il ramo errore del Future va osservato localmente senza convertire Object in Result.error e senza un secondo report: per esempio error continuation che termina soltanto l’attesa UI già gestita dal Command. I test usano handler globali ripristinati. Completamento per dispose o cambio owner non produce feedback. Non aggiungere lifecycle state holder nel widget.
+SettingsScreen captures owner/input before await, ignores rejected duplicate callbacks and observes **its own returned Result**, not command.value or a later run snapshot. Snackbar requires enable=true, Success<void>, mounted context and identical current Provider owner. Observe Future errors locally without Object→Result conversion or another report (an error continuation may end the already-reported UI wait). Restore test handlers. Disposal/owner replacement wait completion gives no feedback; add no widget lifecycle holder.
 
-**Correzione visibile dichiarata:** oggi la callback mostra lo snackbar anche dopo Result.error quando value=true. Dopo migrazione quel messaggio non viene mostrato su failure. È l’unica correzione UX intenzionale qui pianificata, già autorizzata dalla richiesta sul feedback; non dichiararla equivalenza del ramo fallito.
+Declared UX correction: legacy callback showed success for value=true even after Result.error. Migration suppresses that message on failure; this is the only authorized intentional UX correction, not failure-branch equivalence.
 
 ### D4 — Error handling
 
-Le azioni mantengono Result.error e identità delle Exception; nessun catch generico Object→Result. Le factory mantengono globalHandler; osservare results non deve disabilitare il reporting. Il wrapper legacy FlutterError.reportError viene sostituito dal percorso globale foundation per i soli sei Command, senza duplicazione. Non modificare command_configuration, whitelist, logging o assertion policy.
+Preserve Result.error/Exception identity, factory globalHandler, reporting while results are observed, and assertion policy. Replace legacy FlutterError.reportError only for migrated Commands with foundation reporting, without duplicate reports or command_configuration/whitelist/logging changes.
 
-setFavourite resta diretto Future<Result<void>>: preservare catch on Exception già in _persistFavourite, errore non-Exception resta throw, nessun global reporting automatico aggiunto a questa API. Raw StateError non diventa rollback applicativo; preservare tale distinzione. La normale failure di una write live produce invece l’esatto rollback previsto.
+setFavourite remains direct Future<Result<void>>: preserve _persistFavourite catch on Exception; non-Exception errors still throw with no automatic Command-global report. Raw StateError does not become application rollback; a normal live application failure retains exact rollback.
 
-### D5 — Lifecycle e cleanup locale — R1
+### D5 — Local lifecycle cleanup — R1
 
-**Revoca pubblica immediata, teardown fisico differito per tutti i Command, anche idle.** Ogni owner marca subito _disposed e rende idempotente la propria richiesta di disposal. Stacca subito i listener che possiede sui Command, compresi forwarder results e cattura F2c: removeListener è supportato durante dispatch e tombstona gli elementi rimossi. Non riattaccare mai un listener pubblico dopo la revoca. Il solo listener eventualmente trattenuto è privato e serve al settlement/cleanup.
+**Immediate public revocation; deferred physical cleanup for every Command, including idle.** Owners set _disposed immediately/idempotently and detach owned listeners, including results forwarding and F2c admission capture. removeListener is supported during dispatch/tombstones removed elements. Never reattach public listeners after revocation; retained listeners are private settlement/cleanup observers only.
 
-Verificare il guard all’ingresso dell’azione, dopo ogni await, dopo ogni notify sincrona potenzialmente rientrante, prima di ogni commit e di ogni nuova fase repository. Un guard soltanto dentro _notifyListeners non protegge liste o I/O successivi. Se dispose precede ingresso/write, terminare privatamente con Result.error di owner non disponibile (per Favourite riusare update-unavailable), senza iniziare I/O. Una fase già iniziata conserva il proprio esito, senza commit/rollback/notify o fasi ulteriori; se load multi-stage viene interrotto non fabbricare Success completo. La direct write già avviata conserva l’originale Result/throw. Nessuna cancellazione o rollback remoto implicito.
+Guard action entry, every post-await, post-notify and every new repository phase. _notifyListeners guarding alone cannot prevent forbidden commits/I/O. Already-started writes retain physical behavior; no cancellation claim.
 
-**Evidenza upstream necessaria, non solo idle.** In command_it.dart:249–251 results è CustomValueNotifier con asyncNotification=false di default (listen_it/src/custom_value_notifier.dart:391–396). I notifier di results e del valore Command sono sincroni; è `_isRunningAsync` a usare asyncNotification=true (command_it.dart:775–779). Su successo la dispatch terminale results precede il false sync e la notifica del valore; su errore results precede reporting globale e il false nel finally (369–407, 1000–1024). Il decoupler interno su false accoda la notifica asincrona isRunning tramite Future; il finally accoda inoltre il proprio zero-delay prima dell’eventuale logging. Il Future runAsync può completare prima di quel lavoro finale. Perciò false, snapshot terminale o Future completato **non provano da soli** che tutte le dispatch siano terminate.
+**Upstream evidence, beyond idle.** command_it.dart:249–251 results uses CustomValueNotifier with asyncNotification=false by default (listen_it/src/custom_value_notifier.dart:391–396); results/value notifiers are synchronous, whereas `_isRunningAsync` is asynchronous (775–779). On success terminal results dispatch precedes false sync/value notify; on failure results precedes global reporting/false in finally (369–407, 1000–1024). False’s internal decoupler schedules asynchronous isRunning through Future; finally schedules another zero-delay before optional logging. runAsync may complete before this work. False/terminal snapshot/completed Future alone cannot prove all dispatch finished.
 
-**Strategia locale deterministica:**
+**Deterministic local strategy:**
 
-1. Alla revoca, per ogni Command posseduto conservare soltanto un listener privato isRunningSync e flag locali di chiusura (controllo accodato / barriera invalidata da transizione successiva / rilascio effettuato). Se inizialmente attivo attendere la transizione false; se idle o never-run chiedere comunque il controllo differito, mai il dispose inline; nessuna chiamata sincrona a Command.dispose dalla dispatch dell’owner o di un notifier Command.
-2. Coalescere la richiesta in una microtask che, dopo l’uscita dallo stack corrente, accoda un unico callback event-queue tramite `Future<void>(...)`. Al momento della richiesta iniziare una barriera valida; ogni nuova transizione sync true/false prima del callback la invalida. Il listener false chiede un controllo, senza duplicarlo se è già accodato; non modifica i listener pubblici. Non eseguire il rilascio nella sola microtask: così il callback event viene accodato dopo le notifiche asincrone e lo zero-delay del finally prodotti nello stack terminale. È una barriera derivata da questo sorgente, non un timer di durata scelta né un generico rilevatore di dispatch.
-3. Nel callback consumare il flag controllo accodato e verificare di nuovo revoca, rilascio non ancora effettuato, isRunningSync e validità della barriera. Se nel frattempo c’è stata una transizione ma il Command è già tornato idle, richiedere una nuova barriera dopo quell’ultimo settlement invece di riusare quella precedente. Questo evita il caso completion durante una barriera già accodata (R1.3); è un nuovo controllo giustificato dalla transizione osservata, non polling né retry di dispose. La sicurezza deriva **insieme** da autorità revocata, uscita da dispatch, barriera non invalidata sugli eventi terminali noti e stato attuale non-running; non da idle isolato. Un’azione ordinaria in attesa mantiene true; dopo un throw gestito il reporting originale precede il false. Il finally abbassa false anche per assertion, senza trasformarla in normale terminal failure.
-4. Se ancora attivo, non disporre, non fare polling e non riaccodare tentativi periodici: attendere la prossima transizione sync false, che richiederà la stessa barriera. La transizione true invalida la barriera precedente senza programmare controlli periodici. Un nuovo run rientrante prima del controllo viene così rilevato; gli handler revocati non possono iniziare I/O. Nessun listener pubblico viene riattaccato.
-5. Se sicuro, staccare il listener privato, marcare rilasciato **prima** dell’unica chiamata Command.dispose e non ritentare dispose. La successiva dismissione dei notifier interni resta quella upstream: Command.dispose marca _isDisposing e programma internamente il teardown a 50ms (799–825). Non duplicare quel timer, non chiamare direttamente dispose sui notifier interni e non usare quei 50ms come proxy del settlement dell’azione.
+1. At revocation retain only a private isRunningSync listener per Command and local closing flags (check queued/barrier invalidated by later transition/released). If active, await false; if idle/never-run still request deferred checking. Never call Command.dispose inline from owner/Command notifier dispatch.
+2. Coalesce into a microtask that exits the current stack then schedules one event callback through `Future<void>(...)`. Begin a valid barrier when requested; any sync true/false before callback invalidates it. False requests checking without duplicating an already queued check and without modifying public listeners. Do not release in the microtask alone: scheduling the event afterward places it behind known asynchronous notifications/finally zero-delay. This derives from resolved source, not an arbitrary delay or general dispatch detector.
+3. Event callback consumes queued flag and rechecks revocation, unreleased state, isRunningSync and barrier validity. If a transition occurred and it is already idle again, request a fresh post-settlement barrier instead of reusing the old one (R1.3). This is event-driven rechecking, not polling/dispose retry. Safety combines revoked authority, exited dispatch, valid barrier across known terminal events and currently nonrunning state. Pending ordinary work remains true; handled failure reporting precedes false; finally lowers false for assertions without normalizing their failure.
+4. If still active, do not dispose/poll/schedule periodic retries; wait for next false to request the same barrier. True invalidates the old barrier without periodic checks. Reentrant run before checking is detected; revoked actions cannot start I/O. Public listeners remain detached.
+5. When safe, detach private listener and mark released **before** the only Command.dispose call, without retry. Upstream then marks _isDisposing and schedules its own internal 50ms teardown (799–825). Do not duplicate that timer/dispose internal notifiers/use 50ms as action-settlement proof.
 
-La microtask da sola basta a uscire dalla dispatch sincrona corrente, ma non a lasciare eseguire gli eventi asincroni upstream; la barriera microtask→event callback è il piccolo passo aggiuntivo motivato dal codice. Non affermare che misuri quiescenza di qualunque callback esterno arbitrario. La policy è specifica per le factory ordinarie risolte senza nuove restriction/progress handler; un upgrade richiede nuovo audit. Il callback event effettua il ricontrollo prima di avviare il rilascio upstream; una run dopo tale chiamata è rifiutata da _isDisposing.
+A microtask exits current synchronous dispatch but does not run upstream queued events; microtask→event is the required additional step. It does not establish arbitrary external-callback quiescence. This policy applies to resolved ordinary factories without new restrictions/progress handlers; upgrades need another audit. A run after upstream disposal begins is rejected by _isDisposing.
 
-**Teardown del notifier dell’owner:** anche Flutter ChangeNotifier.dispose asserisce depth==0 (SDK foundation/change_notifier.dart:376–383). Il caso Favourite results→VM.notify→listener.dispose renderebbe rientrante anche super.dispose del VM. Per questo programmare sempre la chiamata exactly-once a super.dispose del notifier dell’owner fuori dallo stack, tramite microtask dopo la revoca; non attendere per essa il Future repository. Tutti i notify e commit applicativi restano già bloccati da _disposed. Una dispatch iniziata prima della revoca può finire il proprio stack; non iniziano nuove dispatch pubbliche dopo la revoca. Non introdurre un tracker della profondità, un nuovo state holder o una nuova gerarchia per fermare retroattivamente callback già entrati.
+**Owner notifier:** Flutter ChangeNotifier.dispose asserts depth==0 (foundation/change_notifier.dart:376–383). Favourite results→ViewModel.notify→listener.dispose makes super.dispose reentrant too. Always schedule exactly-once owner super.dispose in a microtask after revocation, without awaiting repository work. _disposed already blocks new notify/commits; an existing dispatch may finish its stack. No depth tracker/state holder/hierarchy to retroactively cancel entered callbacks.
 
-Nessun manager lifecycle, nuova factory, reference counting, scheduler condiviso, polling, dispose retry illimitato, dipendenza o timeout arbitrario. I flag locali coalescono le richieste, invalidano le barriere antecedenti a nuove transizioni e garantiscono il rilascio exactly-once; la revoca rende idempotente il dispose dell’owner. Un Future non terminante conserva risorse private fino al settlement. Errori runtime tardivi continuano a raggiungere il global handler una volta senza errori secondari; assertion policy fail-loud invariata. Non usare il finally dell’azione, runAsync o soltanto results per dichiarare cleanup sicuro.
+No lifecycle manager/factory/reference counting/shared scheduler/polling/unbounded retry/dependency/arbitrary timeout. Local flags coalesce/invalidate/release once; owner disposal is idempotent. Nonterminating work retains private resources until settlement. Late runtime failures preserve one original global report/no secondary notifier errors; assertions remain fail-loud. Action finally/runAsync/results alone are insufficient safe-cleanup evidence.
 
-### Regression matrix R1.1–R1.6
+### Regression matrix R1.1–R1.6 — historical apply gates
 
-Questi sono gate di apply con Command reali, Completer e clock virtuale già usati nel test support; non esiti già verificati. Riutilizzare le fixture e parameterizzare i casi comuni senza sei copie di logica; MockCommand non prova il lifecycle reale. Osservare identità e ordine degli eventi, non un numero preciso di microtask. Per il rilascio exactly-once si possono osservare gli eventi pubblici di disposal FlutterMemoryAllocations in debug, registrati prima della costruzione e filtrati per identità (SDK memory_allocations.dart), con restoration nel teardown; nessun contatore/API di test aggiunto in produzione. Accompagnare con assenza di doppio-dispose assertion e con review dei flag locali: la sola assenza di FlutterError non prova un rilascio avvenuto.
+Use real Commands/Completers/existing virtual clock/support, reused fixtures/parameterized cases rather than six copies. MockCommand does not prove actual lifecycle. Observe identity/event ordering, not microtask counts. Debug FlutterMemoryAllocations disposal events, installed before construction and identity-filtered (memory_allocations.dart), may prove exactly-once release; restore in teardown. Add no production counter/API. Combine with no double-dispose assertion and flag inspection; absence of FlutterError alone does not prove release.
 
-| Caso | Coordinazione deterministica | Risultato obbligatorio |
+| Case | Deterministic coordination | Required result |
 | --- | --- | --- |
-| R1.1 terminale | Listener results terminale dispone owner durante la propria callback; includere anche listener del valore Command già logicamente idle | Revoca immediata, nessuna richiesta di teardown rientrante, nessun notifier-after-dispose, nessuna nuova notifica owner, rilascio privato exactly-once dopo la barriera |
-| R1.2 idle | Dispose never-run o già completato; Theme anche con una lane idle e l’altra pendente | Sempre rilascio fuori stack, nessun secondo dispose; lane pendente sopravvive fino al proprio settlement |
-| R1.3 stesso turno | Completer liberato e owner disposal nello stesso turno; coprire disposal prima e da callback terminale, e nuova transizione/settlement durante barriera già accodata | Nessuna collisione fra settlement/dispatch/cleanup, nessun report originale perso |
-| R1.4 attivo | Owner revocato mentre Completer repository è ancora pendente, poi success/Result.error | Command vivo privatamente fino a settlement, zero nuovi commit/rollback/notify/fasi repository, rilascio una volta |
-| R1.5 late failure | Dopo revoca liberare Completer con StateError originale; variante AssertionError con policy upstream invariata | StateError originale e stack al global handler una volta, nessun errore notifier secondario; assertion sul percorso fail-loud, non Result.error o report globale normale; cleanup privato una volta |
-| R1.6 Favourite | Forwarder load.results invoca notify del VM, listener del VM dispone owner rientrantemente | Forwarding e cattura admission rimossi subito; anche teardown del notifier VM fuori dispatch; nessun commit/nuova notifica tardiva e Command rilasciato una volta |
+| R1.1 terminal | Dispose from terminal results callback and already-logically-idle value callback | Immediate revocation; no reentrant teardown/notifier-after-dispose/new owner notify; exactly-once release after barrier |
+| R1.2 idle | Dispose never-run/completed; Theme one idle/one pending | Always outside-stack release once; pending lane retained until own settlement |
+| R1.3 same turn | Settle Completer/dispose in both orders, including terminal callback/new transition during queued barrier | No settlement/dispatch/cleanup collision or lost original report |
+| R1.4 active | Revoke with repository pending, then success/Result.error | Private retention; zero new commit/rollback/notify/repository phase; one release |
+| R1.5 late failure | Original StateError after revocation; AssertionError variant | Original object/stack once globally, no secondary notifier failure; assertion remains fail-loud, not Result.error/normal global failure; one cleanup |
+| R1.6 Favourite | results forwarder→ViewModel.notify→reentrant disposal | Forwarding/admission capture detach immediately; owner notifier outside dispatch; no late commit/notify; Command released once |
 
-Non cambiare gli skip upstream preesistenti per nascondere il bug: le nuove prove riguardano la policy owner che evita il dispose anticipato. Usare pump/event turn virtuali per la barriera e, ove necessario per osservare gli eventi di teardown fisico, il timer interno 50ms documentato; nessuna attesa reale o durata di sicurezza inventata.
+Preserve upstream skips: new tests prove owner policy avoiding premature disposal. Use virtual pump/event turns/barrier and documented internal 50ms timer where physical-teardown events require it; no real sleep/invented safety duration.
 
-| Owner | Guardie specifiche / risorse |
+| Owner | Specific guards/resources |
 | --- | --- |
-| Settings — decisione storica superata da CR-F1 | Un Command; guard dopo notify prima della write e dopo await prima di rollback/notify. Il precedente divieto di aggiornare anche SentryLoggingFlag dopo dispose era errato: vedere la remediation post-apply per la riconciliazione del consenso condiviso. |
-| Theme | Due Command indipendenti; guard prima delle write e dei rollback/notify; scope app non sostituisce il lifecycle. |
-| Explore | Un Command; guard prima dell’unico commit lista/notify, senza nuovo completion observer o payload. |
-| Suggestion | Un Command; guard anche su assegnazione [] di errore; sostituire dispose immediato con settlement sicuro. |
-| Favourite | Un Command più API write diretta; guard post-await e post-notify, prima delle lookup/fasi successive e dei rollback; separare revoca pubblica da cleanup del load. |
+| Settings — historical decision superseded by CR-F1 | One Command; guard after notify/before write and post-await/before presentation rollback/notify. Banning SentryLoggingFlag reconciliation after disposal was incorrect; post-apply shared-consent remediation supersedes it. |
+| Theme | Two independent Commands; guards before writes/rollback/notify; app scope does not replace lifecycle |
+| Explore | One Command; guard single list commit/notify; no new payload/completion observer |
+| Suggestion | One Command; guard error [] assignment; replace immediate disposal with safe settlement |
+| Favourite | One Command/direct write API; guards post-await/post-notify/before lookups/later phases/rollback; distinguish public revocation/load cleanup |
 
-## Audit temporale Settings/Theme
+## Settings/Theme timing audit — historical planning
 
-Riletti VM, tutti i call site di setCrashReporting/setThemeBrightness/setThemeType, Consumer main.dart, test e SettingsRepositoryImpl su origin/main. L’implementazione del repository copia i settings al momento della chiamata e aggiorna la cache dopo persistenza riuscita; nessun intervento al repository è previsto. L’indipendenza locale delle lane non è una garanzia di fusione atomica delle scritture condivise: vedere R2 sotto.
+Read ViewModels/all preference call sites/main.dart Consumer/tests/SettingsRepositoryImpl on origin/main. Repository copies settings at call time and updates cache after successful persistence; no repository change planned. Independent local lanes do not imply atomic shared-write merging (R2).
 
-| Fase | Legacy verificato | Factory ordinaria proposta |
+| Phase | Verified legacy | Proposed ordinary factory |
 | --- | --- | --- |
-| 1. Ammissione | running=true e reset risultato nello stack execute; notifica Command | isRunningSync=true e snapshot loading nello stack run; duplicati già esclusi |
-| 2. Aggiornamento locale | Action entra subito; assegna crashReporting/brightness/type; Theme cattura old-value | Action entra dopo Duration.zero; stessa assegnazione e cattura old-value |
-| 3. Observer VM | notifyListeners sincrono dopo assegnazione | Identico ordine dentro action, più tardi rispetto a dispatch; guard se observer dispone |
-| 4. Persistenza | Chiamata repository dopo notify, quindi await | Identico ordine dopo notify e guard live, quindi await |
-| 5. Esito | Su Result.error rollback e notify; su success conserva valore. Settings sincronizza flag dopo esito | Stesse politiche live; dopo dispose nessun rollback/notify/flag; Result.error distinto dal raw throw |
+| 1. Admission | running=true/reset in execute stack; Command notify | isRunningSync=true/loading in run stack; duplicates excluded |
+| 2. Local update | Inline action/field assignment; Theme captures old value | Same update/capture after Duration.zero |
+| 3. ViewModel observers | Synchronous notify after assignment | Same action-local order later than dispatch; guard if observer disposes |
+| 4. Persistence | Repository call after notify, then await | Same order after notify/live guard, then await |
+| 5. Outcome | Error rollback/notify; success retains; Settings flag follows outcome | Same live presentation policy; no post-dispose rollback/notify. Historical flag prohibition is superseded by CR-F1; Result.error remains distinct from raw throw |
 
-**Differenza reale:** un getter letto nello stesso stack subito dopo run può ancora contenere il valore precedente; non è corretto sostenere timing identico. **Evidenza consumer:** SettingsScreen attende la write crash-reporting; brightness non ha continuazione dipendente dal getter; main.dart ricostruisce su notify. setThemeType non ha UI runtime attiva oltre ai test/routing che attendono il completamento. Nessun consumer verificato richiede same-stack optimism, né orchestra un’altra operazione in funzione di quel getter subito dopo dispatch. Le due lane Theme aggiornano campi distinti; nessun nuovo latest-wins o serializzazione comune.
+Real timing difference: same-stack getter after run may still be old. SettingsScreen awaits consent; brightness has no getter-dependent continuation; main rebuilds on notify. Type UI is commented; tests/routing await it. No verified current consumer required same-stack optimism or getter-dependent orchestration immediately after dispatch. Theme lanes affect distinct fields without new latest-wins/common serialization.
 
-**Decisione:** conservare l’ordine applicativo dentro l’azione e consentire esplicitamente ingresso differito nella delta. Il ritardo è osservabile al livello di chiamata sincrona, ma non emerge un cambiamento materiale dei contratti dei consumer attuali. Non introdurre un bridge per simulare l’ingresso inline o aggiornare stato da snapshot listener. Non promettere identico frame di rendering o sequenza universale di microtask.
+Decision: preserve action-local order and explicitly permit deferred entry. Synchronous-call timing changes, but inspected consumer contracts revealed no material regression. Add no inline-entry bridge/snapshot-listener state updates or universal frame/microtask promise.
 
-**PREF1–5, regression gate:** registrare local value al notify e ingresso repository con Completer; local update/notify precedono write; successo mantiene valore, failure ripristina campo/flag; duplicati prima del primo pump e dal listener notify non scrivono due volte; type/brightness indipendenti con risposte rilasciate nei due ordini controllati, verificando esclusivamente stato/rollback locale e single-flight per lane, non l’assenza di lost update nel repository condiviso; widget Consumer si aggiorna durante persistence pending e rollback; dispose prima ingresso, dal notify e durante write impedisce le fasi vietate. Per Settings verificare zero snackbar su failure/throw/duplicato/cambio owner e uno sul successo enable della propria run. Nessun sleep o assertion sul numero preciso di microtask. Se la caratterizzazione sull’execution head trova un consumer con dipendenza same-stack, fermare affected apply e riconciliare il piano; non è una scelta architetturale già lasciata aperta.
+PREF1–5 gate: record notify values/repository entry using Completers; optimism/notify before write; success retention/application rollback; pre-pump and notify-listener duplicate rejection; both controlled response orders for independent Theme fields and success/failure/disposal combinations. Tests establish local state/rollback/single-flight, not repository lost-update absence. Widget Consumer shows pending optimism/rollback; disposal before entry/from notify/during write prevents forbidden phases. Settings snackbar: zero on failure/throw/duplicate/replacement, one for own enable success. No sleeps/microtask-count assertions. Any newly found same-stack-dependent consumer required stopping affected apply/reconciling the plan.
 
-### R2 — Rischio preesistente di lost update sul repository condiviso
+### R2 — Pre-existing shared-repository lost-update risk
 
-VERIFICATO su origin/main: ThemeViewModel ha due Command separati (inizializzazione 11–12 e azioni 30–60); SettingsRepositoryImpl.setThemeBrightness/setThemeType costruiscono entrambi `_cache.copyWith(...)` (96–104). `_persistNewSettings` attende `_dataSource.save(newSettings)` e sostituisce `_settings` soltanto su Success (43–50). Non ci sono qui mutex, merge dopo await, aggiornamenti per campo o coordinamento transazionale fra le due lane.
+Verified origin/main: separate Theme Commands (initialization 11–12/actions 30–60); SettingsRepositoryImpl.setThemeBrightness/setThemeType both build `_cache.copyWith(...)` (96–104). `_persistNewSettings` awaits `_dataSource.save(newSettings)` and updates `_settings` only on Success (43–50). No mutex/post-await merge/per-field write/transactional lane coordination.
 
-**Rischio concreto, preesistente alla migrazione:** se A=brightness e B=type vengono costruiti dalla stessa cache S0 prima che una save completi, gli snapshot possono essere S_A=(brightness nuovo, type vecchio) e S_B=(brightness vecchio, type nuovo). Un ordine di completamento può lasciare cache e contenuto salvato corrispondenti a un solo snapshot e perdere l’altro aggiornamento; dipende dall’effettivo ordine di esecuzione/salvataggio. Il VM può comunque mostrare entrambi i campi nuovi. Questo esempio dimostra il rischio, non afferma che ogni esecuzione reale lo produca o che il Command lo introduca.
+If A=brightness/B=type both copy cache S0 before either save completes, S_A=(new brightness, old type), S_B=(old brightness, new type). Completion order may leave cache/storage with one snapshot, losing the other update while the ViewModel displays both. This demonstrates a pre-existing risk, not inevitability or migration causation.
 
-**Decisione e confine:** mantenere ammissione/esecuzione indipendenti, single-flight dentro ciascuna lane, ottimismo locale e rollback del solo campo pertinente. Questa change **non garantisce atomicità, serializzazione o assenza di lost update persistito fra campi differenti**. Il differimento dell’handler resta quello dichiarato da F4; nessuna promessa di identici interleaving globali. Una caratterizzazione che provi una regressione aggiuntiva introdotta dalla migrazione richiede riconciliazione del piano; non autorizza a correggere incidentalmente il rischio repository preesistente.
+Keep independent single-flight lanes/local optimism/per-field rollback. No atomicity/serialization/persisted lost-update guarantee or identical global interleavings; deferred entry is declared in F4. A demonstrated additional migration regression requires plan reconciliation, not incidental repair of pre-existing storage behavior. Repository/data source/mutex/queue/coordinator/global serialization fixes belong to separate work. R2 remains a known accepted scope limitation.
 
-Correzione di tale rischio riservata a intervento separato, non creato né implementato qui: non modificare SettingsRepositoryImpl/data source, non aggiungere mutex, queue, transaction coordinator o serializzazione globale. È un limite noto accettato del perimetro, non un blocker nascosto da fare risolvere all’esecutore.
+Correct PREF acceptance: controlled fake admits both lanes, rejects same-lane duplicate, observes each local update/notify before its write and rollback only for its application failure; exercise both completion orders/success-failure combinations/disposal, no coupling/post-dispose commit. Fake results establish ViewModel behavior, not merging of real AppSettings. Keep tests without requiring final repository to contain both fields; add no persistence promise to delta.
 
-**Acceptance PREF corretta:** con repository fake controllabile, ammettere entrambe le lane, rifiutare un duplicato della stessa lane, osservare per ciascun campo update locale/notify prima della sua write e rollback locale solo su suo Result.error; rilasciare le due risposte in entrambi gli ordini, includendo combinazioni success/failure e dispose. Nessun nuovo accoppiamento fra i Command, nessun commit post-dispose. I risultati del fake dimostrano la logica ViewModel e non la correttezza persistente di due AppSettings reali. Non eliminare questi test, non aggiungere l’aspettativa che il repository finale contenga sempre entrambi i nuovi campi. Non modificare la delta per promettere garanzie persistenti nuove.
+## Favourite adversarial review — historical F2/F3 reconciliation
 
-## Review adversariale Favourite — F2 riconciliato con F3
+### Contract and admission
 
-### Contratto e ammissione
+Verified: constructor autoload; isUpdating=load.running||_mutationRunning; setFavourite sets mutation flag before optimism; _load checks it on entry. Optimistic IDs/objects retain exact list/index rollback on Result.error; deduplicated membership IDs survive missing objects. Load publishes the complete place side before events, still queries events after place application failure and chooses the first error; a failed side does not erase the successful other side. MODIFIED permits this progression.
 
-VERIFICATO: autoload nel costruttore; isUpdating=load.running||_mutationRunning; setFavourite alza _mutationRunning prima dell’ottimismo; _load controlla _mutationRunning all’ingresso. Le mutazioni aggiungono/rimuovono ID e oggetti ottimisticamente e ripristinano esattamente liste/indici su Result.error. IDs deduplicati sopravvivono a mancata risoluzione dell’oggetto. _load pubblica un intero lato places prima di iniziare events; esegue anche il secondo lato se il primo ha dato Result.error e privilegia il primo errore. Un errore su un lato non elimina l’altro lato riuscito. Questa progressione è prevista e consentita dalla nuova MODIFIED.
+Proposed setFavourite admission: `_disposed || load.isRunningSync.value || _mutationRunning`; preserve sync isUpdating/independent flag and no post-dispose finally update. Load rejects active writes. Keep one results→ViewModel forwarder because Screen/Button observe Provider/ViewModel; detach on disposal. Partial/optimistic ViewModel notifications remain separately necessary.
 
-PROPOSTO: admission di setFavourite usa `_disposed || load.isRunningSync.value || _mutationRunning`; isUpdating mantiene il controllo sync e il flag indipendente. Nessun aggiornamento post-dispose neppure nel finally di _mutationRunning. Il load continua a rifiutare una write attiva; il forwarder rimane necessario perché Screen/Button osservano VM e Provider. Un solo forwarder da results, rimosso al dispose; notifiche partial/optimistic del VM sono distinte e necessarie.
+### F2c — Inverse race and captured admission rejection
 
-### F2c — Race inversa e cattura locale del rifiuto
+Source-derived inference: load.run during a write whose completion precedes deferred handler entry would see _mutationRunning=false and start, whereas legacy entry rejected unavailable. Screen retry is a real input after earlier failure.
 
-INFERENZA verificabile dal sorgente: se load.run è chiamato durante una write e questa termina prima dell’handler differito, il solo guard attuale dentro _load vedrebbe _mutationRunning=false e partirebbe; il legacy avrebbe già restituito update-unavailable. Il retry di FavouriteScreen è un ingresso reale anche dopo precedente errore, quindi non ignorare questo caso.
+Capture one necessary historical fact `_loadRejectedAtAdmission` (initial false). Before autoload attach isRunningSync listener: every true captures _mutationRunning; false does not rewrite it. _load checks _disposed, captured rejection and defensive current mutation flag, returning the same unavailable Result.error without queries when blocked. Next accepted run overwrites capture; duplicates/runAsync joins have no new true transition and cannot alter it.
 
-Strategia concreta: aggiungere **un solo fatto di ammissione locale**, `_loadRejectedAtAdmission`, inizializzato false. Installare, prima dell’autoload, un listener isRunningSync che sulla transizione a true cattura `_mutationRunning`; quando running torna false non riscrive il fatto. All’ingresso _load controllare prima _disposed, poi il rifiuto catturato e il guard difensivo _mutationRunning; se bloccato ritorna lo stesso tipo di Result.error update-unavailable senza query. La successiva ammissione sovrascrive sempre la cattura; duplicate run o join runAsync non generano nuova transizione e non la alterano.
+Single-flight permits one accepted load; sync admission prevents a later write. No token/queue/Future/finally reset is needed. This fact is not derivable from current mutation state. Admission listener performs no I/O/commit/ViewModel forwarding and is distinct from results forwarding; detach before notifier disposal. It covers direct public Command invocation without new entry API/factory/adapter. At planning time this test remained an apply gate, not an executed result.
 
-Single-flight garantisce un solo load ammesso e la mutazione non può iniziare dopo l’ammissione del load grazie al guard sync. Per questo il fatto non necessita di token, coda, Future o reset nel finally. È informazione storica non derivabile dal valore corrente di _mutationRunning: conservarla preserva un comportamento concreto. Il listener coordina solo l’ammissione, non esegue I/O/commit e non inoltra notifiche al VM; nessuna duplicazione del forwarder results. Viene rimosso al dispose prima del notifier. Questa soluzione copre anche chi invoca direttamente il Command pubblico e non introduce nuovi ingressi API, factory o adapter. Il relativo test rimane obbligatorio, non è una prova già eseguita.
+### Progressive commits, rollback and disposal
 
-### Commit progressivi, rollback e disposal
+Guard after every ID/object await before commit/next lookup. Accumulate each side privately and publish only live. Recheck after place notify before events, and after optimistic notify before persistence (observer may dispose). Already-started write retains direct Result/throw; skip disposed rollback/notify. _notifyListeners guard alone is insufficient. Use D5 for load cleanup without turning the direct write into a Command.
 
-Guard dopo ogni attesa IDs/oggetto prima del commit e prima di altra lookup; accumulare ogni lato localmente come oggi e pubblicarlo soltanto live. Dopo il notify places, ripetere guard prima di events: un observer può disporre l’owner. Dopo ogni optimistic notify ripetere guard prima di _persistFavourite: l’I/O non iniziato deve essere saltato. Dopo write già avviata conservare Result/throw, ma saltare rollback e notify se disposed. _notifyListeners guard da solo non basta. Cleanup del load usa D5; non usare la direct write come motivo di introdurre un nuovo Command.
+FAV1–8 gates: (1) constructor/run then immediate pre-pump mutation rejected/zero write; (2) pending write→run→write settles before load handler yields unavailable/zero query, duplicate/join preserve capture and next free load works; (3) second mutation rejected; (4) places while events pending/partial success both ways/first failure/dedup IDs/missing object/retry; (5) exact add/remove ordering/rollback including ID without object; (6) disposal in IDs/lookups/between sides/write/from notify before write/events causes no new phase/commit/rollback/notify while preserving started write outcome; (7) late StateError report once/no secondary FlutterError/cleanup once/assertion/reentrancy; (8) forwarding updates Screen and reenables Button on start/terminal/retry. Use real Commands/reused fakes/Completers, not MockCommand for races.
 
-**Regression FAV1–8:** (1) constructor/load.run e mutazione immediata prima di pump → rejection, zero write; (2) write pending→load.run→write risolta prima dell’ingresso load → failure unavailable e zero query; duplicate/join non riscrivono cattura, successivo load live può riuscire; (3) seconda mutazione rifiutata; (4) progressive places mentre events pending, partial success nei due versi, primo errore, ID dedup/senza oggetto e retry; (5) rollback add/remove esatto con ordine e ID presente senza oggetto; (6) dispose in IDs/per-oggetto/tra lati/durante write e da notify prima di write o events: zero nuove fasi/commit/rollback/notify, outcome diretto preservato se write già avviata; (7) late StateError del Command una segnalazione originale, nessun FlutterError secondario, cleanup once, anche assertion/reentrant dispose; (8) forwarder aggiorna FavouriteScreen e riabilita FavouriteButton a start/terminal/retry. Tutti da verificare con Command reale, fake riusati e Completer, non MockCommand per le race.
+Historical F2 status: strategy defined/compatible with F3 but not yet implemented or verified. Existing partial/rollback/no-FlutterError cases alone did not establish absence of late commits or all races.
 
-**Stato F2:** strategia definita e compatibile con F3, non ancora implementata né verificata. I test esistenti coprono partial/rollback e alcune assenze di FlutterError dopo dispose; non dimostrano l’assenza di commit tardivi o tutte le race sopra.
+## Simplification opportunities — historical decisions
 
-## Simplification Opportunities and Decisions
+| ID / verified surface | Complexity / proposal | Invariants / risk / tests | Decision |
+| --- | --- | --- | --- |
+| S1 legacy builders read several state getters | One results snapshot/build + existing extensions (KISS/DRY) | Neutral/void/errors/retry distinct; avoid missed rebuild/false success; widget matrix | ADOPT |
+| S2 unawaited(execute) without continuation | Direct run for bootstrap/retry/UI (minimal change/SRP) | One operation, no Future confirmation; preserve necessary waits; counts/Settings feedback | ADOPT |
+| S5 Favourite load→ViewModel forwarder | Apparently duplicated; proposal to remove | Screen/Button need load/membership updates and reenabling; FAV8 | REJECT: keep results forwarder with distinct responsibility |
+| S6 four Favourite Event/Place add/remove branches | Generic mutation helper despite differing indices/rollback | Exact predecessor/order; abstraction can hide rollback; FAV5–6 | REJECT: Rule of Three does not compel unproven abstraction |
+| S7 Favourite mutation/disposal/IDs/objects | Proposal to merge into load Result<void> | Not derivable: direct mutation/missing-object membership/lifecycle; FAV1–6 | REJECT: preserve state; F2c is another necessary distinct fact |
+| S8 missing/immediate/incomplete disposers | Immediate revoke, always microtask→event barrier even idle, recheck/release once (KISS/SRP) | Reporting/no new commit/notify/assertions; reentrancy/nontermination; R1.1–R1.6 | ADOPT: no dynamic dispatch detector/manager |
+| S9 similar local cleanup in five owners | Global helper across migrations | Different owners/observers; upstream-specific premature framework; lifecycle matrix first | DEFER: no helper/task here |
 
-Solo opportunità dei cinque owner residui. Gli ID rimasti conservano tracciabilità; le opportunità esclusivamente escluse non fanno più parte di questa tabella o dei task.
+F3 permits live continuation commits: do not add payload/completion observers/parallel loading-completed-error merely for uniformity, remove required state, rewrite repositories or unify Explore/Suggestion retention.
 
-| ID / codice verificato | Complessità effettiva | Proposta e principio | Invarianti | Rischio | Test | Decisione |
-| --- | --- | --- | --- | --- | --- | --- |
-| S1: builder legacy leggono più getter di stato | Discriminazione ripetuta, rischio successo null/value conservato | Un snapshot results per build + extension esistente; KISS/DRY | Neutral, void, entrambi errori e retry distinti | Mancato rebuild/falso successo | Matrice widget stati/retry | ADOPT |
-| S2: unawaited(execute) senza continuazioni | Future scartato non necessario con run | run diretto per bootstrap/retry/trigger senza seguito; Minimal Change/SRP | Una sola operazione, nessuna conferma dal Future | Rimuovere attesa realmente necessaria | Call count, Settings feedback separato | ADOPT |
-| S5: forwarder Favourite load→VM | Apparente duplicazione, ma consumer ascoltano VM | Eliminarlo | Screen/Button aggiornati su load e membership | Perdita rebuild/riabilitazione | FAV8 | REJECT: mantenerlo su results; ha responsabilità distinta |
-| S6: quattro rami add/remove Event/Place Favourite | Somiglianza sintattica con rollback e indici diversi | Helper generico mutazione | Esatto predecessore e ordine | Astrazione nasconde rollback | FAV5–6 | REJECT: Rule of Three non impone un’astrazione, beneficio non dimostrato |
-| S7: _mutationRunning, _disposed, ID e oggetti Favourite | Non derivabili da load Result<void> | Unificarli nel Command load | Membership senza oggetto, mutazione diretta, lifecycle | Perdita ID/esclusione/rollback | FAV1–6 | REJECT: preservare stato indipendente; cattura F2c è un fatto diverso necessario |
-| S8: disposer mancanti/immediati o incompleti | Teardown idle può essere rientrante, settlement non coincide con sola fine Future | Revoca immediata, barriera locale sempre microtask→event anche idle, cleanup once dopo ricontrollo; KISS/SRP | Reporting, no nuovi commit/notify, policy assertion | Retention nonterminante/rientranza | R1.1–R1.6 e guardie dei cinque VM | ADOPT: evita rilevamento dinamico della dispatch e manager |
-| S9: cleanup locale simile nei cinque VM | Ripetizione reale con owner/observer differenti | Helper globale per tutte le migrazioni | Corretto teardown di ciascun owner | Framework lifecycle prematuro legato a dettagli upstream | Matrice lifecycle prima di futura valutazione | DEFER: nessun task/helper in questa change |
+## Invariants and acceptance gates — historical plan
 
-La delta F3 consente di tenere i commit nelle continuazioni vive: non introdurre payload, observer di commit o stato parallelo loading/completed/error solo per uniformare i VM. Non rimuovere stato necessario, non riscrivere repository, non uniformare retention Explore/Suggestion.
+Six migrated Commands/five legacy-free ViewModels; 12 identities removed/113 preserved with reconciled drift/no new diagnostics. No domain/repository/persistence/backend/ObjectBox change or ID/N+1 latest API. local-content-retrieval membership/order/direct limits remain; SuggestionViewModel is not Search.loadSuggestions. URI/Provider/router retention unchanged.
 
-## Invarianti e acceptance gates
+Only declared Settings false-success UX correction; preserve action-local optimism→notify→write→success/rollback with declared deferred entry and single-flight authority. Distinct application/runtime outcomes, report once/assertions intact; no post-dispose presentation commits/notify/rollback/new phase. Always nonreentrant cleanup including idle after settlement/barrier/recheck D5/R1.1–R1.6. R2 promises no Theme persistence atomicity/serialization; PREF is local. Capture full analyzer metadata/raw exit/identity ledger R3. Five owner suites/relevant widgets/Provider/router/full Flutter suite must pass with identified pre-existing skips. No migration of later areas or global-zero/legacy-deletion gate at this checkpoint.
 
-Sei Command migrati; cinque VM senza import/riferimenti legacy. Dodici identità eliminate, 113 preservate salvo drift riconciliato e nessuna nuova diagnostica. Nessun cambiamento dominio/repository/persistenza/backend/ObjectBox; nessuna API ID/N+1 per latest. local-content-retrieval conserva membership/ordine/limiti diretti; SuggestionViewModel non è Search.loadSuggestions. URI/Provider scope e router retention invariati.
+## Risks / Trade-offs — historical plan
 
-Nessun redesign UX, con sola correzione esplicita del falso feedback Settings. Ordine ottimismo→notify→write→success/rollback preservato dentro le action, ingresso differito dichiarato; single-flight e autorità rispettati. Errori applicativi/runtime distinti, global reporting once, assertion policy intatta. Dopo dispose zero commit/notifiche/rollback locali o nuove fasi repository; command cleanup sempre fuori dispatch, anche idle, dopo settlement e ricontrollo secondo D5/R1.1–R1.6. Nessuna atomicità o serializzazione delle write Theme promessa (R2); i test garantiscono lo stato locale per lane, non l’assenza di lost update preesistente. Analyzer con argv/cwd/flag/versioni/exit grezzo acquisiti e ledger per identità (R3). Test cinque suite VM, widget pertinenti e integrazioni Provider/router verdi; suite Flutter completa verde con soli skip preesistenti identificati. Nessuna modifica ai Command delle altre sei change; nessun gate zero diagnostiche globali/rimozione command.dart.
+- Deferred preferences: declare timing, characterize current consumers/order, no generic bridge/same-stack promise.
+- Favourite races in both directions: sync write admission/captured load rejection, deterministic FAV1–2.
+- Reentrant notify disposal: guard after notify before new I/O, as well as post-await.
+- R1 idle dispatch: immediate revoke/detach; deferred owner notifier and microtask→event Command cleanup/recheck/once flags; R1.1–R1.6.
+- Upstream late throw after disposal: retain Command until safe settlement/reporting; assertions fail loud; idle alone insufficient.
+- R2 lost updates: local independence without repository atomicity; separate storage fix, no new infrastructure.
+- R3 incomplete log metadata: exact executable/argv/cwd/defaults/raw exit; separate replay/history and apply identity ledger.
+- Nonterminating Future: private retention, no added timeout/cancellation.
+- Already-started writes: no late presentation or persistence-cancellation promise; preserve direct outcome.
+- Settings join/retained value: no-await admission check/own Result/current owner/context; observe UI wait error without duplicate report.
+- Base/SDK drift: repeat preflight/resolved lifecycle source/ledger, no implicit caret upgrade.
 
-## Risks / Trade-offs
+## Migration plan — historical
 
-- [Ingresso differito preferenze] → esplicitarlo, test ordine e consumer attuali, nessun ponte generico o promessa same-stack.
-- [Race Favourite nelle due direzioni] → isRunningSync per mutazioni e cattura del rifiuto all’ammissione load; FAV1–2 deterministici.
-- [Notify dispone rientrantemente l’owner] → guard anche dopo notify e prima delle nuove fasi I/O, non solo dopo await.
-- [R1: teardown rientrante anche se idle] → revoca/detach subito; teardown del notifier owner fuori stack e rilascio Command sempre con barriera microtask→event, ricontrollo e flag exactly-once; R1.1–R1.6.
-- [Late throw upstream dopo dispose] → Command trattenuto fino a settlement sicuro, reporting originale prima del rilascio, assertion fail-loud e nessun affidamento al solo idle.
-- [R2: lost update persistito Theme preesistente] → dichiarare indipendenza locale senza atomicità/serializzazione repository; PREF verifica i campi del VM, correzione storage separata e nessuna infrastruttura aggiunta.
-- [R3: exit/log analyzer non autosufficienti] → comando esatto, cwd, flag e returncode separati dal conteggio; replay nuovo distinto dalla prova storica e rigenerazione ledger per identità in apply.
-- [Future non terminante] → retention privata senza timeout/cancellazione nuovi.
-- [Write già iniziata dopo disposal] → nessun commit locale, nessuna promessa di annullamento persistente; outcome diretto preservato.
-- [Feedback Settings attribuito a join/value vecchio] → ammissione check senza await, Result della propria run, owner/context correnti; error Future osservato senza secondo report.
-- [Drift base/SDK] → rifare preflight, sorgente lifecycle e ledger prima degli edit; nessun upgrade implicito sotto caret.
+At this phase only documentation remediation was authorized. After independent review/apply authorization: common branch from verified origin/main, isolated checkout if user work present, transfer approved artifacts only (not old PR3 code/PR4 plans). Characterize/migrate Settings/Theme, Explore/Suggestion, Favourite, consumers/routing, then validate. No future implementation dependencies; one later integration PR. Any rollback is limited to attributable diff, preserving others, never global reset/clean.
 
-## Migration Plan
+Before apply tests/edits load test-support-reuse/dart-add-unit-test/relevant widget-integration/lifecycle/static-analysis skills. Reuse updated main support, Completers/virtual pumps; MockCommand only for projections; no sleep/production test seam. Focused tests precede full `flutter test --no-pub`, analysis and full base diff.
 
-Soltanto remediation documentale ora. Dopo review indipendente e autorizzazione apply, usare il branch comune alle sette change dalla base origin/main verificata; isolare il lavoro se il checkout utente è occupato e trasferire solo artifact approvati. Non importare vecchio codice PR3 o piani PR4. Caratterizzare poi migrare Settings/Theme, Explore/Suggestion, Favourite, consumer/routing e validare. Nessuna dipendenza da implementazioni future. Una sola PR finale, senza crearla ora. Rollback futuro circoscritto al diff attribuibile alla prima change, preservando lavoro altrui; nessun reset/clean globale.
+## Adversarial planning self-review
 
-Prima di test/edit di apply caricare skill test-support-reuse e dart-add-unit-test, skill widget/integration pertinenti, lifecycle per State/callback async, static-analysis. Riutilizzare supporto main aggiornato. Completer e pump virtuali per race, MockCommand solo per proiezioni; niente sleep o test seam produttivi. Test mirati prima della suite completa `flutter test --no-pub`, analisi e confronto completo rispetto alla base.
-
-## Autoreview adversariale della remediation
-
-| Finding | Severità / evidenza | Remediation documentale / stato |
+| Finding | Severity / evidence | Historical disposition |
 | --- | --- | --- |
-| F1 ingresso differito e nested orchestration | HIGH; action legacy inline contro zero timer upstream | RISOLTO PER ESCLUSIONE: futura change indipendente, nessun requisito/task qui |
-| F3 disciplina unica sui commit | HIGH; testo canonico generale incompatibile con progressive/rollback | RISOLTO NEL PLANNING: MODIFIED autorizzata distingue lane, preserva scenario obsoleto e garanzie Search/GeoMap |
-| F2 admission async e rollback/commit tardivi | HIGH; isRunning async, _load/mapError post-await | STRATEGIA DEFINITA: sync admission, flag write indipendente, progressione, guard lifecycle e safe cleanup; test apply obbligatori |
-| F2c write finita prima dell’handler load | HIGH; zero timer prima del guard _mutationRunning | STRATEGIA DEFINITA: unico fatto di rifiuto catturato sulla sync admission; nessun bridge di esecuzione o API nuova |
-| F4 timing ottimistico Settings/Theme | MEDIUM; getter può essere vecchio dopo dispatch | RISOLTO NEL PIANO: ritardo dichiarato, nessun consumer same-stack verificato, ordine applicativo conservato e PREF1–5 |
-| F5 falso snackbar Settings | MEDIUM; callback attuale ignora esito Result | CORREZIONE ESPLICITA: feedback solo per proprio Success<void>, test failure/throw/duplicato/dispose |
-| F6 dispose da notify prima della write/fase successiva | HIGH; notify sincrono seguito da I/O | STRATEGIA DEFINITA: guard post-notify oltre a post-await, outcome unavailable se write non avviata, no rollback tardivo |
-| R1 cleanup idle/settlement dentro dispatch | HIGH; notifier sincroni, UI running async e assertion depth nei notifier | REMEDIATO: D5 sempre fuori stack/barriera, owner notifier differito, flag once e R1.1–R1.6; test futuri |
-| R2 storage Theme condiviso | MEDIUM; copyWith da cache e save/cache commit successivo | REMEDIATO DOCUMENTALMENTE: rischio preesistente esplicito, nessuna garanzia persistente/nuova serializzazione; PREF locale |
-| R3 baseline analyzer poco riproducibile | LOW; machine log non contiene argv/exit | REMEDIATO: comando/cwd/flag/SDK/adattamento URI/exit storico e replay indipendente misurato, con hash e provenienza ledger |
+| F1 deferred entry/nested orchestration | HIGH; inline legacy action vs upstream zero timer | RESOLVED BY EXCLUSION to separate Category change |
+| F3 uniform commit rule | HIGH; general canonical text vs progression/rollback | RESOLVED IN PLAN by authorized MODIFIED distinction; stale scenario/Search/GeoMap retained |
+| F2 async admission/late rollback-commit | HIGH; async isRunning/post-await _load/mapError | STRATEGY DEFINED: sync admission/independent write/progression/guards/cleanup; apply tests required |
+| F2c write finishes before load entry | HIGH; zero timer before mutation guard | STRATEGY DEFINED: capture rejection at sync admission without API/bridge |
+| F4 preference timing | MEDIUM; getter can be old after dispatch | RESOLVED IN PLAN: declared delay/no verified same-stack consumer/PREF1–5 |
+| F5 Settings false snackbar | MEDIUM; callback ignores Result | EXPLICIT CORRECTION: own Success<void>, failure/throw/duplicate/dispose tests |
+| F6 notify disposal before I/O | HIGH; synchronous notify followed by phase | STRATEGY DEFINED: post-notify/post-await guards, unavailable if write never began/no late rollback |
+| R1 idle cleanup/settlement dispatch | HIGH; sync notifiers/async UI running/depth assertions | REMEDIATED IN PLAN: D5/barrier/deferred owner/once flags/R1.1–R1.6; tests future |
+| R2 shared Theme storage | MEDIUM; copyWith/save/cache timing | DOCUMENTED: pre-existing risk/no persistence promise/serialization; local PREF |
+| R3 analyzer provenance | LOW; machine log lacks argv/exit | REMEDIATED: exact metadata/URI adaptation/historical exit/separate measured replay/hashes/ledger |
 
-Nessuna assunzione di runAsync come prova di ammissione o successo; nessun catch Object→Result; nessuna rimozione di forwarding utile; niente cleanup prematuro; nessun refactoring di produzione per supportare le altre sei change. ADOPT integrati nei task feature, DEFER non diventano attività. Le strategie restano da implementare e verificare; questo non costituisce un blocker documentale quando decisioni ed esiti attesi sono concreti.
+No runAsync admission/success assumption, Object→Result catch, forwarding removal, premature cleanup or preparatory production refactor for later migrations. ADOPT items enter feature tasks; DEFER does not. Concrete strategies were not yet executed. Historical **READY FOR INDEPENDENT REVIEW** meant no known material planning blocker after audit, not approved review/tests/READY FOR APPLY. Independent review needed to challenge F2c, reentrant disposal, feedback ownership and restartable compatibility.
 
-**READY FOR INDEPENDENT REVIEW.** Nessun blocker architetturale materiale noto resta aperto dopo le decisioni esplicite della remediation e l’audit aggiuntivo. Non significa review approvata, test superati o READY FOR APPLY. La review indipendente deve contestare in particolare la cattura F2c, disposal rientrante, attribuzione feedback e compatibilità della MODIFIED con i contratti restartable.
+## Earlier F1–F6 remediation validation — 2026-10-19 (historical)
 
-## Validazione della precedente remediation F1–F6 — 2026-10-19 (storica)
+- Strict `openspec validate migrate-simple-view-model-commands --strict --no-interactive`: **exit 0**.
+- `git diff --check`: exit 0; all five untracked files checked for trailing spaces/tabs/final newline.
+- Five artifacts/four edited/.openspec.yaml unchanged; **1 MODIFIED requirement, 4 ADDED, 23 scenarios; 23 unique unchecked tasks**. No Category in requirements/tasks, only provenance/exclusion in proposal/design.
+- Exact canonical MODIFIED name and `Superseded retrieval returns data` scenario preserved; other six canonical blocks unchanged. D1 checked ordinary allowance did not weaken restartable/error/assertion/ownership/lifecycle contracts.
+- Tracked/nonignored-untracked SHA-256 comparison showed only proposal/design/tasks/delta changed. Metadata/canonical/production/tests/support/dependencies/config/AGENTS.md/existing PR4 plan unchanged; no future change created.
+- HEAD/branch/origin/main/empty index and three initial working-tree entries unchanged. No apply/implementation test/commit/push/PR/archive. Cited baseline analysis was earlier actual execution on that same main.
 
-- `openspec validate migrate-simple-view-model-commands --strict --no-interactive`: eseguito, **exit 0**, change valida.
-- `git diff --check`: eseguito, exit 0; controllo esplicito dei cinque file untracked della change: nessuno spazio finale/tab, newline finale presente.
-- Coerenza: cinque artifact presenti; quattro modificati e .openspec.yaml invariato. Una delta con **1 requisito MODIFIED, 4 ADDED e 23 scenari**; **23 task con ID univoci, tutti unchecked**. Nessuna occorrenza di Category in requisiti o task; compare solo come esclusione/provenienza in proposal/design.
-- MODIFIED corrisponde esattamente al nome canonico e conserva lo scenario preesistente Superseded retrieval returns data; gli altri sei blocchi canonici non sono modificati. Self-review semantica in D1 verifica che ordinary allowance non si applichi a Search/GeoMap e non alteri error reporting, assertion, ownership restartable o lifecycle.
-- Confronto SHA-256 dei file tracked/untracked non ignorati rispetto all’inizio della remediation: cambiano soltanto proposal.md, design.md, tasks.md e specs/command-execution-concurrency/spec.md di questa change. Metadata, canonical dirette, produzione, test/support, dipendenze/config, AGENTS.md e piano PR4 preesistente invariati. Nessuna futura change creata.
-- HEAD/branch/origin/main invariati rispetto al preflight, index vuoto; working tree finale conserva gli stessi tre elementi iniziali. Nessun apply, test d’implementazione, commit, push, PR o archivio. L’analisi baseline citata resta quella realmente eseguita nella fase precedente sul medesimo origin/main; nessun risultato futuro attribuito alla remediation.
+Verdict: **READY FOR INDEPENDENT REVIEW**; structural validity did not establish architectural approval/apply readiness. Regression gates remained future work.
 
-Esito: **READY FOR INDEPENDENT REVIEW**; validazione strutturale positiva e assenza di blocker documentali noti non equivalgono ad approvazione architetturale o a readiness per apply. I regression test delle strategie restano gate futuri obbligatori.
+## R1–R3 self-review/validation — 2026-10-19 (historical)
 
-## Autoreview e validazione R1–R3 — 2026-10-19
+R1 documented immediate revoke/detach, deferred owner teardown/barrier even idle, transition invalidation/recheck/once release. Idle/Future/microtask alone was not universal dispatch completion; no infrastructure/polling/arbitrary delay. R1.1–R1.6 became owner/common future gates.
 
-- **R1 completata nel planning:** D5 revoca/detach immediati, teardown owner fuori dalla propria notify, barriera locale anche per Command idle, invalidazione di una barriera antecedente a nuove transizioni, ricontrollo e rilascio exactly-once. Non considera idle/Future/microtask isolati prova universale di fine dispatch. Nessuna nuova infrastruttura, polling o sicurezza basata su delay arbitrario. Matrice R1.1–R1.6 concreta e integrata nei task owner/comuni; test futuri, non dichiarati superati.
-- **R2 completata documentalmente:** rischio lost update preesistente riconosciuto con evidenza copyWith/save/cache; nessuna atomicità o serializzazione implicita, nessuna correzione repository o coordinator. PREF valuta ammissione/single-flight/update/rollback locale/post-dispose e non esiti di fusione persistente del fake. Il rischio MEDIUM resta presente nel prodotto come limite noto fuori perimetro, non è nascosto né richiesto di correggere per questa acceptance.
-- **R3 completata:** comando/cwd/flag/default/SDK/URI temporanee ed exit storico distinti dalla nuova esecuzione; replay con returncode grezzo 0 e stdout identico al log originale, 125 INFO/0 WARNING/0 ERROR. Rigenerazione per identità richiesta in apply; nessun exit dedotto dal numero di diagnostiche o confuso fra Dart e Flutter wrapper.
-- **Coerenza:** matrice dei sei Command e perimetro 5/6/12/113 invariati; sette OpenSpec/una PR finale; Category resta esclusa. F1–F6 e F2c preservati, setFavourite diretto, forwarding necessario mantenuto. MODIFIED F3 e gli scenari preesistenti non cambiano; la delta aggiunge soltanto il vincolo e uno scenario osservabile contro il teardown che invalida una dispatch terminale già in corso. Nessun requisito di persistenza aggiunto.
-- **Conteggi attuali:** cinque artifact presenti, .openspec.yaml invariato; **24 task con ID univoci, tutti unchecked; 24 scenari**, un requisito MODIFIED e quattro ADDED. Il precedente conteggio 23/23 nella sezione storica è l’esito della remediation precedente, non quello corrente. S8 ADOPT rafforzata; S1/S2 ADOPT, S5/S6/S7 REJECT e S9 DEFER conservati.
-- **Validazione eseguita:** `openspec validate migrate-simple-view-model-commands --strict --no-interactive`, `git diff --check` e `git diff --cached --check` exit 0; whitespace/newline controllati anche nei cinque file untracked, senza problemi. Hash iniziali/finali dei file tracked/untracked non ignorati confermano soltanto i quattro artifact autorizzati modificati; .openspec.yaml, canonical dirette, AGENTS.md, piano PR4, produzione, test/support e dipendenze/config invariati.
-- **Git:** HEAD `556c62b0d1e57dbebc24d2fb2e19da1785aeab09`, branch `codex/resolve-flutter-analyzer-diagnostics-pr3`, origin/main dopo fetch `d16f73714fcbb58d1ee4ed91a45e61be1072667e`, index vuoto. Stato iniziale/finale: AGENTS.md modificato e directory untracked di questa change e PR4, nessun altro cambiamento.
+R2 documented copyWith/save/cache lost-update risk and no implicit atomicity/serialization/repository/coordinator fix. PREF verifies local admission/single-flight/rollback/disposal rather than persistent fake merging. MEDIUM risk remains known/outside scope.
 
-**READY FOR INDEPENDENT REVIEW.** R1, R2 e R3 sono tutte applicate agli artifact; nessun blocker documentale o architetturale noto rimane aperto. Il rischio persistente R2 è deliberatamente documentato come preesistente, non risolto in produzione. Nessun apply, suite Flutter completa, commit/push/PR/merge/archive eseguito. La validazione strict non è READY FOR APPLY e non sostituisce la successiva review indipendente.
+R3 separated historical command/cwd/defaults/SDK/temp URI/exit from new replay (raw exit 0, identical 125 INFO/0 WARNING/0 ERROR). Apply still required identity regeneration; Dart/Flutter exits were not conflated.
 
+Scope stayed 5/6/12/113, seven changes/one PR, Category excluded. F1–F6/F2c/direct setFavourite/forwarding retained. MODIFIED and existing scenarios stayed; one observable nonreentrant terminal-dispatch scenario was added, without persistence guarantees.
+
+Current-at-that-time counts: five artifacts/.openspec.yaml unchanged, **24 unique unchecked tasks, 24 scenarios**, 1 MODIFIED/4 ADDED. Earlier 23/23 counts above remain an earlier checkpoint. S8 strengthened; S1/S2 ADOPT, S5/S6/S7 REJECT, S9 DEFER retained.
+
+Strict validate, `git diff --check`, `git diff --cached --check`: exit 0; untracked whitespace/newline checked. Hashes confirmed only four authorized artifacts changed. HEAD `556c62b0d1e57dbebc24d2fb2e19da1785aeab09`, branch `codex/resolve-flutter-analyzer-diagnostics-pr3`, fetched main `d16f73714fcbb58d1ee4ed91a45e61be1072667e`, empty index; same modified AGENTS/untracked change+PR4 entries.
+
+Historical **READY FOR INDEPENDENT REVIEW**: R1–R3 applied to documents/no known material planning blocker, R2 unresolved in product but explicit. No apply/full Flutter suite/commit/push/PR/merge/archive; strict validity was not apply authorization.
 
 ## Apply evidence — 2026-10-20
 
-### A. Baseline e ambiente
+### A. Baseline and environment
 
-Apply esplicitamente autorizzato dal prompt utente del 2026-10-20; le etichette
-storiche READY FOR INDEPENDENT REVIEW nelle sezioni precedenti descrivono il
-planning, non lo stato corrente. Worktree e branch:
-`/Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-simple-view-model-commands`,
-`migrate-simple-view-model-commands`. HEAD iniziale/finale e origin/main locale:
-`ee60777c7fdfc5c16daa1151050c134fbb7cde29`. Il confronto con la base storica
-`d16f737` cambia soltanto AGENTS/skill e relativi metadata; nessun drift del codice,
-delle foundation, delle dipendenze o dei contratti canonici interessati.
-Nessun nuovo fetch/sync/checkout/worktree/commit/push/PR eseguito nell’apply.
+User explicitly authorized apply on 2026-10-20. Earlier readiness labels refer to planning. Dedicated `<worktree>`, branch `migrate-simple-view-model-commands`; initial/final HEAD and local origin/main `ee60777c7fdfc5c16daa1151050c134fbb7cde29`. Compared with historical `d16f737`, only AGENTS/skill metadata changed: no affected code/foundation/dependency/canonical drift. This local apply did not fetch/sync/checkout/create worktree/commit/push/update PR.
 
-Stato iniziale: soltanto la directory untracked dei cinque artifact revisionati.
-Stato finale: diff di implementazione/test e artifact disponibile non committato;
-index vuoto. Gli artifact non sono stati importati dal codice PR3.
-Flutter 3.47.5, framework `6a19cca56475dbfba1478ee68d7bd0c2ef891da1`,
-Dart 3.13.4, command_it 9.5.2 e listen_it 6.0.0. Nessun pub get/upgrade.
+Initially only the five reviewed untracked artifacts; finally implementation/test/artifact diff uncommitted, empty index. No PR3 code imported. Flutter 3.47.5/framework `6a19cca56475dbfba1478ee68d7bd0c2ef891da1`, Dart 3.13.4, command_it 9.5.2/listen_it 6.0.0; no pub get/upgrade.
 
-Il worktree non aveva `.dart_tool/package_config.json` né `package_graph.json`:
-sono stati preparati come metadata ignorati e temporanei dalle dipendenze già
-risolte del checkout principale, adattando soltanto moliseis.rootUri alla URI
-assoluta risolta del worktree. Nessun file di configurazione tracked cambiato.
-Il wrapper Flutter richiede scrittura nella cache SDK esterna al sandbox.
+Missing ignored .dart_tool/package_config.json/package_graph.json were prepared temporarily from already-resolved main-checkout dependencies; only moliseis.rootUri was adapted to resolved worktree URI. No tracked config changed. Flutter wrapper required writing external SDK cache.
 
-### B. Sei Command implementati
+### B. Six implemented Commands
 
-| Owner / operazione | Factory e consumer | Concorrenza e lifecycle |
+| Owner/operation | Factory/consumer | Concurrency/lifecycle |
 | --- | --- | --- |
-| Settings / setCrashReporting | createResultCommand<bool, void>; SettingsScreen attende il Result della propria richiesta ammessa | Single-flight; ottimismo/notify prima della write; rollback e flag soltanto live; isDisposed impedisce feedback e ammissione da owner revocato |
-| Theme / setThemeBrightness | createResultCommand<ThemeBrightness, void>; SettingsScreen usa run | Lane indipendente; old brightness e rollback locale; guardie prima I/O e dopo await |
-| Theme / setThemeType | createResultCommand<ThemeType, void>; sync_redirect_test osserva runAsync con pump virtuale e verifica il Result | Lane indipendente; old type e rollback locale; selettore commentato resta inattivo |
-| Explore / loadLatest | createResultCommandNoParam<void>; bootstrap/retry run; latest di ExploreScreen osserva results | Single-flight; commit atomico della lista live; retention su errore e svuotamento su successo vuoto |
-| Suggestion / load | createResultCommandNoParam<void>; bootstrap/retry run; SuggestiondHorizontalListView osserva results | Single-flight; skeleton neutral/loading; errore svuota la lista; successo vuoto distinto; lista non modificabile |
-| Favourite / load | createResultCommandNoParam<void>; bootstrap/retry run; FavouriteScreen usa snapshot, Button resta API diretta | Single-flight e cattura sync F2c; pubblicazioni progressive vive; forwarding results→VM mantenuto e staccato alla revoca |
+| Settings/setCrashReporting | createResultCommand<bool, void>; screen awaits its accepted request Result | Single-flight, optimism/notify before write; live rollback; isDisposed blocks admission/feedback. Historical live-only flag rule was subsequently corrected by CR-F1 below. |
+| Theme/setThemeBrightness | createResultCommand<ThemeBrightness, void>; screen run | Independent lane/local old brightness/rollback; before-I/O/post-await guards |
+| Theme/setThemeType | createResultCommand<ThemeType, void>; sync_redirect_test runAsync/virtual pump/Result check | Independent lane/local old type/rollback; commented selector remains inactive |
+| Explore/loadLatest | createResultCommandNoParam<void>; bootstrap/retry run/latest results | Single-flight/live atomic list commit; error retains, empty success clears |
+| Suggestion/load | createResultCommandNoParam<void>; bootstrap/retry run/SuggestiondHorizontalListView results | Single-flight/neutral-loading skeleton; error clears; empty success distinct; unmodifiable list |
+| Favourite/load | createResultCommandNoParam<void>; bootstrap/retry run/screen snapshots/direct Button API | Single-flight/F2c capture/live progressive publication/results forwarding detached on revoke |
 
-Tutti gli owner applicano D5 localmente: revoca idempotente immediata, guardie
-all’ingresso/post-notify/post-await, super.dispose in microtask; Command attivi
-trattenuti privatamente. Cleanup microtask→event, controllo running e barriera
-invalidata dalle transizioni sync, listener privato rimosso e rilascio marcato
-prima dell’unica dispose. Nessuna nuova factory o astrazione lifecycle globale.
-S1/S2/S8 adottati; S5/S6/S7 rispettati come REJECT e S9 come DEFER.
+All owners implement local D5: immediate idempotent revocation, entry/post-notify/post-await guards, microtask super.dispose and private active-Command retention. microtask→event cleanup rechecks running/barrier invalidation; detach private listener/mark released before one disposal. No global lifecycle abstraction/new factory. S1/S2/S8 adopted; S5/S6/S7 rejected and S9 deferred.
 
-Differenze intenzionali: ingresso differito delle preferenze; failure runtime
-separata da Result.error secondo foundation; snackbar Settings soltanto per
-Success<void> enable della propria richiesta, context montato e stesso owner live.
-Invocazioni ignorate/join, failure, throw, unmount, dispose e cambio owner non
-producono feedback positivo. Il rischio repository Theme R2 resta invariato:
-nessun mutex, serializzazione o garanzia di fusione persistente introdotta.
+Intentional differences: deferred preferences; runtime failures distinct from Result.error; Settings snackbar only for own enable Success<void>/mounted context/current live owner. Ignored/joined/failure/throw/unmount/disposal/replacement yields no positive feedback. R2 unchanged, no mutex/serialization/persistent merge guarantee.
 
-### C. Favourite — evidenze
+### C. Favourite evidence
 
-- F2: isRunningSync respinge write anche immediatamente dopo il bootstrap;
-  _mutationRunning conserva l’esclusione della seconda write.
-- F2c: listener sync installato prima dell’autoload cattura il rifiuto a ogni
-  nuova ammissione; duplicate/join non lo riscrivono. Write completata prima
-  dell’handler load → unavailable, zero nuove query; load successivo libero riesce.
-- Places sono pubblicati prima di events; successo parziale nei due versi,
-  retention del lato precedente fallito e primo errore sono conservati.
-- IDs deduplicati e membership senza oggetto completo restano osservabili.
-  Add/remove conservano rollback esatto e ordine per Event/Place.
-- Dispose durante IDs/lookup, tra lati, durante write o dalla notify ottimistica
-  impedisce nuovi commit, rollback, notifiche e fasi I/O. Una write già avviata
-  conserva il proprio Result/throw diretto; StateError tardivo non entra nel
-  reporting globale del Command e non annulla l’ottimismo dopo la revoca.
-- Forwarding load.results→VM verificato con Provider reale in Screen/Button,
-  inclusi errore/retry e riabilitazione. Dispose rientrante coperto separatamente.
+F2 sync admission rejects writes immediately after bootstrap; independent mutation flag rejects second writes. F2c listener before autoload captures every accepted load, not duplicate/join; write finishing before load entry still yields unavailable/zero new query, next free load succeeds. Places publish before events; partial successes in both directions/previous failed-side retention/first error preserved. Deduplicated IDs/membership without objects and exact Event/Place add-remove rollback/order preserved.
+
+Disposal during IDs/lookups/between sides/writes/optimistic notify prevents new commits/rollback/notify/I/O. A started direct write retains its Result/throw; late direct StateError does not use Command-global reporting or undo revoked optimism. Real Provider Screen/Button confirms forwarding/error/retry/reenabling; reentrant disposal tested separately.
 
 ### D. Lifecycle R1.1–R1.6
 
-`test/ui/ordinary_view_model_lifecycle_test.dart`: 79 casi con Command reali sulle
-sei lane; supporto in `test/support/ordinary_view_model_lifecycle_support.dart`.
-R1.1 listener terminale results/value; R1.2 never-run/completato e Theme con altra
-lane idle; R1.3 entrambi gli ordini settlement/dispose e transizioni true→false
-che invalidano una barriera accodata; R1.4 success/error pendenti e revoca prima
-dell’ingresso; R1.5 StateError/ArgumentError con oggetto e stack originali once,
-AssertionError nel percorso fail-loud originale; R1.6 forwarding Favourite che
-provoca dispose dalla notify del VM. Aggiunta la revoca dalla notify ottimistica
-Settings e dalle due lane Theme prima di qualsiasi persistenza.
+`test/ui/ordinary_view_model_lifecycle_test.dart`: 79 real-Command cases over six lanes; `test/support/ordinary_view_model_lifecycle_support.dart`. R1.1 terminal results/value; R1.2 never-run/completed/Theme other idle lane; R1.3 both settlement-disposal orders and queued-barrier invalidating true→false; R1.4 pending success/error and pre-entry revoke; R1.5 original StateError/ArgumentError object/stack once and original fail-loud AssertionError; R1.6 Favourite forwarding→ViewModel notify→dispose. Optimistic Settings/both Theme notification revocation before persistence added.
 
-Gli eventi pubblici FlutterMemoryAllocations ObjectDisposed sono filtrati per
-identità, provando zero release durante dispatch/pending e una release dopo
-settlement, anche con dispose duplicato. Non si usa soltanto l’assenza di errori.
-Handler globali e probe SDK vengono ripristinati; nessun seam di produzione.
-Event turns e timer upstream 50 ms sono mossi nel clock virtuale, senza sleep.
-Un Future che non termina conserva le risorse private: limite deliberato senza
-timeout né promessa di cancellazione della write esterna.
+Identity-filtered FlutterMemoryAllocations ObjectDisposed events prove zero release during dispatch/pending and one after settlement, including duplicate dispose. Not merely absence of errors. Restore global handlers/SDK probes; no production seam. Virtual event turns/internal 50ms timer, no sleep. Nonterminating Future deliberately retains private resources, without timeout/external-write cancellation promise.
 
 ### E. Analyzer R3
 
-Stesso eseguibile e argv baseline/finale, cwd il worktree dedicato:
+Same executable/argv for baseline/final; cwd dedicated worktree. Portable command representation:
 
 ```text
-/opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart analyze --format machine /Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-simple-view-model-commands
+<flutter-sdk>/bin/cache/dart-sdk/bin/dart analyze --format machine <worktree>
 ```
 
-Default warning fatal e info non fatal; nessun --fatal-infos. Exit grezzo
-baseline **0**, finale **0**; stderr entrambi vuoti. **125 INFO → 113 INFO**,
-zero warning/errori in entrambe le esecuzioni. Confronto Counter per
-path/regola/messaggio (simbolo e contesto), normalizzando root e spostamenti di
-linea: esattamente dodici identità rimosse, zero nuove, tutte le 113 residue
-inalterate anche nella molteplicità. Le identità originarie sono:
+Default fatal warnings/nonfatal INFO; no --fatal-infos. Baseline **raw exit 0**, final **0**, empty stderr. **125 INFO → 113 INFO**, zero warnings/errors both. Counter comparison by path/rule/message (symbol/context), normalizing root/line shifts: exactly 12 identities removed, zero new, all 113 residual identities/multiplicities unchanged. Original positions are the R3 target table above (Settings 13:25/21:8; Theme 11:26/12:20/25:8/27:8; Explore 15:18/21:8; Suggestion 13:12/21:8; Favourite 20:12/29:14).
 
-| File lib/ui | Linea:colonna baseline | Eliminate |
-| --- | --- | ---: |
-| settings/view_models/settings_view_model.dart | 13:25, 21:8 | 2 |
-| settings/view_models/theme_view_model.dart | 11:26, 12:20, 25:8, 27:8 | 4 |
-| explore/view_models/explore_view_model.dart | 15:18, 21:8 | 2 |
-| explore/view_models/suggestion_view_model.dart | 13:12, 21:8 | 2 |
-| favourite/view_models/favourite_view_model.dart | 20:12, 29:14 | 2 |
+No flutter analyze ran; no exit attributed to it. Historical stdout/stderr/argv/cwd/SHA/version metadata/baseline-final ledgers/comparison JSON were in `<evidence-dir>/molise-simple-apply-evidence/`, ephemeral local provenance, not currently guaranteed accessible. Tracked ledger/history remain durable.
 
-Nessun flutter analyze eseguito; nessun suo exit viene dedotto da quello Dart.
-Log stdout/stderr, metadati argv/cwd/SHA/versioni, ledger baseline/finale e
-confronto JSON sono in `/private/tmp/molise-simple-apply-evidence/`.
+### F. Tests actually run — historical local apply
 
-### F. Test realmente eseguiti
+- Baseline five legacy suites: 34 passed; preference characterization: 11 passed; Favourite write→load characterization: 1 passed before edits.
+- Settings/Theme/widgets: 31 passed first gate; later Settings/Favourite widget run: 21 passed (overlapping suites).
+- Explore/Suggestion/Home gate C: 24 passed.
+- Favourite gate D: 23 passed; final late-direct-throw/event-lookup-disposal version: 25 passed.
+- Lifecycle initially 76 passed, finally 79. Final combined lifecycle/Favourite: **104 passed**, exit 0.
+- Router sync/four foundation suites: **65 passed, 3 pre-existing skips**, exit 0; result_command/restartable_command/command_configuration/command_it_disposal_behavior.
+- Provider/router after cleanup adaptation: 277 passed, one skip; that run’s one failure was unavailable shell-loaded ObjectBox runtime. DI smoke with correct runtime: 1 passed, exit 0.
+- Final full suite: **2366 passed, 0 failed, 6 pre-existing skips**, exit 0. 191 hidden framework events were not application pass counts.
 
-- Baseline cinque suite legacy: 34 passati; caratterizzazione preferenze legacy:
-  11 passati; caratterizzazione Favourite write→load: 1 passato prima degli edit.
-- Settings/Theme + widget: 31 passati nel primo gate; aggiunte successive dei
-  widget Settings/Favourite: 21 passati nel run mirato (suite sovrapposte).
-- Explore/Suggestion/Home: 24 passati nel gate C.
-- Favourite: 23 passati nel gate D, poi 25 nella versione finale con late throw
-  diretto e dispose durante lookup events.
-- Matrice lifecycle iniziale: 76 passati; finale: 79. Ultimo run mirato combinato
-  lifecycle + Favourite: **104 passati**, exit 0.
-- Router sync + quattro suite foundation: **65 passati, 3 skip preesistenti**,
-  exit 0. Foundation comprende result_command, restartable_command,
-  command_configuration e command_it_disposal_behavior.
-- Integrazioni Provider/router dopo adattamento cleanup: 277 passati, uno skip;
-  l’unico failure di quel run era il runtime ObjectBox non caricato da shell.
-  Smoke DI con runtime correttamente caricato: 1 passato, exit 0.
-- Suite completa finale: **2366 passati, 0 falliti, 6 skip preesistenti**, exit 0.
-  I 191 eventi framework hidden non sono contati come test applicativi passati.
+First full run failed for absent native ObjectBox runtime and pending timers after automatic migrated-Provider unmount. No assertions weakened: testOwnerUI executes original callbacks then unmounts/drains virtual barrier/upstream teardown. Other-feature tests changed registration/import/format only; those production Commands were not migrated.
 
-Il primo run completo è fallito per runtime nativo ObjectBox assente e timer
-pendenti dopo l’unmount automatico dei Provider migrati. Nessuna asserzione è
-stata indebolita: il supporto testOwnerUI esegue i callback originali e poi
-unmount + drain virtuale della barriera e teardown upstream. I test di altre
-feature toccati per questo motivo cambiano soltanto registrazione/import e
-formattazione; nessuna loro logica di produzione è stata migrata.
-
-Runtime test ObjectBox C 5.3.2 ufficiale macOS, esclusivamente in /private/tmp;
-archivio objectbox-macos-universal.zip SHA-256
-`680c598573ede04b9762565d48d4e161ad286f786f159abb8da89353bfa1d0bc`,
-verificato contro il digest della release ufficiale. Nessuna dipendenza cambiata.
-La shell macOS perde DYLD_LIBRARY_PATH: il run completo finale ha avviato lo
-stesso tool Flutter direttamente, con comando effettivo:
+Official ObjectBox C 5.3.2 macOS runtime was temporary only; objectbox-macos-universal.zip SHA-256 `680c598573ede04b9762565d48d4e161ad286f786f159abb8da89353bfa1d0bc`, checked against official release digest. No dependency changed. Because the macOS shell dropped DYLD_LIBRARY_PATH, final full run launched Flutter directly (portable paths):
 
 ```text
-DYLD_LIBRARY_PATH=/private/tmp/molise-simple-apply-evidence/runtime/lib TZ=Europe/Rome /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart /opt/homebrew/share/flutter/bin/cache/flutter_tools.snapshot test --no-pub --reporter json
+DYLD_LIBRARY_PATH=<evidence-dir>/molise-simple-apply-evidence/runtime/lib TZ=Europe/Rome <flutter-sdk>/bin/cache/dart-sdk/bin/dart <flutter-sdk>/bin/cache/flutter_tools.snapshot test --no-pub --reporter json
 ```
 
-L’exit 0 appartiene a questo processo, non al precedente wrapper fallito.
-Risultati machine e metadati: full-suite-final.jsonl/.stderr/.json nella directory
-delle evidenze. I sei skip sono gli stessi presenti in HEAD:
-all_day_pipeline locale; external_event_token_pipeline locale; tre casi upstream
-late StateError di command_it_disposal_behavior; inactive branch Back upstream
-#188018 in geo_map_route_test. Nessun nuovo skip o servizio esterno simulato come
-verifica eseguita; i due smoke locali Supabase/Deno restano non eseguiti.
+Exit 0 belongs to this process, not the earlier failed wrapper. Historical outputs: full-suite-final.jsonl/.stderr/.json in that temporary evidence directory. Same six HEAD skips: local all_day_pipeline, local external_event_token_pipeline, three upstream command_it_disposal_behavior late-StateError cases, inactive-branch Back upstream #188018 in geo_map_route_test. No new skip; two local Supabase/Deno smokes were **NOT RUN**, not simulated passes.
 
-### G. OpenSpec e coerenza
+### G. OpenSpec and consistency
 
-24 task verificati, nessuna canonical sincronizzata o change archiviata.
-OpenSpec 1.14.3 strict aveva rilevato quattro warning di lunghezza >500 nei
-requisiti ADDED approvati. Le quattro formulazioni sono state rese più concise,
-conservando nomi, obblighi e tutti i 24 scenari invariati; nessun cambio dei
-contratti D1–D5, F2c o perimetro. La validazione strict successiva è verde,
-exit 0. Metadata/proposal invariati; design/tasks/delta aggiornati coerentemente.
+24 tasks verified; no canonical synchronization/archival. OpenSpec 1.14.3 strict originally warned four approved ADDED requirements exceeded 500 characters; wording was shortened while names/obligations/all 24 scenarios remained unchanged. No D1–D5/F2c/scope change. Subsequent strict validation exit 0. Metadata/proposal unchanged; design/tasks/delta reconciled.
 
-### H. Autoreview e review adversariale
+### H. Apply self-review/adversarial review
 
-Audit completo rispetto a HEAD/base approvata: produzione limitata a cinque VM
-e quattro consumer; nessuna modifica foundation, command.dart, dominio,
-repository, DI, router, database/backend, generati, dipendenze, analyzer o CI.
-Le sole modifiche agli altri test Provider/router servono al cleanup degli owner
-migrati. Riletti ammissione e join, rollback e progressive publication, notify
-rientranti, teardown idle/pending/assertion, reporting once e feedback Settings.
-Review avversariale separata in sola lettura da agente reviewer: nessun finding
-materiale residuo. Le verifiche eseguite sono quelle riportate sopra; il reviewer
-non ha rivendicato test autonomi. L’approvazione indipendente dell’utente resta
-separata da questa autoreview dell’apply.
+Full approved-base/HEAD diff limited production to five ViewModels/four consumers. No foundation/command.dart/domain/repository/DI/router/backend/generated/dependency/analyzer/CI change. Other Provider/router test changes served migrated-owner teardown only. Re-read admission/join/rollback/progression/reentrant notify/idle-pending-assertion cleanup/reporting/feedback. Separate read-only reviewer found no remaining material issue and claimed no autonomous tests; user independent approval remained separate.
 
-### I. Readiness storica dell’apply
+### I. Historical apply readiness
 
-Questo verdetto precede la code review CR-F1–CR-F3; lo stato corrente è nella sezione post-apply seguente.
+This verdict preceded CR-F1–CR-F3: **READY FOR INDEPENDENT CODE REVIEW** for the first change only. Diff remained uncommitted then; no push/PR/merge/canonical synchronization/archive/automatic next change. R2/nonterminating-work limits remained explicit.
 
-**READY FOR INDEPENDENT CODE REVIEW** per questa prima change soltanto.
-Diff lasciato non committato; nessun push, PR, merge, sync canonical, archive o
-avvio automatico delle altre sei change. Restano i limiti espliciti di R2 e del
-Future fisicamente non terminante, non blocker nascosti né garanzie aggiunte.
+## Post-apply remediation — CR-F1–CR-F3
 
+### Status and provenance
 
-## Remediation post-apply — CR-F1–CR-F3
+Later independent review found CR-F1 HIGH (Sentry consent not reconciled after disposal), CR-F2 MEDIUM (obsolete document status), CR-F3 LOW (unselective wrapper expansion). These differ from 2026-10-19 planning IDs. Remediation prompt authorized this phase; earlier readiness neither resolved these findings nor approved merge.
 
-### Stato e provenienza
+Historical preflight: dedicated worktree/branch migrate-simple-view-model-commands, HEAD/local main `ee60777c7fdfc5c16daa1151050c134fbb7cde29`, implementation already uncommitted. No reset/checkout/fetch/sync/commit/push/PR/main-checkout change. Initial hashes/status were recorded as initial-hashes.json/initial-status.txt under `<evidence-dir>/molise-simple-remediation/` (temporary provenance, availability not asserted now).
 
-La review indipendente successiva all’apply ha riscontrato CR-F1 HIGH (consenso
-Sentry non riconciliato dopo dispose), CR-F2 MEDIUM (stato documentale obsoleto)
-e CR-F3 LOW (wrapper test esteso senza audit selettivo). Questi ID non sono i
-finding omonimi della review del piano del 2026-10-19. Il prompt di remediation
-è l’autorizzazione corrente. La precedente readiness dell’apply è un esito
-storico, non la risoluzione di questi finding né un’approvazione al merge.
+### CR-F1 — Shared consent is distinct from presentation
 
-Preflight corrente: worktree dedicato e branch migrate-simple-view-model-commands;
-HEAD e origin/main locale restano ee60777c7fdfc5c16daa1151050c134fbb7cde29.
-L’implementazione era già non committata; nessun reset, checkout, fetch/sync,
-commit, push, PR o modifica al checkout principale. Sono stati acquisiti hash
-dei file tracked/untracked e stato iniziale in
-/private/tmp/molise-simple-remediation/initial-hashes.json e initial-status.txt.
+Verified root cause: post-await _disposed guard also blocked SentryLoggingFlag, allowing already-persisted opt-out to leave telemetry enabled. D5 presentation restriction had been wrongly extended to application state shared by AppLogger.
 
-### CR-F1 — consenso condiviso distinto dalla presentazione
+Minimal fix: on normal Result return, before presentation guard, SettingsViewModel assigns flag from _settingsRepository.crashReporting, not request enable/optimistic _crashReporting. Real repository commits cache only after save Success and before Future completion; getter reads it without I/O. Read/flag assignment are synchronous without await/notify, so delayed delivery reads current committed cache rather than old-owner snapshot.
 
-**Root cause verificata:** il guard _disposed dopo l’await della write impediva
-anche l’aggiornamento di SentryLoggingFlag. Una disattivazione già persistita
-poteva così lasciare attiva la telemetria. Il vincolo D5 sulla presentazione era
-stato impropriamente esteso a uno stato applicativo condiviso da AppLogger.
+Result.error retains original identity/outcome and does not commit cache; flag still reflects current confirmed consent, never failed request. Unexpected throw does not commit cache here and retains original command_it reporting; no conversion/reporting catch/finally. Assertion/D5 presentation policies unchanged. No post-revoke optimism/rollback/notify/new writes/phases; reconciliation performs no new I/O.
 
-**Correzione minima:** alla normale restituzione del Result, prima del guard di
-presentazione, SettingsViewModel assegna il flag da
-_settingsRepository.crashReporting. Non usa enable né _crashReporting come
-valore autoritativo. SettingsRepositoryImpl._persistNewSettings aggiorna la
-cache solo dopo Success della save e prima di completare il Future; il getter
-legge quella cache senza I/O. Lettura e assegnazione del flag sono sincrone e
-senza await/notify intermedio: una continuation consegnata tardi legge il valore
-repository corrente, non uno snapshot catturato dal vecchio owner.
+No serialization/latest-request-wins was added. Whole-settings snapshots retain R2 concurrent-write risk. Flag follows current committed cache, which may reflect an older request if its write completed last. No cross-await storage/cache/flag atomicity or cancellation of started writes; no general coordinator.
 
-Un Result.error mantiene identità ed esito e non committa la cache; anche in
-questo caso il flag riflette il consenso confermato corrente, mai la richiesta
-fallita. Un throw inatteso non aggiorna la cache in questa implementazione e
-resta sul reporting command_it originale; non è aggiunto alcun catch/finally
-che lo converta o lo segnali due volte. Assertion policy e D5 sono invariati.
-Ottimismo, rollback e notify restano vietati dopo revoca. Le nuove write restano
-bloccate; la riconciliazione non avvia nuove fasi repository.
+F1.1–F1.6: six deterministic settings_view_model_test cases cover enable/disable after dispose, original Result.error, both commit orders with reversed Result delivery and original late StateError once. Real SettingsRepositoryImpl, FakeSettingsLocalDataSource optional save callback/shared A-B flag. Test-only DeferredSettingsRepository delays delivery after actual commit/cache; it demonstrates the race without production API/seam or a new repository guarantee. Assert simulated persistence/cache/flag/no late notify-rollback/first I/O admission.
 
-**Concorrenza e limite:** nessuna serializzazione o latest-request-wins aggiunta.
-Il repository persiste snapshot interi e può perdere aggiornamenti concorrenti
-fra preferenze, come già documentato in R2. Il flag segue il consenso della cache
-confermata attuale, che può riflettere una richiesta più vecchia se quella è
-l’ultima write a completare. Non si promette atomicità fra storage/cache/flag
-attraverso gli await né cancellazione remota di write iniziate. Non viene risolto
-il rischio generale di snapshot concorrenti, né introdotto un coordinator.
+F1.6 retains SettingsScreen own-success/duplicate/dispose/unmount/same-context owner replacement/Result.error/throw cases. SettingsScreen/AppLogger unchanged. R1 common snapshot now concerns **presentation** and excludes shared flag, positively tested by six consent cases. SDK exactly-once/reporting/fail-loud evidence is retained, not replaced with generic teardown.
 
-**Regression F1.1–F1.6:** settings_view_model_test aggiunge sei casi deterministici:
-disable/enable dopo dispose, Result.error originale, entrambi gli ordini di commit
-con consegna invertita dei Results e StateError tardivo originale once. Usano
-SettingsRepositoryImpl reale, FakeSettingsLocalDataSource con callback save
-opzionale e lo stesso flag per gli owner A/B. DeferredSettingsRepository è un
-fixture solo test che ritarda la consegna dopo il vero commit/cache: dimostra la
-race senza cambiare API o seam di produzione. La sua attesa non rappresenta una
-nuova garanzia del repository. Le prove confrontano anche persistenza simulata,
-cache, flag, assenza di notify/rollback tardivi e controllo del primo ingresso I/O.
+### CR-F2 — Artifact traceability
 
-F1.6 conserva i casi SettingsScreen per successo della propria richiesta,
-duplicate admission, dispose, unmount, owner replacement con stesso context,
-Result.error e throw. SettingsScreen e AppLogger non cambiano. La matrice comune
-R1 resta una prova di stato **di presentazione**: il suo snapshot Settings non
-include più il flag condiviso, ora verificato separatamente dai sei nuovi test
-con assert positivi di riconciliazione. Le prove di rilascio SDK exactly-once,
-reporting e fail-loud non sono rimosse o sostituite da teardown generico.
+Proposal separates current status/planning/remediation/authorization/actual apply. Historical design remains; Settings table explicitly marks CR-F1 supersession. MODIFIED clarifies presentation commits and permits current repository-consent reconciliation without I/O/restored UI authority; restartable Search/Map paragraph unchanged. Two owner-disposed/reversed-commit-delivery scenarios supplement 24 originals (**26**). No canonical change. Task 2.3/6.1–6.4 were selectively reopened until reverified; 7.1–7.3 capture remediation, not wholesale task reopening.
 
-### CR-F2 — tracciabilità degli artifact
+### CR-F3 — Selective test-support audit
 
-Proposal distingue ora stato corrente, planning storico, remediation documentali,
-autorizzazione e apply eseguito. Il design originario resta consultabile come
-storia; la tabella Settings segnala esplicitamente l’ipotesi errata superata da
-CR-F1. La delta MODIFIED precisa “presentation commits” e aggiunge soltanto la
-riconciliazione del consenso corrente da repository, senza I/O né riattribuzione
-di autorità UI e senza modificare il paragrafo restartable Search/Map. Due scenari
-coprono owner disposto e commit/delivery invertiti: 24 scenari originali più 2.
-Nessuna canonical modificata. Task 2.3 e gate 6.1–6.4 riaperti selettivamente
-finché riverificati; task 7.1–7.3 esplicitano F1–F3, senza riaprire il resto.
+Audited all 160 testOwnerUI registration sites in 18 files against initial remediation snapshot. Two unwrapped probes preserved callbacks/assertions/skips; 154 executions intentionally failed solely for “A Timer is still pending even after the widget tree was disposed.” Each KEEP site had a generated case proving migrated-owner timers by stack. This was fixture teardown, often root Providers, not a new architecture requirement for excluded features.
 
-### CR-F3 — audit selettivo del test support
-
-Audit di tutti i 160 siti di registrazione testOwnerUI in 18 file rispetto allo
-snapshot iniziale della remediation. Due probe senza wrapper hanno mantenuto
-callback, assert e skip: 154 esecuzioni hanno fallito intenzionalmente soltanto
-per “A Timer is still pending even after the widget tree was disposed.” Ogni sito
-KEEP ha almeno un caso generato con quella prova, attribuita dagli stack agli
-owner migrati. Non è una nuova necessità architetturale delle feature escluse:
-è il teardown delle fixture che istanziano quei Provider, spesso al root.
-
-| Gruppo di test | Decisione | Motivazione verificata |
+| Test group | Decision | Verified reason |
 | --- | --- | --- |
-| Consumer diretti migrati | KEEP selettivo / REVERT | Explore mantiene 7 siti; FavouriteButton 8, Screen 1 e disposal VM 2. Suggestion ripristina tutti i 7 testWidgets: owner esterno e teardown già equivalente. Settings mantiene i propri test con cleanup esplicito. |
-| Routing con owner migrati | KEEP selettivo | Mantiene solo percorsi che istanziano Explore/Suggestion o root Favourite/Settings/Theme e falliscono realmente senza drain. Restoration e ownership del router non vengono modificate. |
-| Feature non migrate | REVERT dove indipendenti | Admin conserva solo 3 casi Settings; Content Submission solo 2 siti che raggiungono Home. Nearby ripristina tutti gli 8 testWidgets: in 2 casi bastano pumpCommandTurns locali per i timer zero del bootstrap Favourite esterno; nessun teardown Provider necessario. Events mantiene solo il caso con card che istanzia il Favourite lazy. |
-| Foundation e lifecycle | KEEP prove esplicite; nessun nuovo wrapper | Restano testWidgets e controlli SDK exactly-once, reporting/assertion e interleaving. Il wrapper non è una prova del rilascio; nessuna sostituzione della matrice R1. |
+| Direct migrated consumers | Selective KEEP/REVERT | Explore 7; FavouriteButton 8/Screen 1/ViewModel disposal 2 retained. Suggestion reverted all 7 testWidgets (external owner/equivalent cleanup). Settings uses explicit cleanup. |
+| Routing with migrated owners | Selective KEEP | Only reproduced Explore/Suggestion/root Favourite/Settings/Theme paths require drain; restoration/router ownership unchanged |
+| Unmigrated features | REVERT independent cases | Admin retains 3 Settings cases; Content Submission 2 Home-reaching registrations. Nearby reverts 8 (2 need local pumpCommandTurns for external Favourite bootstrap, no owned-provider teardown). Events retains card case instantiating lazy Favourite. |
+| Foundation/lifecycle | Explicit evidence KEEP; no new wrapper | SDK exactly-once/reporting/assertion/interleaving tests remain testWidgets; wrapper does not prove release or replace R1 |
 
 | File | Original wrapper sites | KEEP | REVERT | Evidence / actual dependency |
 |---|---:|---:|---:|---|
@@ -619,75 +439,35 @@ owner migrati. Non è una nuova necessità architetturale delle feature escluse:
 
 Totals: **160 → 84 retained / 76 removed**. Only registration names changed except two local virtual-clock drains in nearby-content tests. No original assertions, callbacks (other than these drains), variants, skip metadata, production code, or router fixtures changed for F3.
 
+Shared helper unchanged: virtual clock only, no catch/takeException/global handler/automatic skip/router access. It passes original callbacks/variants/skips to the runner and consumes no sync/async framework failures. All 270 probed case names occur in final audit. 84 KEEP/76 REVERT, 10 files reduced, no original assertion lost. Per-execution f3-audit.json was temporary local evidence under `<evidence-dir>/molise-simple-remediation/`; current accessibility is not claimed.
 
-Il helper condiviso rimane invariato: solo clock virtuale, nessun catch,
-takeException, handler globale, skip automatico o accesso al router. Le sue
-registrazioni passano gli stessi callback, varianti e skip al runner. Errori
-sincroni e asincroni non vengono consumati: nessun catch o lettura delle
-eccezioni del framework è stato aggiunto dal helper. I 270 nomi dei casi
-sottoposti a probe compaiono nel run finale dell’audit. Restano 84 KEEP, 76 REVERT;
-10 file ridotti, nessuna asserzione originaria persa. La documentazione completa
-per singola esecuzione è in /private/tmp/molise-simple-remediation/f3-audit.json.
+### Post-remediation validation — historical local results
 
-### Validazione post-remediation
+- F1/Settings UI/Theme/lifecycle: 117 passed, exit 0.
+- Final 18-file F3 audit: 291 passed, 0 failed, 1 pre-existing skip, exit 0.
+- Four foundation suites/SettingsRepositoryImpl: 49 passed, 3 pre-existing skips, exit 0.
+- Full Flutter suite: **2372 passed, 0 failed, 6 pre-existing skips**, raw exit 0; same two external local smokes/three upstream command_it/#188018 identities as apply.
+- Final test-fixture super-parameter naming adjustment (dataSource → _dataSource for matching_super_parameters): 17 Settings ViewModel/repository tests rerun/passed, then final analyzer comparison.
+- Final analyzer: **113 INFO, 0 WARNING, 0 ERROR, raw exit 0**; no identity added/removed relative to approved apply 113; original 12 targets remain absent from 125 baseline. Same R3 executable/argv/cwd, unchanged package_config, empty stderr.
+- Strict OpenSpec/`git diff --check`/`git diff --cached --check`: exit 0; untracked whitespace/newline checked.
+- Only 15 remediation-changed Dart files formatted. No tracked repository/backend/domain/logging/foundation/DI/router/dependency/generated/analyzer/CI/canonical change.
 
-- Mirati F1/Settings UI/Theme/lifecycle: 117 passati, exit 0.
-- Audit finale dei 18 file F3: 291 passati, 0 falliti, 1 skip preesistente, exit 0.
-- Quattro suite foundation più SettingsRepositoryImpl: 49 passati, 3 skip
-  preesistenti, exit 0.
-- Suite Flutter completa: **2372 passati, 0 falliti, 6 skip preesistenti**,
-  exit grezzo 0. I sei skip coincidono per identità con il run dell’apply:
-  due smoke locali esterni, tre casi upstream command_it e #188018.
-- Ultimo aggiustamento esclusivamente nominale del super parametro nella fixture
-  test (dataSource → _dataSource, per matching_super_parameters): 17 test mirati
-  Settings VM/repository ripetuti e verdi, poi analyzer finale confrontato.
-- Analyzer finale: **113 INFO, 0 WARNING, 0 ERROR, exit grezzo 0**; zero identità
-  aggiunte/rimosse rispetto alle 113 approvate dopo apply. Le 12 identità target
-  restano assenti rispetto alle 125 originali. Stessi eseguibile/argv/cwd della
-  sezione R3, nessuna modifica al package_config nella remediation, stderr vuoto.
-- OpenSpec strict, git diff --check e git diff --cached --check: exit 0;
-  whitespace/newline verificati anche per i file untracked.
-- Formattati solo i 15 Dart modificati durante la remediation. Nessuna modifica
-  tracked a repository, backend, dominio, logging, foundation, DI/router,
-  dipendenze, generati, analyzer, CI o specifiche canoniche.
+Approved analyzer reference remained apply’s 113 INFO. A probe-overlapping run temporarily saw 10 unused imports (**123 diagnostics, exit 2**); it was rejected as stable baseline but preserved in baseline.stdout/.stderr/.json for transparency. Final comparison used approved identity/multiplicity ledger without suppressions/rule changes, not that transient attempt.
 
-Analyzer: il riferimento approvato resta il ledger apply a 113 INFO. Il primo
-lancio durante i probe F3 ha osservato 10 import temporaneamente inutilizzati
-(123 diagnostiche, exit 2): è un’analisi sovrapposta all’esperimento, scartata come
-baseline stabile e conservata in baseline.stdout/.stderr/.json per trasparenza.
-Il confronto finale usa identità/molteplicità del ledger approvato, non
-quel tentativo transitorio, senza soppressioni o modifiche alle regole.
+### Historical remediation closeout
 
-### Autoreview e closeout corrente
+Re-reviewed synchronous cache/flag assignment, commit/delivery order, Result.error/throw/assertion, UI/feedback guards, D5, fixtures/wrappers. Separate read-only adversarial reviewer inspected sources/diff/reported logs, found no material issue and ran no tests; user independent review remained separate. No architectural expansion needed.
 
-Riesaminati lettura cache/assegnazione flag sincrone, ordine commit/delivery,
-Result.error/throw/assertion, guardie UI/feedback, teardown D5, fixture e wrapper.
-Una review avversariale separata in sola lettura ha verificato F1, la copertura
-positiva distinta dal snapshot di presentazione, F2 e il confronto selettivo dei
-18 file F3: nessun finding materiale residuo. Il reviewer non ha eseguito test;
-ha ispezionato sorgenti, diff e log dei run riportati, senza sostituire la nuova
-review indipendente dell’utente. Nessun ampliamento architetturale necessario.
+Remediation changed 19 files: SettingsViewModel, settings_view_model_test, three support files (ordinary_view_model_lifecycle_support/settings_local_data_source/new settings_consent_support), ten F3-reduced tests and four change artifacts. Full manifest/initial hashes were remediation-files.json/initial-hashes.json in ephemeral evidence. No initial file deleted/other change/main checkout modified. HEAD/branch/local main/empty index remained preflight values during that local phase.
 
-La remediation modifica 19 file: un file di produzione (SettingsViewModel),
-settings_view_model_test, tre file di supporto (ordinary_view_model_lifecycle_support,
-settings_local_data_source, il nuovo settings_consent_support), dieci file di test
-ridotti per F3 e quattro artifact di questa change. Elenco completo e hash
-iniziali: remediation-files.json e initial-hashes.json nelle evidenze temporanee.
-Nessun file iniziale eliminato, nessuna modifica alle altre change o al checkout
-principale. HEAD/branch/origin/main e index vuoto restano quelli del preflight.
+Historical evidence names in `<evidence-dir>/molise-simple-remediation/`: f1-targeted.log, f3-audit.md/.json, f3-probe1.jsonl, f3-probe2.jsonl, f3-final.jsonl, foundation.log, constructor-final-check.log, full-suite.jsonl/.stderr/.json, final.stdout/.stderr/.json, analyzer-comparison.json. These temporary logs are provenance records, not guaranteed current artifacts. Runtime remained official temporary ObjectBox 5.3.2/TZ=Europe/Rome, with the direct Flutter command shown in apply evidence.
 
-Evidenze riproducibili in /private/tmp/molise-simple-remediation/: f1-targeted.log,
-f3-audit.md/.json, f3-probe1.jsonl, f3-probe2.jsonl, f3-final.jsonl,
-foundation.log, constructor-final-check.log, full-suite.jsonl/.stderr/.json,
-final.stdout/.stderr/.json e analyzer-comparison.json. Il run Flutter conserva
-lo stesso ambiente già verificato durante apply: runtime ObjectBox ufficiale
-5.3.2 temporaneo e TZ=Europe/Rome. Comando effettivo completo:
+Historical verdict: **READY FOR INDEPENDENT CODE REVIEW**, CR-F1/CR-F2/CR-F3 resolved; not merge readiness. At that closeout no commit/push/PR/merge/archive/canonical sync/next migration had occurred. Known pre-existing limitations remained explicit.
 
-```text
-DYLD_LIBRARY_PATH=/private/tmp/molise-simple-apply-evidence/runtime/lib TZ=Europe/Rome /opt/homebrew/share/flutter/bin/cache/dart-sdk/bin/dart /opt/homebrew/share/flutter/bin/cache/flutter_tools.snapshot test --no-pub --reporter json
-```
+## Published checkpoint — subsequent reconciliation
 
-**Stato corrente: READY FOR INDEPENDENT CODE REVIEW.** CR-F1, CR-F2 e CR-F3
-risolti; non è readiness al merge. Nessun commit, push, PR, merge, archive,
-sync canonical o avvio della seconda change. Restano soltanto i limiti
-preesistenti esplicitamente documentati, senza blocker materiale residuo.
+Git verifies implementation/remediation commit `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, parent `ee60777c7fdfc5c16daa1151050c134fbb7cde29`, committed 2026-10-20 and included in [Draft PR #12](https://github.com/xmattjus/moliseis/pull/12). This later record supersedes local/unpublished status as a current claim while preserving it as historical evidence. The next checkpoint is Category `e3d9d891c5b560524e66b35f0bf70f9108cacb7e`, whose parent is this commit. All seven implementations are now published; historical analyzer progression is 125 → 113 → 105 → 87 → 66 → 52 → 37 → 0 INFO, not measurements made during reconciliation. This checkpoint had 113 INFO, not zero.
+
+The durable code/tests/documentation are in Git. Temporary local logs remain historical evidence with the availability limitations above; recorded SHA-256/counts/outcomes are preserved. CI status must be taken from exact-SHA GitHub Actions checks, separately from these historical local runs; no new-head CI approval is inferred here. Legacy compatibility removal/canonical synchronization/archival/merge remain outside this reconciliation.
+
+Historical remote CI is separate from the local passes above: the [GitHub Actions run](https://github.com/xmattjus/moliseis/actions/runs/39418170941) associated with `9d17d224d5094c5b043128113d9aba6a1ce69f0a` concluded **failure**. This publication record does not relabel that checkpoint as CI-clean or infer the failure cause from local results. Later-head workflow results belong to their own exact SHAs.

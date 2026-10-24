@@ -1,12 +1,14 @@
 # Analyzer B0 and Git preflight evidence
 
-## B0 regenerated
+## Historical B0 regenerated
+
+This ledger describes the planning checkpoint `e80dfbaf472ef1cc15b220a48df966509a9ee8a1`, not the final seven-migration analyzer state. Publication of migration 6 at `0cdb764a7586f85180a802fafcf2b485791cb5ff` reduced 52 to 37 INFO; migration 7 subsequently reduced 37 to zero. Reconciliation changes only provenance/path narrative here; the machine rows and source hashes below are unchanged.
 
 Command: `dart analyze --format machine`, cwd isolated worktree, 2026-10-24. Dependencies prepared using `flutter pub get --offline` from the unchanged lockfile; no generator or formatter run. Analyzer exited 0, 52 INFO / 0 WARNING / 0 ERROR. Every row has type LINT and code DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE. Column and length below distinguish multiple diagnostics at the same source position: DO NOT deduplicate by line/symbol.
 
-SDK resolved through /opt/homebrew/bin/dart (Flutter installation); exact versions are recorded in validation.md. Full machine output is retained below with worktree prefix normalized away, preserving messages and multiplicity.
+SDK resolved through `<sdk-bin>/dart` (Flutter installation); exact versions are recorded in validation.md. Full machine output is retained below with worktree prefix normalized away, preserving messages and multiplicity.
 
-Published fifth change design records B1 52 INFO with 14 target removals from 66 and no non-target additions/removals. Its residual includes the two current targets 6+9; current B0 matches all 52 reported residual deprecations and the surviving source surfaces. Fifth-plan B1 specifically records the fake_repositories dartdoc movement 1165→1169, and current B0 has 1169. Historical B1 raw evidence was located at /private/tmp/content-submission-apply-evidence/B1.stdout (52 machine rows). After normalizing only the absolute checkout prefix, the complete Counter of severity/type/code/path/line/column/length/message equals current B0 exactly: missing=0, added=0, no position or multiplicity drift. No line remapping was needed. Historical stdout SHA256: d51c7aace9166819a1c8df115914a0f326f4c5689d315035d6325320b7a6ded8. The complete current ledger below preserves that same normalized evidence without depending on temporary files.
+Published fifth change design records B1 52 INFO with 14 target removals from 66 and no non-target additions/removals. Its residual includes the two current targets 6+9; current B0 matches all 52 reported residual deprecations and the surviving source surfaces. Fifth-plan B1 specifically records the fake_repositories dartdoc movement 1165→1169, and current B0 has 1169. During the original audit, historical B1 raw evidence was located at `<evidence-dir>/content-submission/B1.stdout` (52 machine rows). After normalizing only the absolute checkout prefix, the complete Counter of severity/type/code/path/line/column/length/message equals current B0 exactly: missing=0, added=0, no position or multiplicity drift. No line remapping was needed. Historical stdout SHA256: d51c7aace9166819a1c8df115914a0f326f4c5689d315035d6325320b7a6ded8. That temporary stdout is not tracked or guaranteed accessible. The complete checkpoint ledger below preserves the normalized diagnostic rows; the original raw-byte hash cannot be independently recomputed from the normalized ledger alone.
 
 ## Multiplicity and scope
 
@@ -107,16 +109,16 @@ INFO|LINT|DEPRECATED_MEMBER_USE_FROM_SAME_PACKAGE|test/support/fake_repositories
 
 ## Initial checkout inventory
 
-Before any mutation, every listed checkout had empty index (`git diff --cached --name-status`), empty tracked diff, and no untracked files (`git ls-files --others --exclude-standard`). `git status --porcelain=v2 --branch` and worktree porcelain provided branch/SHA. This table is the preflight baseline for final isolation verification.
+Before any mutation, every listed checkout had empty index (`git diff --cached --name-status`), empty tracked diff, and no untracked files (`git ls-files --others --exclude-standard`). `git status --porcelain=v2 --branch` and worktree porcelain provided branch/SHA. This historical table is the original preflight baseline; descriptive placeholders replace machine locations without changing branches or SHAs. It is not a current inventory.
 
 | Checkout | Branch | HEAD |
 |---|---|---|
-| /Users/benitomatteobercini/Developer/Progetti/moliseis_v2 | main | ee60777c7fdfc5c16daa1151050c134fbb7cde29 |
-| /Users/benitomatteobercini/.codex/worktrees/27f4/moliseis_v2 | detached | ee60777c7fdfc5c16daa1151050c134fbb7cde29 |
-| /Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-category-view-model-commands | codex/plan-migrate-category-view-model-commands | e3d9d891c5b560524e66b35f0bf70f9108cacb7e |
-| /Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-content-submission-commands | codex/plan-migrate-content-submission-commands | e80dfbaf472ef1cc15b220a48df966509a9ee8a1 |
-| /Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-content-view-model-commands | codex/plan-migrate-content-view-model-commands | 1f3753b10c18061c6655cb32d078bf93aff1b05e |
-| /Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-search-map-commands | codex/plan-migrate-search-map-commands | f48a08946c9ac40146104a0157556243ad433c92 |
-| /Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-simple-view-model-commands | migrate-simple-view-model-commands | 9d17d224d5094c5b043128113d9aba6a1ce69f0a |
+| `<primary-checkout>` | main | ee60777c7fdfc5c16daa1151050c134fbb7cde29 |
+| `<detached-app-checkout>` | detached | ee60777c7fdfc5c16daa1151050c134fbb7cde29 |
+| `<worktrees>/migrate-category-view-model-commands` | codex/plan-migrate-category-view-model-commands | e3d9d891c5b560524e66b35f0bf70f9108cacb7e |
+| `<worktrees>/migrate-content-submission-commands` | codex/plan-migrate-content-submission-commands | e80dfbaf472ef1cc15b220a48df966509a9ee8a1 |
+| `<worktrees>/migrate-content-view-model-commands` | codex/plan-migrate-content-view-model-commands | 1f3753b10c18061c6655cb32d078bf93aff1b05e |
+| `<worktrees>/migrate-search-map-commands` | codex/plan-migrate-search-map-commands | f48a08946c9ac40146104a0157556243ad433c92 |
+| `<worktrees>/migrate-simple-view-model-commands` | migrate-simple-view-model-commands | 9d17d224d5094c5b043128113d9aba6a1ce69f0a |
 
 Remote PR read via `gh pr view 12 --repo xmattjus/moliseis --json number,state,headRefName,headRefOid,baseRefName,url`: OPEN / codex/migrate-legacy-commands / e80dfbaf472ef1cc15b220a48df966509a9ee8a1 / main. Network sandbox required approved escalation; no remote mutation occurred. Destination directory absent and `git show-ref --verify refs/heads/codex/plan-migrate-admin-session-commands` confirmed branch absent. `git worktree add -b ... <exact-checkpoint>` created only the requested worktree/branch.

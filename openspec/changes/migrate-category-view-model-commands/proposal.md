@@ -2,34 +2,40 @@
 
 ## Why
 
-Category mantiene quattro Command legacy deprecati; la sostituzione meccanica con factory asincrone rende insicuro il bootstrap e conserva richieste filtro perse o risultati mescolati. OpenSpec 2/7 deve rimuovere queste dipendenze usando la foundation già presente e definire prima dell’apply ownership, pubblicazione e lifecycle verificabili.
+Category originally retained four deprecated legacy Commands. A mechanical replacement with asynchronous factories would make bootstrap unsafe and preserve lost filter requests/mixed results. OpenSpec 2/7 therefore defines verifiable ownership, publication and lifecycle while reusing the existing foundation.
+
+## Published checkpoint
+
+Implementation and final GeoMap selector-owner remediation were published in `e3d9d891c5b560524e66b35f0bf70f9108cacb7e`, parent `9d17d224d5094c5b043128113d9aba6a1ce69f0a` (2026-10-20), included in [Draft PR #12](https://github.com/xmattjus/moliseis/pull/12). Git history verifies these values. This is a later publication record; earlier local/uncommitted statements describe their original phases. All seven migrations are now published. Canonical synchronization, archival, compatibility deletion and merge remain separately authorized work.
 
 ## What Changes
 
-- Inizializzare la selezione validata della route nel costruttore, prima di esporre il ViewModel; normalizzare gli input diretti vuoti alla selezione completa come già fa la UI; preservare slug, `all`, error routing, Provider e ownership delle route.
-- Eliminare i due Command di selezione in favore di metodi sincroni del ViewModel: aggiornano l’intent, senza chiamate Command annidate né attese fittizie.
-- Usare un solo caricamento restartable per categoria/tipi, con input immutabili, retrieval separato dal commit autoritativo e ordinamento corrente al commit.
-- Pubblicare atomicamente solo successi completi. Una nuova selezione svuota subito il contenuto precedente; refresh della stessa selezione conserva internamente l’ultimo successo, ma loading/errore governano la UI. Nessuna collezione parziale viene pubblicata.
-- Conservare `setSort` single-flight tramite factory Result-aware, ordinamento ottimistico e persistenza esistente. Propagare il vero Result della write invece del falso successo legacy; nessun rollback della scelta di sessione e nessuna nuova garanzia di persistenza.
-- Rendere espliciti neutral/loading/success/empty/error e retry; revocare pubblicazione e notifiche al dispose con cleanup privato dopo settlement sicuro.
-- Correggere il selettore condiviso: confronto semantico delle selezioni confermate, retention del draft su rebuild innocui e label esplicite per draft vuoti. Ripristinare tutte le opzioni solo alla chiusura del modal, con una sola callback se ancora mounted e la sessione draft è corrente. Un cambiamento confermato di valore osservato dal widget ritira la sessione aperta precedente senza ripubblicarla; mantenere indipendenti snapshot confermati, editing e owner.
+- Initialize the validated route selection in the constructor before exposing the ViewModel; normalize empty direct inputs to all options, matching existing UI confirmation. Preserve slugs, `all`, error routing, Provider and route ownership.
+- Replace the two selection Commands with synchronous ViewModel methods that update intent without nested Commands/fictitious waits.
+- Use one restartable retrieval for categories/types with immutable input, separate retrieval/authoritative commit and current sorting at commit.
+- Atomically publish complete successes only. A changed selection immediately clears previous content; same-selection refresh retains the previous complete collection internally, while loading/error govern UI. No partial collection is published.
+- Keep `setSort` single-flight through a Result-aware factory, optimistic session order and existing persistence. Return the real write Result instead of legacy false success; no session-order rollback/new persistence guarantee.
+- Expose neutral/loading/success/empty/error and retry. Revoke publication/notifications on disposal, with private cleanup after safe settlement.
+- Correct shared selectors: semantic confirmed-set equality preserves drafts across harmless rebuilds; empty drafts have explicit labels. Restore all options only on normal modal close, with one callback if mounted/current. An observed confirmed-value change retires that open draft without republishing it. Keep confirmed snapshots, editing session and owner identity separate.
 
 ## Capabilities
 
 ### New Capabilities
 
-Nessuna.
+None.
 
 ### Modified Capabilities
 
-- `command-execution-concurrency`: aggiungere contratti Category per bootstrap, filtri latest-intent, commit atomico, ordinamento, stati UI e lifecycle. La delta aggiunge requisiti disgiunti: non ricopia né sovrascrive il requisito MODIFIED dal primo OpenSpec. Riconciliazione delle delta solo nel consolidamento finale della PR cumulativa.
+- `command-execution-concurrency`: add distinct Category contracts for bootstrap, latest-intent filters, atomic commit, sorting, UI state and lifecycle. Do not duplicate/overwrite OpenSpec 1’s MODIFIED requirement. Future authorized canonical reconciliation must preserve both deltas; this reconciliation does not synchronize them.
 
 ## Impact
 
-Superfici di produzione implementate nell’apply: `category_view_model.dart`, `category_screen.dart`, inizializzazione Category in `core_routes.dart` e `category_content_and_type_selection.dart`; remediation finale: la sola chiave del selettore in `geo_map_screen.dart`. Confronto semantico e label sicure sono necessari anche per il draft locale. Test dell’apply: suite Category, routing/ownership/restoration e una regressione mirata del consumer reale GeoMap del selettore condiviso, riusando `test/support/`. Nessun cambiamento a UseCase, repository, backend, dipendenze o foundation globale.
+Implemented production surfaces: `category_view_model.dart`, `category_screen.dart`, Category initialization in `core_routes.dart`, and `category_content_and_type_selection.dart`; final remediation adds only selector ownership key in `geo_map_screen.dart`. Semantic equality/safe labels are needed for local draft state too. Apply tests cover Category, routing/ownership/restoration and focused real-GeoMap shared-selector compatibility, reusing `test/support/`. No UseCase/repository/backend/dependency/global-foundation change.
 
-Baseline verificata: `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, uguale a `origin/codex/migrate-legacy-commands` dopo fetch e all’HEAD della Draft PR #12. Nuovo worktree dedicato e branch `codex/plan-migrate-category-view-model-commands`; dettagli e ledger in design.md. Analyzer storico di planning: **113 INFO, 8 Category**, senza riduzione in quella fase. Il confronto dell’apply ha verificato **105 INFO residue identiche**, otto target rimosse e zero nuove identità; provenienza e comandi in design.md.
+Verified planning baseline: `9d17d224d5094c5b043128113d9aba6a1ce69f0a`, matching fetched origin/codex/migrate-legacy-commands and Draft PR #12 then. Dedicated worktree/branch `codex/plan-migrate-category-view-model-commands`; provenance/ledger in design.md. Historical planning analyzer: **113 INFO, 8 Category**, no reduction in planning. Apply verified **105 identical remaining INFO**, eight target removals/zero new identities.
 
-Sono esclusi Event, Post, Search, i Command e l’orchestrazione GeoMap, Sync, Submission, Admin, gli altri Command e la rimozione globale di `command.dart`. Il selettore condiviso già usato da GeoMap riceve F1/F2 e la relativa verifica di compatibilità; la remediation finale della code review aggiunge esclusivamente ObjectKey(owner) al suo punto di montaggio in GeoMapScreen e regressioni di owner replacement. Non si migra quella feature o i suoi Command. Provider/ChangeNotifier, Result e confini UI/domain/data restano quelli del progetto. Nessuna factory generica, adapter legacy o nuova infrastruttura di concorrenza.
+Excluded: Event, Post, Search, GeoMap Commands/orchestration, Sync, Submission, Admin, other Commands and global command.dart removal. Shared selector F1/F2 compatibility and final `ObjectKey(owner)` mounting correction in GeoMapScreen do not migrate GeoMap. Keep Provider/ChangeNotifier, Result and UI/domain/data boundaries; no generic factory/legacy adapter/concurrency infrastructure.
 
-Fase corrente: **apply autorizzato il 2026-10-20**, successivo alla review e remediation documentale F1/F2/RF3. Implementazione e regression test nel worktree dedicato; task marcati solo sulla base delle verifiche effettive. Le precedenti fasi erano esclusivamente planning/remediation: le loro evidenze storiche restano in design.md. Nessun commit, push, mutazione PR, merge, archive o sync canonical; la PR #12 resta invariata. Esiti dei gate e readiness di codice nella sezione finale del design.
+## Historical implementation status
+
+Apply was authorized on 2026-10-20 after independent planning review and F1/F2/RF3 remediation. Implementation/regressions were completed in the dedicated worktree; completed tasks reflect actual verification. Earlier planning/remediation evidence remains in design.md. The original local closeout preceded commit/push/PR mutation/merge/archive/canonical sync; those historical statements do not describe current publication. Final code-review remediation and gate results are in the design closeout; the PR remains Draft.

@@ -1,5 +1,7 @@
 # Analyzer baseline B0
 
+Historical planning baseline at `0cdb764a7586f85180a802fafcf2b485791cb5ff`; the published editor checkpoint `52d4e448d010d2d13c13a4d3d665cdf5b1b0103b` subsequently removed these 37 diagnostics, as recorded in validation.md. The diagnostic companion files and their checksums remain unchanged.
+
 Acquired on 2026-10-24 from the exact authorized checkpoint in the dedicated planning branch. Dart 3.13.4; Flutter metadata 3.47.5; command_it 9.5.2; listen_it 6.0.0. Offline `flutter pub get --offline` prepared ignored package metadata; the lockfile and tracked configuration are unchanged. The initial Flutter launcher attempt was denied SDK-cache writes; the authorized offline preparation succeeded. The successful analyzer used the installed SDK directly, equivalent argv `dart analyze --format machine`, with exit 0 and empty stderr. INFO diagnostics remain visible; this is not a claim of a green Flutter frontend. No tests or apply were run.
 
 The replay produced 37 INFO, zero WARNING/ERROR: 33 editor ViewModel, one editor screen, three fake-repository documentation references. `analyzer-b0.json` preserves full identity, message, diagnostic span and occurrence; `analyzer-b0.machine.txt` preserves every machine record with only the checkout prefix removed. Same-position constructor diagnostics have different span lengths and MUST NOT be deduplicated.

@@ -1,6 +1,10 @@
 # Tasks
 
-Apply was explicitly authorized after independent plan review/remediation and F1–F4 re-review. Checked tasks below have passed their recorded acceptance gates in validation.md; unchecked tasks remain in progress. No task authorizes commit, push, PR update, merge or archive. Design matrix IDs are acceptance references, not optional examples.
+## Published checkpoint
+
+This migration was published in Draft [PR #12](https://github.com/xmattjus/moliseis/pull/12) as commit [`0cdb764a7586f85180a802fafcf2b485791cb5ff`](https://github.com/xmattjus/moliseis/commit/0cdb764a7586f85180a802fafcf2b485791cb5ff), whose parent is `e80dfbaf472ef1cc15b220a48df966509a9ee8a1` (verified from Git history). All seven migrations are now published. The historical analyzer transition for this checkpoint was **52 → 37 INFO**; these are recorded checkpoint results, not analyzer runs performed during reconciliation. Planning assumptions, local-only authorization and uncommitted-work statements below describe their original phases. Subsequent publication supersedes those status statements without changing the historical evidence. Canonical synchronization, archival, legacy compatibility deletion and merge remain outside this reconciliation.
+
+Apply was explicitly authorized after independent plan review/remediation and F1–F4 re-review. Checked tasks below have passed their recorded acceptance gates in validation.md; any unchecked tasks describe incomplete work at that phase. No task authorizes commit, push, PR update, merge or archive. Design matrix IDs are acceptance references, not optional examples.
 
 ## 1. Authorized baseline and reusable test controls
 
@@ -38,7 +42,7 @@ Apply was explicitly authorized after independent plan review/remediation and F1
 - [x] 5.3 Run B1 analyzer with B0 SDK/config; verify exact 15 target removals, 37 INFO/0 WARNING/0 ERROR, no non-target message/multiplicity changes after context-based line mapping, and no suppressions. Search all five old APIs to prove every target consumer migrated while Editor legacy references remain unchanged.
 - [x] 5.4 Validate OpenSpec strict, git diff --check, allowed-file manifest and no excluded changes; inspect generated/dependency/config/backend/foundation/editor paths remain untouched. Record final HEAD/index/all-worktree isolation, test limitations and reviewable local diff. Stop for independent code review; do not publish without separate authorization.
 
-## Workflow follow-up
+## Historical workflow follow-up
 
 - Independent plan review and remediation precede separate apply authorization.
 - Independent code review precedes separate commit/push/publication authorization for PR #12. No merge or archive is authorized here.

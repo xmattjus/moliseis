@@ -1,6 +1,10 @@
 # Proposal
 
-## Why
+## Published checkpoint
+
+This migration was published in Draft [PR #12](https://github.com/xmattjus/moliseis/pull/12) as commit [`52d4e448d010d2d13c13a4d3d665cdf5b1b0103b`](https://github.com/xmattjus/moliseis/commit/52d4e448d010d2d13c13a4d3d665cdf5b1b0103b), whose parent is `0cdb764a7586f85180a802fafcf2b485791cb5ff` (verified from Git history). All seven migrations are now published. The historical analyzer transition for this checkpoint was **37 → 0 INFO**; these are recorded checkpoint results, not analyzer runs performed during reconciliation. Planning assumptions, local-only authorization and uncommitted-work statements below describe their original phases. Subsequent publication supersedes those status statements without changing the historical evidence. Canonical synchronization, archival, legacy compatibility deletion and merge remain outside this reconciliation.
+
+## Planning history — Why
 
 Six of the seven legacy Command migrations are published in Draft PR #12. The route-scoped Admin Submission Editor owns the remaining eleven legacy commands and all 37 remaining analyzer INFO diagnostics; migrating it requires explicit admission and lifecycle rules because command_it defers action entry.
 

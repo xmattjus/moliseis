@@ -1,5 +1,15 @@
 # Planning validation and adversarial self-review
 
+## Published checkpoint
+
+This migration was published in Draft [PR #12](https://github.com/xmattjus/moliseis/pull/12) as commit [`52d4e448d010d2d13c13a4d3d665cdf5b1b0103b`](https://github.com/xmattjus/moliseis/commit/52d4e448d010d2d13c13a4d3d665cdf5b1b0103b), whose parent is `0cdb764a7586f85180a802fafcf2b485791cb5ff` (verified from Git history). All seven migrations are now published. The historical analyzer transition for this checkpoint was **37 → 0 INFO**; these are recorded checkpoint results, not analyzer runs performed during reconciliation. Planning assumptions, local-only authorization and uncommitted-work statements below describe their original phases. Subsequent publication supersedes those status statements without changing the historical evidence. Canonical synchronization, archival, legacy compatibility deletion and merge remain outside this reconciliation.
+
+## Evidence provenance
+
+Recorded artifact SHA-256 values and byte-for-byte preservation claims below refer to the original apply/remediation revisions in the published checkpoint, before this documentation reconciliation. They are not hashes of the revised narrative files. Diagnostic records and machine-readable evidence remain unchanged.
+
+Historical local apply and CR1 results below are preserved in tracked `apply-verification.json`, the analyzer companions and the test manifest. Recorded source hashes and results describe those executions; they are not fresh reconciliation runs or proof that an external runtime stack was available. No latest-head GitHub Actions result is inferred from historical local tests; check PR #12 for checks attached to the exact published SHA.
+
 ## Initial planning record — historical
 
 The record below belongs to the initial planning turn. Its author self-review is superseded where necessary by the independent-review remediation section at the end; it is not evidence of a second independent review.
@@ -271,3 +281,30 @@ The autonomous count increased by exactly eighteen from 3373 to 3391; all four s
 Incremental CR1 diff is eight files: Screen, routing tests, design.md, test-plan.md, tasks.md, validation.md, command-execution-concurrency/spec.md and apply-verification.json. No new files or manifest change. All other apply content is byte-identical to the pre-remediation snapshot, including ViewModel/router, other tests/support, metadata/B0 and its recorded checksums, provenance delta and proposal. Direct checks cover untracked text/UTF-8/final newline/whitespace/conflict markers/portable artifact paths, requirement names/scenarios, empty index and unchanged other worktrees. Final tested Dart hashes are recorded separately from historical apply hashes. All 27 task checkboxes remain completed.
 
 **CR1 CLOSED locally.** No known remaining material blocker from the executed gates. The documented local Supabase token/all-day integrations remain NOT RUN because of the missing Docker daemon; no new infrastructure, backend or credentials were prepared and no integration pass is claimed. Runtime global reporting is independent of route visibility, and accepted physical operations continue normally. No commit/push/PR update/thread resolution/merge/archive/canonical sync or legacy deletion occurred. Stop for independent code re-review; this author remediation is not that review.
+
+
+## PR #12 reconciliation verification — 2026-10-24
+
+This section records new consolidation checks against the working tree based on published head `52d4e448d010d2d13c13a4d3d665cdf5b1b0103b`, including the two Content Submission route-test teardown callback additions. It does not replace the historical apply/CR1 results above or attribute those old counts to this run.
+
+- Locked dependency preparation: exit 0; no dependency or lockfile change is part of the consolidation.
+- `flutter test --no-pub test/routing/content_submission_route_test.dart`: exit 0, **39 passed / 0 failed / 0 skipped** (new reconciliation run).
+- `dart analyze --format machine`: exit 0, empty output, **0 INFO / 0 WARNING / 0 ERROR** (new reconciliation run).
+- `TZ=Europe/Rome flutter test --no-pub --reporter expanded` with the exact autonomous CI selection (160 files, excluding `test/integration/**`): exit 0, **3391 passed / 0 failed / 4 pre-existing skips**. This is a new run, coincidentally matching the historical CR1 count; it is not reused evidence. The selection matches tracked `autonomous-test-manifest.txt` (SHA-256 `c0be3cce82129b302bf6d491286a82217336a88b1071cd29eb0185528e8647d0`). All relevant lifecycle/support regressions are included.
+- `flutter analyze --no-pub`: exit 0, **No issues found** (new reconciliation run).
+- Local-stack integration tests: **NOT RUN**; the autonomous selection deliberately excludes `test/integration/`. No Supabase/Deno runtime stack was prepared or integration pass claimed.
+- Historical GitHub Actions at exact head `52d4e448d010d2d13c13a4d3d665cdf5b1b0103b`: both Flutter analyze and Autonomous Flutter tests succeeded in [run 40124157345](https://github.com/xmattjus/moliseis/actions/runs/40124157345). These are remote results for the prior head, separate from the local reconciliation runs above.
+- Latest-head GitHub Actions and final independent review: no completion is claimed by these local results.
+- This section records results only; local temporary logs are not committed or promised accessible. The published commit and its CI run provide the persistent source/replay references.
+
+### Documentary reconciliation and independent diff review
+
+All seven existing migration directories were inspected. Each passed `openspec validate <change> --type change --strict --no-interactive` with exit 0 in the consolidation. All 13 normative specification files, JSON/TXT evidence and YAML metadata remain byte-identical to the starting head. Existing full Git SHA/evidence-hash values, analyzer machine rows and numbered task IDs/check states were compared with Git and preserved. The historical analyzer sequence remains **125 → 113 → 105 → 87 → 66 → 52 → 37 → 0 INFO**, not seven fresh analyzer runs.
+
+English narrative, historical/current status and portable evidence references were checked throughout; remaining Italian text consists of exact product labels and other immutable names. No workstation/home/temporary absolute paths remain in these artifacts. Historical inaccessible logs are explicitly identified as unavailable raw evidence; recorded outcomes are not upgraded into newly verified passes. The seven published checkpoint/parent pairs were checked against Git, including the intermediate Search/GeoMap reconciliation `f48a08946c9ac40146104a0157556243ad433c92` after `da7c426fb799a26094f043319b47e63b98728f92`.
+
+A separate read-only reviewer compared all five translated migration proposals/designs/tasks with their original revisions and inspected lifecycle correctness of the two-line test fix: no actionable finding. The integration agent separately reviewed the already-English Admin documentation diffs, source scope and evidence. The test fix is distinct from documentation normalization: each affected test creates/registers one harness, passes the established `disposeOwners` callback, and performs no earlier explicit disposal. `testOwnerUI` invokes it in `finally` after assertions and widget unmount, including when the test callback throws; `disposeContentSubmissionOwners` calls each registered disposer once and clears the list. No shared support/lifecycle abstraction changed.
+
+CodeRabbit dispositions at this local verification stage: publication status (CR-A), missing teardown (CR-B) and evidence portability (CR-C) corrected; already-resolved Search/GeoMap inconsistency (CR-D) remains corrected. The two older deferred-disposal helper extraction suggestions are nonblocking production refactors outside scope. No unresolved correctness defect was confirmed from those suggestions. Thread replies/resolution and latest-head CI require subsequent publication/live verification; this pre-commit record does not claim those future actions.
+
+Final reviewed source manifest: 26 existing Markdown files under the seven changes (proposal/design/tasks in migrations 1–5; proposal/design/tasks/validation/analyzer-baseline in Admin Session; proposal/design/tasks/validation/analyzer-baseline/test-plan in Admin Editor) plus `test/routing/content_submission_route_test.dart`. No production/backend/dependency/configuration/canonical files changed, no new files or permanent tooling. `git diff --check` passed; nine unrelated checkout HEAD/status inventories matched the initial read-only inventory. The dedicated reconciliation branch starts at `52d4e448d010d2d13c13a4d3d665cdf5b1b0103b`; its new commit cannot record its own SHA before creation. Final independent review, explicit merge authorization, canonical synchronization, archival and legacy compatibility removal remain separate gates.

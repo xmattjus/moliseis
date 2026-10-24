@@ -1,5 +1,9 @@
 # Tasks
 
+## Published checkpoint
+
+This migration was published in Draft [PR #12](https://github.com/xmattjus/moliseis/pull/12) as commit [`52d4e448d010d2d13c13a4d3d665cdf5b1b0103b`](https://github.com/xmattjus/moliseis/commit/52d4e448d010d2d13c13a4d3d665cdf5b1b0103b), whose parent is `0cdb764a7586f85180a802fafcf2b485791cb5ff` (verified from Git history). All seven migrations are now published. The historical analyzer transition for this checkpoint was **37 → 0 INFO**; these are recorded checkpoint results, not analyzer runs performed during reconciliation. Planning assumptions, local-only authorization and uncommitted-work statements below describe their original phases. Subsequent publication supersedes those status statements without changing the historical evidence. Canonical synchronization, archival, legacy compatibility deletion and merge remain outside this reconciliation.
+
 Authorized local apply completed after user-supplied independent plan approval and explicit apply authorization. Decisions refer to design.md; scenario IDs refer to test-plan.md. Executed evidence and per-task traceability are in validation.md and apply-verification.json. This checklist does not authorize publication or canonical synchronization.
 
 ## 1. Authorized baseline and shared test support
@@ -53,7 +57,7 @@ Authorized local apply completed after user-supplied independent plan approval a
 - [x] 8.5 Run full machine analyzer plus Flutter analyzer, reconcile B0/B1 and check formatter/whitespace/scoped diff. Acceptance: zero remaining/new diagnostic tuples, actual exits recorded, only authorized production/test/support and current-change artifacts differ; no legacy deletion/backend/foundation/canonical edits (test-plan gate 5).
 - [x] 8.6 Strictly validate OpenSpec and update implementation evidence/traceability honestly. Acceptance: `openspec validate migrate-admin-editor-commands --type change --strict --no-interactive` passes; completed tasks cite executed evidence and limitations; stop for independent code review (test-plan gate 6).
 
-## Workflow follow-up
+## Historical workflow follow-up
 
 - The user supplied independent plan approval and authorized this local apply. Independent code review is the next gate; this checklist does not claim that review.
 - Publication to cumulative Draft PR #12, final consolidation/legacy deletion, canonical sync, archive and merge are later separately authorized work. Never push directly to main.

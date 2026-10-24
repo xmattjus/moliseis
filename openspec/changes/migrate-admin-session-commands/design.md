@@ -1,12 +1,16 @@
 # Design
 
+## Published checkpoint
+
+This migration was published in Draft [PR #12](https://github.com/xmattjus/moliseis/pull/12) as commit [`0cdb764a7586f85180a802fafcf2b485791cb5ff`](https://github.com/xmattjus/moliseis/commit/0cdb764a7586f85180a802fafcf2b485791cb5ff), whose parent is `e80dfbaf472ef1cc15b220a48df966509a9ee8a1` (verified from Git history). All seven migrations are now published. The historical analyzer transition for this checkpoint was **52 → 37 INFO**; these are recorded checkpoint results, not analyzer runs performed during reconciliation. Planning assumptions, local-only authorization and uncommitted-work statements below describe their original phases. Subsequent publication supersedes those status statements without changing the historical evidence. Canonical synchronization, archival, legacy compatibility deletion and merge remain outside this reconciliation.
+
 ## Context
 
 See proposal.md for motivation. This is the sixth of seven cumulative Command migrations. The original planning and F1–F4 remediation observations below refer exclusively to e80dfbaf472ef1cc15b220a48df966509a9ee8a1. Decisions D1–D5 remain the approved contract. The separately authorized apply and its actual runtime-test evidence are recorded in the implementation appendix and validation.md; historical planning evidence is not presented as runtime validation.
 
 ### Git baseline and isolation
 
-Remote preflight: xmattjus/moliseis PR #12 OPEN, head branch codex/migrate-legacy-commands, base main, head e80dfbaf472ef1cc15b220a48df966509a9ee8a1 exactly matches authorization. Primary checkout is main at ee60777c7fdfc5c16daa1151050c134fbb7cde29; it is deliberately not the planning baseline. Existing seven worktrees had empty index, tracked diff and untracked inventory. Destination and branch did not exist. Created exactly /Users/benitomatteobercini/Developer/Progetti/moliseis-worktrees/migrate-admin-session-commands with branch codex/plan-migrate-admin-session-commands from the authorized commit, without moving any other branch. Full initial checkout inventory and diagnostic ledger are in analyzer-baseline.md. Remediation preflight reconfirmed the same PR/head, branch, empty index and tracked diff, seven existing documentary artifacts and unchanged other checkouts. The worktree was reused without branch switching or recreation; analyzer-baseline.md remains byte-for-byte unchanged. Stop affected mutations if PR head changes; never adopt a newer commit implicitly.
+Remote preflight: xmattjus/moliseis PR #12 OPEN, head branch codex/migrate-legacy-commands, base main, head e80dfbaf472ef1cc15b220a48df966509a9ee8a1 exactly matches authorization. Primary checkout is main at ee60777c7fdfc5c16daa1151050c134fbb7cde29; it is deliberately not the planning baseline. Existing seven worktrees had empty index, tracked diff and untracked inventory. Destination and branch did not exist. Created exactly `<worktree>` with branch codex/plan-migrate-admin-session-commands from the authorized commit, without moving any other branch. Full initial checkout inventory and diagnostic ledger are in analyzer-baseline.md. Remediation preflight reconfirmed the same PR/head, branch, empty index and tracked diff, seven existing documentary artifacts and unchanged other checkouts. The worktree was reused without branch switching or recreation; analyzer-baseline.md remains byte-for-byte unchanged. Stop affected mutations if PR head changes; never adopt a newer commit implicitly.
 
 ### Observed implementation and dependency evidence
 
