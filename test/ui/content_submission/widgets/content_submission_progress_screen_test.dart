@@ -8,21 +8,28 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/models/content_submission_draft.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
+import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
+import '../../../support/command_test_support.dart';
+import '../../../support/content_submission_command_harness.dart';
 import '../../../support/fake_image_picker.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
 import '../../../support/predictive_back.dart';
 
 void main() {
+  final ownerDisposals = <void Function()>[];
+  setUp(ownerDisposals.clear);
   ContentSubmissionViewModel buildViewModel({
     required ContentSubmissionRepository submissionRepository,
     ContentSubmissionDraftRepository? draftRepository,
@@ -30,20 +37,23 @@ void main() {
     ImagePicker? imagePicker,
   }) {
     // _submit null-checks these fields; populate them so the Command can run.
-    return ContentSubmissionViewModel(
-        logger: MockLogger(),
-        contentSubmissionRepository: submissionRepository,
-        draftRepository:
-            draftRepository ?? FakeContentSubmissionDraftRepository(),
-        stagedAssetRepository:
-            stagedAssetRepository ??
-            FakeContentSubmissionStagedAssetRepository(),
-        imagePicker: imagePicker ?? FakeImagePicker(),
-      )
-      ..setCity('Campobasso')
-      ..setName('Test event')
-      ..setUserEmail('test@example.com')
-      ..setUserName('Test User');
+    final owner =
+        ContentSubmissionViewModel(
+            logger: MockLogger(),
+            contentSubmissionRepository: submissionRepository,
+            draftRepository:
+                draftRepository ?? FakeContentSubmissionDraftRepository(),
+            stagedAssetRepository:
+                stagedAssetRepository ??
+                FakeContentSubmissionStagedAssetRepository(),
+            imagePicker: imagePicker ?? FakeImagePicker(),
+          )
+          ..setCity('Campobasso')
+          ..setName('Test event')
+          ..setUserEmail('test@example.com')
+          ..setUserName('Test User');
+    ownerDisposals.add(owner.dispose);
+    return owner;
   }
 
   /// Harness mounting the progress screen as the initial route. Use for tests
@@ -129,8 +139,163 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testOwnerUI('P1 admission renders running before deferred action starts', (
+    tester,
+  ) async {
+    final repository = ControllableSubmissionRepository();
+    final vm = buildViewModel(submissionRepository: repository);
+    expect(vm.requestSubmit(), isTrue);
+    expect(repository.submitCallCount, 0);
+    await tester.pumpWidget(buildProgressFirstApp(vm));
+    expect(find.text('Invio in corso...'), findsOneWidget);
+    expect(find.textContaining("L'invio è stato interrotto"), findsNothing);
+    expect(find.byType(BackButton), findsNothing);
+    expect(find.text('Torna alla home'), findsNothing);
+    await pumpCommandTurns(tester);
+    expect(repository.submitCallCount, 1);
+    repository.completeSubmission(Result.error(Exception('remote rejected')));
+    await tester.pumpAndSettle();
+  }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
+
+  testOwnerUI('P3 runtime pre-ack failure differs from domain failure', (
+    tester,
+  ) async {
+    final logger = MockLogger();
+    addTearDown(installCommandTestReporting(logger));
+    final original = StateError('unexpected final request');
+    final repository = FakeContentSubmissionRepository(
+      submitThrownError: original,
+    );
+    final vm = buildViewModel(submissionRepository: repository);
+    await tester.pumpWidget(buildProgressFirstApp(vm));
+    expect(vm.requestSubmit(), isTrue);
+    await tester.pumpAndSettle();
+    expect(vm.submitSnapshot.unexpectedError, same(original));
+    expect(vm.submitSnapshot.domainError, isNull);
+    expect(
+      find.text("Si è verificato un problema imprevisto durante l'invio"),
+      findsOneWidget,
+    );
+    expect(find.text('Riprova'), findsNothing);
+    expect(find.text('Torna al modulo'), findsOneWidget);
+    expect(find.byType(BackButton), findsOneWidget);
+    expect(logger.eventsOfType<CommandExecutionFailed>(), hasLength(1));
+  }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
+
+  testOwnerUI('P2 P3 post-ack runtime retry performs only local retirement', (
+    tester,
+  ) async {
+    final logger = MockLogger();
+    addTearDown(installCommandTestReporting(logger));
+    final pending = Completer<Result<void>>();
+    final drafts = FakeContentSubmissionDraftRepository()
+      ..pendingClearDraft = pending;
+    final repository = FakeContentSubmissionRepository();
+    final vm = buildViewModel(
+      submissionRepository: repository,
+      draftRepository: drafts,
+    );
+    await tester.pumpWidget(buildProgressFirstApp(vm));
+    expect(vm.requestSubmit(), isTrue);
+    await pumpCommandTurns(tester);
+    expect(drafts.clearDraftCallCount, 1);
+    expect(vm.submissionFinalizationPending, isTrue);
+    final original = Exception('local retirement runtime');
+    pending.completeError(original, StackTrace.current);
+    await tester.pumpAndSettle();
+    expect(vm.submitSnapshot.unexpectedError, same(original));
+    expect(find.text('Riprova'), findsOneWidget);
+    expect(find.byType(BackButton), findsNothing);
+    expect(find.text('Torna alla home'), findsNothing);
+    expect(find.text('Nuovo suggerimento'), findsNothing);
+    final retryPending = Completer<Result<void>>();
+    drafts.pendingClearDraft = retryPending;
+    final retry = tester
+        .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Riprova'))
+        .onPressed!;
+    retry();
+    retry();
+    expect(vm.isSubmitting, isTrue);
+    expect(vm.canRetrySubmissionImmediately, isFalse);
+    await pumpCommandTurns(tester);
+    expect(find.text('Invio in corso...'), findsOneWidget);
+    expect(find.text('Riprova'), findsNothing);
+    expect(drafts.clearDraftCallCount, 2);
+    expect(repository.submitCallCount, 1);
+    expect(repository.uploadedImages, isEmpty);
+    expect(drafts.saveDraftCallCount, 1);
+    retryPending.complete(const Result.success(null));
+    await tester.pumpAndSettle();
+    expect(vm.submitSnapshot.completed, isTrue);
+    expect(vm.submissionFinalizationPending, isFalse);
+    expect(find.text('Nuovo suggerimento'), findsOneWidget);
+    expect(repository.submitCallCount, 1);
+    expect(drafts.clearDraftCallCount, 2);
+    expect(drafts.saveDraftCallCount, 1);
+    expect(logger.eventsOfType<CommandExecutionFailed>(), hasLength(1));
+  }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
+
+  testOwnerUI(
+    'B1 progress rebind ignores retained exit of equal-ID old owner',
+    (tester) async {
+      final a = buildViewModel(
+        submissionRepository: ControllableSubmissionRepository(),
+      );
+      await a.initialize();
+      final repository = ControllableSubmissionRepository();
+      final b = buildViewModel(
+        submissionRepository: repository,
+        draftRepository: FakeContentSubmissionDraftRepository(
+          loadDraftResult: Result.success(
+            ContentSubmissionDraft(
+              clientSubmissionId: a.state.clientSubmissionId,
+              city: 'B city',
+              name: 'B name',
+              userEmail: 'b@example.test',
+              userName: 'B',
+            ),
+          ),
+        ),
+      );
+      await b.initialize();
+      final current = ValueNotifier(a);
+      addTearDown(current.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ValueListenableBuilder<ContentSubmissionViewModel>(
+            valueListenable: current,
+            builder: (_, owner, _) =>
+                ContentSubmissionProgressScreen(viewModel: owner),
+          ),
+        ),
+      );
+      final stale = tester
+          .widget<OutlinedButton>(
+            find.widgetWithText(OutlinedButton, 'Torna al modulo'),
+          )
+          .onPressed!;
+      current.value = b;
+      await tester.pump(Duration.zero);
+      expect(b.requestSubmit(), isTrue);
+      await pumpCommandTurns(tester);
+      expect(find.text('Invio in corso...'), findsOneWidget);
+      stale();
+      await tester.pump(Duration.zero);
+      expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
+      expect(b.isSubmitting, isTrue);
+      expect(repository.submitCallCount, 1);
+      repository.completeSubmission(
+        Result.error(Exception('B remote rejected')),
+      );
+      await tester.pumpAndSettle();
+      expect(b.submitSnapshot.domainError, isNotNull);
+      expect(tester.takeException(), isNull);
+    },
+    disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
+  );
+
   group('ContentSubmissionProgressScreen state rendering', () {
-    testWidgets('idle: shows recovery UI and no retry action', (tester) async {
+    testOwnerUI('idle: shows recovery UI and no retry action', (tester) async {
       final repo = ControllableSubmissionRepository();
       final vm = buildViewModel(submissionRepository: repo);
 
@@ -144,10 +309,10 @@ void main() {
       expect(find.text('Torna alla home'), findsNothing);
       expect(find.text('Nuovo suggerimento'), findsNothing);
       expect(find.text('Riprova'), findsNothing);
-      expect(vm.submit.idle, isTrue);
-    });
+      expect(vm.submitSnapshot.idle, isTrue);
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('running: shows spinner and no action buttons', (tester) async {
+    testOwnerUI('running: shows spinner and no action buttons', (tester) async {
       final repo = ControllableSubmissionRepository();
       final draftRepository = FakeContentSubmissionDraftRepository();
       final vm = buildViewModel(
@@ -157,9 +322,9 @@ void main() {
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
 
-      unawaited(vm.submit.execute());
-      unawaited(vm.submit.execute());
-      await tester.pump();
+      expect(vm.requestSubmit(), isTrue);
+      expect(vm.requestSubmit(), isFalse);
+      await tester.pump(Duration.zero);
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('Invio in corso...'), findsOneWidget);
@@ -167,14 +332,14 @@ void main() {
       expect(find.text('Nuovo suggerimento'), findsNothing);
       expect(find.text('Riprova'), findsNothing);
       expect(find.byType(BackButton), findsNothing);
-      expect(vm.submit.running, isTrue);
+      expect(vm.isSubmitting, isTrue);
       expect(repo.submitCallCount, 1);
       expect(draftRepository.clearDraftCallCount, 0);
 
       addTearDown(() => repo.completeSubmission(const Result.success(null)));
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('completed: shows success text and Nuovo suggerimento', (
+    testOwnerUI('completed: shows success text and Nuovo suggerimento', (
       tester,
     ) async {
       final repo = ControllableSubmissionRepository();
@@ -182,8 +347,8 @@ void main() {
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
 
-      unawaited(vm.submit.execute());
-      await tester.pump();
+      vm.requestSubmit();
+      await tester.pump(Duration.zero);
 
       repo.completeSubmission(const Result.success(null));
       await tester.pumpAndSettle();
@@ -193,10 +358,10 @@ void main() {
       expect(find.text('Nuovo suggerimento'), findsOneWidget);
       expect(find.text('Riprova'), findsNothing);
       expect(find.text('Torna alla home'), findsOneWidget);
-      expect(vm.submit.completed, isTrue);
-    });
+      expect(vm.submitSnapshot.completed, isTrue);
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('success UI waits for ViewModel-owned local finalization', (
+    testOwnerUI('success UI waits for ViewModel-owned local finalization', (
       tester,
     ) async {
       final clearGate = Completer<Result<void>>();
@@ -210,13 +375,13 @@ void main() {
       final submittedIdentity = vm.state.clientSubmissionId;
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
-      unawaited(vm.submit.execute());
-      await tester.pump();
+      vm.requestSubmit();
+      await tester.pump(Duration.zero);
       repository.completeSubmission(const Result.success(null));
-      await tester.pump();
-      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pump(Duration.zero);
 
-      expect(vm.submit.running, isTrue);
+      expect(vm.isSubmitting, isTrue);
       expect(vm.submissionFinalizationPending, isTrue);
       expect(draftRepository.clearDraftCallCount, 1);
       expect(vm.state.clientSubmissionId, submittedIdentity);
@@ -226,11 +391,11 @@ void main() {
       clearGate.complete(const Result.success(null));
       await tester.pumpAndSettle();
 
-      expect(vm.submit.completed, isTrue);
+      expect(vm.submitSnapshot.completed, isTrue);
       expect(vm.submissionFinalizationPending, isFalse);
       expect(vm.state.clientSubmissionId, isNot(submittedIdentity));
       expect(find.text('Nuovo suggerimento'), findsOneWidget);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
     for (final failure in <({String name, Exception error})>[
       (name: 'validation', error: TestException('VALIDATION_ERROR')),
@@ -258,7 +423,7 @@ void main() {
       (name: 'local', error: TestException('checkpoint failed')),
       (name: 'unknown', error: TestException('unknown failure')),
     ]) {
-      testWidgets('${failure.name} error has safe recovery and no retry', (
+      testOwnerUI('${failure.name} error has safe recovery and no retry', (
         tester,
       ) async {
         final repository = FakeContentSubmissionRepository(
@@ -267,7 +432,11 @@ void main() {
         final viewModel = buildViewModel(submissionRepository: repository);
 
         await tester.pumpWidget(buildProgressFirstApp(viewModel));
-        await viewModel.submit.execute();
+        await requestAndPump(
+          tester,
+          viewModel.requestSubmit,
+          () => viewModel.isSubmitting,
+        );
         await tester.pumpAndSettle();
 
         expect(
@@ -280,13 +449,13 @@ void main() {
         expect(find.text('Torna alla home'), findsOneWidget);
         expect(find.text('Torna al modulo'), findsOneWidget);
         expect(find.byType(BackButton), findsOneWidget);
-        expect(viewModel.submit.error, isTrue);
+        expect(viewModel.submitSnapshot.hasFailure, isTrue);
         expect(viewModel.canRetrySubmissionImmediately, isFalse);
         expect(repository.submitCallCount, 1);
-      });
+      }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
     }
 
-    testWidgets(
+    testOwnerUI(
       'finalization failure retries local retirement until it succeeds',
       (tester) async {
         final imagePicker = FakeImagePicker(
@@ -315,12 +484,16 @@ void main() {
           stagedAssetRepository: stagedRepository,
           imagePicker: imagePicker,
         );
-        await viewModel.addAsset.execute();
+        await requestAndPump(
+          tester,
+          viewModel.requestAddAsset,
+          () => viewModel.isAddingAsset,
+        );
         final pendingIdentity = viewModel.state.clientSubmissionId;
         final pendingState = viewModel.state;
         await tester.pumpWidget(buildProgressFirstApp(viewModel));
 
-        unawaited(viewModel.submit.execute());
+        viewModel.requestSubmit();
         await tester.pumpAndSettle();
 
         expect(viewModel.submissionFinalizationPending, isTrue);
@@ -339,7 +512,7 @@ void main() {
         expect(viewModel.assets, hasLength(1));
         expect(stagedRepository.clearedSessions, isEmpty);
         expect(await tester.binding.handlePopRoute(), isTrue);
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
 
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -355,9 +528,9 @@ void main() {
         final retryClear = Completer<Result<void>>();
         draftRepository.pendingClearDraft = retryClear;
         await tester.tap(find.text('Riprova'));
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
-        expect(viewModel.submit.running, isTrue);
+        expect(viewModel.isSubmitting, isTrue);
         expect(viewModel.canRetrySubmissionImmediately, isFalse);
         expect(find.text('Riprova'), findsNothing);
         expect(find.text('Torna alla home'), findsNothing);
@@ -387,7 +560,7 @@ void main() {
         expect(repository.submitCallCount, 1);
         expect(repository.uploadedImages, hasLength(1));
         expect(draftRepository.clearDraftCallCount, 3);
-        expect(viewModel.submit.completed, isTrue);
+        expect(viewModel.submitSnapshot.completed, isTrue);
         expect(viewModel.submissionFinalizationPending, isFalse);
         expect(viewModel.canRetrySubmissionImmediately, isFalse);
         expect(viewModel.state.clientSubmissionId, isNot(pendingIdentity));
@@ -395,11 +568,12 @@ void main() {
         expect(stagedRepository.clearedSessions, <String>[pendingIdentity]);
         expect(find.text('Nuovo suggerimento'), findsOneWidget);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
   });
 
   group('ContentSubmissionProgressScreen navigation-only actions', () {
-    testWidgets(
+    testOwnerUI(
       'BackButton when completed reveals the already-finalized fresh form',
       (tester) async {
         final repo = ControllableSubmissionRepository(
@@ -425,7 +599,11 @@ void main() {
             ],
           ),
         );
-        await vm.addAsset.execute();
+        await requestAndPump(
+          tester,
+          vm.requestAddAsset,
+          () => vm.isAddingAsset,
+        );
         final completedIdentity = vm.state.clientSubmissionId;
         expect(vm.assets, hasLength(1));
 
@@ -440,8 +618,8 @@ void main() {
           isTrue,
           reason: 'Provider must subscribe to the view model.',
         );
-        unawaited(vm.submit.execute());
-        await tester.pump();
+        vm.requestSubmit();
+        await tester.pump(Duration.zero);
         repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
@@ -463,9 +641,10 @@ void main() {
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'BackButton after remote failure preserves the same draft and staged '
       'session',
       (tester) async {
@@ -492,15 +671,19 @@ void main() {
             ],
           ),
         );
-        await vm.addAsset.execute();
+        await requestAndPump(
+          tester,
+          vm.requestAddAsset,
+          () => vm.isAddingAsset,
+        );
         final failedState = vm.state;
         final failedIdentity = vm.state.clientSubmissionId;
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
         await pushProgress(tester, router);
-        unawaited(vm.submit.execute());
-        await tester.pump();
+        vm.requestSubmit();
+        await tester.pump(Duration.zero);
         repo.completeSubmission(Result.error(Exception('boom')));
         await tester.pumpAndSettle();
 
@@ -519,9 +702,10 @@ void main() {
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets('Nuovo suggerimento reveals the already-finalized fresh form', (
+    testOwnerUI('Nuovo suggerimento reveals the already-finalized fresh form', (
       tester,
     ) async {
       final repo = ControllableSubmissionRepository();
@@ -537,8 +721,8 @@ void main() {
       final (router, app) = buildHomeFirstApp(vm);
       await tester.pumpWidget(app);
       await pushProgress(tester, router);
-      unawaited(vm.submit.execute());
-      await tester.pump();
+      vm.requestSubmit();
+      await tester.pump(Duration.zero);
       repo.completeSubmission(const Result.success(null));
       await tester.pumpAndSettle();
 
@@ -558,9 +742,9 @@ void main() {
       expect(find.byType(_HomeMarker), findsNothing);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
       expect(tester.takeException(), isNull);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets(
+    testOwnerUI(
       'OS back when completed reveals the already-finalized fresh form',
       (tester) async {
         final repo = ControllableSubmissionRepository();
@@ -575,8 +759,8 @@ void main() {
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
         await pushProgress(tester, router);
-        unawaited(vm.submit.execute());
-        await tester.pump();
+        vm.requestSubmit();
+        await tester.pump(Duration.zero);
         repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
@@ -597,9 +781,10 @@ void main() {
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets('OS back when error does not clear and pops to the form', (
+    testOwnerUI('OS back when error does not clear and pops to the form', (
       tester,
     ) async {
       final repo = ControllableSubmissionRepository();
@@ -614,8 +799,8 @@ void main() {
       final (router, app) = buildHomeFirstApp(vm);
       await tester.pumpWidget(app);
       await pushProgress(tester, router);
-      unawaited(vm.submit.execute());
-      await tester.pump();
+      vm.requestSubmit();
+      await tester.pump(Duration.zero);
       repo.completeSubmission(Result.error(Exception('boom')));
       await tester.pumpAndSettle();
 
@@ -627,9 +812,9 @@ void main() {
       expect(stagedRepo.clearedSessions, isEmpty);
       expect(find.byType(_FormMarker), findsOneWidget);
       expect(find.byType(_HomeMarker), findsNothing);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets(
+    testOwnerUI(
       'BackButton while idle pops to form without clearing or retrying',
       (tester) async {
         final repo = ControllableSubmissionRepository();
@@ -655,9 +840,10 @@ void main() {
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'Torna al modulo while idle pops to form without clearing or retrying',
       (tester) async {
         final repo = ControllableSubmissionRepository();
@@ -680,9 +866,10 @@ void main() {
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'OS back while idle pops to form without clearing or retrying',
       (tester) async {
         final repo = ControllableSubmissionRepository();
@@ -706,9 +893,10 @@ void main() {
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets('OS back while running is blocked and does not pop', (
+    testOwnerUI('OS back while running is blocked and does not pop', (
       tester,
     ) async {
       final repo = ControllableSubmissionRepository();
@@ -717,22 +905,22 @@ void main() {
       final (router, app) = buildHomeFirstApp(vm);
       await tester.pumpWidget(app);
       await pushProgress(tester, router);
-      unawaited(vm.submit.execute());
-      await tester.pump();
+      vm.requestSubmit();
+      await tester.pump(Duration.zero);
 
       final handled = await tester.binding.handlePopRoute();
       // The spinner keeps animating, so a single pump is enough here.
-      await tester.pump();
+      await tester.pump(Duration.zero);
 
       expect(handled, isTrue);
       expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
       expect(find.byType(_FormMarker), findsNothing);
-      expect(vm.submit.running, isTrue);
+      expect(vm.isSubmitting, isTrue);
 
       addTearDown(() => repo.completeSubmission(const Result.success(null)));
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets(
+    testOwnerUI(
       'predictive back while idle pops to form without clearing or retrying',
       (tester) async {
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -762,9 +950,10 @@ void main() {
           debugDefaultTargetPlatformOverride = null;
         }
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'predictive back while running does not pop the progress route',
       (tester) async {
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -775,8 +964,8 @@ void main() {
           final (router, app) = buildHomeFirstApp(vm);
           await tester.pumpWidget(app);
           await pushProgress(tester, router);
-          unawaited(vm.submit.execute());
-          await tester.pump();
+          vm.requestSubmit();
+          await tester.pump(Duration.zero);
 
           await startPredictiveBack(tester);
           expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
@@ -787,7 +976,7 @@ void main() {
 
           expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
           expect(find.byType(_FormMarker), findsNothing);
-          expect(vm.submit.running, isTrue);
+          expect(vm.isSubmitting, isTrue);
 
           addTearDown(
             () => repo.completeSubmission(const Result.success(null)),
@@ -796,9 +985,10 @@ void main() {
           debugDefaultTargetPlatformOverride = null;
         }
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'Torna al modulo after error pops once and performs no lifecycle work',
       (tester) async {
         final repo = FakeContentSubmissionRepository(
@@ -825,12 +1015,16 @@ void main() {
             ],
           ),
         );
-        await vm.addAsset.execute();
+        await requestAndPump(
+          tester,
+          vm.requestAddAsset,
+          () => vm.isAddingAsset,
+        );
 
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
         await pushProgress(tester, router);
-        await vm.submit.execute();
+        await requestAndPump(tester, vm.requestSubmit, () => vm.isSubmitting);
         await tester.pumpAndSettle();
 
         expect(repo.submitCallCount, 1);
@@ -857,9 +1051,10 @@ void main() {
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(find.byType(_HomeMarker), findsNothing);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets('Torna alla home navigates without another finalization', (
+    testOwnerUI('Torna alla home navigates without another finalization', (
       tester,
     ) async {
       final repo = ControllableSubmissionRepository();
@@ -873,8 +1068,8 @@ void main() {
       final completedIdentity = vm.state.clientSubmissionId;
 
       await tester.pumpWidget(buildProgressFirstApp(vm));
-      unawaited(vm.submit.execute());
-      await tester.pump();
+      vm.requestSubmit();
+      await tester.pump(Duration.zero);
       repo.completeSubmission(const Result.success(null));
       await tester.pumpAndSettle();
 
@@ -892,9 +1087,9 @@ void main() {
       expect(find.byType(_HomeMarker), findsOneWidget);
       expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
       expect(tester.takeException(), isNull);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets(
+    testOwnerUI(
       'repeated completed Home actions cannot retire the fresh session',
       (tester) async {
         final repo = ControllableSubmissionRepository();
@@ -904,8 +1099,8 @@ void main() {
           draftRepository: draftRepo,
         );
         await tester.pumpWidget(buildProgressFirstApp(vm));
-        unawaited(vm.submit.execute());
-        await tester.pump();
+        vm.requestSubmit();
+        await tester.pump(Duration.zero);
         repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
@@ -923,9 +1118,10 @@ void main() {
         expect(vm.state.clientSubmissionId, finalizedIdentity);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'completed navigation does not rotate or clear the fresh session twice',
       (tester) async {
         final repo = ControllableSubmissionRepository();
@@ -938,8 +1134,8 @@ void main() {
         final (router, app) = buildHomeFirstApp(vm);
         await tester.pumpWidget(app);
         await pushProgress(tester, router);
-        unawaited(vm.submit.execute());
-        await tester.pump();
+        vm.requestSubmit();
+        await tester.pump(Duration.zero);
         repo.completeSubmission(const Result.success(null));
         await tester.pumpAndSettle();
 
@@ -960,8 +1156,8 @@ void main() {
           ..setUserName('Second Test User');
 
         await pushProgress(tester, router);
-        unawaited(vm.submit.execute());
-        await tester.pump();
+        vm.requestSubmit();
+        await tester.pump(Duration.zero);
 
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         expect(repo.submitCallCount, 2);
@@ -980,6 +1176,7 @@ void main() {
         expect(find.byType(_FormMarker), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
   });
 }

@@ -35,6 +35,7 @@ void testOwnerUI(
   WidgetTesterCallback callback, {
   bool? skip,
   Timeout? timeout,
+  VoidCallback? disposeOwners,
   TestVariant<Object?> variant = const DefaultTestVariant(),
 }) {
   testWidgets(
@@ -44,6 +45,7 @@ void testOwnerUI(
         await callback(tester);
       } finally {
         await tester.pumpWidget(const SizedBox.shrink());
+        disposeOwners?.call();
         await pumpCommandTurns(tester);
         await tester.pump(const Duration(milliseconds: 50));
         await pumpCommandTurns(tester);

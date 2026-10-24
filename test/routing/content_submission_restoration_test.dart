@@ -10,14 +10,16 @@ import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
+import '../support/command_test_support.dart';
 import '../support/fake_image_picker.dart';
 import '../support/fake_repositories.dart';
 import '../support/mock_logger.dart';
 
 void main() {
   group('content submission restoration', () {
-    testWidgets(
+    testOwnerUI(
       'restored idle progress returns to the recoverable form without '
       'retrying or clearing',
       (tester) async {
@@ -31,31 +33,33 @@ void main() {
         await tester.pumpAndSettle();
 
         // Mirror production: submit begins before the progress route is pushed.
-        unawaited(before.viewModel.submit.execute());
+        before.viewModel.requestSubmit();
         unawaited(
           before.router.pushNamed(RouteNames.contentSubmissionUploadProgress),
         );
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
 
-        expect(before.viewModel.submit.running, isTrue);
+        expect(before.viewModel.isSubmitting, isTrue);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
 
         // Keep the old request pending through process death. The new fixture
         // receives a fresh view model, exactly as production does.
-        addTearDown(
-          () => before.submissionRepository.completeSubmission(
-            const Result.success(null),
-          ),
-        );
 
         await tester.restartAndRestore();
         await tester.pumpAndSettle();
 
+        before.submissionRepository.completeSubmission(
+          const Result.success(null),
+        );
+        await pumpCommandTurns(tester);
+        await tester.pump(const Duration(milliseconds: 50));
+        await pumpCommandTurns(tester);
+
         final after = holder.fixture!;
         expect(after, isNot(same(before)));
         expect(after.viewModel, isNot(same(before.viewModel)));
-        expect(after.viewModel.submit.idle, isTrue);
+        expect(after.viewModel.submitSnapshot.idle, isTrue);
         expect(after.viewModel.state.city, 'Campobasso');
         expect(after.viewModel.state.name, 'Test event');
         expect(

@@ -13,7 +13,9 @@ import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/event_formatted_date_time.dart';
+import 'package:moliseis/utils/result_command.dart';
 
+import '../support/content_submission_command_harness.dart';
 import '../support/fake_image_picker.dart';
 import '../support/fake_repositories.dart';
 import '../support/mock_logger.dart';
@@ -71,8 +73,11 @@ void main() {
             ..setStartCalendarDate(fixture.date);
           if (fixture.clock != null) vm.setStartClockTime(fixture.clock!);
           if (fixture.end != null) vm.setEndCalendarDate(fixture.end!);
-          await vm.submit.execute();
-          expect(vm.submit.completed, isTrue);
+          expect(
+            await requestAndWait(vm.requestSubmit, () => vm.isSubmitting),
+            isTrue,
+          );
+          expect(vm.submitSnapshot.completed, isTrue);
           final captured = repository.submittedContentSubmissions.single;
           final request = contentSubmissionToWireMap(
             clientSubmissionId: repository.submittedClientSubmissionIds.single,

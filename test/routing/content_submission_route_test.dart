@@ -25,9 +25,11 @@ import 'package:moliseis/ui/content_submission/widgets/content_submission_screen
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
 import '../support/command_test_support.dart';
+import '../support/content_submission_command_harness.dart';
 import '../support/fake_external_url_service.dart';
 import '../support/fake_image_picker.dart';
 import '../support/fake_repositories.dart';
@@ -36,22 +38,29 @@ import '../support/mock_logger.dart';
 import '../support/predictive_back.dart';
 
 void main() {
+  final ownerDisposals = <void Function()>[];
+  setUp(ownerDisposals.clear);
   _ContentSubmissionRouteHarness createHarness({
     FakeContentSubmissionDraftRepository? draftRepository,
     FakeContentSubmissionStagedAssetRepository? stagedAssetRepository,
     FakeImagePicker? imagePicker,
     ControllableSubmissionRepository? submissionRepository,
     FakeExternalUrlService? externalUrlService,
-  }) => _ContentSubmissionRouteHarness(
-    draftRepository: draftRepository ?? FakeContentSubmissionDraftRepository(),
-    stagedAssetRepository:
-        stagedAssetRepository ?? FakeContentSubmissionStagedAssetRepository(),
-    imagePicker: imagePicker ?? FakeImagePicker(),
-    submissionRepository:
-        submissionRepository ?? ControllableSubmissionRepository(),
-    externalUrlService:
-        externalUrlService ?? FakeExternalUrlService(logger: MockLogger()),
-  );
+  }) {
+    final harness = _ContentSubmissionRouteHarness(
+      draftRepository:
+          draftRepository ?? FakeContentSubmissionDraftRepository(),
+      stagedAssetRepository:
+          stagedAssetRepository ?? FakeContentSubmissionStagedAssetRepository(),
+      imagePicker: imagePicker ?? FakeImagePicker(),
+      submissionRepository:
+          submissionRepository ?? ControllableSubmissionRepository(),
+      externalUrlService:
+          externalUrlService ?? FakeExternalUrlService(logger: MockLogger()),
+    );
+    ownerDisposals.add(harness.dispose);
+    return harness;
+  }
 
   final mainScrollable = find
       .descendant(
@@ -74,9 +83,9 @@ void main() {
   Future<void> scrollToAndTap(WidgetTester tester, Finder finder) async {
     await tester.scrollUntilVisible(finder, 200, scrollable: mainScrollable);
     await tester.ensureVisible(finder);
-    await tester.pump();
+    await tester.pump(Duration.zero);
     await tester.tap(finder);
-    await tester.pump();
+    await tester.pump(Duration.zero);
   }
 
   Future<void> enterLabeledField(
@@ -87,9 +96,9 @@ void main() {
     final field = find.widgetWithText(TextFormField, label);
     await tester.scrollUntilVisible(field, 200, scrollable: mainScrollable);
     await tester.ensureVisible(field);
-    await tester.pump();
+    await tester.pump(Duration.zero);
     await tester.enterText(field, value);
-    await tester.pump();
+    await tester.pump(Duration.zero);
   }
 
   Future<void> fillValidForm(WidgetTester tester) async {
@@ -104,9 +113,142 @@ void main() {
     await scrollToAndTap(tester, termsCheckbox);
   }
 
+  for (final choice in ['Salva ed esci', 'Esci senza salvare']) {
+    testOwnerUI(
+      'B4 pending dialog $choice cannot target replacement Provider',
+      (tester) async {
+        final a = createHarness();
+        final b = createHarness();
+        await b.viewModel.initialize();
+        await a.pumpForm(tester, withGallerySentinel: true);
+        a.viewModel.setCity('A dirty');
+        await tester.pump(Duration.zero);
+        final exit = tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.text('Salvare le modifiche?'), findsOneWidget);
+        await a.pumpForm(
+          tester,
+          providedOwner: b.viewModel,
+          preserveLocation: true,
+        );
+        final stateB = b.viewModel.state;
+        await tester.tap(find.text(choice));
+        await tester.pumpAndSettle();
+        await exit;
+        expect(a.draftRepository.saveDraftCallCount, 0);
+        expect(a.viewModel.restoreCallCount, 0);
+        expect(b.draftRepository.saveDraftCallCount, 0);
+        expect(b.viewModel.restoreCallCount, 0);
+        expect(b.viewModel.state, same(stateB));
+        expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+        expect(find.byType(SnackBar), findsNothing);
+        // The revoked transition releases its token; clean B can exit normally.
+        expect(await tester.binding.handlePopRoute(), isTrue);
+        await tester.pumpAndSettle();
+        expect(find.byType(ContentSubmissionScreen), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
+    );
+  }
+
+  for (final operation in ['checkpoint', 'restore']) {
+    for (final ending in ['live', 'replacement', 'unmount']) {
+      testOwnerUI(
+        'P8 route $operation raw failure after $ending reports once',
+        (tester) async {
+          final pending = Completer<Result<void>>();
+          final drafts = FakeContentSubmissionDraftRepository();
+          if (operation == 'checkpoint') {
+            drafts.pendingSaveDraft = pending;
+          }
+          final a = createHarness(draftRepository: drafts);
+          final b = createHarness();
+          await b.viewModel.initialize();
+          if (operation == 'restore') {
+            a.viewModel.restoreGate = pending;
+          }
+          await a.pumpForm(tester, withGallerySentinel: true);
+          a.viewModel.setCity('A dirty');
+          await tester.pump(Duration.zero);
+          final exit = tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.text(
+              operation == 'checkpoint'
+                  ? 'Salva ed esci'
+                  : 'Esci senza salvare',
+            ),
+          );
+          await pumpCommandTurns(tester);
+          expect(
+            operation == 'checkpoint'
+                ? drafts.saveDraftCallCount
+                : a.viewModel.restoreCallCount,
+            1,
+          );
+          final stateB = b.viewModel.state;
+          if (ending == 'replacement') {
+            await a.pumpForm(
+              tester,
+              providedOwner: b.viewModel,
+              preserveLocation: true,
+            );
+          } else if (ending == 'unmount') {
+            await tester.pumpWidget(const SizedBox.shrink());
+          }
+          final original = Exception('unexpected $operation');
+          final stack = StackTrace.fromString(
+            '#0 directRouteBoundary (file:///direct_route_boundary.dart:19:3)',
+          );
+          final reports = <FlutterErrorDetails>[];
+          final previous = FlutterError.onError;
+          FlutterError.onError = reports.add;
+          try {
+            pending.completeError(original, stack);
+            await tester.pumpAndSettle();
+            await exit;
+          } finally {
+            FlutterError.onError = previous;
+          }
+          expect(reports, hasLength(1));
+          expect(reports.single.exception, same(original));
+          expect(
+            reports.single.stack.toString(),
+            contains('direct_route_boundary.dart'),
+          );
+          expect(a.submissionRepository.submitCallCount, 0);
+          expect(b.submissionRepository.submitCallCount, 0);
+          expect(b.draftRepository.saveDraftCallCount, 0);
+          expect(b.viewModel.restoreCallCount, 0);
+          expect(b.viewModel.state, same(stateB));
+          expect(drafts.clearDraftCallCount, 0);
+          if (ending != 'unmount') {
+            expect(find.byType(ContentSubmissionScreen), findsOneWidget);
+            expect(
+              find.byType(SnackBar),
+              ending == 'live' ? findsOneWidget : findsNothing,
+            );
+            // A fresh Back proves the old boundary did not retain its token.
+            final retryExit = tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            if (ending == 'live') {
+              expect(find.text('Salvare le modifiche?'), findsOneWidget);
+              await tester.tap(find.text('Annulla'));
+              await tester.pumpAndSettle();
+            }
+            await retryExit;
+          }
+          expect(tester.takeException(), isNull);
+        },
+        disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
+      );
+    }
+  }
+
   group('Content Submission session presentation', () {
     for (final populated in [false, true]) {
-      testWidgets(
+      testOwnerUI(
         populated
             ? 'mixed late recovery preserves exact draft and clean Back'
             : 'RED 2 empty late recovery preserves exact draft and clean Back',
@@ -120,7 +262,7 @@ void main() {
           final repository = FakeContentSubmissionDraftRepository()
             ..pendingLoadDraft = loadGate;
           final harness = createHarness(draftRepository: repository);
-          addTearDown(harness.dispose);
+
           final constructorIdentity =
               harness.viewModel.state.clientSubmissionId;
           unawaited(harness.viewModel.initialize());
@@ -201,6 +343,7 @@ void main() {
           expect(repository.clearDraftCallCount, 0);
           expect(tester.takeException(), isNull);
         },
+        disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
       );
     }
 
@@ -227,7 +370,7 @@ void main() {
             loadDraftResult: Result.success(recovered),
           )..pendingClearDraft = clearGate;
           final harness = createHarness(draftRepository: repository);
-          addTearDown(harness.dispose);
+
           await harness.viewModel.initialize();
           await harness.pumpForm(tester, withGallerySentinel: true);
           expect(harness.viewModel.state, recovered);
@@ -274,13 +417,13 @@ void main() {
           );
           for (var frame = 0; frame < 20; frame++) {
             if (repository.clearDraftCallCount == 1) break;
-            await tester.pump();
+            await tester.pump(Duration.zero);
           }
           expect(repository.clearDraftCallCount, 1);
-          expect(harness.viewModel.submit.running, isTrue);
+          expect(harness.viewModel.isSubmitting, isTrue);
           clearGate.complete(const Result.success(null));
           await tester.pumpAndSettle();
-          expect(harness.viewModel.submit.completed, isTrue);
+          expect(harness.viewModel.submitSnapshot.completed, isTrue);
           expect(tester.takeException(), isNull);
           final freshId = harness.viewModel.state.clientSubmissionId;
           final checkpointCalls = harness.viewModel.checkpointCallCount;
@@ -379,7 +522,7 @@ void main() {
           expect(nextIdentities, {freshId});
           expect(harness.viewModel.checkpointCallCount, checkpointCalls);
           expect(harness.viewModel.restoreCallCount, restoreCalls);
-          expect(harness.viewModel.clear.idle, isTrue);
+          expect(harness.viewModel.clearSnapshot.idle, isTrue);
           expect(repository.saveDraftCallCount, saveCalls);
           expect(repository.clearDraftCallCount, 1);
           expect(
@@ -392,11 +535,11 @@ void main() {
       );
     }
 
-    testWidgets(
+    testOwnerUI(
       'same-session text input updates draft and structural dirtiness',
       (tester) async {
         final harness = createHarness();
-        addTearDown(harness.dispose);
+
         await harness.viewModel.initialize();
         await harness.pumpForm(tester);
         final identity = harness.viewModel.state.clientSubmissionId;
@@ -416,22 +559,23 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Modifiche non salvate'), findsOneWidget);
         await harness.viewModel.checkpointDraft();
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(harness.viewModel.hasUnsavedChanges, isFalse);
         expect(find.text('Modifiche non salvate'), findsNothing);
         expect(tester.state<FormState>(find.byType(Form).first), same(form));
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets('RED 1 retirement stays canonical beneath real progress', (
+    testOwnerUI('RED 1 retirement stays canonical beneath real progress', (
       tester,
     ) async {
       final clearGate = Completer<Result<void>>();
       final draftRepository = FakeContentSubmissionDraftRepository()
         ..pendingClearDraft = clearGate;
       final harness = createHarness(draftRepository: draftRepository);
-      addTearDown(harness.dispose);
+
       await harness.viewModel.initialize();
       await harness.pumpForm(tester, withGallerySentinel: true);
       await fillValidForm(tester);
@@ -464,18 +608,18 @@ void main() {
       );
       for (var frame = 0; frame < 20; frame++) {
         if (draftRepository.clearDraftCallCount == 1) break;
-        await tester.pump();
+        await tester.pump(Duration.zero);
       }
       expect(draftRepository.clearDraftCallCount, 1);
-      expect(harness.viewModel.submit.running, isTrue);
-      expect(harness.viewModel.clear.idle, isTrue);
+      expect(harness.viewModel.isSubmitting, isTrue);
+      expect(harness.viewModel.clearSnapshot.idle, isTrue);
       expect(find.text('Nuovo suggerimento'), findsNothing);
       expect(harness.viewModel.state.clientSubmissionId, submittedIdentity);
 
       clearGate.complete(const Result.success(null));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      expect(harness.viewModel.submit.completed, isTrue);
+      expect(harness.viewModel.submitSnapshot.completed, isTrue);
       expect(find.text('Nuovo suggerimento'), findsOneWidget);
       final freshIdentity = harness.viewModel.state.clientSubmissionId;
       final canonical = ContentSubmissionDraft(
@@ -518,15 +662,15 @@ void main() {
       expect(harness.stagedAssetRepository.clearedSessions, [
         submittedIdentity,
       ]);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
   });
 
   group('Content Submission production route exit', () {
-    testWidgets('clean replacement exits without a dialog or draft write', (
+    testOwnerUI('clean replacement exits without a dialog or draft write', (
       tester,
     ) async {
       final harness = createHarness();
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester);
 
       harness.router.go(RoutePaths.gallery);
@@ -540,19 +684,19 @@ void main() {
       expect(harness.draftRepository.saveDraftCallCount, 0);
       expect(tester.takeException(), isNull);
       debugDefaultTargetPlatformOverride = null;
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('dirty replacement shows cancelable three-choice policy', (
+    testOwnerUI('dirty replacement shows cancelable three-choice policy', (
       tester,
     ) async {
       final harness = createHarness();
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester);
       harness.viewModel.setCity('Campobasso');
-      await tester.pump();
+      await tester.pump(Duration.zero);
 
       harness.router.go(RoutePaths.gallery);
-      await tester.pump();
+      await tester.pump(Duration.zero);
 
       expect(find.text('Salva ed esci'), findsOneWidget);
       expect(find.text('Esci senza salvare'), findsOneWidget);
@@ -565,24 +709,24 @@ void main() {
       expect(harness.draftRepository.saveDraftCallCount, 0);
       expect(tester.takeException(), isNull);
       debugDefaultTargetPlatformOverride = null;
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('a gated dirty checkpoint permits only its owner to exit', (
+    testOwnerUI('a gated dirty checkpoint permits only its owner to exit', (
       tester,
     ) async {
       final draftRepository = FakeContentSubmissionDraftRepository();
       final harness = createHarness(draftRepository: draftRepository);
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester);
       harness.viewModel.setCity('Campobasso');
-      await tester.pump();
+      await tester.pump(Duration.zero);
 
       final checkpoint = Completer<Result<void>>();
       draftRepository.pendingSaveDraft = checkpoint;
       harness.router.go(RoutePaths.gallery);
-      await tester.pump();
+      await tester.pump(Duration.zero);
       await tester.tap(find.text('Salva ed esci'));
-      await tester.pump();
+      await tester.pump(Duration.zero);
       expect(find.text('Salva ed esci'), findsNothing);
       expect(draftRepository.saveDraftCallCount, 1);
       checkpoint.complete(const Result.success(null));
@@ -593,27 +737,27 @@ void main() {
         RoutePaths.gallery,
       );
       expect(tester.takeException(), isNull);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('checkpoint failure denies exit and a later attempt succeeds', (
+    testOwnerUI('checkpoint failure denies exit and a later attempt succeeds', (
       tester,
     ) async {
       final draftRepository = FakeContentSubmissionDraftRepository(
         saveDraftResult: Result.error(Exception('checkpoint failed')),
       );
       final harness = createHarness(draftRepository: draftRepository);
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester, withGallerySentinel: true);
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       harness.viewModel.setCity('Campobasso');
-      await tester.pump();
+      await tester.pump(Duration.zero);
 
       await tester.tap(find.byType(BackButton));
-      await tester.pump();
-      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pump(Duration.zero);
       await tester.tap(find.text('Salva ed esci'));
-      await tester.pump();
+      await tester.pump(Duration.zero);
 
       expect(find.text('Suggerimento'), findsOneWidget);
       expect(harness.viewModel.hasUnsavedChanges, isTrue);
@@ -626,8 +770,8 @@ void main() {
 
       draftRepository.saveDraftResult = const Result.success(null);
       await tester.tap(find.byType(BackButton));
-      await tester.pump();
-      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pump(Duration.zero);
       await tester.tap(find.text('Salva ed esci'));
       await tester.pumpAndSettle();
 
@@ -638,19 +782,19 @@ void main() {
       expect(draftRepository.saveDraftCallCount, 2);
       expect(tester.takeException(), isNull);
       debugDefaultTargetPlatformOverride = null;
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('dirty AppBar and system Back use the same cancelable policy', (
+    testOwnerUI('dirty AppBar and system Back use the same cancelable policy', (
       tester,
     ) async {
       final harness = createHarness();
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester, withGallerySentinel: true);
       harness.viewModel.setCity('Campobasso');
-      await tester.pump();
+      await tester.pump(Duration.zero);
 
       await tester.tap(find.byType(BackButton));
-      await tester.pump();
+      await tester.pump(Duration.zero);
       expect(find.text('Salva ed esci'), findsOneWidget);
       expect(find.text('Esci senza salvare'), findsOneWidget);
       expect(find.text('Annulla'), findsOneWidget);
@@ -658,8 +802,8 @@ void main() {
       await tester.pumpAndSettle();
 
       final systemBack = tester.binding.handlePopRoute();
-      await tester.pump();
-      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pump(Duration.zero);
       expect(find.text('Salva ed esci'), findsOneWidget);
       await tester.tap(find.text('Annulla'));
       expect(await systemBack, isTrue);
@@ -669,23 +813,23 @@ void main() {
       expect(harness.viewModel.hasUnsavedChanges, isTrue);
       expect(harness.draftRepository.saveDraftCallCount, 0);
       expect(tester.takeException(), isNull);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets(
+    testOwnerUI(
       'iOS AppBar Back revokes its one-shot allowance after each cancellation',
       (tester) async {
         final harness = createHarness();
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
         debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
         addTearDown(() => debugDefaultTargetPlatformOverride = null);
         harness.viewModel.setCity('Campobasso');
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         expect(contentSubmissionCanPop(tester), isFalse);
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
         expect(find.text('Salva ed esci'), findsOneWidget);
         await tester.tap(find.text('Annulla'));
         await tester.pumpAndSettle();
@@ -695,8 +839,8 @@ void main() {
         expect(contentSubmissionCanPop(tester), isFalse);
 
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
         expect(find.text('Salva ed esci'), findsOneWidget);
         await tester.tap(find.text('Annulla'));
         await tester.pumpAndSettle();
@@ -705,27 +849,28 @@ void main() {
         expect(tester.takeException(), isNull);
         debugDefaultTargetPlatformOverride = null;
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'overlapping removals have one owner and preserve the sentinel',
       (tester) async {
         final draftRepository = FakeContentSubmissionDraftRepository();
         final harness = createHarness(draftRepository: draftRepository);
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
         harness.viewModel.setCity('Campobasso');
         final checkpoint = Completer<Result<void>>();
         draftRepository.pendingSaveDraft = checkpoint;
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         harness.router.go(RoutePaths.logging);
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(find.text('Salva ed esci'), findsOneWidget);
         await tester.tap(find.text('Salva ed esci'));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(draftRepository.saveDraftCallCount, 1);
         expect(find.text('Salva ed esci'), findsNothing);
 
@@ -739,22 +884,23 @@ void main() {
         expect(find.text('Suggerimento'), findsNothing);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'overlap releases after cancel and failure, then permits a reopened exit',
       (tester) async {
         final draftRepository = FakeContentSubmissionDraftRepository();
         final harness = createHarness(draftRepository: draftRepository);
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
         harness.viewModel.setCity('Campobasso');
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         harness.router.go(RoutePaths.logging);
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(find.text('Salva ed esci'), findsOneWidget);
         await tester.tap(find.text('Annulla'));
         await tester.pumpAndSettle();
@@ -763,17 +909,17 @@ void main() {
 
         draftRepository.saveDraftResult = Result.error(Exception('failed'));
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         harness.router.go(RoutePaths.logging);
-        await tester.pump();
+        await tester.pump(Duration.zero);
         await tester.tap(find.text('Salva ed esci'));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(draftRepository.saveDraftCallCount, 1);
         expect(find.text('Suggerimento'), findsOneWidget);
 
         draftRepository.saveDraftResult = const Result.success(null);
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         await tester.tap(find.text('Salva ed esci'));
         await tester.pumpAndSettle();
         expect(
@@ -784,9 +930,9 @@ void main() {
         unawaited(harness.router.push(RoutePaths.contentSubmission));
         await tester.pumpAndSettle();
         harness.viewModel.setCity('Isernia');
-        await tester.pump();
+        await tester.pump(Duration.zero);
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         await tester.tap(find.text('Salva ed esci'));
         await tester.pumpAndSettle();
         expect(
@@ -796,9 +942,10 @@ void main() {
         expect(draftRepository.saveDraftCallCount, 3);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'durable staged-asset mutations do not make a clean form dirty',
       (tester) async {
         final harness = createHarness(
@@ -808,11 +955,15 @@ void main() {
             ],
           ),
         );
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
 
-        await harness.viewModel.addAsset.execute();
-        await tester.pump();
+        await requestAndPump(
+          tester,
+          harness.viewModel.requestAddAsset,
+          () => harness.viewModel.isAddingAsset,
+        );
+        await tester.pump(Duration.zero);
         expect(harness.viewModel.hasUnsavedChanges, isFalse);
         expect(find.text('Modifiche non salvate'), findsNothing);
 
@@ -826,8 +977,12 @@ void main() {
 
         unawaited(harness.router.push(RoutePaths.contentSubmission));
         await tester.pumpAndSettle();
-        await harness.viewModel.removeAssetAt.execute(0);
-        await tester.pump();
+        await requestAndPump(
+          tester,
+          () => harness.viewModel.requestRemoveAssetAt(0),
+          () => harness.viewModel.isRemovingAsset,
+        );
+        await tester.pump(Duration.zero);
         expect(harness.viewModel.assets, isEmpty);
         expect(harness.viewModel.hasUnsavedChanges, isFalse);
         expect(find.text('Modifiche non salvate'), findsNothing);
@@ -841,9 +996,10 @@ void main() {
         expect(find.text('Salva ed esci'), findsNothing);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'discard restores the durable draft without retiring its assets',
       (tester) async {
         final draftRepository = FakeContentSubmissionDraftRepository();
@@ -857,20 +1013,24 @@ void main() {
             ],
           ),
         );
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
         harness.viewModel.setCity('Campobasso');
         await harness.viewModel.checkpointDraft();
         final identity = harness.viewModel.state.clientSubmissionId;
-        await harness.viewModel.addAsset.execute();
+        await requestAndPump(
+          tester,
+          harness.viewModel.requestAddAsset,
+          () => harness.viewModel.isAddingAsset,
+        );
         expect(harness.viewModel.assets, hasLength(1));
         expect(harness.viewModel.hasUnsavedChanges, isFalse);
         harness.viewModel.setCity('Isernia');
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
         await tester.tap(find.text('Esci senza salvare'));
         await tester.pumpAndSettle();
 
@@ -893,28 +1053,29 @@ void main() {
         expect(harness.viewModel.assets, hasLength(1));
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'unknown persisted ownership blocks discard and keeps the form',
       (tester) async {
         final draftRepository = FakeContentSubmissionDraftRepository(
           loadDraftResult: Result.error(Exception('unknown draft ownership')),
         );
         final harness = createHarness(draftRepository: draftRepository);
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
         debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
         addTearDown(() => debugDefaultTargetPlatformOverride = null);
         harness.viewModel.setCity('Campobasso');
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(contentSubmissionCanPop(tester), isFalse);
 
         await tester.tap(find.byType(BackButton));
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
         await tester.tap(find.text('Esci senza salvare'));
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         expect(find.text('Suggerimento'), findsOneWidget);
         expect(harness.viewModel.state.city, 'Campobasso');
@@ -928,15 +1089,16 @@ void main() {
         expect(tester.takeException(), isNull);
         debugDefaultTargetPlatformOverride = null;
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets('clean Android predictive Back removes the form directly', (
+    testOwnerUI('clean Android predictive Back removes the form directly', (
       tester,
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final harness = createHarness();
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester, withGallerySentinel: true);
 
       await startPredictiveBack(tester);
@@ -950,18 +1112,18 @@ void main() {
       expect(harness.draftRepository.saveDraftCallCount, 0);
       expect(tester.takeException(), isNull);
       debugDefaultTargetPlatformOverride = null;
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('dirty Android predictive Back shares cancellation policy', (
+    testOwnerUI('dirty Android predictive Back shares cancellation policy', (
       tester,
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final harness = createHarness();
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester, withGallerySentinel: true);
       harness.viewModel.setCity('Campobasso');
-      await tester.pump();
+      await tester.pump(Duration.zero);
 
       await startPredictiveBack(tester);
       await cancelPredictiveBack(tester);
@@ -978,26 +1140,26 @@ void main() {
       expect(harness.draftRepository.saveDraftCallCount, 0);
       expect(tester.takeException(), isNull);
       debugDefaultTargetPlatformOverride = null;
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets(
+    testOwnerUI(
       'concurrent programmatic removals retain only the owner destination',
       (tester) async {
         final draftRepository = FakeContentSubmissionDraftRepository();
         final harness = createHarness(draftRepository: draftRepository);
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester);
         harness.viewModel.setCity('Campobasso');
         final checkpoint = Completer<Result<void>>();
         draftRepository.pendingSaveDraft = checkpoint;
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         harness.router.go(RoutePaths.gallery);
-        await tester.pump();
+        await tester.pump(Duration.zero);
         harness.router.go(RoutePaths.logging);
-        await tester.pump();
+        await tester.pump(Duration.zero);
         await tester.tap(find.text('Salva ed esci'));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(draftRepository.saveDraftCallCount, 1);
         checkpoint.complete(const Result.success(null));
         await tester.pumpAndSettle();
@@ -1017,13 +1179,14 @@ void main() {
         );
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'popping progress does not invoke the dirty parent exit policy',
       (tester) async {
         final harness = createHarness();
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester);
         harness.viewModel.setCity('Campobasso');
         unawaited(
@@ -1041,9 +1204,10 @@ void main() {
         expect(harness.viewModel.hasUnsavedChanges, isTrue);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets(
+    testOwnerUI(
       'ordinary-error Back and return-to-form each pop one progress route',
       (tester) async {
         final draftRepository = FakeContentSubmissionDraftRepository();
@@ -1069,17 +1233,21 @@ void main() {
             ],
           ),
         );
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester);
         await fillValidForm(tester);
-        await harness.viewModel.addAsset.execute();
-        await tester.pump();
+        await requestAndPump(
+          tester,
+          harness.viewModel.requestAddAsset,
+          () => harness.viewModel.isAddingAsset,
+        );
+        await tester.pump(Duration.zero);
 
         await scrollToAndTap(
           tester,
           find.widgetWithText(FilledButton, 'Invia'),
         );
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(submissionRepository.submitCallCount, 1);
         submissionRepository.completeSubmission(
           Result.error(Exception('ordinary failure')),
@@ -1130,11 +1298,12 @@ void main() {
         expect(stagedRepository.clearedSessions, isEmpty);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
   });
 
   group('Content Submission production router boundary ownership', () {
-    testWidgets(
+    testOwnerUI(
       'pre-submit ownership rejects system and predictive exit until handoff',
       (tester) async {
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -1150,7 +1319,7 @@ void main() {
           draftRepository: draftRepository,
           submissionRepository: repository,
         );
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
         await fillValidForm(tester);
         await scrollToAndTap(
@@ -1161,11 +1330,11 @@ void main() {
         expect(draftRepository.saveDraftCallCount, 1);
         expect(repository.submitCallCount, 0);
         final systemBack = tester.binding.handlePopRoute();
-        await tester.pump();
+        await tester.pump(Duration.zero);
         await systemBack;
         await startPredictiveBack(tester);
         await commitPredictiveBack(tester);
-        await tester.pump();
+        await tester.pump(Duration.zero);
         debugDefaultTargetPlatformOverride = null;
 
         expect(find.text('Salva ed esci'), findsNothing);
@@ -1175,24 +1344,24 @@ void main() {
         expect(find.byType(ContentSubmissionScreen), findsOneWidget);
 
         checkpoint.complete(const Result.success(null));
-        await tester.pump();
-        await tester.pump();
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
 
         expect(repository.submitCallCount, 1);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         repository.completeSubmission(
           Result.error(Exception('remote failure')),
         );
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
         expect(await tester.binding.handlePopRoute(), isTrue);
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
         expect(await tester.binding.handlePopRoute(), isTrue);
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
 
         expect(
           harness.router.routeInformationProvider.value.uri.path,
@@ -1200,13 +1369,14 @@ void main() {
         );
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
     for (final legalLink in <String>[
       'Termini di Servizio',
       'Informativa sulla privacy',
     ]) {
-      testWidgets(
+      testOwnerUI(
         '$legalLink ownership rejects system and predictive exit until launch',
         (tester) async {
           debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -1215,20 +1385,20 @@ void main() {
           final draftRepository = FakeContentSubmissionDraftRepository()
             ..pendingSaveDraft = checkpoint;
           final harness = createHarness(draftRepository: draftRepository);
-          addTearDown(harness.dispose);
+
           await harness.pumpForm(tester, withGallerySentinel: true);
           harness.viewModel.setCity('Campobasso');
-          await tester.pump();
+          await tester.pump(Duration.zero);
           await scrollToAndTap(tester, find.text(legalLink));
 
           expect(draftRepository.saveDraftCallCount, 1);
           expect(harness.externalUrlService.launchedUrls, isEmpty);
           final systemBack = tester.binding.handlePopRoute();
-          await tester.pump();
+          await tester.pump(Duration.zero);
           await systemBack;
           await startPredictiveBack(tester);
           await commitPredictiveBack(tester);
-          await tester.pump();
+          await tester.pump(Duration.zero);
           debugDefaultTargetPlatformOverride = null;
 
           expect(find.text('Salva ed esci'), findsNothing);
@@ -1248,20 +1418,21 @@ void main() {
           );
           expect(tester.takeException(), isNull);
         },
+        disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
       );
     }
 
-    testWidgets('failed Terms boundary releases ownership for normal Back', (
+    testOwnerUI('failed Terms boundary releases ownership for normal Back', (
       tester,
     ) async {
       final checkpoint = Completer<Result<void>>();
       final draftRepository = FakeContentSubmissionDraftRepository()
         ..pendingSaveDraft = checkpoint;
       final harness = createHarness(draftRepository: draftRepository);
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester, withGallerySentinel: true);
       harness.viewModel.setCity('Campobasso');
-      await tester.pump();
+      await tester.pump(Duration.zero);
       await scrollToAndTap(tester, find.text('Termini di Servizio'));
 
       checkpoint.complete(Result.error(Exception('checkpoint failed')));
@@ -1270,17 +1441,17 @@ void main() {
       expect(harness.externalUrlService.launchedUrls, isEmpty);
       expect(find.byType(ContentSubmissionScreen), findsOneWidget);
       final systemBack = tester.binding.handlePopRoute();
-      await tester.pump();
-      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pump(Duration.zero);
       expect(find.text('Salva ed esci'), findsOneWidget);
       await tester.tap(find.text('Annulla'));
       expect(await systemBack, isTrue);
       await tester.pumpAndSettle();
       expect(find.byType(ContentSubmissionScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets(
+    testOwnerUI(
       'owning exit denies every form boundary before it removes the form',
       (tester) async {
         final checkpoint = Completer<Result<void>>();
@@ -1291,7 +1462,7 @@ void main() {
           draftRepository: draftRepository,
           submissionRepository: repository,
         );
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
         await fillValidForm(tester);
 
@@ -1317,13 +1488,13 @@ void main() {
         final submit = tester.widget<FilledButton>(submitFinder);
 
         final exitAttempt = tester.binding.handlePopRoute();
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(find.text('Salva ed esci'), findsOneWidget);
 
         submit.onPressed!();
         terms.onTap!();
         privacy.onTap!();
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         expect(draftRepository.saveDraftCallCount, 0);
         expect(repository.submitCallCount, 0);
@@ -1331,12 +1502,12 @@ void main() {
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
 
         await tester.tap(find.text('Salva ed esci'));
-        await tester.pump();
+        await tester.pump(Duration.zero);
         expect(draftRepository.saveDraftCallCount, 1);
         submit.onPressed!();
         terms.onTap!();
         privacy.onTap!();
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         expect(draftRepository.saveDraftCallCount, 1);
         expect(repository.submitCallCount, 0);
@@ -1356,18 +1527,19 @@ void main() {
         expect(find.byType(ContentSubmissionProgressScreen), findsNothing);
         expect(tester.takeException(), isNull);
       },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
     );
 
-    testWidgets('cancelled exit releases Terms and Privacy boundaries', (
+    testOwnerUI('cancelled exit releases Terms and Privacy boundaries', (
       tester,
     ) async {
       final harness = createHarness();
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester, withGallerySentinel: true);
       await fillValidForm(tester);
 
       final exitAttempt = tester.binding.handlePopRoute();
-      await tester.pump();
+      await tester.pump(Duration.zero);
       await tester.tap(find.text('Annulla'));
       expect(await exitAttempt, isTrue);
       await tester.pumpAndSettle();
@@ -1376,25 +1548,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(harness.externalUrlService.launchedUrls, hasLength(1));
       harness.viewModel.setCity('Isernia');
-      await tester.pump();
+      await tester.pump(Duration.zero);
       await scrollToAndTap(tester, find.text('Informativa sulla privacy'));
       await tester.pumpAndSettle();
       expect(harness.externalUrlService.launchedUrls, hasLength(2));
 
       harness.viewModel.setCity('Termoli');
-      await tester.pump();
+      await tester.pump(Duration.zero);
       final laterBack = tester.binding.handlePopRoute();
-      await tester.pump();
-      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pump(Duration.zero);
       expect(find.text('Salva ed esci'), findsOneWidget);
       await tester.tap(find.text('Annulla'));
       expect(await laterBack, isTrue);
       await tester.pumpAndSettle();
       expect(find.byType(ContentSubmissionScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
-    testWidgets('failed exit releases a later submit boundary', (tester) async {
+    testOwnerUI('failed exit releases a later submit boundary', (tester) async {
       final draftRepository = FakeContentSubmissionDraftRepository(
         saveDraftResult: Result.error(Exception('exit checkpoint failed')),
       );
@@ -1406,12 +1578,12 @@ void main() {
         draftRepository: draftRepository,
         submissionRepository: repository,
       );
-      addTearDown(harness.dispose);
+
       await harness.pumpForm(tester, withGallerySentinel: true);
       await fillValidForm(tester);
 
       final exitAttempt = tester.binding.handlePopRoute();
-      await tester.pump();
+      await tester.pump(Duration.zero);
       await tester.tap(find.text('Salva ed esci'));
       expect(await exitAttempt, isTrue);
       await tester.pumpAndSettle();
@@ -1421,14 +1593,14 @@ void main() {
       tester
           .widget<FilledButton>(find.widgetWithText(FilledButton, 'Invia'))
           .onPressed!();
-      await tester.pump();
-      await tester.pump();
+      await tester.pump(Duration.zero);
+      await tester.pump(Duration.zero);
 
       expect(draftRepository.saveDraftCallCount, 2);
       expect(repository.submitCallCount, 1);
       expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
       expect(tester.takeException(), isNull);
-    });
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
 
     testOwnerUI(
       'failed progress Home uses the parent exit policy and releases the '
@@ -1440,7 +1612,7 @@ void main() {
           draftRepository: draftRepository,
           submissionRepository: repository,
         );
-        addTearDown(harness.dispose);
+
         await harness.pumpForm(tester, withGallerySentinel: true);
         await fillValidForm(tester);
 
@@ -1448,20 +1620,20 @@ void main() {
           tester,
           find.widgetWithText(FilledButton, 'Invia'),
         );
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
         expect(find.byType(ContentSubmissionProgressScreen), findsOneWidget);
         repository.completeSubmission(
           Result.error(Exception('remote failure')),
         );
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
 
         final submittedIdentity = harness.viewModel.state.clientSubmissionId;
         harness.viewModel.setCity('Isernia');
-        await tester.pump();
+        await tester.pump(Duration.zero);
         await tester.tap(find.text('Torna alla home'));
-        await tester.pump();
+        await tester.pump(Duration.zero);
 
         expect(find.text('Salva ed esci'), findsOneWidget);
         expect(draftRepository.clearDraftCallCount, 0);
@@ -1547,10 +1719,14 @@ final class _ContentSubmissionRouteHarness {
     WidgetTester tester, {
     bool withGallerySentinel = false,
     bool settleAfterPush = true,
+    ContentSubmissionViewModel? providedOwner,
+    bool preserveLocation = false,
   }) async {
-    router.go(
-      withGallerySentinel ? RoutePaths.gallery : RoutePaths.contentSubmission,
-    );
+    if (!preserveLocation) {
+      router.go(
+        withGallerySentinel ? RoutePaths.gallery : RoutePaths.contentSubmission,
+      );
+    }
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -1558,7 +1734,7 @@ final class _ContentSubmissionRouteHarness {
           Provider<PlaceRepository>.value(value: FakePlaceRepository()),
           Provider<SearchRepository>.value(value: FakeSearchRepository()),
           ChangeNotifierProvider<ContentSubmissionViewModel>.value(
-            value: viewModel,
+            value: providedOwner ?? viewModel,
           ),
           ChangeNotifierProvider<SyncViewModel>.value(value: syncViewModel),
           Provider<UrlLaunchService>.value(value: urlLaunchService),
@@ -1574,15 +1750,15 @@ final class _ContentSubmissionRouteHarness {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump();
-    if (withGallerySentinel) {
+    await tester.pump(Duration.zero);
+    await tester.pump(Duration.zero);
+    if (withGallerySentinel && !preserveLocation) {
       unawaited(router.push(RoutePaths.contentSubmission));
       if (settleAfterPush) {
         await tester.pumpAndSettle();
       } else {
-        await tester.pump();
-        await tester.pump();
+        await tester.pump(Duration.zero);
+        await tester.pump(Duration.zero);
       }
     }
   }
@@ -1608,6 +1784,7 @@ final class _RecordingContentSubmissionViewModel
 
   int checkpointCallCount = 0;
   int restoreCallCount = 0;
+  Completer<Result<void>>? restoreGate;
 
   @override
   Future<Result<void>> checkpointDraft() {
@@ -1618,6 +1795,9 @@ final class _RecordingContentSubmissionViewModel
   @override
   Future<Result<void>> restoreCheckpointDraft() {
     restoreCallCount++;
+    final pending = restoreGate;
+    restoreGate = null;
+    if (pending != null) return pending.future;
     return super.restoreCheckpointDraft();
   }
 }

@@ -111,14 +111,34 @@ GoRouter buildAppRouter({
         onExit: (context, _) async {
           final token = acquireContentSubmissionTransition();
           if (token == null) return false;
+          ContentSubmissionViewModel? owner;
+          String? identity;
+          var exiting = false;
+          bool current() {
+            if (!context.mounted) return false;
+            final captured = owner;
+            return captured != null &&
+                identical(
+                  context.read<ContentSubmissionViewModel?>(),
+                  captured,
+                ) &&
+                captured.state.clientSubmissionId == identity;
+          }
 
           try {
+            if (!context.mounted) return false;
             final viewModel = context.read<ContentSubmissionViewModel>();
+            owner = viewModel;
+            identity = viewModel.state.clientSubmissionId;
+            if (viewModel.isSubmitting ||
+                viewModel.submissionFinalizationPending) {
+              return false;
+            }
             if (!viewModel.hasUnsavedChanges) {
               releaseAfterRouteRemoval(token);
+              exiting = true;
               return true;
             }
-
             final choice = await showDialog<_ContentSubmissionExitChoice>(
               context: context,
               builder: (context) => AlertDialog(
@@ -148,7 +168,12 @@ GoRouter buildAppRouter({
                 ],
               ),
             );
-
+            if (!context.mounted) return false;
+            if (!current() ||
+                viewModel.isSubmitting ||
+                viewModel.submissionFinalizationPending) {
+              return false;
+            }
             final result = switch (choice) {
               _ContentSubmissionExitChoice.save =>
                 await viewModel.checkpointDraft(),
@@ -156,27 +181,40 @@ GoRouter buildAppRouter({
                 await viewModel.restoreCheckpointDraft(),
               _ContentSubmissionExitChoice.cancel || null => null,
             };
-
-            if (result == null) {
-              releaseContentSubmissionTransition(token);
+            if (!context.mounted) return false;
+            if (!current() ||
+                viewModel.isSubmitting ||
+                viewModel.submissionFinalizationPending) {
               return false;
             }
+            if (result == null) return false;
             if (result is Error<void>) {
-              releaseContentSubmissionTransition(token);
-              if (context.mounted) showSnackBarGenericError(context: context);
+              showSnackBarGenericError(context: context);
               return false;
             }
-
             releaseAfterRouteRemoval(token);
+            exiting = true;
             return true;
-          } on Object {
-            releaseContentSubmissionTransition(token);
-            if (context.mounted) showSnackBarGenericError(context: context);
+          } on Object catch (error, stack) {
+            if (error is AssertionError) rethrow;
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                stack: stack,
+                context: ErrorDescription('leaving a content submission form'),
+              ),
+            );
+            if (current()) showSnackBarGenericError(context: context);
             return false;
+          } finally {
+            if (!exiting) releaseContentSubmissionTransition(token);
           }
         },
         builder: (context, _) {
-          final viewModel = context.read<ContentSubmissionViewModel>();
+          final viewModel = context
+              .select<ContentSubmissionViewModel, ContentSubmissionViewModel>(
+                (owner) => owner,
+              );
           return ContentSubmissionScreen(
             viewModel: viewModel,
             acquireTransition: acquireContentSubmissionTransition,
@@ -188,7 +226,11 @@ GoRouter buildAppRouter({
             path: RoutePaths.contentSubmissionUploadProgress,
             name: RouteNames.contentSubmissionUploadProgress,
             builder: (context, _) {
-              final viewModel = context.read<ContentSubmissionViewModel>();
+              final viewModel = context
+                  .select<
+                    ContentSubmissionViewModel,
+                    ContentSubmissionViewModel
+                  >((owner) => owner);
               return ContentSubmissionProgressScreen(viewModel: viewModel);
             },
           ),

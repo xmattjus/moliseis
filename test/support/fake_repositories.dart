@@ -1120,21 +1120,25 @@ final class FakeImageUploadTask implements ImageUploadTask {
   FakeImageUploadTask.completed(Result<SubmissionAsset> result)
     : _result = Future.value(result),
       _pendingResult = null,
-      _thrownError = null;
+      _thrownError = null,
+      _thrownStack = null;
 
   FakeImageUploadTask.pending()
     : _result = null,
       _pendingResult = Completer<Result<SubmissionAsset>>(),
-      _thrownError = null;
+      _thrownError = null,
+      _thrownStack = null;
 
-  FakeImageUploadTask.throwing(Object error)
+  FakeImageUploadTask.throwing(Object error, {StackTrace? stackTrace})
     : _result = null,
       _pendingResult = null,
-      _thrownError = error;
+      _thrownError = error,
+      _thrownStack = stackTrace;
 
   final Future<Result<SubmissionAsset>>? _result;
   final Completer<Result<SubmissionAsset>>? _pendingResult;
   final Object? _thrownError;
+  final StackTrace? _thrownStack;
   int cancelCallCount = 0;
 
   /// Completes a task created with [FakeImageUploadTask.pending].
@@ -1145,7 +1149,7 @@ final class FakeImageUploadTask implements ImageUploadTask {
   @override
   Future<Result<SubmissionAsset>> get result => _thrownError == null
       ? _result ?? _pendingResult!.future
-      : Future<Result<SubmissionAsset>>.error(_thrownError);
+      : Future<Result<SubmissionAsset>>.error(_thrownError, _thrownStack);
 
   @override
   Stream<double> get progress => Stream<double>.value(1);
@@ -1255,6 +1259,8 @@ final class FakeContentSubmissionStagedAssetRepository
   Completer<Result<ContentSubmissionStagedAsset>>? pendingAcquire;
   Completer<Result<void>>? pendingRemove;
   Completer<Result<void>>? pendingClearSession;
+  Completer<Result<File>>? pendingResolve;
+  int resolveCallCount = 0;
   final acquired =
       <({String clientSubmissionId, String digest, File source})>[];
   int reconcileCallCount = 0;
@@ -1326,11 +1332,16 @@ final class FakeContentSubmissionStagedAssetRepository
   @override
   Future<Result<File>> resolveAbsolutePath(
     ContentSubmissionStagedAsset asset,
-  ) async =>
-      resolveResult ??
-      Result.success(
-        File('${stagingDirectory?.path ?? '/staged'}/${asset.relativePath}'),
-      );
+  ) async {
+    resolveCallCount++;
+    final pending = pendingResolve;
+    pendingResolve = null;
+    if (pending != null) return await pending.future;
+    return resolveResult ??
+        Result.success(
+          File('${stagingDirectory?.path ?? '/staged'}/${asset.relativePath}'),
+        );
+  }
 }
 
 // ---------------------------------------------------------------------------
