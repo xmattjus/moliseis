@@ -521,7 +521,7 @@ A request made while initialization is pending SHALL bind that initialization in
 - **THEN** identity-dependent mutation remains unavailable without orphan cleanup or reassignment of assets to a fresh session
 
 ### Requirement: Recovery eligibility cannot migrate between sessions
-Android recovery SHALL bind the eligible restored identity from its identified initialization before waiting for lost media. Clear, retirement or owner disposal SHALL invalidate subsequent recovery commits for that identity. Retrieval failures expected from the platform SHALL remain best-effort diagnostics. Non-Android requests SHALL perform no retrieval.
+Android recovery SHALL capture its initialization outcome or ticket before lost-data retrieval; media MAY arrive first, but media processing or commits SHALL await resolving and binding the eligible restored identity, never an absent, unknown or replacement session. Clear, retirement or owner disposal SHALL invalidate subsequent recovery commits for that identity. Retrieval failures expected from the platform SHALL remain best-effort diagnostics. Non-Android requests SHALL perform no retrieval.
 
 #### Scenario: Recovery response arrives after clear
 - **WHEN** recovery is admitted for initialization A, clear creates B and lost media arrives afterward

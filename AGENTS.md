@@ -231,13 +231,6 @@ handler. Do not rely on global reporting to make post-dispose raw throws safe.
 Preserve appropriate ViewModel lifecycle guards and re-audit this constraint
 when `command_it` is upgraded.
 
-`lib/utils/command.dart`, `Command`, `Command0`, and `Command1` exist only for
-legacy compatibility with consumers that have not yet migrated. They are
-deprecated for new code: do not introduce new imports or references, including
-public contracts built on the legacy base type. Existing consumers may remain
-until explicitly migrated by a reviewed change; do not opportunistically migrate
-them during unrelated work.
-
 ### Provider / `ChangeNotifier`
 
 Keep the existing Provider/`ChangeNotifier` state-management and dependency
