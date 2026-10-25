@@ -1,6 +1,8 @@
 ## Context
 
-See proposal.md for motivation. Planning audited local and remote `main` at `8d7724960889a4224c11f8a2c58d31d8c1c945c7`; remote HEAD matched the supplied baseline, and no pre-existing work was present. Only this change's planning artifacts are written now. Remediation audited local and remote `main` at review commit `18ff4ff09427b7675750639d646e32bc68adbf9f`; the change is intact and production files are unchanged from the original planning baseline.
+This is the historical implementation design. Repository observations below describe the planning baseline, not the current checkout; D1–D7 and the later cursor-authority clarification record the accepted contracts. Historical execution conclusions are retained in implementation-evidence.md.
+
+See proposal.md for motivation. Planning audited local and remote `main` at `8d7724960889a4224c11f8a2c58d31d8c1c945c7`; remote HEAD matched the supplied baseline, and no pre-existing work was present. Only this change's planning artifacts were written at that checkpoint. Remediation audited local and remote `main` at review commit `18ff4ff09427b7675750639d646e32bc68adbf9f`; the change is intact and production files are unchanged from the original planning baseline.
 
 Repository evidence:
 
@@ -118,7 +120,7 @@ Persist U exactly, never device time, greatest observed row marker or latest pag
 
 ### D7 — Overlap correctness envelope
 
-The accepted assumption is: “una transazione che modifica contenuto canonical non rimane non committed per 24 ore dopo l'assegnazione del proprio modified_at.” Current promotion/apply/ingest writers run request-scoped Postgres RPCs; no long-lived production canonical transaction path was found, so this is operationally consistent, not database-enforced proof.
+The accepted assumption is: “a transaction modifying canonical content does not remain uncommitted for 24 hours after assigning its modified_at.” Current promotion/apply/ingest writers run request-scoped Postgres RPCs; no long-lived production canonical transaction path was found, so this is operationally consistent, not database-enforced proof.
 
 During ID scanning, a passed row can change. Markers after U are above the next lower bound and are retrieved next time; a pre-U transaction becoming visible later within the assumption is caught by the inclusive 24-hour overlap. A short server-capped page still advances by its last id and cannot terminate the scan. This gives at-least-once retrieval with idempotent merge, **not** mathematical commit ordering or a point-in-time multi-table snapshot. No upper bound should pretend otherwise. Hard-delete omissions cannot be discovered by this protocol; canonical removals that must propagate are soft-delete. Manual privileged SQL and historic unobservable restores are outside the guarantee.
 
@@ -151,4 +153,4 @@ Concrete database and Flutter gate commands and requirement coverage are recorde
 
 Remediation at initial local/remote main HEAD `18ff4ff09427b7675750639d646e32bc68adbf9f` changed only this change's artifacts. The five reviewed findings are addressed by the modified provenance requirement, M1 generated-schema task, D1 persistent column comments and supported-writer creation-metadata invariant, plus actual planning validation.
 
-Executed during remediation: `openspec validate optimize-content-sync-delta-retrieval --strict --no-interactive` (OpenSpec 1.12.0 supports the flag), exit 0, output: `Change 'optimize-content-sync-delta-retrieval' is valid`. This is current planning evidence, separate from the retained future apply gate in Task 4.5. `git diff --check` produced no errors. No runtime test, reset, migration, type generation, apply or deployment was executed by this remediation.
+Executed during remediation: `openspec validate optimize-content-sync-delta-retrieval --strict --no-interactive` (OpenSpec 1.12.0 supports the flag), exit 0, output: `Change 'optimize-content-sync-delta-retrieval' is valid`. This was planning-remediation evidence at that checkpoint, preceding the implementation gate in Task 4.5. `git diff --check` produced no errors. No runtime test, reset, migration, type generation, apply or deployment was executed by this remediation.
