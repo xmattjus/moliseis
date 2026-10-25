@@ -1,3 +1,5 @@
+> Historical proposal: the implementation was completed in `9e2f49ed2956ff641423610d56b68b6217535dce`; the contract clarification followed in `05b0f9e3432462a2fbf86c84dc4b6f80e0ed4ab9`. Planning-time observations and future-tense actions below describe those earlier checkpoints. See implementation-evidence.md for historical verification and reported operational outcomes.
+
 ## Why
 
 Canonical content sync currently fetches entire Supabase tables without pagination, even when almost nothing changed, and can silently stop at the server row cap. Reusing the existing semantic modification marker with paginated bootstrap/delta retrieval reduces remote transfer while retaining the two-phase, concurrent-fetch, atomic local-commit and offline-cache behavior.
@@ -12,7 +14,7 @@ Canonical content sync currently fetches entire Supabase tables without paginati
 - Preserve three-day scheduling, existing first-sync fatal classification, Result boundaries and Provider wiring. Return sync failure on settings-save failure after content commit and support harmless replay.
 - Clarify the external provenance restore boundary: canonical persistence/sync remains restore-capable with low-level regression coverage, while no supported Event restore operation or provenance restore producer is introduced.
 - Require backend-first rollout and deterministic DB/client compatibility, failure and concurrency regression gates. After local ObjectBox upgrade, any operational full-sync rollback release must preserve the current model/UIDs and contentSyncCursorAt; compatibility with the exact pre-change binary/model is not promised. No rollback implementation is introduced.
-- Bind cursor authority to the projection/materialization contract that advanced it. Future projection expansion requiring historical remote state must reconcile that state before reusing the cursor; no runtime versioning or infrastructure is added. No production implementation is part of this proposal.
+- Bind cursor authority to the projection/materialization contract that advanced it. Future projection expansion requiring historical remote state must reconcile that state before reusing the cursor; no runtime versioning or infrastructure is added. This contract clarification adds no production implementation.
 
 ## Capabilities
 

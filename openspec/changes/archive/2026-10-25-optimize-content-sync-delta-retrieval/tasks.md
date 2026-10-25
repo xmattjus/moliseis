@@ -1,3 +1,5 @@
+> Historical completed implementation checklist. Commands below define the original verification gates; they are not commands executed by the documentation finalization. Historical outcomes and later user-reported operations are recorded in implementation-evidence.md.
+
 Implementation checklist only: no task is executed by this planning change. Design decisions D1–D7 are frozen. At apply start recheck main/working-tree changes against the audited HEAD; preserve unrelated work and resolve material contradictions before affected implementation. Load applicable test-support/ObjectBox/Result/static-analysis skills before editing those surfaces. Do not broaden scope into command migration or unrelated cleanup.
 
 ## 1. M1 — Canonical modified_at contract and server cursor
@@ -36,7 +38,7 @@ Implementation checklist only: no task is executed by this planning change. Desi
 
 ## Gate commands and coverage
 
-New proposed DB runners are `bash supabase/tests/run_canonical_content_sync_db_test.sh` and `bash supabase/tests/run_canonical_content_sync_migration_db_test.sh` (created in M1). Local Supabase/PostgreSQL 17 and Deno must be available; start/reset the disposable local environment according to installed CLI help, never reset a linked production database. Preserve existing runner credentials handling without printing secrets.
+DB runners introduced by M1 are `bash supabase/tests/run_canonical_content_sync_db_test.sh` and `bash supabase/tests/run_canonical_content_sync_migration_db_test.sh` (created in M1). Local Supabase/PostgreSQL 17 and Deno must be available; start/reset the disposable local environment according to installed CLI help, never reset a linked production database. Preserve existing runner credentials handling without printing secrets.
 
 Existing backend gates (all required):
 
@@ -56,7 +58,7 @@ bash supabase/tests/run_external_event_rollout_db_test.sh
 
 Format/type-check new or changed Deno tests following their current imports and runner environment before those gates; use `deno fmt --check <changed-files>` and `deno check <changed-files>`. Run changed Edge Function tests only if implementation needs a justified caller-contract adjustment; no Edge Function change is anticipated.
 
-Focused Flutter gates (new paths are explicitly proposed):
+Focused Flutter gates (paths introduced during implementation are included):
 
 ```sh
 flutter test test/data/content_sync_previous_store_test.dart test/data/all_day_previous_store_test.dart
