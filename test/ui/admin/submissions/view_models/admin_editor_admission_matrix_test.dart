@@ -82,7 +82,6 @@ void main() {
                 expect(harness.snapshots[row].hasFailure, isFalse);
                 expect(harness.snapshots[row].completed, isFalse);
               }
-              expect(harness.owner.debugCommandDisposalCounts, everyElement(0));
             } finally {
               harness.owner.dispose();
               harness.release();

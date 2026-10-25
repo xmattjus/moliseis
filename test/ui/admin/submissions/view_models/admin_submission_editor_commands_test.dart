@@ -16,7 +16,7 @@ void main() {
   late AdminSubmissionEditorViewModel owner;
 
   testOwnerUI(
-    'RF1.1/RF1.3/RF3.1 Save receipts survive error and equal successes',
+    'RF1.1/RF1.3/RF3.1 Save outcomes survive error and equal successes',
     (tester) async {
       final first = Completer<Result<AdminSubmission>>();
       final second = Completer<Result<AdminSubmission>>();
@@ -30,9 +30,7 @@ void main() {
             )
             ..setCity('Campobasso')
             ..setName('Snapshot A');
-      final identities = owner.debugCommandIdentities;
       final observed = <int>[];
-      final reentrant = <bool>[];
       owner.addListener(() {
         final id = owner.saveExecutionId;
         if (id != null &&
@@ -40,7 +38,6 @@ void main() {
             !owner.saveSnapshot.idle &&
             !observed.contains(id)) {
           observed.add(id);
-          reentrant.add(owner.requestSave());
         }
       });
       expect(owner.saveSnapshot.idle, isTrue);
@@ -56,8 +53,6 @@ void main() {
       expect(owner.saveSnapshot.domainError, same(expectedError));
       expect(owner.canRequestSave, isTrue);
       expect(owner.canCloseAfterSave, isFalse);
-      expect(owner.debugCommandDisposalCounts, everyElement(0));
-      expect(owner.debugPrivateObserverCounts, everyElement(2));
 
       repository.pendingCreate = second;
       expect(owner.requestSave(), isTrue);
@@ -73,7 +68,6 @@ void main() {
       expect(owner.saveSnapshot.completed, isTrue);
       expect(owner.canCloseAfterSave, isTrue);
       expect(owner.submissionId, isNull);
-      expect(owner.debugCommandIdentities, identities);
 
       repository.pendingCreate = third;
       expect(owner.requestSave(), isTrue);
@@ -84,12 +78,61 @@ void main() {
       await pumpCommandTurns(tester);
       expect(owner.canCloseAfterSave, isTrue);
       expect(observed, [firstId, secondId, thirdId]);
-      expect(reentrant, [false, false, false]);
-      expect(owner.debugSettlementCounts[1], 3);
-      expect(owner.debugCommandDisposalCounts, everyElement(0));
     },
     disposeOwners: () => owner.dispose(),
   );
+
+  testOwnerUI('E6 terminal notification admits one new Save '
+      'without clearing its busy state', (tester) async {
+    final first = Completer<Result<AdminSubmission>>();
+    final second = Completer<Result<AdminSubmission>>();
+    final repository = FakeAdminContentSubmissionRepository()
+      ..pendingCreate = first;
+    owner =
+        AdminSubmissionEditorViewModel(
+            repository: repository,
+            contentSubmissionRepository: FakeContentSubmissionRepository(),
+          )
+          ..setCity('Campobasso')
+          ..setName('Captured draft');
+    var admittedNext = false;
+    bool? acceptedNext;
+    (bool, bool)? atReentrantAdmission;
+    int? nextEffect;
+    owner.addListener(() {
+      if (!owner.saveSnapshot.completed || admittedNext) return;
+      admittedNext = true;
+      repository.pendingCreate = second;
+      acceptedNext = owner.requestSave();
+      nextEffect = owner.saveExecutionId;
+      atReentrantAdmission = (
+        owner.operationRunning,
+        owner.saveSnapshot.isRunning,
+      );
+    });
+    expect(owner.requestSave(), isTrue);
+    final firstEffect = owner.saveExecutionId;
+    await pumpCommandTurns(tester);
+    first.complete(Result.success(sampleAdminSubmission()));
+    await pumpCommandTurns(tester);
+    await pumpCommandTurns(tester);
+    expect(admittedNext, isTrue);
+    expect(acceptedNext, isTrue);
+    expect(atReentrantAdmission, (true, true));
+    expect(nextEffect, greaterThan(firstEffect!));
+    expect(repository.createInputs, hasLength(2));
+    expect(owner.saveExecutionId, nextEffect);
+    expect(owner.operationRunning, isTrue);
+    expect(owner.saveSnapshot.isRunning, isTrue);
+    expect(owner.requestSave(), isFalse);
+    expect(owner.canCloseAfterSave, isFalse);
+    second.complete(Result.success(sampleAdminSubmission()));
+    await pumpCommandTurns(tester);
+    expect(repository.createInputs, hasLength(2));
+    expect(owner.operationRunning, isFalse);
+    expect(owner.saveSnapshot.completed, isTrue);
+    expect(owner.canCloseAfterSave, isTrue);
+  }, disposeOwners: () => owner.dispose());
 
   testOwnerUI(
     'RF1.4 second Save retains raw reporting beyond upstream teardown',
@@ -117,12 +160,6 @@ void main() {
         ..addListener(() => notifications++)
         ..dispose();
       await pumpCommandTurns(tester);
-      expect(owner.debugCommandDisposalCounts[1], 0);
-      expect(owner.debugPrivateObserverCounts[1], 2);
-      expect(
-        owner.debugCommandDisposalCounts.where((count) => count == 1),
-        hasLength(10),
-      );
       await tester.pump(const Duration(milliseconds: 51));
       final error = StateError('original second Save');
       final stack = StackTrace.current;
@@ -136,12 +173,8 @@ void main() {
       );
       expect(owner.saveSnapshot, same(frozen));
       expect(notifications, 0);
-      expect(owner.debugCommandDisposalCounts, everyElement(1));
-      expect(owner.debugPrivateObserverCounts, everyElement(0));
-      expect(owner.debugSettlementCounts[1], 2);
       owner.dispose();
       await pumpCommandTurns(tester);
-      expect(owner.debugCommandDisposalCounts, everyElement(1));
     },
     disposeOwners: () => owner.dispose(),
   );
@@ -225,8 +258,6 @@ void main() {
           await pumpCommandTurns(tester);
           expect(owner.candidates!.events.single.id, 9);
           expect(owner.findCandidatesSnapshot.completed, isTrue);
-          expect(owner.debugCommandDisposalCounts, everyElement(0));
-          expect(owner.debugPrivateObserverCounts, everyElement(2));
         },
         disposeOwners: () => owner.dispose(),
       );
@@ -314,8 +345,6 @@ void main() {
           harness.owner.dispose();
           await pumpCommandTurns(tester);
           await tester.pump(const Duration(milliseconds: 51));
-          expect(harness.owner.debugCommandDisposalCounts[lane], 0);
-          expect(harness.owner.debugPrivateObserverCounts[lane], 2);
           final error = switch (kind) {
             'StateError' => StateError('late original'),
             'TypeError' => TypeError(),
@@ -338,9 +367,13 @@ void main() {
           }
           expect(harness.snapshots, snapshots);
           expect(notifications, 0);
-          expect(harness.owner.debugCommandDisposalCounts, everyElement(1));
-          expect(harness.owner.debugPrivateObserverCounts, everyElement(0));
           expect(harness.calls[lane], 1);
+          await tester.pump(const Duration(milliseconds: 51));
+          await pumpCommandTurns(tester);
+          await pumpCommandTurns(tester);
+          expect(harness.snapshots, snapshots);
+          expect(notifications, 0);
+          expect(tester.takeException(), isNull);
         },
         disposeOwners: () => harness.owner.dispose(),
       );
@@ -399,13 +432,14 @@ void main() {
           throwsUnsupportedError,
         );
         final error = StateError('save boundary');
+        final stack = StackTrace.fromString('originalSaveBoundary:9:2');
         switch (outcome) {
           case 'success':
             gate.complete(Result.success(sampleAdminSubmission(id: 88)));
           case 'expected':
             gate.complete(Result.error(TestException('expected')));
           case 'runtime':
-            gate.completeError(error, StackTrace.current);
+            gate.completeError(error, stack);
         }
         await pumpCommandTurns(tester);
         expect(owner.name, 'Newer unsaved name');
@@ -414,6 +448,23 @@ void main() {
         expect(owner.submissionId, create ? null : 1);
         expect(logger.calls, hasLength(outcome == 'runtime' ? 1 : 0));
         expect(owner.saveSnapshot.completed, outcome == 'success');
+        if (outcome == 'runtime') {
+          expect(owner.saveSnapshot.unexpectedError, same(error));
+          expect(
+            owner.saveSnapshot.stackTrace.toString(),
+            allOf(contains('originalSaveBoundary'), contains('9:2')),
+          );
+          expect(
+            owner.saveSnapshot.stackTrace,
+            same(logger.calls.single.stackTrace),
+          );
+          expect(owner.saveSnapshot.errorReaction, isNotNull);
+          expect(logger.calls.single.error, same(error));
+          expect(
+            logger.calls.single.stackTrace.toString(),
+            allOf(contains('originalSaveBoundary'), contains('9:2')),
+          );
+        }
         final firstId = owner.saveExecutionId;
         repository
           ..pendingCreate = null
@@ -523,8 +574,6 @@ void main() {
       expect(runningIds, [a, b, c]);
       expect(terminals, [a, b, c]);
       expect({a, b, c}, hasLength(3));
-      expect(owner.debugSettlementCounts[1], 3);
-      expect(owner.debugCommandDisposalCounts, everyElement(0));
     },
     disposeOwners: () => owner.dispose(),
   );
@@ -536,7 +585,7 @@ void main() {
   ) {
     late AdminEditorCommandHarness harness;
     testOwnerUI(
-      'A3/L1 ${AdminEditorCommandHarness.laneNames[lane]} revoke inside admission notify',
+      'E11/A3/L1 ${AdminEditorCommandHarness.laneNames[lane]} revoke inside admission notify',
       (tester) async {
         harness = AdminEditorCommandHarness();
         expect(harness.owner.requestLoad(), isTrue);
@@ -544,26 +593,38 @@ void main() {
         expect(harness.owner.requestPreview(), isTrue);
         await pumpCommandTurns(tester);
         harness.hold();
+        var notifications = 0;
         harness.owner.addListener(() {
+          notifications++;
           if (harness.snapshots.any((snapshot) => snapshot.isRunning)) {
             harness.owner.dispose();
           }
         });
         expect(harness.requests[lane](), isTrue);
         final frozen = harness.snapshots;
+        final atRevocation = notifications;
+        expect(frozen[lane].completed, isFalse);
         expect(harness.owner.isDisposed, isTrue);
         await pumpCommandTurns(tester);
         expect(harness.calls, everyElement(0));
         expect(harness.snapshots, frozen);
-        expect(harness.owner.debugCommandDisposalCounts, everyElement(1));
-        expect(harness.owner.debugPrivateObserverCounts, everyElement(0));
+        await tester.pump(const Duration(milliseconds: 51));
+        await pumpCommandTurns(tester);
+        await pumpCommandTurns(tester);
+        expect(harness.calls, everyElement(0));
+        expect(harness.snapshots, frozen);
+        expect(harness.owner.operationRunning, isFalse);
+        expect(harness.owner.loading, isFalse);
+        expect(harness.requests[lane](), isFalse);
+        expect(notifications, atRevocation);
+        expect(tester.takeException(), isNull);
       },
       disposeOwners: () => harness.owner.dispose(),
     );
   }
 
   testOwnerUI(
-    'A4/L2 live assertion is fail-loud without synthetic success and lane retries',
+    'A4/L2 live assertion is fail-loud without synthetic success or retry',
     (tester) async {
       final logger = MockLogger();
       addTearDown(installCommandTestReporting(logger));
@@ -587,14 +648,12 @@ void main() {
       expect(logger.calls, isEmpty);
       expect(owner.saveSnapshot.completed, isFalse);
       expect(owner.saveSnapshot.domainError, isNull);
-      expect(owner.canRequestSave, isTrue);
-      expect(owner.debugCommandDisposalCounts, everyElement(0));
-      expect(owner.debugPrivateObserverCounts, everyElement(2));
+      expect(owner.canRequestSave, isFalse);
       harness.repository.pendingUpdate = null;
-      expect(owner.requestSave(), isTrue);
+      expect(owner.requestSave(), isFalse);
       await pumpCommandTurns(tester);
-      expect(owner.saveSnapshot.completed, isTrue);
-      expect(owner.debugSettlementCounts[1], 2);
+      expect(owner.saveSnapshot.completed, isFalse);
+      expect(harness.repository.updateIds, [1]);
     },
     disposeOwners: () => owner.dispose(),
   );

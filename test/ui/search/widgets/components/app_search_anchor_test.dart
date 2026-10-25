@@ -24,6 +24,176 @@ import '../../../../support/predictive_back.dart';
 
 void main() {
   group('AppSearchAnchor', () {
+    for (final initial in [
+      <String>[],
+      ['initial'],
+    ]) {
+      testWidgets(
+        'H10 open unchanged popup reacts to confirmed history, failure '
+        'and read-only reload initial=$initial',
+        (tester) async {
+          final reads = <Completer<Result<List<String>>>>[];
+          final repository = FakeSearchRepository()
+            ..historyReadHandler = () {
+              final read = Completer<Result<List<String>>>();
+              reads.add(read);
+              return read.future;
+            };
+          final fixture = _SearchFixture(
+            cleanupOnClose: false,
+            surfaceSize: const Size(390, 844),
+            searchRepository: repository,
+          );
+          addTearDown(fixture.dispose);
+          await fixture.pumpApp(tester);
+          reads.single.complete(Result.success(initial));
+          await pumpCommandTurns(tester);
+          await _openSearch(tester, fixture);
+          final oldAnchor = tester.widget<SearchAnchor>(
+            find.byType(SearchAnchor),
+          );
+          fixture.viewModel.requestPastSearchesRefresh();
+          await pumpCommandTurns(tester);
+          reads.last.complete(const Result.success(['confirmed A']));
+          await pumpCommandTurns(tester);
+          expect(find.widgetWithText(RawChip, 'confirmed A'), findsOneWidget);
+          expect(fixture.controller.text, isEmpty);
+          expect(fixture.controller.isOpen, isTrue);
+          fixture.viewModel.requestPastSearchesRefresh();
+          await pumpCommandTurns(tester);
+          reads.last.complete(Result.error(TestException('read failed')));
+          await pumpCommandTurns(tester);
+          expect(find.widgetWithText(RawChip, 'confirmed A'), findsOneWidget);
+          expect(
+            find.text('Impossibile caricare la cronologia.'),
+            findsOneWidget,
+          );
+          await tester.tap(find.text('Ricarica cronologia'));
+          await pumpCommandTurns(tester);
+          reads.last.complete(const Result.success(['confirmed B']));
+          await pumpCommandTurns(tester);
+          expect(find.widgetWithText(RawChip, 'confirmed B'), findsOneWidget);
+          expect(find.widgetWithText(RawChip, 'confirmed A'), findsNothing);
+          expect(
+            find.text('Impossibile caricare la cronologia.'),
+            findsNothing,
+          );
+          expect(repository.historyWrites, isEmpty);
+          expect(fixture.controller.text, isEmpty);
+          expect(fixture.controller.isOpen, isTrue);
+          final staleReload = tester
+              .widget<TextButton>(
+                find.widgetWithText(TextButton, 'Ricarica cronologia'),
+              )
+              .onPressed!;
+          fixture.controller.closeView(null);
+          await tester.pumpAndSettle();
+          await tester.pumpWidget(const SizedBox.shrink());
+          staleReload();
+          final count = reads.length;
+          final stale = await oldAnchor.suggestionsBuilder(
+            tester.element(find.byType(SizedBox).first),
+            fixture.controller,
+          );
+          expect(stale, isNotEmpty);
+          oldAnchor.viewBuilder!(stale);
+          await pumpCommandTurns(tester);
+          expect(reads, hasLength(count));
+          expect(repository.historyWrites, isEmpty);
+          expect(tester.takeException(), isNull);
+          debugDefaultTargetPlatformOverride = null;
+        },
+      );
+    }
+
+    testWidgets('H10 replaced owner ignores old read and popup callbacks', (
+      tester,
+    ) async {
+      final oldRead = Completer<Result<List<String>>>();
+      final nextRead = Completer<Result<List<String>>>();
+      final oldRepository = FakeSearchRepository(
+        pastSearchesResult: const Result.success(['old confirmed']),
+      );
+      final nextRepository = FakeSearchRepository()
+        ..pendingGetPastSearches = nextRead;
+      final owner = SearchViewModel(searchRepository: oldRepository);
+      final nextOwner = SearchViewModel(searchRepository: nextRepository);
+      final controller = SearchController();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppSearchAnchor(
+              controller: controller,
+              viewModel: owner,
+              onSuggestionPressed: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(SearchBar));
+      await tester.pumpAndSettle();
+      final oldAnchor = tester.widget<SearchAnchor>(find.byType(SearchAnchor));
+      final oldChip = tester.widget<RawChip>(
+        find.widgetWithText(RawChip, 'old confirmed'),
+      );
+      final oldReload = tester
+          .widget<TextButton>(
+            find.widgetWithText(TextButton, 'Ricarica cronologia'),
+          )
+          .onPressed!;
+      oldRepository.pendingGetPastSearches = oldRead;
+      owner.requestPastSearchesRefresh();
+      await pumpCommandTurns(tester);
+      controller.closeView(null);
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppSearchAnchor(
+              controller: controller,
+              viewModel: nextOwner,
+              onSuggestionPressed: (_) {},
+            ),
+          ),
+        ),
+      );
+      owner.dispose();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(SearchBar));
+      await tester.pump(const Duration(seconds: 1));
+      await pumpCommandTurns(tester);
+      nextRead.complete(const Result.success(['new confirmed']));
+      await pumpCommandTurns(tester);
+      expect(nextOwner.pastSearches, ['new confirmed']);
+      expect(controller.isOpen, isTrue);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(RawChip, 'new confirmed'), findsOneWidget);
+      oldRead.complete(const Result.success(['stale completion']));
+      oldReload();
+      oldChip.onPressed!();
+      oldChip.onDeleted!();
+      oldAnchor.viewOnSubmitted!('stale submit');
+      final staleView = oldAnchor.viewBuilder!(const []);
+      expect(staleView, isA<SizedBox>());
+      await pumpCommandTurns(tester);
+      expect(find.widgetWithText(RawChip, 'new confirmed'), findsOneWidget);
+      expect(find.widgetWithText(RawChip, 'stale completion'), findsNothing);
+      expect(find.text('Impossibile caricare la cronologia.'), findsNothing);
+      expect(controller.text, isEmpty);
+      expect(controller.isOpen, isTrue);
+      expect(oldRepository.historyWrites, isEmpty);
+      expect(nextRepository.historyWrites, isEmpty);
+      expect(nextRepository.getPastSearchesCallCount, 1);
+      controller.closeView(null);
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+      nextOwner.dispose();
+      controller.dispose();
+      await tester.pump(const Duration(milliseconds: 51));
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('debounce admits only latest input and repeated builders '
         'do not postpone it', (tester) async {
       final repository = FakeSearchRepository();
@@ -263,7 +433,7 @@ void main() {
     });
 
     for (final replaceOwner in [false, true]) {
-      testWidgets('cached history callbacks and reset ignore '
+      testWidgets('cached history callbacks ignore '
           '${replaceOwner ? 'owner' : 'controller'} replacement', (
         tester,
       ) async {
@@ -330,7 +500,7 @@ void main() {
       });
     }
 
-    testWidgets('delete reset preserves text typed after optimistic removal', (
+    testWidgets('confirmed-history removal never edits controller text', (
       tester,
     ) async {
       final repository = FakeSearchRepository(
@@ -437,46 +607,50 @@ void main() {
       }
     }
 
-    testWidgets('close reentered during optimistic dispatch revokes navigation '
-        'but keeps the accepted write', (tester) async {
-      final repository = FakeSearchRepository();
-      final owner = SearchViewModel(searchRepository: repository);
-      final controller = SearchController();
-      var navigations = 0;
-      var closeOnMutation = false;
-      owner.addListener(() {
-        if (closeOnMutation && controller.isOpen) controller.closeView(null);
-      });
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: AppSearchAnchor(
-              controller: controller,
-              viewModel: owner,
-              onSuggestionPressed: (_) {},
-              onSubmitted: (_) => navigations++,
+    testWidgets(
+      'accepted write permits immediate navigation without optimistic dispatch',
+      (tester) async {
+        final repository = FakeSearchRepository();
+        final owner = SearchViewModel(searchRepository: repository);
+        final controller = SearchController();
+        var navigations = 0;
+        var closeOnMutation = false;
+        owner.addListener(() {
+          if (closeOnMutation && controller.isOpen) controller.closeView(null);
+        });
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: AppSearchAnchor(
+                controller: controller,
+                viewModel: owner,
+                onSuggestionPressed: (_) {},
+                onSubmitted: (_) => navigations++,
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(SearchBar));
-      await tester.pumpAndSettle();
-      closeOnMutation = true;
-      tester.widget<SearchAnchor>(find.byType(SearchAnchor)).viewOnSubmitted!(
-        'accepted',
-      );
-      expect(navigations, 0);
-      expect(controller.isOpen, isFalse);
-      await pumpCommandTurns(tester);
-      await tester.pumpAndSettle();
-      expect(repository.historyWrites, [(operation: 'add', query: 'accepted')]);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-      owner.dispose();
-      controller.dispose();
-      await tester.pump(const Duration(milliseconds: 50));
-    });
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(SearchBar));
+        await tester.pumpAndSettle();
+        closeOnMutation = true;
+        tester.widget<SearchAnchor>(find.byType(SearchAnchor)).viewOnSubmitted!(
+          'accepted',
+        );
+        expect(navigations, 1);
+        expect(controller.isOpen, isFalse);
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        expect(repository.historyWrites, [
+          (operation: 'add', query: 'accepted'),
+        ]);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        owner.dispose();
+        controller.dispose();
+        await tester.pump(const Duration(milliseconds: 50));
+      },
+    );
 
     group('compact full-screen search', () {
       testWidgets('fallback back closes the popup and keeps the route', (

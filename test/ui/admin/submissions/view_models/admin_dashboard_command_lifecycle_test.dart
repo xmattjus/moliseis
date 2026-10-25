@@ -636,38 +636,40 @@ void main() {
     },
   );
 
-  testWidgets(
-    'F5.1 editor obligation waits for manual read then fetches fresh',
-    (tester) async {
-      final h = AdminDashboardCommandHarness(
-        AdminDashboardLane.submissions,
-        probe: probe,
-      )..request();
-      await pumpCommandTurns(tester);
-      final fresh = Completer<Result<List<AdminSubmission>>>();
-      var completed = 0;
-      final changed = h.owner.refreshAfterEditorChange();
-      unawaited(changed.then((_) => completed++));
-      await pumpCommandTurns(tester);
-      expect(h.calls, 1);
-      expect(completed, 0);
-      h.repository.pendingList = fresh;
-      h.succeed();
-      await pumpCommandTurns(tester);
-      expect(h.calls, 2);
-      expect(completed, 0);
-      fresh.complete(Result.success([sampleAdminSubmission(id: 99)]));
-      await pumpCommandTurns(tester);
-      await changed;
-      await h.original;
-      expect(h.owner.items.single.id, 99);
-      expect(completed, 1);
-      h.owner.dispose();
-      await pumpPhysicalCommandDisposal(tester);
-    },
-  );
+  testWidgets('D1 busy submissions read leaves no deferred editor demand', (
+    tester,
+  ) async {
+    final h = AdminDashboardCommandHarness(
+      AdminDashboardLane.submissions,
+      probe: probe,
+    )..request();
+    await pumpCommandTurns(tester);
+    final changed = h.owner.refreshAfterEditorChange();
+    var completed = false;
+    unawaited(changed.then((_) => completed = true));
+    await pumpCommandTurns(tester);
+    expect(completed, isTrue);
+    expect(h.owner.loadSnapshot.isRunning, isTrue);
+    h.succeed();
+    await pumpCommandTurns(tester);
+    await h.original;
+    expect(h.repository.listCallCount, 1);
+    expect(h.owner.items.single.id, 8);
+    // Recovery is a separate ordinary read, never a repeat editor mutation.
+    h.repository
+      ..pendingList = null
+      ..listResult = Result.success([sampleAdminSubmission(id: 99)]);
+    final retry = h.owner.refreshSubmissions();
+    await pumpCommandTurns(tester);
+    await retry;
+    expect(h.repository.listCallCount, 2);
+    expect(h.owner.items.single.id, 99);
+    expect(h.repository.unIgnoreCalls, isEmpty);
+    h.owner.dispose();
+    await pumpPhysicalCommandDisposal(tester);
+  });
 
-  testWidgets('F5.3 same-turn editor events coalesce before admission', (
+  testWidgets('D5 overlapping editor requests do not extend accepted Future', (
     tester,
   ) async {
     final h = AdminDashboardCommandHarness(
@@ -681,10 +683,9 @@ void main() {
     for (final future in [first, second, third]) {
       unawaited(future.then((_) => completed++));
     }
-    expect(h.calls, 0);
     await pumpCommandTurns(tester);
     expect(h.calls, 1);
-    expect(completed, 0);
+    expect(completed, 2);
     h.succeed();
     await pumpCommandTurns(tester);
     await Future.wait([first, second, third]);
@@ -694,83 +695,8 @@ void main() {
     await pumpPhysicalCommandDisposal(tester);
   });
 
-  testWidgets('F5.3 event during post-editor read requires a newer read', (
-    tester,
-  ) async {
-    final h = AdminDashboardCommandHarness(
-      AdminDashboardLane.submissions,
-      probe: probe,
-    );
-    final first = h.owner.refreshAfterEditorChange();
-    var completed = 0;
-    unawaited(first.then((_) => completed++));
-    await pumpCommandTurns(tester);
-    expect(h.calls, 1);
-    final fresh = Completer<Result<List<AdminSubmission>>>();
-    h.repository.pendingList = fresh;
-    final second = h.owner.refreshAfterEditorChange();
-    unawaited(second.then((_) => completed++));
-    h.succeed();
-    await pumpCommandTurns(tester);
-    expect(h.calls, 2);
-    expect(completed, 1);
-    fresh.complete(Result.success([sampleAdminSubmission(id: 99)]));
-    await pumpCommandTurns(tester);
-    await Future.wait([first, second]);
-    expect(completed, 2);
-    expect(h.owner.items.single.id, 99);
-    h.owner.dispose();
-    await pumpPhysicalCommandDisposal(tester);
-  });
-
-  testWidgets('F5.3 captured batch finishes before newer pending changes', (
-    tester,
-  ) async {
-    final h = AdminDashboardCommandHarness(
-      AdminDashboardLane.submissions,
-      probe: probe,
-    );
-    h.owner.setIgnoredFilter();
-    var firstDone = false;
-    var secondDone = false;
-    final first = h.owner.refreshAfterEditorChange();
-    unawaited(first.then((_) => firstDone = true));
-    await pumpCommandTurns(tester);
-    final fresh = Completer<Result<List<AdminSubmission>>>();
-    final oldIgnored = Completer<Result<List<AdminIgnoredSource>>>();
-    h.repository
-      ..pendingList = fresh
-      ..pendingIgnoredList = oldIgnored;
-    final second = h.owner.refreshAfterEditorChange();
-    unawaited(second.then((_) => secondDone = true));
-    h.succeed();
-    await pumpCommandTurns(tester);
-    expect(h.repository.dashboardCalls, ['list', 'listIgnoredSources']);
-    expect(firstDone, isFalse);
-    expect(secondDone, isFalse);
-    oldIgnored.complete(const Result.success([]));
-    await pumpCommandTurns(tester);
-    expect(firstDone, isTrue);
-    expect(secondDone, isFalse);
-    expect(h.repository.listCallCount, 2);
-    h.repository.pendingIgnoredList = null;
-    fresh.complete(Result.success([sampleAdminSubmission(id: 99)]));
-    await pumpCommandTurns(tester);
-    await pumpCommandTurns(tester);
-    await Future.wait([first, second]);
-    expect(secondDone, isTrue);
-    expect(h.repository.dashboardCalls, [
-      'list',
-      'listIgnoredSources',
-      'list',
-      'listIgnoredSources',
-    ]);
-    h.owner.dispose();
-    await pumpPhysicalCommandDisposal(tester);
-  });
-
   for (final phase in ['mutation', 'ignored', 'submissions']) {
-    testWidgets('F5.2 editor change survives exclusive $phase phase', (
+    testWidgets('D0/D1 editor refresh is refused during exclusive $phase', (
       tester,
     ) async {
       final h = AdminDashboardCommandHarness(
@@ -779,67 +705,42 @@ void main() {
       );
       final ignored = Completer<Result<List<AdminIgnoredSource>>>();
       final main = Completer<Result<List<AdminSubmission>>>();
-      final fresh = Completer<Result<List<AdminSubmission>>>();
       h.repository
         ..pendingIgnoredList = ignored
         ..pendingList = main;
       h.request();
       await pumpCommandTurns(tester);
-      Future<void>? changed;
-      var completed = 0;
-      if (phase == 'mutation') {
-        changed = h.owner.refreshAfterEditorChange();
-        unawaited(changed.then((_) => completed++));
-      }
+      if (phase == 'mutation') await h.owner.refreshAfterEditorChange();
       h.succeed();
       await pumpCommandTurns(tester);
       expect(h.repository.ignoredListCalls, 1);
       expect(h.repository.listCallCount, 0);
-      if (phase == 'ignored') {
-        changed = h.owner.refreshAfterEditorChange();
-        unawaited(changed.then((_) => completed++));
-      }
+      if (phase == 'ignored') await h.owner.refreshAfterEditorChange();
       ignored.complete(const Result.success([]));
       await pumpCommandTurns(tester);
       expect(h.repository.listCallCount, 1);
-      if (phase == 'submissions') {
-        changed = h.owner.refreshAfterEditorChange();
-        unawaited(changed.then((_) => completed++));
-      }
-      await pumpCommandTurns(tester);
-      expect(completed, 0);
+      if (phase == 'submissions') await h.owner.refreshAfterEditorChange();
       expect(h.owner.isUnIgnoring, isTrue);
       expect(h.owner.unignoredPendingId, isNull);
       expect(h.owner.canOpenPendingSubmission, isFalse);
-      h.repository.pendingList = fresh;
       main.complete(Result.success([sampleAdminSubmission(id: 8)]));
       await pumpCommandTurns(tester);
       expect(h.owner.isUnIgnoring, isFalse);
       expect(h.owner.unIgnoreSnapshot.completed, isTrue);
       expect(h.owner.unignoredPendingId, 8);
       expect(h.owner.canOpenPendingSubmission, isTrue);
-      expect(h.repository.listCallCount, 2);
-      expect(h.repository.ignoredListCalls, 1);
-      expect(completed, 0);
-      fresh.complete(Result.success([sampleAdminSubmission(id: 99)]));
-      await pumpCommandTurns(tester);
-      await changed;
-      expect(completed, 1);
-      expect(h.owner.items.single.id, 99);
-      expect(h.repository.unIgnoreCalls, [12]);
+      expect(h.owner.items.single.id, 8);
       expect(h.repository.dashboardCalls, [
         'unIgnoreSource:12',
         'listIgnoredSources',
         'list',
-        'list',
       ]);
-      expect(h.owner.canOpenPendingSubmission, isTrue);
       h.owner.dispose();
       await pumpPhysicalCommandDisposal(tester);
     });
   }
 
-  testWidgets('F5.4 ignored lane drains before a fresh selected ignored read', (
+  testWidgets('D1 busy ignored read is not queued after submissions refresh', (
     tester,
   ) async {
     final h = AdminDashboardCommandHarness(
@@ -850,32 +751,21 @@ void main() {
     h.request();
     await pumpCommandTurns(tester);
     final changed = h.owner.refreshAfterEditorChange();
-    var completed = 0;
-    unawaited(changed.then((_) => completed++));
-    await pumpCommandTurns(tester);
-    await pumpCommandTurns(tester);
-    expect(h.repository.listCallCount, 1);
-    expect(h.repository.ignoredListCalls, 1);
-    expect(completed, 0);
-    final fresh = Completer<Result<List<AdminIgnoredSource>>>();
-    h.repository.pendingIgnoredList = fresh;
-    h.succeed();
-    await pumpCommandTurns(tester);
-    expect(h.repository.ignoredListCalls, 2);
-    expect(completed, 0);
-    fresh.complete(const Result.success([]));
     await pumpCommandTurns(tester);
     await changed;
+    expect(h.repository.dashboardCalls, ['listIgnoredSources', 'list']);
+    h.succeed();
+    await pumpCommandTurns(tester);
     await h.original;
-    expect(completed, 1);
-    expect(h.owner.ignoredSources, isEmpty);
+    expect(h.repository.ignoredListCalls, 1);
+    expect(h.owner.ignoredSources.single.id, 12);
     h.owner.dispose();
     await pumpPhysicalCommandDisposal(tester);
   });
 
   for (final showIgnored in [false, true]) {
     testWidgets(
-      'F5.5 final filter selection ignored=$showIgnored controls second list',
+      'D1 final filter selection ignored=$showIgnored controls second list',
       (tester) async {
         final h = AdminDashboardCommandHarness(
           AdminDashboardLane.submissions,
@@ -901,48 +791,9 @@ void main() {
     );
   }
 
-  testWidgets('F5.3 newer event during ignored read restarts ordered refresh', (
-    tester,
-  ) async {
-    final h = AdminDashboardCommandHarness(
-      AdminDashboardLane.ignored,
-      probe: probe,
-    );
-    h.owner.setIgnoredFilter();
-    final first = h.owner.refreshAfterEditorChange();
-    var completed = 0;
-    unawaited(first.then((_) => completed++));
-    await pumpCommandTurns(tester);
-    await pumpCommandTurns(tester);
-    expect(h.repository.dashboardCalls, ['list', 'listIgnoredSources']);
-    final freshMain = Completer<Result<List<AdminSubmission>>>();
-    final freshIgnored = Completer<Result<List<AdminIgnoredSource>>>();
-    h.repository
-      ..pendingList = freshMain
-      ..pendingIgnoredList = freshIgnored;
-    final second = h.owner.refreshAfterEditorChange();
-    unawaited(second.then((_) => completed++));
-    h.succeed();
-    await pumpCommandTurns(tester);
-    expect(h.repository.listCallCount, 2);
-    expect(completed, 1);
-    freshMain.complete(Result.success([sampleAdminSubmission(id: 99)]));
-    await pumpCommandTurns(tester);
-    expect(h.repository.ignoredListCalls, 2);
-    expect(completed, 1);
-    freshIgnored.complete(const Result.success([]));
-    await pumpCommandTurns(tester);
-    await Future.wait([first, second]);
-    expect(completed, 2);
-    expect(h.owner.items.single.id, 99);
-    expect(h.owner.ignoredSources, isEmpty);
-    h.owner.dispose();
-    await pumpPhysicalCommandDisposal(tester);
-  });
-
   for (final failure in ['domain', 'runtime']) {
     testWidgets(
-      'F5.7 $failure settles obligation once without retry or rethrow',
+      'D2 $failure settles accepted refresh once without retry or rethrow',
       (tester) async {
         final h = AdminDashboardCommandHarness(
           AdminDashboardLane.submissions,
@@ -981,69 +832,8 @@ void main() {
     );
   }
 
-  testWidgets(
-    'F5.6 dispose settles coordinator while physical receipt stays pending',
-    (tester) async {
-      final h = AdminDashboardCommandHarness(
-        AdminDashboardLane.submissions,
-        probe: probe,
-      )..request();
-      await pumpCommandTurns(tester);
-      final changed = h.owner.refreshAfterEditorChange();
-      var completed = 0;
-      unawaited(changed.then((_) => completed++));
-      h.owner.dispose();
-      final state = h.state();
-      final notifications = h.notifications;
-      await pumpPhysicalCommandDisposal(tester);
-      await changed;
-      expect(completed, 1);
-      expect(h.completions, 0);
-      expect(probe.count(h.resultNotifiers.first), 0);
-      final replacement = AdminSubmissionsViewModel(
-        repository: FakeAdminContentSubmissionRepository(
-          listResult: Result.success([sampleAdminSubmission(id: 123)]),
-        ),
-      );
-      final replacementRefresh = replacement.refreshAfterEditorChange();
-      await pumpCommandTurns(tester);
-      await replacementRefresh;
-      expect(replacement.items.single.id, 123);
-      expect(h.completions, 0);
-      h.succeed();
-      await pumpPhysicalCommandDisposal(tester);
-      await h.original;
-      expect(h.completions, 1);
-      expect(h.repository.listCallCount, 1);
-      expect(h.state(), state);
-      expect(h.notifications, notifications);
-      expect(probe.count(h.resultNotifiers.first), 1);
-      expect(replacement.items.single.id, 123);
-      replacement.dispose();
-      await pumpPhysicalCommandDisposal(tester);
-    },
-  );
-
-  testWidgets('F5.6 dispose before drain entry revokes queued coordination', (
-    tester,
-  ) async {
-    final h = AdminDashboardCommandHarness(
-      AdminDashboardLane.submissions,
-      probe: probe,
-    );
-    var completed = 0;
-    final changed = h.owner.refreshAfterEditorChange();
-    unawaited(changed.then((_) => completed++));
-    h.owner.dispose();
-    await pumpPhysicalCommandDisposal(tester);
-    await changed;
-    expect(completed, 1);
-    expect(h.repository.dashboardCalls, isEmpty);
-    expect(h.owner.isDisposed, isTrue);
-  });
-
   for (final ignored in [false, true]) {
-    testWidgets('F5.6 dispose during editor-owned read ignored=$ignored', (
+    testWidgets('D4 disposal during accepted editor read ignored=$ignored', (
       tester,
     ) async {
       final lane = ignored
@@ -1051,25 +841,25 @@ void main() {
           : AdminDashboardLane.submissions;
       final h = AdminDashboardCommandHarness(lane, probe: probe);
       h.owner.setIgnoredFilter();
-      var completed = 0;
+      var completed = false;
       final changed = h.owner.refreshAfterEditorChange();
-      unawaited(changed.then((_) => completed++));
+      unawaited(changed.then((_) => completed = true));
       await pumpCommandTurns(tester);
       await pumpCommandTurns(tester);
       expect(h.calls, 1);
-      expect(completed, 0);
+      expect(completed, isFalse);
       final calls = [...h.repository.dashboardCalls];
       h.owner.dispose();
       final state = h.state();
       final notifications = h.notifications;
       await pumpPhysicalCommandDisposal(tester);
-      await changed;
-      expect(completed, 1);
+      expect(completed, isFalse);
       expect(probe.count(h.resultNotifiers[lane.index]), 0);
       h.succeed();
       await pumpPhysicalCommandDisposal(tester);
+      await changed;
+      expect(completed, isTrue);
       expect(probe.count(h.resultNotifiers[lane.index]), 1);
-      expect(completed, 1);
       expect(h.repository.dashboardCalls, calls);
       expect(h.state(), state);
       expect(h.notifications, notifications);
@@ -1077,8 +867,28 @@ void main() {
     });
   }
 
+  testWidgets('D4 synchronous admission disposal starts no repository phase', (
+    tester,
+  ) async {
+    final h = AdminDashboardCommandHarness(
+      AdminDashboardLane.submissions,
+      probe: probe,
+    );
+    h.owner.setIgnoredFilter();
+    h.owner.addListener(h.owner.dispose);
+    final changed = h.owner.refreshAfterEditorChange();
+    await pumpPhysicalCommandDisposal(tester);
+    await changed;
+    expect(h.repository.dashboardCalls, isEmpty);
+    expect(h.owner.loadSnapshot.completed, isFalse);
+    for (final notifier in h.resultNotifiers) {
+      expect(probe.count(notifier), 1);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'F5 assertion abort settles obligation without ignored continuation',
+    'D4 assertion abort settles accepted refresh without ignored continuation',
     (tester) async {
       late AdminDashboardCommandHarness h;
       late Future<void> changed;
@@ -1109,84 +919,49 @@ void main() {
     },
   );
 
-  for (final failure in ['domain', 'runtime']) {
-    testWidgets('F5.7 prior manual $failure still drains into a fresh read', (
+  for (final phase in ['running', 'terminal', 'safe']) {
+    testWidgets('D5 reentrant editor request from $phase follows admission', (
       tester,
     ) async {
       final h = AdminDashboardCommandHarness(
         AdminDashboardLane.submissions,
         probe: probe,
-      )..request();
-      await pumpCommandTurns(tester);
+      );
       final fresh = Completer<Result<List<AdminSubmission>>>();
+      Future<void>? changed;
+      var registered = false;
+      var completed = false;
+      h.owner.addListener(() {
+        final reached = switch (phase) {
+          'running' => h.owner.loadSnapshot.isRunning,
+          'terminal' => h.owner.loadSnapshot.completed && h.owner.loading,
+          _ => h.owner.loadSnapshot.completed && h.owner.canUnIgnore,
+        };
+        if (!registered && reached) {
+          registered = true;
+          changed = h.owner.refreshAfterEditorChange();
+          unawaited(changed!.then((_) => completed = true));
+        }
+      });
+      h.request();
+      await pumpCommandTurns(tester);
       h.repository.pendingList = fresh;
-      final changed = h.owner.refreshAfterEditorChange();
-      var completed = 0;
-      unawaited(changed.then((_) => completed++));
-      final error = StateError('prior read runtime');
-      if (failure == 'domain') {
-        h.failDomain();
-      } else {
-        h.failRuntime(error, StackTrace.current);
+      h.succeed();
+      await pumpCommandTurns(tester);
+      expect(registered, isTrue);
+      if (phase == 'safe') {
+        expect(h.repository.listCallCount, 2);
+        expect(completed, isFalse);
+        fresh.complete(Result.success([sampleAdminSubmission(id: 99)]));
+        await pumpCommandTurns(tester);
       }
-      await pumpCommandTurns(tester);
-      expect(h.repository.listCallCount, 2);
-      expect(completed, 0);
-      expect(reports, failure == 'runtime' ? [same(error)] : isEmpty);
-      fresh.complete(Result.success([sampleAdminSubmission(id: 99)]));
-      await pumpCommandTurns(tester);
       await changed;
       await h.original;
-      expect(completed, 1);
-      expect(h.owner.items.single.id, 99);
-      expect(h.repository.unIgnoreCalls, isEmpty);
+      expect(completed, isTrue);
+      expect(h.repository.listCallCount, phase == 'safe' ? 2 : 1);
+      expect(h.owner.items.single.id, phase == 'safe' ? 99 : 8);
       h.owner.dispose();
       await pumpPhysicalCommandDisposal(tester);
     });
-  }
-
-  for (final phase in ['running', 'terminal', 'safe']) {
-    testWidgets(
-      'F5.9 reentrant registration from $phase notification is retained',
-      (tester) async {
-        final h = AdminDashboardCommandHarness(
-          AdminDashboardLane.submissions,
-          probe: probe,
-        );
-        final fresh = Completer<Result<List<AdminSubmission>>>();
-        Future<void>? changed;
-        var registered = false;
-        var completed = 0;
-        h.owner.addListener(() {
-          final reached = switch (phase) {
-            'running' => h.owner.loadSnapshot.isRunning,
-            'terminal' => h.owner.loadSnapshot.completed && h.owner.loading,
-            _ => h.owner.loadSnapshot.completed && h.owner.canUnIgnore,
-          };
-          if (!registered && reached) {
-            registered = true;
-            changed = h.owner.refreshAfterEditorChange();
-            unawaited(changed!.then((_) => completed++));
-          }
-        });
-        h.request();
-        await pumpCommandTurns(tester);
-        h.repository.pendingList = fresh;
-        h.succeed();
-        await pumpCommandTurns(tester);
-        expect(registered, isTrue);
-        expect(h.repository.listCallCount, 2);
-        expect(completed, 0);
-        fresh.complete(Result.success([sampleAdminSubmission(id: 99)]));
-        await pumpCommandTurns(tester);
-        await changed;
-        await h.original;
-        expect(completed, 1);
-        expect(h.repository.listCallCount, 2);
-        expect(h.owner.items.single.id, 99);
-        h.owner.dispose();
-        await pumpPhysicalCommandDisposal(tester);
-      },
-    );
   }
 }

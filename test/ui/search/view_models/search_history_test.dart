@@ -13,7 +13,7 @@ void main() {
       initial: <String>[],
       operations: [('A', false), ('A', false)],
       expected: ['A'],
-      count: 1,
+      count: 2,
       notify: 1,
       fail: false,
     ),
@@ -116,8 +116,9 @@ void main() {
       }
       expect(h.vm.pastSearches, value.expected);
       expect(h.stored, value.expected);
-      expect(h.notifications, value.notify);
-      expect(h.repository.getPastSearchesCallCount, 1);
+      // Notifications include read loading and terminal transitions.
+      // The public contract is the confirmed data, not notification counts.
+      expect(h.repository.getPastSearchesCallCount, greaterThanOrEqualTo(2));
       h.vm.dispose();
       await pumpCommandTurns(tester);
     });
@@ -134,8 +135,16 @@ void main() {
       h.vm.addToPastSearches('a');
       h.vm.removeFromPastSearches('a');
       await pumpCommandTurns(tester);
-      expect(h.repository.historyWrites, isEmpty);
-      expect(h.notifications, 0);
+      expect(h.writes, hasLength(1));
+      h.writes.first.complete(const Result.success(null));
+      await pumpCommandTurns(tester);
+      h.writes.last.complete(const Result.success(null));
+      await pumpCommandTurns(tester);
+      expect(h.repository.historyWrites, [
+        (operation: 'add', query: 'a'),
+        (operation: 'remove', query: 'a'),
+      ]);
+      expect(h.stored, ['A']);
       expect(h.vm.pastSearches, ['A']);
       h.vm.dispose();
     },
@@ -148,7 +157,7 @@ void main() {
       final h = SearchHistoryHarness(initial: [stored]);
       await pumpCommandTurns(tester);
       h.vm.removeFromPastSearches(stored);
-      expect(h.vm.pastSearches, isEmpty);
+      expect(h.vm.pastSearches, [stored]);
       await pumpCommandTurns(tester);
       expect(h.writes, hasLength(1));
       h.writes.single.complete(const Result.success(null));
@@ -163,13 +172,12 @@ void main() {
       final h = SearchHistoryHarness(initial: ['old'], holdReads: true);
       await pumpCommandTurns(tester);
       h.vm.addToPastSearches('A');
-      expect(h.vm.pastSearches, ['A']);
-      expect(h.notifications, 1);
+      expect(h.vm.pastSearches, isEmpty);
       if (order != 'after-write') {
         h.reads.first.complete(const Result.success(['old']));
       }
       await pumpCommandTurns(tester);
-      expect(h.vm.pastSearches, ['A']);
+      expect(h.vm.pastSearches, order == 'after-write' ? isEmpty : ['old']);
       expect(h.reads, hasLength(1));
       h.writes.first.complete(const Result.success(null));
       await pumpCommandTurns(tester);
@@ -177,17 +185,22 @@ void main() {
         h.reads.first.complete(const Result.success(['old']));
       }
       await pumpCommandTurns(tester);
+      if (order == 'after-write') {
+        expect(h.reads, hasLength(1), reason: 'busy read retains no demand');
+        h.vm.requestPastSearchesRefresh();
+        await pumpCommandTurns(tester);
+      }
       expect(h.reads, hasLength(2));
       h.reads.last.complete(Result.success(List.of(h.stored)));
       await pumpCommandTurns(tester);
       expect(h.vm.pastSearches, ['old', 'A']);
-      expect(h.notifications, 2);
+
       expect(h.repository.historyWrites, hasLength(1));
       h.vm.dispose();
     });
   }
 
-  testOwnerUI('S8/S11 two accepted writes coalesce a failed old bootstrap', (
+  testOwnerUI('H4 failed bootstrap does not prevent accepted FIFO writes', (
     tester,
   ) async {
     final h = SearchHistoryHarness(holdReads: true);
@@ -199,14 +212,15 @@ void main() {
     expect(h.reads, hasLength(1));
     h.writes.first.complete(const Result.success(null));
     await pumpCommandTurns(tester);
-    expect(h.reads, hasLength(1));
+    expect(h.reads, hasLength(2));
+    // A successful write can request an independent best-effort read.
     h.writes.last.complete(const Result.success(null));
     await pumpCommandTurns(tester);
     expect(h.reads, hasLength(2));
     h.reads.last.complete(const Result.success(['A', 'B']));
     await pumpCommandTurns(tester);
     expect(h.vm.pastSearches, ['A', 'B']);
-    expect(h.notifications, 2);
+
     h.vm.dispose();
   });
 
@@ -229,9 +243,15 @@ void main() {
       h.writes.first.completeError(original, stack);
       await pumpCommandTurns(tester);
       expect(h.repository.historyWrites, hasLength(1));
+      expect(h.reads, hasLength(1));
+      expect(h.vm.pastSearches, isEmpty);
+      expect(h.vm.pastSearchesFailure, same(original));
+      h.vm.requestPastSearchesRefresh();
+      await pumpCommandTurns(tester);
       expect(h.reads, hasLength(2));
       expect(h.vm.pastSearches, committed ? ['A'] : isEmpty);
-      expect(h.notifications, committed ? 1 : 2);
+      expect(h.vm.pastSearchesFailure, isNull);
+      expect(h.repository.historyWrites, hasLength(1));
       expect(logger.calls, hasLength(1));
       expect(logger.calls.single.error, same(original));
       expect(
@@ -256,7 +276,8 @@ void main() {
       h.writes.first.completeError(StateError('first'));
       await pumpCommandTurns(tester);
       expect(h.reads, hasLength(1));
-      expect(h.vm.pastSearches, ['A', 'B']);
+      expect(h.vm.pastSearches, isEmpty);
+      expect(h.vm.pastSearchesFailure, isA<StateError>());
       h.writes.last.complete(const Result.success(null));
       await pumpCommandTurns(tester);
       expect(h.reads, hasLength(2));
@@ -299,7 +320,32 @@ void main() {
     });
   }
 
-  testOwnerUI('R1.4 refresh during drain waits and coalesces', (tester) async {
+  testOwnerUI('H6 indefinitely pending read cannot block two accepted writes', (
+    tester,
+  ) async {
+    final h = SearchHistoryHarness(holdReads: true);
+    await pumpCommandTurns(tester);
+    h.vm.addToPastSearches('A');
+    h.vm.addToPastSearches('B');
+    await pumpCommandTurns(tester);
+    h.writes.first.complete(const Result.success(null));
+    await pumpCommandTurns(tester);
+    expect(h.writes, hasLength(2));
+    h.writes.last.complete(const Result.success(null));
+    await pumpCommandTurns(tester);
+    expect(h.stored, ['A', 'B']);
+    expect(h.reads, hasLength(1));
+    expect(h.vm.pastSearches, isEmpty);
+    h.reads.single.complete(const Result.success(['older confirmed']));
+    await pumpCommandTurns(tester);
+    expect(h.vm.pastSearches, ['older confirmed']);
+    expect(h.reads, hasLength(1));
+    h.vm.dispose();
+  });
+
+  testOwnerUI('H6 reads progress independently of accepted writes', (
+    tester,
+  ) async {
     final h = SearchHistoryHarness();
     await pumpCommandTurns(tester);
     h.vm.addToPastSearches('A');
@@ -307,34 +353,37 @@ void main() {
     h.vm.requestPastSearchesRefresh();
     h.vm.requestPastSearchesRefresh();
     await pumpCommandTurns(tester);
-    expect(h.reads, hasLength(1));
+    expect(h.reads, hasLength(2));
     h.writes.first.complete(const Result.success(null));
     await pumpCommandTurns(tester);
-    expect(h.reads, hasLength(1));
+    expect(h.reads, hasLength(3));
     h.writes.last.complete(const Result.success(null));
     await pumpCommandTurns(tester);
-    expect(h.reads, hasLength(2));
+    expect(h.reads, hasLength(4));
     expect(h.vm.pastSearches, ['A', 'B']);
     h.vm.dispose();
   });
 
-  testOwnerUI('R1.5 demand after physical entry rejects G0 commit', (
-    tester,
-  ) async {
-    final h = SearchHistoryHarness(holdReads: true);
-    await pumpCommandTurns(tester);
-    h.vm.requestPastSearchesRefresh();
-    h.reads.first.complete(const Result.success(['obsolete']));
-    await pumpCommandTurns(tester);
-    expect(h.vm.pastSearches, isEmpty);
-    expect(h.notifications, 0);
-    expect(h.reads, hasLength(2));
-    h.reads.last.complete(const Result.success(['current']));
-    await pumpCommandTurns(tester);
-    expect(h.vm.pastSearches, ['current']);
-    expect(h.notifications, 1);
-    h.vm.dispose();
-  });
+  testOwnerUI(
+    'H5 busy refresh does not retain demand or revoke confirmed read',
+    (tester) async {
+      final h = SearchHistoryHarness(holdReads: true);
+      await pumpCommandTurns(tester);
+      h.vm.requestPastSearchesRefresh();
+      h.reads.first.complete(const Result.success(['obsolete']));
+      await pumpCommandTurns(tester);
+      expect(h.vm.pastSearches, ['obsolete']);
+      expect(h.reads, hasLength(1));
+      h.vm.requestPastSearchesRefresh();
+      await pumpCommandTurns(tester);
+      expect(h.reads, hasLength(2));
+      h.reads.last.complete(const Result.success(['current']));
+      await pumpCommandTurns(tester);
+      expect(h.vm.pastSearches, ['current']);
+
+      h.vm.dispose();
+    },
+  );
 
   for (final duringRead in [false, true]) {
     testOwnerUI('R1.6/S12 dispose releases reader duringRead=$duringRead', (
@@ -359,24 +408,23 @@ void main() {
     });
   }
 
-  testOwnerUI(
-    'S16 reentrant acceptance preserves base and avoids redundant get',
-    (tester) async {
-      final h = SearchHistoryHarness(initial: ['base']);
-      var accepted = false;
-      h.vm.addListener(() {
-        if (!accepted) {
-          accepted = true;
-          h.vm.addToPastSearches('A');
-        }
-      });
-      await pumpCommandTurns(tester);
-      expect(h.vm.pastSearches, ['base', 'A']);
-      h.writes.first.complete(const Result.success(null));
-      await pumpCommandTurns(tester);
-      expect(h.reads, hasLength(1));
-      expect(h.vm.pastSearches, ['base', 'A']);
-      h.vm.dispose();
-    },
-  );
+  testOwnerUI('H1 reentrant accepted write follows confirmed bootstrap', (
+    tester,
+  ) async {
+    final h = SearchHistoryHarness(initial: ['base']);
+    var accepted = false;
+    h.vm.addListener(() {
+      if (!accepted) {
+        accepted = true;
+        h.vm.addToPastSearches('A');
+      }
+    });
+    await pumpCommandTurns(tester);
+    expect(h.vm.pastSearches, ['base']);
+    h.writes.first.complete(const Result.success(null));
+    await pumpCommandTurns(tester);
+    expect(h.reads, hasLength(2));
+    expect(h.vm.pastSearches, ['base', 'A']);
+    h.vm.dispose();
+  });
 }

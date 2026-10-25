@@ -1,0 +1,595 @@
+{
+  "baseline": "ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+  "head": "c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1",
+  "method": "Physical lines via splitlines including blanks/comments; class declaration names via regex; addListener/scheduleMicrotask/Timer.run syntactic call sites, not runtime instances. Semantic field inventory is metrics.md.",
+  "files": [
+    {
+      "path": "lib/ui/admin/auth/view_models/admin_auth_view_model.dart",
+      "main_loc": 165,
+      "pr_loc": 343,
+      "classes_before": [
+        "AdminAuthViewModel"
+      ],
+      "classes_after": [
+        "AdminAuthViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 4,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart",
+      "main_loc": 973,
+      "pr_loc": 1550,
+      "classes_before": [
+        "AdminSubmissionEditorViewModel"
+      ],
+      "classes_after": [
+        "_EditorLane",
+        "_EditorExecution",
+        "AdminSubmissionEditorViewModel"
+      ],
+      "introduced_classes": [
+        "_EditorLane",
+        "_EditorExecution"
+      ],
+      "addListener_calls": 3,
+      "scheduleMicrotask_calls": 3,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/admin/submissions/view_models/admin_submissions_view_model.dart",
+      "main_loc": 151,
+      "pr_loc": 544,
+      "classes_before": [
+        "AdminSubmissionsViewModel"
+      ],
+      "classes_after": [
+        "_AdminExecution",
+        "AdminSubmissionsViewModel"
+      ],
+      "introduced_classes": [
+        "_AdminExecution"
+      ],
+      "addListener_calls": 3,
+      "scheduleMicrotask_calls": 4,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/category/view_models/category_view_model.dart",
+      "main_loc": 152,
+      "pr_loc": 221,
+      "classes_before": [
+        "CategoryViewModel"
+      ],
+      "classes_after": [
+        "CategoryViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 2,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/content_submission/view_models/content_submission_view_model.dart",
+      "main_loc": 1038,
+      "pr_loc": 1500,
+      "classes_before": [
+        "AssetSelectionOutcome",
+        "ContentSubmissionViewModel"
+      ],
+      "classes_after": [
+        "_SessionRequest",
+        "_RemoveRequest",
+        "_SubmitRequest",
+        "AssetSelectionOutcome",
+        "ContentSubmissionViewModel"
+      ],
+      "introduced_classes": [
+        "_SessionRequest",
+        "_RemoveRequest",
+        "_SubmitRequest"
+      ],
+      "addListener_calls": 3,
+      "scheduleMicrotask_calls": 3,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/event/view_models/event_view_model.dart",
+      "main_loc": 248,
+      "pr_loc": 364,
+      "classes_before": [
+        "EventViewModel"
+      ],
+      "classes_after": [
+        "EventViewModel",
+        "EventDayRequest"
+      ],
+      "introduced_classes": [
+        "EventDayRequest"
+      ],
+      "addListener_calls": 3,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/explore/view_models/explore_view_model.dart",
+      "main_loc": 37,
+      "pr_loc": 87,
+      "classes_before": [
+        "ExploreViewModel"
+      ],
+      "classes_after": [
+        "ExploreViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 1,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/explore/view_models/suggestion_view_model.dart",
+      "main_loc": 44,
+      "pr_loc": 88,
+      "classes_before": [
+        "SuggestionViewModel"
+      ],
+      "classes_after": [
+        "SuggestionViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 1,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/favourite/view_models/favourite_view_model.dart",
+      "main_loc": 266,
+      "pr_loc": 341,
+      "classes_before": [
+        "FavouriteViewModel"
+      ],
+      "classes_after": [
+        "FavouriteViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 3,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/geo_map/view_models/geo_map_view_model.dart",
+      "main_loc": 487,
+      "pr_loc": 592,
+      "classes_before": [
+        "GeoMapViewModel"
+      ],
+      "classes_after": [
+        "GeoMapMarkerRequest",
+        "GeoMapMarkerOutcome",
+        "GeoMapViewModel"
+      ],
+      "introduced_classes": [
+        "GeoMapMarkerRequest",
+        "GeoMapMarkerOutcome"
+      ],
+      "addListener_calls": 3,
+      "scheduleMicrotask_calls": 1,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/post/view_models/post_view_model.dart",
+      "main_loc": 88,
+      "pr_loc": 138,
+      "classes_before": [
+        "PostViewModel"
+      ],
+      "classes_after": [
+        "PostViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 1,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/search/view_models/search_view_model.dart",
+      "main_loc": 188,
+      "pr_loc": 407,
+      "classes_before": [
+        "SearchViewModel"
+      ],
+      "classes_after": [
+        "SearchViewModel",
+        "_HistoryMutation",
+        "_HistoryWriter"
+      ],
+      "introduced_classes": [
+        "_HistoryMutation",
+        "_HistoryWriter"
+      ],
+      "addListener_calls": 4,
+      "scheduleMicrotask_calls": 3,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/settings/view_models/settings_view_model.dart",
+      "main_loc": 44,
+      "pr_loc": 101,
+      "classes_before": [
+        "SettingsViewModel"
+      ],
+      "classes_after": [
+        "SettingsViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 1,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/settings/view_models/theme_view_model.dart",
+      "main_loc": 76,
+      "pr_loc": 135,
+      "classes_before": [
+        "ThemeViewModel"
+      ],
+      "classes_after": [
+        "ThemeViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 1,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/ui/sync/view_models/sync_view_model.dart",
+      "main_loc": 52,
+      "pr_loc": 104,
+      "classes_before": [
+        "SyncViewModel"
+      ],
+      "classes_after": [
+        "SyncViewModel"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 2,
+      "scheduleMicrotask_calls": 2,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/utils/command.dart",
+      "main_loc": 159,
+      "pr_loc": 159,
+      "classes_before": [
+        "Command",
+        "Command0",
+        "Command1"
+      ],
+      "classes_after": [
+        "Command",
+        "Command0",
+        "Command1"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 0,
+      "scheduleMicrotask_calls": 0,
+      "timerRun_calls": 0
+    },
+    {
+      "path": "lib/utils/restartable_command.dart",
+      "main_loc": 216,
+      "pr_loc": 216,
+      "classes_before": [
+        "RestartableCommand",
+        "_Execution",
+        "_Emission"
+      ],
+      "classes_after": [
+        "RestartableCommand",
+        "_Execution",
+        "_Emission"
+      ],
+      "introduced_classes": [],
+      "addListener_calls": 2,
+      "scheduleMicrotask_calls": 3,
+      "timerRun_calls": 1
+    },
+    {
+      "path": "lib/utils/result_command.dart",
+      "main_loc": 57,
+      "pr_loc": 57,
+      "classes_before": [],
+      "classes_after": [],
+      "introduced_classes": [],
+      "addListener_calls": 0,
+      "scheduleMicrotask_calls": 0,
+      "timerRun_calls": 0
+    }
+  ],
+  "post_implementation": {
+    "provenance": "Measured uncommitted implementation at the original PR checkpoint; no implementation commit or publication. Original baseline fields remain unchanged.",
+    "files": [
+      {
+        "path": "lib/ui/admin/auth/view_models/admin_auth_view_model.dart",
+        "loc": 343,
+        "netReductionFromPr": 0,
+        "classes": [
+          "AdminAuthViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 4,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart",
+        "loc": 1505,
+        "netReductionFromPr": 45,
+        "classes": [
+          "AdminSubmissionEditorViewModel"
+        ],
+        "removedClasses": [
+          "_EditorExecution",
+          "_EditorLane"
+        ],
+        "addedClasses": [],
+        "addListener_calls": 1,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/admin/submissions/view_models/admin_submissions_view_model.dart",
+        "loc": 443,
+        "netReductionFromPr": 101,
+        "classes": [
+          "_AdminExecution",
+          "AdminSubmissionsViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 3,
+        "scheduleMicrotask_calls": 3,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/category/view_models/category_view_model.dart",
+        "loc": 221,
+        "netReductionFromPr": 0,
+        "classes": [
+          "CategoryViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 2,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/content_submission/view_models/content_submission_view_model.dart",
+        "loc": 1500,
+        "netReductionFromPr": 0,
+        "classes": [
+          "_SessionRequest",
+          "_RemoveRequest",
+          "_SubmitRequest",
+          "AssetSelectionOutcome",
+          "ContentSubmissionViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 3,
+        "scheduleMicrotask_calls": 3,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/event/view_models/event_view_model.dart",
+        "loc": 364,
+        "netReductionFromPr": 0,
+        "classes": [
+          "EventViewModel",
+          "EventDayRequest"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 3,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/explore/view_models/explore_view_model.dart",
+        "loc": 87,
+        "netReductionFromPr": 0,
+        "classes": [
+          "ExploreViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 1,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/explore/view_models/suggestion_view_model.dart",
+        "loc": 88,
+        "netReductionFromPr": 0,
+        "classes": [
+          "SuggestionViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 1,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/favourite/view_models/favourite_view_model.dart",
+        "loc": 341,
+        "netReductionFromPr": 0,
+        "classes": [
+          "FavouriteViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 3,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/geo_map/view_models/geo_map_view_model.dart",
+        "loc": 591,
+        "netReductionFromPr": 1,
+        "classes": [
+          "GeoMapMarkerRequest",
+          "GeoMapMarkerOutcome",
+          "GeoMapViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 3,
+        "scheduleMicrotask_calls": 1,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/post/view_models/post_view_model.dart",
+        "loc": 138,
+        "netReductionFromPr": 0,
+        "classes": [
+          "PostViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 1,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/search/view_models/search_view_model.dart",
+        "loc": 241,
+        "netReductionFromPr": 166,
+        "classes": [
+          "SearchViewModel"
+        ],
+        "removedClasses": [
+          "_HistoryMutation",
+          "_HistoryWriter"
+        ],
+        "addedClasses": [],
+        "addListener_calls": 5,
+        "scheduleMicrotask_calls": 3,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/settings/view_models/settings_view_model.dart",
+        "loc": 101,
+        "netReductionFromPr": 0,
+        "classes": [
+          "SettingsViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 1,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/settings/view_models/theme_view_model.dart",
+        "loc": 135,
+        "netReductionFromPr": 0,
+        "classes": [
+          "ThemeViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 1,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/ui/sync/view_models/sync_view_model.dart",
+        "loc": 104,
+        "netReductionFromPr": 0,
+        "classes": [
+          "SyncViewModel"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 2,
+        "scheduleMicrotask_calls": 2,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/utils/command.dart",
+        "loc": 159,
+        "netReductionFromPr": 0,
+        "classes": [
+          "Command",
+          "Command0",
+          "Command1"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 0,
+        "scheduleMicrotask_calls": 0,
+        "timerRun_calls": 0
+      },
+      {
+        "path": "lib/utils/restartable_command.dart",
+        "loc": 216,
+        "netReductionFromPr": 0,
+        "classes": [
+          "RestartableCommand",
+          "_Execution",
+          "_Emission"
+        ],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 2,
+        "scheduleMicrotask_calls": 3,
+        "timerRun_calls": 1
+      },
+      {
+        "path": "lib/utils/result_command.dart",
+        "loc": 57,
+        "netReductionFromPr": 0,
+        "classes": [],
+        "removedClasses": [],
+        "addedClasses": [],
+        "addListener_calls": 0,
+        "scheduleMicrotask_calls": 0,
+        "timerRun_calls": 0
+      }
+    ],
+    "viewModelTotals": {
+      "main": 4009,
+      "pr": 6515,
+      "implemented": 6202,
+      "netReductionFromPr": 313
+    },
+    "allTouchedProduction": {
+      "netReductionFromPr": 284,
+      "searchAnchorNetAdded": 29
+    },
+    "privateClassesRemoved": [
+      "_EditorLane",
+      "_EditorExecution",
+      "_HistoryWriter",
+      "_HistoryMutation"
+    ],
+    "privateClassesAdded": [],
+    "editorPermanentCommandObservers": {
+      "pr": 33,
+      "implemented": 11,
+      "fixedCommands": 11
+    },
+    "removedMechanisms": [
+      "Dashboard editor-return revision drain",
+      "Search optimistic projection/rebase and writer drain coordination",
+      "Search retained read-demand scheduler",
+      "Editor revision-rescheduled settlement barrier"
+    ],
+    "note": "LOC includes blanks/comments. Explicit typed Editor snapshots/effect IDs keep the API readable. The estimated reduction range was not a target."
+  }
+}

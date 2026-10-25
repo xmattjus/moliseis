@@ -183,7 +183,6 @@ void main() {
           harness.owner.dispose();
           await pumpEventQueue(times: 4);
           expect(upload.cancelCallCount, phase == 'picker' ? 0 : 1);
-          expect(harness.owner.debugCommandDisposalCounts[7], 0);
           if (phase == 'picker') {
             harness.pickerGate.complete(XFile('/controlled/image.jpg'));
           } else if (phase == 'upload') {
@@ -207,7 +206,6 @@ void main() {
             phase == 'picker' ? isEmpty : hasLength(1),
           );
           expect(harness.repository.deleteAssetCalls, isEmpty);
-          expect(harness.owner.debugCommandDisposalCounts[7], 1);
           expect(upload.cancelCallCount, phase == 'picker' ? 0 : 1);
         } finally {
           harness.owner.dispose();
@@ -497,7 +495,6 @@ void main() {
             harness.owner.dispose();
             await pumpEventQueue(times: 4);
             expect(harness.calls, everyElement(0));
-            expect(harness.owner.debugCommandDisposalCounts, everyElement(1));
             expect(harness.requests[lane](), isFalse);
           } finally {
             harness.owner.dispose();

@@ -26,12 +26,12 @@ void main() {
       repository.pendingAddToPastSearches = pendingAdd;
       vm.addToPastSearches('campobasso');
       await pumpEventQueue();
-      expect(vm.pastSearches, ['campobasso']);
+      expect(vm.pastSearches, isEmpty);
       vm.dispose();
       pendingAdd.complete(Result.error(TestException('db error')));
       await pumpEventQueue();
 
-      expect(vm.pastSearches, ['campobasso']);
+      expect(vm.pastSearches, isEmpty);
     });
 
     test(
@@ -40,7 +40,8 @@ void main() {
         final repository = FakeSearchRepository();
         final vm = SearchViewModel(searchRepository: repository);
         await pumpEventQueue();
-        vm.addToPastSearches('campobasso');
+        repository.pastSearchesResult = const Result.success(['campobasso']);
+        vm.requestPastSearchesRefresh();
         await pumpEventQueue();
         expect(vm.pastSearches, ['campobasso']);
 
@@ -48,12 +49,12 @@ void main() {
         repository.pendingRemoveFromPastSearches = pendingRemove;
         vm.removeFromPastSearches('campobasso');
         await pumpEventQueue();
-        expect(vm.pastSearches, isEmpty);
+        expect(vm.pastSearches, ['campobasso']);
         vm.dispose();
         pendingRemove.complete(Result.error(TestException('db error')));
         await pumpEventQueue();
 
-        expect(vm.pastSearches, isEmpty);
+        expect(vm.pastSearches, ['campobasso']);
       },
     );
 
@@ -127,15 +128,17 @@ void main() {
         expect(vm.pastSearches, hasLength(1));
       });
 
-      test('optimistically adds query and persists on success', () async {
-        final vm = await _buildLoaded(searchRepository: FakeSearchRepository());
+      test('confirmed read presents a persisted successful add', () async {
+        final repository = FakeSearchRepository();
+        final vm = await _buildLoaded(searchRepository: repository);
+        repository.pastSearchesResult = const Result.success(['campobasso']);
 
         vm.addToPastSearches('campobasso');
         await pumpEventQueue();
         expect(vm.pastSearches, contains('campobasso'));
       });
 
-      test('rolls back optimistic add when persist fails', () async {
+      test('retains confirmed data when add fails', () async {
         final vm = await _buildLoaded(
           searchRepository: FakeSearchRepository(
             addToHistoryResult: Result.error(TestException('write failed')),
@@ -149,19 +152,19 @@ void main() {
     });
 
     group('removeFromPastSearches', () {
-      test('removes query on success', () async {
-        final vm = await _buildLoaded(
-          searchRepository: FakeSearchRepository(
-            pastSearchesResult: const Result.success(['molise']),
-          ),
+      test('confirmed read presents a successful removal', () async {
+        final repository = FakeSearchRepository(
+          pastSearchesResult: const Result.success(['molise']),
         );
+        final vm = await _buildLoaded(searchRepository: repository);
+        repository.pastSearchesResult = const Result.success([]);
 
         vm.removeFromPastSearches('molise');
         await pumpEventQueue();
         expect(vm.pastSearches, isNot(contains('molise')));
       });
 
-      test('rolls back removal when persist fails', () async {
+      test('retains confirmed data when removal fails', () async {
         final vm = await _buildLoaded(
           searchRepository: FakeSearchRepository(
             pastSearchesResult: const Result.success(['molise']),

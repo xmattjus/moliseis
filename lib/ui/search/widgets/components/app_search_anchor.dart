@@ -184,7 +184,12 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
         child: SearchAnchor(
           isFullScreen: _isFullScreen,
           searchController: searchController,
-          viewBuilder: _buildViewBuilder,
+          viewBuilder: (suggestions) => _buildViewBuilder(
+            suggestions,
+            owner: owner,
+            controller: searchController,
+            session: session,
+          ),
           builder: (context, controller) {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -270,15 +275,9 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
             _admitSuggestions(viewModel, controller.text);
 
             if (controller.text.isEmpty) {
-              final history = viewModel.pastSearches;
-
-              return _lastHistory = _buildChips(
-                viewModel: viewModel,
-                controller: controller,
-                session: session,
-                texts: history,
-                showDeleteIcon: true,
-              );
+              // Inert fallback only. The popup's Recenti branch owns the
+              // live history subscription, independently of text changes.
+              return _lastHistory;
             }
 
             if (!SearchViewModel.isSearchQueryValid(controller.text)) {
@@ -336,6 +335,7 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
   }
 
   List<Widget> _buildChips({
+    required BuildContext popupContext,
     required SearchViewModel viewModel,
     required SearchController controller,
     required Object session,
@@ -356,76 +356,105 @@ class _AppSearchAnchorState extends State<AppSearchAnchor> {
           },
           deleteIcon: const Icon(Symbols.close),
           onDeleted: showDeleteIcon
-              ? () async {
+              ? () {
                   if (!_admits(viewModel, controller, session)) return;
                   viewModel.removeFromPastSearches(e);
-                  if (!_admits(viewModel, controller, session)) return;
-                  // Workaround to refresh the past searches list after
-                  // removing a suggestion chip from the list.
-                  controller.text = '\u200B';
-                  final resetValue = controller.value;
-                  await Future.delayed(Durations.medium1, () {
-                    // The anchor may have been unmounted (host navigated
-                    // away) during the delay. Writing to a disposed
-                    // internal controller asserts in debug; writing to
-                    // an external controller re-triggers suggestionsBuilder
-                    // on the dead State. Either way, bail out.
-                    if (!mounted) return;
-                    if (!_admits(viewModel, controller, session) ||
-                        controller.value != resetValue) {
-                      return;
-                    }
-                    controller.text = '';
-                  });
                 }
               : null,
-          backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+          backgroundColor: Theme.of(
+            popupContext,
+          ).colorScheme.surfaceContainerLow,
         );
       }),
     );
   }
 
   /// Lays out the suggestion list of the search view.
-  Widget _buildViewBuilder(Iterable<Widget> suggestions) {
+  Widget _buildViewBuilder(
+    Iterable<Widget> suggestions, {
+    required SearchViewModel owner,
+    required SearchController controller,
+    required Object session,
+  }) {
     // The search view lives in its own popup route, which keeps rebuilding
     // `viewBuilder` on every animation tick while it fades out. If the anchor
     // has been unmounted (e.g. the host navigated away via goNamed right after
     // closeView), `State.context` would throw a null-check error. Return a
     // harmless widget for the remaining exit-transition frames.
-    if (!mounted) {
+    if (!mounted ||
+        !_owns(owner, controller) ||
+        !identical(session, _popupSession)) {
       return const SizedBox.shrink();
     }
 
-    final owner = widget.viewModel;
-    final controller = _searchController;
-    final session = _popupSession;
     final children = <Widget>[];
     if (_searchController.text.isEmpty) {
-      children.addAll([
-        const TextSectionDivider('Categorie'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: CategoryContentWrap(
-            chipBackgroundColor: context.colorScheme.surfaceContainerLow,
-            onCategorySelected: (category) {
-              if (!_admits(owner, controller, session)) return;
-              controller.text = category.label;
-              if (!_admits(owner, controller, session)) return;
-              owner.addToPastSearches(category.label);
-            },
-          ),
-        ),
-      ]);
-
-      if (_lastHistory.isNotEmpty) {
-        children.addAll([
-          const TextSectionDivider('Recenti'),
+      children
+        ..addAll([
+          const TextSectionDivider('Categorie'),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Wrap(spacing: 8, runSpacing: 8, children: _lastHistory),
+            child: CategoryContentWrap(
+              chipBackgroundColor: context.colorScheme.surfaceContainerLow,
+              onCategorySelected: (category) {
+                if (!_admits(owner, controller, session)) return;
+                controller.text = category.label;
+                if (!_admits(owner, controller, session)) return;
+                owner.addToPastSearches(category.label);
+              },
+            ),
           ),
-        ]);
-      }
+        ])
+        ..add(
+          ListenableBuilder(
+            listenable: owner,
+            builder: (popupContext, _) {
+              if (!mounted ||
+                  !_owns(owner, controller) ||
+                  !identical(session, _popupSession) ||
+                  controller.text.isNotEmpty) {
+                return const SizedBox.shrink();
+              }
+              _lastHistory = _buildChips(
+                popupContext: popupContext,
+                viewModel: owner,
+                controller: controller,
+                session: session,
+                texts: owner.pastSearches,
+                showDeleteIcon: true,
+              );
+              final loading = owner.pastSearchesState.value.isRunning;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const TextSectionDivider('Recenti'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _lastHistory,
+                    ),
+                  ),
+                  if (loading) const LinearProgressIndicator(),
+                  if (owner.pastSearchesFailure != null)
+                    const ListTile(
+                      title: Text('Impossibile caricare la cronologia.'),
+                    ),
+                  TextButton(
+                    onPressed: loading
+                        ? null
+                        : () {
+                            if (!_admits(owner, controller, session)) return;
+                            owner.requestPastSearchesRefresh();
+                          },
+                    child: const Text('Ricarica cronologia'),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
     } else {
       children.addAll(suggestions);
     }

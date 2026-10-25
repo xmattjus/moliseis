@@ -1494,11 +1494,13 @@ void main() {
         );
         addTearDown(viewModel.dispose);
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
-        var notifications = 0;
-        viewModel.addListener(() => notifications++);
+        final states = <(bool, AdminSubmissionStatus?)>[];
+        viewModel.addListener(
+          () => states.add((viewModel.operationRunning, viewModel.status)),
+        );
 
         await settleEditorRequest(admitted: viewModel.requestLoad());
-        notifications = 0;
+        states.clear();
 
         expect(viewModel.hasPublishableCategory, isTrue);
 
@@ -1518,8 +1520,8 @@ void main() {
             entityId: 1,
           ),
         );
-        // One logical notification for the moderation success.
-        expect(notifications, 4);
+        expect(states.any((state) => state.$1), isTrue);
+        expect(states.last, (false, AdminSubmissionStatus.accepted));
 
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
         final rejectingViewModel = AdminSubmissionEditorViewModel(

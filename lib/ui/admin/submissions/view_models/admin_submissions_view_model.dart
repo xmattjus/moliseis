@@ -12,15 +12,12 @@ import 'package:moliseis/utils/result_command.dart';
 
 /// One admitted execution, retained independently of presentation listeners.
 final class _AdminExecution<P, T> {
-  _AdminExecution(this.id, this.command, {this.read = false, this.token});
+  _AdminExecution(this.command, {this.read = false});
 
-  final int id;
   final ResultCommand<P, T> command;
   final bool read;
-  final Object? token;
   final completion = Completer<void>();
   commands.CommandResult<P?, Result<T>?>? terminal;
-  bool started = false;
   bool actionSettled = false;
   bool settled = false;
   bool queued = false;
@@ -98,15 +95,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   bool _showIgnored = false;
   bool _disposed = false;
   bool _postCommit = false;
-  int _nextExecution = 0;
   int? _unignoredPendingId;
-  int _editorRevision = 0;
-  int _editorReadingRevision = 0;
-  bool _editorDrainQueued = false;
-  bool _editorNeedsIgnored = false;
-  _AdminExecution<void, List<AdminSubmission>>? _editorSubmissionRead;
-  _AdminExecution<void, List<AdminIgnoredSource>>? _editorIgnoredRead;
-  final _editorWaiters = <({int revision, Completer<void> completion})>[];
 
   /// Last forwarded submissions outcome, frozen after revocation.
   commands.CommandResult<void, Result<List<AdminSubmission>>?>
@@ -197,84 +186,16 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   Future<void> refreshIgnoredSources() =>
       _startIgnored()?.completion.future ?? Future<void>.value();
 
-  /// Registers a persisted editor change even while ordinary admission is busy.
+  /// Requests a best-effort refresh after an editor has persisted a change.
   ///
-  /// A read admitted before this call cannot satisfy its revision. Changes
-  /// waiting for admission coalesce; a later change during a read requires
-  /// another read. Ignored sources follow when selected at submissions
-  /// settlement. Completion acknowledges processing, not repository success.
-  /// Revocation completes these coordination waiters immediately; physical
-  /// read receipts keep their separate safe-settlement contract.
-  Future<void> refreshAfterEditorChange() {
-    if (_disposed) return Future<void>.value();
-    final completion = Completer<void>();
-    _editorWaiters.add((revision: ++_editorRevision, completion: completion));
-    _scheduleEditorDrain();
-    return completion.future;
-  }
-
-  /// Wake only for an explicit invalidation or a safe lane/phase release.
-  void _scheduleEditorDrain() {
-    if (_disposed || _editorWaiters.isEmpty || _editorDrainQueued) return;
-    _editorDrainQueued = true;
-    scheduleMicrotask(() {
-      _editorDrainQueued = false;
-      if (!_disposed && _editorWaiters.isNotEmpty) _drainEditorChanges();
-    });
-  }
-
-  /// Advances at most one admission per wake, never polling a busy lane.
-  void _drainEditorChanges() {
-    if (_editorSubmissionRead case final read?) {
-      if (!read.settled) return;
-      _editorSubmissionRead = null;
-      if (!read.normal) {
-        // An assertion is fail-loud, not permission for a normal next phase.
-        _completeEditorRevision();
-        return;
-      }
-      // Finish the captured batch even when newer revisions are waiting;
-      // old callers do not require a quiet period to complete.
-      _editorNeedsIgnored = _showIgnored;
-      if (!_editorNeedsIgnored) {
-        _completeEditorRevision();
-        return;
-      }
-    }
-    if (_editorIgnoredRead case final read?) {
-      if (!read.settled) return;
-      _editorIgnoredRead = null;
-      _editorNeedsIgnored = false;
-      _completeEditorRevision();
-      return;
-    }
-    // Internal reactivation reads deliberately do not satisfy editor demand.
-    if (_mutation != null) return;
-    if (_editorNeedsIgnored) {
-      if (_ignoredRead != null) return;
-      final read = _startIgnored();
-      if (!_disposed) _editorIgnoredRead = read;
-      return;
-    }
-    if (_submissionRead != null) return;
-    _editorNeedsIgnored = false;
-    // Capture BEFORE _startSubmissions can synchronously register a new change.
-    _editorReadingRevision = _editorRevision;
-    final read = _startSubmissions();
-    if (!_disposed) _editorSubmissionRead = read;
-  }
-
-  void _completeEditorRevision() {
-    final completed = _editorWaiters
-        .where((waiter) => waiter.revision <= _editorReadingRevision)
-        .toList();
-    _editorWaiters.removeWhere(
-      (waiter) => waiter.revision <= _editorReadingRevision,
-    );
-    for (final waiter in completed) {
-      waiter.completion.complete();
-    }
-    _scheduleEditorDrain();
+  /// A busy lane may refuse the read; no freshness obligation is retained.
+  /// Manual refresh can recover stale rows. Assertions have no normal terminal
+  /// snapshot and must not permit a subsequent ignored-source read.
+  Future<void> refreshAfterEditorChange() async {
+    if (_disposed) return;
+    await refreshSubmissions();
+    if (_disposed || _loadSnapshot.isRunning || _loadSnapshot.idle) return;
+    if (_showIgnored) await refreshIgnoredSources();
   }
 
   bool _canRead(Object? token) =>
@@ -285,12 +206,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     Object? token,
   ]) {
     if (!_canRead(token) || _submissionRead != null) return null;
-    final execution = _AdminExecution(
-      ++_nextExecution,
-      _load,
-      read: true,
-      token: token,
-    );
+    final execution = _AdminExecution(_load, read: true);
     _submissionRead = execution;
     _loadSnapshot = const commands.CommandResult.isLoading();
     notifyListeners();
@@ -302,12 +218,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     Object? token,
   ]) {
     if (!_canRead(token) || _ignoredRead != null) return null;
-    final execution = _AdminExecution(
-      ++_nextExecution,
-      _loadIgnored,
-      read: true,
-      token: token,
-    );
+    final execution = _AdminExecution(_loadIgnored, read: true);
     _ignoredRead = execution;
     _loadIgnoredSnapshot = const commands.CommandResult.isLoading();
     notifyListeners();
@@ -318,7 +229,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   /// Reserves reactivation synchronously; true denotes admission only.
   bool requestUnIgnore(int recordId) {
     if (!canUnIgnore) return false;
-    final execution = _AdminExecution(++_nextExecution, _unIgnore);
+    final execution = _AdminExecution(_unIgnore);
     _mutation = execution;
     _unignoredPendingId = null;
     _postCommit = false;
@@ -334,7 +245,6 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
       _scheduleSettlement(execution);
       return;
     }
-    execution.started = true;
     execution.command.run(parameter);
   }
 
@@ -461,7 +371,6 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     } else {
       notifyListeners();
     }
-    _scheduleEditorDrain();
   }
 
   Future<void> _refreshAfterCommit(
@@ -491,7 +400,6 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     _mutation = null;
     _postCommit = false;
     notifyListeners();
-    _scheduleEditorDrain();
   }
 
   bool _ownsMutation(_AdminExecution<int, AdminEventResolution> mutation) =>
@@ -504,7 +412,6 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     _mutation = null;
     _postCommit = false;
     notifyListeners();
-    _scheduleEditorDrain();
   }
 
   void _release<P, T>(ResultCommand<P, T> command) {
@@ -517,14 +424,6 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    final editorWaiters = _editorWaiters.toList();
-    _editorWaiters.clear();
-    _editorSubmissionRead = null;
-    _editorIgnoredRead = null;
-    _editorNeedsIgnored = false;
-    for (final waiter in editorWaiters) {
-      waiter.completion.complete();
-    }
     for (final remove in _removePublic) {
       remove();
     }

@@ -844,7 +844,7 @@ void main() {
 
     for (final changed in [true, false, null]) {
       testOwnerUI(
-        'F5.8 editor return $changed while stale read is active',
+        'D1 editor return $changed while stale read is active',
         (tester) async {
           editorChanged = changed;
           repository.listResult = Result.success([sampleAdminSubmission()]);
@@ -856,7 +856,6 @@ void main() {
           await tester.tap(find.byType(CustomInkWell));
           await tester.pumpAndSettle();
           final stale = Completer<Result<List<AdminSubmission>>>();
-          final fresh = Completer<Result<List<AdminSubmission>>>();
           repository.pendingList = stale;
           final oldRead = viewModel.refreshSubmissions();
           await pumpCommandTurns(tester);
@@ -864,29 +863,26 @@ void main() {
           await tester.tap(find.text('EDIT_EDITOR_MARKER'));
           await pumpCommandTurns(tester);
           expect(repository.listCallCount, 2);
-          repository.pendingList = fresh;
           stale.complete(
             Result.success([sampleAdminSubmission(name: 'Stale')]),
           );
           await pumpCommandTurns(tester);
           await oldRead;
-          expect(repository.listCallCount, changed == true ? 3 : 2);
-          if (changed == true) {
-            fresh.complete(
-              Result.success([
-                sampleAdminSubmission(name: 'Updated after editor'),
-              ]),
-            );
-          }
+          expect(repository.listCallCount, 2);
           await tester.pumpAndSettle();
-          expect(
-            repository.dashboardCalls,
-            List.filled(changed == true ? 3 : 2, 'list'),
-          );
-          expect(
-            viewModel.items.single.name,
-            changed == true ? 'Updated after editor' : 'Stale',
-          );
+          expect(repository.dashboardCalls, ['list', 'list']);
+          expect(viewModel.items.single.name, 'Stale');
+          if (changed == true) {
+            repository
+              ..pendingList = null
+              ..listResult = Result.success([
+                sampleAdminSubmission(name: 'Updated after manual refresh'),
+              ]);
+            await tester.tap(find.byIcon(Symbols.sync));
+            await tester.pumpAndSettle();
+            expect(repository.listCallCount, 3);
+            expect(viewModel.items.single.name, 'Updated after manual refresh');
+          }
           expect(tester.takeException(), isNull);
         },
         disposeOwners: () {
@@ -928,7 +924,7 @@ void main() {
     );
 
     testOwnerUI(
-      'F5.8 registered change survives widget unmount with live owner',
+      'D1 busy editor refresh has no obligation after widget unmount',
       (tester) async {
         repository.listResult = Result.success([sampleAdminSubmission()]);
         final initial = viewModel.refreshSubmissions();
@@ -939,23 +935,17 @@ void main() {
         await tester.tap(find.byType(CustomInkWell));
         await tester.pumpAndSettle();
         final stale = Completer<Result<List<AdminSubmission>>>();
-        final fresh = Completer<Result<List<AdminSubmission>>>();
         repository.pendingList = stale;
         final oldRead = viewModel.refreshSubmissions();
         await pumpCommandTurns(tester);
         await tester.tap(find.text('EDIT_EDITOR_MARKER'));
         await pumpCommandTurns(tester);
         await tester.pumpWidget(const SizedBox.shrink());
-        repository.pendingList = fresh;
         stale.complete(const Result.success([]));
         await pumpCommandTurns(tester);
         await oldRead;
-        expect(repository.listCallCount, 3);
-        fresh.complete(
-          Result.success([sampleAdminSubmission(name: 'Fresh unmounted')]),
-        );
-        await pumpCommandTurns(tester);
-        expect(viewModel.items.single.name, 'Fresh unmounted');
+        expect(repository.listCallCount, 2);
+        expect(viewModel.items, isEmpty);
         expect(tester.takeException(), isNull);
       },
       disposeOwners: () {

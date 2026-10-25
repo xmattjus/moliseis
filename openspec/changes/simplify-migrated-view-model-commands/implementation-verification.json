@@ -1,0 +1,572 @@
+{
+  "scope": "Authorized local implementation only; no publication",
+  "repository": "xmattjus/moliseis",
+  "pullRequest": {
+    "url": "https://github.com/xmattjus/moliseis/pull/12",
+    "state": "open",
+    "draft": true,
+    "headBranch": "codex/migrate-legacy-commands",
+    "head": "c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1",
+    "baseBranch": "main",
+    "base": "ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+    "remoteReconfirmedAfterVerification": true
+  },
+  "local": {
+    "branch": "codex/plan-simplify-migrated-view-model-commands",
+    "head": "c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1",
+    "parent": "52d4e448d010d2d13c13a4d3d665cdf5b1b0103b",
+    "worktree": "moliseis-worktrees/simplify-migrated-view-model-commands",
+    "stagedChanges": 0,
+    "initialApprovedUntrackedArtifacts": 15
+  },
+  "changedSourceAndTestFiles": [
+    {
+      "path": "lib/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart",
+      "sha256": "82af28dfb0b65ea5db882b5ae7f76076fad000b6677635fc7bd19cafc6b16a20"
+    },
+    {
+      "path": "lib/ui/admin/submissions/view_models/admin_submissions_view_model.dart",
+      "sha256": "630ca0a6933e9d54d984fb6052095ab1419c3995669a71a385a364efa09fc2c7"
+    },
+    {
+      "path": "lib/ui/geo_map/view_models/geo_map_view_model.dart",
+      "sha256": "6a1dc0e61279615b2909aa7ae8a99effd4dab46c4ad4248d24410dd47b5a46e5"
+    },
+    {
+      "path": "lib/ui/search/view_models/search_view_model.dart",
+      "sha256": "59e2ff6365c8a7fa2d3f3f6733d155565cec0abc2cc7f42d7e5bc2d3da3b4ca9"
+    },
+    {
+      "path": "lib/ui/search/widgets/components/app_search_anchor.dart",
+      "sha256": "bc65e831bde19bc9a90cc36c78a818f22611c322ea2333f04e3d8d00bd9b0d3b"
+    },
+    {
+      "path": "test/ui/admin/submissions/view_models/admin_dashboard_command_lifecycle_test.dart",
+      "sha256": "c3223c0896ea66824b6128fcfa0a6b3428b579000fda60da22b8b70dd66fb7ce"
+    },
+    {
+      "path": "test/ui/admin/submissions/view_models/admin_editor_admission_matrix_test.dart",
+      "sha256": "b76e04716924f8434261fefb450a1106f46243b70975542066fcc201a53d63af"
+    },
+    {
+      "path": "test/ui/admin/submissions/view_models/admin_editor_phase_test.dart",
+      "sha256": "65485e3aca61ef4ed07792b25b26b7b1130476a3a8cb152ad0201b28ca36f016"
+    },
+    {
+      "path": "test/ui/admin/submissions/view_models/admin_submission_editor_commands_test.dart",
+      "sha256": "1b31771f08173dbab984d1f4c52e1838da5b7c7ae5b9e21aed91f204a18875c8"
+    },
+    {
+      "path": "test/ui/admin/submissions/view_models/admin_submission_editor_view_model_test.dart",
+      "sha256": "94f130a4a9f4eb394d854d51f6d95d7d26a5f2d2729ebd6fea1f63e238feda09"
+    },
+    {
+      "path": "test/ui/admin/submissions/widgets/admin_dashboard_screen_test.dart",
+      "sha256": "a9f09e7ea82ce5edbf2112db1b6696ffc1b1296e25876ddf192781143f68247c"
+    },
+    {
+      "path": "test/ui/geo_map/view_models/geo_map_markers_test.dart",
+      "sha256": "74291dae9f86c9997fee2e34af95fd14a70dc288ebb972f8aab0ee82df26c51f"
+    },
+    {
+      "path": "test/ui/search/view_models/search_history_characterization_test.dart",
+      "sha256": "58937f5d3e04e208359b930b1ad0a354798ca3f221dca784a5d7ab265bf65cd9"
+    },
+    {
+      "path": "test/ui/search/view_models/search_history_lifecycle_test.dart",
+      "sha256": "1bbf67ba769448d1fbb085f5b809bff800209562b603a3da3bdaee1ce8aa5a35"
+    },
+    {
+      "path": "test/ui/search/view_models/search_history_test.dart",
+      "sha256": "cc131c1d7830ba184a24147bd571bdf0562b4f2f3c0f8958a426f9d45393cfea"
+    },
+    {
+      "path": "test/ui/search/view_models/search_view_model_test.dart",
+      "sha256": "775b1db839c670799b395894594763aece21aa7205b0bbc03cb3a6c775a7be17"
+    },
+    {
+      "path": "test/ui/search/widgets/components/app_search_anchor_test.dart",
+      "sha256": "ec7fc3e052550217a5497415024c15045eaa9d65e6ed7386527c85f9948c82a6"
+    }
+  ],
+  "changedArtifactsInThisExecution": [
+    "openspec/changes/simplify-migrated-view-model-commands/autonomous-test-manifest.txt",
+    "openspec/changes/simplify-migrated-view-model-commands/implementation-verification.json",
+    "openspec/changes/simplify-migrated-view-model-commands/implementation-verification.md",
+    "openspec/changes/simplify-migrated-view-model-commands/metrics.json",
+    "openspec/changes/simplify-migrated-view-model-commands/metrics.md",
+    "openspec/changes/simplify-migrated-view-model-commands/tasks.md",
+    "openspec/changes/simplify-migrated-view-model-commands/validation.md"
+  ],
+  "sourceAndTestDiffSha256": "a6c15e5d2ab1e61db47023094bb7e59da13589f65c0428ed47501f924e133aaf",
+  "testRuns": [
+    {
+      "id": "A",
+      "timezone": "Europe/Rome",
+      "commandPrefix": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "--reporter",
+        "expanded"
+      ],
+      "passed": 264,
+      "failed": 0,
+      "skipped": 1,
+      "exit": 0,
+      "arguments": [
+        "test/ui/geo_map/view_models/geo_map_markers_test.dart",
+        "test/ui/geo_map/widgets/geo_map_screen_test.dart",
+        "test/routing/geo_map_route_test.dart",
+        "test/ui/admin/submissions/view_models/admin_submissions_view_model_test.dart",
+        "test/ui/admin/submissions/view_models/admin_dashboard_command_lifecycle_test.dart",
+        "test/ui/admin/submissions/widgets/admin_dashboard_screen_test.dart"
+      ]
+    },
+    {
+      "id": "B",
+      "timezone": "Europe/Rome",
+      "commandPrefix": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "--reporter",
+        "expanded"
+      ],
+      "passed": 117,
+      "failed": 0,
+      "skipped": 0,
+      "exit": 0,
+      "arguments": [
+        "test/ui/admin/submissions/view_models/admin_submissions_view_model_test.dart",
+        "test/ui/admin/submissions/view_models/admin_dashboard_command_lifecycle_test.dart",
+        "test/ui/admin/submissions/widgets/admin_dashboard_screen_test.dart"
+      ]
+    },
+    {
+      "id": "C",
+      "timezone": "Europe/Rome",
+      "commandPrefix": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "--reporter",
+        "expanded"
+      ],
+      "passed": 159,
+      "failed": 0,
+      "skipped": 0,
+      "exit": 0,
+      "arguments": [
+        "test/ui/search",
+        "test/data/repositories/search_repository_impl_test.dart"
+      ]
+    },
+    {
+      "id": "D",
+      "timezone": "Europe/Rome",
+      "commandPrefix": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "--reporter",
+        "expanded"
+      ],
+      "passed": 560,
+      "failed": 0,
+      "skipped": 0,
+      "exit": 0,
+      "arguments": [
+        "test/ui/admin/submissions/view_models/admin_submission_editor_commands_test.dart",
+        "test/ui/admin/submissions/view_models/admin_editor_admission_matrix_test.dart",
+        "test/ui/admin/submissions/view_models/admin_editor_phase_test.dart",
+        "test/ui/admin/submissions/view_models/admin_submission_editor_view_model_test.dart",
+        "test/ui/admin/submissions/widgets/admin_submission_editor_screen_test.dart",
+        "test/routing/admin_route_test.dart"
+      ]
+    },
+    {
+      "id": "crossFeature",
+      "timezone": "Europe/Rome",
+      "commandPrefix": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "--reporter",
+        "expanded"
+      ],
+      "passed": 968,
+      "failed": 0,
+      "skipped": 3,
+      "exit": 0,
+      "arguments": [
+        "test/ui/content_submission",
+        "test/ui/admin/auth",
+        "test/ui/event",
+        "test/ui/category",
+        "test/ui/ordinary_view_model_lifecycle_test.dart",
+        "test/utils/result_command_test.dart",
+        "test/utils/restartable_command_test.dart",
+        "test/utils/command_configuration_test.dart",
+        "test/utils/command_it_disposal_behavior_test.dart",
+        "test/routing/home_event_discovery_test.dart",
+        "test/routing/content_submission_route_test.dart",
+        "test/routing/content_submission_restoration_test.dart",
+        "test/routing/events_route_test.dart",
+        "test/data/repositories/content_submission_repository_impl_test.dart",
+        "test/data/repositories/content_submission_draft_repository_impl_test.dart",
+        "test/data/repositories/content_submission_staged_asset_repository_impl_test.dart",
+        "test/data/repositories/admin_content_submission_repository_impl_test.dart"
+      ]
+    },
+    {
+      "id": "autonomous",
+      "timezone": "Europe/Rome",
+      "commandPrefix": [
+        "flutter",
+        "test",
+        "--no-pub",
+        "--reporter",
+        "expanded"
+      ],
+      "passed": 3390,
+      "failed": 0,
+      "skipped": 4,
+      "exit": 0,
+      "manifest": "openspec/changes/simplify-migrated-view-model-commands/autonomous-test-manifest.txt",
+      "manifestSha256": "c0be3cce82129b302bf6d491286a82217336a88b1071cd29eb0185528e8647d0",
+      "testFiles": 160
+    }
+  ],
+  "analyzers": [
+    {
+      "command": [
+        "dart",
+        "analyze",
+        "--format",
+        "machine"
+      ],
+      "exit": 0,
+      "lines": 0
+    },
+    {
+      "command": [
+        "flutter",
+        "analyze",
+        "--no-pub"
+      ],
+      "exit": 0,
+      "lines": 2
+    }
+  ],
+  "negativeControls": {
+    "searchSubscription": {
+      "expectedExit": 1,
+      "failedUnchangedPopupCases": 2,
+      "sourceRestored": true,
+      "followedByFullGreenSuite": true
+    },
+    "editorReleaseGuard": {
+      "expectedExit": 1,
+      "failure": "upstream duplicate Command.dispose assertion",
+      "sourceRestored": true,
+      "restoredScenarioPassed": 1,
+      "restoredScenarioExit": 0
+    }
+  },
+  "openSpec": {
+    "directStrictValidation": {
+      "command": [
+        "openspec",
+        "validate",
+        "simplify-migrated-view-model-commands",
+        "--type",
+        "change",
+        "--strict",
+        "--no-interactive"
+      ],
+      "exit": 0,
+      "stdout": "Change 'simplify-migrated-view-model-commands' is valid\n",
+      "stderr": "\u2139 [INFO] command-execution-concurrency/spec.md: Archive would refuse this delta: command-execution-concurrency RENAMED failed for header \"### Requirement: Search history deduplication respects repository identity and knowledge\" - source not found\n"
+    },
+    "isolatedComposition": {
+      "tool": "Installed OpenSpec buildUpdatedSpec and parseDeltaSpec; no archive/sync command",
+      "version": "1.14.3",
+      "applicationOrder": "RENAMED -> REMOVED -> MODIFIED -> ADDED; MODIFIED uses TO header",
+      "implementationSha256": "54eb0e80c13e569ca2bfe84ed5ff937545d925e629b372533129923827d4c3ff",
+      "parserSha256": "8b1e4fae7b079f7a58c7c8115da326131f3adff7f14c4af9be8c06e65dfa2ee4",
+      "order": [
+        "migrate-simple-view-model-commands",
+        "migrate-category-view-model-commands",
+        "migrate-content-view-model-commands",
+        "migrate-search-map-commands",
+        "migrate-content-submission-commands",
+        "migrate-admin-session-commands",
+        "migrate-admin-editor-commands",
+        "simplify-migrated-view-model-commands"
+      ],
+      "priorDeltas": 13,
+      "priorWarnings": [],
+      "strictChangeValidation": {
+        "exit": 0,
+        "output": "Change 'simplify-migrated-view-model-commands' is valid",
+        "stderr": ""
+      },
+      "replacements": 13,
+      "renameLedger": [
+        {
+          "from": "Search history deduplication respects repository identity and knowledge",
+          "to": "Search history mutations use repository identity rules"
+        },
+        {
+          "from": "Search history rollback rebases later accepted intentions",
+          "to": "Search history presentation retains confirmed data"
+        },
+        {
+          "from": "History read authority changes at mutation acceptance",
+          "to": "History reads remain independent of accepted writes"
+        },
+        {
+          "from": "Runtime write failure requests bounded history reconciliation",
+          "to": "Runtime history write failures allow explicit read-only recovery"
+        },
+        {
+          "from": "History read demands distinguish stale errors from retry loops",
+          "to": "History read failures terminate without automatic retry"
+        },
+        {
+          "from": "Explicit history refresh registers independent read demand",
+          "to": "Explicit history refresh uses ordinary single-flight admission"
+        },
+        {
+          "from": "Editor changes retain an owner-local refresh obligation",
+          "to": "Editor return requests best-effort dashboard refresh"
+        }
+      ],
+      "counts": {
+        "added": 0,
+        "modified": 13,
+        "removed": 0,
+        "renamed": 7
+      },
+      "warnings": [],
+      "targetCapability": {
+        "name": "command-execution-concurrency",
+        "before": {
+          "capabilities": 1,
+          "requirements": 59,
+          "scenarios": 287
+        },
+        "after": {
+          "capabilities": 1,
+          "requirements": 59,
+          "scenarios": 290
+        }
+      },
+      "allCapabilities": {
+        "before": {
+          "capabilities": 17,
+          "requirements": 240,
+          "scenarios": 972
+        },
+        "after": {
+          "capabilities": 17,
+          "requirements": 240,
+          "scenarios": 975
+        }
+      },
+      "targetedOriginalNames": [
+        "Only authoritative completion can commit asynchronous data",
+        "Search history preserves accepted mutation order",
+        "Accepted history persistence survives presentation disposal",
+        "Search history deduplication respects repository identity and knowledge",
+        "Search history rollback rebases later accepted intentions",
+        "History read authority changes at mutation acceptance",
+        "Runtime write failure requests bounded history reconciliation",
+        "History read demands distinguish stale errors from retry loops",
+        "Explicit history refresh registers independent read demand",
+        "Editor changes retain an owner-local refresh obligation",
+        "Dashboard entry and refresh consumers retain behavior",
+        "Admin editor results preserve failure kind and original reporting",
+        "Admin editor revocation preserves private physical settlement"
+      ],
+      "finalTargetNames": [
+        "Only authoritative completion can commit asynchronous data",
+        "Search history preserves accepted mutation order",
+        "Accepted history persistence survives presentation disposal",
+        "Search history mutations use repository identity rules",
+        "Search history presentation retains confirmed data",
+        "History reads remain independent of accepted writes",
+        "Runtime history write failures allow explicit read-only recovery",
+        "History read failures terminate without automatic retry",
+        "Explicit history refresh uses ordinary single-flight admission",
+        "Editor return requests best-effort dashboard refresh",
+        "Dashboard entry and refresh consumers retain behavior",
+        "Admin editor results preserve failure kind and original reporting",
+        "Admin editor revocation preserves private physical settlement"
+      ],
+      "addedScenarios": [
+        {
+          "requirement": "Search history presentation retains confirmed data",
+          "scenario": "Open popup updates from a confirmed read"
+        },
+        {
+          "requirement": "Search history presentation retains confirmed data",
+          "scenario": "Popup history observation changes owner or ends"
+        },
+        {
+          "requirement": "Admin editor revocation preserves private physical settlement",
+          "scenario": "Overlapping cleanup of a never-started command"
+        }
+      ],
+      "checks": {
+        "allOriginalTargetsPresent": true,
+        "allPreviousRequirementsAvailable": true,
+        "originalScenariosPreserved": true,
+        "allModifiedBodiesApplied": true,
+        "obsoleteRenameHeadersAbsent": true,
+        "duplicateOrOrphanRequirements": 0,
+        "duplicateScopedScenarios": 0,
+        "unrelatedCapabilitiesUnchanged": true
+      }
+    }
+  },
+  "preservation": {
+    "otherWorktrees": [
+      {
+        "branch": "refs/heads/main",
+        "head": "ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1064,
+        "existingCRLFInputNormalizationFiles": [
+          "lib/ui/core/ui/custom_rich_text.dart"
+        ]
+      },
+      {
+        "branch": "detached",
+        "head": "ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1064,
+        "existingCRLFInputNormalizationFiles": []
+      },
+      {
+        "branch": "refs/heads/codex/pr12-final-reconciliation",
+        "head": "c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1139,
+        "existingCRLFInputNormalizationFiles": []
+      },
+      {
+        "branch": "refs/heads/codex/plan-migrate-admin-editor-commands",
+        "head": "52d4e448d010d2d13c13a4d3d665cdf5b1b0103b",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1139,
+        "existingCRLFInputNormalizationFiles": []
+      },
+      {
+        "branch": "refs/heads/codex/plan-migrate-admin-session-commands",
+        "head": "0cdb764a7586f85180a802fafcf2b485791cb5ff",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1122,
+        "existingCRLFInputNormalizationFiles": []
+      },
+      {
+        "branch": "refs/heads/codex/plan-migrate-category-view-model-commands",
+        "head": "e3d9d891c5b560524e66b35f0bf70f9108cacb7e",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1083,
+        "existingCRLFInputNormalizationFiles": []
+      },
+      {
+        "branch": "refs/heads/codex/plan-migrate-content-submission-commands",
+        "head": "e80dfbaf472ef1cc15b220a48df966509a9ee8a1",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1112,
+        "existingCRLFInputNormalizationFiles": []
+      },
+      {
+        "branch": "refs/heads/codex/plan-migrate-content-view-model-commands",
+        "head": "1f3753b10c18061c6655cb32d078bf93aff1b05e",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1091,
+        "existingCRLFInputNormalizationFiles": []
+      },
+      {
+        "branch": "refs/heads/codex/plan-migrate-search-map-commands",
+        "head": "f48a08946c9ac40146104a0157556243ad433c92",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1103,
+        "existingCRLFInputNormalizationFiles": []
+      },
+      {
+        "branch": "refs/heads/migrate-simple-view-model-commands",
+        "head": "9d17d224d5094c5b043128113d9aba6a1ce69f0a",
+        "headAndBranchUnchanged": true,
+        "indexBytesUnchanged": true,
+        "statusUnchanged": "clean; no untracked files",
+        "trackedFilesCheckedAgainstCapturedCleanHead": 1073,
+        "existingCRLFInputNormalizationFiles": []
+      }
+    ],
+    "worktreesTotal": 11,
+    "otherWorktreesPreserved": 10,
+    "historicalArtifactsVerified": 50,
+    "historicalHashMismatches": 0,
+    "note": "No other worktree was written. HEAD/branch/status and exact index bytes match preflight. Tracked contents match captured clean HEADs; existing CRLF text is compared using configured core.autocrlf=input, not mistaken for a current edit."
+  },
+  "historicalTranscriptSha256": "8fdc1c63c19353383b0d2c17505f951261dbd5b21283cb11e448853da75a80fa",
+  "metricsReference": "metrics.json/post_implementation",
+  "independentReview": {
+    "role": "configured reviewer",
+    "disposition": "No material finding survived adversarial verification",
+    "readOnly": true,
+    "testsRerunByReviewer": false,
+    "equivalentExecutionEngineRecreated": false,
+    "remainingFindings": []
+  },
+  "integrationsNotRun": [
+    {
+      "path": "test/integration/all_day_pipeline_test.dart",
+      "reason": "Docker daemon unavailable; docker info exit 1"
+    },
+    {
+      "path": "test/integration/external_event_token_pipeline_test.dart",
+      "reason": "Docker daemon unavailable; docker info exit 1"
+    }
+  ],
+  "artifactInspectionPending": false,
+  "publicationActions": [],
+  "tasksComplete": 9,
+  "documentationChecks": {
+    "jsonSyntax": "passed",
+    "yamlSchema": "spec-driven; parsed with installed YAML parser",
+    "javascriptSyntax": "node --check passed",
+    "markdownFencesTablesAndReferences": "passed",
+    "englishProseReview": "passed; exact Italian UI identifiers retained",
+    "machineSpecificPathMatches": 0,
+    "trailingWhitespace": "none",
+    "finalNewlines": "present",
+    "sourceHashesAndManifest": "verified",
+    "historicalBaselineMetrics": "preserved",
+    "touchedDartFormat": "17 files; zero changes; exit 0",
+    "gitDiffCheck": "exit 0"
+  }
+}

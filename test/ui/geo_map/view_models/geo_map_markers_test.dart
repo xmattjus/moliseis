@@ -123,7 +123,7 @@ void main() {
     });
   }
 
-  testOwnerUI('G4 A-B-A different tickets ignore out-of-order outcomes', (
+  testOwnerUI('G4 A-B-A different requests ignore out-of-order outcomes', (
     tester,
   ) async {
     final h = GeoMapMarkerHarness();

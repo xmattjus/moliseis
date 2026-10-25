@@ -39,7 +39,7 @@ typedef GeoMapSelectionSnapshot =
 
 /// An immutable filter selection with a unique admission identity.
 class GeoMapMarkerRequest {
-  /// Copies caller-owned sets; later selections receive independent tickets.
+  /// Copies caller-owned sets; later selections receive independent identities.
   GeoMapMarkerRequest({
     required Set<ContentCategory> categories,
     required Set<ContentType> types,
@@ -51,9 +51,6 @@ class GeoMapMarkerRequest {
 
   /// Content sources admitted for this retrieval.
   final Set<ContentType> types;
-
-  /// Identity is independent of filter equality, including A → B → A.
-  final Object ticket = Object();
 
   /// Empty programmatic selection settles without repository work.
   bool get isEmpty => categories.isEmpty || types.isEmpty;
@@ -152,9 +149,8 @@ class GeoMapViewModel extends ChangeNotifier {
   GeoMapNearbyTerminal? _nearbyTerminal;
   late GeoMapMarkerRequest _markerRequest;
   GeoMapMarkerTerminal? _markerTerminal;
-  GeoMapMarkerStatus _markerStatus = GeoMapMarkerStatus.loading;
 
-  /// Current immutable admission, including its unique ticket.
+  /// Current immutable admission, including its unique request identity.
   GeoMapMarkerRequest get markerRequest => _markerRequest;
 
   /// Terminal evidence is cleared synchronously whenever filters change.
@@ -164,7 +160,18 @@ class GeoMapViewModel extends ChangeNotifier {
   GeoMapMarkerOutcome? get markerOutcome => _markerTerminal?.data?.getOrNull();
 
   /// Current loading, empty, data or failure projection.
-  GeoMapMarkerStatus get markerStatus => _markerStatus;
+  GeoMapMarkerStatus get markerStatus {
+    final terminal = _markerTerminal;
+    if (terminal == null) return GeoMapMarkerStatus.loading;
+    final outcome = terminal.data?.getOrNull();
+    if (terminal.hasFailure || outcome?.firstError != null) {
+      return GeoMapMarkerStatus.failure;
+    }
+    return (outcome?.events.isEmpty ?? true) &&
+            (outcome?.places.isEmpty ?? true)
+        ? GeoMapMarkerStatus.successEmpty
+        : GeoMapMarkerStatus.successData;
+  }
 
   GeoMapMode get mode => _mode;
   ContentBase? get resolvedContent => _resolvedContent;
@@ -233,7 +240,7 @@ class GeoMapViewModel extends ChangeNotifier {
   /// Retries current filters; busy and empty selections perform no extra work.
   void retryMarkers() {
     if (_disposed ||
-        _markerStatus == GeoMapMarkerStatus.loading ||
+        markerStatus == GeoMapMarkerStatus.loading ||
         _markerRequest.isEmpty) {
       return;
     }
@@ -249,7 +256,6 @@ class GeoMapViewModel extends ChangeNotifier {
     _allEvents = [];
     _allPlaces = [];
     _markerTerminal = null;
-    _markerStatus = GeoMapMarkerStatus.loading;
     if (request.isEmpty) {
       loadMarkers.invalidate();
       if (_disposed || !identical(_markerRequest, request)) return;
@@ -260,7 +266,6 @@ class GeoMapViewModel extends ChangeNotifier {
         null,
         false,
       );
-      _markerStatus = GeoMapMarkerStatus.successEmpty;
     } else {
       loadMarkers.run(request);
     }
@@ -308,7 +313,6 @@ class GeoMapViewModel extends ChangeNotifier {
     if (_disposed || loadMarkers.isRunningSync.value) return;
     final snapshot = loadMarkers.results.value;
     if (!identical(snapshot.paramData, _markerRequest) ||
-        !identical(snapshot.paramData?.ticket, _markerRequest.ticket) ||
         !(snapshot.completed || snapshot.hasFailure)) {
       return;
     }
@@ -316,11 +320,6 @@ class GeoMapViewModel extends ChangeNotifier {
     _allEvents = List.of(outcome?.events ?? const []);
     _allPlaces = List.of(outcome?.places ?? const []);
     _markerTerminal = snapshot;
-    _markerStatus = snapshot.hasFailure || outcome?.firstError != null
-        ? GeoMapMarkerStatus.failure
-        : _allEvents.isEmpty && _allPlaces.isEmpty
-        ? GeoMapMarkerStatus.successEmpty
-        : GeoMapMarkerStatus.successData;
     notifyListeners();
   }
 

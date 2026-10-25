@@ -21,38 +21,8 @@ import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
 
-/// A reusable physical command lane with one independently owned attempt.
-final class _EditorLane<T> {
-  late final ResultCommand<void, T> command;
-  commands.CommandResult<void, Result<T>?> snapshot =
-      const commands.CommandResult(null, null, null, false);
-  _EditorExecution<T>? current;
-  int? executionId;
-  VoidCallback? removePublic;
-  VoidCallback? removePrivate;
-  bool released = false;
-  int settlements = 0;
-}
-
-/// Immutable admitted work and its private physical settlement witnesses.
-final class _EditorExecution<T> {
-  _EditorExecution(
-    this.id,
-    this.action, {
-    required this.candidateRevision,
-    required this.contextRevision,
-  });
-  final int id;
-  final int candidateRevision;
-  final int contextRevision;
-  final Future<Result<T>> Function(_EditorExecution<T>) action;
-  bool publish = true;
-  bool started = false;
-  bool actionSettled = false;
-  bool settled = false;
-  bool queued = false;
-  int revision = 0;
-}
+/// Immutable action input captured by one admitted editor operation.
+typedef _EditorAction<T> = Future<Result<T>> Function();
 
 typedef _SaveDraft = ({
   AdminSubmissionInput? input,
@@ -87,17 +57,41 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
        _imagePicker = imagePicker ?? ImagePicker(),
        _contributorName = creatorName,
        _contributorEmail = creatorEmail {
-    _load = _createLane<void>('load');
-    _saveLane = _createLane<void>('save');
-    _rejectLane = _createLane<void>('reject');
-    _promoteLane = _createLane<AdminSubmissionPromotion>('promote');
-    _linkLane = _createLane<AdminEventResolution>('link');
-    _previewLane = _createLane<void>('preview');
-    _candidatesLane = _createLane<void>('find_candidates');
-    _applyLane = _createLane<AdminEventResolution>('apply');
-    _keepLane = _createLane<void>('keep_current');
-    _addLane = _createLane<void>('add_asset');
-    _deleteLane = _createLane<void>('delete_asset');
+    _loadCommand = _createCommand<void>('load', (snapshot) {
+      if (_loadSnapshot.isRunning) _loadSnapshot = snapshot;
+    });
+    _saveCommand = _createCommand<void>('save', (snapshot) {
+      if (_saveSnapshot.isRunning) _saveSnapshot = snapshot;
+    });
+    _rejectCommand = _createCommand<void>('reject', (snapshot) {
+      if (_rejectSnapshot.isRunning) _rejectSnapshot = snapshot;
+    });
+    _promoteCommand = _createCommand<AdminSubmissionPromotion>('promote', (
+      snapshot,
+    ) {
+      if (_promoteSnapshot.isRunning) _promoteSnapshot = snapshot;
+    });
+    _linkCommand = _createCommand<AdminEventResolution>('link', (snapshot) {
+      if (_linkSnapshot.isRunning) _linkSnapshot = snapshot;
+    });
+    _previewCommand = _createCommand<void>('preview', (snapshot) {
+      if (_previewSnapshot.isRunning) _previewSnapshot = snapshot;
+    });
+    _candidatesCommand = _createCommand<void>('find_candidates', (snapshot) {
+      if (_candidatesSnapshot.isRunning) _candidatesSnapshot = snapshot;
+    });
+    _applyCommand = _createCommand<AdminEventResolution>('apply', (snapshot) {
+      if (_applySnapshot.isRunning) _applySnapshot = snapshot;
+    });
+    _keepCommand = _createCommand<void>('keep_current', (snapshot) {
+      if (_keepSnapshot.isRunning) _keepSnapshot = snapshot;
+    });
+    _addCommand = _createCommand<void>('add_asset', (snapshot) {
+      if (_addSnapshot.isRunning) _addSnapshot = snapshot;
+    });
+    _deleteCommand = _createCommand<void>('delete_asset', (snapshot) {
+      if (_deleteSnapshot.isRunning) _deleteSnapshot = snapshot;
+    });
   }
 
   final AdminContentSubmissionRepository _repository;
@@ -129,18 +123,68 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   var _isDirty = false;
   var _disposed = false;
 
-  late final _EditorLane<void> _load;
-  late final _EditorLane<void> _saveLane;
-  late final _EditorLane<void> _rejectLane;
-  late final _EditorLane<AdminSubmissionPromotion> _promoteLane;
-  late final _EditorLane<AdminEventResolution> _linkLane;
-  late final _EditorLane<void> _previewLane;
-  late final _EditorLane<void> _candidatesLane;
-  late final _EditorLane<AdminEventResolution> _applyLane;
-  late final _EditorLane<void> _keepLane;
-  late final _EditorLane<void> _addLane;
-  late final _EditorLane<void> _deleteLane;
-  int _nextExecution = 0;
+  late final ResultCommand<_EditorAction<void>, void> _loadCommand;
+  commands.CommandResult<void, Result<void>?> _loadSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _loadEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _saveCommand;
+  commands.CommandResult<void, Result<void>?> _saveSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _saveEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _rejectCommand;
+  commands.CommandResult<void, Result<void>?> _rejectSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _rejectEffectId;
+  late final ResultCommand<
+    _EditorAction<AdminSubmissionPromotion>,
+    AdminSubmissionPromotion
+  >
+  _promoteCommand;
+  commands.CommandResult<void, Result<AdminSubmissionPromotion>?>
+  _promoteSnapshot = const commands.CommandResult(null, null, null, false);
+  int? _promoteEffectId;
+  late final ResultCommand<
+    _EditorAction<AdminEventResolution>,
+    AdminEventResolution
+  >
+  _linkCommand;
+  commands.CommandResult<void, Result<AdminEventResolution>?> _linkSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _linkEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _previewCommand;
+  commands.CommandResult<void, Result<void>?> _previewSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _previewEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _candidatesCommand;
+  commands.CommandResult<void, Result<void>?> _candidatesSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _candidatesEffectId;
+  late final ResultCommand<
+    _EditorAction<AdminEventResolution>,
+    AdminEventResolution
+  >
+  _applyCommand;
+  commands.CommandResult<void, Result<AdminEventResolution>?> _applySnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _applyEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _keepCommand;
+  commands.CommandResult<void, Result<void>?> _keepSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _keepEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _addCommand;
+  commands.CommandResult<void, Result<void>?> _addSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _addEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _deleteCommand;
+  commands.CommandResult<void, Result<void>?> _deleteSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _deleteEffectId;
+  int _nextEffectId = 0;
+  bool _stopped = false;
+  final _reserved = Set<commands.Command<dynamic, dynamic>>.identity();
+  final _released = Set<commands.Command<dynamic, dynamic>>.identity();
+  final _completionObservers =
+      Map<commands.Command<dynamic, dynamic>, VoidCallback>.identity();
   int _draftRevision = 0;
   int _editorRevision = 0;
   int? _savedExecutionId;
@@ -158,27 +202,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Current editor context for correlating dialog confirmations.
   int get editorRevision => _editorRevision;
 
-  /// Physical identity is separate from execution IDs; no Command is exposed.
-  @visibleForTesting
-  List<int> get debugCommandIdentities =>
-      List.unmodifiable(_lanes.map((lane) => identityHashCode(lane.command)));
-
-  /// Safe receipt releases, in load/mutations/preview/candidates lane order.
-  @visibleForTesting
-  List<int> get debugSettlementCounts =>
-      List.unmodifiable(_lanes.map((lane) => lane.settlements));
-
-  /// Physical release counts, separate from safe receipt settlement.
-  @visibleForTesting
-  List<int> get debugCommandDisposalCounts =>
-      List.unmodifiable(_lanes.map((lane) => lane.released ? 1 : 0));
-
-  /// Stable private observer pairs remain across live retries.
-  @visibleForTesting
-  List<int> get debugPrivateObserverCounts => List.unmodifiable(
-    _lanes.map((lane) => lane.removePrivate == null ? 0 : 2),
-  );
-
   /// Whether this owner has revoked admission and publication authority.
   bool get isDisposed => _disposed;
 
@@ -186,10 +209,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool get canCloseAfterSave =>
       !_disposed &&
       !_isDirty &&
-      _savedExecutionId == _saveLane.executionId &&
+      _savedExecutionId == _saveEffectId &&
       _savedExecutionId != null &&
       _savedDraftRevision == _draftRevision &&
-      _saveLane.snapshot.completed;
+      _saveSnapshot.completed;
 
   bool _acknowledgeCurrentSource = false;
   String? _acknowledgedSourceHash;
@@ -338,51 +361,53 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool get hasLoadedDetail => _hasLoadedDetail;
 
   /// Whether a detail request is in progress.
-  bool get loading => _load.current != null;
+  bool get loading => _reserved.contains(_loadCommand);
 
   /// Whether edits have not yet been saved.
   bool get isDirty => _isDirty;
 
   /// Whether an asset add or delete operation is in progress.
   bool get assetMutationRunning =>
-      _addLane.current != null || _deleteLane.current != null;
+      _reserved.contains(_addCommand) || _reserved.contains(_deleteCommand);
 
   /// Whether an admitted operation can mutate the editor or its submission.
-  bool get operationRunning => _mutations.any((lane) => lane.current != null);
+  bool get operationRunning => _mutations.any(_reserved.contains);
 
-  List<_EditorLane<dynamic>> get _mutations => [
-    _saveLane,
-    _rejectLane,
-    _promoteLane,
-    _linkLane,
-    _applyLane,
-    _keepLane,
-    _addLane,
-    _deleteLane,
+  List<commands.Command<dynamic, dynamic>> get _mutations => [
+    _saveCommand,
+    _rejectCommand,
+    _promoteCommand,
+    _linkCommand,
+    _applyCommand,
+    _keepCommand,
+    _addCommand,
+    _deleteCommand,
   ];
-  List<_EditorLane<dynamic>> get _lanes => [
-    _load,
+  List<commands.Command<dynamic, dynamic>> get _commands => [
+    _loadCommand,
     ..._mutations,
-    _previewLane,
-    _candidatesLane,
+    _previewCommand,
+    _candidatesCommand,
   ];
 
   bool get _canChangeContext => !_disposed && !loading && !operationRunning;
   bool get _canChangeFields =>
       !_disposed &&
       !loading &&
-      (!operationRunning || _saveLane.current != null);
+      (!operationRunning || _reserved.contains(_saveCommand));
 
-  bool _canAdmit(_EditorLane<dynamic> lane) {
-    if (_disposed || lane.current != null || loading) return false;
-    if (identical(lane, _load)) {
-      return !(_hasLoadedDetail && _isDirty) &&
-          _lanes.every((value) => value.current == null);
+  bool _canAdmit(commands.Command<dynamic, dynamic> command) {
+    if (_disposed || _stopped || _reserved.contains(command) || loading) {
+      return false;
     }
-    if (identical(lane, _candidatesLane)) return true;
-    if (identical(lane, _previewLane)) return !operationRunning;
+    if (identical(command, _loadCommand)) {
+      return !(_hasLoadedDetail && _isDirty) && _reserved.isEmpty;
+    }
+    if (identical(command, _candidatesCommand)) return true;
+    if (identical(command, _previewCommand)) return !operationRunning;
     return !operationRunning &&
-        (!identical(lane, _keepLane) || _previewLane.current == null);
+        (!identical(command, _keepCommand) ||
+            !_reserved.contains(_previewCommand));
   }
 
   /// Updates the selected category and marks the editor dirty.
@@ -524,123 +549,129 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Last authorized load state, frozen when the owner is revoked.
-  commands.CommandResult<void, Result<void>?> get loadSnapshot =>
-      _load.snapshot;
+  commands.CommandResult<void, Result<void>?> get loadSnapshot => _loadSnapshot;
 
   /// Identity of the last admitted load execution.
-  int? get loadExecutionId => _load.executionId;
+  int? get loadExecutionId => _loadEffectId;
 
-  /// Whether load can synchronously reserve its lane.
-  bool get canRequestLoad => _canAdmit(_load);
+  /// Whether load can synchronously reserve its operation.
+  bool get canRequestLoad => _canAdmit(_loadCommand);
 
   /// Last authorized save state, frozen when the owner is revoked.
-  commands.CommandResult<void, Result<void>?> get saveSnapshot =>
-      _saveLane.snapshot;
+  commands.CommandResult<void, Result<void>?> get saveSnapshot => _saveSnapshot;
 
   /// Identity of the last admitted save execution.
-  int? get saveExecutionId => _saveLane.executionId;
+  int? get saveExecutionId => _saveEffectId;
 
-  /// Whether save can synchronously reserve its lane.
-  bool get canRequestSave => _canAdmit(_saveLane);
+  /// Whether save can synchronously reserve its operation.
+  bool get canRequestSave => _canAdmit(_saveCommand);
 
   /// Last authorized reject state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<void>?> get rejectSnapshot =>
-      _rejectLane.snapshot;
+      _rejectSnapshot;
 
   /// Identity of the last admitted reject execution.
-  int? get rejectExecutionId => _rejectLane.executionId;
+  int? get rejectExecutionId => _rejectEffectId;
 
-  /// Whether reject can synchronously reserve its lane.
-  bool get canRequestReject => _canAdmit(_rejectLane);
+  /// Whether reject can synchronously reserve its operation.
+  bool get canRequestReject => _canAdmit(_rejectCommand);
 
   /// Last authorized promote state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<AdminSubmissionPromotion>?>
-  get promoteSnapshot => _promoteLane.snapshot;
+  get promoteSnapshot => _promoteSnapshot;
 
   /// Identity of the last admitted promote execution.
-  int? get promoteExecutionId => _promoteLane.executionId;
+  int? get promoteExecutionId => _promoteEffectId;
 
-  /// Whether promote can synchronously reserve its lane.
-  bool get canRequestPromote => _canAdmit(_promoteLane);
+  /// Whether promote can synchronously reserve its operation.
+  bool get canRequestPromote => _canAdmit(_promoteCommand);
 
   /// Last authorized link state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<AdminEventResolution>?>
-  get linkSnapshot => _linkLane.snapshot;
+  get linkSnapshot => _linkSnapshot;
 
   /// Identity of the last admitted link execution.
-  int? get linkExecutionId => _linkLane.executionId;
+  int? get linkExecutionId => _linkEffectId;
 
-  /// Whether link can synchronously reserve its lane.
-  bool get canRequestLink => _canAdmit(_linkLane);
+  /// Whether link can synchronously reserve its operation.
+  bool get canRequestLink => _canAdmit(_linkCommand);
 
   /// Last authorized preview state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<void>?> get previewSnapshot =>
-      _previewLane.snapshot;
+      _previewSnapshot;
 
   /// Identity of the last admitted preview execution.
-  int? get previewExecutionId => _previewLane.executionId;
+  int? get previewExecutionId => _previewEffectId;
 
-  /// Whether preview can synchronously reserve its lane.
-  bool get canRequestPreview => _canAdmit(_previewLane);
+  /// Whether preview can synchronously reserve its operation.
+  bool get canRequestPreview => _canAdmit(_previewCommand);
 
   /// Last authorized findCandidates state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<void>?> get findCandidatesSnapshot =>
-      _candidatesLane.snapshot;
+      _candidatesSnapshot;
 
   /// Identity of the last admitted findCandidates execution.
-  int? get findCandidatesExecutionId => _candidatesLane.executionId;
+  int? get findCandidatesExecutionId => _candidatesEffectId;
 
-  /// Whether findCandidates can synchronously reserve its lane.
-  bool get canRequestFindCandidates => _canAdmit(_candidatesLane);
+  /// Whether findCandidates can synchronously reserve its operation.
+  bool get canRequestFindCandidates => _canAdmit(_candidatesCommand);
 
   /// Last authorized apply state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<AdminEventResolution>?>
-  get applySnapshot => _applyLane.snapshot;
+  get applySnapshot => _applySnapshot;
 
   /// Identity of the last admitted apply execution.
-  int? get applyExecutionId => _applyLane.executionId;
+  int? get applyExecutionId => _applyEffectId;
 
-  /// Whether apply can synchronously reserve its lane.
-  bool get canRequestApply => _canAdmit(_applyLane);
+  /// Whether apply can synchronously reserve its operation.
+  bool get canRequestApply => _canAdmit(_applyCommand);
 
   /// Last authorized keepCurrent state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<void>?> get keepCurrentSnapshot =>
-      _keepLane.snapshot;
+      _keepSnapshot;
 
   /// Identity of the last admitted keepCurrent execution.
-  int? get keepCurrentExecutionId => _keepLane.executionId;
+  int? get keepCurrentExecutionId => _keepEffectId;
 
-  /// Whether keepCurrent can synchronously reserve its lane.
-  bool get canRequestKeepCurrent => _canAdmit(_keepLane);
+  /// Whether keepCurrent can synchronously reserve its operation.
+  bool get canRequestKeepCurrent => _canAdmit(_keepCommand);
 
   /// Last authorized addAsset state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<void>?> get addAssetSnapshot =>
-      _addLane.snapshot;
+      _addSnapshot;
 
   /// Identity of the last admitted addAsset execution.
-  int? get addAssetExecutionId => _addLane.executionId;
+  int? get addAssetExecutionId => _addEffectId;
 
-  /// Whether addAsset can synchronously reserve its lane.
-  bool get canRequestAddAsset => _canAdmit(_addLane);
+  /// Whether addAsset can synchronously reserve its operation.
+  bool get canRequestAddAsset => _canAdmit(_addCommand);
 
   /// Last authorized deleteAsset state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<void>?> get deleteAssetSnapshot =>
-      _deleteLane.snapshot;
+      _deleteSnapshot;
 
   /// Identity of the last admitted deleteAsset execution.
-  int? get deleteAssetExecutionId => _deleteLane.executionId;
+  int? get deleteAssetExecutionId => _deleteEffectId;
 
-  /// Whether deleteAsset can synchronously reserve its lane.
-  bool get canRequestDeleteAsset => _canAdmit(_deleteLane);
+  /// Whether deleteAsset can synchronously reserve its operation.
+  bool get canRequestDeleteAsset => _canAdmit(_deleteCommand);
 
   /// Reserves an exclusive initial or explicit detail refresh.
-  bool requestLoad() => _admit(_load, _loadDetail);
+  bool requestLoad() {
+    if (!canRequestLoad) return false;
+    _loadEffectId = ++_nextEffectId;
+    _loadSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_loadCommand, _loadDetail);
+  }
 
   /// Captures the complete current draft before notifying or deferred entry.
   bool requestSave() {
     if (!canRequestSave) return false;
     final draft = _captureSave();
-    return _admit(_saveLane, (execution) => _save(execution, draft));
+    final effectId = _nextEffectId + 1;
+    _saveEffectId = ++_nextEffectId;
+    _saveSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_saveCommand, () => _save(draft, saveEffectId: effectId));
   }
 
   /// Reserves rejection with immutable source acknowledgment.
@@ -648,10 +679,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (!canRequestReject) return false;
     final guard = _moderationGuardError();
     final source = _sourceAcknowledgment;
-    return _admit(
-      _rejectLane,
-      (execution) => _reject(execution, guard, source),
-    );
+    _rejectEffectId = ++_nextEffectId;
+    _rejectSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_rejectCommand, () => _reject(guard, source));
   }
 
   /// Reserves publication to the explicitly selected target.
@@ -675,12 +705,14 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       }
     }
     final source = _sourceAcknowledgment;
-    return _admit(_promoteLane, (execution) {
-      if (_live(execution) && issue != null) {
+    _promoteEffectId = ++_nextEffectId;
+    _promoteSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_promoteCommand, () {
+      if (!_disposed && issue != null) {
         _eventTimeIssue = issue;
         _notifyListeners();
       }
-      return _promote(execution, target, guard, source);
+      return _promote(target, guard, source);
     });
   }
 
@@ -693,10 +725,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
             ? Exception('Imposta una data di inizio per collegare un evento.')
             : null);
     final source = _sourceAcknowledgment;
-    return _admit(
-      _linkLane,
-      (execution) => _link(execution, target, guard, source),
-    );
+    _linkEffectId = ++_nextEffectId;
+    _linkSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_linkCommand, () => _link(target, guard, source));
   }
 
   /// Captures current target and generation for an explicit preview.
@@ -705,10 +736,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     final target = _targetEventId;
     final generation = _previewGeneration;
     final eligible = submissionId != null && target != null && !_isDirty;
+    _previewEffectId = ++_nextEffectId;
+    _previewSnapshot = const commands.CommandResult.isLoading();
     return _admit(
-      _previewLane,
-      (execution) =>
-          _preview(execution, target, generation, eligible: eligible),
+      _previewCommand,
+      () => _preview(target, generation, eligible: eligible),
     );
   }
 
@@ -716,10 +748,14 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool requestFindCandidates() {
     if (!canRequestFindCandidates) return false;
     final search = _candidateSearch.trim();
+    final revision = _candidateRevision;
+    final context = _editorRevision;
     final eligible = submissionId != null && startDate != null;
+    _candidatesEffectId = ++_nextEffectId;
+    _candidatesSnapshot = const commands.CommandResult.isLoading();
     return _admit(
-      _candidatesLane,
-      (execution) => _findCandidates(execution, search, eligible),
+      _candidatesCommand,
+      () => _findCandidates(search, eligible, revision, context),
     );
   }
 
@@ -730,10 +766,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     final value = _mergePreview;
     final external = isExternalUpdate;
     final source = _sourceAcknowledgment;
-    return _admit(
-      _applyLane,
-      (execution) => _apply(execution, value, external, guard, source),
-    );
+    _applyEffectId = ++_nextEffectId;
+    _applySnapshot = const commands.CommandResult.isLoading();
+    return _admit(_applyCommand, () => _apply(value, external, guard, source));
   }
 
   /// Owns one complete copy, private persistence and private preview chain.
@@ -746,10 +781,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         isEditable &&
         !_isDirty &&
         preview?.groups.any((value) => identical(value, group)) == true;
+    _keepEffectId = ++_nextEffectId;
+    _keepSnapshot = const commands.CommandResult.isLoading();
     return _admit(
-      _keepLane,
-      (execution) => _keepCurrent(
-        execution,
+      _keepCommand,
+      () => _keepCurrent(
         group,
         eligible,
         target: target,
@@ -763,7 +799,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool requestAddAsset() {
     if (!canRequestAddAsset) return false;
     final guard = _assetGuard(add: true);
-    return _admit(_addLane, (execution) => _addAsset(execution, guard));
+    _addEffectId = ++_nextEffectId;
+    _addSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_addCommand, () => _addAsset(guard));
   }
 
   /// Reserves removal of the exact captured persisted association.
@@ -774,10 +812,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         (!_assets.any((asset) => asset.id == assetId)
             ? Exception('La foto non appartiene al contributo.')
             : null);
-    return _admit(
-      _deleteLane,
-      (execution) => _deleteAsset(execution, assetId, guard),
-    );
+    _deleteEffectId = ++_nextEffectId;
+    _deleteSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_deleteCommand, () => _deleteAsset(assetId, guard));
   }
 
   _SourceAcknowledgment get _sourceAcknowledgment => (
@@ -786,23 +823,17 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     ignore: _ignoreSource ? true : null,
   );
 
-  Future<Result<void>> _loadDetail(_EditorExecution<dynamic> execution) async {
+  Future<Result<void>> _loadDetail() async {
     final submissionId = this.submissionId;
     if (submissionId == null) return const Result.success(null);
 
     final draftRevision = _draftRevision;
     final result = await _repository.getById(submissionId);
     return result.map((submission) {
-      if (!_live(execution)) return;
+      if (_disposed) return;
       if (_draftRevision != draftRevision) {
-        if (identical(_load.current, execution)) {
-          execution.publish = false;
-          _load.snapshot = const commands.CommandResult(
-            null,
-            null,
-            null,
-            false,
-          );
+        if (loading) {
+          _loadSnapshot = const commands.CommandResult(null, null, null, false);
         }
         return;
       }
@@ -897,13 +928,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     return (input: input, error: error, issue: issue, revision: _draftRevision);
   }
 
-  Future<Result<void>> _save(
-    _EditorExecution<dynamic> execution,
-    _SaveDraft draft, {
-    bool publicSave = true,
-  }) async {
+  Future<Result<void>> _save(_SaveDraft draft, {int? saveEffectId}) async {
     if (draft.error != null) {
-      if (_live(execution) &&
+      if (!_disposed &&
           draft.issue != null &&
           draft.revision == _draftRevision) {
         _eventTimeIssue = draft.issue;
@@ -916,13 +943,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         ? await _repository.create(draft.input!)
         : await _repository.update(id, draft.input!);
     return result.map((_) {
-      if (!_live(execution)) return;
+      if (_disposed) return;
       _editorRevision++;
       _invalidatePreview();
       _invalidateCandidates();
       _isDirty = _draftRevision != draft.revision;
-      if (publicSave) {
-        _savedExecutionId = execution.id;
+      if (saveEffectId != null) {
+        _savedExecutionId = saveEffectId;
         _savedDraftRevision = draft.revision;
       }
       _notifyListeners();
@@ -993,7 +1020,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _reject(
-    _EditorExecution<void> execution,
     Exception? guard,
     _SourceAcknowledgment source,
   ) async {
@@ -1004,16 +1030,15 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       acknowledgeCurrentSource: source.acknowledge,
       expectedSourceHash: source.hash,
     );
-    await _refreshAfterResolution(execution, result);
+    await _refreshAfterResolution(result);
     return result.map((_) {
-      if (!_live(execution)) return;
+      if (_disposed) return;
       _status = AdminSubmissionStatus.rejected;
       _contextCommitted();
     });
   }
 
   Future<Result<AdminSubmissionPromotion>> _promote(
-    _EditorExecution<AdminSubmissionPromotion> execution,
     AdminPromotionTarget target,
     Exception? guard,
     _SourceAcknowledgment source,
@@ -1025,9 +1050,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       acknowledgeCurrentSource: source.acknowledge,
       expectedSourceHash: source.hash,
     );
-    await _refreshAfterResolution(execution, result);
+    await _refreshAfterResolution(result);
     return result.map((promotion) {
-      if (_live(execution)) {
+      if (!_disposed) {
         _status = AdminSubmissionStatus.accepted;
         _promotion = promotion;
         _contextCommitted();
@@ -1037,7 +1062,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<AdminEventResolution>> _link(
-    _EditorExecution<AdminEventResolution> execution,
     int target,
     Exception? guard,
     _SourceAcknowledgment source,
@@ -1049,9 +1073,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       acknowledgeCurrentSource: source.acknowledge,
       expectedSourceHash: source.hash,
     );
-    await _refreshAfterResolution(execution, result);
+    await _refreshAfterResolution(result);
     return result.map((resolution) {
-      if (_live(execution)) {
+      if (!_disposed) {
         _status = AdminSubmissionStatus.accepted;
         _targetEventId = resolution.eventId;
         _contextCommitted();
@@ -1061,9 +1085,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _findCandidates(
-    _EditorExecution<void> execution,
     String search,
     bool eligible,
+    int revision,
+    int context,
   ) async {
     if (!eligible) {
       return Result.error(
@@ -1075,10 +1100,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       searchName: search.isEmpty ? null : search,
     );
     return result.map((value) {
-      if (!_live(execution) ||
-          !execution.publish ||
-          execution.candidateRevision != _candidateRevision ||
-          execution.contextRevision != _editorRevision) {
+      if (_disposed ||
+          revision != _candidateRevision ||
+          context != _editorRevision) {
         return;
       }
       _candidates = value;
@@ -1087,7 +1111,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _preview(
-    _EditorExecution<dynamic> execution,
     int? target,
     int generation, {
     required bool eligible,
@@ -1101,8 +1124,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
     final result = await _repository.mergePreview(submissionId!, target!);
     return result.map((value) {
-      if (!_live(execution) ||
-          !execution.publish ||
+      if (_disposed ||
           _isDirty ||
           _targetEventId != target ||
           _previewGeneration != generation) {
@@ -1133,7 +1155,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _keepCurrent(
-    _EditorExecution<void> execution,
     AdminEventMergeGroup group,
     bool eligible, {
     required int? target,
@@ -1177,9 +1198,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
     _hydrationRevision++;
     _markDirty();
-    if (!_live(execution)) return _unavailable();
-    final result = await _save(execution, _captureSave(), publicSave: false);
-    if (!_live(execution)) return _unavailable();
+    if (_disposed) return _unavailable();
+    final result = await _save(_captureSave());
+    if (_disposed) return _unavailable();
     if (result is Success<void> && _isDirty) {
       return Result.error(
         Exception('Salva le nuove modifiche prima dell’anteprima.'),
@@ -1190,7 +1211,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
     return await result.asyncFlatMap(
       (_) => _preview(
-        execution,
         target,
         _previewGeneration,
         eligible: submissionId != null && _targetEventId != null && !_isDirty,
@@ -1199,7 +1219,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<Result<AdminEventResolution>> _apply(
-    _EditorExecution<AdminEventResolution> execution,
     AdminEventMergePreview? preview,
     bool external,
     Exception? guard,
@@ -1219,16 +1238,16 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     );
     if (result case Error(
       :final AdminContentSubmissionApiException error,
-    ) when _live(execution)) {
+    ) when !_disposed) {
       if (error.code == 'EVENT_CHANGED' || error.code == 'SUBMISSION_CHANGED') {
         _editorRevision++;
         _invalidatePreview();
         _notifyListeners();
       }
     }
-    await _refreshAfterResolution(execution, result);
+    await _refreshAfterResolution(result);
     return result.map((resolution) {
-      if (_live(execution)) {
+      if (!_disposed) {
         _status = AdminSubmissionStatus.accepted;
         _targetEventId = resolution.eventId;
         _contextCommitted();
@@ -1237,11 +1256,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     });
   }
 
-  Future<void> _refreshAfterResolution<T>(
-    _EditorExecution<dynamic> execution,
-    Result<T> result,
-  ) async {
-    if (!_live(execution) || _externalEvent == null) return;
+  Future<void> _refreshAfterResolution<T>(Result<T> result) async {
+    if (_disposed || _externalEvent == null) return;
     final sourceChanged = switch (result) {
       Error(:final AdminContentSubmissionApiException error) =>
         error.code == 'SOURCE_CHANGED',
@@ -1251,16 +1267,16 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _acknowledgeCurrentSource = false;
     _acknowledgedSourceHash = null;
     _contextCommitted();
-    if (!_live(execution)) return;
-    await _loadDetail(execution);
-    if (!_live(execution)) return;
+    if (_disposed) return;
+    await _loadDetail();
+    if (_disposed) return;
     final pending = switch (result) {
       Success(:final AdminEventResolution value) => value.pendingId,
       _ => null,
     };
     if (pending != null) {
       final followup = await _repository.getById(pending);
-      if (!_live(execution)) return;
+      if (_disposed) return;
       followup.map((value) => _followupSubmission = value);
       _notifyListeners();
     }
@@ -1292,15 +1308,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     return null;
   }
 
-  Future<Result<void>> _addAsset(
-    _EditorExecution<void> execution,
-    Exception? guard,
-  ) async {
+  Future<Result<void>> _addAsset(Exception? guard) async {
     if (guard != null) return Result.error(guard);
     final selectedImage = await _imagePicker.pickImage(
       source: ImageSource.gallery,
     );
-    if (!_live(execution)) return _unavailable();
+    if (_disposed) return _unavailable();
     if (selectedImage == null) return const Result.success(null);
     final task = _contentSubmissionRepository.uploadImageTask(
       File(selectedImage.path),
@@ -1308,13 +1321,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _activeImageUploadTask = task;
     try {
       final upload = await task.result;
-      if (!_live(execution)) return _unavailable();
+      if (_disposed) return _unavailable();
       return await upload.asyncFlatMap((uploadedAsset) async {
         final persisted = await _repository.addAsset(
           submissionId!,
           uploadedAsset,
         );
-        if (!_live(execution)) return _unavailable();
+        if (_disposed) return _unavailable();
         return persisted.map((asset) {
           _assets.add(asset);
           _contextCommitted();
@@ -1327,15 +1340,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Result<void>> _deleteAsset(
-    _EditorExecution<void> execution,
-    int assetId,
-    Exception? guard,
-  ) async {
+  Future<Result<void>> _deleteAsset(int assetId, Exception? guard) async {
     if (guard != null) return Result.error(guard);
     final result = await _repository.deleteAsset(submissionId!, assetId);
     return result.map((_) {
-      if (!_live(execution)) return;
+      if (_disposed) return;
       _assets.removeWhere((asset) => asset.id == assetId);
       _contextCommitted();
     });
@@ -1351,25 +1360,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   void _invalidateCandidates() {
     _candidateRevision++;
     _candidates = null;
-    _candidatesLane.current?.publish = false;
-    _candidatesLane.snapshot = const commands.CommandResult(
-      null,
-      null,
-      null,
-      false,
-    );
+    _candidatesSnapshot = const commands.CommandResult(null, null, null, false);
   }
 
   void _invalidatePreview() {
     _previewGeneration++;
     _mergePreview = null;
-    _previewLane.current?.publish = false;
-    _previewLane.snapshot = const commands.CommandResult(
-      null,
-      null,
-      null,
-      false,
-    );
+    _previewSnapshot = const commands.CommandResult(null, null, null, false);
   }
 
   void _markDirty() {
@@ -1381,132 +1378,100 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _notifyListeners();
   }
 
-  bool _live(_EditorExecution<dynamic> execution) =>
-      !_disposed && !execution.settled;
-
   Result<T> _unavailable<T>() =>
       Result.error(Exception('Editor non disponibile.'));
 
-  _EditorLane<T> _createLane<T>(String name) {
-    final lane = _EditorLane<T>();
-    lane.command = createResultCommandNoParam<T>(() async {
-      final execution = lane.current!;
-      try {
-        if (!_live(execution)) return _unavailable<T>();
-        return await execution.action(execution);
-      } finally {
-        execution.actionSettled = true;
-        execution.revision++;
-        _scheduleSettlement(lane, execution);
-      }
+  ResultCommand<_EditorAction<T>, T> _createCommand<T>(
+    String name,
+    void Function(commands.CommandResult<void, Result<T>?>) publish,
+  ) {
+    final command = createResultCommand<_EditorAction<T>, T>((action) async {
+      if (_disposed) return _unavailable<T>();
+      return await action();
     }, debugName: 'admin_submission_editor_$name');
-    void observe() {
-      final execution = lane.current;
-      if (execution == null || execution.settled) return;
-      execution.revision++;
-      _scheduleSettlement(lane, execution);
-    }
-
-    void forward() {
-      final execution = lane.current;
-      if (_disposed ||
-          execution == null ||
-          !execution.started ||
-          execution.settled ||
-          !execution.publish) {
+    void observeCompletion() {
+      if (_released.contains(command) ||
+          command.isRunningSync.value ||
+          !_reserved.contains(command)) {
         return;
       }
-      final snapshot = lane.command.results.value;
-      if (snapshot.isRunning || snapshot.idle) return;
-      lane.snapshot = snapshot;
-      _notifyListeners();
+      _afterCommandTurn(() {
+        if (_released.contains(command) || command.isRunningSync.value) return;
+        if (!_reserved.remove(command)) return;
+        if (_disposed) {
+          _release(command);
+          return;
+        }
+        final terminal = command.results.value;
+        if (terminal.isRunning) {
+          // An assertion bypasses normal terminal routing. Keep it fail-loud
+          // and require a new owner without reporting synthetic success.
+          _stopped = true;
+        } else {
+          publish(
+            commands.CommandResult(
+              null,
+              terminal.data,
+              terminal.error,
+              false,
+              stackTrace: terminal.stackTrace,
+              errorReaction: terminal.errorReaction,
+              isUndoValue: terminal.isUndoValue,
+            ),
+          );
+        }
+        _notifyListeners();
+      });
     }
 
-    lane.command.results.addListener(observe);
-    lane.command.isRunningSync.addListener(observe);
-    lane.command.results.addListener(forward);
-    lane.removePublic = () => lane.command.results.removeListener(forward);
-    lane.removePrivate = () {
-      lane.command.results.removeListener(observe);
-      lane.command.isRunningSync.removeListener(observe);
-    };
-    return lane;
+    command.isRunningSync.addListener(observeCompletion);
+    _completionObservers[command] = observeCompletion;
+    return command;
   }
 
   bool _admit<T>(
-    _EditorLane<T> lane,
-    Future<Result<T>> Function(_EditorExecution<T>) action,
+    ResultCommand<_EditorAction<T>, T> command,
+    _EditorAction<T> action,
   ) {
-    if (!_canAdmit(lane)) return false;
-    final execution = _EditorExecution(
-      ++_nextExecution,
-      action,
-      candidateRevision: _candidateRevision,
-      contextRevision: _editorRevision,
-    );
-    lane
-      ..current = execution
-      ..executionId = execution.id
-      ..snapshot = const commands.CommandResult.isLoading();
-    if (identical(lane, _saveLane)) {
+    _reserved.add(command);
+    if (identical(command, _saveCommand)) {
       _savedExecutionId = null;
       _savedDraftRevision = null;
     }
-    if (_mutations.any((value) => identical(value, lane))) {
+    if (_mutations.contains(command)) {
       _invalidateCandidates();
       // Apply already captured its committed tokens in the request closure.
       _invalidatePreview();
     }
     _notifyListeners();
     if (_disposed) {
-      execution.actionSettled = true;
-      _scheduleSettlement(lane, execution);
-    } else if (identical(lane.current, execution)) {
-      execution.started = true;
-      lane.command.run();
+      // Disposal from admission notification happens before run(), so no
+      // physical completion notification will arrive for this reservation.
+      _reserved.remove(command);
+      _afterCommandTurn(() => _release(command));
+    } else {
+      command.run(action);
     }
     return true;
   }
 
-  void _scheduleSettlement<T>(
-    _EditorLane<T> lane,
-    _EditorExecution<T> execution,
-  ) {
-    if (execution.queued || execution.settled) return;
-    execution.queued = true;
-    final revision = execution.revision;
-    scheduleMicrotask(() {
-      unawaited(
-        Future<void>(() {
-          execution.queued = false;
-          if (execution.settled || !identical(lane.current, execution)) return;
-          if (lane.command.isRunningSync.value || !execution.actionSettled) {
-            return;
-          }
-          if (revision != execution.revision) {
-            _scheduleSettlement(lane, execution);
-            return;
-          }
-          execution.settled = true;
-          lane
-            ..settlements += 1
-            ..current = null;
-          if (_disposed) {
-            _release(lane);
-          } else {
-            _notifyListeners();
-          }
-        }),
-      );
-    });
+  /// Leaves upstream result dispatch, error reporting and finally together.
+  void _afterCommandTurn(VoidCallback callback) {
+    scheduleMicrotask(() => unawaited(Future<void>(callback)));
   }
 
-  void _release<T>(_EditorLane<T> lane) {
-    if (lane.released || lane.current != null) return;
-    lane.released = true;
-    lane.removePrivate?.call();
-    lane.removePrivate = null;
-    lane.command.dispose();
+  /// Permanently claims release before touching a private observer or Command.
+  void _release(commands.Command<dynamic, dynamic> command) {
+    if (_released.contains(command) ||
+        !_disposed ||
+        command.isRunningSync.value) {
+      return;
+    }
+    _released.add(command);
+    _reserved.remove(command);
+    final observer = _completionObservers.remove(command);
+    if (observer != null) command.isRunningSync.removeListener(observer);
+    command.dispose();
   }
 
   int _notifyDepth = 0;
@@ -1525,20 +1490,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    for (final lane in _lanes) {
-      lane.removePublic?.call();
-      lane.removePublic = null;
-    }
     _activeImageUploadTask?.cancel();
     _activeImageUploadTask = null;
-    scheduleMicrotask(() {
-      unawaited(
-        Future<void>(() {
-          for (final lane in _lanes) {
-            if (lane.current == null) _release(lane);
-          }
-        }),
-      );
+    _afterCommandTurn(() {
+      _commands.forEach(_release);
     });
     if (_notifyDepth == 0) {
       super.dispose();
