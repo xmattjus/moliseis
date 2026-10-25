@@ -77,12 +77,12 @@ void main() {
       await tester.tap(find.text('Riprova'));
       expect(retries, 1);
       expect(loads, 1);
+      await pumpCommandTurns(tester);
     },
   );
 
-  testWidgets('deferred load uses only the latest owner and target', (
-    tester,
-  ) async {
+  testWidgets('deferred load uses only the latest '
+      'owner and target', (tester) async {
     final first = ValueNotifier<NearbyContentPresentation>((
       pending: false,
       items: const <ContentBase>[],
@@ -421,6 +421,7 @@ void main() {
     expect(find.byType(ContentBaseCardGridItem), findsNothing);
     expect(find.text('Riprova'), findsNothing);
     expect(find.byType(SkeletonContentGridItem), findsWidgets);
+    await pumpCommandTurns(tester);
   });
 
   testWidgets('unchanged key does not reload and changed owner/target does', (

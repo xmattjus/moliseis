@@ -6,8 +6,8 @@ import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
-import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 /// Manages the user's favourited places and events.
 ///
@@ -17,16 +17,19 @@ import 'package:moliseis/utils/result.dart';
 class FavouriteViewModel extends ChangeNotifier {
   FavouriteViewModel({required FavouriteGetIdsUseCase favouriteGetIdsUseCase})
     : _favouriteGetIdsUseCase = favouriteGetIdsUseCase {
-    load = Command0(_load);
-    load.addListener(_forwardLoadChanges);
-
-    unawaited(load.execute());
+    load = createResultCommandNoParam<void>(
+      _load,
+      debugName: 'favourite_view_model.load',
+    );
+    load.isRunningSync.addListener(_captureLoadAdmission);
+    load.results.addListener(_forwardLoadChanges);
+    load.run();
   }
 
   final FavouriteGetIdsUseCase _favouriteGetIdsUseCase;
 
   /// Command for loading all favourited places and events from the repository.
-  late final Command0<void> load;
+  late final ResultCommand<void, void> load;
 
   var _favouriteEvents = <ContentBase>[];
   var _favouritePlaces = <ContentBase>[];
@@ -34,6 +37,7 @@ class FavouriteViewModel extends ChangeNotifier {
   var _favouritePlaceIds = <int>[];
   var _mutationRunning = false;
   var _disposed = false;
+  var _loadRejectedAtAdmission = false;
 
   /// The full content objects for all favourited events.
   UnmodifiableListView<ContentBase> get favouriteEvents =>
@@ -52,7 +56,7 @@ class FavouriteViewModel extends ChangeNotifier {
       UnmodifiableListView(_favouritePlaceIds);
 
   /// Whether favourite controls should temporarily reject a new mutation.
-  bool get isUpdating => load.running || _mutationRunning;
+  bool get isUpdating => load.isRunningSync.value || _mutationRunning;
 
   /// Optimistically sets [content]'s favourite state to [save] and persists it.
   ///
@@ -63,7 +67,9 @@ class FavouriteViewModel extends ChangeNotifier {
     ContentBase content, {
     required bool save,
   }) async {
-    if (isUpdating) return Result.error(_updateUnavailableException());
+    if (_disposed || isUpdating) {
+      return Result.error(_updateUnavailableException());
+    }
     if (content is! Event && content is! Place) {
       return Result.error(_unsupportedContentException(content));
     }
@@ -76,8 +82,10 @@ class FavouriteViewModel extends ChangeNotifier {
         _ => Result.error(_unsupportedContentException(content)),
       };
     } finally {
-      _mutationRunning = false;
-      _notifyListeners();
+      if (!_disposed) {
+        _mutationRunning = false;
+        _notifyListeners();
+      }
     }
   }
 
@@ -102,7 +110,9 @@ class FavouriteViewModel extends ChangeNotifier {
       if (contentAdded) _favouriteEvents.add(event);
       _notifyListeners();
 
+      if (_disposed) return Result.error(_updateUnavailableException());
       final result = await _persistFavourite(event, true);
+      if (_disposed) return result;
       return result.mapError((error) {
         if (idAdded) _favouriteEventIds.remove(id);
         if (contentAdded) {
@@ -123,7 +133,9 @@ class FavouriteViewModel extends ChangeNotifier {
     if (idIndex >= 0) _favouriteEventIds.removeAt(idIndex);
     _notifyListeners();
 
+    if (_disposed) return Result.error(_updateUnavailableException());
     final result = await _persistFavourite(event, false);
+    if (_disposed) return result;
     return result.mapError((error) {
       if (idIndex >= 0) _favouriteEventIds.insert(idIndex, id);
       if (removedContent != null) {
@@ -146,7 +158,9 @@ class FavouriteViewModel extends ChangeNotifier {
       if (contentAdded) _favouritePlaces.add(place);
       _notifyListeners();
 
+      if (_disposed) return Result.error(_updateUnavailableException());
       final result = await _persistFavourite(place, true);
+      if (_disposed) return result;
       return result.mapError((error) {
         if (idAdded) _favouritePlaceIds.remove(id);
         if (contentAdded) {
@@ -167,7 +181,9 @@ class FavouriteViewModel extends ChangeNotifier {
     if (idIndex >= 0) _favouritePlaceIds.removeAt(idIndex);
     _notifyListeners();
 
+    if (_disposed) return Result.error(_updateUnavailableException());
     final result = await _persistFavourite(place, false);
+    if (_disposed) return result;
     return result.mapError((error) {
       if (idIndex >= 0) _favouritePlaceIds.insert(idIndex, id);
       if (removedContent != null) {
@@ -200,15 +216,23 @@ class FavouriteViewModel extends ChangeNotifier {
   }
 
   Future<Result<void>> _load() async {
-    if (_mutationRunning) return Result.error(_updateUnavailableException());
+    if (_disposed || _loadRejectedAtAdmission || _mutationRunning) {
+      return Result.error(_updateUnavailableException());
+    }
 
     final placesResult = await _favouriteGetIdsUseCase.getFavouritePlaceIds();
+    if (_disposed) {
+      return placesResult.isError
+          ? placesResult.map((_) {})
+          : Result.error(_updateUnavailableException());
+    }
     final placeIds = placesResult.getOrNull();
     if (placeIds != null) {
       final freshPlaceIds = _deduplicateIds(placeIds);
       final freshPlaces = <ContentBase>[];
       for (final id in freshPlaceIds) {
         final place = await _getPlaceFromRepository(id);
+        if (_disposed) return Result.error(_updateUnavailableException());
         if (place != null) freshPlaces.add(place);
       }
       _favouritePlaceIds = freshPlaceIds;
@@ -216,13 +240,25 @@ class FavouriteViewModel extends ChangeNotifier {
       _notifyListeners();
     }
 
+    if (_disposed) return Result.error(_updateUnavailableException());
     final eventsResult = await _favouriteGetIdsUseCase.getFavouriteEventIds();
+    if (_disposed) {
+      if (placesResult.isError) return placesResult.map((_) {});
+      return eventsResult.isError
+          ? eventsResult.map((_) {})
+          : Result.error(_updateUnavailableException());
+    }
     final eventIds = eventsResult.getOrNull();
     if (eventIds != null) {
       final freshEventIds = _deduplicateIds(eventIds);
       final freshEvents = <ContentBase>[];
       for (final id in freshEventIds) {
         final event = await _getEventFromRepository(id);
+        if (_disposed) {
+          return placesResult.isError
+              ? placesResult.map((_) {})
+              : Result.error(_updateUnavailableException());
+        }
         if (event != null) freshEvents.add(event);
       }
       _favouriteEventIds = freshEventIds;
@@ -250,6 +286,10 @@ class FavouriteViewModel extends ChangeNotifier {
     'Cannot update favourites while another update is in progress.',
   );
 
+  void _captureLoadAdmission() {
+    if (load.isRunningSync.value) _loadRejectedAtAdmission = _mutationRunning;
+  }
+
   void _forwardLoadChanges() => _notifyListeners();
 
   void _notifyListeners() {
@@ -258,9 +298,44 @@ class FavouriteViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
-    load.removeListener(_forwardLoadChanges);
-    if (!load.running) load.dispose();
-    super.dispose();
+    load.results.removeListener(_forwardLoadChanges);
+    load.isRunningSync.removeListener(_captureLoadAdmission);
+    // Forwarding can cause dispose inside the owner's own notification.
+    scheduleMicrotask(super.dispose);
+    final command = load;
+    var queued = false;
+    var invalidated = false;
+    var released = false;
+    late VoidCallback onRunningChanged;
+    void requestCleanup() {
+      if (queued || released) return;
+      queued = true;
+      invalidated = false;
+      // Leave dispatch and upstream's terminal event work before release.
+      scheduleMicrotask(() {
+        unawaited(
+          Future<void>(() {
+            queued = false;
+            if (released || command.isRunningSync.value) return;
+            if (invalidated) {
+              requestCleanup();
+              return;
+            }
+            command.isRunningSync.removeListener(onRunningChanged);
+            released = true;
+            command.dispose();
+          }),
+        );
+      });
+    }
+
+    onRunningChanged = () {
+      invalidated = true;
+      if (!command.isRunningSync.value) requestCleanup();
+    };
+    command.isRunningSync.addListener(onRunningChanged);
+    if (!command.isRunningSync.value) requestCleanup();
   }
 }

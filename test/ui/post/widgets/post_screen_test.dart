@@ -17,6 +17,7 @@ import 'package:moliseis/ui/post/view_models/post_view_model.dart';
 import 'package:moliseis/ui/post/widgets/components/post_section_nearby_content.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
 import '../../../support/command_test_support.dart';
@@ -53,7 +54,8 @@ void main() {
       addTearDown(oldWeather.dispose);
       addTearDown(newWeather.dispose);
       addTearDown(favourites.dispose);
-      await viewModel.loadEvent.execute(event.remoteId);
+      viewModel.loadEvent.run(event.remoteId);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(
         _buildTestApp(
           ValueListenableBuilder(
@@ -92,7 +94,8 @@ void main() {
       final event = _buildEvent();
       final place = _buildPlace();
       final first = _buildPostViewModel(event: event, place: place);
-      await first.loadEvent.execute(event.remoteId);
+      first.loadEvent.run(event.remoteId);
+      await pumpCommandTurns(tester);
       final pending = Completer<Result<Place>>();
       final places = FakePlaceRepository()
         ..pendingGetById[place.remoteId] = pending;
@@ -124,12 +127,12 @@ void main() {
         ),
       );
       expect(weather.currentTarget?.type, ContentType.event);
-      final loading = second.loadPlace.execute(place.remoteId);
+      second.loadPlace.run(place.remoteId);
       source.value = second;
       await tester.pump();
       expect(weather.currentTarget, isNull);
       pending.complete(Result.success(place));
-      await loading;
+      await pumpCommandTurns(tester);
       expect(weather.currentTarget?.type, ContentType.place);
       expect(weather.currentTarget?.id, place.remoteId);
       await tester.pumpWidget(const SizedBox.shrink());
@@ -162,7 +165,8 @@ void main() {
       addTearDown(viewModel.dispose);
       addTearDown(weather.dispose);
       addTearDown(favourites.dispose);
-      await viewModel.loadPlace.execute(place.remoteId);
+      viewModel.loadPlace.run(place.remoteId);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(
         _buildTestApp(
           PostScreen(
@@ -215,7 +219,8 @@ void main() {
       addTearDown(vm.dispose);
       addTearDown(weather.dispose);
       addTearDown(favourites.dispose);
-      await vm.loadPlace.execute(place.remoteId);
+      vm.loadPlace.run(place.remoteId);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(
         _buildTestApp(
           PostScreen(isEvent: false, viewModel: vm, weatherViewModel: weather),
@@ -270,8 +275,10 @@ void main() {
             ),
           ),
         );
-        await first.loadPlace.execute(1);
-        await second.loadPlace.execute(2);
+        first.loadPlace.run(1);
+        await pumpCommandTurns(tester);
+        second.loadPlace.run(2);
+        await pumpCommandTurns(tester);
         final source = ValueNotifier(first);
         final weather = buildWeatherViewModel(mockLogger);
         final favourites = _buildFavouriteViewModel(
@@ -319,6 +326,126 @@ void main() {
       },
     );
 
+    for (final isEvent in [true, false]) {
+      for (final runtime in [null, StateError('detail'), TypeError()]) {
+        testWidgets('${isEvent ? 'Event' : 'Place'} terminal '
+            '${runtime?.runtimeType ?? 'domain'} failure '
+            'ends loading and recovers Weather', (tester) async {
+          final event = _buildEvent();
+          final place = _buildPlace();
+          final events = FakeEventRepository();
+          final places = FakePlaceRepository();
+          final pendingEvent = Completer<Result<Event>>();
+          final pendingPlace = Completer<Result<Place>>();
+          events.pendingGetById[event.remoteId] = pendingEvent;
+          places.pendingGetById[place.remoteId] = pendingPlace;
+          final vm = PostViewModel(
+            postUseCase: PostUseCase(
+              eventRepository: events,
+              placeRepository: places,
+            ),
+          );
+          final weather = buildWeatherViewModel(mockLogger);
+          final favourites = _buildFavouriteViewModel(
+            event: event,
+            place: place,
+          );
+          final restore = installCommandTestReporting(mockLogger);
+          addTearDown(restore);
+          addTearDown(vm.dispose);
+          addTearDown(weather.dispose);
+          addTearDown(favourites.dispose);
+          final command = isEvent ? vm.loadEvent : vm.loadPlace;
+          final id = isEvent ? event.remoteId : place.remoteId;
+          command.run(id);
+          await tester.pumpWidget(
+            _buildTestApp(
+              PostScreen(
+                isEvent: isEvent,
+                viewModel: vm,
+                weatherViewModel: weather,
+              ),
+              favourites,
+            ),
+          );
+          await pumpCommandTurns(tester);
+          expect(find.text('Caricamento in corso...'), findsOneWidget);
+          expect(weather.currentTarget, isNull);
+          final failure = TestException('detail');
+          final stack = StackTrace.fromString(
+            '#0 postOriginal (package:moliseis/post_original.dart:123:45)',
+          );
+          if (runtime != null) {
+            if (isEvent) {
+              pendingEvent.completeError(runtime, stack);
+            } else {
+              pendingPlace.completeError(runtime, stack);
+            }
+          } else {
+            if (isEvent) {
+              pendingEvent.complete(Result.error(failure));
+            } else {
+              pendingPlace.complete(Result.error(failure));
+            }
+          }
+          await pumpCommandTurns(tester);
+          expect(find.text('Caricamento in corso...'), findsNothing);
+          expect(
+            find.text('Si è verificato un errore durante il caricamento.'),
+            findsOneWidget,
+          );
+          expect(find.text('Riprova'), findsNothing);
+          expect(weather.currentTarget, isNull);
+          expect(() => vm.content, throwsA(anything));
+          expect(events.getByCoordinatesCallCount, 0);
+          expect(places.getByCoordinatesCallCount, 0);
+          expect(
+            command.results.value.domainError,
+            runtime == null ? same(failure) : isNull,
+          );
+          expect(
+            command.results.value.unexpectedError,
+            runtime == null ? isNull : same(runtime),
+          );
+          expect(mockLogger.calls, runtime == null ? isEmpty : hasLength(1));
+          if (runtime != null) {
+            expect(mockLogger.calls.single.error, same(runtime));
+            expect(
+              mockLogger.calls.single.stackTrace.toString(),
+              contains('post_original.dart 123:45'),
+            );
+          }
+          events.pendingGetById.clear();
+          places.pendingGetById.clear();
+          events.getByIdResults[id] = Result.success(event);
+          places.getByIdResults[id] = Result.success(place);
+          command.run(id);
+          expect(weather.currentTarget, isNull);
+          await pumpCommandTurns(tester);
+          expect(command.results.value.completed, isTrue);
+          expect(find.text('Caricamento in corso...'), findsNothing);
+          expect(weather.currentTarget?.id, id);
+          expect(
+            weather.currentTarget?.type,
+            isEvent ? ContentType.event : ContentType.place,
+          );
+          command.run(id);
+          expect(weather.currentTarget, isNull);
+          await pumpCommandTurns(tester);
+          expect(weather.currentTarget?.id, id);
+          await tester.pumpWidget(const SizedBox.shrink());
+          expect(weather.currentTarget, isNull);
+          vm.dispose();
+          weather.dispose();
+          favourites.dispose();
+          await pumpCommandTurns(tester);
+          await tester.pump(const Duration(milliseconds: 50));
+          await pumpCommandTurns(tester);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
     testWidgets('renders EventFormattedDateTime for event content', (
       tester,
     ) async {
@@ -331,7 +458,8 @@ void main() {
         place: place,
       );
 
-      await viewModel.loadEvent.execute(event.remoteId);
+      viewModel.loadEvent.run(event.remoteId);
+      await pumpCommandTurns(tester);
 
       await tester.pumpWidget(
         _buildTestApp(
@@ -362,7 +490,8 @@ void main() {
         place: place,
       );
 
-      await viewModel.loadPlace.execute(place.remoteId);
+      viewModel.loadPlace.run(place.remoteId);
+      await pumpCommandTurns(tester);
 
       await tester.pumpWidget(
         _buildTestApp(

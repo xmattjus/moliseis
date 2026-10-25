@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:collection';
 
 import 'package:go_router/go_router.dart';
@@ -18,6 +17,7 @@ import 'package:moliseis/ui/explore/view_models/suggestion_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_button.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 const double _itemWidth = kGridViewCardWidth * 0.8;
@@ -52,17 +52,18 @@ class SuggestiondHorizontalListView extends StatelessWidget {
         SizedBox(
           height: height,
           child: ListenableBuilder(
-            listenable: viewModel.load,
+            listenable: viewModel.load.results,
             builder: (context, child) {
-              final showPlaceholders = viewModel.load.running;
+              final snapshot = viewModel.load.results.value;
+              final showPlaceholders = snapshot.isRunning || snapshot.idle;
 
-              if (viewModel.load.error) {
+              if (snapshot.hasFailure) {
                 return EmptyView.error(
                   text: const Text(
                     'Si è verificato un errore durante il caricamento',
                   ),
                   action: TextButton(
-                    onPressed: () => unawaited(viewModel.load.execute()),
+                    onPressed: () => viewModel.load.run(),
                     child: const Text('Riprova'),
                   ),
                 );
@@ -81,7 +82,7 @@ class SuggestiondHorizontalListView extends StatelessWidget {
                       borderRadius: borderRadius,
                     );
 
-              if (viewModel.load.completed && viewModel.suggestions.isEmpty) {
+              if (snapshot.completed && viewModel.suggestions.isEmpty) {
                 return const EmptyView(
                   text: Text('Nessun luogo suggerito per ora'),
                 );

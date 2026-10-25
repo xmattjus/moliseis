@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/scheduler.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/themes/system_ui_overlay_styles.dart';
@@ -7,6 +5,7 @@ import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
 class SyncScreen extends StatefulWidget {
@@ -17,37 +16,83 @@ class SyncScreen extends StatefulWidget {
 }
 
 class _SyncScreenState extends State<SyncScreen> {
-  // Whether to schedule a callback on next frame build or not.
-  bool _scheduleCallbackOnNextFrame = true;
-
-  late final SyncViewModel _syncViewModel;
+  SyncViewModel? _owner;
+  Object? _pendingSnapshot;
+  Object? _authorizedSnapshot;
 
   @override
-  void initState() {
-    super.initState();
-    _syncViewModel = context.read<SyncViewModel>();
-    _syncViewModel.sync.addListener(_onSyncChanged);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final currentOwner = Provider.of<SyncViewModel>(context);
+    if (identical(currentOwner, _owner)) return;
+    _owner?.sync.results.removeListener(_onSyncChanged);
+    _pendingSnapshot = null;
+    _authorizedSnapshot = null;
+    _owner = currentOwner;
+    currentOwner.sync.results.addListener(_onSyncChanged);
+    _observeOutcome(reconcile: true);
   }
 
   @override
   void dispose() {
-    _syncViewModel.sync.removeListener(_onSyncChanged);
+    _owner?.sync.results.removeListener(_onSyncChanged);
+    _pendingSnapshot = null;
+    _owner = null;
     super.dispose();
   }
 
-  void _onSyncChanged() {
-    if (_syncViewModel.sync.error && !_syncViewModel.fatalError) {
-      _scheduleCallback(() {
-        if (!mounted) return;
-        showSnackBar(
-          context: context,
-          textContent:
-              "Si è verificato un errore durante l'aggiornamento dei "
-              'contenuti',
-          type: SnackBarType.error,
-        );
-      });
+  void _onSyncChanged() => _observeOutcome(reconcile: false);
+
+  void _observeOutcome({required bool reconcile}) {
+    if (!mounted) return;
+    final owner = _owner;
+    if (owner == null) return;
+    final snapshot = owner.sync.results.value;
+    if (!snapshot.hasFailure || owner.fatalError) {
+      _pendingSnapshot = null;
+      return;
     }
+    if (identical(snapshot, _authorizedSnapshot) ||
+        identical(snapshot, _pendingSnapshot)) {
+      return;
+    }
+    if (reconcile ||
+        SchedulerBinding.instance.schedulerPhase ==
+            SchedulerPhase.persistentCallbacks) {
+      _pendingSnapshot = snapshot;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (!identical(_pendingSnapshot, snapshot)) return;
+        _pendingSnapshot = null;
+        if (owner.sync.isRunningSync.value) return;
+        _deliverFeedback(owner, snapshot);
+      });
+      return;
+    }
+    // Ordinary terminal publication precedes running=false. Deliver now while
+    // this route owns a live context. The messenger survives normal return.
+    _deliverFeedback(owner, snapshot);
+  }
+
+  void _deliverFeedback(SyncViewModel owner, Object snapshot) {
+    if (!mounted) return;
+    if (!identical(_owner, owner) ||
+        !identical(context.read<SyncViewModel>(), owner) ||
+        !identical(owner.sync.results.value, snapshot) ||
+        identical(_authorizedSnapshot, snapshot) ||
+        owner.fatalError ||
+        !owner.sync.results.value.hasFailure ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    _authorizedSnapshot = snapshot;
+    _pendingSnapshot = null;
+    showSnackBar(
+      context: context,
+      textContent:
+          "Si è verificato un errore durante l'aggiornamento dei contenuti",
+      type: SnackBarType.error,
+    );
   }
 
   @override
@@ -64,26 +109,34 @@ class _SyncScreenState extends State<SyncScreen> {
         body: Consumer<SyncViewModel>(
           builder: (_, viewModel, _) {
             return ListenableBuilder(
-              listenable: viewModel.sync,
+              listenable: Listenable.merge([
+                viewModel.sync.results,
+                viewModel.sync.isRunning,
+              ]),
               builder: (context, child) {
-                if (viewModel.sync.error && viewModel.fatalError) {
+                if (viewModel.sync.results.value.hasFailure &&
+                    viewModel.fatalError) {
                   return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     spacing: 8,
                     children: <Widget>[
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
-                          'Molise Is necessita di una connessione ad internet '
-                          "per l'aggiornamento dei contenuti. Controlla le "
-                          'impostazioni di rete.',
+                          viewModel.sync.results.value.unexpectedError != null
+                              ? 'Impossibile aggiornare i contenuti. '
+                                    'Riprova più tardi.'
+                              : 'Molise Is necessita di una connessione ad '
+                                    'internet '
+                                    "per l'aggiornamento dei contenuti. "
+                                    'Controlla le '
+                                    'impostazioni di rete.',
                           textAlign: TextAlign.center,
                         ),
                       ),
                       TextButton(
                         onPressed: () {
-                          _scheduleCallbackOnNextFrame = true;
-                          unawaited(viewModel.sync.execute(true));
+                          viewModel.sync.run(true);
                         },
                         child: const Text('Riprova'),
                       ),
@@ -91,7 +144,7 @@ class _SyncScreenState extends State<SyncScreen> {
                   );
                 }
 
-                if (viewModel.sync.running) {
+                if (viewModel.sync.isRunningSync.value) {
                   return const EmptyView.loading(
                     text: Text('Aggiornamento dei contenuti in corso...'),
                   );
@@ -106,23 +159,5 @@ class _SyncScreenState extends State<SyncScreen> {
         ),
       ),
     );
-  }
-
-  void _scheduleCallback(void Function() callback) {
-    // Guards the addPostFrameCallback() from running multiple times
-    // when it is not needed, e.g. when the app Brightness changes
-    // and widgets are rebuilt.
-    if (_scheduleCallbackOnNextFrame) {
-      // Schedules a callback to be fired once when the build phase
-      // of this widget has ended.
-      //
-      // Shows a SnackBar signaling a recoverable error occurred
-      // while refreshing the repositories.
-      SchedulerBinding.instance.addPostFrameCallback((_) {
-        callback();
-
-        _scheduleCallbackOnNextFrame = false;
-      });
-    }
   }
 }

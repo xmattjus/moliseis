@@ -30,6 +30,7 @@ import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
 
+import '../support/command_test_support.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/mock_logger.dart';
@@ -87,7 +88,7 @@ void main() {
   });
 
   group('providers()', () {
-    testWidgets('wires every advertised type into the provider tree', (
+    testOwnerUI('wires every advertised type into the provider tree', (
       tester,
     ) async {
       final resolved = <Type, Object?>{};

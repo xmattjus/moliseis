@@ -6,6 +6,9 @@ import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submissions_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
+
+import '../../../../support/content_submission_command_harness.dart';
 
 import '../../../../support/fake_repositories.dart';
 
@@ -27,16 +30,16 @@ void main() {
         );
       final vm = AdminSubmissionsViewModel(repository: repository);
       addTearDown(vm.dispose);
-      await vm.load.execute();
+      await vm.refreshSubmissions();
       vm.setIgnoredFilter();
-      await vm.loadIgnored.execute();
+      await vm.refreshIgnoredSources();
       expect(vm.items, isEmpty);
       expect(vm.ignoredSources.single.id, 12);
       repository
         ..ignoredSourcesResult = const Result.success([])
         ..listResult = Result.success([sampleAdminSubmission(id: 8)]);
-      await vm.unIgnore.execute(12);
-      expect(vm.unIgnore.completed, isTrue);
+      await requestAndWait(() => vm.requestUnIgnore(12), () => vm.isUnIgnoring);
+      expect(vm.unIgnoreSnapshot.completed, isTrue);
       expect(vm.ignoredSources, isEmpty);
       expect(vm.items.single.id, 8);
       expect(vm.unignoredPendingId, 8);
@@ -60,11 +63,14 @@ void main() {
         ..pendingUnIgnore = pending;
       final vm = AdminSubmissionsViewModel(repository: repository);
       addTearDown(vm.dispose);
-      await vm.loadIgnored.execute();
-      await vm.load.execute();
-      final resolution = vm.unIgnore.execute(12);
-      final ignoredRefresh = vm.loadIgnored.execute();
-      final pendingRefresh = vm.load.execute();
+      await vm.refreshIgnoredSources();
+      await vm.refreshSubmissions();
+      final resolution = requestAndWait(
+        () => vm.requestUnIgnore(12),
+        () => vm.isUnIgnoring,
+      );
+      final ignoredRefresh = vm.refreshIgnoredSources();
+      final pendingRefresh = vm.refreshSubmissions();
       // Complete immediately: the blocked commands may still be running.
       repository
         ..ignoredSourcesResult = const Result.success([])
@@ -79,9 +85,9 @@ void main() {
       await resolution;
       expect(vm.ignoredSources, isEmpty);
       expect(vm.items.single.id, 8);
-      expect(vm.unIgnore.completed, isTrue);
-      expect(vm.loadIgnored.completed, isTrue);
-      expect(vm.load.completed, isTrue);
+      expect(vm.unIgnoreSnapshot.completed, isTrue);
+      expect(vm.loadIgnoredSnapshot.completed, isTrue);
+      expect(vm.loadSnapshot.completed, isTrue);
       expect(repository.ignoredListCalls, 2);
       expect(repository.listCallCount, 2);
     });
@@ -102,10 +108,10 @@ void main() {
             ..unIgnoreResult = Result.error(TestException('Failure'));
       final vm = AdminSubmissionsViewModel(repository: repository);
       addTearDown(vm.dispose);
-      await vm.load.execute();
-      await vm.loadIgnored.execute();
-      await vm.unIgnore.execute(12);
-      expect(vm.unIgnore.error, isTrue);
+      await vm.refreshSubmissions();
+      await vm.refreshIgnoredSources();
+      await requestAndWait(() => vm.requestUnIgnore(12), () => vm.isUnIgnoring);
+      expect(vm.unIgnoreSnapshot.hasFailure, isTrue);
       expect(vm.ignoredSources, [source]);
       expect(vm.items.single.id, 1);
       expect(repository.ignoredListCalls, 1);
@@ -121,9 +127,9 @@ void main() {
       final viewModel = AdminSubmissionsViewModel(repository: repository);
       addTearDown(viewModel.dispose);
 
-      await viewModel.load.execute();
+      await viewModel.refreshSubmissions();
 
-      expect(viewModel.load.completed, isTrue);
+      expect(viewModel.loadSnapshot.completed, isTrue);
       expect(viewModel.items, <AdminSubmission>[submission]);
       expect(viewModel.filteredItems, <AdminSubmission>[submission]);
     });
@@ -137,7 +143,7 @@ void main() {
         final viewModel = AdminSubmissionsViewModel(repository: repository);
         addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
+        await viewModel.refreshSubmissions();
 
         expect(viewModel.error, isTrue);
         expect(viewModel.items, isEmpty);
@@ -153,9 +159,9 @@ void main() {
       final viewModel = AdminSubmissionsViewModel(repository: repository);
       addTearDown(viewModel.dispose);
 
-      await viewModel.load.execute();
+      await viewModel.refreshSubmissions();
       repository.listResult = Result.success(<AdminSubmission>[submission]);
-      await viewModel.load.execute();
+      await viewModel.refreshSubmissions();
 
       expect(viewModel.error, isFalse);
       expect(viewModel.items, <AdminSubmission>[submission]);
@@ -176,7 +182,7 @@ void main() {
         final viewModel = AdminSubmissionsViewModel(repository: repository);
         addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
+        await viewModel.refreshSubmissions();
         viewModel.setFilter(AdminSubmissionStatus.accepted);
 
         expect(viewModel.filteredItems, <AdminSubmission>[accepted]);

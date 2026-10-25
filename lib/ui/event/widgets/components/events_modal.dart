@@ -11,6 +11,7 @@ import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart'
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/utils/enums.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 class EventsModal extends StatelessWidget {
   const EventsModal({
@@ -30,63 +31,88 @@ class EventsModal extends StatelessWidget {
   Widget build(BuildContext context) {
     final command = viewModel.loadByDate;
 
-    final localizedSelectedMonth = localizedMonths[selectedDate.month - 1];
-
-    final bottomSheetTitle = selectedDate == viewModel.currentCalendarDate
-        ? 'Eventi di oggi ${selectedDate.day} $localizedSelectedMonth'
-        : 'Eventi del ${selectedDate.day} $localizedSelectedMonth';
-
     final showDragHandle = context.windowSizeClass.isAtMost(
       WindowSizeClass.medium,
     );
 
-    return CustomScrollView(
-      controller: scrollController,
-      slivers: <Widget>[
-        SliverList.list(
-          children: <Widget>[
-            if (showDragHandle) const AppBottomSheetDragHandle(),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                showDragHandle ? 0.0 : 16.0,
-                16,
-                16,
-              ),
-              child: AppBottomSheetTitle(title: bottomSheetTitle, icon: null),
+    return ListenableBuilder(
+      listenable: Listenable.merge([viewModel, command.results]),
+      builder: (context, _) {
+        final date = viewModel.selectedDate;
+        final month = localizedMonths[date.month - 1];
+        final bottomSheetTitle = date == viewModel.currentCalendarDate
+            ? 'Eventi di oggi ${date.day} $month'
+            : 'Eventi del ${date.day} $month';
+        return CustomScrollView(
+          controller: scrollController,
+          slivers: <Widget>[
+            SliverList.list(
+              children: <Widget>[
+                if (showDragHandle) const AppBottomSheetDragHandle(),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    showDragHandle ? 0.0 : 16.0,
+                    16,
+                    16,
+                  ),
+                  child: AppBottomSheetTitle(
+                    title: bottomSheetTitle,
+                    icon: null,
+                  ),
+                ),
+              ],
+            ),
+            Builder(
+              builder: (context) {
+                final snapshot = command.results.value;
+                if (command.isRunningSync.value ||
+                    !viewModel.hasCurrentDaySnapshot) {
+                  return const SkeletonContentSliverGrid();
+                }
+                if (snapshot.hasFailure) {
+                  return SliverToBoxAdapter(
+                    child: EmptyView.error(
+                      text: const Text(
+                        'Si è verificato un errore durante il caricamento.',
+                      ),
+                      action: TextButton(
+                        onPressed: () =>
+                            viewModel.selectDate(viewModel.selectedDate),
+                        child: const Text('Riprova'),
+                      ),
+                    ),
+                  );
+                }
+                if (snapshot.completed) {
+                  final events = viewModel.byMonth;
+
+                  if (events.isEmpty) {
+                    return const SliverToBoxAdapter(
+                      child: EmptyView(
+                        text: Text('Nessun evento trovato per questa data.'),
+                      ),
+                    );
+                  }
+
+                  return ContentSliverGrid(
+                    events,
+                    onPressed: (content) {
+                      GoRouter.of(context).goNamed(
+                        RouteNames.eventsPost,
+                        pathParameters: {'id': content.remoteId.toString()},
+                        queryParameters: {'type': RouteParameters.eventType},
+                      );
+                    },
+                  );
+                }
+
+                return const SkeletonContentSliverGrid();
+              },
             ),
           ],
-        ),
-        ListenableBuilder(
-          listenable: command,
-          builder: (context, child) {
-            if (command.completed) {
-              final events = viewModel.byMonth;
-
-              if (events.isEmpty) {
-                return const SliverToBoxAdapter(
-                  child: EmptyView(
-                    text: Text('Nessun evento trovato per questa data.'),
-                  ),
-                );
-              }
-
-              return ContentSliverGrid(
-                events,
-                onPressed: (content) {
-                  GoRouter.of(context).goNamed(
-                    RouteNames.eventsPost,
-                    pathParameters: {'id': content.remoteId.toString()},
-                    queryParameters: {'type': RouteParameters.eventType},
-                  );
-                },
-              );
-            }
-
-            return const SkeletonContentSliverGrid();
-          },
-        ),
-      ],
+        );
+      },
     );
   }
 }

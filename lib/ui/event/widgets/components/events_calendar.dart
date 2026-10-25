@@ -7,6 +7,7 @@ import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_day.dart';
 import 'package:moliseis/ui/event/widgets/components/events_vertical_calendar_month.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:paged_vertical_calendar/paged_vertical_calendar.dart';
 
 class EventsCalendar extends StatefulWidget {
@@ -56,9 +57,12 @@ class _EventsCalendarState extends State<EventsCalendar> {
     final (:startDate, :endDate, :initialDate) =
         EventsCalendar.calendarDateBounds(currentDate);
     return ListenableBuilder(
-      listenable: widget.viewModel.loadAll,
+      listenable: Listenable.merge([
+        widget.viewModel,
+        widget.viewModel.loadAll.results,
+      ]),
       builder: (context, child) {
-        if (widget.viewModel.loadAll.completed) {
+        if (widget.viewModel.loadAll.results.value.completed) {
           return SliverFillRemaining(
             child: _buildCalendar(
               minDate: startDate,
@@ -83,14 +87,14 @@ class _EventsCalendarState extends State<EventsCalendar> {
         return SliverFillRemaining(
           hasScrollBody: false,
           child: Center(
-            child: widget.viewModel.loadAll.running
+            child: widget.viewModel.loadAll.isRunningSync.value
                 ? const EmptyView.loading(text: Text('Caricamento in corso...'))
                 : EmptyView(
                     text: const Text(
                       'Si è verificato un errore durante il caricamento.',
                     ),
                     action: TextButton(
-                      onPressed: widget.viewModel.loadAll.execute,
+                      onPressed: widget.viewModel.loadAll.run,
                       child: const Text('Riprova'),
                     ),
                   ),

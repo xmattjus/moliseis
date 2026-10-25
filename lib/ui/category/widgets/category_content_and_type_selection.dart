@@ -1,5 +1,6 @@
 import 'dart:collection' show UnmodifiableListView;
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
@@ -49,11 +50,11 @@ class _CategoryContentAndTypeSelectionState
   void didUpdateWidget(covariant CategoryContentAndTypeSelection oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.selectedCategories != widget.selectedCategories) {
+    if (!setEquals(oldWidget.selectedCategories, widget.selectedCategories)) {
       _selectedCategories = Set.of(widget.selectedCategories);
     }
 
-    if (oldWidget.selectedTypes != widget.selectedTypes) {
+    if (!setEquals(oldWidget.selectedTypes, widget.selectedTypes)) {
       _selectedTypes = Set.of(widget.selectedTypes);
     }
   }
@@ -68,7 +69,12 @@ class _CategoryContentAndTypeSelectionState
         children: <Widget>[
           InputChip(
             label: Text(
-              _selectedTypes.containsAll({ContentType.event, ContentType.place})
+              _selectedTypes.isEmpty
+                  ? 'Nessun tipo'
+                  : _selectedTypes.containsAll({
+                      ContentType.event,
+                      ContentType.place,
+                    })
                   ? 'Tipo'
                   : _selectedTypes.contains(ContentType.event)
                   ? 'Eventi'
@@ -81,8 +87,10 @@ class _CategoryContentAndTypeSelectionState
           ),
           InputChip(
             label: Text(
-              _selectedCategories.length ==
-                      ContentCategory.values.minusUnknown.length
+              _selectedCategories.isEmpty
+                  ? 'Nessuna categoria'
+                  : _selectedCategories.length ==
+                        ContentCategory.values.minusUnknown.length
                   ? 'Categoria'
                   : _selectedCategories.first.label +
                         (_selectedCategories.length > 1
@@ -100,6 +108,8 @@ class _CategoryContentAndTypeSelectionState
   }
 
   Future<void> _onTypeChipPressed() async {
+    final draft = _selectedTypes;
+    final onChanged = widget.onTypeSelectionChanged;
     await _showAdaptiveSelectionWidget<void>(
       title: 'Seleziona per tipo',
       children: UnmodifiableListView(
@@ -107,27 +117,26 @@ class _CategoryContentAndTypeSelectionState
           (type) => _buildSelectionRow(
             label: type.label,
             itemKey: ValueKey<ContentType>(type),
-            isSelected: _selectedTypes.contains(type),
-            onChanged: (value) => _toggleItem(_selectedTypes, type, value),
+            isSelected: draft.contains(type),
+            onChanged: (value) => _toggleItem(draft, type, value),
           ),
         ),
       ),
     );
 
-    if (mounted) {
-      setState(() {
-        // If the user has selected no types, resets to the default
-        // selection of all types.
-        if (_selectedTypes.isEmpty) {
-          _selectedTypes.addAll(ContentType.values);
-        }
-      });
+    if (!mounted) return;
+    if (!identical(draft, _selectedTypes)) return;
 
-      widget.onTypeSelectionChanged.call(Set.from(_selectedTypes));
-    }
+    setState(() {
+      // Empty is valid while editing; normalize only this current session.
+      if (draft.isEmpty) draft.addAll(ContentType.values);
+    });
+    onChanged(Set.of(draft));
   }
 
   Future<void> _onCategoryChipPressed() async {
+    final draft = _selectedCategories;
+    final onChanged = widget.onCategorySelectionChanged;
     await _showAdaptiveSelectionWidget<void>(
       title: 'Seleziona per categoria',
       children: UnmodifiableListView(
@@ -135,25 +144,20 @@ class _CategoryContentAndTypeSelectionState
           (category) => _buildSelectionRow(
             label: category.label,
             itemKey: ValueKey<ContentCategory>(category),
-            isSelected: _selectedCategories.contains(category),
-            onChanged: (value) =>
-                _toggleItem(_selectedCategories, category, value),
+            isSelected: draft.contains(category),
+            onChanged: (value) => _toggleItem(draft, category, value),
           ),
         ),
       ),
     );
 
-    if (mounted) {
-      setState(() {
-        // If the user has selected no categories, resets to the
-        // default selection of all categories.
-        if (_selectedCategories.isEmpty) {
-          _selectedCategories.addAll(ContentCategory.values.minusUnknown);
-        }
-      });
+    if (!mounted) return;
+    if (!identical(draft, _selectedCategories)) return;
 
-      widget.onCategorySelectionChanged.call(Set.from(_selectedCategories));
-    }
+    setState(() {
+      if (draft.isEmpty) draft.addAll(ContentCategory.values.minusUnknown);
+    });
+    onChanged(Set.of(draft));
   }
 
   Future<T?> _showAdaptiveSelectionWidget<T>({

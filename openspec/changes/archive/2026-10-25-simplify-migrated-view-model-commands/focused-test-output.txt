@@ -1,0 +1,364 @@
+# Normalized historical Flutter test transcript
+
+Execution: initial planning run, 2026-10-24, checkpoint c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1.
+This file was normalized during documentation remediation on 2026-10-25; it is not verbatim raw output and no test was rerun for this remediation.
+Normalization removes the original machine-specific temporary-checkout prefix from test paths; test names, counters, errors, stacks and skip reasons remain unchanged below.
+Original raw SHA-256 verified before normalization: 6cb192e731c4817a961d617e63fe6e7aa02e81f92623884a2b60d51a96870250
+Recorded outcome: 298 passed, 0 failed, 3 pre-existing skips, exit 0. Skipped cases are not verification.
+Reproduce the command in validation-evidence.json against the checkpoint and resolved dependencies; interleaving/timing and raw-byte output identity are not promised. The original temporary raw file is not a portable or guaranteed available artifact.
+
+--- BEGIN NORMALIZED HISTORICAL OUTPUT ---
+00:00 +0: loading test/utils/result_command_test.dart
+00:00 +0: test/utils/result_command_test.dart: MockCommand distinguishes nullable success from initial null
+00:00 +1: test/utils/result_command_test.dart: empty success and retained value never hide domain failure
+00:00 +2: test/utils/result_command_test.dart: snapshot projections separate neutral, null success and failures
+00:00 +3: test/utils/result_command_test.dart: ordinary admission is single-flight and runAsync joins
+00:00 +4: test/utils/result_command_test.dart: no-param factory supports real Success<void>(null)
+00:00 +5: test/utils/result_command_test.dart: dispose completes pending runAsync with neutral current value
+00:00 +6: test/utils/result_command_test.dart: upstream canRun restriction remains authoritative
+00:03 +7: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current success after dispose; checks notifier safety
+A upstream-like / success: global=0, logger=0, FlutterError.onError=0, zone=[], value publications=0, result publications=0, local errors=0, running=true->true, resultError=null, runAsync=null/0
+00:03 +8: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current Result.error after dispose; checks notifier safety
+A upstream-like / Result.error: global=0, logger=0, FlutterError.onError=0, zone=[], value publications=0, result publications=0, local errors=0, running=true->true, resultError=null, runAsync=null/0
+00:03 +9: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current StateError early after dispose; checks notifier safety
+A upstream-like / StateError early: global=0, logger=0, FlutterError.onError=0, zone=[], value publications=0, result publications=1, local errors=1, running=true->true, resultError=StateError, runAsync=null/0
+00:03 +10: test/utils/restartable_command_test.dart: neutral, invalidate and dispose-before-start do no work
+00:03 +10: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current StateError after dispose; checks notifier safety
+  Skip: command_it 9.5.2: late StateError after dispose causes upstream notifier use-after-dispose. Re-enable after an upstream fix.
+00:03 +10 ~1: test/utils/restartable_command_test.dart: neutral, invalidate and dispose-before-start do no work
+00:03 +11 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +12 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +13 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +14 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +15 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +16 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +17 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +18 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +19 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+A upstream-like / AssertionError: global=0, logger=0, FlutterError.onError=0, zone=[AssertionError], value publications=0, result publications=0, local errors=0, running=true->true, resultError=null, runAsync=null/0
+00:03 +20 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+Captured Zone error: Assertion failed: "original late assertion"
+test/utils/command_it_disposal_behavior_test.dart 192:58  main.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 253:15         Declarer.test.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 250:11         Declarer.test.<fn>
+package:test_api/src/backend/invoker.dart 318:9           Invoker._waitForOutstandingCallbacks.<fn> (search_results)
+===== asynchronous gap ===========================
+test/utils/command_it_disposal_behavior_test.dart 168:25  main.<fn>.<fn>.<fn>
+dart:async                                                runZonedGuarded
+test/utils/command_it_disposal_behavior_test.dart 114:13  main.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 253:25         Declarer.test.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 250:11         Declarer.test.<fn>
+package:test_api/src/backend/invoker.dart 318:9           Invoker._waitForOutstandingCallbacks.<fn>
+
+00:03 +21 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +22 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +23 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +24 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +25 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +26 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +27 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +28 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +29 ~1: test/utils/command_it_disposal_behavior_test.dart: A upstream-like captures current AssertionError after dispose; checks notifier safety
+00:03 +30 ~1: test/utils/command_it_disposal_behavior_test.dart: B runAsync captures current success after dispose; checks notifier safety
+B runAsync / success: global=0, logger=0, FlutterError.onError=0, zone=[], value publications=0, result publications=0, local errors=0, running=true->true, resultError=null, runAsync=7/1
+00:04 +31 ~1: test/utils/command_it_disposal_behavior_test.dart: B runAsync captures current StateError after dispose; checks notifier safety
+  Skip: command_it 9.5.2: late StateError after dispose causes upstream notifier use-after-dispose. Re-enable after an upstream fix.
+00:04 +31 ~2: test/utils/command_it_disposal_behavior_test.dart: B runAsync captures current AssertionError after dispose; checks notifier safety
+B runAsync / AssertionError: global=0, logger=0, FlutterError.onError=0, zone=[AssertionError], value publications=0, result publications=0, local errors=0, running=true->true, resultError=null, runAsync=7/1
+Captured Zone error: Assertion failed: "original late assertion"
+test/utils/command_it_disposal_behavior_test.dart 192:58  main.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 253:15         Declarer.test.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 250:11         Declarer.test.<fn>
+package:test_api/src/backend/invoker.dart 318:9           Invoker._waitForOutstandingCallbacks.<fn> (search_results)
+===== asynchronous gap ===========================
+test/utils/command_it_disposal_behavior_test.dart 156:22  main.<fn>.<fn>.<fn>
+dart:async                                                runZonedGuarded
+test/utils/command_it_disposal_behavior_test.dart 114:13  main.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 253:25         Declarer.test.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 250:11         Declarer.test.<fn>
+package:test_api/src/backend/invoker.dart 318:9           Invoker._waitForOutstandingCallbacks.<fn>
+
+00:04 +32 ~2: test/utils/command_it_disposal_behavior_test.dart: E Molise reporting captures current StateError after dispose; checks notifier safety
+  Skip: command_it 9.5.2: late StateError after dispose causes upstream notifier use-after-dispose. Re-enable after an upstream fix.
+00:04 +32 ~3: test/utils/command_it_disposal_behavior_test.dart: E Molise reporting captures current AssertionError after dispose; checks notifier safety
+E Molise reporting / AssertionError: global=0, logger=0, FlutterError.onError=0, zone=[AssertionError], value publications=0, result publications=0, local errors=0, running=true->true, resultError=null, runAsync=null/0
+Captured Zone error: Assertion failed: "original late assertion"
+test/utils/command_it_disposal_behavior_test.dart 192:58  main.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 253:15         Declarer.test.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 250:11         Declarer.test.<fn>
+package:test_api/src/backend/invoker.dart 318:9           Invoker._waitForOutstandingCallbacks.<fn> (search_results)
+===== asynchronous gap ===========================
+test/utils/command_it_disposal_behavior_test.dart 168:25  main.<fn>.<fn>.<fn>
+dart:async                                                runZonedGuarded
+test/utils/command_it_disposal_behavior_test.dart 114:13  main.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 253:25         Declarer.test.<fn>.<fn>
+package:test_api/src/backend/declarer.dart 250:11         Declarer.test.<fn>
+package:test_api/src/backend/invoker.dart 318:9           Invoker._waitForOutstandingCallbacks.<fn>
+
+00:04 +33 ~3: test/utils/command_it_disposal_behavior_test.dart: E Molise reporting captures current Result.error after dispose; checks notifier safety
+E Molise reporting / Result.error: global=0, logger=0, FlutterError.onError=0, zone=[], value publications=0, result publications=0, local errors=0, running=true->true, resultError=null, runAsync=null/0
+00:04 +34 ~3: test/utils/command_it_disposal_behavior_test.dart: C dispose before action entry never enters the user action or publishes a terminal result
+00:04 +35 ~3: test/utils/command_it_disposal_behavior_test.dart: D run after dispose never enters the user action or publishes a terminal result
+00:08 +36 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings revocation before deferred entry starts no repository phase
+00:08 +37 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings pending success retains command until settlement
+00:08 +38 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings pending domain error retains command until settlement
+00:08 +39 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings terminal results listener disposes without reentrant teardown
+00:08 +40 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings terminal value listener disposes without reentrant teardown
+00:08 +41 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings settlement and dispose in same turn: completeFirst=true
+00:08 +42 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings settlement and dispose in same turn: completeFirst=false
+00:08 +43 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings late StateError preserves upstream reporting policy
+00:08 +44 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings late ArgumentError preserves upstream reporting policy
+00:08 +45 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings late AssertionError preserves upstream reporting policy
+00:08 +46 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings transition after revocation invalidates queued idle barrier
+00:08 +47 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings completed owner releases exactly once outside dispose stack
+00:08 +48 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings optimistic notification revokes before persistence
+00:08 +49 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: settings never-run owner releases outside dispose stack
+00:08 +50 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness revocation before deferred entry starts no repository phase
+00:08 +51 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness pending success retains command until settlement
+00:08 +52 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness pending domain error retains command until settlement
+00:08 +53 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness terminal results listener disposes without reentrant teardown
+00:08 +54 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness terminal value listener disposes without reentrant teardown
+00:08 +55 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness settlement and dispose in same turn: completeFirst=true
+00:08 +56 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness settlement and dispose in same turn: completeFirst=false
+00:08 +57 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness late StateError preserves upstream reporting policy
+00:08 +58 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness late ArgumentError preserves upstream reporting policy
+00:08 +59 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness late AssertionError preserves upstream reporting policy
+00:08 +60 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness transition after revocation invalidates queued idle barrier
+00:08 +61 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness completed owner releases exactly once outside dispose stack
+00:08 +62 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness optimistic notification revokes before persistence
+00:08 +63 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: brightness never-run owner releases outside dispose stack
+00:08 +64 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType revocation before deferred entry starts no repository phase
+00:08 +65 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType pending success retains command until settlement
+00:08 +66 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType pending domain error retains command until settlement
+00:08 +67 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType terminal results listener disposes without reentrant teardown
+00:08 +68 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType terminal value listener disposes without reentrant teardown
+00:08 +69 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType settlement and dispose in same turn: completeFirst=true
+00:08 +70 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType settlement and dispose in same turn: completeFirst=false
+00:08 +71 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType late StateError preserves upstream reporting policy
+00:08 +72 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType late ArgumentError preserves upstream reporting policy
+00:08 +73 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType late AssertionError preserves upstream reporting policy
+00:08 +74 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType transition after revocation invalidates queued idle barrier
+00:08 +75 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType completed owner releases exactly once outside dispose stack
+00:08 +76 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType optimistic notification revokes before persistence
+00:08 +77 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: themeType never-run owner releases outside dispose stack
+00:08 +78 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore revocation before deferred entry starts no repository phase
+00:08 +79 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore pending success retains command until settlement
+00:08 +80 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore pending domain error retains command until settlement
+00:08 +81 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore terminal results listener disposes without reentrant teardown
+00:08 +82 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore terminal value listener disposes without reentrant teardown
+00:08 +83 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore settlement and dispose in same turn: completeFirst=true
+00:08 +84 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore settlement and dispose in same turn: completeFirst=false
+00:08 +85 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore late StateError preserves upstream reporting policy
+00:08 +86 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore late ArgumentError preserves upstream reporting policy
+00:08 +87 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore late AssertionError preserves upstream reporting policy
+00:08 +88 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore transition after revocation invalidates queued idle barrier
+00:08 +89 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: explore completed owner releases exactly once outside dispose stack
+00:08 +90 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion revocation before deferred entry starts no repository phase
+00:08 +91 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion pending success retains command until settlement
+00:08 +92 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion pending domain error retains command until settlement
+00:08 +93 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion terminal results listener disposes without reentrant teardown
+00:08 +94 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion terminal value listener disposes without reentrant teardown
+00:08 +95 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion settlement and dispose in same turn: completeFirst=true
+00:08 +96 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion settlement and dispose in same turn: completeFirst=false
+00:08 +97 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion late StateError preserves upstream reporting policy
+00:08 +98 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion late ArgumentError preserves upstream reporting policy
+00:08 +99 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion late AssertionError preserves upstream reporting policy
+00:08 +100 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion transition after revocation invalidates queued idle barrier
+00:08 +101 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: suggestion completed owner releases exactly once outside dispose stack
+00:08 +102 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite revocation before deferred entry starts no repository phase
+00:08 +103 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite pending success retains command until settlement
+00:08 +104 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite pending domain error retains command until settlement
+00:08 +105 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite terminal results listener disposes without reentrant teardown
+00:08 +106 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite terminal value listener disposes without reentrant teardown
+00:08 +107 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite settlement and dispose in same turn: completeFirst=true
+00:08 +108 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite settlement and dispose in same turn: completeFirst=false
+00:08 +109 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite late StateError preserves upstream reporting policy
+00:08 +110 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite late ArgumentError preserves upstream reporting policy
+00:08 +111 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite late AssertionError preserves upstream reporting policy
+00:08 +112 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite transition after revocation invalidates queued idle barrier
+00:08 +113 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: favourite completed owner releases exactly once outside dispose stack
+00:08 +114 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort revocation before deferred entry starts no repository phase
+00:08 +115 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort pending success retains command until settlement
+00:08 +116 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort pending domain error retains command until settlement
+00:08 +117 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort terminal results listener disposes without reentrant teardown
+00:08 +118 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort terminal value listener disposes without reentrant teardown
+00:08 +119 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort settlement and dispose in same turn: completeFirst=true
+00:08 +120 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort settlement and dispose in same turn: completeFirst=false
+00:08 +121 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort late StateError preserves upstream reporting policy
+00:08 +122 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort late ArgumentError preserves upstream reporting policy
+00:08 +123 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort late AssertionError preserves upstream reporting policy
+00:08 +124 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort transition after revocation invalidates queued idle barrier
+00:08 +125 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort completed owner releases exactly once outside dispose stack
+00:08 +126 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort optimistic notification revokes before persistence
+00:08 +127 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: categorySort never-run owner releases outside dispose stack
+00:08 +128 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual revocation before deferred entry starts no repository phase
+00:08 +129 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual pending success retains command until settlement
+00:08 +130 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual pending domain error retains command until settlement
+00:08 +131 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual terminal results listener disposes without reentrant teardown
+00:08 +132 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual terminal value listener disposes without reentrant teardown
+00:08 +133 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual settlement and dispose in same turn: completeFirst=true
+00:08 +134 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual settlement and dispose in same turn: completeFirst=false
+00:08 +135 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual late StateError preserves upstream reporting policy
+00:08 +136 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual late ArgumentError preserves upstream reporting policy
+00:08 +137 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual late AssertionError preserves upstream reporting policy
+00:08 +138 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual transition after revocation invalidates queued idle barrier
+00:08 +139 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventAnnual completed owner releases exactly once outside dispose stack
+00:08 +140 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing revocation before deferred entry starts no repository phase
+00:08 +141 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing pending success retains command until settlement
+00:08 +142 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing pending domain error retains command until settlement
+00:08 +143 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing terminal results listener disposes without reentrant teardown
+00:08 +144 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing terminal value listener disposes without reentrant teardown
+00:08 +145 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing settlement and dispose in same turn: completeFirst=true
+00:08 +146 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing settlement and dispose in same turn: completeFirst=false
+00:08 +147 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing late StateError preserves upstream reporting policy
+00:08 +148 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing late ArgumentError preserves upstream reporting policy
+00:08 +149 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing late AssertionError preserves upstream reporting policy
+00:08 +150 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing transition after revocation invalidates queued idle barrier
+00:08 +151 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventOngoing completed owner releases exactly once outside dispose stack
+00:08 +152 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext revocation before deferred entry starts no repository phase
+00:08 +153 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext pending success retains command until settlement
+00:08 +154 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext pending domain error retains command until settlement
+00:08 +155 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext terminal results listener disposes without reentrant teardown
+00:08 +156 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext terminal value listener disposes without reentrant teardown
+00:08 +157 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext settlement and dispose in same turn: completeFirst=true
+00:08 +158 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext settlement and dispose in same turn: completeFirst=false
+00:08 +159 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext late StateError preserves upstream reporting policy
+00:08 +160 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext late ArgumentError preserves upstream reporting policy
+00:08 +161 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext late AssertionError preserves upstream reporting policy
+00:08 +162 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext transition after revocation invalidates queued idle barrier
+00:08 +163 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: eventNext completed owner releases exactly once outside dispose stack
+00:08 +164 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent revocation before deferred entry starts no repository phase
+00:08 +165 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent pending success retains command until settlement
+00:08 +166 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent pending domain error retains command until settlement
+00:08 +167 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent terminal results listener disposes without reentrant teardown
+00:08 +168 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent terminal value listener disposes without reentrant teardown
+00:08 +169 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent settlement and dispose in same turn: completeFirst=true
+00:08 +170 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent settlement and dispose in same turn: completeFirst=false
+00:08 +171 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent late StateError preserves upstream reporting policy
+00:08 +172 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent late ArgumentError preserves upstream reporting policy
+00:08 +173 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent late AssertionError preserves upstream reporting policy
+00:08 +174 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent transition after revocation invalidates queued idle barrier
+00:08 +175 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postEvent completed owner releases exactly once outside dispose stack
+00:08 +176 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace revocation before deferred entry starts no repository phase
+00:08 +177 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace pending success retains command until settlement
+00:08 +178 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace pending domain error retains command until settlement
+00:08 +179 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace terminal results listener disposes without reentrant teardown
+00:08 +180 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace terminal value listener disposes without reentrant teardown
+00:08 +181 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace settlement and dispose in same turn: completeFirst=true
+00:08 +182 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace settlement and dispose in same turn: completeFirst=false
+00:08 +183 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace late StateError preserves upstream reporting policy
+00:08 +184 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace late ArgumentError preserves upstream reporting policy
+00:08 +185 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace late AssertionError preserves upstream reporting policy
+00:08 +186 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace transition after revocation invalidates queued idle barrier
+00:08 +187 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postPlace completed owner releases exactly once outside dispose stack
+00:08 +188 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby revocation before deferred entry starts no repository phase
+00:08 +189 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby pending success retains command until settlement
+00:08 +190 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby pending domain error retains command until settlement
+00:08 +191 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby terminal results listener disposes without reentrant teardown
+00:08 +192 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby terminal value listener disposes without reentrant teardown
+00:08 +193 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby settlement and dispose in same turn: completeFirst=true
+00:08 +194 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby settlement and dispose in same turn: completeFirst=false
+00:08 +195 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby late StateError preserves upstream reporting policy
+00:08 +196 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby late ArgumentError preserves upstream reporting policy
+00:08 +197 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby late AssertionError preserves upstream reporting policy
+00:08 +198 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby transition after revocation invalidates queued idle barrier
+00:08 +199 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: postNearby completed owner releases exactly once outside dispose stack
+00:08 +200 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync revocation before deferred entry starts no repository phase
+00:08 +201 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync pending success retains command until settlement
+00:08 +202 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync pending domain error retains command until settlement
+00:08 +203 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync terminal results listener disposes without reentrant teardown
+00:08 +204 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync terminal value listener disposes without reentrant teardown
+00:08 +205 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync settlement and dispose in same turn: completeFirst=true
+00:09 +206 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync settlement and dispose in same turn: completeFirst=false
+00:09 +207 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync late StateError preserves upstream reporting policy
+00:09 +208 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync late ArgumentError preserves upstream reporting policy
+00:09 +209 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync late AssertionError preserves upstream reporting policy
+00:09 +210 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync transition after revocation invalidates queued idle barrier
+00:09 +211 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: sync completed owner releases exactly once outside dispose stack
+00:09 +212 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D1 revoke before deferred entry starts no phase
+00:09 +213 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D2 late success retains private settlement beyond 50ms
+00:09 +214 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D2 late domain error retains private settlement beyond 50ms
+00:09 +215 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D2-D4 late StateError preserves original error and stack
+00:09 +216 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D2-D4 late ArgumentError preserves original error and stack
+00:09 +217 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D2-D4 late Object preserves original error and stack
+00:09 +218 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D2-D4 late AssertionError preserves original error and stack
+00:09 +219 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D3 same-turn settlement/dispose completeFirst=true
+00:09 +220 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D3 same-turn settlement/dispose completeFirst=false
+00:09 +221 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D3 terminal VM observer revokes outside notifier dispatch
+00:09 +222 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D3 sync idle observer admits then revokes the deferred next request
+00:09 +223 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D3 reentrant second request stays single-flight disposeSecond=false
+00:09 +224 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D3 reentrant second request stays single-flight disposeSecond=true
+00:09 +225 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D3 never-run all five result notifiers release once
+00:09 +226 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 add D3 idle all five result notifiers release once
+00:09 +227 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D1 revoke before deferred entry starts no phase
+00:09 +228 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D2 late success retains private settlement beyond 50ms
+00:09 +229 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D2 late domain error retains private settlement beyond 50ms
+00:09 +230 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D2-D4 late StateError preserves original error and stack
+00:09 +231 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D2-D4 late ArgumentError preserves original error and stack
+00:09 +232 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D2-D4 late Object preserves original error and stack
+00:09 +233 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D2-D4 late AssertionError preserves original error and stack
+00:09 +234 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D3 same-turn settlement/dispose completeFirst=true
+00:09 +235 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D3 same-turn settlement/dispose completeFirst=false
+00:09 +236 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D3 terminal VM observer revokes outside notifier dispatch
+00:09 +237 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D3 sync idle observer admits then revokes the deferred next request
+00:09 +238 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D3 reentrant second request stays single-flight disposeSecond=false
+00:09 +239 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D3 reentrant second request stays single-flight disposeSecond=true
+00:09 +240 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D3 never-run all five result notifiers release once
+00:09 +241 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 remove D3 idle all five result notifiers release once
+00:09 +242 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D1 revoke before deferred entry starts no phase
+00:09 +243 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D2 late success retains private settlement beyond 50ms
+00:09 +244 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D2 late domain error retains private settlement beyond 50ms
+00:09 +245 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D2-D4 late StateError preserves original error and stack
+00:09 +246 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D2-D4 late ArgumentError preserves original error and stack
+00:09 +247 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D2-D4 late Object preserves original error and stack
+00:09 +248 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D2-D4 late AssertionError preserves original error and stack
+00:09 +249 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D3 same-turn settlement/dispose completeFirst=true
+00:09 +250 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D3 same-turn settlement/dispose completeFirst=false
+00:09 +251 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D3 terminal VM observer revokes outside notifier dispatch
+00:09 +252 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D3 sync idle observer admits then revokes the deferred next request
+00:09 +253 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D3 reentrant second request stays single-flight disposeSecond=false
+00:09 +254 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D3 reentrant second request stays single-flight disposeSecond=true
+00:09 +255 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D3 never-run all five result notifiers release once
+00:09 +256 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 submit D3 idle all five result notifiers release once
+00:09 +257 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D1 revoke before deferred entry starts no phase
+00:09 +258 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D2 late success retains private settlement beyond 50ms
+00:09 +259 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D2 late domain error retains private settlement beyond 50ms
+00:09 +260 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D2-D4 late StateError preserves original error and stack
+00:09 +261 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D2-D4 late ArgumentError preserves original error and stack
+00:09 +262 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D2-D4 late Object preserves original error and stack
+00:09 +263 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D2-D4 late AssertionError preserves original error and stack
+00:09 +264 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D3 same-turn settlement/dispose completeFirst=true
+00:09 +265 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D3 same-turn settlement/dispose completeFirst=false
+00:09 +266 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D3 terminal VM observer revokes outside notifier dispatch
+00:09 +267 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D3 sync idle observer admits then revokes the deferred next request
+00:09 +268 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D3 reentrant second request stays single-flight disposeSecond=false
+00:09 +269 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D3 reentrant second request stays single-flight disposeSecond=true
+00:09 +270 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D3 never-run all five result notifiers release once
+00:09 +271 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 clear D3 idle all five result notifiers release once
+00:09 +272 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D1 revoke before deferred entry starts no phase
+00:09 +273 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D2 late success retains private settlement beyond 50ms
+00:09 +274 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D2 late domain error retains private settlement beyond 50ms
+00:09 +275 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D2-D4 late StateError preserves original error and stack
+00:09 +276 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D2-D4 late ArgumentError preserves original error and stack
+00:09 +277 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D2-D4 late Object preserves original error and stack
+00:09 +278 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D2-D4 late AssertionError preserves original error and stack
+00:09 +279 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D3 same-turn settlement/dispose completeFirst=true
+00:09 +280 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D3 same-turn settlement/dispose completeFirst=false
+00:09 +281 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D3 terminal VM observer revokes outside notifier dispatch
+00:09 +282 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D3 sync idle observer admits then revokes the deferred next request
+00:09 +283 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D3 reentrant second request stays single-flight disposeSecond=false
+00:09 +284 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D3 reentrant second request stays single-flight disposeSecond=true
+00:09 +285 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D3 never-run all five result notifiers release once
+00:09 +286 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 recovery D3 idle all five result notifiers release once
+00:09 +287 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 pending first upload starts neither next upload nor remote submit
+00:09 +288 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 post-ack staged cleanup settles without rotation or pending reset
+00:09 +289 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 bootstrap reconcile pending starts no next resolution or publication
+00:09 +290 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 bootstrap resolve pending starts no next resolution or publication
+00:09 +291 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 add candidate resolve settles without publishing asset
+00:09 +292 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 recovery candidate resolve settles without publishing asset
+00:09 +293 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 add direct length settlement starts no next file read or staging
+00:09 +294 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 add direct hash settlement starts no next file read or staging
+00:09 +295 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 recovery direct length settlement starts no next file read or staging
+00:09 +296 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Content Submission private ordinary owners D1-D4 D1 recovery direct hash settlement starts no next file read or staging
+00:09 +297 ~3: test/ui/ordinary_view_model_lifecycle_test.dart: Favourite forwarding can revoke owner during VM notification
+00:09 +298 ~3: All tests passed!

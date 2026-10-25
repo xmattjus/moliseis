@@ -1,0 +1,546 @@
+{
+  "date": "2026-10-24",
+  "kind": "Historical initial planning evidence from 2026-10-24; current checks are in documentationRemediation",
+  "pr": {
+    "url": "https://github.com/xmattjus/moliseis/pull/12",
+    "state": "open",
+    "draft": true,
+    "headBranch": "codex/migrate-legacy-commands",
+    "head": "c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1",
+    "baseBranch": "main",
+    "base": "ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+    "preflightAndFinalMatch": true
+  },
+  "openspec": {
+    "version": "1.14.3",
+    "schema": "spec-driven",
+    "directStrictExit": 0,
+    "directStrictInfo": "Pending migration-added requirement not in canonical; cannot apply this delta before prior migrations",
+    "effectiveComposition": {
+      "tool": "OpenSpec installed specs-apply.js buildUpdatedSpec; no archive/sync command",
+      "order": [
+        "migrate-simple-view-model-commands",
+        "migrate-category-view-model-commands",
+        "migrate-content-view-model-commands",
+        "migrate-search-map-commands",
+        "migrate-content-submission-commands",
+        "migrate-admin-session-commands",
+        "migrate-admin-editor-commands"
+      ],
+      "priorDeltas": 13,
+      "priorWarnings": [],
+      "strictChangeValidation": {
+        "exit": 0,
+        "output": "Change 'simplify-migrated-view-model-commands' is valid",
+        "stderr": ""
+      },
+      "final": [
+        {
+          "spec": "command-execution-concurrency",
+          "counts": {
+            "added": 0,
+            "modified": 13,
+            "removed": 0,
+            "renamed": 0
+          },
+          "warnings": [],
+          "requirements": 59
+        }
+      ]
+    },
+    "status": "all four planning artifacts done; implementation tasks unchecked"
+  },
+  "tests": {
+    "cwd": "isolated temporary copy of checkpoint lib/test/assets/pubspec; existing resolved dependency metadata copied read-only",
+    "command": "flutter test --no-pub --reporter expanded test/utils/result_command_test.dart test/utils/restartable_command_test.dart test/utils/command_it_disposal_behavior_test.dart test/ui/ordinary_view_model_lifecycle_test.dart",
+    "exit": 0,
+    "passed": 298,
+    "failed": 0,
+    "skipped": 3,
+    "skipReason": "Pre-existing command_it 9.5.2 direct late-StateError-after-dispose cases; skipped cases are not verification",
+    "outputFile": "focused-test-output.txt",
+    "outputSha256": "8fdc1c63c19353383b0d2c17505f951261dbd5b21283cb11e448853da75a80fa",
+    "executionDate": "2026-10-24",
+    "rerunDuringDocumentationRemediation": false,
+    "originalRawOutputSha256": "6cb192e731c4817a961d617e63fe6e7aa02e81f92623884a2b60d51a96870250",
+    "outputFormat": "Explicitly normalized historical transcript; not verbatim raw output",
+    "normalization": {
+      "date": "2026-10-25",
+      "transform": "Remove the original machine-specific temporary-checkout prefix from test paths; add an explanatory provenance header. Preserve all original outcome/skip/error/stack lines otherwise.",
+      "originalRawHashVerifiedBeforeNormalization": true,
+      "rawAvailability": "Original temporary raw output is not a portable or guaranteed available artifact. Its prior hash is retained.",
+      "reproducibility": "The recorded command and Git checkpoint are reproducible with resolved runtime prerequisites; execution timing/interleaving and exact raw bytes are not guaranteed."
+    }
+  },
+  "review": {
+    "independentReviewer": "configured reviewer agent, read-only",
+    "IR1": "fixed and independently re-read, closed",
+    "otherMaterialFindings": "none remain in plan",
+    "limits": "future implementation equivalence not validated"
+  },
+  "worktrees": [
+    {
+      "gitState": [
+        "HEAD ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+        "branch refs/heads/main"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "55722031aa1e9c4af7cb1b04c2252f4497939d9829990af2c21601e1cca5d5bc",
+      "indexSha256": "80fd2623ef6918f7305eed394b28028d87b09de712cd62ba30ed44f45a16ac67",
+      "label": "prior-worktree-01"
+    },
+    {
+      "gitState": [
+        "HEAD ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+        "detached"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "9e51984647be7dbd6026a9845d82ced724e30a3c27a2ad3907453d89d2afa82c",
+      "indexSha256": "1a800a69c82c44e2180df72ef84df1b21c9f4936beb8b312a82a8ecb4f5f5058",
+      "label": "prior-worktree-02"
+    },
+    {
+      "gitState": [
+        "HEAD c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1",
+        "branch refs/heads/codex/pr12-final-reconciliation"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "a322abf663a1b1c61c92bcc4295caabdb18c434696e14d21df556aa32fe67a9e",
+      "indexSha256": "50b806cb4de273dfaf8d64fb86d46b62dbc6782ec6bb550070d97ead10881a9f",
+      "label": "prior-worktree-03"
+    },
+    {
+      "gitState": [
+        "HEAD 52d4e448d010d2d13c13a4d3d665cdf5b1b0103b",
+        "branch refs/heads/codex/plan-migrate-admin-editor-commands"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "10578732eaa298cdc079147219a5aa23f52ae7c908a83911e9a9dc210242ceb1",
+      "indexSha256": "862b1e5901619b60e5d023419d7b051443ab4ddce41d3e4615032e0c30c3d620",
+      "label": "prior-worktree-04"
+    },
+    {
+      "gitState": [
+        "HEAD 0cdb764a7586f85180a802fafcf2b485791cb5ff",
+        "branch refs/heads/codex/plan-migrate-admin-session-commands"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "e85f9f8acd8083c0359fcc40230ef94b5c81178da424b5390eff8f0a92150cf9",
+      "indexSha256": "9f095f7776b97046a865ea28af34fa0be465b38ee2653952ee086415454323d4",
+      "label": "prior-worktree-05"
+    },
+    {
+      "gitState": [
+        "HEAD e3d9d891c5b560524e66b35f0bf70f9108cacb7e",
+        "branch refs/heads/codex/plan-migrate-category-view-model-commands"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "e69718cc08aac1b03dd04355c2eba567e8e7c6f399c35238eade39bbcd05590b",
+      "indexSha256": "d43600a3c33a5815f22fa4088d5aa3d842f0eaf94c723f98f40249c108601473",
+      "label": "prior-worktree-06"
+    },
+    {
+      "gitState": [
+        "HEAD e80dfbaf472ef1cc15b220a48df966509a9ee8a1",
+        "branch refs/heads/codex/plan-migrate-content-submission-commands"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "b1a57f2f3bf2c5526b3f720ef45658453242a30d279192d826d15a73a3061e63",
+      "indexSha256": "0332cec0f24552b7bbc2a91c1eac086a29d30362e79422c2a8a3774369c49341",
+      "label": "prior-worktree-07"
+    },
+    {
+      "gitState": [
+        "HEAD 1f3753b10c18061c6655cb32d078bf93aff1b05e",
+        "branch refs/heads/codex/plan-migrate-content-view-model-commands"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "2aa2a7b44cb8f5c399cf8b876bf3965ea505579e0c9a184e865b0c211a6a033a",
+      "indexSha256": "af7519a2aa31554fc8ed45c7f12aff5e756d759178bc96c736991b621a4cd95c",
+      "label": "prior-worktree-08"
+    },
+    {
+      "gitState": [
+        "HEAD f48a08946c9ac40146104a0157556243ad433c92",
+        "branch refs/heads/codex/plan-migrate-search-map-commands"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "2112e2c04dbb6d87cec827fadaa65ca7094fa9adb1515c543d0506e30ce6b5e2",
+      "indexSha256": "5102d11a75033a53872a976c5303dfe732250164666b66ccfbea464bae6e27ba",
+      "label": "prior-worktree-09"
+    },
+    {
+      "gitState": [
+        "HEAD 9d17d224d5094c5b043128113d9aba6a1ce69f0a",
+        "branch refs/heads/migrate-simple-view-model-commands"
+      ],
+      "headBranchStatusContentIndexPreserved": true,
+      "contentSha256": "43b4aca06fd50b3ea35d499afa024f240cf7bbd76553bd31828efefdd5aaf113",
+      "indexSha256": "8626026a20e6ff8770673fe28ed337b2545f9bf3a80d39372f886956b9db7867",
+      "label": "prior-worktree-10"
+    }
+  ],
+  "integrity": {
+    "otherWorktreesPreserved": 10,
+    "existingTrackedFilesChanged": 0,
+    "existingHistoricalArtifactsUnchanged": 50,
+    "productionOrTestEdits": false,
+    "commits": false,
+    "pushes": false,
+    "prMutation": false,
+    "newFilesOnlyUnder": "openspec/changes/simplify-migrated-view-model-commands/"
+  },
+  "documentationRemediation": {
+    "date": "2026-10-25",
+    "scope": "F1\u2013F3 documentation only; existing artifact files only; no simplification implementation",
+    "originalEvidenceFileSha256": "c5d48e964f60ed5b22273f6570684b86fc246d5db7fbae430019afc49e0043fc",
+    "git": {
+      "repository": "xmattjus/moliseis",
+      "pr": 12,
+      "url": "https://github.com/xmattjus/moliseis/pull/12",
+      "state": "open",
+      "draft": true,
+      "headBranch": "codex/migrate-legacy-commands",
+      "head": "c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1",
+      "parent": "52d4e448d010d2d13c13a4d3d665cdf5b1b0103b",
+      "baseBranch": "main",
+      "base": "ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+      "planningBranch": "codex/plan-simplify-migrated-view-model-commands",
+      "planningDirectory": "moliseis-worktrees/simplify-migrated-view-model-commands",
+      "localOriginRefsMatchConnectedPr": true
+    },
+    "initialState": {
+      "trackedChanges": [],
+      "stagedChanges": [],
+      "untrackedArtifactCount": 15,
+      "artifactBytesCapturedBeforeEditing": true,
+      "otherWorktreesInventoried": 10
+    },
+    "findings": {
+      "F1": "RESOLVED: actual popup-route subscription and rendered acceptance",
+      "F2": "RESOLVED: permanent local release identity guard and convergent-cleanup acceptance",
+      "F3": "RESOLVED: seven verified rename pairs with thirteen final-header modifications"
+    },
+    "modifiedArtifacts": [
+      "openspec/changes/simplify-migrated-view-model-commands/design.md",
+      "openspec/changes/simplify-migrated-view-model-commands/tasks.md",
+      "openspec/changes/simplify-migrated-view-model-commands/test-plan.md",
+      "openspec/changes/simplify-migrated-view-model-commands/specs/command-execution-concurrency/spec.md",
+      "openspec/changes/simplify-migrated-view-model-commands/simplification-audit.md",
+      "openspec/changes/simplify-migrated-view-model-commands/independent-review.md",
+      "openspec/changes/simplify-migrated-view-model-commands/validation.md",
+      "openspec/changes/simplify-migrated-view-model-commands/validation-evidence.json",
+      "openspec/changes/simplify-migrated-view-model-commands/spec-composition-check.mjs",
+      "openspec/changes/simplify-migrated-view-model-commands/focused-test-output.txt"
+    ],
+    "directStrictValidation": {
+      "command": "openspec validate simplify-migrated-view-model-commands --type change --strict --no-interactive",
+      "exit": 0,
+      "output": "Change is valid",
+      "informationalConstraint": "Against unsynchronized canonical alone, the first pending RENAMED source is not found. Apply the seven preceding migration deltas first; the composed validation below has no diagnostic."
+    },
+    "effectiveComposition": {
+      "tool": "Installed OpenSpec buildUpdatedSpec and parseDeltaSpec; no archive/sync command",
+      "version": "1.14.3",
+      "applicationOrder": "RENAMED -> REMOVED -> MODIFIED -> ADDED; MODIFIED uses TO header",
+      "implementationSha256": "54eb0e80c13e569ca2bfe84ed5ff937545d925e629b372533129923827d4c3ff",
+      "parserSha256": "8b1e4fae7b079f7a58c7c8115da326131f3adff7f14c4af9be8c06e65dfa2ee4",
+      "order": [
+        "migrate-simple-view-model-commands",
+        "migrate-category-view-model-commands",
+        "migrate-content-view-model-commands",
+        "migrate-search-map-commands",
+        "migrate-content-submission-commands",
+        "migrate-admin-session-commands",
+        "migrate-admin-editor-commands",
+        "simplify-migrated-view-model-commands"
+      ],
+      "priorDeltas": 13,
+      "priorWarnings": [],
+      "strictChangeValidation": {
+        "exit": 0,
+        "output": "Change 'simplify-migrated-view-model-commands' is valid",
+        "stderr": ""
+      },
+      "replacements": 13,
+      "renameLedger": [
+        {
+          "from": "Search history deduplication respects repository identity and knowledge",
+          "to": "Search history mutations use repository identity rules"
+        },
+        {
+          "from": "Search history rollback rebases later accepted intentions",
+          "to": "Search history presentation retains confirmed data"
+        },
+        {
+          "from": "History read authority changes at mutation acceptance",
+          "to": "History reads remain independent of accepted writes"
+        },
+        {
+          "from": "Runtime write failure requests bounded history reconciliation",
+          "to": "Runtime history write failures allow explicit read-only recovery"
+        },
+        {
+          "from": "History read demands distinguish stale errors from retry loops",
+          "to": "History read failures terminate without automatic retry"
+        },
+        {
+          "from": "Explicit history refresh registers independent read demand",
+          "to": "Explicit history refresh uses ordinary single-flight admission"
+        },
+        {
+          "from": "Editor changes retain an owner-local refresh obligation",
+          "to": "Editor return requests best-effort dashboard refresh"
+        }
+      ],
+      "counts": {
+        "added": 0,
+        "modified": 13,
+        "removed": 0,
+        "renamed": 7
+      },
+      "warnings": [],
+      "targetCapability": {
+        "name": "command-execution-concurrency",
+        "before": {
+          "capabilities": 1,
+          "requirements": 59,
+          "scenarios": 287
+        },
+        "after": {
+          "capabilities": 1,
+          "requirements": 59,
+          "scenarios": 290
+        }
+      },
+      "allCapabilities": {
+        "before": {
+          "capabilities": 17,
+          "requirements": 240,
+          "scenarios": 972
+        },
+        "after": {
+          "capabilities": 17,
+          "requirements": 240,
+          "scenarios": 975
+        }
+      },
+      "targetedOriginalNames": [
+        "Only authoritative completion can commit asynchronous data",
+        "Search history preserves accepted mutation order",
+        "Accepted history persistence survives presentation disposal",
+        "Search history deduplication respects repository identity and knowledge",
+        "Search history rollback rebases later accepted intentions",
+        "History read authority changes at mutation acceptance",
+        "Runtime write failure requests bounded history reconciliation",
+        "History read demands distinguish stale errors from retry loops",
+        "Explicit history refresh registers independent read demand",
+        "Editor changes retain an owner-local refresh obligation",
+        "Dashboard entry and refresh consumers retain behavior",
+        "Admin editor results preserve failure kind and original reporting",
+        "Admin editor revocation preserves private physical settlement"
+      ],
+      "finalTargetNames": [
+        "Only authoritative completion can commit asynchronous data",
+        "Search history preserves accepted mutation order",
+        "Accepted history persistence survives presentation disposal",
+        "Search history mutations use repository identity rules",
+        "Search history presentation retains confirmed data",
+        "History reads remain independent of accepted writes",
+        "Runtime history write failures allow explicit read-only recovery",
+        "History read failures terminate without automatic retry",
+        "Explicit history refresh uses ordinary single-flight admission",
+        "Editor return requests best-effort dashboard refresh",
+        "Dashboard entry and refresh consumers retain behavior",
+        "Admin editor results preserve failure kind and original reporting",
+        "Admin editor revocation preserves private physical settlement"
+      ],
+      "addedScenarios": [
+        {
+          "requirement": "Search history presentation retains confirmed data",
+          "scenario": "Open popup updates from a confirmed read"
+        },
+        {
+          "requirement": "Search history presentation retains confirmed data",
+          "scenario": "Popup history observation changes owner or ends"
+        },
+        {
+          "requirement": "Admin editor revocation preserves private physical settlement",
+          "scenario": "Overlapping cleanup of a never-started command"
+        }
+      ],
+      "checks": {
+        "allOriginalTargetsPresent": true,
+        "allPreviousRequirementsAvailable": true,
+        "originalScenariosPreserved": true,
+        "allModifiedBodiesApplied": true,
+        "obsoleteRenameHeadersAbsent": true,
+        "duplicateOrOrphanRequirements": 0,
+        "duplicateScopedScenarios": 0,
+        "unrelatedCapabilitiesUnchanged": true
+      }
+    },
+    "checksActuallyExecuted": [
+      "Git/connected PR baseline and parent verification",
+      "Initial status/index/content/artifact snapshot",
+      "Installed parser/application implementation inspection",
+      "OpenSpec strict change validation",
+      "Isolated seven-migration-plus-simplification composition and all thirteen target mappings",
+      "Requirement and scoped scenario uniqueness, orphan and no-loss checks",
+      "node --check on the existing validation script",
+      "JSON parsing for every artifact JSON and installed YAML parser for .openspec.yaml",
+      "Markdown delta parser/heading/table/reference review",
+      "English explanatory-text and portable-path review",
+      "Trailing whitespace/final newline/realpath containment checks",
+      "Historical artifact hashes and previous ten worktree HEAD/branch/status/index/content checks",
+      "Exact before/after artifact diff and unchanged tracked/staged tree checks"
+    ],
+    "flutterTests": "NOT RUN during this documentation remediation",
+    "analyzer": "NOT RUN during this documentation remediation",
+    "ci": "No fresh CI run claimed",
+    "focusedReview": {
+      "role": "configured reviewer, read-only",
+      "scope": "F1\u2013F3 only",
+      "outcome": "No remaining material finding; reviewer independently reran official composition",
+      "implementationEquivalenceVerified": false
+    },
+    "preservation": {
+      "otherWorktrees": [
+        {
+          "label": "prior-worktree-01",
+          "gitState": [
+            "HEAD ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+            "branch refs/heads/main"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "55722031aa1e9c4af7cb1b04c2252f4497939d9829990af2c21601e1cca5d5bc",
+          "indexSha256": "80fd2623ef6918f7305eed394b28028d87b09de712cd62ba30ed44f45a16ac67",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-02",
+          "gitState": [
+            "HEAD ee60777c7fdfc5c16daa1151050c134fbb7cde29",
+            "detached"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "9e51984647be7dbd6026a9845d82ced724e30a3c27a2ad3907453d89d2afa82c",
+          "indexSha256": "1a800a69c82c44e2180df72ef84df1b21c9f4936beb8b312a82a8ecb4f5f5058",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-03",
+          "gitState": [
+            "HEAD c6e4a21b17f9d14299f7a159dd7bebe5b31d9af1",
+            "branch refs/heads/codex/pr12-final-reconciliation"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "a322abf663a1b1c61c92bcc4295caabdb18c434696e14d21df556aa32fe67a9e",
+          "indexSha256": "50b806cb4de273dfaf8d64fb86d46b62dbc6782ec6bb550070d97ead10881a9f",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-04",
+          "gitState": [
+            "HEAD 52d4e448d010d2d13c13a4d3d665cdf5b1b0103b",
+            "branch refs/heads/codex/plan-migrate-admin-editor-commands"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "10578732eaa298cdc079147219a5aa23f52ae7c908a83911e9a9dc210242ceb1",
+          "indexSha256": "862b1e5901619b60e5d023419d7b051443ab4ddce41d3e4615032e0c30c3d620",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-05",
+          "gitState": [
+            "HEAD 0cdb764a7586f85180a802fafcf2b485791cb5ff",
+            "branch refs/heads/codex/plan-migrate-admin-session-commands"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "e85f9f8acd8083c0359fcc40230ef94b5c81178da424b5390eff8f0a92150cf9",
+          "indexSha256": "9f095f7776b97046a865ea28af34fa0be465b38ee2653952ee086415454323d4",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-06",
+          "gitState": [
+            "HEAD e3d9d891c5b560524e66b35f0bf70f9108cacb7e",
+            "branch refs/heads/codex/plan-migrate-category-view-model-commands"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "e69718cc08aac1b03dd04355c2eba567e8e7c6f399c35238eade39bbcd05590b",
+          "indexSha256": "d43600a3c33a5815f22fa4088d5aa3d842f0eaf94c723f98f40249c108601473",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-07",
+          "gitState": [
+            "HEAD e80dfbaf472ef1cc15b220a48df966509a9ee8a1",
+            "branch refs/heads/codex/plan-migrate-content-submission-commands"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "b1a57f2f3bf2c5526b3f720ef45658453242a30d279192d826d15a73a3061e63",
+          "indexSha256": "0332cec0f24552b7bbc2a91c1eac086a29d30362e79422c2a8a3774369c49341",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-08",
+          "gitState": [
+            "HEAD 1f3753b10c18061c6655cb32d078bf93aff1b05e",
+            "branch refs/heads/codex/plan-migrate-content-view-model-commands"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "2aa2a7b44cb8f5c399cf8b876bf3965ea505579e0c9a184e865b0c211a6a033a",
+          "indexSha256": "af7519a2aa31554fc8ed45c7f12aff5e756d759178bc96c736991b621a4cd95c",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-09",
+          "gitState": [
+            "HEAD f48a08946c9ac40146104a0157556243ad433c92",
+            "branch refs/heads/codex/plan-migrate-search-map-commands"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "2112e2c04dbb6d87cec827fadaa65ca7094fa9adb1515c543d0506e30ce6b5e2",
+          "indexSha256": "5102d11a75033a53872a976c5303dfe732250164666b66ccfbea464bae6e27ba",
+          "matchesRemediationPreflight": true
+        },
+        {
+          "label": "prior-worktree-10",
+          "gitState": [
+            "HEAD 9d17d224d5094c5b043128113d9aba6a1ce69f0a",
+            "branch refs/heads/migrate-simple-view-model-commands"
+          ],
+          "initialStatusPreserved": true,
+          "contentSha256": "43b4aca06fd50b3ea35d499afa024f240cf7bbd76553bd31828efefdd5aaf113",
+          "indexSha256": "8626026a20e6ff8770673fe28ed337b2545f9bf3a80d39372f886956b9db7867",
+          "matchesRemediationPreflight": true
+        }
+      ],
+      "historicalArtifactsVerified": 50,
+      "baselineArtifactsUnchanged": [
+        ".openspec.yaml",
+        "proposal.md",
+        "metrics.md",
+        "metrics.json",
+        "historical-artifact-inventory.json"
+      ],
+      "existingArtifactSetPreserved": true,
+      "implementationTasksUnchecked": 9,
+      "productionTestBackendDependencyEdits": false,
+      "commits": false,
+      "pushes": false,
+      "prModifications": false,
+      "syncOrArchive": false
+    },
+    "documentationHygiene": {
+      "explanatoryLanguage": "English",
+      "exactUiIdentifiersMayRemainItalian": true,
+      "machineSpecificPaths": "Removed from the normalized historical transcript and replaced with stable labels in evidence; no such paths remain",
+      "historicalHashesPreservedExceptChangedSourceBytes": true,
+      "normalizedTranscriptSha256": "8fdc1c63c19353383b0d2c17505f951261dbd5b21283cb11e448853da75a80fa"
+    },
+    "preliminaryChecks": "The first strengthened composition check caught a misplaced scenario in a rename TO line and then an extra-blank-line raw-body mismatch. Both documentary issues were corrected before the final successful strict/composition checks; neither was a runtime or Flutter test result.",
+    "blockers": []
+  }
+}

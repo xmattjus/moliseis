@@ -14,8 +14,10 @@ import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
-// import 'package:moliseis/features/settings/domain/theme_type.dart';
+import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
+
+// import 'package:moliseis/features/settings/domain/theme_type.dart';
 
 // typedef _ThemeTypeEntry = DropdownMenuEntry<ThemeType>;
 
@@ -93,11 +95,9 @@ class SettingsScreen extends StatelessWidget {
                       subtitle: Text(darkModeSubtitle),
                       trailing: DropdownMenu<ThemeBrightness>(
                         initialSelection: themeProvider.themeBrightness,
-                        onSelected: (brightness) async {
+                        onSelected: (brightness) {
                           if (brightness != null) {
-                            await themeProvider.setThemeBrightness.execute(
-                              brightness,
-                            );
+                            themeProvider.setThemeBrightness.run(brightness);
                           }
                         },
                         dropdownMenuEntries:
@@ -124,9 +124,28 @@ class SettingsScreen extends StatelessWidget {
                 return SwitchListTile(
                   value: sentryLoggingEnabled,
                   onChanged: (value) async {
-                    await viewModel.setCrashReporting.execute(value);
-
-                    if (context.mounted && value) {
+                    final command = viewModel.setCrashReporting;
+                    if (viewModel.isDisposed ||
+                        command.isRunningSync.value ||
+                        !command.canRun.value) {
+                      return;
+                    }
+                    // The global handler reports unexpected failures.
+                    // This continuation only observes its own admitted run.
+                    final result = await command
+                        .runAsync(value)
+                        .then(
+                          (result) => result,
+                          onError: (Object _, StackTrace _) => null,
+                        );
+                    if (!context.mounted) return;
+                    if (!viewModel.isDisposed &&
+                        value &&
+                        result is Success<void> &&
+                        identical(
+                          context.read<SettingsViewModel>(),
+                          viewModel,
+                        )) {
                       showSnackBar(
                         context: context,
                         textContent:

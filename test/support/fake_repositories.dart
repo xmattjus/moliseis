@@ -40,7 +40,6 @@ import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
-import 'package:moliseis/utils/command.dart' show Command;
 import 'package:moliseis/utils/result.dart';
 
 import 'mock_logger.dart';
@@ -198,6 +197,31 @@ final class FakeAdminContentSubmissionRepository
   Result<void> deleteAssetResult;
 
   int listCallCount = 0;
+
+  /// Remote dashboard phase order, including reads following a mutation.
+  final dashboardCalls = <String>[];
+
+  /// Optional entry barriers; invoked only after the call has been counted.
+  void Function()? onListEntry;
+  void Function()? onIgnoredListEntry;
+  void Function(int recordId)? onUnIgnoreEntry;
+
+  /// Per-call async overrides preserve the ordinary configured-result defaults.
+  Future<Result<AdminSubmission>> Function(int id)? onGetById;
+  Future<Result<AdminEventCandidates>> Function(
+    int id,
+    String? searchName,
+    int? targetEventId,
+  )?
+  onEventCandidates;
+  Future<Result<AdminEventResolution>> Function(
+    int id,
+    int targetEventId, {
+    bool? acknowledgeCurrentSource,
+    String? expectedSourceHash,
+  })?
+  onLink;
+
   final getByIdIds = <int>[];
   final createInputs = <AdminSubmissionInput>[];
   final updateIds = <int>[];
@@ -232,6 +256,8 @@ final class FakeAdminContentSubmissionRepository
   @override
   Future<Result<List<AdminSubmission>>> list() async {
     listCallCount++;
+    dashboardCalls.add('list');
+    onListEntry?.call();
     final pending = pendingList;
     if (pending != null) return await pending.future;
     return listResult;
@@ -240,6 +266,7 @@ final class FakeAdminContentSubmissionRepository
   @override
   Future<Result<AdminSubmission>> getById(int id) async {
     getByIdIds.add(id);
+    if (onGetById case final handler?) return await handler(id);
     return getByIdResults[id] ??
         Result.error(TestException('Admin submission $id not configured'));
   }
@@ -315,17 +342,25 @@ final class FakeAdminContentSubmissionRepository
   );
   Result<AdminEventResolution>? unIgnoreResult;
   Completer<Result<AdminEventResolution>>? pendingUnIgnore;
+
+  /// Holds ignored-source reads independently from submissions reads.
+  Completer<Result<List<AdminIgnoredSource>>>? pendingIgnoredList;
   int ignoredListCalls = 0;
   final unIgnoreCalls = <int>[];
   @override
   Future<Result<List<AdminIgnoredSource>>> listIgnoredSources() async {
     ignoredListCalls++;
+    dashboardCalls.add('listIgnoredSources');
+    onIgnoredListEntry?.call();
+    if (pendingIgnoredList case final pending?) return await pending.future;
     return ignoredSourcesResult;
   }
 
   @override
   Future<Result<AdminEventResolution>> unIgnoreSource(int recordId) async {
     unIgnoreCalls.add(recordId);
+    dashboardCalls.add('unIgnoreSource:$recordId');
+    onUnIgnoreEntry?.call(recordId);
     if (pendingUnIgnore case final pending?) return await pending.future;
     return unIgnoreResult ??
         Result.error(TestException('No un-ignore configured'));
@@ -349,6 +384,9 @@ final class FakeAdminContentSubmissionRepository
     int? targetEventId,
   }) async {
     candidateCalls.add((id, searchName, targetEventId));
+    if (onEventCandidates case final handler?) {
+      return await handler(id, searchName, targetEventId);
+    }
     return candidatesResult ??
         Result.error(TestException('No candidates configured'));
   }
@@ -378,6 +416,14 @@ final class FakeAdminContentSubmissionRepository
       acknowledgeCurrentSource,
       expectedSourceHash,
     ));
+    if (onLink case final handler?) {
+      return await handler(
+        id,
+        targetEventId,
+        acknowledgeCurrentSource: acknowledgeCurrentSource,
+        expectedSourceHash: expectedSourceHash,
+      );
+    }
     return linkResult ?? Result.error(TestException('No link configured'));
   }
 
@@ -512,9 +558,12 @@ final class FakeEventRepository extends EventRepository {
   int getNextEventsCallCount = 0;
   int getByIdCallCount = 0;
   Result<List<int>> getFavouriteEventIdsResult;
+  int getFavouriteEventIdsCallCount = 0;
+  Future<Result<List<int>>> Function()? getFavouriteEventIdsHandler;
   Result<Iterable<Event>> getFavouritesResult;
   Result<void> setFavouriteEventResult;
   Completer<Result<List<Event>>>? pendingGetByCurrentYear;
+  Future<Result<List<Event>>> Function()? getByCurrentYearHandler;
   Completer<Result<List<Event>>>? pendingGetByDate;
   Future<Result<void>> Function(int id, {required bool save})?
   setFavouriteEventHandler;
@@ -529,6 +578,8 @@ final class FakeEventRepository extends EventRepository {
   int getByDateCallCount = 0;
   int getByCurrentYearCallCount = 0;
   int getByCategoriesCallCount = 0;
+  Future<Result<List<Event>>> Function(Set<ContentCategory>)?
+  getByCategoriesHandler;
   int getByCoordinatesCallCount = 0;
 
   // Argument captures (only where existing tests inspect them)
@@ -554,6 +605,8 @@ final class FakeEventRepository extends EventRepository {
   @override
   Future<Result<List<Event>>> getByCurrentYear() async {
     getByCurrentYearCallCount++;
+    final handler = getByCurrentYearHandler;
+    if (handler != null) return await handler();
     final pending = pendingGetByCurrentYear;
     if (pending != null) return await pending.future;
     return getByCurrentYearResult;
@@ -580,6 +633,8 @@ final class FakeEventRepository extends EventRepository {
     ContentSort sort = ContentSort.byName,
   }) async {
     getByCategoriesCallCount++;
+    final handler = getByCategoriesHandler;
+    if (handler != null) return await handler(categories);
     return getByCategoriesResult;
   }
 
@@ -622,8 +677,12 @@ final class FakeEventRepository extends EventRepository {
   }
 
   @override
-  Future<Result<List<int>>> getFavouriteEventIds() async =>
-      getFavouriteEventIdsResult;
+  Future<Result<List<int>>> getFavouriteEventIds() async {
+    getFavouriteEventIdsCallCount++;
+    final handler = getFavouriteEventIdsHandler;
+    if (handler != null) return await handler();
+    return getFavouriteEventIdsResult;
+  }
 
   @override
   Future<Result<void>> setFavouriteEvent(int id, {required bool save}) async {
@@ -640,7 +699,7 @@ final class FakeEventRepository extends EventRepository {
 
 /// An [EventRepository] fake whose [getById] result is gated by a fresh
 /// [Completer] per call. Used by widget tests that need to hold the
-/// resolution [Command] in the running state and complete the repository
+/// resolution command in the running state and complete the repository
 /// calls in a controlled order (e.g. rapid-navigation races).
 ///
 /// Every non-`getById` method mirrors the successful no-op defaults of
@@ -805,13 +864,18 @@ final class FakePlaceRepository extends PlaceRepository {
 
   Result<List<Place>> getAllResult;
   Completer<Result<List<Place>>>? pendingGetAll;
+  Future<Result<List<Place>>> Function(ContentSort)? getAllHandler;
   Result<List<Place>> getByCategoriesResult;
+  int getByCategoriesCallCount = 0;
+  Future<Result<List<Place>>> Function(Set<ContentCategory>)?
+  getByCategoriesHandler;
   Result<List<Place>> getByCoordinatesResult;
   Completer<Result<List<Place>>>? pendingGetByCoordinates;
   Completer<void>? getByCoordinatesCalled;
   int getByCoordinatesCallCount = 0;
   Result<List<int>> getFavouritePlaceIdsResult;
   Future<Result<List<int>>> Function()? getFavouritePlaceIdsHandler;
+  int getFavouritePlaceIdsCallCount = 0;
   Result<Iterable<Place>> getFavouritesResult;
   Result<List<Place>> getLatestResult;
   Completer<Result<List<Place>>>? pendingGetLatest;
@@ -858,6 +922,8 @@ final class FakePlaceRepository extends PlaceRepository {
   }) async {
     getAllCallCount++;
     lastGetAllSort = sort;
+    final handler = getAllHandler;
+    if (handler != null) return await handler(sort);
     final pending = pendingGetAll;
     if (pending != null) return await pending.future;
     return getAllResult;
@@ -867,7 +933,12 @@ final class FakePlaceRepository extends PlaceRepository {
   Future<Result<List<Place>>> getByCategories(
     Set<ContentCategory> categories, {
     ContentSort sort = ContentSort.byName,
-  }) async => getByCategoriesResult;
+  }) async {
+    getByCategoriesCallCount++;
+    final handler = getByCategoriesHandler;
+    if (handler != null) return await handler(categories);
+    return getByCategoriesResult;
+  }
 
   @override
   Future<Result<List<Place>>> getByCoordinates(List<double> coordinates) {
@@ -891,6 +962,7 @@ final class FakePlaceRepository extends PlaceRepository {
 
   @override
   Future<Result<List<int>>> getFavouritePlaceIds() async {
+    getFavouritePlaceIdsCallCount++;
     final handler = getFavouritePlaceIdsHandler;
     if (handler != null) return await handler();
     return getFavouritePlaceIdsResult;
@@ -961,6 +1033,14 @@ final class FakeSettingsRepository implements SettingsRepository {
   Result<void> setThemeBrightnessResult;
   Result<void> setThemeTypeResult;
 
+  // Mirrors the positional command input for controlled preference writes.
+  // ignore: avoid_positional_boolean_parameters
+  Future<Result<void>> Function(bool)? onSetCrashReporting;
+  Future<Result<void>> Function(ThemeBrightness)? onSetThemeBrightness;
+  Future<Result<void>> Function(ThemeType)? onSetThemeType;
+  Future<Result<void>> Function(ContentSort)? onSetContentSort;
+  final contentSortCalls = <ContentSort>[];
+
   // Call tracking
   bool setSyncStateCalled = false;
 
@@ -969,14 +1049,21 @@ final class FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<Result<void>> setCrashReporting({required bool enable}) async {
-    if (setCrashReportingResult is Success<void>) crashReporting = enable;
-    return setCrashReportingResult;
+    final result =
+        await (onSetCrashReporting?.call(enable) ??
+            Future.value(setCrashReportingResult));
+    if (result is Success<void>) crashReporting = enable;
+    return result;
   }
 
   @override
   Future<Result<void>> setContentSort(ContentSort sort) async {
-    if (setContentSortResult is Success<void>) contentSort = sort;
-    return setContentSortResult;
+    contentSortCalls.add(sort);
+    final result =
+        await (onSetContentSort?.call(sort) ??
+            Future.value(setContentSortResult));
+    if (result is Success<void>) contentSort = sort;
+    return result;
   }
 
   @override
@@ -994,14 +1081,19 @@ final class FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<Result<void>> setThemeBrightness(ThemeBrightness brightness) async {
-    if (setThemeBrightnessResult is Success<void>) themeBrightness = brightness;
-    return setThemeBrightnessResult;
+    final result =
+        await (onSetThemeBrightness?.call(brightness) ??
+            Future.value(setThemeBrightnessResult));
+    if (result is Success<void>) themeBrightness = brightness;
+    return result;
   }
 
   @override
   Future<Result<void>> setThemeType(ThemeType type) async {
-    if (setThemeTypeResult is Success<void>) themeType = type;
-    return setThemeTypeResult;
+    final result =
+        await (onSetThemeType?.call(type) ?? Future.value(setThemeTypeResult));
+    if (result is Success<void>) themeType = type;
+    return result;
   }
 }
 
@@ -1074,21 +1166,25 @@ final class FakeImageUploadTask implements ImageUploadTask {
   FakeImageUploadTask.completed(Result<SubmissionAsset> result)
     : _result = Future.value(result),
       _pendingResult = null,
-      _thrownError = null;
+      _thrownError = null,
+      _thrownStack = null;
 
   FakeImageUploadTask.pending()
     : _result = null,
       _pendingResult = Completer<Result<SubmissionAsset>>(),
-      _thrownError = null;
+      _thrownError = null,
+      _thrownStack = null;
 
-  FakeImageUploadTask.throwing(Object error)
+  FakeImageUploadTask.throwing(Object error, {StackTrace? stackTrace})
     : _result = null,
       _pendingResult = null,
-      _thrownError = error;
+      _thrownError = error,
+      _thrownStack = stackTrace;
 
   final Future<Result<SubmissionAsset>>? _result;
   final Completer<Result<SubmissionAsset>>? _pendingResult;
   final Object? _thrownError;
+  final StackTrace? _thrownStack;
   int cancelCallCount = 0;
 
   /// Completes a task created with [FakeImageUploadTask.pending].
@@ -1099,7 +1195,7 @@ final class FakeImageUploadTask implements ImageUploadTask {
   @override
   Future<Result<SubmissionAsset>> get result => _thrownError == null
       ? _result ?? _pendingResult!.future
-      : Future<Result<SubmissionAsset>>.error(_thrownError);
+      : Future<Result<SubmissionAsset>>.error(_thrownError, _thrownStack);
 
   @override
   Stream<double> get progress => Stream<double>.value(1);
@@ -1116,7 +1212,7 @@ final class FakeImageUploadTask implements ImageUploadTask {
 
 /// A [ContentSubmissionRepository] fake whose [submit] result is gated by a
 /// fresh [Completer] per call. Used by widget tests that need to hold the
-/// submit [Command] in the running state until the test resolves it to
+/// submit command in the running state until the test resolves it to
 /// success or error.
 ///
 /// [uploadImageTask] throws by default: the widget tests that consume this
@@ -1209,6 +1305,8 @@ final class FakeContentSubmissionStagedAssetRepository
   Completer<Result<ContentSubmissionStagedAsset>>? pendingAcquire;
   Completer<Result<void>>? pendingRemove;
   Completer<Result<void>>? pendingClearSession;
+  Completer<Result<File>>? pendingResolve;
+  int resolveCallCount = 0;
   final acquired =
       <({String clientSubmissionId, String digest, File source})>[];
   int reconcileCallCount = 0;
@@ -1280,11 +1378,16 @@ final class FakeContentSubmissionStagedAssetRepository
   @override
   Future<Result<File>> resolveAbsolutePath(
     ContentSubmissionStagedAsset asset,
-  ) async =>
-      resolveResult ??
-      Result.success(
-        File('${stagingDirectory?.path ?? '/staged'}/${asset.relativePath}'),
-      );
+  ) async {
+    resolveCallCount++;
+    final pending = pendingResolve;
+    pendingResolve = null;
+    if (pending != null) return await pending.future;
+    return resolveResult ??
+        Result.success(
+          File('${stagingDirectory?.path ?? '/staged'}/${asset.relativePath}'),
+        );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1373,6 +1476,12 @@ final class FakeSearchRepository implements SearchRepository {
 
   /// Optional per-query execution control; defaults preserve existing behavior.
   Future<Result<List<ContentBase>>> Function(String)? resultsByQueryHandler;
+
+  /// Optional history operations retain existing fake defaults when unset.
+  Future<Result<List<String>>> Function()? historyReadHandler;
+  Future<Result<void>> Function(String)? historyAddHandler;
+  Future<Result<void>> Function(String)? historyRemoveHandler;
+  final List<({String operation, String query})> historyWrites = [];
   final List<String> capturedQueries = [];
   int getPastSearchesCallCount = 0;
   int getResultsByQueryCallCount = 0;
@@ -1383,8 +1492,12 @@ final class FakeSearchRepository implements SearchRepository {
   Completer<Result<List<ContentBase>>>? pendingGetResultsByQuery;
 
   @override
-  Future<Result<void>> addToPastSearches(String text) =>
-      pendingAddToPastSearches?.future ?? Future.value(addToHistoryResult);
+  Future<Result<void>> addToPastSearches(String text) {
+    historyWrites.add((operation: 'add', query: text));
+    return historyAddHandler?.call(text) ??
+        pendingAddToPastSearches?.future ??
+        Future.value(addToHistoryResult);
+  }
 
   @override
   Future<Result<List<ContentBase>>> getResultsByQuery(String text) {
@@ -1400,15 +1513,19 @@ final class FakeSearchRepository implements SearchRepository {
   Future<Result<List<String>>> getPastSearches() async {
     getPastSearchesCallCount++;
     final result =
-        await (pendingGetPastSearches?.future ??
+        await (historyReadHandler?.call() ??
+            pendingGetPastSearches?.future ??
             Future.value(pastSearchesResult));
     return result.map(List.of);
   }
 
   @override
-  Future<Result<void>> removeFromPastSearches(String text) =>
-      pendingRemoveFromPastSearches?.future ??
-      Future.value(removeFromHistoryResult);
+  Future<Result<void>> removeFromPastSearches(String text) {
+    historyWrites.add((operation: 'remove', query: text));
+    return historyRemoveHandler?.call(text) ??
+        pendingRemoveFromPastSearches?.future ??
+        Future.value(removeFromHistoryResult);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1457,12 +1574,15 @@ final class FakeSyncCursorSource implements SyncCursorSource {
   /// The response returned by the next cursor observation.
   Result<DateTime> result;
 
+  /// Gates cursor settlement and raw failures before parallel preparation.
+  Completer<Result<DateTime>>? pendingCursor;
+
   /// Number of cursor observations.
   int calls = 0;
 
   @override
   Future<Result<DateTime>> getCurrentCursor() {
     calls++;
-    return Future.value(result);
+    return pendingCursor?.future ?? Future.value(result);
   }
 }

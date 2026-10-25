@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -51,6 +49,9 @@ GoRoute categoryRoute({
           key: ValueKey(slug),
           create: (context) {
             final viewModel = CategoryViewModel(
+              initialCategories: category == null
+                  ? {...allCategories}
+                  : {category},
               categoryUseCase: CategoryUseCase(
                 eventRepository: context.read(),
                 placeRepository: context.read(),
@@ -60,12 +61,6 @@ GoRoute categoryRoute({
                 placeRepository: context.read(),
               ),
               settingsRepository: context.read(),
-            );
-
-            unawaited(
-              viewModel.setSelectedCategories.execute(
-                category == null ? {...allCategories} : {category},
-              ),
             );
 
             return viewModel;
@@ -147,9 +142,9 @@ GoRoute postRoute({
             ),
           );
           if (isEvent) {
-            unawaited(viewModel.loadEvent.execute(id));
+            viewModel.loadEvent.run(id);
           } else {
-            unawaited(viewModel.loadPlace.execute(id));
+            viewModel.loadPlace.run(id);
           }
           return viewModel;
         },

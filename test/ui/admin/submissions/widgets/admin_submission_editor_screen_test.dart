@@ -2,6 +2,7 @@ import 'dart:async' show Completer, unawaited;
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
+import 'package:command_it/command_it.dart' as commands;
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -26,13 +27,16 @@ import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import '../../../../support/admin_moderation_error_cases.dart';
+import '../../../../support/command_test_support.dart';
 import '../../../../support/fake_cache_manager.dart';
 import '../../../../support/fake_image_picker.dart';
 import '../../../../support/fake_repositories.dart';
+import '../../../../support/mock_logger.dart';
 import '../../../../support/recording_tile_http_client.dart';
 
 void main() {
@@ -43,6 +47,7 @@ void main() {
     late AdminSubmissionEditorViewModel viewModel;
     late GoRouter router;
     late Widget app;
+    late StateSetter rebuildEditor;
 
     setUp(() {
       repository = FakeAdminContentSubmissionRepository();
@@ -57,8 +62,12 @@ void main() {
           ),
           GoRoute(
             path: '/editor',
-            builder: (_, _) =>
-                AdminSubmissionEditorScreen(viewModel: viewModel),
+            builder: (_, _) => StatefulBuilder(
+              builder: (_, setState) {
+                rebuildEditor = setState;
+                return AdminSubmissionEditorScreen(viewModel: viewModel);
+              },
+            ),
           ),
         ],
       );
@@ -84,10 +93,9 @@ void main() {
 
     tearDown(() {
       router.dispose();
-      viewModel.dispose();
     });
 
-    testWidgets(
+    testOwnerUI(
       'manual lookup shows canonical targets and nonblocking warnings',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 2600));
@@ -118,7 +126,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
@@ -161,9 +170,10 @@ void main() {
         );
         expect(viewModel.isDirty, isFalse);
       },
+      disposeOwners: () => viewModel.dispose(),
     );
 
-    testWidgets(
+    testOwnerUI(
       'merge shows overwrite and keep-current saves/reloads in place',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 3000));
@@ -205,8 +215,10 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
-        await viewModel.preview.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        expect(viewModel.requestPreview(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
@@ -231,15 +243,17 @@ void main() {
         );
         expect(viewModel.city, 'Termoli');
         expect(viewModel.name, 'Edited after keep');
-        await viewModel.save.execute();
+        expect(viewModel.requestSave(), isTrue);
+        await pumpCommandTurns(tester);
         expect(repository.updateInputs.last.city, 'Termoli');
         expect(repository.updateInputs.last.name, 'Edited after keep');
         expect(repository.previewCalls, hasLength(2));
       },
+      disposeOwners: () => viewModel.dispose(),
     );
 
     for (final (code, status, text) in adminModerationErrorCases) {
-      testWidgets('Link $code displays actionable feedback', (tester) async {
+      testOwnerUI('Link $code displays actionable feedback', (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 2600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
         repository.getByIdResults[1] = Result.success(
@@ -257,7 +271,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         viewModel.selectTargetEvent(42);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
@@ -268,11 +283,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.textContaining(text), findsOneWidget);
         expect(find.text('SHELL_MARKER'), findsNothing);
-      });
+      }, disposeOwners: () => viewModel.dispose());
     }
 
     for (final currentCity in <String?>[null, 'Isernia']) {
-      testWidgets(
+      testOwnerUI(
         'keep-current rehydrates city $currentCity without old form text',
         (tester) async {
           await tester.binding.setSurfaceSize(const Size(800, 3000));
@@ -314,12 +329,15 @@ void main() {
             contentSubmissionRepository: contentSubmissionRepository,
             submissionId: 1,
           );
-          await viewModel.load.execute();
-          await viewModel.preview.execute();
+          expect(viewModel.requestLoad(), isTrue);
+          await pumpCommandTurns(tester);
+          expect(viewModel.requestPreview(), isTrue);
+          await pumpCommandTurns(tester);
           await tester.pumpWidget(app);
           unawaited(router.push('/editor'));
           await tester.pumpAndSettle();
-          await viewModel.keepCurrent.execute(group);
+          expect(viewModel.requestKeepCurrent(group), isTrue);
+          await pumpCommandTurns(tester);
           await tester.pumpAndSettle();
           final input = find.descendant(
             of: find.widgetWithText(TextFormField, 'Città'),
@@ -352,8 +370,10 @@ void main() {
                 groups: [nameGroup],
               ),
             );
-            await viewModel.preview.execute();
-            await viewModel.keepCurrent.execute(nameGroup);
+            expect(viewModel.requestPreview(), isTrue);
+            await pumpCommandTurns(tester);
+            expect(viewModel.requestKeepCurrent(nameGroup), isTrue);
+            await pumpCommandTurns(tester);
             await tester.pumpAndSettle();
             final title = find.descendant(
               of: find.widgetWithText(TextFormField, 'Luogo o evento'),
@@ -368,15 +388,17 @@ void main() {
               'New edit',
             );
             expect(viewModel.name, 'New edit');
-            await viewModel.save.execute();
+            expect(viewModel.requestSave(), isTrue);
+            await pumpCommandTurns(tester);
             expect(repository.updateInputs.last.name, 'New edit');
             expect(repository.updateInputs.last.city, currentCity);
           }
         },
+        disposeOwners: () => viewModel.dispose(),
       );
     }
 
-    testWidgets(
+    testOwnerUI(
       'failed Link cannot mask the current Apply failure or start feedback',
       (tester) async {
         repository.getByIdResults[1] = Result.success(
@@ -415,19 +437,22 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
-        await viewModel.link.execute(42);
+        expect(viewModel.requestLink(42), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpAndSettle();
         expect(find.textContaining('La fonte è cambiata'), findsOneWidget);
         await tester.pump(const Duration(seconds: 6));
         await tester.pumpAndSettle();
-        await viewModel.preview.execute();
+        expect(viewModel.requestPreview(), isTrue);
+        await pumpCommandTurns(tester);
         final pending = Completer<Result<AdminEventResolution>>();
         repository.pendingApply = pending;
-        final applying = viewModel.apply.execute();
+        expect(viewModel.requestApply(), isTrue);
         await tester.pump();
         expect(find.textContaining('La fonte è cambiata'), findsNothing);
         pending.complete(
@@ -439,14 +464,15 @@ void main() {
             ),
           ),
         );
-        await applying;
+        await pumpCommandTurns(tester);
         await tester.pumpAndSettle();
         expect(find.textContaining('I dati sono cambiati'), findsOneWidget);
         expect(find.textContaining('La fonte è cambiata'), findsNothing);
       },
+      disposeOwners: () => viewModel.dispose(),
     );
 
-    testWidgets(
+    testOwnerUI(
       'imported Reject explains revision discard and forwards ignore plus '
       'stale acknowledgement',
       (tester) async {
@@ -471,7 +497,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
@@ -500,9 +527,10 @@ void main() {
         expect(repository.sourceOptions.single, ('reject', true, true, 'y'));
         expect(find.text('SHELL_MARKER'), findsOneWidget);
       },
+      disposeOwners: () => viewModel.dispose(),
     );
 
-    testWidgets(
+    testOwnerUI(
       'source_changed displays fresh source and requires a new explicit '
       'selection',
       (tester) async {
@@ -534,7 +562,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         viewModel.selectTargetEvent(42);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
@@ -588,14 +617,16 @@ void main() {
           AdminEventResolution(outcome: 'linked', eventId: 42),
         );
         viewModel.selectTargetEvent(42);
-        await viewModel.link.execute(42);
+        expect(viewModel.requestLink(42), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpAndSettle();
         expect(repository.sourceOptions.last.$4, 'z');
         expect(find.text('SHELL_MARKER'), findsOneWidget);
       },
+      disposeOwners: () => viewModel.dispose(),
     );
 
-    testWidgets('non-stale imported Event cannot remove Event mode and has no '
+    testOwnerUI('non-stale imported Event cannot remove Event mode and has no '
         'acknowledgement action', (tester) async {
       repository.getByIdResults[1] = Result.success(
         sampleAdminSubmission(
@@ -616,7 +647,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -638,9 +670,9 @@ void main() {
       viewModel.setEventEnabled(enabled: false);
       expect(viewModel.startDate, isNotNull);
       expect(viewModel.isDirty, isFalse);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets(
+    testOwnerUI(
       'imported Save backend Event-readiness rejection preserves editor and '
       'shows action',
       (tester) async {
@@ -668,12 +700,14 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
         viewModel.setName('Edited');
-        await viewModel.save.execute();
+        expect(viewModel.requestSave(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpAndSettle();
         expect(
           find.textContaining('Imposta una data di inizio'),
@@ -682,10 +716,11 @@ void main() {
         expect(find.text('SHELL_MARKER'), findsNothing);
         expect(viewModel.isDirty, isTrue);
       },
+      disposeOwners: () => viewModel.dispose(),
     );
 
     for (final mode in AdminExternalEventMode.values) {
-      testWidgets('imported $mode offers correct resolution choices', (
+      testOwnerUI('imported $mode offers correct resolution choices', (
         tester,
       ) async {
         await tester.binding.setSurfaceSize(const Size(800, 2200));
@@ -708,7 +743,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
@@ -721,10 +757,10 @@ void main() {
           find.text('Anteprima aggiornamento'),
           mode == AdminExternalEventMode.update ? findsOneWidget : findsNothing,
         );
-      });
+      }, disposeOwners: () => viewModel.dispose());
     }
 
-    testWidgets('rehydrates date-only and toggle off requests a new clock', (
+    testOwnerUI('rehydrates date-only and toggle off requests a new clock', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -741,7 +777,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
@@ -762,9 +799,9 @@ void main() {
       expect(viewModel.endCalendarDate, EventCalendarDate(2026, 3, 30));
       expect(find.text('Seleziona ora di inizio'), findsOneWidget);
       expect(find.textContaining('00:00'), findsNothing);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('renders the shared create fields without an asset section', (
+    testOwnerUI('renders the shared create fields without an asset section', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -807,9 +844,9 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Foto'), findsNothing);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('shows creator identity read-only without public fields', (
+    testOwnerUI('shows creator identity read-only without public fields', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -845,9 +882,9 @@ void main() {
       expect(find.widgetWithText(TextFormField, 'E-mail'), findsNothing);
       expect(find.widgetWithText(TextFormField, 'Autore'), findsNothing);
       expect(find.byType(CheckboxFormField), findsNothing);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('shows loaded edit details, assets, count, and add control', (
+    testOwnerUI('shows loaded edit details, assets, count, and add control', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -870,7 +907,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
@@ -914,9 +952,9 @@ void main() {
       expect(find.text('Proposto da'), findsOneWidget);
       expect(find.text('Anna Bianchi'), findsOneWidget);
       expect(find.text('anna@example.com'), findsOneWidget);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('unfocuses the editor before opening the asset picker', (
+    testOwnerUI('unfocuses the editor before opening the asset picker', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -929,7 +967,8 @@ void main() {
         imagePicker: FakeImagePicker(onPickImage: () => pendingPicker.future),
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -961,7 +1000,7 @@ void main() {
       await tester.tap(addAsset);
       await tester.pump();
 
-      expect(viewModel.addAsset.running, isTrue);
+      expect(viewModel.addAssetSnapshot.isRunning, isTrue);
       expect(FocusManager.instance.primaryFocus, isNot(same(cityFocusNode)));
       // A keyboard event arriving after the picker starts cannot mutate the
       // draft while the editor's focus barrier is active.
@@ -970,15 +1009,15 @@ void main() {
 
       pendingPicker.complete(null);
       await tester.pumpAndSettle();
-      expect(viewModel.addAsset.completed, isTrue);
+      expect(viewModel.addAssetSnapshot.completed, isTrue);
 
       final restoredFocusNode =
           tester.widget<EditableText>(cityEditable).focusNode..requestFocus();
       await tester.pump();
       expect(FocusManager.instance.primaryFocus, same(restoredFocusNode));
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('never loads or saves the public draft after field edits', (
+    testOwnerUI('never loads or saves the public draft after field edits', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -989,7 +1028,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
@@ -1006,9 +1046,9 @@ void main() {
 
       expect(draftRepository.loadDraftCallCount, 0);
       expect(draftRepository.saveDraftCallCount, 0);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('shows an empty pending photo section with an add control', (
+    testOwnerUI('shows an empty pending photo section with an add control', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1019,7 +1059,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1031,9 +1072,9 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsOneWidget,
       );
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('hides add control at the pending asset limit', (tester) async {
+    testOwnerUI('hides add control at the pending asset limit', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       repository.getByIdResults[1] = Result.success(
@@ -1054,7 +1095,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1065,9 +1107,9 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsNothing,
       );
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('confirms deletion before removing an asset association', (
+    testOwnerUI('confirms deletion before removing an asset association', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1086,7 +1128,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1110,9 +1153,9 @@ void main() {
       expect(repository.deleteAssetCalls, <(int, int)>[(1, 2)]);
       expect(find.text('0 / 5'), findsOneWidget);
       expect(find.byType(AppNetworkImage), findsNothing);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('shows a generic error snackbar for add and delete failures', (
+    testOwnerUI('shows a generic error snackbar for add and delete failures', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1134,31 +1177,34 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
 
-      await viewModel.addAsset.execute();
+      expect(viewModel.requestAddAsset(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pump();
-      expect(viewModel.addAsset.error, isTrue);
+      expect(viewModel.addAssetSnapshot.hasFailure, isTrue);
       expect(
         find.text('Si è verificato un errore, riprova più tardi'),
         findsOneWidget,
       );
       $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
 
-      await viewModel.deleteAsset.execute(2);
+      expect(viewModel.requestDeleteAsset(2), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pump();
-      expect(viewModel.deleteAsset.error, isTrue);
+      expect(viewModel.deleteAssetSnapshot.hasFailure, isTrue);
       expect(
         find.text('Si è verificato un errore, riprova più tardi'),
         findsOneWidget,
       );
       $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets(
+    testOwnerUI(
       'disables asset, save, and moderation controls while deleting',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1180,12 +1226,13 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
 
-        unawaited(viewModel.deleteAsset.execute(2));
+        expect(viewModel.requestDeleteAsset(2), isTrue);
         await tester.pump();
 
         expect(
@@ -1226,9 +1273,10 @@ void main() {
         pendingDelete.complete(const Result.success(null));
         await tester.pumpAndSettle();
       },
+      disposeOwners: () => viewModel.dispose(),
     );
 
-    testWidgets('keeps entered text after an asset mutation rebuild', (
+    testOwnerUI('keeps entered text after an asset mutation rebuild', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1247,7 +1295,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1256,15 +1305,16 @@ void main() {
         'Isernia',
       );
 
-      await viewModel.deleteAsset.execute(2);
+      expect(viewModel.requestDeleteAsset(2), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpAndSettle();
 
       expect(find.text('Isernia'), findsOneWidget);
       expect(viewModel.city, 'Isernia');
       expect(viewModel.isDirty, isTrue);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('disables publish and reject after edits and saves '
+    testOwnerUI('disables publish and reject after edits and saves '
         'separately', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -1274,7 +1324,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
@@ -1335,9 +1386,9 @@ void main() {
 
       expect(repository.updateIds, <int>[1]);
       expect(find.text('SHELL_MARKER'), findsOneWidget);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('requires a concrete saved category before publication', (
+    testOwnerUI('requires a concrete saved category before publication', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1350,7 +1401,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1411,9 +1463,9 @@ void main() {
         find.text('Seleziona una categoria e salva prima di pubblicare.'),
         findsNothing,
       );
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('disables moderation while a save request is pending', (
+    testOwnerUI('disables moderation while a save request is pending', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1427,7 +1479,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1464,9 +1517,9 @@ void main() {
       );
       pendingUpdate.complete(Result.success(sampleAdminSubmission()));
       await tester.pumpAndSettle();
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('does not auto-confirm publication when save completes '
+    testOwnerUI('does not auto-confirm publication when save completes '
         'during confirmation', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -1479,7 +1532,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1501,9 +1555,9 @@ void main() {
         findsOneWidget,
       );
 
-      unawaited(viewModel.save.execute());
+      expect(viewModel.requestSave(), isTrue);
       await tester.pump();
-      expect(viewModel.save.running, isTrue);
+      expect(viewModel.saveSnapshot.isRunning, isTrue);
       pendingUpdate.complete(Result.success(sampleAdminSubmission()));
       await tester.pumpAndSettle();
 
@@ -1520,57 +1574,65 @@ void main() {
       // refreshes the dashboard instead of running a stale moderation.
       expect(repository.promoteCalls, isEmpty);
       expect(find.text('SHELL_MARKER'), findsOneWidget);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('does not run a stale rejection when save completes '
-        'during its confirmation', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1600));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      final pendingUpdate = Completer<Result<AdminSubmission>>();
-      repository
-        ..getByIdResults[1] = Result.success(sampleAdminSubmission())
-        ..pendingUpdate = pendingUpdate;
-      viewModel = AdminSubmissionEditorViewModel(
-        repository: repository,
-        contentSubmissionRepository: contentSubmissionRepository,
-        submissionId: 1,
-      );
-      await viewModel.load.execute();
-      await tester.pumpWidget(app);
-      unawaited(router.push('/editor'));
-      await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      final reject = find.widgetWithText(FilledButton, 'Rifiuta');
-      await tester.scrollUntilVisible(reject, 200, scrollable: scrollable);
+    for (final dialogAction in ['Annulla', 'Conferma']) {
+      testOwnerUI('does not run a stale rejection when save completes '
+          'during its confirmation ($dialogAction)', (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final pendingUpdate = Completer<Result<AdminSubmission>>();
+        repository
+          ..getByIdResults[1] = Result.success(sampleAdminSubmission())
+          ..pendingUpdate = pendingUpdate;
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        final scrollable = find
+            .descendant(
+              of: find.byKey(
+                const ValueKey<String>('admin_submission_editor_scroll'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final reject = find.widgetWithText(FilledButton, 'Rifiuta');
+        await tester.scrollUntilVisible(reject, 200, scrollable: scrollable);
 
-      await tester.tap(reject);
-      await tester.pump();
-      expect(
-        find.text('Confermi di voler rifiutare questo contributo?'),
-        findsOneWidget,
-      );
+        await tester.tap(reject);
+        await tester.pump();
+        expect(
+          find.text('Confermi di voler rifiutare questo contributo?'),
+          findsOneWidget,
+        );
 
-      unawaited(viewModel.save.execute());
-      await tester.pump();
-      expect(viewModel.save.running, isTrue);
-      pendingUpdate.complete(Result.success(sampleAdminSubmission()));
-      await tester.pumpAndSettle();
+        expect(viewModel.requestSave(), isTrue);
+        await tester.pump();
+        expect(viewModel.saveSnapshot.isRunning, isTrue);
+        pendingUpdate.complete(Result.success(sampleAdminSubmission()));
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
-      await tester.pumpAndSettle();
+        await tester.tap(
+          find.widgetWithText(
+            dialogAction == 'Conferma' ? FilledButton : TextButton,
+            dialogAction,
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(repository.rejectIds, isEmpty);
-      expect(find.text('SHELL_MARKER'), findsOneWidget);
-    });
+        expect(repository.rejectIds, isEmpty);
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
+      }, disposeOwners: () => viewModel.dispose());
+    }
 
-    testWidgets('rechecks busy state before confirming publication', (
+    testOwnerUI('rechecks busy state before confirming publication', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1583,7 +1645,8 @@ void main() {
         imagePicker: FakeImagePicker(onPickImage: () => pendingPick.future),
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1600,18 +1663,18 @@ void main() {
       await tester.tap(publish);
       await tester.pumpAndSettle();
 
-      unawaited(viewModel.addAsset.execute());
+      expect(viewModel.requestAddAsset(), isTrue);
       await tester.pump();
-      expect(viewModel.addAsset.running, isTrue);
+      expect(viewModel.addAssetSnapshot.isRunning, isTrue);
       await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
       await tester.pump();
 
       expect(repository.promoteCalls, isEmpty);
       pendingPick.complete(null);
       await tester.pumpAndSettle();
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('disables save while a rejection request is pending', (
+    testOwnerUI('disables save while a rejection request is pending', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1625,12 +1688,13 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
 
-      unawaited(viewModel.reject.execute());
+      expect(viewModel.requestReject(), isTrue);
       await tester.pump();
 
       expect(
@@ -1643,9 +1707,9 @@ void main() {
       );
       pendingReject.complete(const Result.success(null));
       await tester.pumpAndSettle();
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets(
+    testOwnerUI(
       'keeps edited data on save failure and shows an error snackbar',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1658,7 +1722,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         await tester.pumpAndSettle();
         unawaited(router.push('/editor'));
@@ -1693,9 +1758,10 @@ void main() {
         expect(viewModel.city, 'Isernia');
         $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
       },
+      disposeOwners: () => viewModel.dispose(),
     );
 
-    testWidgets('rejects a clean submission only after confirmation', (
+    testOwnerUI('rejects a clean submission only after confirmation', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1706,7 +1772,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
@@ -1743,9 +1810,9 @@ void main() {
 
       expect(repository.rejectIds, <int>[1]);
       expect(find.text('SHELL_MARKER'), findsOneWidget);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('publishes a place draft after explicit confirmation', (
+    testOwnerUI('publishes a place draft after explicit confirmation', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1756,7 +1823,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
@@ -1795,9 +1863,9 @@ void main() {
         (1, AdminPromotionTarget.place),
       ]);
       expect(find.text('SHELL_MARKER'), findsOneWidget);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('publishes an event draft as an event', (tester) async {
+    testOwnerUI('publishes an event draft as an event', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       repository.getByIdResults[1] = Result.success(
@@ -1811,7 +1879,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
@@ -1855,9 +1924,9 @@ void main() {
         (1, AdminPromotionTarget.event),
       ]);
       expect(find.text('SHELL_MARKER'), findsOneWidget);
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('keeps event publication CTA and renders a temporal issue', (
+    testOwnerUI('keeps event publication CTA and renders a temporal issue', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1870,7 +1939,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       viewModel.setStartClockTime(EventClockTime(2, 30));
       await tester.pumpWidget(app);
       await tester.pumpAndSettle();
@@ -1899,7 +1969,7 @@ void main() {
         find.widgetWithText(FilledButton, 'Pubblica come luogo'),
         findsNothing,
       );
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
     group('promotion error messages', () {
       Future<void> pumpPendingEditor(WidgetTester tester) async {
@@ -1911,13 +1981,14 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
       }
 
-      testWidgets('maps readiness codes to actionable Italian copy', (
+      testOwnerUI('maps readiness codes to actionable Italian copy', (
         tester,
       ) async {
         for (final entry in <(String?, String)>[
@@ -1958,7 +2029,8 @@ void main() {
               ),
             );
 
-          await viewModel.promote.execute(AdminPromotionTarget.place);
+          expect(viewModel.requestPromote(AdminPromotionTarget.place), isTrue);
+          await pumpCommandTurns(tester);
           await tester.pump();
 
           expect(find.text(entry.$2), findsOneWidget);
@@ -1966,10 +2038,10 @@ void main() {
           router.go('/shell');
           await tester.pumpAndSettle();
         }
-      });
+      }, disposeOwners: () => viewModel.dispose());
     });
 
-    testWidgets('renders promoted accepted rows read-only with linkage', (
+    testOwnerUI('renders promoted accepted rows read-only with linkage', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -1996,7 +2068,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -2039,9 +2112,9 @@ void main() {
       final lockedNode = _requestFocusOn(tester, cityField);
       await tester.pump();
       expect(FocusManager.instance.primaryFocus, isNot(equals(lockedNode)));
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('excludes keyboard focus from locked fields while busy', (
+    testOwnerUI('excludes keyboard focus from locked fields while busy', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -2063,14 +2136,15 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
 
-      unawaited(viewModel.deleteAsset.execute(2));
+      expect(viewModel.requestDeleteAsset(2), isTrue);
       await tester.pump();
-      expect(viewModel.deleteAsset.running, isTrue);
+      expect(viewModel.deleteAssetSnapshot.isRunning, isTrue);
 
       final cityField = find.widgetWithText(TextFormField, 'Città');
       // While locked, requesting focus on an inner field never makes it the
@@ -2087,9 +2161,9 @@ void main() {
       final unlockedNode = _requestFocusOn(tester, cityField);
       await tester.pump();
       expect(FocusManager.instance.primaryFocus, equals(unlockedNode));
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('keeps drafts locked while a save is running and restores '
+    testOwnerUI('keeps drafts locked while a save is running and restores '
         'interaction afterwards', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -2102,7 +2176,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -2120,7 +2195,7 @@ void main() {
         scrollable: scrollable,
       );
 
-      unawaited(viewModel.save.execute());
+      expect(viewModel.requestSave(), isTrue);
       await tester.pump();
 
       // Tapping the city field while saving cannot dirty the editor.
@@ -2136,8 +2211,8 @@ void main() {
       await tester.pumpAndSettle();
       // The save success pops the editor back to the shell.
       expect(find.text('SHELL_MARKER'), findsOneWidget);
-    });
-    testWidgets('renders historical accepted rows read-only without Save', (
+    }, disposeOwners: () => viewModel.dispose());
+    testOwnerUI('renders historical accepted rows read-only without Save', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -2160,7 +2235,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -2189,9 +2265,9 @@ void main() {
       await tester.pump();
       expect(viewModel.isDirty, isFalse);
       expect(viewModel.city, 'Campobasso');
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('renders rejected rows read-only without Save', (tester) async {
+    testOwnerUI('renders rejected rows read-only without Save', (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       repository.getByIdResults[1] = Result.success(
@@ -2212,7 +2288,8 @@ void main() {
         contentSubmissionRepository: contentSubmissionRepository,
         submissionId: 1,
       );
-      await viewModel.load.execute();
+      expect(viewModel.requestLoad(), isTrue);
+      await pumpCommandTurns(tester);
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -2237,9 +2314,9 @@ void main() {
       await tester.pump();
       expect(viewModel.isDirty, isFalse);
       expect(viewModel.city, 'Campobasso');
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('shows the profile-specific create failure message', (
+    testOwnerUI('shows the profile-specific create failure message', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -2276,9 +2353,9 @@ void main() {
         findsOneWidget,
       );
       $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
-    });
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets('blocks an incomplete event save with a date-section issue', (
+    testOwnerUI('blocks an incomplete event save with a date-section issue', (
       tester,
     ) async {
       await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -2319,10 +2396,10 @@ void main() {
       expect(find.text('Seleziona una data di inizio.'), findsOneWidget);
       expect(viewModel.eventTimeIssue, EventTimeIssue.missingStartDate);
       expect(repository.createInputs, isEmpty);
-      expect(viewModel.save.result, isNull);
-    });
+      expect(viewModel.saveSnapshot.data, isNull);
+    }, disposeOwners: () => viewModel.dispose());
 
-    testWidgets(
+    testOwnerUI(
       'cancelling an inverted end-date picker preserves the invalid draft',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
@@ -2337,7 +2414,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
@@ -2361,7 +2439,8 @@ void main() {
         expect(repository.updateInputs, isEmpty);
         expect(viewModel.validateEventTimeForSave(), isFalse);
         expect(viewModel.eventTimeIssue, EventTimeIssue.invalidRange);
-        await viewModel.save.execute();
+        expect(viewModel.requestSave(), isTrue);
+        await pumpCommandTurns(tester);
         expect(repository.updateInputs, isEmpty);
 
         await tester.tap(endDateChip);
@@ -2378,7 +2457,274 @@ void main() {
         expect(viewModel.eventTimeIssue, isNull);
         expect(viewModel.isDirty, isTrue);
       },
+      disposeOwners: () => viewModel.dispose(),
     );
+
+    for (final retrySucceeds in [false, true]) {
+      testOwnerUI('Save receipts isolate dialog effects across success/error'
+          '${retrySucceeds ? '/success' : ' on a clean draft (DF1)'}', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        await tester.pumpWidget(app);
+        final routeResult = router.push<bool>('/editor');
+        var pops = 0;
+        bool? returned;
+        unawaited(
+          routeResult.then((value) {
+            pops++;
+            returned = value;
+          }),
+        );
+        await tester.pumpAndSettle();
+        final publish = find.widgetWithText(
+          FilledButton,
+          'Pubblica come luogo',
+        );
+        await tester.ensureVisible(publish);
+        await tester.tap(publish);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+
+        final first = Completer<Result<AdminSubmission>>();
+        repository.pendingUpdate = first;
+        expect(viewModel.requestSave(), isTrue);
+        final firstId = viewModel.saveExecutionId;
+        await pumpCommandTurns(tester);
+        first.complete(Result.success(sampleAdminSubmission()));
+        await tester.pumpAndSettle();
+        expect(viewModel.canCloseAfterSave, isTrue);
+        expect(pops, 0);
+
+        if (retrySucceeds) viewModel.setCity('Termoli');
+        final second = Completer<Result<AdminSubmission>>();
+        repository.pendingUpdate = second;
+        expect(viewModel.requestSave(), isTrue);
+        final secondId = viewModel.saveExecutionId;
+        expect(secondId, greaterThan(firstId!));
+        expect(viewModel.canCloseAfterSave, isFalse);
+        await pumpCommandTurns(tester);
+        second.complete(Result.error(TestException('second save failed')));
+        await tester.pumpAndSettle();
+        expect(viewModel.saveSnapshot.hasFailure, isTrue);
+        expect(viewModel.canCloseAfterSave, isFalse);
+        expect(pops, 0);
+        expect(
+          find.text('Si è verificato un errore, riprova più tardi'),
+          findsOneWidget,
+        );
+        $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
+        await tester.pumpAndSettle();
+        viewModel.setCandidateSearch('unrelated notification');
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Si è verificato un errore, riprova più tardi'),
+          findsNothing,
+        );
+
+        if (retrySucceeds) {
+          final third = Completer<Result<AdminSubmission>>();
+          repository.pendingUpdate = third;
+          expect(viewModel.requestSave(), isTrue);
+          expect(viewModel.saveExecutionId, greaterThan(secondId!));
+          await pumpCommandTurns(tester);
+          third.complete(Result.success(sampleAdminSubmission()));
+          await tester.pumpAndSettle();
+          expect(viewModel.canCloseAfterSave, isTrue);
+          expect(pops, 0);
+        } else {
+          expect(viewModel.isDirty, isFalse);
+        }
+        await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
+        await tester.pumpAndSettle();
+        expect(repository.promoteCalls, isEmpty);
+        expect(repository.rejectIds, isEmpty);
+        expect(pops, retrySucceeds ? 1 : 0);
+        expect(returned, retrySucceeds ? isTrue : isNull);
+        expect(
+          find.byType(AdminSubmissionEditorScreen),
+          retrySucceeds ? findsNothing : findsOneWidget,
+        );
+        await pumpCommandTurns(tester);
+        expect(pops, retrySucceeds ? 1 : 0);
+        expect(tester.takeException(), isNull);
+      }, disposeOwners: () => viewModel.dispose());
+    }
+
+    testOwnerUI(
+      'candidate input survives same-owner rebuild and rebinds to new owner',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(startDate: DateTime.utc(2026, 10, 2)),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        final search = find.byKey(const ValueKey('admin_event_search'));
+        await tester.ensureVisible(search);
+        await tester.enterText(search, 'query A');
+        expect(viewModel.candidateSearch, 'query A');
+        viewModel.selectTargetEvent(42);
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: search, matching: find.text('query A')),
+          findsOneWidget,
+        );
+        final oldOwner = viewModel;
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        viewModel.setCandidateSearch('query B');
+        oldOwner.dispose();
+        rebuildEditor(() {});
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: search, matching: find.text('query B')),
+          findsOneWidget,
+        );
+        expect(viewModel.candidateSearch, 'query B');
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () => viewModel.dispose(),
+    );
+
+    for (final outcome in ['success', 'expected error', 'raw error']) {
+      testOwnerUI('binding seeds old terminal and replacement ignores '
+          'late owner $outcome completion', (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final logger = MockLogger();
+        addTearDown(installCommandTestReporting(logger));
+        final detailedStackTraces = commands.Command.detailedStackTraces;
+        commands.Command.detailedStackTraces = false;
+        addTearDown(() {
+          commands.Command.detailedStackTraces = detailedStackTraces;
+        });
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        expect(viewModel.requestSave(), isTrue);
+        await pumpCommandTurns(tester);
+        expect(viewModel.saveSnapshot.completed, isTrue);
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        final oldOwner = viewModel;
+        final oldUpdate = Completer<Result<AdminSubmission>>();
+        repository.pendingUpdate = oldUpdate;
+        expect(oldOwner.requestSave(), isTrue);
+        await pumpCommandTurns(tester);
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        oldOwner.dispose();
+        rebuildEditor(() {});
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 50));
+        final runtimeError = StateError('old owner runtime');
+        final runtimeStack = StackTrace.fromString('old owner stack');
+        switch (outcome) {
+          case 'success':
+            oldUpdate.complete(Result.success(sampleAdminSubmission()));
+          case 'expected error':
+            oldUpdate.complete(Result.error(TestException('old owner failed')));
+          case 'raw error':
+            oldUpdate.completeError(runtimeError, runtimeStack);
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(viewModel.saveSnapshot.idle, isTrue);
+        expect(logger.calls, hasLength(outcome == 'raw error' ? 1 : 0));
+        if (outcome == 'raw error') {
+          expect(logger.calls.single.error, same(runtimeError));
+          expect(logger.calls.single.stackTrace, same(runtimeStack));
+        }
+        expect(
+          find.text('Si è verificato un errore, riprova più tardi'),
+          findsNothing,
+        );
+        repository.pendingUpdate = null;
+        expect(viewModel.requestSave(), isTrue);
+        await tester.pumpAndSettle();
+        expect(find.text('SHELL_MARKER'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }, disposeOwners: () => viewModel.dispose());
+    }
+
+    for (final action in ['Pubblica come luogo', 'Rifiuta']) {
+      testOwnerUI('owner replacement invalidates an open $action dialog', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        final control = find.widgetWithText(FilledButton, action);
+        await tester.ensureVisible(control);
+        await tester.tap(control);
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsOneWidget);
+        final oldOwner = viewModel;
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        oldOwner.dispose();
+        rebuildEditor(() {});
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
+        await tester.pumpAndSettle();
+        expect(repository.promoteCalls, isEmpty);
+        expect(repository.rejectIds, isEmpty);
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(viewModel.saveSnapshot.idle, isTrue);
+        expect(tester.takeException(), isNull);
+      }, disposeOwners: () => viewModel.dispose());
+    }
 
     group('location section', () {
       Finder scrollableOf(WidgetTester tester) => find
@@ -2402,7 +2748,7 @@ void main() {
       Future<void> scrollTo(WidgetTester tester, Finder finder) => tester
           .scrollUntilVisible(finder, 200, scrollable: scrollableOf(tester));
 
-      testWidgets('create screen exposes the Posizione section', (
+      testOwnerUI('create screen exposes the Posizione section', (
         tester,
       ) async {
         viewModel = AdminSubmissionEditorViewModel(
@@ -2418,9 +2764,9 @@ void main() {
         expect(find.text('Mappa'), findsOneWidget);
         expect(find.text('Coordinate'), findsOneWidget);
         expect(find.byType(GeoMap), findsOneWidget);
-      });
+      }, disposeOwners: () => viewModel.dispose());
 
-      testWidgets('edit screen exposes the Posizione section after load', (
+      testOwnerUI('edit screen exposes the Posizione section after load', (
         tester,
       ) async {
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
@@ -2429,14 +2775,15 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await pushEditor(tester);
 
         await scrollTo(tester, find.text('Posizione'));
         expect(find.text('Posizione'), findsOneWidget);
-      });
+      }, disposeOwners: () => viewModel.dispose());
 
-      testWidgets('loaded coordinates reach the location editor fields', (
+      testOwnerUI('loaded coordinates reach the location editor fields', (
         tester,
       ) async {
         repository.getByIdResults[1] = Result.success(
@@ -2447,7 +2794,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await pushEditor(tester);
 
         final latitudeField = find.widgetWithText(
@@ -2462,9 +2810,9 @@ void main() {
         );
         expect(latitudeField, findsOneWidget);
         expect(longitudeField, findsOneWidget);
-      });
+      }, disposeOwners: () => viewModel.dispose());
 
-      testWidgets('mode switching alone does not dirty the editor', (
+      testOwnerUI('mode switching alone does not dirty the editor', (
         tester,
       ) async {
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
@@ -2473,7 +2821,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await pushEditor(tester);
 
         await scrollTo(tester, find.text('Posizione'));
@@ -2483,9 +2832,9 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(viewModel.isDirty, isFalse);
-      });
+      }, disposeOwners: () => viewModel.dispose());
 
-      testWidgets('a coordinate edit makes the editor dirty and disables '
+      testOwnerUI('a coordinate edit makes the editor dirty and disables '
           'moderation', (tester) async {
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
         viewModel = AdminSubmissionEditorViewModel(
@@ -2493,7 +2842,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await pushEditor(tester);
 
         await scrollTo(tester, find.text('Posizione'));
@@ -2530,9 +2880,9 @@ void main() {
               .onPressed,
           isNull,
         );
-      });
+      }, disposeOwners: () => viewModel.dispose());
 
-      testWidgets('an invalid location prevents Save', (tester) async {
+      testOwnerUI('an invalid location prevents Save', (tester) async {
         repository.getByIdResults[1] = Result.success(
           sampleAdminSubmission(latitude: 12.5, longitude: -3),
         );
@@ -2541,7 +2891,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await pushEditor(tester);
 
         // Break the loaded pair into a half-location.
@@ -2563,9 +2914,9 @@ void main() {
 
         expect(repository.updateIds, isEmpty);
         expect(viewModel.isDirty, isTrue);
-      });
+      }, disposeOwners: () => viewModel.dispose());
 
-      testWidgets('valid blank drafts permit Save directly from Map mode', (
+      testOwnerUI('valid blank drafts permit Save directly from Map mode', (
         tester,
       ) async {
         viewModel = AdminSubmissionEditorViewModel(
@@ -2596,9 +2947,9 @@ void main() {
         expect(repository.createInputs.single.latitude, isNull);
         expect(repository.createInputs.single.longitude, isNull);
         expect(find.text('SHELL_MARKER'), findsOneWidget);
-      });
+      }, disposeOwners: () => viewModel.dispose());
 
-      testWidgets('successful Save persists the updated coordinate pair', (
+      testOwnerUI('successful Save persists the updated coordinate pair', (
         tester,
       ) async {
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
@@ -2607,7 +2958,8 @@ void main() {
           contentSubmissionRepository: contentSubmissionRepository,
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
         await pushEditor(tester);
 
         await scrollTo(tester, find.text('Posizione'));
@@ -2634,7 +2986,7 @@ void main() {
         expect(repository.updateInputs.single.latitude, 41.55);
         expect(repository.updateInputs.single.longitude, 14.64);
         expect(find.text('SHELL_MARKER'), findsOneWidget);
-      });
+      }, disposeOwners: () => viewModel.dispose());
     });
   });
 }

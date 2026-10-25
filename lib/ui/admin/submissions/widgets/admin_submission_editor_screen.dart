@@ -1,10 +1,10 @@
 import 'dart:async' show unawaited;
 
+import 'package:command_it/command_it.dart' as commands;
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
-import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
@@ -19,9 +19,9 @@ import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/ui/core/utils/content_submission_asset_size.dart';
-import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 /// Form screen for creating and editing a moderation submission.
 class AdminSubmissionEditorScreen extends StatefulWidget {
@@ -38,46 +38,110 @@ class AdminSubmissionEditorScreen extends StatefulWidget {
 
 class _AdminSubmissionEditorScreenState
     extends State<AdminSubmissionEditorScreen> {
-  String _eventSearch = '';
   final _eventTargetController = TextEditingController();
-
   final _formKey = GlobalKey<FormState>();
   final _locationFormKey = GlobalKey<FormState>();
+  final _consumed = <String, int?>{};
+  late AdminSubmissionEditorViewModel _owner;
   var _statusDialogOpen = false;
   var _saveCompletedWhileStatusDialogOpen = false;
+  int? _dialogSaveExecutionId;
+  ModalRoute<dynamic>? _statusDialogRoute;
+  var _statusDialogRevoked = false;
+  var _dialogSession = 0;
+  var _routeExited = false;
 
   @override
   void initState() {
     super.initState();
+    _bind(widget.viewModel);
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminSubmissionEditorScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.viewModel, widget.viewModel)) {
+      _owner.removeListener(_onOwnerChanged);
+      _bind(widget.viewModel);
+    }
+  }
+
+  void _bind(AdminSubmissionEditorViewModel owner) {
+    _owner = owner;
+    _routeExited = false;
+    _dialogSession++;
+    _statusDialogOpen = false;
+    _saveCompletedWhileStatusDialogOpen = false;
+    _dialogSaveExecutionId = null;
+    _statusDialogRoute = null;
+    _statusDialogRevoked = false;
+    // Existing terminals are historical, not new effects for this binding.
+    _consumed
+      ..clear()
+      ..addAll({
+        'save': owner.saveExecutionId,
+        'reject': owner.rejectExecutionId,
+        'promote': owner.promoteExecutionId,
+        'link': owner.linkExecutionId,
+        'apply': owner.applyExecutionId,
+        'addAsset': owner.addAssetExecutionId,
+        'deleteAsset': owner.deleteAssetExecutionId,
+      });
+    // A running execution has not yet delivered its terminal to this binding.
+    if (owner.saveSnapshot.isRunning) _consumed.remove('save');
+    if (owner.rejectSnapshot.isRunning) _consumed.remove('reject');
+    if (owner.promoteSnapshot.isRunning) _consumed.remove('promote');
+    if (owner.linkSnapshot.isRunning) _consumed.remove('link');
+    if (owner.applySnapshot.isRunning) _consumed.remove('apply');
+    if (owner.addAssetSnapshot.isRunning) _consumed.remove('addAsset');
+    if (owner.deleteAssetSnapshot.isRunning) _consumed.remove('deleteAsset');
+    owner.addListener(_onOwnerChanged);
     _syncEventTarget();
-    widget.viewModel.addListener(_syncEventTarget);
-    widget.viewModel.save.addListener(_handleSaveCompleted);
-    widget.viewModel.reject.addListener(_handleRejectCompleted);
-    widget.viewModel.promote.addListener(_handlePromoteCompleted);
-    widget.viewModel.link.addListener(_handleLinkCompleted);
-    widget.viewModel.apply.addListener(_handleApplyCompleted);
-    widget.viewModel.addAsset.addListener(_handleAddAssetCompleted);
-    widget.viewModel.deleteAsset.addListener(_handleDeleteAssetCompleted);
+  }
+
+  bool _owns(AdminSubmissionEditorViewModel owner) =>
+      mounted &&
+      identical(_owner, owner) &&
+      identical(widget.viewModel, owner) &&
+      !owner.isDisposed &&
+      !_routeExited;
+
+  bool _hasRouteEffectAuthority(AdminSubmissionEditorViewModel owner) =>
+      _owns(owner) && ModalRoute.of(context)?.isCurrent == true;
+
+  void _observeStatusDialogRoute(BuildContext dialogContext, int session) {
+    if (!mounted || session != _dialogSession) return;
+    // ModalRoute.of subscribes this dialog builder to isCurrent changes. A
+    // covering page permanently revokes this session, including an old latch.
+    _statusDialogRoute = ModalRoute.of(dialogContext);
+    _revokeCoveredStatusDialog();
+  }
+
+  void _revokeCoveredStatusDialog() {
+    final route = _statusDialogRoute;
+    // Normal dialog dismissal makes the route inactive, not covered.
+    if (route != null && route.isActive && !route.isCurrent) {
+      _statusDialogRevoked = true;
+    }
+  }
+
+  bool _hasStatusDialogEffectAuthority(AdminSubmissionEditorViewModel owner) {
+    if (!_owns(owner) || !_statusDialogOpen) return false;
+    _revokeCoveredStatusDialog();
+    return !_statusDialogRevoked && _statusDialogRoute?.isCurrent == true;
   }
 
   @override
   void dispose() {
-    widget.viewModel.removeListener(_syncEventTarget);
+    _dialogSession++;
+    _owner.removeListener(_onOwnerChanged);
     _eventTargetController.dispose();
-    widget.viewModel.save.removeListener(_handleSaveCompleted);
-    widget.viewModel.reject.removeListener(_handleRejectCompleted);
-    widget.viewModel.promote.removeListener(_handlePromoteCompleted);
-    widget.viewModel.link.removeListener(_handleLinkCompleted);
-    widget.viewModel.apply.removeListener(_handleApplyCompleted);
-    widget.viewModel.addAsset.removeListener(_handleAddAssetCompleted);
-    widget.viewModel.deleteAsset.removeListener(_handleDeleteAssetCompleted);
     super.dispose();
   }
 
   void _syncEventTarget() {
-    if (!mounted) return;
-    final target = widget.viewModel.targetEventId;
-    // Preserve raw manual input when it already represents the selected ID.
+    if (!_owns(_owner)) return;
+    final target = _owner.targetEventId;
     if (int.tryParse(_eventTargetController.text) == target) return;
     final text = target?.toString() ?? '';
     _eventTargetController.value = TextEditingValue(
@@ -86,27 +150,115 @@ class _AdminSubmissionEditorScreenState
     );
   }
 
-  void _handleLinkCompleted() {
-    if (!mounted) return;
-    _handleResolutionCompleted(widget.viewModel.link);
+  void _request(AdminSubmissionEditorViewModel owner, void Function() action) {
+    if (_owns(owner)) action();
   }
 
-  void _handleApplyCompleted() {
-    if (!mounted) return;
-    _handleResolutionCompleted(widget.viewModel.apply);
+  void _closeEditor(AdminSubmissionEditorViewModel owner) {
+    if (!_hasRouteEffectAuthority(owner)) return;
+    _routeExited = true;
+    context.pop(true);
   }
 
-  void _handleResolutionCompleted(Command<AdminEventResolution> command) {
-    if (!mounted || command.running || command.idle) return;
-    if (command.completed) {
-      context.pop(true);
-    } else if (command.error) {
-      _showModerationError(command.result);
+  void _consume<T>(
+    AdminSubmissionEditorViewModel owner,
+    String lane,
+    int? executionId,
+    commands.CommandResult<void, Result<T>?> snapshot,
+    void Function() effect,
+  ) {
+    if (!_owns(owner) ||
+        executionId == null ||
+        snapshot.isRunning ||
+        snapshot.idle ||
+        _consumed[lane] == executionId) {
+      return;
+    }
+    _consumed[lane] = executionId;
+    // Hidden terminals are consumed, never queued for replay on return. Only
+    // Save may feed its editor's currently authoritative confirmation dialog.
+    if (_hasRouteEffectAuthority(owner) ||
+        lane == 'save' && _hasStatusDialogEffectAuthority(owner)) {
+      effect();
+    }
+  }
+
+  void _onOwnerChanged() {
+    final owner = _owner;
+    if (!_owns(owner)) return;
+    _syncEventTarget();
+    _consume(
+      owner,
+      'save',
+      owner.saveExecutionId,
+      owner.saveSnapshot,
+      () => _handleSaveCompleted(owner),
+    );
+    _consume(
+      owner,
+      'reject',
+      owner.rejectExecutionId,
+      owner.rejectSnapshot,
+      () => _handleRejectCompleted(owner),
+    );
+    _consume(
+      owner,
+      'promote',
+      owner.promoteExecutionId,
+      owner.promoteSnapshot,
+      () => _handleResolutionCompleted(owner, owner.promoteSnapshot),
+    );
+    _consume(
+      owner,
+      'link',
+      owner.linkExecutionId,
+      owner.linkSnapshot,
+      () => _handleResolutionCompleted(owner, owner.linkSnapshot),
+    );
+    _consume(
+      owner,
+      'apply',
+      owner.applyExecutionId,
+      owner.applySnapshot,
+      () => _handleResolutionCompleted(owner, owner.applySnapshot),
+    );
+    _consume(
+      owner,
+      'addAsset',
+      owner.addAssetExecutionId,
+      owner.addAssetSnapshot,
+      () {
+        if (owner.addAssetSnapshot.hasFailure) _showModerationError(null);
+      },
+    );
+    _consume(
+      owner,
+      'deleteAsset',
+      owner.deleteAssetExecutionId,
+      owner.deleteAssetSnapshot,
+      () {
+        if (owner.deleteAssetSnapshot.hasFailure) _showModerationError(null);
+      },
+    );
+  }
+
+  void _handleResolutionCompleted<T>(
+    AdminSubmissionEditorViewModel owner,
+    commands.CommandResult<void, Result<T>?> snapshot,
+  ) {
+    if (!_owns(owner)) return;
+    if (snapshot.completed) {
+      _closeEditor(owner);
+    } else if (snapshot.hasFailure) {
+      _showModerationError(snapshot.data);
     }
   }
 
   void _showModerationError(Result<dynamic>? result) {
-    if (!mounted) return;
+    if (!_hasRouteEffectAuthority(_owner) &&
+        !_hasStatusDialogEffectAuthority(_owner)) {
+      return;
+    }
     final message = switch (result) {
       Error(:final AdminContentSubmissionApiException error) =>
         _moderationErrorMessage(error.code),
@@ -123,20 +275,20 @@ class _AdminSubmissionEditorScreenState
     }
   }
 
-  void _handleSaveCompleted() {
-    if (!mounted) return;
-
-    final save = widget.viewModel.save;
-    if (save.completed) {
+  void _handleSaveCompleted(AdminSubmissionEditorViewModel owner) {
+    if (!_owns(owner)) return;
+    final save = owner.saveSnapshot;
+    if (save.completed && owner.canCloseAfterSave) {
       if (_statusDialogOpen) {
-        _saveCompletedWhileStatusDialogOpen = true;
+        if (_hasStatusDialogEffectAuthority(owner)) {
+          _saveCompletedWhileStatusDialogOpen = true;
+          _dialogSaveExecutionId = owner.saveExecutionId;
+        }
         return;
       }
-      context.pop(true);
-    } else if (save.error) {
-      final result = save.result;
-      if (result
-          case Error<void>(:final AdminContentSubmissionApiException error)
+      _closeEditor(owner);
+    } else if (save.hasFailure) {
+      if (save.domainError case final AdminContentSubmissionApiException error
           when error.statusCode == 422 &&
               error.code == 'ADMIN_PROFILE_INCOMPLETE') {
         showSnackBar(
@@ -146,61 +298,18 @@ class _AdminSubmissionEditorScreenState
           type: SnackBarType.error,
         );
       } else {
-        _showModerationError(save.result);
+        _showModerationError(save.data);
       }
     }
   }
 
-  void _handleRejectCompleted() {
-    if (!mounted) return;
-
-    final reject = widget.viewModel.reject;
+  void _handleRejectCompleted(AdminSubmissionEditorViewModel owner) {
+    if (!_owns(owner)) return;
+    final reject = owner.rejectSnapshot;
     if (reject.completed) {
-      // Success pops through the route result so the dashboard reloads.
-      context.pop(true);
-    } else if (reject.error) {
-      final result = reject.result;
-      if (result case Error<void>(
-        :final AdminContentSubmissionApiException error,
-      ) when error.code == 'INVALID_STATUS_TRANSITION') {
-        showSnackBar(
-          context: context,
-          textContent:
-              'Il contributo non è più in attesa. Ricarica la schermata.',
-          type: SnackBarType.error,
-        );
-      } else {
-        _showModerationError(reject.result);
-      }
-    }
-  }
-
-  void _handlePromoteCompleted() {
-    if (!mounted) return;
-
-    final promote = widget.viewModel.promote;
-    if (promote.completed) {
-      // Success pops through the route result so the dashboard refreshes.
-      context.pop(true);
-    } else if (promote.error) {
-      final result = promote.result;
-      final String? message;
-      if (result case Error<AdminSubmissionPromotion>(
-        :final AdminContentSubmissionApiException error,
-      )) {
-        message = _moderationErrorMessage(error.code);
-      } else {
-        message = null;
-      }
-      if (message != null) {
-        showSnackBar(
-          context: context,
-          textContent: message,
-          type: SnackBarType.error,
-        );
-      } else {
-        showSnackBarGenericError(context: context);
-      }
+      _closeEditor(owner);
+    } else if (reject.hasFailure) {
+      _showModerationError(reject.data);
     }
   }
 
@@ -253,20 +362,6 @@ class _AdminSubmissionEditorScreenState
     _ => null,
   };
 
-  void _handleAddAssetCompleted() {
-    if (!mounted) return;
-    if (widget.viewModel.addAsset.error) {
-      showSnackBarGenericError(context: context);
-    }
-  }
-
-  void _handleDeleteAssetCompleted() {
-    if (!mounted) return;
-    if (widget.viewModel.deleteAsset.error) {
-      showSnackBarGenericError(context: context);
-    }
-  }
-
   /// Closes the keyboard so an already-focused input cannot swallow edits
   /// after the request snapshot pops the route on success.
   void _unfocus() {
@@ -283,18 +378,37 @@ class _AdminSubmissionEditorScreenState
     return 'Pubblicato come $kind · ID ${promotion.entityId}';
   }
 
-  Future<void> _confirmPublish(AdminPromotionTarget target) async {
+  static void _dismissDialog(BuildContext dialogContext, [bool? result]) {
+    if (!dialogContext.mounted ||
+        ModalRoute.of(dialogContext)?.isCurrent != true) {
+      return;
+    }
+    Navigator.of(dialogContext).pop(result);
+  }
+
+  Future<void> _confirmPublish(
+    AdminSubmissionEditorViewModel viewModel,
+    AdminPromotionTarget target,
+  ) async {
     if (!mounted) return;
 
-    final viewModel = widget.viewModel;
-    if (viewModel.operationRunning) return;
-
+    if (!_hasRouteEffectAuthority(viewModel) ||
+        viewModel.operationRunning ||
+        _statusDialogOpen) {
+      return;
+    }
+    final revision = viewModel.editorRevision;
+    final session = ++_dialogSession;
     _unfocus();
     _statusDialogOpen = true;
+    _statusDialogRoute = null;
+    _statusDialogRevoked = false;
     try {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) {
+          _observeStatusDialogRoute(context, session);
+          if (!_owns(viewModel)) return const SizedBox.shrink();
           final question = switch (target) {
             AdminPromotionTarget.event =>
               'Confermi di voler pubblicare questo contributo come evento?',
@@ -305,124 +419,178 @@ class _AdminSubmissionEditorScreenState
             content: Text(question),
             actions: <Widget>[
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => _dismissDialog(context),
                 child: const Text('Annulla'),
               ),
               FilledButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => _dismissDialog(context, true),
                 child: const Text('Conferma'),
               ),
             ],
           );
         },
       );
-      final saveCompleted = _saveCompletedWhileStatusDialogOpen;
       if (!mounted) return;
-      if (saveCompleted) {
-        context.pop(true);
+      if (!_hasRouteEffectAuthority(viewModel) ||
+          session != _dialogSession ||
+          _statusDialogRevoked) {
         return;
       }
-      if (confirmed != true || viewModel.operationRunning) return;
+      if (_saveCompletedWhileStatusDialogOpen) {
+        if (_dialogSaveExecutionId == viewModel.saveExecutionId &&
+            viewModel.canCloseAfterSave) {
+          _closeEditor(viewModel);
+        }
+        // A superseded successful Save must not fall through to moderation.
+        return;
+      }
+      if (confirmed != true ||
+          viewModel.operationRunning ||
+          revision != viewModel.editorRevision) {
+        return;
+      }
 
-      unawaited(viewModel.promote.execute(target));
+      _request(viewModel, () => viewModel.requestPromote(target));
     } finally {
-      _statusDialogOpen = false;
-      _saveCompletedWhileStatusDialogOpen = false;
+      if (session == _dialogSession && identical(_owner, viewModel)) {
+        _statusDialogOpen = false;
+        _saveCompletedWhileStatusDialogOpen = false;
+        _dialogSaveExecutionId = null;
+        _statusDialogRoute = null;
+      }
     }
   }
 
-  Future<void> _confirmReject() async {
+  Future<void> _confirmReject(AdminSubmissionEditorViewModel viewModel) async {
     if (!mounted) return;
 
-    final viewModel = widget.viewModel;
-    if (viewModel.operationRunning) return;
-
+    if (!_hasRouteEffectAuthority(viewModel) ||
+        viewModel.operationRunning ||
+        _statusDialogOpen) {
+      return;
+    }
+    final revision = viewModel.editorRevision;
+    final session = ++_dialogSession;
     var ignoreSource = viewModel.ignoreSource;
     _unfocus();
     _statusDialogOpen = true;
+    _statusDialogRoute = null;
+    _statusDialogRevoked = false;
     try {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) {
+          _observeStatusDialogRoute(context, session);
+          if (!_owns(viewModel)) return const SizedBox.shrink();
           return StatefulBuilder(
-            builder: (dialogContext, setDialogState) => AlertDialog(
-              scrollable: true,
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Confermi di voler rifiutare questo contributo?'),
-                  if (viewModel.externalEvent != null) ...[
-                    const Text(
-                      'Rifiutare una revisione considera quella revisione '
-                      'sorgente esaminata e scartata. Le modifiche ancora '
-                      'presenti in revisioni future non vengono riproposte '
-                      'finché il provider non modifica nuovamente il relativo '
-                      'gruppo.',
+            builder: (dialogContext, setDialogState) => !_owns(viewModel)
+                ? const SizedBox.shrink()
+                : AlertDialog(
+                    scrollable: true,
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Confermi di voler rifiutare questo contributo?',
+                        ),
+                        if (viewModel.externalEvent != null) ...[
+                          const Text(
+                            'Rifiutare una revisione considera quella '
+                            'revisione sorgente esaminata e scartata. '
+                            'Le modifiche ancora presenti in revisioni '
+                            'future non vengono riproposte finché il '
+                            'provider non modifica nuovamente il '
+                            'relativo gruppo.',
+                          ),
+                          CheckboxListTile(
+                            title: const Text(
+                              'Ignora anche le revisioni future della fonte',
+                            ),
+                            subtitle: const Text(
+                              'Le revisioni future saranno soppresse '
+                              'finché non riattivi la fonte da Fonti '
+                              'ignorate.',
+                            ),
+                            value: ignoreSource,
+                            onChanged: (value) => _request(
+                              viewModel,
+                              () => setDialogState(
+                                () => ignoreSource = value ?? false,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    CheckboxListTile(
-                      title: const Text(
-                        'Ignora anche le revisioni future della fonte',
+                    actions: <Widget>[
+                      TextButton(
+                        onPressed: () => _dismissDialog(context),
+                        child: const Text('Annulla'),
                       ),
-                      subtitle: const Text(
-                        'Le revisioni future saranno soppresse finché non '
-                        'riattivi la fonte da Fonti ignorate.',
+                      FilledButton(
+                        onPressed: () => _dismissDialog(context, true),
+                        child: const Text('Conferma'),
                       ),
-                      value: ignoreSource,
-                      onChanged: (value) =>
-                          setDialogState(() => ignoreSource = value ?? false),
-                    ),
-                  ],
-                ],
-              ),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Annulla'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Conferma'),
-                ),
-              ],
-            ),
+                    ],
+                  ),
           );
         },
       );
-      final saveCompleted = _saveCompletedWhileStatusDialogOpen;
       if (!mounted) return;
-      if (saveCompleted) {
-        context.pop(true);
+      if (!_hasRouteEffectAuthority(viewModel) ||
+          session != _dialogSession ||
+          _statusDialogRevoked) {
         return;
       }
-      if (confirmed != true || viewModel.operationRunning) return;
+      if (_saveCompletedWhileStatusDialogOpen) {
+        if (_dialogSaveExecutionId == viewModel.saveExecutionId &&
+            viewModel.canCloseAfterSave) {
+          _closeEditor(viewModel);
+        }
+        // A superseded successful Save must not fall through to moderation.
+        return;
+      }
+      if (confirmed != true ||
+          viewModel.operationRunning ||
+          revision != viewModel.editorRevision) {
+        return;
+      }
 
       viewModel.setIgnoreSource(ignored: ignoreSource);
-      unawaited(viewModel.reject.execute());
+      _request(viewModel, viewModel.requestReject);
     } finally {
-      _statusDialogOpen = false;
-      _saveCompletedWhileStatusDialogOpen = false;
+      if (session == _dialogSession && identical(_owner, viewModel)) {
+        _statusDialogOpen = false;
+        _saveCompletedWhileStatusDialogOpen = false;
+        _dialogSaveExecutionId = null;
+        _statusDialogRoute = null;
+      }
     }
   }
 
-  Future<void> _confirmAssetDeletion(int assetId) async {
+  Future<void> _confirmAssetDeletion(
+    AdminSubmissionEditorViewModel viewModel,
+    int assetId,
+  ) async {
     if (!mounted) return;
 
-    final viewModel = widget.viewModel;
-    if (viewModel.operationRunning) return;
-
+    if (!_hasRouteEffectAuthority(viewModel) || viewModel.operationRunning) {
+      return;
+    }
     _unfocus();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
+        if (!_owns(viewModel)) return const SizedBox.shrink();
         return AlertDialog(
           content: const Text('Rimuovere questa foto dal suggerimento?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => _dismissDialog(context),
               child: const Text('Annulla'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => _dismissDialog(context, true),
               child: const Text('Conferma'),
             ),
           ],
@@ -430,18 +598,23 @@ class _AdminSubmissionEditorScreenState
       },
     );
     if (!mounted) return;
-    if (confirmed != true || viewModel.operationRunning) return;
-
-    unawaited(viewModel.deleteAsset.execute(assetId));
+    if (!_hasRouteEffectAuthority(viewModel) ||
+        confirmed != true ||
+        viewModel.operationRunning ||
+        !viewModel.assets.any((asset) => asset.id == assetId)) {
+      return;
+    }
+    _request(viewModel, () => viewModel.requestDeleteAsset(assetId));
   }
 
-  void _save() {
+  void _save(AdminSubmissionEditorViewModel owner) {
+    if (!_owns(owner)) return;
     final contentOk = _formKey.currentState?.validate() ?? false;
     final locationOk = _locationFormKey.currentState?.validate() ?? false;
-    final eventTimeOk = widget.viewModel.validateEventTimeForSave();
+    final eventTimeOk = owner.validateEventTimeForSave();
     if (contentOk && locationOk && eventTimeOk) {
       _unfocus();
-      unawaited(widget.viewModel.save.execute());
+      _request(owner, owner.requestSave);
     }
   }
 
@@ -451,20 +624,7 @@ class _AdminSubmissionEditorScreenState
 
     return Scaffold(
       body: ListenableBuilder(
-        listenable: Listenable.merge(<Listenable>[
-          viewModel,
-          viewModel.load,
-          viewModel.save,
-          viewModel.promote,
-          viewModel.reject,
-          viewModel.link,
-          viewModel.apply,
-          viewModel.preview,
-          viewModel.keepCurrent,
-          viewModel.findCandidates,
-          viewModel.addAsset,
-          viewModel.deleteAsset,
-        ]),
+        listenable: viewModel,
         builder: (context, _) {
           final status = viewModel.status;
 
@@ -476,12 +636,12 @@ class _AdminSubmissionEditorScreenState
             );
           }
           if (viewModel.isEditMode &&
-              viewModel.load.error &&
+              viewModel.loadSnapshot.hasFailure &&
               !viewModel.hasLoadedDetail) {
             return EmptyView.error(
               text: const Text('Impossibile caricare il contributo'),
               action: FilledButton(
-                onPressed: viewModel.load.execute,
+                onPressed: () => _request(viewModel, viewModel.requestLoad),
                 child: const Text('Riprova'),
               ),
             );
@@ -491,7 +651,9 @@ class _AdminSubmissionEditorScreenState
           // while any mutation is running, so edits made after the request
           // snapshot cannot be silently lost when success pops the route.
           final lockEditor =
-              !viewModel.isEditable || viewModel.operationRunning;
+              !viewModel.isEditable ||
+              viewModel.operationRunning ||
+              viewModel.loading;
 
           return CustomScrollView(
             key: const ValueKey<String>('admin_submission_editor_scroll'),
@@ -518,6 +680,7 @@ class _AdminSubmissionEditorScreenState
                           // transient busy states stay fully visible.
                           opacity: viewModel.isEditable ? 1.0 : 0.55,
                           child: ContentSubmissionFields(
+                            key: ObjectKey(viewModel),
                             formKey: _formKey,
                             hydrationRevision: viewModel.hydrationRevision,
                             eventModeLocked: viewModel.externalEvent != null,
@@ -528,23 +691,57 @@ class _AdminSubmissionEditorScreenState
                             descriptionDelta: viewModel.descriptionDelta,
                             isEvent: viewModel.isEvent,
                             allDay: viewModel.allDay,
-                            onAllDayChanged: (allDay) =>
-                                viewModel.setAllDay(allDay: allDay),
+                            onAllDayChanged: (allDay) => _request(
+                              viewModel,
+                              () => viewModel.setAllDay(allDay: allDay),
+                            ),
                             startCalendarDate: viewModel.startCalendarDate,
                             startClockTime: viewModel.startClockTime,
                             endCalendarDate: viewModel.endCalendarDate,
                             eventTimeIssue: viewModel.eventTimeIssue,
-                            onCategorySelected: viewModel.setCategory,
-                            onCategoryDeleted: () =>
-                                viewModel.setCategory(null),
-                            onCityChanged: viewModel.setCity,
-                            onNameChanged: viewModel.setName,
-                            onDescriptionChanged: viewModel.setDescription,
-                            onEventChanged: (enabled) =>
-                                viewModel.setEventEnabled(enabled: enabled),
-                            onStartDateChanged: viewModel.setStartCalendarDate,
-                            onStartTimeChanged: viewModel.setStartClockTime,
-                            onEndDateChanged: viewModel.setEndCalendarDate,
+                            onCategorySelected: (value) => _request(
+                              viewModel,
+                              () => viewModel.setCategory(value),
+                            ),
+                            onCategoryDeleted: () => _request(
+                              viewModel,
+                              () => viewModel.setCategory(null),
+                            ),
+                            onCityChanged: (value) => _request(
+                              viewModel,
+                              () => viewModel.setCity(value),
+                            ),
+                            onNameChanged: (value) => _request(
+                              viewModel,
+                              () => viewModel.setName(value),
+                            ),
+                            onDescriptionChanged:
+                                ({
+                                  required description,
+                                  required descriptionDelta,
+                                }) => _request(
+                                  viewModel,
+                                  () => viewModel.setDescription(
+                                    description: description,
+                                    descriptionDelta: descriptionDelta,
+                                  ),
+                                ),
+                            onEventChanged: (enabled) => _request(
+                              viewModel,
+                              () => viewModel.setEventEnabled(enabled: enabled),
+                            ),
+                            onStartDateChanged: (value) => _request(
+                              viewModel,
+                              () => viewModel.setStartCalendarDate(value),
+                            ),
+                            onStartTimeChanged: (value) => _request(
+                              viewModel,
+                              () => viewModel.setStartClockTime(value),
+                            ),
+                            onEndDateChanged: (value) => _request(
+                              viewModel,
+                              () => viewModel.setEndCalendarDate(value),
+                            ),
                           ),
                         ),
                       ),
@@ -565,12 +762,26 @@ class _AdminSubmissionEditorScreenState
                         child: Opacity(
                           opacity: viewModel.isEditable ? 1.0 : 0.55,
                           child: AdminSubmissionLocationEditor(
+                            key: ObjectKey(viewModel),
                             latitudeText: viewModel.latitudeText,
                             longitudeText: viewModel.longitudeText,
                             formKey: _locationFormKey,
-                            onLatitudeTextChanged: viewModel.setLatitudeText,
-                            onLongitudeTextChanged: viewModel.setLongitudeText,
-                            onMapCoordinatesSelected: viewModel.setCoordinates,
+                            onLatitudeTextChanged: (value) => _request(
+                              viewModel,
+                              () => viewModel.setLatitudeText(value),
+                            ),
+                            onLongitudeTextChanged: (value) => _request(
+                              viewModel,
+                              () => viewModel.setLongitudeText(value),
+                            ),
+                            onMapCoordinatesSelected: (latitude, longitude) =>
+                                _request(
+                                  viewModel,
+                                  () => viewModel.setCoordinates(
+                                    latitude,
+                                    longitude,
+                                  ),
+                                ),
                           ),
                         ),
                       ),
@@ -610,27 +821,31 @@ class _AdminSubmissionEditorScreenState
                                   ),
                                   showRemoveIcon:
                                       status == AdminSubmissionStatus.pending,
-                                  onRemove: viewModel.operationRunning
+                                  onRemove: !viewModel.canRequestDeleteAsset
                                       ? null
                                       : () => unawaited(
-                                          _confirmAssetDeletion(asset.id),
+                                          _confirmAssetDeletion(
+                                            viewModel,
+                                            asset.id,
+                                          ),
                                         ),
                                 );
                               }),
                               if ((status == AdminSubmissionStatus.pending &&
                                       viewModel.assets.length <
                                           kMaximumSubmissionAssetCount) &&
-                                  !viewModel.operationRunning)
+                                  viewModel.canRequestAddAsset)
                                 ContentSubmissionAddAssetButton(
                                   key: const ValueKey<String>(
                                     'admin_submission_add_asset',
                                   ),
-                                  onPressed: viewModel.operationRunning
+                                  onPressed: !viewModel.canRequestAddAsset
                                       ? null
                                       : () {
                                           _unfocus();
-                                          unawaited(
-                                            viewModel.addAsset.execute(),
+                                          _request(
+                                            viewModel,
+                                            viewModel.requestAddAsset,
                                           );
                                         },
                                 ),
@@ -724,32 +939,41 @@ class _AdminSubmissionEditorScreenState
                                 value: viewModel.acknowledgeCurrentSource,
                                 onChanged: viewModel.operationRunning
                                     ? null
-                                    : (value) =>
-                                          viewModel.setAcknowledgeCurrentSource(
-                                            selected: value ?? false,
-                                          ),
+                                    : (value) => _request(
+                                        viewModel,
+                                        () => viewModel
+                                            .setAcknowledgeCurrentSource(
+                                              selected: value ?? false,
+                                            ),
+                                      ),
                               ),
                           ],
                           if (status == AdminSubmissionStatus.pending) ...[
                             if (viewModel.startDate != null) ...[
-                              TextFormField(
-                                key: const ValueKey('admin_event_search'),
-                                decoration: const InputDecoration(
-                                  labelText: 'Cerca evento per nome',
+                              KeyedSubtree(
+                                key: ObjectKey(viewModel),
+                                child: TextFormField(
+                                  key: const ValueKey('admin_event_search'),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Cerca evento per nome',
+                                  ),
+                                  initialValue: viewModel.candidateSearch,
+                                  onChanged: (value) => _request(
+                                    viewModel,
+                                    () => viewModel.setCandidateSearch(value),
+                                  ),
                                 ),
-                                onChanged: (value) => _eventSearch = value,
                               ),
                               TextButton(
-                                onPressed: viewModel.findCandidates.running
+                                onPressed: !viewModel.canRequestFindCandidates
                                     ? null
-                                    : () => unawaited(
-                                        viewModel.findCandidates.execute(
-                                          _eventSearch,
-                                        ),
+                                    : () => _request(
+                                        viewModel,
+                                        viewModel.requestFindCandidates,
                                       ),
                                 child: const Text('Cerca eventi'),
                               ),
-                              if (viewModel.findCandidates.error)
+                              if (viewModel.findCandidatesSnapshot.hasFailure)
                                 const Text(
                                   'Impossibile cercare gli eventi. Riprova.',
                                 ),
@@ -776,10 +1000,15 @@ class _AdminSubmissionEditorScreenState
                                     ),
                                     selected:
                                         viewModel.targetEventId == candidate.id,
-                                    onTap: viewModel.operationRunning
+                                    onTap:
+                                        viewModel.operationRunning ||
+                                            viewModel.loading
                                         ? null
-                                        : () => viewModel.selectTargetEvent(
-                                            candidate.id,
+                                        : () => _request(
+                                            viewModel,
+                                            () => viewModel.selectTargetEvent(
+                                              candidate.id,
+                                            ),
                                           ),
                                   ),
                               ],
@@ -792,18 +1021,25 @@ class _AdminSubmissionEditorScreenState
                                   labelText: 'ID evento esistente',
                                 ),
                                 keyboardType: TextInputType.number,
-                                enabled: !viewModel.operationRunning,
-                                onChanged: (value) => viewModel
-                                    .selectTargetEvent(int.tryParse(value)),
+                                enabled:
+                                    !viewModel.operationRunning &&
+                                    !viewModel.loading,
+                                onChanged: (value) => _request(
+                                  viewModel,
+                                  () => viewModel.selectTargetEvent(
+                                    int.tryParse(value),
+                                  ),
+                                ),
                               ),
                               FilledButton.tonal(
                                 onPressed:
                                     viewModel.isDirty ||
-                                        viewModel.operationRunning ||
+                                        !viewModel.canRequestLink ||
                                         viewModel.targetEventId == null
                                     ? null
-                                    : () => unawaited(
-                                        viewModel.link.execute(
+                                    : () => _request(
+                                        viewModel,
+                                        () => viewModel.requestLink(
                                           viewModel.targetEventId!,
                                         ),
                                       ),
@@ -813,16 +1049,21 @@ class _AdminSubmissionEditorScreenState
                                 TextButton(
                                   onPressed:
                                       viewModel.isDirty ||
-                                          viewModel.operationRunning
+                                          !viewModel.canRequestPreview
                                       ? null
-                                      : viewModel.preview.execute,
+                                      : () => _request(
+                                          viewModel,
+                                          viewModel.requestPreview,
+                                        ),
                                   child: const Text('Anteprima aggiornamento'),
                                 ),
-                                if (viewModel.preview.error ||
-                                    viewModel.keepCurrent.error)
-                                  Text(switch (viewModel.keepCurrent.error
-                                      ? viewModel.keepCurrent.result
-                                      : viewModel.preview.result) {
+                                if (viewModel.previewSnapshot.hasFailure ||
+                                    viewModel.keepCurrentSnapshot.hasFailure)
+                                  Text(switch (viewModel
+                                          .keepCurrentSnapshot
+                                          .hasFailure
+                                      ? viewModel.keepCurrentSnapshot.data
+                                      : viewModel.previewSnapshot.data) {
                                     Error(
                                       :final AdminContentSubmissionApiException
                                       error,
@@ -862,11 +1103,15 @@ class _AdminSubmissionEditorScreenState
                                             Text('Attuale: ${group.current}'),
                                             TextButton(
                                               onPressed:
-                                                  viewModel.operationRunning
+                                                  !viewModel
+                                                      .canRequestKeepCurrent
                                                   ? null
-                                                  : () => unawaited(
-                                                      viewModel.keepCurrent
-                                                          .execute(group),
+                                                  : () => _request(
+                                                      viewModel,
+                                                      () => viewModel
+                                                          .requestKeepCurrent(
+                                                            group,
+                                                          ),
                                                     ),
                                               child: const Text(
                                                 'Mantieni valore attuale',
@@ -878,9 +1123,12 @@ class _AdminSubmissionEditorScreenState
                                     ),
                                 if (viewModel.mergePreview != null)
                                   FilledButton(
-                                    onPressed: viewModel.operationRunning
+                                    onPressed: !viewModel.canRequestApply
                                         ? null
-                                        : viewModel.apply.execute,
+                                        : () => _request(
+                                            viewModel,
+                                            viewModel.requestApply,
+                                          ),
                                     child: const Text('Applica aggiornamento'),
                                   ),
                               ],
@@ -906,11 +1154,12 @@ class _AdminSubmissionEditorScreenState
                                   FilledButton.tonal(
                                     onPressed:
                                         viewModel.isDirty ||
-                                            viewModel.operationRunning ||
+                                            !viewModel.canRequestPromote ||
                                             !viewModel.hasPublishableCategory
                                         ? null
                                         : () => unawaited(
                                             _confirmPublish(
+                                              viewModel,
                                               viewModel.isEvent
                                                   ? AdminPromotionTarget.event
                                                   : AdminPromotionTarget.place,
@@ -925,9 +1174,11 @@ class _AdminSubmissionEditorScreenState
                                 FilledButton.tonal(
                                   onPressed:
                                       viewModel.isDirty ||
-                                          viewModel.operationRunning
+                                          !viewModel.canRequestReject
                                       ? null
-                                      : () => unawaited(_confirmReject()),
+                                      : () => unawaited(
+                                          _confirmReject(viewModel),
+                                        ),
                                   child: const Text('Rifiuta'),
                                 ),
                               ],
@@ -953,7 +1204,9 @@ class _AdminSubmissionEditorScreenState
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: FilledButton.icon(
-                        onPressed: viewModel.operationRunning ? null : _save,
+                        onPressed: !viewModel.canRequestSave
+                            ? null
+                            : () => _save(viewModel),
                         icon: const Icon(Symbols.save),
                         label: Text(
                           viewModel.isEditMode

@@ -8,6 +8,7 @@ import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:paged_vertical_calendar/paged_vertical_calendar.dart';
 
+import '../../../support/command_test_support.dart';
 import '../../../support/events_harness.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
@@ -15,7 +16,7 @@ import '../../../support/fixtures.dart';
 void main() {
   setUpAll(() => initializeDateFormatting('en'));
 
-  testWidgets(
+  testOwnerUI(
     'provider initialization does not notify its Consumer during build',
     (tester) async {
       final loadAll = Completer<Result<List<Event>>>();
@@ -31,8 +32,10 @@ void main() {
       await tester.pumpWidget(harness.app);
 
       expect(tester.takeException(), isNull);
-      expect(harness.viewModel.loadAll.running, isTrue);
-      expect(harness.viewModel.loadByDate.running, isTrue);
+      expect(harness.viewModel.loadAll.isRunningSync.value, isTrue);
+      expect(harness.viewModel.loadByDate.isRunningSync.value, isTrue);
+      expect(repository.getByDateCallCount, 0);
+      await pumpCommandTurns(tester);
       expect(repository.getByDateCallCount, 1);
       expect(repository.lastGetByDate, EventCalendarDate(2026, 3, 11));
 
@@ -45,7 +48,7 @@ void main() {
     },
   );
 
-  testWidgets(
+  testOwnerUI(
     'provider initialization uses the current Europe/Rome calendar day',
     (tester) async {
       final event = makeEvent(startDate: DateTime.utc(2026, 1, 10, 23, 30));
@@ -59,7 +62,7 @@ void main() {
       );
 
       await tester.pumpWidget(harness.app);
-      await tester.pump();
+      await pumpCommandTurns(tester);
 
       expect(harness.viewModel.selectedDate, EventCalendarDate(2026, 1, 11));
       expect(repository.getByDateCallCount, 1);
@@ -68,7 +71,7 @@ void main() {
     },
   );
 
-  testWidgets('legacy paged calendar has a compatible Material subtree', (
+  testOwnerUI('legacy paged calendar has a compatible Material subtree', (
     tester,
   ) async {
     final harness = EventsProviderHarness(
@@ -77,7 +80,7 @@ void main() {
     );
 
     await tester.pumpWidget(harness.app);
-    await tester.pump();
+    await pumpCommandTurns(tester);
     await tester.pump();
 
     expect(find.byType(PagedVerticalCalendar), findsOneWidget);

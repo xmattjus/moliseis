@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:collection' show UnmodifiableListView;
 import 'dart:io' show File;
 
+import 'package:command_it/command_it.dart' as commands;
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
@@ -15,9 +17,24 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/image_upload_task.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
-import 'package:moliseis/utils/command.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
+
+/// Immutable action input captured by one admitted editor operation.
+typedef _EditorAction<T> = Future<Result<T>> Function();
+
+typedef _SaveDraft = ({
+  AdminSubmissionInput? input,
+  Exception? error,
+  EventTimeIssue? issue,
+  int revision,
+});
+typedef _SourceAcknowledgment = ({
+  bool? acknowledge,
+  String? hash,
+  bool? ignore,
+});
 
 /// Route-scoped state for creating or editing an admin submission.
 ///
@@ -40,19 +57,41 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
        _imagePicker = imagePicker ?? ImagePicker(),
        _contributorName = creatorName,
        _contributorEmail = creatorEmail {
-    load = Command0<void>(_loadDetail);
-    save = Command0<void>(_save);
-    reject = Command0<void>(_reject);
-    promote = Command1<AdminSubmissionPromotion, AdminPromotionTarget>(
-      _promote,
-    );
-    link = Command1<AdminEventResolution, int>(_link);
-    preview = Command0<void>(_preview);
-    findCandidates = Command1<void, String>(_findCandidates);
-    apply = Command0<AdminEventResolution>(_apply);
-    keepCurrent = Command1<void, AdminEventMergeGroup>(_keepCurrent);
-    addAsset = Command0<void>(_addAsset);
-    deleteAsset = Command1<void, int>(_deleteAsset);
+    _loadCommand = _createCommand<void>('load', (snapshot) {
+      if (_loadSnapshot.isRunning) _loadSnapshot = snapshot;
+    });
+    _saveCommand = _createCommand<void>('save', (snapshot) {
+      if (_saveSnapshot.isRunning) _saveSnapshot = snapshot;
+    });
+    _rejectCommand = _createCommand<void>('reject', (snapshot) {
+      if (_rejectSnapshot.isRunning) _rejectSnapshot = snapshot;
+    });
+    _promoteCommand = _createCommand<AdminSubmissionPromotion>('promote', (
+      snapshot,
+    ) {
+      if (_promoteSnapshot.isRunning) _promoteSnapshot = snapshot;
+    });
+    _linkCommand = _createCommand<AdminEventResolution>('link', (snapshot) {
+      if (_linkSnapshot.isRunning) _linkSnapshot = snapshot;
+    });
+    _previewCommand = _createCommand<void>('preview', (snapshot) {
+      if (_previewSnapshot.isRunning) _previewSnapshot = snapshot;
+    });
+    _candidatesCommand = _createCommand<void>('find_candidates', (snapshot) {
+      if (_candidatesSnapshot.isRunning) _candidatesSnapshot = snapshot;
+    });
+    _applyCommand = _createCommand<AdminEventResolution>('apply', (snapshot) {
+      if (_applySnapshot.isRunning) _applySnapshot = snapshot;
+    });
+    _keepCommand = _createCommand<void>('keep_current', (snapshot) {
+      if (_keepSnapshot.isRunning) _keepSnapshot = snapshot;
+    });
+    _addCommand = _createCommand<void>('add_asset', (snapshot) {
+      if (_addSnapshot.isRunning) _addSnapshot = snapshot;
+    });
+    _deleteCommand = _createCommand<void>('delete_asset', (snapshot) {
+      if (_deleteSnapshot.isRunning) _deleteSnapshot = snapshot;
+    });
   }
 
   final AdminContentSubmissionRepository _repository;
@@ -84,33 +123,96 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   var _isDirty = false;
   var _disposed = false;
 
-  /// Loads a persisted submission when editing.
-  late Command0<void> load;
-
-  /// Saves the editor-owned fields by creating or updating a submission.
-  late Command0<void> save;
-
-  /// Rejects a clean persisted pending submission.
-  late Command0<void> reject;
-
-  /// Publishes a clean persisted pending submission as an explicit target.
-  late Command1<AdminSubmissionPromotion, AdminPromotionTarget> promote;
-
-  /// Adds one gallery image to the persisted pending submission.
-  late Command0<void> addAsset;
-
-  /// Removes one persisted image association from the pending submission.
-  late Command1<void, int> deleteAsset;
-
+  late final ResultCommand<_EditorAction<void>, void> _loadCommand;
+  commands.CommandResult<void, Result<void>?> _loadSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _loadEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _saveCommand;
+  commands.CommandResult<void, Result<void>?> _saveSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _saveEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _rejectCommand;
+  commands.CommandResult<void, Result<void>?> _rejectSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _rejectEffectId;
+  late final ResultCommand<
+    _EditorAction<AdminSubmissionPromotion>,
+    AdminSubmissionPromotion
+  >
+  _promoteCommand;
+  commands.CommandResult<void, Result<AdminSubmissionPromotion>?>
+  _promoteSnapshot = const commands.CommandResult(null, null, null, false);
+  int? _promoteEffectId;
+  late final ResultCommand<
+    _EditorAction<AdminEventResolution>,
+    AdminEventResolution
+  >
+  _linkCommand;
+  commands.CommandResult<void, Result<AdminEventResolution>?> _linkSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _linkEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _previewCommand;
+  commands.CommandResult<void, Result<void>?> _previewSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _previewEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _candidatesCommand;
+  commands.CommandResult<void, Result<void>?> _candidatesSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _candidatesEffectId;
+  late final ResultCommand<
+    _EditorAction<AdminEventResolution>,
+    AdminEventResolution
+  >
+  _applyCommand;
+  commands.CommandResult<void, Result<AdminEventResolution>?> _applySnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _applyEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _keepCommand;
+  commands.CommandResult<void, Result<void>?> _keepSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _keepEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _addCommand;
+  commands.CommandResult<void, Result<void>?> _addSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _addEffectId;
+  late final ResultCommand<_EditorAction<void>, void> _deleteCommand;
+  commands.CommandResult<void, Result<void>?> _deleteSnapshot =
+      const commands.CommandResult(null, null, null, false);
+  int? _deleteEffectId;
+  int _nextEffectId = 0;
+  bool _stopped = false;
+  final _reserved = Set<commands.Command<dynamic, dynamic>>.identity();
+  final _released = Set<commands.Command<dynamic, dynamic>>.identity();
+  final _completionObservers =
+      Map<commands.Command<dynamic, dynamic>, VoidCallback>.identity();
+  int _draftRevision = 0;
+  int _editorRevision = 0;
+  int? _savedExecutionId;
+  int? _savedDraftRevision;
+  String _candidateSearch = '';
+  int _candidateRevision = 0;
   AdminEventCandidates? _candidates;
 
   /// Candidate discovery is advisory and never changes moderation readiness.
-  late Command1<void, String> findCandidates;
-
   AdminEventCandidates? get candidates => _candidates;
 
-  /// Copies one complete Event group and saves through the ordinary editor.
-  late Command1<void, AdminEventMergeGroup> keepCurrent;
+  /// Desired candidate input, independent of a physically pending search.
+  String get candidateSearch => _candidateSearch;
+
+  /// Current editor context for correlating dialog confirmations.
+  int get editorRevision => _editorRevision;
+
+  /// Whether this owner has revoked admission and publication authority.
+  bool get isDisposed => _disposed;
+
+  /// A current clean Save success remains close-authorized after settlement.
+  bool get canCloseAfterSave =>
+      !_disposed &&
+      !_isDirty &&
+      _savedExecutionId == _saveEffectId &&
+      _savedExecutionId != null &&
+      _savedDraftRevision == _draftRevision &&
+      _saveSnapshot.completed;
 
   bool _acknowledgeCurrentSource = false;
   String? _acknowledgedSourceHash;
@@ -124,6 +226,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   AdminSubmission? get followupSubmission => _followupSubmission;
 
   void setAcknowledgeCurrentSource({required bool selected}) {
+    if (!_canChangeContext) return;
     _acknowledgeCurrentSource = selected && isSourceStale;
     _acknowledgedSourceHash = _acknowledgeCurrentSource
         ? _externalEvent?.currentHash
@@ -132,6 +235,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   void setIgnoreSource({required bool ignored}) {
+    if (!_canChangeContext) return;
     _ignoreSource = ignored && _externalEvent != null;
     _notifyListeners();
   }
@@ -145,15 +249,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Only explicit backend reload or keep-current replaces field widget state.
   int get hydrationRevision => _hydrationRevision;
 
-  /// Accepts against the selected canonical Event without copying media.
-  late Command1<AdminEventResolution, int> link;
-
-  /// Loads an authoritative merge preview for the linked Event.
-  late Command0<void> preview;
-
-  /// Applies the preview with its untouched concurrency tokens.
-  late Command0<AdminEventResolution> apply;
-
   AdminExternalEvent? get externalEvent => _externalEvent;
   bool get isExternalUpdate =>
       _externalEvent?.mode == AdminExternalEventMode.update;
@@ -162,9 +257,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Selecting a different target invalidates its preview.
   void selectTargetEvent(int? id) {
-    _previewGeneration++;
+    if (!_canChangeContext) return;
     _targetEventId = id;
-    _mergePreview = null;
+    _editorRevision++;
+    _invalidatePreview();
+    _invalidateCandidates();
     _notifyListeners();
   }
 
@@ -264,38 +361,72 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool get hasLoadedDetail => _hasLoadedDetail;
 
   /// Whether a detail request is in progress.
-  bool get loading => load.running;
+  bool get loading => _reserved.contains(_loadCommand);
 
   /// Whether edits have not yet been saved.
   bool get isDirty => _isDirty;
 
   /// Whether an asset add or delete operation is in progress.
-  bool get assetMutationRunning => addAsset.running || deleteAsset.running;
+  bool get assetMutationRunning =>
+      _reserved.contains(_addCommand) || _reserved.contains(_deleteCommand);
 
-  /// Whether any operation can mutate the editor or its submission.
-  bool get operationRunning =>
-      save.running ||
-      promote.running ||
-      reject.running ||
-      link.running ||
-      apply.running ||
-      keepCurrent.running ||
-      assetMutationRunning;
+  /// Whether an admitted operation can mutate the editor or its submission.
+  bool get operationRunning => _mutations.any(_reserved.contains);
+
+  List<commands.Command<dynamic, dynamic>> get _mutations => [
+    _saveCommand,
+    _rejectCommand,
+    _promoteCommand,
+    _linkCommand,
+    _applyCommand,
+    _keepCommand,
+    _addCommand,
+    _deleteCommand,
+  ];
+  List<commands.Command<dynamic, dynamic>> get _commands => [
+    _loadCommand,
+    ..._mutations,
+    _previewCommand,
+    _candidatesCommand,
+  ];
+
+  bool get _canChangeContext => !_disposed && !loading && !operationRunning;
+  bool get _canChangeFields =>
+      !_disposed &&
+      !loading &&
+      (!operationRunning || _reserved.contains(_saveCommand));
+
+  bool _canAdmit(commands.Command<dynamic, dynamic> command) {
+    if (_disposed || _stopped || _reserved.contains(command) || loading) {
+      return false;
+    }
+    if (identical(command, _loadCommand)) {
+      return !(_hasLoadedDetail && _isDirty) && _reserved.isEmpty;
+    }
+    if (identical(command, _candidatesCommand)) return true;
+    if (identical(command, _previewCommand)) return !operationRunning;
+    return !operationRunning &&
+        (!identical(command, _keepCommand) ||
+            !_reserved.contains(_previewCommand));
+  }
 
   /// Updates the selected category and marks the editor dirty.
   void setCategory(ContentCategory? category) {
+    if (!_canChangeFields) return;
     _category = category;
     _markDirty();
   }
 
   /// Updates the city and marks the editor dirty.
   void setCity(String? city) {
+    if (!_canChangeFields) return;
     _city = city;
     _markDirty();
   }
 
   /// Updates the place or event name and marks the editor dirty.
   void setName(String? name) {
+    if (!_canChangeFields) return;
     _name = name;
     _markDirty();
   }
@@ -305,6 +436,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     required String? description,
     required List<Map<String, dynamic>>? descriptionDelta,
   }) {
+    if (!_canChangeFields) return;
     _description = description;
     _descriptionDelta = descriptionDelta;
     _markDirty();
@@ -319,6 +451,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   void setEventEnabled({required bool enabled}) {
+    if (!_canChangeFields) return;
     if (_externalEvent != null && !enabled) return;
     _eventDates = enabled
         ? _eventTimePolicy.enable(_eventDates)
@@ -354,6 +487,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   void _applyTemporalEdit(EventTimeEditResult result) {
+    if (!_canChangeFields) return;
     _eventDates = result.draft;
     _eventTimeIssue = result.issue;
     _markDirty();
@@ -364,6 +498,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Returns whether the current temporal draft is eligible for saving. The
   /// issue is transient and is cleared by the next valid temporal edit.
   bool validateEventTimeForSave({EventDateDraft? draft}) {
+    if (_disposed) return false;
     final issue =
         _eventTimeIssue ??
         _eventTimePolicy.validateForPersistence(draft ?? _eventDates);
@@ -381,12 +516,14 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Invalid or partial text is kept as-is so it stays visible and blocks
   /// Save until corrected.
   void setLatitudeText(String value) {
+    if (!_canChangeFields) return;
     _latitudeText = value;
     _markDirty();
   }
 
   /// Updates the raw longitude draft and marks the editor dirty.
   void setLongitudeText(String value) {
+    if (!_canChangeFields) return;
     _longitudeText = value;
     _markDirty();
   }
@@ -396,19 +533,315 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// This is one logical change: both drafts are written with six-decimal
   /// formatting and the editor is marked dirty exactly once.
   void setCoordinates(double latitude, double longitude) {
+    if (!_canChangeFields) return;
     _latitudeText = latitude.toStringAsFixed(6);
     _longitudeText = longitude.toStringAsFixed(6);
     _markDirty();
   }
 
+  /// Changes desired query and invalidates older results without starting I/O.
+  void setCandidateSearch(String value) {
+    if (_disposed || value == _candidateSearch) return;
+    _candidateSearch = value;
+    _candidateRevision++;
+    _invalidateCandidates();
+    _notifyListeners();
+  }
+
+  /// Last authorized load state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<void>?> get loadSnapshot => _loadSnapshot;
+
+  /// Identity of the last admitted load execution.
+  int? get loadExecutionId => _loadEffectId;
+
+  /// Whether load can synchronously reserve its operation.
+  bool get canRequestLoad => _canAdmit(_loadCommand);
+
+  /// Last authorized save state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<void>?> get saveSnapshot => _saveSnapshot;
+
+  /// Identity of the last admitted save execution.
+  int? get saveExecutionId => _saveEffectId;
+
+  /// Whether save can synchronously reserve its operation.
+  bool get canRequestSave => _canAdmit(_saveCommand);
+
+  /// Last authorized reject state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<void>?> get rejectSnapshot =>
+      _rejectSnapshot;
+
+  /// Identity of the last admitted reject execution.
+  int? get rejectExecutionId => _rejectEffectId;
+
+  /// Whether reject can synchronously reserve its operation.
+  bool get canRequestReject => _canAdmit(_rejectCommand);
+
+  /// Last authorized promote state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<AdminSubmissionPromotion>?>
+  get promoteSnapshot => _promoteSnapshot;
+
+  /// Identity of the last admitted promote execution.
+  int? get promoteExecutionId => _promoteEffectId;
+
+  /// Whether promote can synchronously reserve its operation.
+  bool get canRequestPromote => _canAdmit(_promoteCommand);
+
+  /// Last authorized link state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<AdminEventResolution>?>
+  get linkSnapshot => _linkSnapshot;
+
+  /// Identity of the last admitted link execution.
+  int? get linkExecutionId => _linkEffectId;
+
+  /// Whether link can synchronously reserve its operation.
+  bool get canRequestLink => _canAdmit(_linkCommand);
+
+  /// Last authorized preview state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<void>?> get previewSnapshot =>
+      _previewSnapshot;
+
+  /// Identity of the last admitted preview execution.
+  int? get previewExecutionId => _previewEffectId;
+
+  /// Whether preview can synchronously reserve its operation.
+  bool get canRequestPreview => _canAdmit(_previewCommand);
+
+  /// Last authorized findCandidates state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<void>?> get findCandidatesSnapshot =>
+      _candidatesSnapshot;
+
+  /// Identity of the last admitted findCandidates execution.
+  int? get findCandidatesExecutionId => _candidatesEffectId;
+
+  /// Whether findCandidates can synchronously reserve its operation.
+  bool get canRequestFindCandidates => _canAdmit(_candidatesCommand);
+
+  /// Last authorized apply state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<AdminEventResolution>?>
+  get applySnapshot => _applySnapshot;
+
+  /// Identity of the last admitted apply execution.
+  int? get applyExecutionId => _applyEffectId;
+
+  /// Whether apply can synchronously reserve its operation.
+  bool get canRequestApply => _canAdmit(_applyCommand);
+
+  /// Last authorized keepCurrent state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<void>?> get keepCurrentSnapshot =>
+      _keepSnapshot;
+
+  /// Identity of the last admitted keepCurrent execution.
+  int? get keepCurrentExecutionId => _keepEffectId;
+
+  /// Whether keepCurrent can synchronously reserve its operation.
+  bool get canRequestKeepCurrent => _canAdmit(_keepCommand);
+
+  /// Last authorized addAsset state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<void>?> get addAssetSnapshot =>
+      _addSnapshot;
+
+  /// Identity of the last admitted addAsset execution.
+  int? get addAssetExecutionId => _addEffectId;
+
+  /// Whether addAsset can synchronously reserve its operation.
+  bool get canRequestAddAsset => _canAdmit(_addCommand);
+
+  /// Last authorized deleteAsset state, frozen when the owner is revoked.
+  commands.CommandResult<void, Result<void>?> get deleteAssetSnapshot =>
+      _deleteSnapshot;
+
+  /// Identity of the last admitted deleteAsset execution.
+  int? get deleteAssetExecutionId => _deleteEffectId;
+
+  /// Whether deleteAsset can synchronously reserve its operation.
+  bool get canRequestDeleteAsset => _canAdmit(_deleteCommand);
+
+  /// Reserves an exclusive initial or explicit detail refresh.
+  bool requestLoad() {
+    if (!canRequestLoad) return false;
+    _loadEffectId = ++_nextEffectId;
+    _loadSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_loadCommand, _loadDetail);
+  }
+
+  /// Captures the complete current draft before notifying or deferred entry.
+  bool requestSave() {
+    if (!canRequestSave) return false;
+    final draft = _captureSave();
+    final effectId = _nextEffectId + 1;
+    _saveEffectId = ++_nextEffectId;
+    _saveSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_saveCommand, () => _save(draft, saveEffectId: effectId));
+  }
+
+  /// Reserves rejection with immutable source acknowledgment.
+  bool requestReject() {
+    if (!canRequestReject) return false;
+    final guard = _moderationGuardError();
+    final source = _sourceAcknowledgment;
+    _rejectEffectId = ++_nextEffectId;
+    _rejectSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_rejectCommand, () => _reject(guard, source));
+  }
+
+  /// Reserves publication to the explicitly selected target.
+  bool requestPromote(AdminPromotionTarget target) {
+    if (!canRequestPromote) return false;
+    var guard = _moderationGuardError();
+    EventTimeIssue? issue;
+    if (guard == null && !hasPublishableCategory) {
+      guard = Exception('Seleziona una categoria e salva prima di pubblicare.');
+    }
+    if (guard == null && target == AdminPromotionTarget.event) {
+      issue =
+          _eventTimeIssue ??
+          _eventTimePolicy.validateForPersistence(
+            _eventTimePolicy.enable(_eventDates),
+          );
+      if (issue != null) {
+        guard = Exception(
+          'Completa i dati temporali prima di pubblicare l’evento.',
+        );
+      }
+    }
+    final source = _sourceAcknowledgment;
+    _promoteEffectId = ++_nextEffectId;
+    _promoteSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_promoteCommand, () {
+      if (!_disposed && issue != null) {
+        _eventTimeIssue = issue;
+        _notifyListeners();
+      }
+      return _promote(target, guard, source);
+    });
+  }
+
+  /// Reserves a link without copying canonical Event fields or media.
+  bool requestLink(int target) {
+    if (!canRequestLink) return false;
+    final guard =
+        _moderationGuardError() ??
+        (startDate == null
+            ? Exception('Imposta una data di inizio per collegare un evento.')
+            : null);
+    final source = _sourceAcknowledgment;
+    _linkEffectId = ++_nextEffectId;
+    _linkSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_linkCommand, () => _link(target, guard, source));
+  }
+
+  /// Captures current target and generation for an explicit preview.
+  bool requestPreview() {
+    if (!canRequestPreview) return false;
+    final target = _targetEventId;
+    final generation = _previewGeneration;
+    final eligible = submissionId != null && target != null && !_isDirty;
+    _previewEffectId = ++_nextEffectId;
+    _previewSnapshot = const commands.CommandResult.isLoading();
+    return _admit(
+      _previewCommand,
+      () => _preview(target, generation, eligible: eligible),
+    );
+  }
+
+  /// Searches desired input; refusal has no observable side effects.
+  bool requestFindCandidates() {
+    if (!canRequestFindCandidates) return false;
+    final search = _candidateSearch.trim();
+    final revision = _candidateRevision;
+    final context = _editorRevision;
+    final eligible = submissionId != null && startDate != null;
+    _candidatesEffectId = ++_nextEffectId;
+    _candidatesSnapshot = const commands.CommandResult.isLoading();
+    return _admit(
+      _candidatesCommand,
+      () => _findCandidates(search, eligible, revision, context),
+    );
+  }
+
+  /// Captures opaque preview tokens and source acknowledgment unchanged.
+  bool requestApply() {
+    if (!canRequestApply) return false;
+    final guard = _moderationGuardError();
+    final value = _mergePreview;
+    final external = isExternalUpdate;
+    final source = _sourceAcknowledgment;
+    _applyEffectId = ++_nextEffectId;
+    _applySnapshot = const commands.CommandResult.isLoading();
+    return _admit(_applyCommand, () => _apply(value, external, guard, source));
+  }
+
+  /// Owns one complete copy, private persistence and private preview chain.
+  bool requestKeepCurrent(AdminEventMergeGroup group) {
+    if (!canRequestKeepCurrent) return false;
+    final preview = _mergePreview;
+    final target = _targetEventId;
+    final generation = _previewGeneration;
+    final eligible =
+        isEditable &&
+        !_isDirty &&
+        preview?.groups.any((value) => identical(value, group)) == true;
+    _keepEffectId = ++_nextEffectId;
+    _keepSnapshot = const commands.CommandResult.isLoading();
+    return _admit(
+      _keepCommand,
+      () => _keepCurrent(
+        group,
+        eligible,
+        target: target,
+        generation: generation,
+        preview: preview,
+      ),
+    );
+  }
+
+  /// Reserves picker, upload and persisted association as one attempt.
+  bool requestAddAsset() {
+    if (!canRequestAddAsset) return false;
+    final guard = _assetGuard(add: true);
+    _addEffectId = ++_nextEffectId;
+    _addSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_addCommand, () => _addAsset(guard));
+  }
+
+  /// Reserves removal of the exact captured persisted association.
+  bool requestDeleteAsset(int assetId) {
+    if (!canRequestDeleteAsset) return false;
+    final guard =
+        _assetGuard(add: false) ??
+        (!_assets.any((asset) => asset.id == assetId)
+            ? Exception('La foto non appartiene al contributo.')
+            : null);
+    _deleteEffectId = ++_nextEffectId;
+    _deleteSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_deleteCommand, () => _deleteAsset(assetId, guard));
+  }
+
+  _SourceAcknowledgment get _sourceAcknowledgment => (
+    acknowledge: _acknowledgeCurrentSource ? true : null,
+    hash: _acknowledgedSourceHash,
+    ignore: _ignoreSource ? true : null,
+  );
+
   Future<Result<void>> _loadDetail() async {
     final submissionId = this.submissionId;
     if (submissionId == null) return const Result.success(null);
 
+    final draftRevision = _draftRevision;
     final result = await _repository.getById(submissionId);
     return result.map((submission) {
       if (_disposed) return;
+      if (_draftRevision != draftRevision) {
+        if (loading) {
+          _loadSnapshot = const commands.CommandResult(null, null, null, false);
+        }
+        return;
+      }
       _hydrationRevision++;
+      _editorRevision++;
+      _draftRevision++;
+      _invalidateCandidates();
+      _invalidatePreview();
       _category = submission.category;
       _city = submission.city;
       _name = submission.name;
@@ -457,63 +890,68 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     });
   }
 
-  Future<Result<void>> _save({bool fromKeepCurrent = false}) async {
-    if (promote.running ||
-        reject.running ||
-        link.running ||
-        apply.running ||
-        (keepCurrent.running && !fromKeepCurrent) ||
-        assetMutationRunning) {
-      return Result.error(
-        Exception('Attendi il completamento della moderazione.'),
-      );
-    }
-    // Editorial updates are pending-only for existing submissions. The
-    // backend enforces the same predicate authoritatively; create mode is
-    // unaffected.
+  _SaveDraft _captureSave() {
+    Exception? error;
     if (isEditMode && _status != AdminSubmissionStatus.pending) {
-      return Result.error(
-        Exception('I contributi pubblicati o rifiutati non sono modificabili.'),
+      error = Exception(
+        'I contributi pubblicati o rifiutati non sono modificabili.',
       );
     }
-
     final city = _city;
     final name = _name;
     if (city == null || city.isEmpty || name == null || name.isEmpty) {
-      return Result.error(Exception('Compila i campi obbligatori.'));
+      error ??= Exception('Compila i campi obbligatori.');
     }
-
-    if (!validateEventTimeForSave()) {
-      return Result.error(Exception('Inserisci un intervallo di date valido.'));
+    final issue =
+        _eventTimeIssue ?? _eventTimePolicy.validateForPersistence(_eventDates);
+    if (issue != null) {
+      error ??= Exception('Inserisci un intervallo di date valido.');
     }
-
     final coordinates = _parsedCoordinates();
     if (coordinates == null) {
-      return Result.error(Exception('Inserisci coordinate valide.'));
+      error ??= Exception('Inserisci coordinate valide.');
     }
-    final (latitude, longitude) = coordinates;
+    final input = error == null
+        ? AdminSubmissionInput(
+            category: _category ?? ContentCategory.unknown,
+            city: city!,
+            name: name!,
+            description: _description,
+            descriptionDelta: _descriptionDelta,
+            allDay: _eventDates.allDay,
+            startDate: _eventDates.startInstantUtc,
+            endDate: _eventDates.endInstantUtc,
+            latitude: coordinates!.$1,
+            longitude: coordinates.$2,
+          )
+        : null;
+    return (input: input, error: error, issue: issue, revision: _draftRevision);
+  }
 
-    final input = AdminSubmissionInput(
-      category: _category ?? ContentCategory.unknown,
-      city: city,
-      name: name,
-      description: _description,
-      descriptionDelta: _descriptionDelta,
-      allDay: _eventDates.allDay,
-      startDate: _eventDates.startInstantUtc,
-      endDate: _eventDates.endInstantUtc,
-      latitude: latitude,
-      longitude: longitude,
-    );
-    final submissionId = this.submissionId;
-    final result = submissionId == null
-        ? await _repository.create(input)
-        : await _repository.update(submissionId, input);
-
+  Future<Result<void>> _save(_SaveDraft draft, {int? saveEffectId}) async {
+    if (draft.error != null) {
+      if (!_disposed &&
+          draft.issue != null &&
+          draft.revision == _draftRevision) {
+        _eventTimeIssue = draft.issue;
+        _notifyListeners();
+      }
+      return Result.error(draft.error!);
+    }
+    final id = submissionId;
+    final result = id == null
+        ? await _repository.create(draft.input!)
+        : await _repository.update(id, draft.input!);
     return result.map((_) {
-      _previewGeneration++;
-      _mergePreview = null;
-      _isDirty = false;
+      if (_disposed) return;
+      _editorRevision++;
+      _invalidatePreview();
+      _invalidateCandidates();
+      _isDirty = _draftRevision != draft.revision;
+      if (saveEffectId != null) {
+        _savedExecutionId = saveEffectId;
+        _savedDraftRevision = draft.revision;
+      }
       _notifyListeners();
     });
   }
@@ -564,30 +1002,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     return value;
   }
 
-  /// Guards shared by both moderation mutations: only a loaded, persisted,
-  /// clean, pending submission can be moderated while nothing else runs.
-  ///
-  /// [caller] excludes the calling command from the mutual-exclusion
-  /// check, because its own `running` state is already true while its action
-  /// executes.
-  Exception? _moderationGuardError({required String caller}) {
-    final submissionId = this.submissionId;
+  /// Domain eligibility is captured before reserving the operation itself.
+  Exception? _moderationGuardError() {
     if (submissionId == null) {
       return Exception('Non puoi moderare un nuovo contributo.');
     }
     if (!_hasLoadedDetail) {
       return Exception('Carica il contributo prima di moderarlo.');
-    }
-    final otherModerationRunning =
-        (caller != 'promote' && promote.running) ||
-        (caller != 'reject' && reject.running) ||
-        (caller != 'link' && link.running) ||
-        (caller != 'apply' && apply.running);
-    if (save.running ||
-        otherModerationRunning ||
-        keepCurrent.running ||
-        assetMutationRunning) {
-      return Exception('Attendi il completamento dell’operazione in corso.');
     }
     if (_isDirty) {
       return Exception('Salva le modifiche prima di pubblicare o rifiutare.');
@@ -598,123 +1019,110 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     return null;
   }
 
-  Future<Result<void>> _reject() async {
-    final guard = _moderationGuardError(caller: 'reject');
+  Future<Result<void>> _reject(
+    Exception? guard,
+    _SourceAcknowledgment source,
+  ) async {
     if (guard != null) return Result.error(guard);
-
-    final submissionId = this.submissionId!;
     final result = await _repository.reject(
-      submissionId,
-      ignoreSource: _ignoreSource ? true : null,
-      acknowledgeCurrentSource: _acknowledgeCurrentSource ? true : null,
-      expectedSourceHash: _acknowledgedSourceHash,
+      submissionId!,
+      ignoreSource: source.ignore,
+      acknowledgeCurrentSource: source.acknowledge,
+      expectedSourceHash: source.hash,
     );
     await _refreshAfterResolution(result);
     return result.map((_) {
       if (_disposed) return;
       _status = AdminSubmissionStatus.rejected;
-      _notifyListeners();
+      _contextCommitted();
     });
   }
 
   Future<Result<AdminSubmissionPromotion>> _promote(
     AdminPromotionTarget target,
+    Exception? guard,
+    _SourceAcknowledgment source,
   ) async {
-    final guard = _moderationGuardError(caller: 'promote');
     if (guard != null) return Result.error(guard);
-
-    if (!hasPublishableCategory) {
-      return Result.error(
-        Exception('Seleziona una categoria e salva prima di pubblicare.'),
-      );
-    }
-
-    if (target == AdminPromotionTarget.event &&
-        !validateEventTimeForSave(
-          draft: _eventTimePolicy.enable(_eventDates),
-        )) {
-      return Result.error(
-        Exception('Completa i dati temporali prima di pubblicare l’evento.'),
-      );
-    }
-
-    final submissionId = this.submissionId!;
     final result = await _repository.promote(
-      submissionId,
+      submissionId!,
       target,
-      acknowledgeCurrentSource: _acknowledgeCurrentSource ? true : null,
-      expectedSourceHash: _acknowledgedSourceHash,
+      acknowledgeCurrentSource: source.acknowledge,
+      expectedSourceHash: source.hash,
     );
     await _refreshAfterResolution(result);
     return result.map((promotion) {
-      if (_disposed) return promotion;
-      // Same-target idempotent retries report the original promotion exactly
-      // like a first success; no reload is needed because the repository
-      // result already carries the durable linkage.
-      _status = AdminSubmissionStatus.accepted;
-      _promotion = promotion;
-      _notifyListeners();
+      if (!_disposed) {
+        _status = AdminSubmissionStatus.accepted;
+        _promotion = promotion;
+        _contextCommitted();
+      }
       return promotion;
     });
   }
 
-  Future<Result<AdminEventResolution>> _link(int target) async {
-    final guard = _moderationGuardError(caller: 'link');
+  Future<Result<AdminEventResolution>> _link(
+    int target,
+    Exception? guard,
+    _SourceAcknowledgment source,
+  ) async {
     if (guard != null) return Result.error(guard);
-    if (startDate == null) {
-      return Result.error(
-        Exception('Imposta una data di inizio per collegare un evento.'),
-      );
-    }
     final result = await _repository.link(
       submissionId!,
       target,
-      acknowledgeCurrentSource: _acknowledgeCurrentSource ? true : null,
-      expectedSourceHash: _acknowledgedSourceHash,
+      acknowledgeCurrentSource: source.acknowledge,
+      expectedSourceHash: source.hash,
     );
     await _refreshAfterResolution(result);
     return result.map((resolution) {
-      if (_disposed) return resolution;
-      _status = AdminSubmissionStatus.accepted;
-      _targetEventId = resolution.eventId;
-      _notifyListeners();
+      if (!_disposed) {
+        _status = AdminSubmissionStatus.accepted;
+        _targetEventId = resolution.eventId;
+        _contextCommitted();
+      }
       return resolution;
     });
   }
 
-  Future<Result<void>> _findCandidates(String search) async {
-    final id = submissionId;
-    if (id == null || startDate == null) {
+  Future<Result<void>> _findCandidates(
+    String search,
+    bool eligible,
+    int revision,
+    int context,
+  ) async {
+    if (!eligible) {
       return Result.error(
         Exception('Carica un contributo evento prima di cercare.'),
       );
     }
     final result = await _repository.eventCandidates(
-      id,
-      searchName: search.trim().isEmpty ? null : search.trim(),
+      submissionId!,
+      searchName: search.isEmpty ? null : search,
     );
     return result.map((value) {
-      if (_disposed) return;
+      if (_disposed ||
+          revision != _candidateRevision ||
+          context != _editorRevision) {
+        return;
+      }
       _candidates = value;
       _notifyListeners();
     });
   }
 
-  Future<Result<void>> _preview({bool fromKeepCurrent = false}) async {
-    final id = submissionId;
-    final target = _targetEventId;
-    if (id == null ||
-        target == null ||
-        _isDirty ||
-        (operationRunning && !fromKeepCurrent)) {
+  Future<Result<void>> _preview(
+    int? target,
+    int generation, {
+    required bool eligible,
+  }) async {
+    if (!eligible) {
       return Result.error(
         Exception(
           'Seleziona un evento e salva le modifiche prima dell’anteprima.',
         ),
       );
     }
-    final generation = _previewGeneration;
-    final result = await _repository.mergePreview(id, target);
+    final result = await _repository.mergePreview(submissionId!, target!);
     return result.map((value) {
       if (_disposed ||
           _isDirty ||
@@ -728,6 +1136,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         if (external.currentHash != value.currentSourceHash) {
           _acknowledgeCurrentSource = false;
           _acknowledgedSourceHash = null;
+          _editorRevision++;
+          _invalidateCandidates();
         }
         _externalEvent = AdminExternalEvent(
           recordId: external.recordId,
@@ -744,16 +1154,18 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     });
   }
 
-  Future<Result<void>> _keepCurrent(AdminEventMergeGroup group) async {
-    if (_mergePreview == null ||
-        save.running ||
-        promote.running ||
-        reject.running ||
-        link.running ||
-        apply.running ||
-        preview.running ||
-        assetMutationRunning ||
-        !isEditable) {
+  Future<Result<void>> _keepCurrent(
+    AdminEventMergeGroup group,
+    bool eligible, {
+    required int? target,
+    required int generation,
+    required AdminEventMergePreview? preview,
+  }) async {
+    // Mutation admission itself invalidates the old preview once.
+    if (!eligible ||
+        preview == null ||
+        _targetEventId != target ||
+        _previewGeneration != generation + 1) {
       return Result.error(Exception('Attendi e carica una nuova anteprima.'));
     }
     final values = group.current;
@@ -786,33 +1198,60 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
     _hydrationRevision++;
     _markDirty();
-    final result = await _save(fromKeepCurrent: true);
-    if (_disposed) return const Result.success(null);
-    return await result.asyncFlatMap((_) => _preview(fromKeepCurrent: true));
+    if (_disposed) return _unavailable();
+    final result = await _save(_captureSave());
+    if (_disposed) return _unavailable();
+    if (result is Success<void> && _isDirty) {
+      return Result.error(
+        Exception('Salva le nuove modifiche prima dell’anteprima.'),
+      );
+    }
+    if (_targetEventId != target) {
+      return Result.error(Exception('Carica una nuova anteprima.'));
+    }
+    return await result.asyncFlatMap(
+      (_) => _preview(
+        target,
+        _previewGeneration,
+        eligible: submissionId != null && _targetEventId != null && !_isDirty,
+      ),
+    );
   }
 
-  Future<Result<AdminEventResolution>> _apply() async {
-    final guard = _moderationGuardError(caller: 'apply');
+  Future<Result<AdminEventResolution>> _apply(
+    AdminEventMergePreview? preview,
+    bool external,
+    Exception? guard,
+    _SourceAcknowledgment source,
+  ) async {
     if (guard != null) return Result.error(guard);
-    final value = _mergePreview;
-    if (!isExternalUpdate || value == null) {
+    if (!external || preview == null) {
       return Result.error(
         Exception('Carica una nuova anteprima prima di applicare.'),
       );
     }
     final result = await _repository.apply(
       submissionId!,
-      value,
-      acknowledgeCurrentSource: _acknowledgeCurrentSource ? true : null,
-      expectedSourceHash: _acknowledgedSourceHash,
+      preview,
+      acknowledgeCurrentSource: source.acknowledge,
+      expectedSourceHash: source.hash,
     );
+    if (result case Error(
+      :final AdminContentSubmissionApiException error,
+    ) when !_disposed) {
+      if (error.code == 'EVENT_CHANGED' || error.code == 'SUBMISSION_CHANGED') {
+        _editorRevision++;
+        _invalidatePreview();
+        _notifyListeners();
+      }
+    }
     await _refreshAfterResolution(result);
     return result.map((resolution) {
-      if (_disposed) return resolution;
-      _status = AdminSubmissionStatus.accepted;
-      _targetEventId = resolution.eventId;
-      _mergePreview = null;
-      _notifyListeners();
+      if (!_disposed) {
+        _status = AdminSubmissionStatus.accepted;
+        _targetEventId = resolution.eventId;
+        _contextCommitted();
+      }
       return resolution;
     });
   }
@@ -827,9 +1266,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (result is Error && !sourceChanged) return;
     _acknowledgeCurrentSource = false;
     _acknowledgedSourceHash = null;
-    _mergePreview = null;
-    _previewGeneration++;
-    _notifyListeners();
+    _contextCommitted();
+    if (_disposed) return;
     await _loadDetail();
     if (_disposed) return;
     final pending = switch (result) {
@@ -844,62 +1282,55 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Result<void>> _addAsset() async {
-    final submissionId = this.submissionId;
+  Exception? _assetGuard({required bool add}) {
     if (submissionId == null) {
-      return Result.error(
-        Exception('Aggiungi foto solo dopo aver creato il contributo.'),
+      return Exception(
+        add
+            ? 'Aggiungi foto solo dopo aver creato il contributo.'
+            : 'Non puoi rimuovere foto da un nuovo contributo.',
       );
     }
     if (!_hasLoadedDetail) {
-      return Result.error(
-        Exception('Carica il contributo prima di aggiungere foto.'),
+      return Exception(
+        add
+            ? 'Carica il contributo prima di aggiungere foto.'
+            : 'Carica il contributo prima di rimuovere foto.',
       );
     }
     if (_status != AdminSubmissionStatus.pending) {
-      return Result.error(
-        Exception('Puoi modificare le foto solo dei contributi in attesa.'),
+      return Exception(
+        'Puoi modificare le foto solo dei contributi in attesa.',
       );
     }
-    if (_assets.length >= kMaximumSubmissionAssetCount) {
-      return Result.error(Exception('Hai raggiunto il limite di foto.'));
+    if (add && _assets.length >= kMaximumSubmissionAssetCount) {
+      return Exception('Hai raggiunto il limite di foto.');
     }
-    if (save.running ||
-        promote.running ||
-        reject.running ||
-        link.running ||
-        apply.running ||
-        keepCurrent.running ||
-        deleteAsset.running) {
-      return Result.error(
-        Exception('Attendi il completamento dell’operazione in corso.'),
-      );
-    }
+    return null;
+  }
 
+  Future<Result<void>> _addAsset(Exception? guard) async {
+    if (guard != null) return Result.error(guard);
     final selectedImage = await _imagePicker.pickImage(
       source: ImageSource.gallery,
     );
-    if (_disposed || selectedImage == null) return const Result.success(null);
-
+    if (_disposed) return _unavailable();
+    if (selectedImage == null) return const Result.success(null);
     final task = _contentSubmissionRepository.uploadImageTask(
       File(selectedImage.path),
     );
     _activeImageUploadTask = task;
-
     try {
-      final uploadResult = await task.result;
-      if (_disposed) return const Result.success(null);
-
-      return await uploadResult.asyncFlatMap((uploadedAsset) async {
-        final persistedAsset = await _repository.addAsset(
-          submissionId,
+      final upload = await task.result;
+      if (_disposed) return _unavailable();
+      return await upload.asyncFlatMap((uploadedAsset) async {
+        final persisted = await _repository.addAsset(
+          submissionId!,
           uploadedAsset,
         );
-        if (_disposed) return const Result.success(null);
-
-        return persistedAsset.map((asset) {
+        if (_disposed) return _unavailable();
+        return persisted.map((asset) {
           _assets.add(asset);
-          _notifyListeners();
+          _contextCommitted();
         });
       });
     } finally {
@@ -909,65 +1340,166 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
   }
 
-  Future<Result<void>> _deleteAsset(int assetId) async {
-    final submissionId = this.submissionId;
-    if (submissionId == null) {
-      return Result.error(
-        Exception('Non puoi rimuovere foto da un nuovo contributo.'),
-      );
-    }
-    if (!_hasLoadedDetail) {
-      return Result.error(
-        Exception('Carica il contributo prima di rimuovere foto.'),
-      );
-    }
-    if (_status != AdminSubmissionStatus.pending) {
-      return Result.error(
-        Exception('Puoi modificare le foto solo dei contributi in attesa.'),
-      );
-    }
-    if (save.running ||
-        promote.running ||
-        reject.running ||
-        link.running ||
-        apply.running ||
-        keepCurrent.running ||
-        addAsset.running) {
-      return Result.error(
-        Exception('Attendi il completamento dell’operazione in corso.'),
-      );
-    }
-    if (!_assets.any((asset) => asset.id == assetId)) {
-      return Result.error(Exception('La foto non appartiene al contributo.'));
-    }
-
-    final result = await _repository.deleteAsset(submissionId, assetId);
-    if (_disposed) return const Result.success(null);
-
+  Future<Result<void>> _deleteAsset(int assetId, Exception? guard) async {
+    if (guard != null) return Result.error(guard);
+    final result = await _repository.deleteAsset(submissionId!, assetId);
     return result.map((_) {
+      if (_disposed) return;
       _assets.removeWhere((asset) => asset.id == assetId);
-      _notifyListeners();
+      _contextCommitted();
     });
   }
 
-  void _markDirty() {
+  void _contextCommitted() {
+    _editorRevision++;
+    _invalidateCandidates();
+    _invalidatePreview();
+    _notifyListeners();
+  }
+
+  void _invalidateCandidates() {
+    _candidateRevision++;
+    _candidates = null;
+    _candidatesSnapshot = const commands.CommandResult(null, null, null, false);
+  }
+
+  void _invalidatePreview() {
     _previewGeneration++;
     _mergePreview = null;
+    _previewSnapshot = const commands.CommandResult(null, null, null, false);
+  }
+
+  void _markDirty() {
+    _draftRevision++;
+    _editorRevision++;
+    _invalidatePreview();
+    _invalidateCandidates();
     _isDirty = true;
     _notifyListeners();
   }
 
+  Result<T> _unavailable<T>() =>
+      Result.error(Exception('Editor non disponibile.'));
+
+  ResultCommand<_EditorAction<T>, T> _createCommand<T>(
+    String name,
+    void Function(commands.CommandResult<void, Result<T>?>) publish,
+  ) {
+    final command = createResultCommand<_EditorAction<T>, T>((action) async {
+      if (_disposed) return _unavailable<T>();
+      return await action();
+    }, debugName: 'admin_submission_editor_$name');
+    void observeCompletion() {
+      if (_released.contains(command) ||
+          command.isRunningSync.value ||
+          !_reserved.contains(command)) {
+        return;
+      }
+      _afterCommandTurn(() {
+        if (_released.contains(command) || command.isRunningSync.value) return;
+        if (!_reserved.remove(command)) return;
+        if (_disposed) {
+          _release(command);
+          return;
+        }
+        final terminal = command.results.value;
+        if (terminal.isRunning) {
+          // An assertion bypasses normal terminal routing. Keep it fail-loud
+          // and require a new owner without reporting synthetic success.
+          _stopped = true;
+        } else {
+          publish(
+            commands.CommandResult(
+              null,
+              terminal.data,
+              terminal.error,
+              false,
+              stackTrace: terminal.stackTrace,
+              errorReaction: terminal.errorReaction,
+              isUndoValue: terminal.isUndoValue,
+            ),
+          );
+        }
+        _notifyListeners();
+      });
+    }
+
+    command.isRunningSync.addListener(observeCompletion);
+    _completionObservers[command] = observeCompletion;
+    return command;
+  }
+
+  bool _admit<T>(
+    ResultCommand<_EditorAction<T>, T> command,
+    _EditorAction<T> action,
+  ) {
+    _reserved.add(command);
+    if (identical(command, _saveCommand)) {
+      _savedExecutionId = null;
+      _savedDraftRevision = null;
+    }
+    if (_mutations.contains(command)) {
+      _invalidateCandidates();
+      // Apply already captured its committed tokens in the request closure.
+      _invalidatePreview();
+    }
+    _notifyListeners();
+    if (_disposed) {
+      // Disposal from admission notification happens before run(), so no
+      // physical completion notification will arrive for this reservation.
+      _reserved.remove(command);
+      _afterCommandTurn(() => _release(command));
+    } else {
+      command.run(action);
+    }
+    return true;
+  }
+
+  /// Leaves upstream result dispatch, error reporting and finally together.
+  void _afterCommandTurn(VoidCallback callback) {
+    scheduleMicrotask(() => unawaited(Future<void>(callback)));
+  }
+
+  /// Permanently claims release before touching a private observer or Command.
+  void _release(commands.Command<dynamic, dynamic> command) {
+    if (_released.contains(command) ||
+        !_disposed ||
+        command.isRunningSync.value) {
+      return;
+    }
+    _released.add(command);
+    _reserved.remove(command);
+    final observer = _completionObservers.remove(command);
+    if (observer != null) command.isRunningSync.removeListener(observer);
+    command.dispose();
+  }
+
+  int _notifyDepth = 0;
+  bool _superDisposeQueued = false;
   void _notifyListeners() {
-    if (!_disposed) {
+    if (_disposed) return;
+    _notifyDepth++;
+    try {
       notifyListeners();
+    } finally {
+      _notifyDepth--;
     }
   }
 
   @override
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
     _activeImageUploadTask?.cancel();
     _activeImageUploadTask = null;
-    super.dispose();
+    _afterCommandTurn(() {
+      _commands.forEach(_release);
+    });
+    if (_notifyDepth == 0) {
+      super.dispose();
+    } else if (!_superDisposeQueued) {
+      _superDisposeQueued = true;
+      scheduleMicrotask(super.dispose);
+    }
   }
 }

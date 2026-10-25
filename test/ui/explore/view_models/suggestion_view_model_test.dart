@@ -1,13 +1,42 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/ui/explore/view_models/suggestion_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
 
 void main() {
   group('SuggestionViewModel', () {
+    test('pending reload keeps prior data, domain error clears it, empty retry '
+        'succeeds', () async {
+      final gate = Completer<Result<List<Place>>>();
+      final repository = FakePlaceRepository(
+        getSuggestedPlacesResult: Result.success([makePlace()]),
+      );
+      final vm = SuggestionViewModel(placeRepository: repository);
+      addTearDown(vm.dispose);
+      await pumpEventQueue();
+      repository.getSuggestionsHandler = () => gate.future;
+      final loading = vm.load.runAsync();
+      vm.load.run();
+      expect(vm.suggestions, hasLength(1));
+      gate.complete(Result.error(TestException('failed retry')));
+      await loading;
+      expect(vm.suggestions, isEmpty);
+      expect(vm.load.results.value.hasFailure, isTrue);
+      expect(repository.getSuggestionsCallCount, 2);
+      repository
+        ..getSuggestionsHandler = null
+        ..getSuggestedPlacesResult = const Result.success([]);
+      expect(await vm.load.runAsync(), isA<Success<void>>());
+      expect(vm.load.results.value.completed, isTrue);
+      expect(vm.suggestions, isEmpty);
+    });
+
     test(
       'loads suggestions from the constructor and completes the command',
       () async {
@@ -24,8 +53,8 @@ void main() {
 
         await _waitForInitialLoad();
 
-        expect(viewModel.load.completed, isTrue);
-        expect(viewModel.load.error, isFalse);
+        expect(viewModel.load.results.value.completed, isTrue);
+        expect(viewModel.load.results.value.hasFailure, isFalse);
         expect(viewModel.suggestions, equals(suggestions));
       },
     );
@@ -42,9 +71,9 @@ void main() {
 
       await _waitForInitialLoad();
 
-      expect(viewModel.load.completed, isFalse);
-      expect(viewModel.load.error, isTrue);
-      expect(viewModel.load.result, isA<Error<void>>());
+      expect(viewModel.load.results.value.completed, isFalse);
+      expect(viewModel.load.results.value.hasFailure, isTrue);
+      expect(viewModel.load.results.value.data, isA<Error<void>>());
       expect(viewModel.suggestions, isEmpty);
     });
 
@@ -60,7 +89,7 @@ void main() {
         addTearDown(viewModel.dispose);
 
         await _waitForInitialLoad();
-        expect(viewModel.load.error, isTrue);
+        expect(viewModel.load.results.value.hasFailure, isTrue);
         expect(viewModel.suggestions, isEmpty);
 
         final recoveredSuggestion = makePlace(remoteId: 7, name: 'Museo');
@@ -68,11 +97,11 @@ void main() {
           recoveredSuggestion,
         ]);
 
-        await viewModel.load.execute();
+        await viewModel.load.runAsync();
 
         expect(repository.getSuggestionsCallCount, 2);
-        expect(viewModel.load.completed, isTrue);
-        expect(viewModel.load.error, isFalse);
+        expect(viewModel.load.results.value.completed, isTrue);
+        expect(viewModel.load.results.value.hasFailure, isFalse);
         expect(viewModel.suggestions, equals([recoveredSuggestion]));
       },
     );

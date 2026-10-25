@@ -1,0 +1,74 @@
+# Risk-based test plan
+
+## Meaning and boundaries
+
+This is future acceptance, not proof an alternative implementation has run. The initial 2026-10-24 planning run recorded the four existing foundation/ordinary lifecycle suites in validation.md; the F1–F3 documentation remediation does not rerun Flutter tests or analyzer. Tests use existing support/harnesses and controlled futures/virtual Flutter clock; no wall-clock sleeps, observer-count targets or production test probes. Before editing tests, load the repository unit/widget/test-support-reuse skills. Preserve errors by original object/stack; test actual admission and effects instead of a microtask count.
+
+## Acceptance matrix
+
+| ID | Preserved guarantee / continuing behavior | Deliberately relaxed guarantee | Acceptable failure / user recovery | Tests kept or replaced |
+|---|---|---|---|---|
+| G1 | Fresh immutable request identity owns A→B→A result | none | Current fetch error retains current error/retry | Keep marker out-of-order/current-filter tests; remove ticket-only oracle |
+| G2 | Status loading immediately on admission; empty programmatic set no query | none | Current failure can reload current filters | Keep marker VM/widget loading/empty/retry |
+| G3 | Partial source error renders failure even with successful other list | none | Marker retry, no semantic navigation reset | Keep partial source error and Map screen tests |
+| G4 | Map owner/selection/Nearby/weather unaffected | none | Existing route/error behavior | Existing geo_map_route/selection/owner replacement |
+| D0 | Mutation token, read exclusion and exact pending ID retained | none | Read retry never repeats unIgnore | Keep all unIgnore lifecycle/pending route tests |
+| D1 | Current editor true return requests submissions then currently selected ignored | No per-revision batch coverage | Busy request can leave stale rows; manual refresh | Replace editor-demand revision batch tests; keep successful route return |
+| D2 | Failure kind, retained rows and loading terminal | No auto read retry or retained editor obligation | Pull/menu retry reads storage | Keep dashboard failure/retry/retained data tests |
+| D3 | false/null/replaced owner return requests nothing | none | New owner owns its own bootstrap | Keep dashboard owner-return tests |
+| D4 | No read after disposal or fail-loud assertion | none | No fabricated success; assertion needs developer fix | Keep no-next-phase/raw/late-dispose tests; ensure bounded D2 method checks actual normal terminal |
+| D5 | Ordinary accepted refresh Future remains correlated; busy no-op is not success | No editor-waiter Future per revision | Existing read feedback, no repeat persistence | Keep normal accepted-refresh lifecycle; remove only revision waiter tests |
+| H1 | Accepted add/remove and different-entry writes execute once FIFO | Duplicate idempotent calls need not be suppressed in VM | Actual repository duplicate add stays one stored entry | Keep opposite-intent/different-entry/storage call order; replace redundant-call-count oracle |
+| H2 | Accepted queued writes survive navigation/dispose before entry | none | New owner can later load stored result | Keep detached FIFO tests; do not stop queued writes on UI disposal |
+| H3 | Last confirmed history visible while mutation/read pending | Instant optimism/rollback/rebase | Delayed chip change; reload after completion | Replace optimistic/projection tests with confirmed list assertions |
+| H4 | Expected/raw first failure does not discard later accepted writes | No provisional projection or automatic stable read | Original failure visible; read-only reload, no mutation replay | Keep error-before/after-commit and next-write tests; verify one raw report |
+| H5 | Read success replaces list/clears visible failure; failed read ends loading, retains data | Post-start refresh may be ignored; old confirmed data can publish | Visible reload after busy terminal, or owner recreation | Replace epoch/demand tests with actual read outcome/reload |
+| H6 | Reads never block accepted write FIFO | Automatic post-drain stable freshness | Slow bootstrap can coexist with writes; explicit later reload | Hold read pending, accept/settle two writes, assert both calls progress; no read count choreography |
+| H7 | Assertion remains upstream fail-loud; eligible resources clean safely | Automatic progress/reuse after programming assertion | Stop tail without fake Result, no later queued write; restart after fix | Keep assertion origin/no-false-outcome, replace receipt settlement count |
+| H8 | Popup/session/mounted safety and immediate navigation | No synchronous optimistic notification requirement | Old popup callbacks inert; writes already accepted still persist | Keep anchor close/navigate/unmount/owner tests |
+| H9 | Reload is exclusively a read and usable for empty/retained history | No automatic uncertain-write replay | Reload actual storage even if write already committed before throw | Extend existing anchor widget suite, assert write count unchanged |
+| H10 | The open empty-input popup reacts to confirmed read/failure/reload without text changes; old owner/session cannot update replacement popup | none beyond the already-approved confirmed/stale read policy | Retained chips and read-only recovery remain visible; success clears failure | Perform the rendered-popup sequence below in the existing anchor widget suite; VM notification alone is insufficient |
+| E1 | All directed conflict/admission rules before notify/deferred entry; editor reservation can be revoked before I/O | Exact physical command/receipt topology | Busy request false/no I/O; explicit normal retry later | Keep admission matrix, captured inputs and eleven-operation dispose-from-admission-notification zero-I/O case |
+| E11 | Each private Command releases resources once despite bulk/dispose-before-run/late/reentrant cleanup convergence | No physical count getters or lane topology | No I/O, fake success, late VM notify or secondary disposal/listener error; later queued paths are no-ops | Extend existing eleven-operation admission-observer disposal and pending-late-error tests with all cleanup callbacks drained, then further turns and teardown interval |
+| E2 | Save captures A, newer B stays dirty/visible; create route identity unchanged | none | Explicit Save for B; never false close for unsaved B | Keep Save VM/screen/revision tests |
+| E3 | Candidate/preview/context A→B→A remains stale; Apply uses current tokens | none | Explicit current read retry after settled failure | Keep candidates/source/preview tests; no token/identity weakening |
+| E4 | One outer KeepCurrent/save/preview and asset phases | none | Expected/raw failure truthful; no next phase on dispose | Keep phase tests, exact I/O/asset identity |
+| E5 | Late raw after >50ms reports original once/no notifier error; no UI/new phase | No counts/paired observers requirement | No success after dispose; eligible resources release exactly once under D4/F2, including never-started commands with no running transition | Keep deterministic late-error regression; remove physical probes only |
+| E6 | Reentrant accepted request never dropped/doubled/reset by old completion | A request from newly published terminal may now be admitted | Refusal while reserved or one execution after release | Replace exact terminal-listener=false oracle with repository count/new busy state trace |
+| E7 | Equal Results from separate accepted mutations yield separate logical effects | No physical Command identity evidence | No duplicate snackbar/pop after repeated notify | Keep once-only effects and logical effect ID behavior |
+| E8 | Current owned dialog defers matching clean Save close; newer Save invalidates prior latch | none | Dialog can close once for matching current Save, no stale moderation | Keep A success→B error→C success and dirty-revision cases |
+| E9 | Covered editor/dialog has no effect or later replay | none | Return/reopen permits fresh user action | Keep CR1 real router push coverage; do not mock route ownership away |
+| E10 | Replacement owner cannot receive old feedback/navigation | none | New owner independently bootstraps | Keep owner replacement/bind-time terminal tests |
+
+K01–K06 stay unchanged: all Content Submission draft/staged/finalization tests, Auth correlation/credential/privacy tests, Event annual/day/Home and Category atomic/sort/selector tests remain. N01/N02/N03 have no implementation acceptance because no change is authorized for them.
+
+## F1 rendered-popup sequence (H10; future tests only)
+
+In `test/ui/search/widgets/components/app_search_anchor_test.dart`, use the existing real SearchController/anchor harness with controlled repository Futures. Open the popup with empty text and keep the same popup route/controller/text throughout steps 1–6:
+
+1. Complete a controlled history read with list A and assert the actual rendered chips are A without typing, closing or reopening the popup.
+2. Request another read and fail it; assert A remains rendered beside visible error and read-only reload.
+3. Activate `Ricarica cronologia`, complete it with B and assert B replaces A in that still-open popup and the failure clears.
+4. Check the exact repository mutation log before/after failure/reload: no add/remove or replay occurs. The input value stays empty throughout; no zero-width-text workaround or synthetic controller refresh is permitted.
+5. Check the empty-history variation: the live reactive section/reload exists with no initial chip, then a successful controlled read displays new chips without remounting it.
+6. Replace the owner/controller or invalidate the session while an old read/callback is pending; open the replacement popup, release old work and invoke saved stale callbacks. The replacement's rendered chips/error and mutation log remain unchanged; only its own read can update it.
+7. Unmount the anchor with the old popup exiting, exercise cached fallback/view-builder callbacks and drain notifications. No unmounted State/context access or stale controller write occurs. The inert cache contains no live subscribing child; subscriptions belong only to the mounted current popup subtree.
+
+Observe rendered chips/error/control and popup identity, not merely notifyListeners counts. Existing latest-wins result/suggestion and accepted-write navigation/FIFO tests stay.
+
+## F2 convergent-release sequence (E1/E5/E11; future tests only)
+
+Retain the existing eleven-operation `A3/L1 ... revoke inside admission notify` trace in `admin_submission_editor_commands_test.dart:539+`. Dispose the owner synchronously from its admission observer before `.run()`. This naturally queues both owner-wide cleanup and the skipped-admission path for a never-started Command; previously settled Load/Preview commands also exist. Drain every controlled queued cleanup/completion callback and the package's virtual 50 ms teardown interval, then drive another set of turns to expose any late duplicate attempt. Assert zero repository/picker phases for the revoked request, no fabricated success/frozen-snapshot change, no late VM notification and no captured secondary disposal/listener/uncaught error. The release guard must make all paths after the first claim no-ops, not merely suppress a reported error. Inspect that all release calls use that guard; command_it's duplicate-dispose debug assertion and Flutter listener error capture provide observable evidence without reintroducing four production getters.
+
+Keep the complementary E5 trace with physically pending work: revoke, let owner cleanup run beyond the teardown threshold while I/O is held, then complete it with the original runtime error and known stack, drain completion/cleanup and additional turns. Assert one original report, unchanged revoked presentation and no secondary or duplicate-release error. Normal completion while live releases admission only; later owner disposal safely releases resources once. An operation skipped before entry is not reported as successful persistence. These are planned tests, not results of this remediation.
+
+## Execution order and exact test families
+
+1. **GeoMap/Dashboard:** `flutter test --no-pub test/ui/geo_map/view_models/geo_map_markers_test.dart test/ui/geo_map/widgets/geo_map_screen_test.dart test/ui/admin/submissions/view_models/admin_submissions_view_model_test.dart test/ui/admin/submissions/view_models/admin_dashboard_command_lifecycle_test.dart test/ui/admin/submissions/widgets/admin_dashboard_screen_test.dart`.
+2. **Search:** existing `test/ui/search/view_models/search_history_test.dart`, `search_history_lifecycle_test.dart`, `search_history_characterization_test.dart`, `search_view_model_test.dart`, `test/ui/search/widgets/components/app_search_anchor_test.dart`, plus unchanged result/suggestion and affected routing tests.
+3. **Editor:** existing `admin_submission_editor_commands_test.dart`, `admin_editor_admission_matrix_test.dart`, `admin_editor_phase_test.dart`, `admin_submission_editor_view_model_test.dart`, `test/ui/admin/submissions/widgets/admin_submission_editor_screen_test.dart`, `test/routing/admin_route_test.dart`.
+4. **Foundation/unchanged safety:** `test/utils/result_command_test.dart`, `restartable_command_test.dart`, `command_configuration_test.dart`, `command_it_disposal_behavior_test.dart`, `test/ui/ordinary_view_model_lifecycle_test.dart`; affected Content Submission route/form/progress/asset tests and Auth/Event/Category counterparts. Do not rely on the three known skipped direct upstream late-error cases as passing proof; ordinary owner late-error protection tests must pass.
+5. **Integration:** `dart analyze --format machine`, separately `flutter analyze --no-pub`, and actual current CI autonomous selection from `.github/workflows/pull-request.yml` (all sorted test files excluding integration, explicit manifest), `TZ=Europe/Rome`. Record measured pass/fail/skip, exit and source hashes. Supabase/Deno live-stack integrations are conditional on available prerequisites; no backend mutation or deployment is part of this plan. Missing services must be reported NOT RUN, not as pass. Preserve existing wire/repository/backend contract tests; no new hardening matrix.
+6. **Artifact consistency:** `openspec validate simplify-migrated-view-model-commands --type change --strict --no-interactive`; temporary effective-spec composition ordered canonical→seven migrations→simplification, then validation. Recompute metrics and scoped diff. No sync/archive or historical artifact rewrite.
+
+A test with a now-relaxed oracle must change alongside its feature increment. It must not simply be skipped or deleted while a production guarantee still depends on it. Maintain real temporary ObjectBox stores if any repository tests are touched; this plan needs no repository changes.

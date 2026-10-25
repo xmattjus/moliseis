@@ -1,11 +1,11 @@
-import 'dart:async' show unawaited;
+import 'dart:async';
 import 'dart:collection' show UnmodifiableListView;
 
-import 'package:material_ui/material_ui.dart';
+import 'package:command_it/command_it.dart' as commands;
+import 'package:flutter/foundation.dart';
 import 'package:moliseis/domain/models/content_base.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/search_repository.dart';
-import 'package:moliseis/utils/command.dart' as legacy;
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/restartable_command.dart';
 import 'package:moliseis/utils/result.dart';
@@ -14,62 +14,93 @@ import 'package:moliseis/utils/result_command.dart';
 /// ViewModel for the search screen.
 ///
 /// Manages past search history, live search results, and suggestions.
-/// All async actions are exposed as commands so that
-/// UI widgets can observe running, completed, and error states without
-/// direct async/await wiring.
+/// Accepted history writes run FIFO independently of confirmed-history reads.
+/// Results and suggestions retain independent commands.
 class SearchViewModel extends ChangeNotifier {
-  SearchViewModel({required SearchRepository searchRepository})
-    : _searchRepository = searchRepository {
-    addToPastSearches = legacy.Command1(_addToPastSearches);
-    loadPastSearches = legacy.Command0(_loadPastSearches);
-    unawaited(loadPastSearches.execute());
+  SearchViewModel({required SearchRepository searchRepository}) {
+    _historyWriter = createResultCommand<({String query, bool add}), void>(
+      (operation) => operation.add
+          ? searchRepository.addToPastSearches(operation.query)
+          : searchRepository.removeFromPastSearches(operation.query),
+      debugName: 'search_history_write',
+    );
+    _historyWriter.isRunningSync.addListener(_writerRunningChanged);
+    _historyReader = createResultCommandNoParam<List<String>>(
+      () => _disposed
+          ? Future.value(const Result.success(<String>[]))
+          : searchRepository.getPastSearches(),
+      debugName: 'search_history_read',
+    );
+    _historyReader.results.addListener(_historyReadChanged);
+    _historyReader.isRunningSync.addListener(_readerRunningChanged);
     loadResults = RestartableCommand(
       (query) => _fetch(searchRepository, query),
       debugName: 'search_results',
     );
     loadResults.results.addListener(_commitResults);
-    removeFromPastSearches = legacy.Command1(_removeFromPastSearches);
     loadSuggestions = RestartableCommand(
       (query) => _fetch(searchRepository, query),
       debugName: 'search_suggestions',
     );
     loadSuggestions.results.addListener(_commitSuggestions);
+    requestPastSearchesRefresh();
   }
 
-  final SearchRepository _searchRepository;
   bool _disposed = false;
+  bool _stopped = false;
+  bool _writerReleased = false;
+  bool _readerReleased = false;
+  late final ResultCommand<({String query, bool add}), void> _historyWriter;
+  late final ResultCommand<void, List<String>> _historyReader;
+  Future<void> _writeTail = Future<void>.value();
+  Completer<void>? _writeWaiter;
+  Object? _historyFailure;
+
+  /// The original read/write failure, retained until a successful history read.
+  Object? get pastSearchesFailure => _historyFailure;
 
   @override
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
+    _readerRunningChanged();
+    unawaited(_writeTail.then((_) => _releaseWriter()));
     loadResults.results.removeListener(_commitResults);
     loadSuggestions.results.removeListener(_commitSuggestions);
     loadResults.dispose();
     loadSuggestions.dispose();
-    super.dispose();
+    scheduleMicrotask(super.dispose);
   }
 
-  /// Adds a query string to the persistent search history.
-  ///
-  /// Uses an optimistic update: the entry is added locally before the write
-  /// succeeds and rolled back on error.
-  late legacy.Command1<void, String> addToPastSearches;
+  /// Transfers an accepted write to the FIFO before navigation can dispose us.
+  void addToPastSearches(String query) {
+    if (query.isEmpty ||
+        _types.any((type) => type.label.toLowerCase() == query.toLowerCase())) {
+      return;
+    }
+    _acceptWrite((query: query, add: true));
+  }
 
-  /// Loads the persisted search history into [pastSearches].
-  ///
-  /// Executed automatically on construction.
-  late legacy.Command0<void> loadPastSearches;
+  /// The independent ordinary history read, including loading and failures.
+  ValueListenable<commands.CommandResult<void, Result<List<String>>?>>
+  get pastSearchesState => _historyReader.results;
+
+  /// Requests one read; a busy read does not retain another refresh demand.
+  void requestPastSearchesRefresh() {
+    if (_disposed || _stopped || _readerReleased) return;
+    _historyReader.run();
+  }
 
   /// Searches places and events matching the query and populates [results].
   ///
   /// No-op for queries shorter than 3 characters.
   late final RestartableCommand<String, List<ContentBase>?> loadResults;
 
-  /// Removes a query string from the persistent search history.
-  ///
-  /// Uses an optimistic update: the entry is removed locally before the delete
-  /// succeeds and restored on error.
-  late legacy.Command1<void, String> removeFromPastSearches;
+  /// Accepts an exact-case removal without dropping earlier or later writes.
+  void removeFromPastSearches(String query) {
+    if (_disposed) return;
+    _acceptWrite((query: query, add: false));
+  }
 
   /// Loads search suggestions for a query into [suggestions].
   ///
@@ -100,60 +131,82 @@ class SearchViewModel extends ChangeNotifier {
   /// and [loadSuggestions].
   static bool isSearchQueryValid(String query) => query.length >= 3;
 
-  Future<Result<void>> _addToPastSearches(String query) async {
-    if (query.isEmpty) {
-      return const Result.success(null);
-    }
-
-    final historyToLowerCase = _pastSearches.map((e) => e.toLowerCase());
-    final lowerCaseText = query.toLowerCase();
-    final typeSuggestions = _types.map((e) => e.label.toLowerCase());
-
-    // Does not add the text to history since it's equal to one of the type
-    // suggestions or is already present in history.
-    if (typeSuggestions.contains(lowerCaseText) ||
-        historyToLowerCase.contains(lowerCaseText)) {
-      return const Result.success(null);
-    }
-
-    // Optimistically adds the query to past searches.
-    _pastSearches.add(query);
-    notifyListeners();
-
-    final result = await _searchRepository.addToPastSearches(query);
-    if (_disposed) return result;
-
-    return result.mapError((error) {
-      // Removes again the query from past searches on errors.
-      _pastSearches.remove(query);
-      notifyListeners();
-      return error;
+  void _acceptWrite(({String query, bool add}) operation) {
+    if (_disposed || _stopped) return;
+    _writeTail = _writeTail.then((_) async {
+      if (_stopped) return;
+      final waiter = Completer<void>();
+      _writeWaiter = waiter;
+      _historyWriter.run(operation);
+      await waiter.future;
     });
   }
 
-  Future<Result<void>> _loadPastSearches() async {
-    final result = await _searchRepository.getPastSearches();
-    if (_disposed) return result.map((_) {});
-
-    return result.map((pastSearches) {
-      _pastSearches = pastSearches;
-      notifyListeners();
+  void _writerRunningChanged() {
+    if (_writerReleased || _historyWriter.isRunningSync.value) return;
+    final waiter = _writeWaiter;
+    if (waiter == null) return;
+    // Leave upstream terminal dispatch, global error routing and its final
+    // running reset before admitting another operation on this fixed command.
+    scheduleMicrotask(() {
+      unawaited(
+        Future<void>(() {
+          if (_writerReleased || !identical(waiter, _writeWaiter)) return;
+          if (_historyWriter.isRunningSync.value) return;
+          final snapshot = _historyWriter.results.value;
+          _writeWaiter = null;
+          if (snapshot.isRunning) {
+            _stopped = true; // AssertionError has no normal terminal outcome.
+            _releaseWriter();
+          } else if (!_disposed) {
+            if (snapshot.hasFailure) {
+              _historyFailure =
+                  snapshot.unexpectedError ?? snapshot.domainError;
+              notifyListeners();
+            } else {
+              requestPastSearchesRefresh();
+            }
+          }
+          waiter.complete();
+        }),
+      );
     });
   }
 
-  Future<Result<void>> _removeFromPastSearches(String query) async {
-    // Optimistically removes the query from past searches.
-    _pastSearches.remove(query);
+  void _releaseWriter() {
+    if (_writerReleased) return;
+    _writerReleased = true;
+    _historyWriter.isRunningSync.removeListener(_writerRunningChanged);
+    _historyWriter.dispose();
+  }
+
+  void _historyReadChanged() {
+    if (_disposed) return;
+    final snapshot = _historyReader.results.value;
+    if (snapshot.completed) {
+      _pastSearches = List.of(snapshot.data!.getOrNull()!);
+      _historyFailure = null;
+    } else if (snapshot.hasFailure) {
+      _historyFailure = snapshot.unexpectedError ?? snapshot.domainError;
+    }
     notifyListeners();
+  }
 
-    final result = await _searchRepository.removeFromPastSearches(query);
-    if (_disposed) return result;
-
-    return result.mapError((error) {
-      // Adds again the query to past searches on error.
-      _pastSearches.add(query);
-      notifyListeners();
-      return error;
+  void _readerRunningChanged() {
+    if (_readerReleased || _historyReader.isRunningSync.value) return;
+    // Keep a physically pending reader alive through raw-error reporting.
+    scheduleMicrotask(() {
+      unawaited(
+        Future<void>(() {
+          if (_readerReleased || _historyReader.isRunningSync.value) return;
+          if (_disposed || _historyReader.results.value.isRunning) {
+            _readerReleased = true;
+            _historyReader.results.removeListener(_historyReadChanged);
+            _historyReader.isRunningSync.removeListener(_readerRunningChanged);
+            _historyReader.dispose();
+          }
+        }),
+      );
     });
   }
 

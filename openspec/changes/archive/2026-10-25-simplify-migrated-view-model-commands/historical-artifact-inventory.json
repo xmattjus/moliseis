@@ -1,0 +1,252 @@
+[
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/.openspec.yaml",
+    "bytes": 40,
+    "sha256": "e2ebaebee255ccc1e09b64ba38d9b09c360a7392fc110a48ca2525e1ea49fa46"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/analyzer-b0.json",
+    "bytes": 21019,
+    "sha256": "71289bd326ba14116772a61db8af498ca1b66e35b2c53fb316882f6edfb4d910"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/analyzer-b0.machine.txt",
+    "bytes": 14342,
+    "sha256": "d3d479bc73bf5acdcb365303621f8a8360c4c347d77cdac7da75f5d3329eeac6"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/analyzer-baseline.md",
+    "bytes": 7637,
+    "sha256": "bee3bb5e570a90e70410ef0329a183380a794049be1352a4d92687e7107d68b0"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/apply-verification.json",
+    "bytes": 65083,
+    "sha256": "1746219bf4a9d8e6960bfa8c7f6f9ee69ceac5a3964bb5b4a15f692d16677ce8"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/autonomous-test-manifest.txt",
+    "bytes": 8827,
+    "sha256": "c0be3cce82129b302bf6d491286a82217336a88b1071cd29eb0185528e8647d0"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/design.md",
+    "bytes": 54364,
+    "sha256": "450267d8fcea3ea8c292d4d8fae61bc4acff8367362b8cf89e4d0bb861fcd6bd"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/proposal.md",
+    "bytes": 3715,
+    "sha256": "ea44ef1daa08ff019c13c20f34bc50dd26eb295914335dba408c885dbecdc4f2"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/specs/command-execution-concurrency/spec.md",
+    "bytes": 13507,
+    "sha256": "69346d30a4d19a4130d5ebcccacebbaac9af6c32945aef1778833a934c3d0711"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/specs/external-event-provenance-moderation/spec.md",
+    "bytes": 6768,
+    "sha256": "5ca5552d5631bc3b446886abd3b5c6e7b047912608f70240577de77833430e58"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/tasks.md",
+    "bytes": 11951,
+    "sha256": "f2aa452496e7d9dd66e62218ea64a311e50df7a3c5066f04d262b4989a6bb781"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/test-plan.md",
+    "bytes": 31436,
+    "sha256": "5edfea69f5ef0718ade66b12bdb6effe804af9e48898e95bcd6c2cf98050cfb5"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-editor-commands/validation.md",
+    "bytes": 59278,
+    "sha256": "acbd1abbd59f35728fd2cabd8b6f5da4b919138c0cd969ff7cd4183d5fe8784c"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-session-commands/.openspec.yaml",
+    "bytes": 40,
+    "sha256": "e2ebaebee255ccc1e09b64ba38d9b09c360a7392fc110a48ca2525e1ea49fa46"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-session-commands/analyzer-baseline.md",
+    "bytes": 28026,
+    "sha256": "ea1e43b733df2da35aafed26ebafd3d5273d3719f706e483bbca2d92a3bca436"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-session-commands/design.md",
+    "bytes": 75589,
+    "sha256": "daacc34a475da1b2c69728ace6e69c0e1388168a46b1814fccec796e0435652a"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-session-commands/proposal.md",
+    "bytes": 3883,
+    "sha256": "277050c78b0a4f69d2f59e9da327ae9403aae3b89af1c0495831ca2e662df8a9"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-session-commands/specs/command-execution-concurrency/spec.md",
+    "bytes": 27613,
+    "sha256": "39aa8dccc6f889b77fb5278305ee1f110a97d89f0397fbf1c596c2cb1766d0cf"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-session-commands/tasks.md",
+    "bytes": 11499,
+    "sha256": "834fd8b7250ae0c5656e36f6bd7bbe3eb32cea3c545f9d40971b84bfc42cf506"
+  },
+  {
+    "path": "openspec/changes/migrate-admin-session-commands/validation.md",
+    "bytes": 49330,
+    "sha256": "ce85896813e597aa166fe88b3f25176046a41655fcb8174cf2e5dde44c21218f"
+  },
+  {
+    "path": "openspec/changes/migrate-category-view-model-commands/.openspec.yaml",
+    "bytes": 40,
+    "sha256": "ff4326f8b42dcf8851877f4f3989c7fecb8f97d8154686d7d74b7281b70e6b9b"
+  },
+  {
+    "path": "openspec/changes/migrate-category-view-model-commands/design.md",
+    "bytes": 64122,
+    "sha256": "545522c27117cc11c1f8707c8ba1aaedde25fc67cfc6a515e0e9dbc98e51b402"
+  },
+  {
+    "path": "openspec/changes/migrate-category-view-model-commands/proposal.md",
+    "bytes": 4773,
+    "sha256": "3178e65045f2cf46e4379d994f6dafecc8942034362deb80033a9d5dd6a5cbc0"
+  },
+  {
+    "path": "openspec/changes/migrate-category-view-model-commands/specs/command-execution-concurrency/spec.md",
+    "bytes": 12954,
+    "sha256": "f5b218ac8ac62623dd9836c0b0ec7a08b96ab056c534f23e12cf3fbe72fadb12"
+  },
+  {
+    "path": "openspec/changes/migrate-category-view-model-commands/tasks.md",
+    "bytes": 10457,
+    "sha256": "0b015d7ab45710403f9ed7f21221f7f5594034e27b4bbf33b8dbc811996cb501"
+  },
+  {
+    "path": "openspec/changes/migrate-content-submission-commands/.openspec.yaml",
+    "bytes": 40,
+    "sha256": "54c2a6955b514abf783374521da3b6364c1d6b221970ad9faa7124a7e1124528"
+  },
+  {
+    "path": "openspec/changes/migrate-content-submission-commands/design.md",
+    "bytes": 89436,
+    "sha256": "768de6806f841483dbc696addb8947e5a7e88cacbd56b68b4d88740e6ea1555c"
+  },
+  {
+    "path": "openspec/changes/migrate-content-submission-commands/proposal.md",
+    "bytes": 4117,
+    "sha256": "9e651b4cb3709fcff17ea3324d52d7a9bad83899545dece7f57e53826cbf66b7"
+  },
+  {
+    "path": "openspec/changes/migrate-content-submission-commands/specs/command-execution-concurrency/spec.md",
+    "bytes": 5119,
+    "sha256": "2ed30030dc12247a6ce8146d871252565b26044ac4850ec23e711ba1fc79c5fc"
+  },
+  {
+    "path": "openspec/changes/migrate-content-submission-commands/specs/content-submission-local-asset-staging/spec.md",
+    "bytes": 6124,
+    "sha256": "a442db89afe2279e83800df8370c311c14e6bfa969cc813ccd73b5b905b14aa9"
+  },
+  {
+    "path": "openspec/changes/migrate-content-submission-commands/specs/content-submission-navigation-lifecycle/spec.md",
+    "bytes": 8051,
+    "sha256": "bfd276cd96532505880803c929847e437fdfaeaaca136c53563538eac86038e3"
+  },
+  {
+    "path": "openspec/changes/migrate-content-submission-commands/specs/content-submission-submit-orchestration/spec.md",
+    "bytes": 13163,
+    "sha256": "fa1fbfdfc64cbfa71bfed18a069fc0a2f5316c491a7ac7f7e08cb2a04acf0c7f"
+  },
+  {
+    "path": "openspec/changes/migrate-content-submission-commands/tasks.md",
+    "bytes": 13099,
+    "sha256": "401c5448a0ebb7ae999516b9a869ffbe27e4f308f7861b13692317277fcd2ec0"
+  },
+  {
+    "path": "openspec/changes/migrate-content-view-model-commands/.openspec.yaml",
+    "bytes": 40,
+    "sha256": "30cfdee007123f96b2ab27ca107e406084602caf445d6b7cd2130ab329668ed3"
+  },
+  {
+    "path": "openspec/changes/migrate-content-view-model-commands/design.md",
+    "bytes": 94218,
+    "sha256": "41610aad86ac04fc4ec1686611f2133da24694b178f79457608f4c55a84f937d"
+  },
+  {
+    "path": "openspec/changes/migrate-content-view-model-commands/proposal.md",
+    "bytes": 5572,
+    "sha256": "3bb3de6d7c4506e96c841403ae608f2f89437243c89edff19d3681f816b31850"
+  },
+  {
+    "path": "openspec/changes/migrate-content-view-model-commands/specs/command-execution-concurrency/spec.md",
+    "bytes": 14167,
+    "sha256": "6fe785b18b8d02fe0d24f3bd9f5ca64d607af824d029786e43d5545b086c60b8"
+  },
+  {
+    "path": "openspec/changes/migrate-content-view-model-commands/specs/home-ongoing-events/spec.md",
+    "bytes": 2585,
+    "sha256": "6147360877bb34697fe70a2e30c9c780f09f03d4dfa504da8f6b141ca1b06a03"
+  },
+  {
+    "path": "openspec/changes/migrate-content-view-model-commands/tasks.md",
+    "bytes": 12361,
+    "sha256": "52f4e1cc04aa8c170ddb95dda32deda33105b6b5272279bbd436cea654f5d54d"
+  },
+  {
+    "path": "openspec/changes/migrate-search-map-commands/.openspec.yaml",
+    "bytes": 40,
+    "sha256": "54c2a6955b514abf783374521da3b6364c1d6b221970ad9faa7124a7e1124528"
+  },
+  {
+    "path": "openspec/changes/migrate-search-map-commands/design.md",
+    "bytes": 51894,
+    "sha256": "9f52f10558c41c6295714b48d81046409766b0333899c24fad207f7e7f496a9b"
+  },
+  {
+    "path": "openspec/changes/migrate-search-map-commands/proposal.md",
+    "bytes": 4003,
+    "sha256": "655bd4dc46f2f636f5a9db26a866d334571fb47a63c34b2f3fca4ff90f605130"
+  },
+  {
+    "path": "openspec/changes/migrate-search-map-commands/specs/command-execution-concurrency/spec.md",
+    "bytes": 14361,
+    "sha256": "7d55bc5d0af4143e9785bb8c167ba49e08dacec322245221f794103b66a1ae41"
+  },
+  {
+    "path": "openspec/changes/migrate-search-map-commands/specs/local-content-retrieval/spec.md",
+    "bytes": 4254,
+    "sha256": "85f9f0b513c1c6c02ebd12ce7dc54cfa6d038fcf28518877921a8fd22f6662c4"
+  },
+  {
+    "path": "openspec/changes/migrate-search-map-commands/tasks.md",
+    "bytes": 9015,
+    "sha256": "b04c992f5174e171bedbe70472c01848e636df61bd9d1142575f259d2348833b"
+  },
+  {
+    "path": "openspec/changes/migrate-simple-view-model-commands/.openspec.yaml",
+    "bytes": 40,
+    "sha256": "b552ab6519df8f66b705724100f565c5cd842bc9389aeaa177da9cec3d02a685"
+  },
+  {
+    "path": "openspec/changes/migrate-simple-view-model-commands/design.md",
+    "bytes": 67559,
+    "sha256": "164c9bd821de70a49f71b4e0f38f7ada9e36a644e06ea8047d8ec5cd6c9c46ae"
+  },
+  {
+    "path": "openspec/changes/migrate-simple-view-model-commands/proposal.md",
+    "bytes": 7468,
+    "sha256": "2286a68641dbbfac39c0abca4fde54616b3902e98fe4b5ae9c3675897a1a7a42"
+  },
+  {
+    "path": "openspec/changes/migrate-simple-view-model-commands/specs/command-execution-concurrency/spec.md",
+    "bytes": 11847,
+    "sha256": "949ced5d656f2997ee28690d852e08eb0fd146d0027b5d9774d223d9049cc879"
+  },
+  {
+    "path": "openspec/changes/migrate-simple-view-model-commands/tasks.md",
+    "bytes": 10885,
+    "sha256": "7229eb6fb0c17a6d538d70e8480021296c07f974262219f9a2ffa60bcfe12f80"
+  }
+]

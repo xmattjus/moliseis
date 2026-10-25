@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async';
 
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -48,9 +48,7 @@ final class EventsProviderHarness {
             repository: repository,
             nowUtc: _nowUtc,
           );
-          unawaited(
-            viewModel.loadByDate.execute(viewModel.currentCalendarDate),
-          );
+          viewModel.selectDate(viewModel.currentCalendarDate);
           _viewModel = viewModel;
           return viewModel;
         },
@@ -129,3 +127,44 @@ final class EventsRouteHarness {
     syncViewModel.dispose();
   }
 }
+
+/// Waits for the current day intent, including deferred public terminal
+/// delivery.
+Future<void> settleEventDay(EventViewModel vm) {
+  bool settled() =>
+      !vm.loadByDate.isRunningSync.value &&
+      vm.hasCurrentDaySnapshot &&
+      !vm.loadByDate.results.value.isRunning;
+  if (settled()) return Future.value();
+  final completion = Completer<void>();
+  late VoidCallback listener;
+  listener = () {
+    if (!settled()) return;
+    vm.loadByDate.results.removeListener(listener);
+    completion.complete();
+  };
+  vm.loadByDate.results.addListener(listener);
+  return completion.future;
+}
+
+/// Owns commands while a fixed child observes the VM directly, without a parent
+/// Consumer.
+Widget eventCommandApp(
+  EventViewModel vm,
+  FakeEventRepository repository,
+  Widget child,
+) => MaterialApp(
+  locale: const Locale('en'),
+  home: ChangeNotifierProvider<FavouriteViewModel>(
+    create: (_) => FavouriteViewModel(
+      favouriteGetIdsUseCase: FavouriteGetIdsUseCase(
+        eventRepository: repository,
+        placeRepository: FakePlaceRepository(),
+      ),
+    ),
+    child: ChangeNotifierProvider<EventViewModel>(
+      create: (_) => vm,
+      child: Scaffold(body: child),
+    ),
+  ),
+);

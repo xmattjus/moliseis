@@ -8,9 +8,12 @@ import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/post_use_case.dart';
 import 'package:moliseis/ui/post/view_models/post_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
+import '../../../support/command_test_support.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/fixtures.dart';
+import '../../../support/mock_logger.dart';
 
 void main() {
   group('PostViewModel async lifetime', () {
@@ -20,8 +23,12 @@ void main() {
     late List<FlutterErrorDetails> reportedErrors;
     late FlutterExceptionHandler? previousErrorHandler;
     var disposed = false;
+    late MockLogger logger;
+    late VoidCallback restoreReporting;
 
     setUp(() {
+      logger = MockLogger();
+      restoreReporting = installCommandTestReporting(logger);
       events = FakeEventRepository();
       places = FakePlaceRepository();
       viewModel = PostViewModel(
@@ -39,6 +46,7 @@ void main() {
     tearDown(() {
       if (!disposed) viewModel.dispose();
       FlutterError.onError = previousErrorHandler;
+      restoreReporting();
     });
 
     test('Event completion after dispose cannot mutate or notify', () async {
@@ -47,8 +55,9 @@ void main() {
       var notifications = 0;
       viewModel.addListener(() => notifications++);
 
-      final execution = viewModel.loadEvent.execute(1);
-      expect(viewModel.loadEvent.running, isTrue);
+      final execution = viewModel.loadEvent.runAsync(1);
+      expect(viewModel.loadEvent.isRunningSync.value, isTrue);
+      await Future<void>(() {});
       viewModel.dispose();
       disposed = true;
       pending.complete(Result.success(makeEvent()));
@@ -62,8 +71,8 @@ void main() {
       );
       expect(notifications, 0);
       expect(() => viewModel.content, throwsA(anything));
-      expect(viewModel.loadEvent.completed, isTrue);
-      expect(viewModel.loadEvent.error, isFalse);
+      expect(viewModel.loadEvent.results.value.completed, isTrue);
+      expect(viewModel.loadEvent.results.value.hasFailure, isFalse);
     });
 
     test('Place completion after dispose cannot mutate or notify', () async {
@@ -72,8 +81,9 @@ void main() {
       var notifications = 0;
       viewModel.addListener(() => notifications++);
 
-      final execution = viewModel.loadPlace.execute(2);
-      expect(viewModel.loadPlace.running, isTrue);
+      final execution = viewModel.loadPlace.runAsync(2);
+      expect(viewModel.loadPlace.isRunningSync.value, isTrue);
+      await Future<void>(() {});
       viewModel.dispose();
       disposed = true;
       pending.complete(Result.success(makePlace(remoteId: 2)));
@@ -87,8 +97,8 @@ void main() {
       );
       expect(notifications, 0);
       expect(() => viewModel.content, throwsA(anything));
-      expect(viewModel.loadPlace.completed, isTrue);
-      expect(viewModel.loadPlace.error, isFalse);
+      expect(viewModel.loadPlace.results.value.completed, isTrue);
+      expect(viewModel.loadPlace.results.value.hasFailure, isFalse);
     });
 
     test('Repository errors remain errors after disposal', () async {
@@ -99,22 +109,23 @@ void main() {
       events.pendingGetById[1] = pendingEvent;
       places.pendingGetById[2] = pendingPlace;
 
-      final eventExecution = viewModel.loadEvent.execute(1);
-      final placeExecution = viewModel.loadPlace.execute(2);
+      final eventExecution = viewModel.loadEvent.runAsync(1);
+      final placeExecution = viewModel.loadPlace.runAsync(2);
+      await Future<void>(() {});
       viewModel.dispose();
       disposed = true;
       pendingEvent.complete(Result.error(eventError));
       pendingPlace.complete(Result.error(placeError));
-      await Future.wait(<Future<void>>[eventExecution, placeExecution]);
+      await Future.wait([eventExecution, placeExecution]);
 
-      expect(viewModel.loadEvent.error, isTrue);
-      expect(viewModel.loadPlace.error, isTrue);
+      expect(viewModel.loadEvent.results.value.hasFailure, isTrue);
+      expect(viewModel.loadPlace.results.value.hasFailure, isTrue);
       expect(
-        (viewModel.loadEvent.result! as Error<void>).error,
+        (viewModel.loadEvent.results.value.data! as Error<void>).error,
         same(eventError),
       );
       expect(
-        (viewModel.loadPlace.result! as Error<void>).error,
+        (viewModel.loadPlace.results.value.data! as Error<void>).error,
         same(placeError),
       );
       expect(reportedErrors, isEmpty);
@@ -128,10 +139,11 @@ void main() {
         var notifications = 0;
         viewModel.addListener(() => notifications++);
 
-        final execution = viewModel.loadNearContent.execute(
+        final execution = viewModel.loadNearContent.runAsync(
           const LatLng(41, 14),
         );
-        expect(viewModel.loadNearContent.running, isTrue);
+        expect(viewModel.loadNearContent.isRunningSync.value, isTrue);
+        await Future<void>(() {});
         viewModel.dispose();
         disposed = true;
         pendingEvents.complete(Result.success(<Event>[makeEvent()]));
@@ -141,7 +153,7 @@ void main() {
         expect(viewModel.nearContent, isEmpty);
         expect(notifications, 0);
         expect(reportedErrors, isEmpty);
-        expect(viewModel.loadNearContent.completed, isTrue);
+        expect(viewModel.loadNearContent.results.value.completed, isTrue);
       },
     );
 
@@ -150,7 +162,10 @@ void main() {
       final pendingEvents = Completer<Result<List<Event>>>();
       events.pendingGetByCoordinates = pendingEvents;
 
-      final execution = viewModel.loadNearContent.execute(const LatLng(41, 14));
+      final execution = viewModel.loadNearContent.runAsync(
+        const LatLng(41, 14),
+      );
+      await Future<void>(() {});
       pendingEvents.complete(Result.success(<Event>[makeEvent()]));
       // The repository Future is complete, but its awaiting continuation has
       // not run yet. No timer or scheduler delay is involved.
@@ -168,16 +183,19 @@ void main() {
       final repositoryError = TestException('nearby events failed');
       events.pendingGetByCoordinates = pendingEvents;
 
-      final execution = viewModel.loadNearContent.execute(const LatLng(41, 14));
+      final execution = viewModel.loadNearContent.runAsync(
+        const LatLng(41, 14),
+      );
+      await Future<void>(() {});
       viewModel.dispose();
       disposed = true;
       pendingEvents.complete(Result.error(repositoryError));
       await execution;
 
       expect(places.getByCoordinatesCallCount, 0);
-      expect(viewModel.loadNearContent.error, isTrue);
+      expect(viewModel.loadNearContent.results.value.hasFailure, isTrue);
       expect(
-        (viewModel.loadNearContent.result! as Error<void>).error,
+        (viewModel.loadNearContent.results.value.data! as Error<void>).error,
         same(repositoryError),
       );
       expect(reportedErrors, isEmpty);
@@ -197,7 +215,7 @@ void main() {
         var notifications = 0;
         viewModel.addListener(() => notifications++);
 
-        final execution = viewModel.loadNearContent.execute(
+        final execution = viewModel.loadNearContent.runAsync(
           const LatLng(41, 14),
         );
         pendingEvents.complete(Result.success(<Event>[event]));
@@ -205,6 +223,7 @@ void main() {
         expect(places.getByCoordinatesCallCount, 1);
         expect(viewModel.nearContent, <Event>[event]);
 
+        await Future<void>(() {});
         viewModel.dispose();
         disposed = true;
         pendingPlaces.complete(Result.success(<Place>[place]));
@@ -213,7 +232,7 @@ void main() {
         expect(viewModel.nearContent, <Event>[event]);
         expect(notifications, 0);
         expect(reportedErrors, isEmpty);
-        expect(viewModel.loadNearContent.completed, isTrue);
+        expect(viewModel.loadNearContent.results.value.completed, isTrue);
       },
     );
 
@@ -222,12 +241,13 @@ void main() {
       () async {
         final event = makeEvent();
         events.getByCoordinatesResult = Result.success(<Event>[event]);
-        await viewModel.loadNearContent.execute(const LatLng(41, 14));
+        await viewModel.loadNearContent.runAsync(const LatLng(41, 14));
         expect(viewModel.nearContent, <Event>[event]);
 
+        await Future<void>(() {});
         viewModel.dispose();
         disposed = true;
-        await viewModel.loadNearContent.execute(const LatLng(42, 15));
+        await viewModel.loadNearContent.runAsync(const LatLng(42, 15));
 
         expect(viewModel.nearContent, <Event>[event]);
         expect(events.getByCoordinatesCallCount, 1);
@@ -242,16 +262,16 @@ void main() {
       var notifications = 0;
       var commandNotifications = 0;
       viewModel.addListener(() => notifications++);
-      viewModel.loadEvent.addListener(() => commandNotifications++);
+      viewModel.loadEvent.results.addListener(() => commandNotifications++);
 
-      await viewModel.loadEvent.execute(1);
+      await viewModel.loadEvent.runAsync(1);
 
       expect(viewModel.content, same(event));
       expect(notifications, 1);
       expect(commandNotifications, 2);
-      expect(viewModel.loadEvent.completed, isTrue);
-      expect(viewModel.loadEvent.error, isFalse);
-      expect(viewModel.loadEvent.running, isFalse);
+      expect(viewModel.loadEvent.results.value.completed, isTrue);
+      expect(viewModel.loadEvent.results.value.hasFailure, isFalse);
+      expect(viewModel.loadEvent.isRunningSync.value, isFalse);
       expect(reportedErrors, isEmpty);
     });
 
@@ -261,16 +281,16 @@ void main() {
       var notifications = 0;
       var commandNotifications = 0;
       viewModel.addListener(() => notifications++);
-      viewModel.loadPlace.addListener(() => commandNotifications++);
+      viewModel.loadPlace.results.addListener(() => commandNotifications++);
 
-      await viewModel.loadPlace.execute(2);
+      await viewModel.loadPlace.runAsync(2);
 
       expect(viewModel.content, same(place));
       expect(notifications, 1);
       expect(commandNotifications, 2);
-      expect(viewModel.loadPlace.completed, isTrue);
-      expect(viewModel.loadPlace.error, isFalse);
-      expect(viewModel.loadPlace.running, isFalse);
+      expect(viewModel.loadPlace.results.value.completed, isTrue);
+      expect(viewModel.loadPlace.results.value.hasFailure, isFalse);
+      expect(viewModel.loadPlace.isRunningSync.value, isFalse);
       expect(reportedErrors, isEmpty);
     });
 
@@ -280,17 +300,17 @@ void main() {
       events.getByIdResults[1] = Result.error(eventError);
       places.getByIdResults[2] = Result.error(placeError);
 
-      await viewModel.loadEvent.execute(1);
-      await viewModel.loadPlace.execute(2);
+      await viewModel.loadEvent.runAsync(1);
+      await viewModel.loadPlace.runAsync(2);
 
-      expect(viewModel.loadEvent.error, isTrue);
-      expect(viewModel.loadPlace.error, isTrue);
+      expect(viewModel.loadEvent.results.value.hasFailure, isTrue);
+      expect(viewModel.loadPlace.results.value.hasFailure, isTrue);
       expect(
-        (viewModel.loadEvent.result! as Error<void>).error,
+        (viewModel.loadEvent.results.value.data! as Error<void>).error,
         same(eventError),
       );
       expect(
-        (viewModel.loadPlace.result! as Error<void>).error,
+        (viewModel.loadPlace.results.value.data! as Error<void>).error,
         same(placeError),
       );
       expect(reportedErrors, isEmpty);
@@ -306,11 +326,11 @@ void main() {
         var notifications = 0;
         viewModel.addListener(() => notifications++);
 
-        await viewModel.loadNearContent.execute(const LatLng(41, 14));
+        await viewModel.loadNearContent.runAsync(const LatLng(41, 14));
 
         expect(viewModel.nearContent, <Object>[event, place]);
         expect(notifications, 1);
-        expect(viewModel.loadNearContent.completed, isTrue);
+        expect(viewModel.loadNearContent.results.value.completed, isTrue);
         expect(places.getByCoordinatesCallCount, 1);
         expect(reportedErrors, isEmpty);
       },
@@ -322,15 +342,143 @@ void main() {
       events.getByCoordinatesResult = Result.error(eventError);
       places.getByCoordinatesResult = Result.success(<Place>[place]);
 
-      await viewModel.loadNearContent.execute(const LatLng(41, 14));
+      await viewModel.loadNearContent.runAsync(const LatLng(41, 14));
 
       expect(viewModel.nearContent, <Place>[place]);
-      expect(viewModel.loadNearContent.error, isTrue);
+      expect(viewModel.loadNearContent.results.value.hasFailure, isTrue);
       expect(
-        (viewModel.loadNearContent.result! as Error<void>).error,
+        (viewModel.loadNearContent.results.value.data! as Error<void>).error,
         same(eventError),
       );
       expect(reportedErrors, isEmpty);
     });
+
+    test(
+      'detail admission is immediate, entry deferred and duplicates drop',
+      () async {
+        final event = makeEvent();
+        final pending = Completer<Result<Event>>();
+        events.pendingGetById[1] = pending;
+        expect(viewModel.loadEvent.results.value.idle, isTrue);
+        final execution = viewModel.loadEvent.runAsync(1);
+        viewModel.loadEvent.run(2);
+        expect(viewModel.loadEvent.isRunningSync.value, isTrue);
+        expect(viewModel.loadEvent.results.value.isRunning, isTrue);
+        expect(events.getByIdCallCount, 0);
+        await Future<void>(() {});
+        expect(events.getByIdCallCount, 1);
+        pending.complete(Result.success(event));
+        await execution;
+        expect(viewModel.content, same(event));
+        expect(viewModel.loadEvent.results.value.completed, isTrue);
+        expect(events.getByIdCallCount, 1);
+      },
+    );
+
+    test('both Nearby errors retain the original first error', () async {
+      final first = TestException('events');
+      final second = TestException('places');
+      events.getByCoordinatesResult = Result.error(first);
+      places.getByCoordinatesResult = Result.error(second);
+      await viewModel.loadNearContent.runAsync(const LatLng(41, 14));
+      expect(viewModel.nearContent, isEmpty);
+      expect(viewModel.loadNearContent.results.value.domainError, same(first));
+      expect(places.getByCoordinatesCallCount, 1);
+      expect(logger.calls, isEmpty);
+    });
+
+    test(
+      'Nearby places failure retains events and programmatic retry clears',
+      () async {
+        final event = makeEvent();
+        final failure = TestException('places');
+        events.getByCoordinatesResult = Result.success([event]);
+        places.getByCoordinatesResult = Result.error(failure);
+        await viewModel.loadNearContent.runAsync(const LatLng(41, 14));
+        expect(viewModel.nearContent, [event]);
+        expect(
+          viewModel.loadNearContent.results.value.domainError,
+          same(failure),
+        );
+        final pending = Completer<Result<List<Event>>>();
+        events.pendingGetByCoordinates = pending;
+        final retry = viewModel.loadNearContent.runAsync(const LatLng(42, 15));
+        await Future<void>(() {});
+        expect(viewModel.nearContent, isEmpty);
+        expect(viewModel.loadNearContent.results.value.isRunning, isTrue);
+        places.getByCoordinatesResult = const Result.success([]);
+        pending.complete(const Result.success([]));
+        await retry;
+        expect(viewModel.nearContent, isEmpty);
+        expect(viewModel.loadNearContent.results.value.completed, isTrue);
+      },
+    );
+
+    for (final duringPlaces in [false, true]) {
+      test('Nearby runtime during ${duringPlaces ? 'places' : 'events'} '
+          'stays unexpected', () async {
+        final failure = StateError('unexpected Nearby');
+        final stack = StackTrace.fromString(
+          '#0 postOriginal (package:moliseis/post_original.dart:123:45)',
+        );
+        final pendingEvents = Completer<Result<List<Event>>>();
+        final pendingPlaces = Completer<Result<List<Place>>>();
+        events.pendingGetByCoordinates = pendingEvents;
+        places.pendingGetByCoordinates = pendingPlaces;
+        final event = makeEvent();
+        final execution = viewModel.loadNearContent.runAsync(
+          const LatLng(41, 14),
+        );
+        final rejected = expectLater(execution, throwsA(same(failure)));
+        await Future<void>(() {});
+        if (duringPlaces) {
+          pendingEvents.complete(Result.success([event]));
+          await Future<void>(() {});
+          expect(places.getByCoordinatesCallCount, 1);
+          pendingPlaces.completeError(failure, stack);
+        } else {
+          pendingEvents.completeError(failure, stack);
+        }
+        await rejected;
+        final snapshot = viewModel.loadNearContent.results.value;
+        expect(snapshot.unexpectedError, same(failure));
+        expect(snapshot.domainError, isNull);
+        expect(snapshot.data, isNull);
+        expect(viewModel.nearContent, duringPlaces ? [event] : isEmpty);
+        expect(places.getByCoordinatesCallCount, duringPlaces ? 1 : 0);
+        expect(logger.calls, hasLength(1));
+        expect(logger.calls.single.error, same(failure));
+        expect(
+          logger.calls.single.stackTrace.toString(),
+          contains('post_original.dart 123:45'),
+        );
+      });
+    }
+
+    for (final lane in ['event', 'place', 'nearby']) {
+      test('$lane owner notification may dispose reentrantly', () async {
+        events.getByIdResults[1] = Result.success(makeEvent());
+        places.getByIdResults[2] = Result.success(makePlace(remoteId: 2));
+        var notifications = 0;
+        viewModel.addListener(() {
+          notifications++;
+          viewModel.dispose();
+          disposed = true;
+        });
+        if (lane == 'event') {
+          await viewModel.loadEvent.runAsync(1);
+          expect(viewModel.loadEvent.results.value.completed, isTrue);
+        } else if (lane == 'place') {
+          await viewModel.loadPlace.runAsync(2);
+          expect(viewModel.loadPlace.results.value.completed, isTrue);
+        } else {
+          await viewModel.loadNearContent.runAsync(const LatLng(41, 14));
+          expect(viewModel.loadNearContent.results.value.completed, isTrue);
+        }
+        expect(notifications, 1);
+        expect(reportedErrors, isEmpty);
+        expect(logger.calls, isEmpty);
+      });
+    }
   });
 }

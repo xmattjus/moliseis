@@ -14,8 +14,10 @@ import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result_command.dart';
 
 import '../../../../support/admin_moderation_error_cases.dart';
+import '../../../../support/command_test_support.dart';
 import '../../../../support/fake_image_picker.dart';
 import '../../../../support/fake_repositories.dart';
 
@@ -46,8 +48,8 @@ void main() {
             );
       final vm = createViewModel(repository: repository, submissionId: 1);
       addTearDown(vm.dispose);
-      await vm.load.execute();
-      await vm.link.execute(42);
+      await settleEditorRequest(admitted: vm.requestLoad());
+      await settleEditorRequest(admitted: vm.requestLink(42));
       expect(repository.linkCalls, [(1, 42)]);
       expect(vm.status, AdminSubmissionStatus.accepted);
       expect(vm.promotion, isNull);
@@ -85,10 +87,10 @@ void main() {
             );
       final vm = createViewModel(repository: repository, submissionId: 1);
       addTearDown(vm.dispose);
-      await vm.load.execute();
+      await settleEditorRequest(admitted: vm.requestLoad());
       expect(vm.isExternalUpdate, isTrue);
-      await vm.preview.execute();
-      await vm.apply.execute();
+      await settleEditorRequest(admitted: vm.requestPreview());
+      await settleEditorRequest(admitted: vm.requestApply());
       expect(repository.applyCalls.single.$2.submissionVersionToken, 's');
       expect(vm.status, AdminSubmissionStatus.accepted);
     });
@@ -115,14 +117,15 @@ void main() {
             );
       final vm = createViewModel(repository: repository, submissionId: 1);
       addTearDown(vm.dispose);
-      await vm.load.execute();
-      await vm.findCandidates.execute('  festa  ');
+      await settleEditorRequest(admitted: vm.requestLoad());
+      vm.setCandidateSearch('  festa  ');
+      await settleEditorRequest(admitted: vm.requestFindCandidates());
       expect(repository.candidateCalls.single, (1, 'festa', null));
       expect(vm.candidates!.pendingWarnings.single.id, 9);
       expect(vm.isDirty, isFalse);
       vm.selectTargetEvent(42);
-      await vm.link.execute(42);
-      expect(vm.link.completed, isTrue);
+      await settleEditorRequest(admitted: vm.requestLink(42));
+      expect(vm.linkSnapshot.completed, isTrue);
     });
 
     test(
@@ -171,10 +174,10 @@ void main() {
               );
         final vm = createViewModel(repository: repository, submissionId: 1);
         addTearDown(vm.dispose);
-        await vm.load.execute();
-        await vm.preview.execute();
-        await vm.keepCurrent.execute(group);
-        expect(vm.keepCurrent.completed, isTrue);
+        await settleEditorRequest(admitted: vm.requestLoad());
+        await settleEditorRequest(admitted: vm.requestPreview());
+        await settleEditorRequest(admitted: vm.requestKeepCurrent(group));
+        expect(vm.keepCurrentSnapshot.completed, isTrue);
         expect(repository.updateInputs.single.city, 'Termoli');
         expect(repository.updateInputs.single.latitude, 41.123456789);
         expect(repository.updateInputs.single.longitude, 14.555555555);
@@ -227,10 +230,10 @@ void main() {
               );
         final vm = createViewModel(repository: repository, submissionId: 1);
         addTearDown(vm.dispose);
-        await vm.load.execute();
-        await vm.preview.execute();
-        await vm.keepCurrent.execute(group);
-        expect(vm.keepCurrent.error, isTrue);
+        await settleEditorRequest(admitted: vm.requestLoad());
+        await settleEditorRequest(admitted: vm.requestPreview());
+        await settleEditorRequest(admitted: vm.requestKeepCurrent(group));
+        expect(vm.keepCurrentSnapshot.hasFailure, isTrue);
         expect(vm.city, isNull);
         expect(vm.latitudeText, isEmpty);
         expect(repository.updateInputs, isEmpty);
@@ -295,10 +298,10 @@ void main() {
               );
         final vm = createViewModel(repository: repository, submissionId: 1);
         addTearDown(vm.dispose);
-        await vm.load.execute();
-        await vm.preview.execute();
-        await vm.keepCurrent.execute(group);
-        expect(vm.keepCurrent.completed, isTrue);
+        await settleEditorRequest(admitted: vm.requestLoad());
+        await settleEditorRequest(admitted: vm.requestPreview());
+        await settleEditorRequest(admitted: vm.requestKeepCurrent(group));
+        expect(vm.keepCurrentSnapshot.completed, isTrue);
         final input = repository.updateInputs.single;
         if (entry.key == 'description') {
           expect(input.description, 'Current');
@@ -341,10 +344,11 @@ void main() {
         )..pendingPreview = pending;
         final vm = createViewModel(repository: repository, submissionId: 1);
         addTearDown(vm.dispose);
-        await vm.load.execute();
-        final fetching = vm.preview.execute();
-        vm.setName('saved change');
-        await vm.save.execute();
+        await settleEditorRequest(admitted: vm.requestLoad());
+        vm
+          ..requestPreview()
+          ..setName('saved change');
+        await settleEditorRequest(admitted: vm.requestSave());
         pending.complete(
           Result.success(
             AdminEventMergePreview(
@@ -355,7 +359,7 @@ void main() {
             ),
           ),
         );
-        await fetching;
+        await pumpEventQueue();
         expect(vm.isDirty, isFalse);
         expect(vm.mergePreview, isNull);
         expect(repository.updateInputs, hasLength(1));
@@ -380,10 +384,10 @@ void main() {
           )..linkResult = Result.error(error);
           final vm = createViewModel(repository: repository, submissionId: 1);
           addTearDown(vm.dispose);
-          await vm.load.execute();
-          await vm.link.execute(42);
+          await settleEditorRequest(admitted: vm.requestLoad());
+          await settleEditorRequest(admitted: vm.requestLink(42));
           expect(
-            (vm.link.result! as Error<AdminEventResolution>).error,
+            (vm.linkSnapshot.data! as Error<AdminEventResolution>).error,
             same(error),
           );
           expect(vm.status, AdminSubmissionStatus.pending);
@@ -432,18 +436,22 @@ void main() {
                 );
           final vm = createViewModel(repository: repository, submissionId: 1);
           addTearDown(vm.dispose);
-          await vm.load.execute();
-          if (operation == 'apply') await vm.preview.execute();
+          await settleEditorRequest(admitted: vm.requestLoad());
+          if (operation == 'apply') {
+            await settleEditorRequest(admitted: vm.requestPreview());
+          }
           vm.setAcknowledgeCurrentSource(selected: true);
           switch (operation) {
             case 'reject':
-              await vm.reject.execute();
+              await settleEditorRequest(admitted: vm.requestReject());
             case 'promote':
-              await vm.promote.execute(AdminPromotionTarget.event);
+              await settleEditorRequest(
+                admitted: vm.requestPromote(AdminPromotionTarget.event),
+              );
             case 'link':
-              await vm.link.execute(42);
+              await settleEditorRequest(admitted: vm.requestLink(42));
             case 'apply':
-              await vm.apply.execute();
+              await settleEditorRequest(admitted: vm.requestApply());
           }
           expect(repository.sourceOptions.single.$3, isTrue);
           expect(repository.sourceOptions.single.$4, 'y');
@@ -484,7 +492,7 @@ void main() {
             );
       final vm = createViewModel(repository: repository, submissionId: 1);
       addTearDown(vm.dispose);
-      await vm.load.execute();
+      await settleEditorRequest(admitted: vm.requestLoad());
       vm.setAcknowledgeCurrentSource(selected: true);
       repository.getByIdResults[1] = Result.success(
         sampleAdminSubmission(
@@ -501,14 +509,14 @@ void main() {
           ),
         ),
       );
-      await vm.link.execute(42);
+      await settleEditorRequest(admitted: vm.requestLink(42));
       expect(repository.sourceOptions.single.$4, 'y');
       expect(vm.externalEvent!.currentHash, 'z');
       expect(vm.externalEvent!.currentSnapshot!['name'], 'Z');
       expect(vm.acknowledgeCurrentSource, isFalse);
-      expect(vm.link.error, isTrue);
+      expect(vm.linkSnapshot.hasFailure, isTrue);
       vm.setAcknowledgeCurrentSource(selected: true);
-      await vm.link.execute(42);
+      await settleEditorRequest(admitted: vm.requestLink(42));
       expect(repository.sourceOptions.last.$4, 'z');
     });
 
@@ -546,9 +554,9 @@ void main() {
             );
       final vm = createViewModel(repository: repository, submissionId: 1);
       addTearDown(vm.dispose);
-      await vm.load.execute();
+      await settleEditorRequest(admitted: vm.requestLoad());
       vm.setAcknowledgeCurrentSource(selected: true);
-      await vm.preview.execute();
+      await settleEditorRequest(admitted: vm.requestPreview());
       expect(vm.externalEvent!.currentHash, 'z');
       expect(vm.externalEvent!.currentSnapshot!['name'], 'Z');
       expect(vm.acknowledgeCurrentSource, isFalse);
@@ -579,11 +587,11 @@ void main() {
             );
       final vm = createViewModel(repository: repository, submissionId: 1);
       addTearDown(vm.dispose);
-      await vm.load.execute();
+      await settleEditorRequest(admitted: vm.requestLoad());
       vm.setAcknowledgeCurrentSource(selected: true);
       expect(vm.isSourceStale, isFalse);
       expect(vm.acknowledgeCurrentSource, isFalse);
-      await vm.link.execute(42);
+      await settleEditorRequest(admitted: vm.requestLink(42));
       expect(repository.sourceOptions.single.$3, isNull);
       expect(repository.sourceOptions.single.$4, isNull);
     });
@@ -612,8 +620,8 @@ void main() {
         )..rejectPendingId = 2;
         final vm = createViewModel(repository: repository, submissionId: 1);
         addTearDown(vm.dispose);
-        await vm.load.execute();
-        await vm.reject.execute();
+        await settleEditorRequest(admitted: vm.requestLoad());
+        await settleEditorRequest(admitted: vm.requestReject());
         expect(repository.getByIdIds, [1, 1, 2]);
         expect(vm.followupSubmission!.id, 2);
         expect(vm.status, AdminSubmissionStatus.rejected);
@@ -631,8 +639,8 @@ void main() {
         ..setAllDay(allDay: true)
         ..setStartCalendarDate(EventCalendarDate(2026, 3, 29));
       expect(vm.startClockTime, isNull);
-      await vm.save.execute();
-      expect(vm.save.completed, isTrue);
+      await settleEditorRequest(admitted: vm.requestSave());
+      expect(vm.saveSnapshot.completed, isTrue);
       expect(repository.createInputs.single.allDay, isTrue);
       expect(
         repository.createInputs.single.startDate,
@@ -657,7 +665,7 @@ void main() {
           );
           final vm = createViewModel(repository: repository, submissionId: 1);
           addTearDown(vm.dispose);
-          await vm.load.execute();
+          await settleEditorRequest(admitted: vm.requestLoad());
           expect(vm.allDay, initiallyAllDay);
           expect(vm.isDirty, isFalse);
           vm.setAllDay(allDay: !initiallyAllDay);
@@ -665,13 +673,13 @@ void main() {
           expect(vm.startClockTime, isNull);
           expect(vm.endCalendarDate, EventCalendarDate(2026, 10, 26));
           if (initiallyAllDay) {
-            await vm.save.execute();
+            await settleEditorRequest(admitted: vm.requestSave());
             expect(repository.updateInputs, isEmpty);
             expect(vm.eventTimeIssue, EventTimeIssue.missingStartTime);
             vm.setStartClockTime(EventClockTime(10, 30));
           }
-          await vm.save.execute();
-          expect(vm.save.completed, isTrue);
+          await settleEditorRequest(admitted: vm.requestSave());
+          expect(vm.saveSnapshot.completed, isTrue);
           expect(repository.updateInputs.single.allDay, !initiallyAllDay);
           expect(vm.isDirty, isFalse);
         },
@@ -727,9 +735,9 @@ void main() {
         );
         addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
-        expect(viewModel.load.completed, isTrue);
+        expect(viewModel.loadSnapshot.completed, isTrue);
         expect(repository.getByIdIds, <int>[1]);
         expect(viewModel.city, 'Isernia');
         expect(viewModel.name, 'Museo');
@@ -761,9 +769,9 @@ void main() {
       );
       addTearDown(viewModel.dispose);
 
-      await viewModel.load.execute();
+      await settleEditorRequest(admitted: viewModel.requestLoad());
 
-      expect(viewModel.load.error, isTrue);
+      expect(viewModel.loadSnapshot.hasFailure, isTrue);
       expect(viewModel.hasLoadedDetail, isFalse);
     });
 
@@ -776,9 +784,9 @@ void main() {
       addTearDown(viewModel.dispose);
 
       viewModel.setName('Museo');
-      await viewModel.save.execute();
+      await settleEditorRequest(admitted: viewModel.requestSave());
 
-      expect(viewModel.save.error, isTrue);
+      expect(viewModel.saveSnapshot.hasFailure, isTrue);
       expect(repository.createInputs, isEmpty);
 
       final missingNameViewModel = AdminSubmissionEditorViewModel(
@@ -787,9 +795,9 @@ void main() {
       );
       addTearDown(missingNameViewModel.dispose);
       missingNameViewModel.setCity('Isernia');
-      await missingNameViewModel.save.execute();
+      await settleEditorRequest(admitted: missingNameViewModel.requestSave());
 
-      expect(missingNameViewModel.save.error, isTrue);
+      expect(missingNameViewModel.saveSnapshot.hasFailure, isTrue);
       expect(repository.createInputs, isEmpty);
     });
 
@@ -813,9 +821,9 @@ void main() {
               <String, dynamic>{'insert': 'Descrizione\n'},
             ],
           );
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.completed, isTrue);
+        expect(viewModel.saveSnapshot.completed, isTrue);
         expect(repository.createInputs, hasLength(1));
         final input = repository.createInputs.single;
         expect(input.category, ContentCategory.unknown);
@@ -845,16 +853,16 @@ void main() {
       addTearDown(viewModel.dispose);
 
       // Editorial updates are pending-only, so the detail must load first.
-      await viewModel.load.execute();
+      await settleEditorRequest(admitted: viewModel.requestLoad());
       expect(viewModel.isEditable, isTrue);
 
       viewModel
         ..setCategory(ContentCategory.nature)
         ..setCity('Termoli')
         ..setName('Spiaggia');
-      await viewModel.save.execute();
+      await settleEditorRequest(admitted: viewModel.requestSave());
 
-      expect(viewModel.save.completed, isTrue);
+      expect(viewModel.saveSnapshot.completed, isTrue);
       expect(repository.updateIds, <int>[3]);
       expect(repository.updateInputs.single.category, ContentCategory.nature);
       expect(repository.updateInputs.single.city, 'Termoli');
@@ -874,9 +882,9 @@ void main() {
       viewModel
         ..setCity('Isernia')
         ..setName('Museo');
-      await viewModel.save.execute();
+      await settleEditorRequest(admitted: viewModel.requestSave());
 
-      expect(viewModel.save.error, isTrue);
+      expect(viewModel.saveSnapshot.hasFailure, isTrue);
       expect(viewModel.city, 'Isernia');
       expect(viewModel.name, 'Museo');
       expect(viewModel.isDirty, isTrue);
@@ -913,9 +921,9 @@ void main() {
           ..setName('Sagra del Tartufo')
           ..setStartCalendarDate(EventCalendarDate(2026, 8, 20))
           ..setStartClockTime(EventClockTime(10, 30));
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.completed, isTrue);
+        expect(viewModel.saveSnapshot.completed, isTrue);
         final input = repository.createInputs.single;
         expect(input.startDate, DateTime.utc(2026, 8, 20, 8, 30));
         expect(input.endDate, isNull);
@@ -942,9 +950,9 @@ void main() {
           );
           expect(viewModel.endDate!.isUtc, isTrue);
 
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.completed, isTrue);
+          expect(viewModel.saveSnapshot.completed, isTrue);
           expect(
             repository.createInputs.single.endDate,
             DateTime.utc(2026, 8, 20, 21, 59, 59, 999, 999),
@@ -961,9 +969,9 @@ void main() {
           ..setCity('Isernia')
           ..setName('Sagra del Tartufo')
           ..setEndCalendarDate(EventCalendarDate(2026, 8, 20));
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.error, isTrue);
+        expect(viewModel.saveSnapshot.hasFailure, isTrue);
         expect(repository.createInputs, isEmpty);
         expect(viewModel.isDirty, isTrue);
       });
@@ -985,9 +993,9 @@ void main() {
           expect(viewModel.endDate, isNull);
           expect(viewModel.eventTimeIssue, EventTimeIssue.invalidRange);
 
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.error, isTrue);
+          expect(viewModel.saveSnapshot.hasFailure, isTrue);
           expect(repository.createInputs, isEmpty);
           expect(viewModel.isDirty, isTrue);
         },
@@ -1014,15 +1022,15 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
           expect(viewModel.startDate, loadedDate);
           expect(viewModel.startDate!.isUtc, isTrue);
           expect(viewModel.endDate, loadedDate);
 
           viewModel.setName('Museo rinnovato');
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.completed, isTrue);
+          expect(viewModel.saveSnapshot.completed, isTrue);
           final input = repository.updateInputs.single;
           expect(input.startDate, loadedDate);
           expect(input.startDate!.isUtc, isTrue);
@@ -1069,7 +1077,7 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
 
           viewModel.setStartClockTime(EventClockTime(5, 0));
 
@@ -1081,9 +1089,9 @@ void main() {
           );
           expect(viewModel.endDate!.isUtc, isTrue);
 
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.completed, isTrue);
+          expect(viewModel.saveSnapshot.completed, isTrue);
           final input = repository.updateInputs.single;
           expect(input.startDate!.isUtc, isTrue);
           expect(
@@ -1114,7 +1122,7 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
 
           // The picker emits a local-represented calendar day.
           viewModel.setStartCalendarDate(EventCalendarDate(2026, 8, 21));
@@ -1147,7 +1155,7 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
 
           viewModel.setStartCalendarDate(EventCalendarDate(2026, 8, 25));
 
@@ -1176,7 +1184,7 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
 
           viewModel.setStartCalendarDate(EventCalendarDate(2026, 8, 21));
 
@@ -1207,13 +1215,13 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
           viewModel
             ..setStartCalendarDate(EventCalendarDate(2026, 8, 21))
             ..setName('Sagra spostata');
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.completed, isTrue);
+          expect(viewModel.saveSnapshot.completed, isTrue);
           final wire = adminSubmissionInputToWireMap(
             repository.updateInputs.single,
           );
@@ -1242,7 +1250,7 @@ void main() {
         );
         addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
         var notifications = 0;
         viewModel
           ..addListener(() => notifications++)
@@ -1275,7 +1283,7 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
           viewModel.setStartCalendarDate(EventCalendarDate(2026, 4, 1));
 
           expect(
@@ -1302,7 +1310,7 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
           viewModel.setStartClockTime(EventClockTime(14, 45));
 
           expect(
@@ -1324,8 +1332,8 @@ void main() {
             ..setEventEnabled(enabled: true)
             ..setStartCalendarDate(EventCalendarDate(2026, 3, 29));
 
-          await viewModel.save.execute();
-          expect(viewModel.save.error, isTrue);
+          await settleEditorRequest(admitted: viewModel.requestSave());
+          expect(viewModel.saveSnapshot.hasFailure, isTrue);
           expect(repository.createInputs, isEmpty);
 
           viewModel
@@ -1335,7 +1343,7 @@ void main() {
           expect(viewModel.eventTimeIssue, EventTimeIssue.nonexistentLocalTime);
           expect(viewModel.startDate, prior);
 
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
           expect(repository.createInputs, isEmpty);
         },
       );
@@ -1378,7 +1386,7 @@ void main() {
         );
         addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
         expect(viewModel.promotion, isNull);
         expect(viewModel.isEditable, isTrue);
@@ -1419,7 +1427,7 @@ void main() {
             submissionId: 1,
           );
           addTearDown(promotedPlace.dispose);
-          await promotedPlace.load.execute();
+          await settleEditorRequest(admitted: promotedPlace.requestLoad());
 
           expect(promotedPlace.promotion, placePromotion);
           expect(promotedPlace.status, AdminSubmissionStatus.accepted);
@@ -1432,7 +1440,7 @@ void main() {
             submissionId: 2,
           );
           addTearDown(promotedEvent.dispose);
-          await promotedEvent.load.execute();
+          await settleEditorRequest(admitted: promotedEvent.requestLoad());
 
           expect(
             promotedEvent.promotion,
@@ -1459,7 +1467,7 @@ void main() {
         );
         addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
         expect(viewModel.status, AdminSubmissionStatus.accepted);
         expect(viewModel.promotion, isNull);
@@ -1486,17 +1494,21 @@ void main() {
         );
         addTearDown(viewModel.dispose);
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
-        var notifications = 0;
-        viewModel.addListener(() => notifications++);
+        final states = <(bool, AdminSubmissionStatus?)>[];
+        viewModel.addListener(
+          () => states.add((viewModel.operationRunning, viewModel.status)),
+        );
 
-        await viewModel.load.execute();
-        notifications = 0;
+        await settleEditorRequest(admitted: viewModel.requestLoad());
+        states.clear();
 
         expect(viewModel.hasPublishableCategory, isTrue);
 
-        await viewModel.promote.execute(AdminPromotionTarget.place);
+        await settleEditorRequest(
+          admitted: viewModel.requestPromote(AdminPromotionTarget.place),
+        );
 
-        expect(viewModel.promote.completed, isTrue);
+        expect(viewModel.promoteSnapshot.completed, isTrue);
         expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
           (1, AdminPromotionTarget.place),
         ]);
@@ -1508,8 +1520,8 @@ void main() {
             entityId: 1,
           ),
         );
-        // One logical notification for the moderation success.
-        expect(notifications, 1);
+        expect(states.any((state) => state.$1), isTrue);
+        expect(states.last, (false, AdminSubmissionStatus.accepted));
 
         repository.getByIdResults[1] = Result.success(sampleAdminSubmission());
         final rejectingViewModel = AdminSubmissionEditorViewModel(
@@ -1521,10 +1533,10 @@ void main() {
         repository.getByIdResults[2] = Result.success(
           sampleAdminSubmission(id: 2),
         );
-        await rejectingViewModel.load.execute();
-        await rejectingViewModel.reject.execute();
+        await settleEditorRequest(admitted: rejectingViewModel.requestLoad());
+        await settleEditorRequest(admitted: rejectingViewModel.requestReject());
 
-        expect(rejectingViewModel.reject.completed, isTrue);
+        expect(rejectingViewModel.rejectSnapshot.completed, isTrue);
         expect(repository.rejectIds, <int>[2]);
         expect(rejectingViewModel.status, AdminSubmissionStatus.rejected);
       },
@@ -1549,36 +1561,40 @@ void main() {
         addTearDown(unknown.dispose);
         addTearDown(unset.dispose);
 
-        await unknown.load.execute();
+        await settleEditorRequest(admitted: unknown.requestLoad());
         expect(unknown.hasPublishableCategory, isFalse);
-        await unknown.promote.execute(AdminPromotionTarget.place);
+        await settleEditorRequest(
+          admitted: unknown.requestPromote(AdminPromotionTarget.place),
+        );
 
-        expect(unknown.promote.error, isTrue);
+        expect(unknown.promoteSnapshot.hasFailure, isTrue);
         expect(repository.promoteCalls, isEmpty);
 
-        await unknown.reject.execute();
+        await settleEditorRequest(admitted: unknown.requestReject());
 
-        expect(unknown.reject.completed, isTrue);
+        expect(unknown.rejectSnapshot.completed, isTrue);
         expect(repository.rejectIds, <int>[1]);
 
-        await unset.load.execute();
+        await settleEditorRequest(admitted: unset.requestLoad());
         unset.setCategory(null);
         expect(unset.hasPublishableCategory, isFalse);
 
-        await unset.save.execute();
+        await settleEditorRequest(admitted: unset.requestSave());
 
-        expect(unset.save.completed, isTrue);
+        expect(unset.saveSnapshot.completed, isTrue);
         expect(
           repository.updateInputs.single.category,
           ContentCategory.unknown,
         );
         expect(unset.isDirty, isFalse);
 
-        await unset.promote.execute(AdminPromotionTarget.place);
+        await settleEditorRequest(
+          admitted: unset.requestPromote(AdminPromotionTarget.place),
+        );
 
-        expect(unset.promote.error, isTrue);
+        expect(unset.promoteSnapshot.hasFailure, isTrue);
         expect(
-          (unset.promote.result! as Error<AdminSubmissionPromotion>).error
+          (unset.promoteSnapshot.data! as Error<AdminSubmissionPromotion>).error
               .toString(),
           'Exception: Seleziona una categoria e salva prima di pubblicare.',
         );
@@ -1609,10 +1625,12 @@ void main() {
           sampleAdminSubmission(startDate: DateTime.utc(2026, 8, 20, 10)),
         );
 
-        await viewModel.load.execute();
-        await viewModel.promote.execute(AdminPromotionTarget.event);
+        await settleEditorRequest(admitted: viewModel.requestLoad());
+        await settleEditorRequest(
+          admitted: viewModel.requestPromote(AdminPromotionTarget.event),
+        );
 
-        expect(viewModel.promote.completed, isTrue);
+        expect(viewModel.promoteSnapshot.completed, isTrue);
         expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
           (4, AdminPromotionTarget.event),
         ]);
@@ -1640,11 +1658,16 @@ void main() {
       );
       addTearDown(viewModel.dispose);
 
-      await viewModel.load.execute();
-      await viewModel.promote.execute(AdminPromotionTarget.event);
+      await settleEditorRequest(admitted: viewModel.requestLoad());
+      await settleEditorRequest(
+        admitted: viewModel.requestPromote(AdminPromotionTarget.event),
+      );
 
-      expect(viewModel.promote.error, isTrue);
-      expect(viewModel.promote.result, isA<Error<AdminSubmissionPromotion>>());
+      expect(viewModel.promoteSnapshot.hasFailure, isTrue);
+      expect(
+        viewModel.promoteSnapshot.data,
+        isA<Error<AdminSubmissionPromotion>>(),
+      );
       expect(viewModel.eventTimeIssue, EventTimeIssue.missingStartDate);
       expect(repository.promoteCalls, isEmpty);
     });
@@ -1663,11 +1686,13 @@ void main() {
         );
         addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
         viewModel.setName('Edited submission');
-        await viewModel.promote.execute(AdminPromotionTarget.event);
+        await settleEditorRequest(
+          admitted: viewModel.requestPromote(AdminPromotionTarget.event),
+        );
 
-        expect(viewModel.promote.error, isTrue);
+        expect(viewModel.promoteSnapshot.hasFailure, isTrue);
         expect(viewModel.eventTimeIssue, isNull);
         expect(repository.promoteCalls, isEmpty);
       },
@@ -1694,8 +1719,10 @@ void main() {
         addTearDown(viewModel.dispose);
         repository.getByIdResults[5] = Result.success(sampleAdminSubmission());
 
-        await viewModel.load.execute();
-        await viewModel.promote.execute(AdminPromotionTarget.place);
+        await settleEditorRequest(admitted: viewModel.requestLoad());
+        await settleEditorRequest(
+          admitted: viewModel.requestPromote(AdminPromotionTarget.place),
+        );
         expect(viewModel.status, AdminSubmissionStatus.accepted);
         expect(viewModel.promotion?.entityId, 42);
       },
@@ -1728,17 +1755,21 @@ void main() {
       addTearDown(accepted.dispose);
       addTearDown(rejected.dispose);
 
-      await accepted.load.execute();
-      await rejected.load.execute();
-      await accepted.promote.execute(AdminPromotionTarget.place);
-      await accepted.reject.execute();
-      await rejected.promote.execute(AdminPromotionTarget.place);
-      await rejected.reject.execute();
+      await settleEditorRequest(admitted: accepted.requestLoad());
+      await settleEditorRequest(admitted: rejected.requestLoad());
+      await settleEditorRequest(
+        admitted: accepted.requestPromote(AdminPromotionTarget.place),
+      );
+      await settleEditorRequest(admitted: accepted.requestReject());
+      await settleEditorRequest(
+        admitted: rejected.requestPromote(AdminPromotionTarget.place),
+      );
+      await settleEditorRequest(admitted: rejected.requestReject());
 
-      expect(accepted.promote.error, isTrue);
-      expect(accepted.reject.error, isTrue);
-      expect(rejected.promote.error, isTrue);
-      expect(rejected.reject.error, isTrue);
+      expect(accepted.promoteSnapshot.hasFailure, isTrue);
+      expect(accepted.rejectSnapshot.hasFailure, isTrue);
+      expect(rejected.promoteSnapshot.hasFailure, isTrue);
+      expect(rejected.rejectSnapshot.hasFailure, isTrue);
       expect(repository.promoteCalls, isEmpty);
       expect(repository.rejectIds, isEmpty);
     });
@@ -1753,10 +1784,12 @@ void main() {
       // Create mode has no persisted ID.
       final createMode = createViewModel(repository: repository);
       addTearDown(createMode.dispose);
-      await createMode.promote.execute(AdminPromotionTarget.place);
-      await createMode.reject.execute();
-      expect(createMode.promote.error, isTrue);
-      expect(createMode.reject.error, isTrue);
+      await settleEditorRequest(
+        admitted: createMode.requestPromote(AdminPromotionTarget.place),
+      );
+      await settleEditorRequest(admitted: createMode.requestReject());
+      expect(createMode.promoteSnapshot.hasFailure, isTrue);
+      expect(createMode.rejectSnapshot.hasFailure, isTrue);
 
       // Detail not loaded yet.
       final unloaded = AdminSubmissionEditorViewModel(
@@ -1765,10 +1798,12 @@ void main() {
         submissionId: 1,
       );
       addTearDown(unloaded.dispose);
-      await unloaded.promote.execute(AdminPromotionTarget.place);
-      await unloaded.reject.execute();
-      expect(unloaded.promote.error, isTrue);
-      expect(unloaded.reject.error, isTrue);
+      await settleEditorRequest(
+        admitted: unloaded.requestPromote(AdminPromotionTarget.place),
+      );
+      await settleEditorRequest(admitted: unloaded.requestReject());
+      expect(unloaded.promoteSnapshot.hasFailure, isTrue);
+      expect(unloaded.rejectSnapshot.hasFailure, isTrue);
 
       // Dirty editor.
       final dirty = AdminSubmissionEditorViewModel(
@@ -1777,12 +1812,14 @@ void main() {
         submissionId: 1,
       );
       addTearDown(dirty.dispose);
-      await dirty.load.execute();
+      await settleEditorRequest(admitted: dirty.requestLoad());
       dirty.setCity('Isernia');
-      await dirty.promote.execute(AdminPromotionTarget.place);
-      await dirty.reject.execute();
-      expect(dirty.promote.error, isTrue);
-      expect(dirty.reject.error, isTrue);
+      await settleEditorRequest(
+        admitted: dirty.requestPromote(AdminPromotionTarget.place),
+      );
+      await settleEditorRequest(admitted: dirty.requestReject());
+      expect(dirty.promoteSnapshot.hasFailure, isTrue);
+      expect(dirty.rejectSnapshot.hasFailure, isTrue);
 
       expect(repository.promoteCalls, isEmpty);
       expect(repository.rejectIds, isEmpty);
@@ -1815,15 +1852,15 @@ void main() {
       addTearDown(accepted.dispose);
       addTearDown(rejected.dispose);
 
-      await accepted.load.execute();
-      await rejected.load.execute();
+      await settleEditorRequest(admitted: accepted.requestLoad());
+      await settleEditorRequest(admitted: rejected.requestLoad());
       accepted.setCity('Isernia');
       rejected.setCity('Termoli');
-      await accepted.save.execute();
-      await rejected.save.execute();
+      await settleEditorRequest(admitted: accepted.requestSave());
+      await settleEditorRequest(admitted: rejected.requestSave());
 
-      expect(accepted.save.error, isTrue);
-      expect(rejected.save.error, isTrue);
+      expect(accepted.saveSnapshot.hasFailure, isTrue);
+      expect(rejected.saveSnapshot.hasFailure, isTrue);
       // A failed non-pending save never reaches the repository.
       expect(repository.updateIds, isEmpty);
     });
@@ -1841,22 +1878,26 @@ void main() {
         submissionId: 1,
       );
       addTearDown(viewModel.dispose);
-      await viewModel.load.execute();
-      viewModel.setCity('Isernia');
-
-      final saving = viewModel.save.execute();
-      expect(viewModel.save.running, isTrue);
+      await settleEditorRequest(admitted: viewModel.requestLoad());
+      viewModel
+        ..setCity('Isernia')
+        ..requestSave();
+      expect(viewModel.saveSnapshot.isRunning, isTrue);
+      expect(repository.updateIds, isEmpty);
+      await pumpEventQueue();
       expect(repository.updateIds, <int>[1]);
 
-      await viewModel.promote.execute(AdminPromotionTarget.place);
-      await viewModel.reject.execute();
+      await settleEditorRequest(
+        admitted: viewModel.requestPromote(AdminPromotionTarget.place),
+      );
+      await settleEditorRequest(admitted: viewModel.requestReject());
 
-      expect(viewModel.promote.error, isTrue);
-      expect(viewModel.reject.error, isTrue);
+      expect(viewModel.promoteSnapshot.idle, isTrue);
+      expect(viewModel.rejectSnapshot.idle, isTrue);
       expect(repository.promoteCalls, isEmpty);
       expect(repository.rejectIds, isEmpty);
       pendingUpdate.complete(Result.success(sampleAdminSubmission()));
-      await saving;
+      await pumpEventQueue();
     });
 
     test('blocks saving while a moderation request is pending', () async {
@@ -1872,17 +1913,18 @@ void main() {
         submissionId: 1,
       );
       addTearDown(viewModel.dispose);
-      await viewModel.load.execute();
+      await settleEditorRequest(admitted: viewModel.requestLoad());
 
-      final publishing = viewModel.promote.execute(AdminPromotionTarget.place);
-      expect(viewModel.promote.running, isTrue);
+      viewModel.requestPromote(AdminPromotionTarget.place);
+      expect(viewModel.promoteSnapshot.isRunning, isTrue);
+      await pumpEventQueue();
       expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
         (1, AdminPromotionTarget.place),
       ]);
 
-      await viewModel.save.execute();
+      await settleEditorRequest(admitted: viewModel.requestSave());
 
-      expect(viewModel.save.error, isTrue);
+      expect(viewModel.saveSnapshot.idle, isTrue);
       expect(repository.updateIds, isEmpty);
       pendingPromote.complete(
         const Result.success(
@@ -1892,7 +1934,7 @@ void main() {
           ),
         ),
       );
-      await publishing;
+      await pumpEventQueue();
       expect(viewModel.status, AdminSubmissionStatus.accepted);
     });
 
@@ -1944,12 +1986,12 @@ void main() {
           submissionId: 1,
         );
         addTearDown(viewModel.dispose);
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
         viewModel.setCity('Termoli');
 
-        await viewModel.addAsset.execute();
+        await settleEditorRequest(admitted: viewModel.requestAddAsset());
 
-        expect(viewModel.addAsset.completed, isTrue);
+        expect(viewModel.addAssetSnapshot.completed, isTrue);
         expect(picker.pickImageSources, <ImageSource>[ImageSource.gallery]);
         expect(
           uploadRepository.uploadedImages.single.path,
@@ -1971,7 +2013,7 @@ void main() {
         expect(viewModel.city, 'Termoli');
         expect(viewModel.isDirty, isTrue);
 
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
         expect(repository.updateInputs.single.city, 'Termoli');
       },
@@ -1992,11 +2034,11 @@ void main() {
         submissionId: 1,
       );
       addTearDown(viewModel.dispose);
-      await viewModel.load.execute();
+      await settleEditorRequest(admitted: viewModel.requestLoad());
 
-      await viewModel.addAsset.execute();
+      await settleEditorRequest(admitted: viewModel.requestAddAsset());
 
-      expect(viewModel.addAsset.completed, isTrue);
+      expect(viewModel.addAssetSnapshot.completed, isTrue);
       expect(picker.pickImageSources, <ImageSource>[ImageSource.gallery]);
       expect(uploadRepository.uploadedImages, isEmpty);
       expect(repository.addAssetCalls, isEmpty);
@@ -2033,11 +2075,11 @@ void main() {
         submissionId: 1,
       );
       addTearDown(viewModel.dispose);
-      await viewModel.load.execute();
+      await settleEditorRequest(admitted: viewModel.requestLoad());
 
-      await viewModel.addAsset.execute();
+      await settleEditorRequest(admitted: viewModel.requestAddAsset());
 
-      expect(viewModel.addAsset.error, isTrue);
+      expect(viewModel.addAssetSnapshot.hasFailure, isTrue);
       expect(repository.addAssetCalls, isEmpty);
       expect(viewModel.assets, const <AdminSubmissionAsset>[initialAsset]);
 
@@ -2062,11 +2104,15 @@ void main() {
         submissionId: 1,
       );
       addTearDown(backendFailureViewModel.dispose);
-      await backendFailureViewModel.load.execute();
+      await settleEditorRequest(
+        admitted: backendFailureViewModel.requestLoad(),
+      );
 
-      await backendFailureViewModel.addAsset.execute();
+      await settleEditorRequest(
+        admitted: backendFailureViewModel.requestAddAsset(),
+      );
 
-      expect(backendFailureViewModel.addAsset.error, isTrue);
+      expect(backendFailureViewModel.addAssetSnapshot.hasFailure, isTrue);
       expect(backendFailureViewModel.assets, const <AdminSubmissionAsset>[
         initialAsset,
       ]);
@@ -2112,11 +2158,11 @@ void main() {
           submissionId: id,
         );
         addTearDown(viewModel.dispose);
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
-        await viewModel.addAsset.execute();
+        await settleEditorRequest(admitted: viewModel.requestAddAsset());
 
-        expect(viewModel.addAsset.error, isTrue);
+        expect(viewModel.addAssetSnapshot.hasFailure, isTrue);
       }
       expect(repository.addAssetCalls, isEmpty);
     });
@@ -2146,12 +2192,14 @@ void main() {
           submissionId: 1,
         );
         addTearDown(viewModel.dispose);
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
         viewModel.setName('Modifica non salvata');
 
-        await viewModel.deleteAsset.execute(asset.id);
+        await settleEditorRequest(
+          admitted: viewModel.requestDeleteAsset(asset.id),
+        );
 
-        expect(viewModel.deleteAsset.completed, isTrue);
+        expect(viewModel.deleteAssetSnapshot.completed, isTrue);
         expect(repository.deleteAssetCalls, <(int, int)>[(1, 2)]);
         expect(viewModel.assets, isEmpty);
         expect(uploadRepository.uploadedImages, isEmpty);
@@ -2201,11 +2249,13 @@ void main() {
             submissionId: id,
           );
           addTearDown(viewModel.dispose);
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
 
-          await viewModel.deleteAsset.execute(asset.id);
+          await settleEditorRequest(
+            admitted: viewModel.requestDeleteAsset(asset.id),
+          );
 
-          expect(viewModel.deleteAsset.error, isTrue);
+          expect(viewModel.deleteAssetSnapshot.hasFailure, isTrue);
           expect(viewModel.assets, const <AdminSubmissionAsset>[asset]);
         }
         expect(repository.deleteAssetCalls, <(int, int)>[(1, 2)]);
@@ -2237,27 +2287,31 @@ void main() {
           submissionId: 1,
         );
         addTearDown(viewModel.dispose);
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
-        final rejecting = viewModel.reject.execute();
-        expect(viewModel.reject.running, isTrue);
+        viewModel.requestReject();
+        expect(viewModel.rejectSnapshot.isRunning, isTrue);
 
-        await viewModel.promote.execute(AdminPromotionTarget.place);
-        await viewModel.save.execute();
-        await viewModel.addAsset.execute();
-        await viewModel.deleteAsset.execute(asset.id);
+        await settleEditorRequest(
+          admitted: viewModel.requestPromote(AdminPromotionTarget.place),
+        );
+        await settleEditorRequest(admitted: viewModel.requestSave());
+        await settleEditorRequest(admitted: viewModel.requestAddAsset());
+        await settleEditorRequest(
+          admitted: viewModel.requestDeleteAsset(asset.id),
+        );
 
-        expect(viewModel.promote.error, isTrue);
-        expect(viewModel.save.error, isTrue);
-        expect(viewModel.addAsset.error, isTrue);
-        expect(viewModel.deleteAsset.error, isTrue);
+        expect(viewModel.promoteSnapshot.idle, isTrue);
+        expect(viewModel.saveSnapshot.idle, isTrue);
+        expect(viewModel.addAssetSnapshot.idle, isTrue);
+        expect(viewModel.deleteAssetSnapshot.idle, isTrue);
         expect(repository.promoteCalls, isEmpty);
         expect(repository.updateIds, isEmpty);
         expect(repository.addAssetCalls, isEmpty);
         expect(repository.deleteAssetCalls, isEmpty);
 
         pendingReject.complete(const Result.success(null));
-        await rejecting;
+        await pumpEventQueue();
         expect(viewModel.status, AdminSubmissionStatus.rejected);
         expect(repository.rejectIds, <int>[1]);
       },
@@ -2288,22 +2342,22 @@ void main() {
           submissionId: 1,
         );
         addTearDown(viewModel.dispose);
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
-        final publishing = viewModel.promote.execute(
-          AdminPromotionTarget.place,
+        viewModel.requestPromote(AdminPromotionTarget.place);
+        expect(viewModel.promoteSnapshot.isRunning, isTrue);
+
+        await settleEditorRequest(admitted: viewModel.requestReject());
+        await settleEditorRequest(admitted: viewModel.requestSave());
+        await settleEditorRequest(admitted: viewModel.requestAddAsset());
+        await settleEditorRequest(
+          admitted: viewModel.requestDeleteAsset(asset.id),
         );
-        expect(viewModel.promote.running, isTrue);
 
-        await viewModel.reject.execute();
-        await viewModel.save.execute();
-        await viewModel.addAsset.execute();
-        await viewModel.deleteAsset.execute(asset.id);
-
-        expect(viewModel.reject.error, isTrue);
-        expect(viewModel.save.error, isTrue);
-        expect(viewModel.addAsset.error, isTrue);
-        expect(viewModel.deleteAsset.error, isTrue);
+        expect(viewModel.rejectSnapshot.idle, isTrue);
+        expect(viewModel.saveSnapshot.idle, isTrue);
+        expect(viewModel.addAssetSnapshot.idle, isTrue);
+        expect(viewModel.deleteAssetSnapshot.idle, isTrue);
         expect(repository.rejectIds, isEmpty);
         expect(repository.updateIds, isEmpty);
         expect(repository.addAssetCalls, isEmpty);
@@ -2317,7 +2371,7 @@ void main() {
             ),
           ),
         );
-        await publishing;
+        await pumpEventQueue();
         expect(viewModel.status, AdminSubmissionStatus.accepted);
         expect(viewModel.promotion?.entityId, 9);
         expect(repository.promoteCalls, <(int, AdminPromotionTarget)>[
@@ -2345,10 +2399,9 @@ void main() {
           ),
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
-        final adding = viewModel.addAsset.execute();
-        await pumpEventQueue();
+        await settleEditorRequest(admitted: viewModel.requestAddAsset());
         viewModel.dispose();
         uploadTask.complete(
           const Result.success(
@@ -2360,7 +2413,7 @@ void main() {
             ),
           ),
         );
-        await adding;
+        await pumpEventQueue();
 
         expect(uploadTask.cancelCallCount, 1);
         expect(repository.addAssetCalls, isEmpty);
@@ -2396,10 +2449,9 @@ void main() {
           ),
           submissionId: 1,
         );
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
-        final adding = viewModel.addAsset.execute();
-        await pumpEventQueue();
+        await settleEditorRequest(admitted: viewModel.requestAddAsset());
         expect(repository.addAssetCalls, hasLength(1));
         viewModel.dispose();
         pendingAdd.complete(
@@ -2412,7 +2464,7 @@ void main() {
             ),
           ),
         );
-        await adding;
+        await pumpEventQueue();
 
         expect(viewModel.assets, isEmpty);
       },
@@ -2447,7 +2499,7 @@ void main() {
           );
           addTearDown(viewModel.dispose);
 
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
 
           expect(viewModel.latitudeText, '41.5575078');
           expect(viewModel.longitudeText, '14.6485406');
@@ -2467,7 +2519,7 @@ void main() {
         );
         addTearDown(viewModel.dispose);
 
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
         expect(viewModel.latitudeText, '');
         expect(viewModel.longitudeText, '');
@@ -2514,9 +2566,9 @@ void main() {
           ..setCity('Isernia')
           ..setName('Museo');
         expect(viewModel.isDirty, isTrue);
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.completed, isTrue);
+        expect(viewModel.saveSnapshot.completed, isTrue);
         expect(repository.createInputs.single.latitude, isNull);
         expect(repository.createInputs.single.longitude, isNull);
       });
@@ -2531,9 +2583,9 @@ void main() {
           ..setName('Museo')
           ..setLatitudeText('41.5575078')
           ..setLongitudeText('14.6485406');
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.completed, isTrue);
+        expect(viewModel.saveSnapshot.completed, isTrue);
         expect(repository.createInputs.single.latitude, 41.5575078);
         expect(repository.createInputs.single.longitude, 14.6485406);
       });
@@ -2547,17 +2599,17 @@ void main() {
           ..setCity('Isernia')
           ..setName('Museo')
           ..setLatitudeText('41.55');
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.error, isTrue);
+        expect(viewModel.saveSnapshot.hasFailure, isTrue);
         expect(repository.createInputs, isEmpty);
 
         viewModel
           ..setLatitudeText('')
           ..setLongitudeText('14.64');
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.error, isTrue);
+        expect(viewModel.saveSnapshot.hasFailure, isTrue);
         expect(repository.createInputs, isEmpty);
       });
 
@@ -2571,9 +2623,9 @@ void main() {
           ..setName('Museo')
           ..setLatitudeText('not-a-number')
           ..setLongitudeText('14.64');
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.error, isTrue);
+        expect(viewModel.saveSnapshot.hasFailure, isTrue);
         expect(repository.createInputs, isEmpty);
       });
 
@@ -2586,14 +2638,14 @@ void main() {
           ..setName('Museo')
           ..setLatitudeText('90.000001')
           ..setLongitudeText('0');
-        await latitudeViewModel.save.execute();
-        expect(latitudeViewModel.save.error, isTrue);
+        await settleEditorRequest(admitted: latitudeViewModel.requestSave());
+        expect(latitudeViewModel.saveSnapshot.hasFailure, isTrue);
 
         latitudeViewModel
           ..setLatitudeText('-91')
           ..setLongitudeText('');
-        await latitudeViewModel.save.execute();
-        expect(latitudeViewModel.save.error, isTrue);
+        await settleEditorRequest(admitted: latitudeViewModel.requestSave());
+        expect(latitudeViewModel.saveSnapshot.hasFailure, isTrue);
         expect(repository.createInputs, isEmpty);
 
         final longitudeViewModel = createViewModel(repository: repository);
@@ -2603,12 +2655,12 @@ void main() {
           ..setName('Museo')
           ..setLatitudeText('0')
           ..setLongitudeText('180.000001');
-        await longitudeViewModel.save.execute();
-        expect(longitudeViewModel.save.error, isTrue);
+        await settleEditorRequest(admitted: longitudeViewModel.requestSave());
+        expect(longitudeViewModel.saveSnapshot.hasFailure, isTrue);
 
         longitudeViewModel.setLongitudeText('-180.5');
-        await longitudeViewModel.save.execute();
-        expect(longitudeViewModel.save.error, isTrue);
+        await settleEditorRequest(admitted: longitudeViewModel.requestSave());
+        expect(longitudeViewModel.saveSnapshot.hasFailure, isTrue);
         expect(repository.createInputs, isEmpty);
       });
 
@@ -2625,9 +2677,9 @@ void main() {
             ..setName('Museo')
             ..setLatitudeText(latitude.toString())
             ..setLongitudeText(longitude.toString());
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.completed, isTrue);
+          expect(viewModel.saveSnapshot.completed, isTrue);
           expect(repository.createInputs.single.latitude, latitude);
           expect(repository.createInputs.single.longitude, longitude);
         }
@@ -2646,14 +2698,16 @@ void main() {
             submissionId: 1,
           );
           addTearDown(viewModel.dispose);
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
           viewModel.setLatitudeText('41');
 
-          await viewModel.promote.execute(AdminPromotionTarget.place);
-          await viewModel.reject.execute();
+          await settleEditorRequest(
+            admitted: viewModel.requestPromote(AdminPromotionTarget.place),
+          );
+          await settleEditorRequest(admitted: viewModel.requestReject());
 
-          expect(viewModel.promote.error, isTrue);
-          expect(viewModel.reject.error, isTrue);
+          expect(viewModel.promoteSnapshot.hasFailure, isTrue);
+          expect(viewModel.rejectSnapshot.hasFailure, isTrue);
           expect(repository.promoteCalls, isEmpty);
           expect(repository.rejectIds, isEmpty);
         },
@@ -2670,9 +2724,9 @@ void main() {
           ..setCoordinates(41.5, 14.6);
         expect(viewModel.isDirty, isTrue);
 
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.completed, isTrue);
+        expect(viewModel.saveSnapshot.completed, isTrue);
         expect(viewModel.isDirty, isFalse);
       });
 
@@ -2688,12 +2742,12 @@ void main() {
           repository.getByIdResults[3] = Result.success(
             sampleAdminSubmission(id: 3, latitude: 41.9, longitude: 14.9),
           );
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
 
           viewModel.setName('Nuovo nome');
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.completed, isTrue);
+          expect(viewModel.saveSnapshot.completed, isTrue);
           expect(repository.updateIds, <int>[3]);
           expect(repository.updateInputs.single.latitude, 41.9);
           expect(repository.updateInputs.single.longitude, 14.9);
@@ -2712,9 +2766,9 @@ void main() {
             ..setName('Museo')
             ..setCoordinates(41.123456789, 14.987654321)
             ..setDescription(description: 'Testo', descriptionDelta: null);
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.completed, isTrue);
+          expect(viewModel.saveSnapshot.completed, isTrue);
           expect(repository.createInputs.single.latitude, 41.123457);
           expect(repository.createInputs.single.longitude, 14.987654);
         },
@@ -2736,12 +2790,12 @@ void main() {
           submissionId: 1,
         );
         addTearDown(viewModel.dispose);
-        await viewModel.load.execute();
+        await settleEditorRequest(admitted: viewModel.requestLoad());
 
         viewModel.setName('Solo nome');
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.completed, isTrue);
+        expect(viewModel.saveSnapshot.completed, isTrue);
         expect(repository.updateInputs.single.latitude, 41.5575078123);
         expect(repository.updateInputs.single.longitude, 14.6485406789);
       });
@@ -2759,15 +2813,15 @@ void main() {
             submissionId: 1,
           );
           addTearDown(viewModel.dispose);
-          await viewModel.load.execute();
+          await settleEditorRequest(admitted: viewModel.requestLoad());
 
           expect(viewModel.latitudeText, '41.5');
           expect(viewModel.longitudeText, '');
           expect(viewModel.isDirty, isFalse);
 
-          await viewModel.save.execute();
+          await settleEditorRequest(admitted: viewModel.requestSave());
 
-          expect(viewModel.save.error, isTrue);
+          expect(viewModel.saveSnapshot.hasFailure, isTrue);
           expect(repository.updateIds, isEmpty);
         },
       );
@@ -2782,9 +2836,9 @@ void main() {
           ..setName('Museo')
           ..setLatitudeText('41,55')
           ..setLongitudeText('14,62');
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.completed, isTrue);
+        expect(viewModel.saveSnapshot.completed, isTrue);
         expect(repository.createInputs.single.latitude, 41.55);
         expect(repository.createInputs.single.longitude, 14.62);
       });
@@ -2799,9 +2853,9 @@ void main() {
           ..setName('Museo')
           ..setLatitudeText('41,55,5')
           ..setLongitudeText('14,62');
-        await viewModel.save.execute();
+        await settleEditorRequest(admitted: viewModel.requestSave());
 
-        expect(viewModel.save.error, isTrue);
+        expect(viewModel.saveSnapshot.hasFailure, isTrue);
         expect(repository.createInputs, isEmpty);
       });
     });

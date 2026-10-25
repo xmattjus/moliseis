@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show scheduleMicrotask;
 
 import 'package:collection/collection.dart';
 import 'package:command_it/command_it.dart' as commands;
@@ -12,7 +12,6 @@ import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_mode.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_selection_intent.dart';
-import 'package:moliseis/utils/command.dart' as legacy;
 import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/restartable_command.dart';
 import 'package:moliseis/utils/result.dart';
@@ -38,20 +37,71 @@ typedef GeoMapNearbyTerminal =
 typedef GeoMapSelectionSnapshot =
     commands.CommandResult<GeoMapSelectionIntent?, Result<ContentBase?>?>;
 
+/// An immutable filter selection with a unique admission identity.
+class GeoMapMarkerRequest {
+  /// Copies caller-owned sets; later selections receive independent identities.
+  GeoMapMarkerRequest({
+    required Set<ContentCategory> categories,
+    required Set<ContentType> types,
+  }) : categories = Set.unmodifiable(categories),
+       types = Set.unmodifiable(types);
+
+  /// Categories captured for this retrieval, excluding unknown values.
+  final Set<ContentCategory> categories;
+
+  /// Content sources admitted for this retrieval.
+  final Set<ContentType> types;
+
+  /// Empty programmatic selection settles without repository work.
+  bool get isEmpty => categories.isEmpty || types.isEmpty;
+}
+
+/// One atomic marker result retaining partial sources and original failures.
+class GeoMapMarkerOutcome {
+  /// Copies source collections so later changes cannot alter committed markers.
+  GeoMapMarkerOutcome({
+    required List<ContentBase> events,
+    required List<ContentBase> places,
+    this.eventError,
+    this.placeError,
+  }) : events = List.unmodifiable(events),
+       places = List.unmodifiable(places);
+
+  /// Ordered events matching the captured categories.
+  final List<ContentBase> events;
+
+  /// Ordered places matching the captured categories.
+  final List<ContentBase> places;
+
+  /// Original expected failure from event discovery, if any.
+  final Exception? eventError;
+
+  /// Original expected failure from place discovery, if any.
+  final Exception? placeError;
+
+  /// Events have display precedence when both sources fail.
+  Exception? get firstError => eventError ?? placeError;
+}
+
+/// Semantic marker state, independent of Map navigation and command dispatch.
+enum GeoMapMarkerStatus { loading, successEmpty, successData, failure }
+
+/// Authoritative terminal evidence belonging to one exact marker admission.
+typedef GeoMapMarkerTerminal =
+    commands.CommandResult<GeoMapMarkerRequest?, Result<GeoMapMarkerOutcome>?>;
+
 class GeoMapViewModel extends ChangeNotifier {
-  GeoMapViewModel({required GeoMapUseCase geoMapUseCase})
-    : _geoMapUseCase = geoMapUseCase {
-    loadEvents = legacy.Command0(_loadEvents);
-    unawaited(loadEvents.execute());
+  GeoMapViewModel({required GeoMapUseCase geoMapUseCase}) {
+    loadMarkers = RestartableCommand(
+      (request) => _fetchMarkers(geoMapUseCase, request),
+      debugName: 'geo_map_markers',
+    );
+    loadMarkers.results.addListener(_commitMarkers);
     loadNearContent = RestartableCommand(
       (target) => _fetchNearby(geoMapUseCase, target),
       debugName: 'geo_map_nearby',
     );
     loadNearContent.results.addListener(_commitNearby);
-    loadPlaces = legacy.Command0(_loadPlaces);
-    unawaited(loadPlaces.execute());
-    setSelectedCategories = legacy.Command1(_setSelectedCategories);
-    setSelectedTypes = legacy.Command1(_setSelectedTypes);
     selectContent = RestartableCommand(
       (intent) => _fetchSelection(geoMapUseCase, intent),
       debugName: 'geo_map_selection',
@@ -59,27 +109,29 @@ class GeoMapViewModel extends ChangeNotifier {
     selectContent.results.addListener(_commitSelection);
 
     equality = const DeepCollectionEquality();
+    _admitMarkers();
   }
 
-  final GeoMapUseCase _geoMapUseCase;
   bool _disposed = false;
 
   @override
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
+    loadMarkers.results.removeListener(_commitMarkers);
+    loadMarkers.dispose();
     selectContent.results.removeListener(_commitSelection);
     selectContent.dispose();
     loadNearContent.results.removeListener(_commitNearby);
     loadNearContent.dispose();
-    super.dispose();
+    scheduleMicrotask(super.dispose);
   }
 
-  late legacy.Command0<void> loadEvents;
+  /// Latest-filter retrieval; source data commits together at its terminal.
+  late final RestartableCommand<GeoMapMarkerRequest, GeoMapMarkerOutcome>
+  loadMarkers;
   late final RestartableCommand<GeoMapNearbyTarget, GeoMapNearbyOutcome>
   loadNearContent;
-  late legacy.Command0<void> loadPlaces;
-  late legacy.Command1<void, Set<ContentCategory>> setSelectedCategories;
-  late legacy.Command1<void, Set<ContentType>> setSelectedTypes;
 
   /// Single latest-intent event/place/clear execution boundary.
   late final RestartableCommand<GeoMapSelectionIntent, ContentBase?>
@@ -95,6 +147,31 @@ class GeoMapViewModel extends ChangeNotifier {
   ContentBase? _resolvedContent;
   LatLng _exploreAnchor = const LatLng(41.5575078, 14.6485406);
   GeoMapNearbyTerminal? _nearbyTerminal;
+  late GeoMapMarkerRequest _markerRequest;
+  GeoMapMarkerTerminal? _markerTerminal;
+
+  /// Current immutable admission, including its unique request identity.
+  GeoMapMarkerRequest get markerRequest => _markerRequest;
+
+  /// Terminal evidence is cleared synchronously whenever filters change.
+  GeoMapMarkerTerminal? get markerTerminal => _markerTerminal;
+
+  /// Partial source data, distinct from protocol-level command success.
+  GeoMapMarkerOutcome? get markerOutcome => _markerTerminal?.data?.getOrNull();
+
+  /// Current loading, empty, data or failure projection.
+  GeoMapMarkerStatus get markerStatus {
+    final terminal = _markerTerminal;
+    if (terminal == null) return GeoMapMarkerStatus.loading;
+    final outcome = terminal.data?.getOrNull();
+    if (terminal.hasFailure || outcome?.firstError != null) {
+      return GeoMapMarkerStatus.failure;
+    }
+    return (outcome?.events.isEmpty ?? true) &&
+            (outcome?.places.isEmpty ?? true)
+        ? GeoMapMarkerStatus.successEmpty
+        : GeoMapMarkerStatus.successData;
+  }
 
   GeoMapMode get mode => _mode;
   ContentBase? get resolvedContent => _resolvedContent;
@@ -116,10 +193,10 @@ class GeoMapViewModel extends ChangeNotifier {
     ),
     _ => null,
   };
-  var _selectedCategories = Set<ContentCategory>.from(
+  var _selectedCategories = Set<ContentCategory>.unmodifiable(
     ContentCategory.values.minusUnknown,
   );
-  var _selectedTypes = Set<ContentType>.from(ContentType.values);
+  var _selectedTypes = Set<ContentType>.unmodifiable(ContentType.values);
 
   UnmodifiableListView<ContentBase> get allEvents =>
       UnmodifiableListView(_allEvents);
@@ -140,34 +217,110 @@ class GeoMapViewModel extends ChangeNotifier {
   UnmodifiableSetView<ContentType> get selectedTypes =>
       UnmodifiableSetView(_selectedTypes);
 
-  Future<Result<void>> _loadEvents() async {
-    final result = await _geoMapUseCase.getAllEvents();
-    if (_disposed) return result;
-
-    final events = result.getOrNull();
-    if (events != null) {
-      _allEvents = events
-          .where((event) => _selectedCategories.contains(event.category))
-          .toList();
-      notifyListeners();
-    }
-
-    return result;
+  /// Captures a new category set and immediately revokes older marker data.
+  void setSelectedCategories(Set<ContentCategory> categories) {
+    if (_disposed) return;
+    final normalized = Set<ContentCategory>.unmodifiable(
+      categories.where((category) => category != ContentCategory.unknown),
+    );
+    if (equality.equals(_selectedCategories, normalized)) return;
+    _selectedCategories = normalized;
+    _admitMarkers();
   }
 
-  Future<Result<void>> _loadPlaces() async {
-    final result = await _geoMapUseCase.getAllPlaces();
-    if (_disposed) return result;
+  /// Captures selected sources independently from the caller's mutable set.
+  void setSelectedTypes(Set<ContentType> types) {
+    if (_disposed) return;
+    final snapshot = Set<ContentType>.unmodifiable(types);
+    if (equality.equals(_selectedTypes, snapshot)) return;
+    _selectedTypes = snapshot;
+    _admitMarkers();
+  }
 
-    final places = result.getOrNull();
-    if (places != null) {
-      _allPlaces = places
-          .where((place) => _selectedCategories.contains(place.category))
-          .toList();
-      notifyListeners();
+  /// Retries current filters; busy and empty selections perform no extra work.
+  void retryMarkers() {
+    if (_disposed ||
+        markerStatus == GeoMapMarkerStatus.loading ||
+        _markerRequest.isEmpty) {
+      return;
     }
+    _admitMarkers();
+  }
 
-    return result;
+  void _admitMarkers() {
+    final request = GeoMapMarkerRequest(
+      categories: _selectedCategories,
+      types: _selectedTypes,
+    );
+    _markerRequest = request;
+    _allEvents = [];
+    _allPlaces = [];
+    _markerTerminal = null;
+    if (request.isEmpty) {
+      loadMarkers.invalidate();
+      if (_disposed || !identical(_markerRequest, request)) return;
+      final outcome = GeoMapMarkerOutcome(events: const [], places: const []);
+      _markerTerminal = commands.CommandResult(
+        request,
+        Result.success(outcome),
+        null,
+        false,
+      );
+    } else {
+      loadMarkers.run(request);
+    }
+    if (!_disposed && identical(_markerRequest, request)) notifyListeners();
+  }
+
+  Future<Result<GeoMapMarkerOutcome>> _fetchMarkers(
+    GeoMapUseCase useCase,
+    GeoMapMarkerRequest request,
+  ) async {
+    var events = <ContentBase>[];
+    var places = <ContentBase>[];
+    Exception? eventError;
+    Exception? placeError;
+    if (!_disposed && request.types.contains(ContentType.event)) {
+      final result = await useCase.getAllEvents();
+      result.fold(
+        (items) => events = items
+            .where((item) => request.categories.contains(item.category))
+            .toList(),
+        (error) => eventError = error,
+      );
+    }
+    // Disposal prevents a new source phase; supersession only revokes commit.
+    if (!_disposed && request.types.contains(ContentType.place)) {
+      final result = await useCase.getAllPlaces();
+      result.fold(
+        (items) => places = items
+            .where((item) => request.categories.contains(item.category))
+            .toList(),
+        (error) => placeError = error,
+      );
+    }
+    return Result.success(
+      GeoMapMarkerOutcome(
+        events: events,
+        places: places,
+        eventError: eventError,
+        placeError: placeError,
+      ),
+    );
+  }
+
+  void _commitMarkers() {
+    if (_disposed || loadMarkers.isRunningSync.value) return;
+    final snapshot = loadMarkers.results.value;
+    if (!identical(snapshot.paramData, _markerRequest) ||
+        !(snapshot.completed || snapshot.hasFailure)) {
+      return;
+    }
+    final outcome = snapshot.data?.getOrNull();
+    _allEvents = List.of(outcome?.events ?? const []);
+    _allPlaces = List.of(outcome?.places ?? const []);
+    _markerTerminal = snapshot;
+    notifyListeners();
   }
 
   static Future<Result<GeoMapNearbyOutcome>> _fetchNearby(
@@ -225,55 +378,6 @@ class GeoMapViewModel extends ChangeNotifier {
     if (oldTarget == nearbyTarget) return;
     _nearbyTerminal = null;
     loadNearContent.invalidate();
-  }
-
-  Future<Result<void>> _setSelectedCategories(
-    Set<ContentCategory> categories,
-  ) async {
-    if (equality.equals(_selectedCategories, categories)) {
-      return const Result.success(null);
-    }
-
-    _selectedCategories = categories;
-
-    await _load();
-    if (_disposed) return const Result.success(null);
-
-    notifyListeners();
-
-    return const Result.success(null);
-  }
-
-  Future<Result<void>> _setSelectedTypes(Set<ContentType> types) async {
-    if (equality.equals(_selectedTypes, types)) {
-      return const Result.success(null);
-    }
-
-    _selectedTypes = types;
-
-    await _load();
-    if (_disposed) return const Result.success(null);
-
-    notifyListeners();
-
-    return const Result.success(null);
-  }
-
-  Future<Result<void>> _load() async {
-    _allEvents.clear();
-    _allPlaces.clear();
-
-    if (_selectedTypes.containsAll({ContentType.place, ContentType.event})) {
-      await loadEvents.execute();
-      if (_disposed) return const Result.success(null);
-      await loadPlaces.execute();
-    } else if (_selectedTypes.contains(ContentType.event)) {
-      await loadEvents.execute();
-    } else if (_selectedTypes.contains(ContentType.place)) {
-      await loadPlaces.execute();
-    }
-
-    return const Result.success(null);
   }
 
   /// Prepares route state during widget lifecycle without notifying Provider.
