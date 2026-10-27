@@ -113,6 +113,22 @@ final class AdminDraftSessionState {
   );
 }
 
+/// Immutable authority captured when an editing context is established.
+///
+/// Keep this token in that context's callbacks; reading a new token when a
+/// delayed callback executes would authorize the replacement context instead.
+final class AdminDraftActivation {
+  AdminDraftActivation._(this._session, this.owner, this.generation);
+
+  final AdminDraftSession _session;
+
+  /// Exact account, session and target at capture time.
+  final AdminDraftOwner owner;
+
+  /// Distinguishes replacement activations even when the owner is unchanged.
+  final int generation;
+}
+
 /// Captured authority issued synchronously before an external hydration.
 final class AdminHydrationToken {
   AdminHydrationToken._(this.owner, this.generation, this.revision);
@@ -265,9 +281,31 @@ final class AdminDraftSession {
     return attempt;
   }
 
-  /// Replaces immutable C without implicit persistence.
-  Result<void> setSnapshot(AdminDraftSnapshot snapshot) {
-    if (_state?.ready != true) return _unavailable();
+  /// Captures the caller's editing context without granting durable ownership.
+  ///
+  /// Normally capture after activation/restoration completes. A provisional
+  /// token becomes stale if restoration supplies a different session owner.
+  /// Capture once for the editing context, never inside a delayed callback.
+  AdminDraftActivation? captureActivation() {
+    final owner = _state?.owner;
+    return owner == null
+        ? null
+        : AdminDraftActivation._(this, owner, _generation);
+  }
+
+  /// Replaces immutable C only for the caller's captured activation.
+  ///
+  /// Stale or foreign authority returns an error without changing any state.
+  /// Ordinary typing neither rotates this authority nor implicitly persists.
+  Result<void> setSnapshot(
+    AdminDraftSnapshot snapshot, {
+    required AdminDraftActivation activation,
+  }) {
+    if (!identical(activation._session, this) ||
+        !_matches(activation.owner, activation.generation) ||
+        _state?.ready != true) {
+      return _unavailable();
+    }
     _state = _state!._copy(current: snapshot);
     return const Result.success(null);
   }

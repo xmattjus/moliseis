@@ -13,6 +13,173 @@ void main() {
   late AdminDraftSessionHarness h;
   setUp(() => h = AdminDraftSessionHarness());
 
+  group('captured setter authority', () {
+    test(
+      'active captured typing updates and checkpoints only its owner',
+      () async {
+        h.seed();
+        await h.session.activate(h.owner);
+        final activation = h.session.captureActivation()!;
+        final before = h.session.state!;
+        Result<void> type() => h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'current typing'),
+          activation: activation,
+        );
+        expect(type(), isA<Success<void>>());
+        expect(h.session.state!.owner, h.owner);
+        expect(h.session.state!.current.name, 'current typing');
+        expect(h.session.state!.effective, same(before.effective));
+        expect(
+          h.session.state!.physicalCheckpoint,
+          same(before.physicalCheckpoint),
+        );
+        expect(h.session.state!.remoteBaseline, same(before.remoteBaseline));
+        expect(h.session.state!.hasUncheckpointedChanges, isTrue);
+        expect(h.drafts.saves, isEmpty);
+        expect(await h.session.checkpoint(), isA<Success<void>>());
+        expect(h.drafts.saves.single.owner, h.owner);
+        expect(h.drafts.saves.single.snapshot.name, 'current typing');
+        expect(h.session.state!.hasUncheckpointedChanges, isFalse);
+        // The same captured authority survives ordinary typing/checkpointing.
+        expect(type(), isA<Success<void>>());
+      },
+    );
+
+    for (final transition in ['target', 'account', 'return', 'revoked']) {
+      test(
+        'stale setter after $transition preserves state and next checkpoint',
+        () async {
+          h.seed();
+          final other = AdminDraftOwner(
+            accountId: transition == 'account' || transition == 'revoked'
+                ? AdminDraftSessionHarness.accountB
+                : h.owner.accountId,
+            submissionId: 8,
+          );
+          h.drafts.drafts[other.lookupKey] = AdminSubmissionDraft(
+            owner: other,
+            snapshot: AdminDraftSnapshot(name: 'B'),
+            remoteBaseline: h.remote('B'),
+          );
+          final finalOwner = transition == 'return' ? h.owner : other;
+          final digest = 'a' * 40;
+          final retained = AdminSubmissionStagedAsset(
+            owner: finalOwner,
+            digest: digest,
+            relativePath:
+                '${finalOwner.accountId}/${finalOwner.sessionId}/$digest',
+          );
+          h.staged.assets[finalOwner] = [retained];
+          await h.session.activate(h.owner);
+          final activationA = h.session.captureActivation()!;
+          // Bind A now, rather than looking up authority when this runs later.
+          Result<void> delayed() => h.session.setSnapshot(
+            AdminDraftSnapshot(name: 'stale A fields'),
+            activation: activationA,
+          );
+          if (transition == 'revoked') {
+            h.session.revoke();
+            expect(delayed(), isA<Error<void>>());
+            expect(h.session.state, isNull);
+            expect(h.session.captureActivation(), isNull);
+          }
+          expect(await h.session.activate(other), isA<Success<void>>());
+          if (transition == 'return') {
+            expect(await h.session.activate(h.owner), isA<Success<void>>());
+            expect(h.session.state!.owner, activationA.owner);
+            expect(
+              h.session.captureActivation()!.generation,
+              isNot(activationA.generation),
+            );
+          }
+          final activationB = h.session.captureActivation()!;
+          final current = AdminDraftSnapshot(name: 'legitimate current fields');
+          expect(
+            h.session.setSnapshot(current, activation: activationB),
+            isA<Success<void>>(),
+          );
+          final before = h.session.state!;
+          expect(before.hasUncheckpointedChanges, isTrue);
+          expect(before.assets, [retained]);
+          expect(delayed(), isA<Error<void>>());
+          expect(h.session.state, same(before));
+          expect(h.drafts.saves, isEmpty);
+          expect(h.staged.acquisitions, isEmpty);
+          expect(h.staged.removals, isEmpty);
+          expect(await h.session.checkpoint(), isA<Success<void>>());
+          expect(h.drafts.saves.single.owner, finalOwner);
+          expect(h.drafts.saves.single.snapshot, current);
+          expect(h.session.state!.assets, [retained]);
+        },
+      );
+    }
+
+    test(
+      'foreign component authority cannot mutate an equal owner generation',
+      () async {
+        h.seed();
+        await h.session.activate(h.owner);
+        final foreign = h.session.captureActivation()!;
+        final other = AdminDraftSession(
+          draftRepository: h.drafts,
+          stagedAssetRepository: h.staged,
+        );
+        await other.activate(h.owner);
+        final before = other.state!;
+        expect(
+          other.setSnapshot(
+            AdminDraftSnapshot(name: 'foreign'),
+            activation: foreign,
+          ),
+          isA<Error<void>>(),
+        );
+        expect(other.state, same(before));
+        expect(h.drafts.saves, isEmpty);
+      },
+    );
+
+    test(
+      'provisional authority does not follow a restored owner replacement',
+      () async {
+        h.seed();
+        final provisional = AdminDraftOwner(
+          accountId: h.owner.accountId,
+          submissionId: h.owner.submissionId,
+        );
+        final pending = Completer<Result<AdminSubmissionDraft?>>();
+        h.drafts.onLoad = (_, _) => pending.future;
+        final activating = h.session.activate(provisional);
+        final early = h.session.captureActivation()!;
+        expect(
+          h.session.setSnapshot(
+            AdminDraftSnapshot(name: 'early'),
+            activation: early,
+          ),
+          isA<Error<void>>(),
+        );
+        pending.complete(Result.success(h.drafts.drafts[h.owner.lookupKey]));
+        await activating;
+        final before = h.session.state;
+        expect(
+          h.session.setSnapshot(
+            AdminDraftSnapshot(name: 'stale provisional'),
+            activation: early,
+          ),
+          isA<Error<void>>(),
+        );
+        expect(h.session.state, same(before));
+        final established = h.session.captureActivation()!;
+        expect(
+          h.session.setSnapshot(
+            AdminDraftSnapshot(name: 'restored typing'),
+            activation: established,
+          ),
+          isA<Success<void>>(),
+        );
+      },
+    );
+  });
+
   group('initialization and checkpoints', () {
     test(
       'restoration is shared and waits for complete reconciliation',
@@ -122,10 +289,14 @@ void main() {
         h.drafts.onLoad = (_, _) async =>
             Result.error(Exception('Read failed'));
         expect(await h.session.activate(h.owner), isA<Error<void>>());
+        final activation = h.session.captureActivation()!;
         expect(h.session.state!.durability, AdminDraftDurability.unknown);
         expect(h.session.state!.physicalCheckpoint, isNull);
         expect(
-          h.session.setSnapshot(AdminDraftSnapshot(name: 'unsafe')),
+          h.session.setSnapshot(
+            AdminDraftSnapshot(name: 'unsafe'),
+            activation: activation,
+          ),
           isA<Error<void>>(),
         );
         expect(await h.session.checkpoint(), isA<Error<void>>());
@@ -162,7 +333,11 @@ void main() {
       () async {
         h.seed();
         await h.session.activate(h.owner);
-        h.session.setSnapshot(AdminDraftSnapshot(name: 'write A'));
+        final activation = h.session.captureActivation()!;
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'write A'),
+          activation: activation,
+        );
         final entered = Completer<void>();
         final pending = Completer<Result<void>>();
         h.drafts.onSave = (_) {
@@ -171,7 +346,10 @@ void main() {
         };
         final checkpoint = h.session.checkpoint();
         await entered.future;
-        h.session.setSnapshot(AdminDraftSnapshot(name: 'B'));
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'B'),
+          activation: activation,
+        );
         expect(h.drafts.saves.single.snapshot.name, 'write A');
         pending.complete(const Result.success(null));
         await checkpoint;
@@ -188,7 +366,11 @@ void main() {
       () async {
         h.seed();
         await h.session.activate(h.owner);
-        h.session.setSnapshot(AdminDraftSnapshot(name: 'C'));
+        final activation = h.session.captureActivation()!;
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'C'),
+          activation: activation,
+        );
         h.drafts.onSave = (_) async => Result.error(Exception('Write failed'));
         expect(await h.session.checkpoint(), isA<Error<void>>());
         expect(h.session.state!.physicalCheckpoint!.snapshot.name, 'A');
@@ -206,7 +388,11 @@ void main() {
       () async {
         h.seed();
         await h.session.activate(h.owner);
-        h.session.setSnapshot(AdminDraftSnapshot(name: 'C'));
+        final activation = h.session.captureActivation()!;
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'C'),
+          activation: activation,
+        );
         final defect = StateError('Unexpected defect');
         h.drafts.onSave = (_) async => throw defect;
         await expectLater(h.session.checkpoint(), throwsA(same(defect)));
@@ -291,6 +477,7 @@ void main() {
         'user C retains remote B', () async {
       h.seed();
       await h.session.activate(h.owner);
+      final activation = h.session.captureActivation()!;
       await h.session.acceptHydration(
         h.session.admitHydration()!,
         h.remote('B'),
@@ -299,7 +486,10 @@ void main() {
       await h.session.checkpoint();
       expect(h.drafts.saves.single.snapshot.name, 'B');
       expect(h.session.state!.currentMatchesDisk, isTrue);
-      h.session.setSnapshot(AdminDraftSnapshot(name: 'C'));
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'C'),
+        activation: activation,
+      );
       expect(h.session.state!.hasUncheckpointedChanges, isTrue);
       await h.session.checkpoint();
       expect(h.session.state!.effective.name, 'C');
@@ -337,6 +527,7 @@ void main() {
         'uncheckpointed typing survive', () async {
       h.seed(name: 'local', remoteName: 'server');
       await h.session.activate(h.owner);
+      final activation = h.session.captureActivation()!;
       final physical = h.session.state!.physicalCheckpoint;
       expect(
         (await h.session.acceptHydration(
@@ -348,7 +539,10 @@ void main() {
       );
       expect(h.session.state!.current.name, 'local');
       expect(h.session.state!.physicalCheckpoint, same(physical));
-      h.session.setSnapshot(AdminDraftSnapshot(name: 'typing'));
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'typing'),
+        activation: activation,
+      );
       expect(
         (await h.session.acceptHydration(
           h.session.admitHydration()!,
@@ -420,12 +614,16 @@ void main() {
       () async {
         h.seed();
         await h.session.activate(h.owner);
+        final activation = h.session.captureActivation()!;
         await h.session.acceptHydration(
           h.session.admitHydration()!,
           h.remote('B'),
           associatedCount: 0,
         );
-        h.session.setSnapshot(AdminDraftSnapshot(name: 'A'));
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'A'),
+          activation: activation,
+        );
         expect(h.session.state!.hasUncheckpointedChanges, isTrue);
         await h.session.checkpoint();
         expect(h.session.state!.hasUncheckpointedChanges, isFalse);
@@ -540,7 +738,11 @@ void main() {
       () async {
         h.seed();
         await h.session.activate(h.owner);
-        h.session.setSnapshot(AdminDraftSnapshot(name: 'A2'));
+        final activation = h.session.captureActivation()!;
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'A2'),
+          activation: activation,
+        );
         final entered = Completer<void>();
         final write = Completer<Result<void>>();
         h.drafts.onSave = (_) {
@@ -682,13 +884,17 @@ void main() {
       () async {
         h.seed();
         await h.session.activate(h.owner);
+        final activation = h.session.captureActivation()!;
         await h.session.acceptHydration(
           h.session.admitHydration()!,
           h.remote('A'),
           associatedCount: 1,
         );
         final old = h.session.capacityContext!;
-        h.session.setSnapshot(AdminDraftSnapshot(name: 'local checkpoint'));
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'local checkpoint'),
+          activation: activation,
+        );
         final entered = Completer<void>();
         final write = Completer<Result<void>>();
         h.drafts.onSave = (_) {
@@ -834,12 +1040,16 @@ void main() {
         accountId: AdminDraftSessionHarness.accountA,
       );
       await h.session.activate(owner);
+      final activation = h.session.captureActivation()!;
       final result = await h.session.acquire(
         File('unused'),
         capacity: h.session.capacityContext,
       );
       final asset = result.getOrNull()!;
-      h.session.setSnapshot(AdminDraftSnapshot(name: 'changed'));
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'changed'),
+        activation: activation,
+      );
       await h.session.checkpoint();
       await h.session.remove(asset);
       expect(h.session.state!.assets, isEmpty);
@@ -909,6 +1119,7 @@ void main() {
         'and retries only assets', () async {
       h.seed();
       await h.session.activate(h.owner);
+      final activation = h.session.captureActivation()!;
       await h.session.acceptHydration(
         h.session.admitHydration()!,
         h.remote('A'),
@@ -927,7 +1138,10 @@ void main() {
         capacity: h.session.capacityContext,
       );
       await entered.future;
-      h.session.setSnapshot(AdminDraftSnapshot(name: 'uncheckpointed typing'));
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'uncheckpointed typing'),
+        activation: activation,
+      );
       final failure = Exception('Descriptor read failed after intake');
       reconcile.complete(Result.error(failure));
       final result = await intake;
@@ -964,11 +1178,15 @@ void main() {
     test('dirty and unsettled normal switches refuse abandonment', () async {
       h.seed();
       await h.session.activate(h.owner);
+      final activation = h.session.captureActivation()!;
       final other = AdminDraftOwner(
         accountId: h.owner.accountId,
         submissionId: 8,
       );
-      h.session.setSnapshot(AdminDraftSnapshot(name: 'typing'));
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'typing'),
+        activation: activation,
+      );
       expect(await h.session.activate(other), isA<Error<void>>());
       expect(h.session.state!.owner, h.owner);
       final entered = Completer<void>();
@@ -990,7 +1208,11 @@ void main() {
       () async {
         h.seed();
         await h.session.activate(h.owner);
-        h.session.setSnapshot(AdminDraftSnapshot(name: 'retained A'));
+        final activation = h.session.captureActivation()!;
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'retained A'),
+          activation: activation,
+        );
         final entered = Completer<void>();
         final write = Completer<Result<void>>();
         h.drafts.onSave = (_) {

@@ -170,7 +170,12 @@ Concurrent local initialization callers for one activation SHALL share completio
 - **AND** an explicit retry shares a new attempt
 
 ### Requirement: Local actions retain activation authority
-Local initialization, checkpoint, acquisition, removal and hydration SHALL bind account, session, target and activation generation. Replacement or explicit revocation SHALL suppress late runtime publication into a new context. Already-started durable work SHALL remain with its captured owner. Normal switches SHALL refuse uncheckpointed work or unsettled local mutation without autosaving it.
+Local initialization, synchronous field mutation, checkpoint, acquisition, removal and hydration SHALL bind account, session, target and activation generation. Replacement or explicit revocation SHALL suppress late runtime publication into a new context. Already-started durable work SHALL remain with its captured owner. Normal switches SHALL refuse uncheckpointed work or unsettled local mutation without autosaving it.
+
+#### Scenario: Delayed setter retains its original editing context
+- **WHEN** a setter callback captures authority when its editing context is established and runs after target/account replacement or revocation, including A1 to B to A2
+- **THEN** the setter requires that captured authority and rejects it as stale without looking up replacement authority
+- **AND** rejection preserves current/effective/physical/remote state, dirty state and assets without writing a checkpoint
 
 #### Scenario: A to B to A rejects old completion
 - **WHEN** activation A1 work settles after B then A2 becomes current
