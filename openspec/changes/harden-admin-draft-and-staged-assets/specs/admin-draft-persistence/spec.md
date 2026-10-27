@@ -67,7 +67,7 @@ Local user dirtiness SHALL compare current fields with their effective compariso
 - **AND** it does not report B as persisted or the saved remote context as freshly verified
 
 ### Requirement: Checkpoint completion confirms only its captured snapshot
-Field mutations SHALL NOT autosave. Explicit checkpoint success SHALL advance the physical checkpoint and effective baseline only to the captured immutable snapshot; failure SHALL preserve both. An equal known physical snapshot SHALL skip rewriting. An untouched absent ordinary checkpoint SHALL be a no-op, while required durable ownership SHALL force its first write.
+Field mutations SHALL NOT autosave. Explicit checkpoint success SHALL advance the physical checkpoint and effective baseline only to the captured immutable snapshot; failure SHALL preserve both. An equal known physical checkpoint, including its recorded remote baseline, SHALL skip rewriting and establish its fields as the effective baseline. An untouched absent ordinary checkpoint SHALL be a no-op, while required durable ownership SHALL force its first write.
 
 #### Scenario: Checkpoint A finishes while current fields are B
 - **WHEN** A is being persisted, fields change to B, and A succeeds
@@ -87,8 +87,13 @@ Field mutations SHALL NOT autosave. Explicit checkpoint success SHALL advance th
 - **THEN** physical/effective checkpoint becomes C and confirmed remote baseline remains B
 
 #### Scenario: Known equal physical checkpoint
-- **WHEN** current and effective fields equal the known physical snapshot
+- **WHEN** current fields and recorded remote baseline equal the known physical checkpoint
 - **THEN** another explicit checkpoint succeeds without a redundant write
+
+#### Scenario: Returning to physical fields after hydration
+- **WHEN** physical A records remote A, hydration accepts B, and the user returns the fields to A and checkpoints
+- **THEN** the checkpoint persists A with remote baseline B and establishes effective A
+- **AND** restart retains the unconfirmed revert instead of treating A as remotely confirmed
 
 #### Scenario: Fresh ordinary versus required checkpoint
 - **WHEN** a fresh untouched absent context requests an ordinary checkpoint and later requires a durable owner

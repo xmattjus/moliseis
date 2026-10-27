@@ -96,7 +96,7 @@ void main() {
     },
   );
 
-  test('all previous model UIDs survive with only one cursor addition', () {
+  test('previous model UIDs survive later additive entities', () {
     final previous =
         jsonDecode(
               File(
@@ -113,7 +113,9 @@ void main() {
         .cast<Map<String, dynamic>>();
     final newEntities = (current['entities'] as List)
         .cast<Map<String, dynamic>>();
-    expect(newEntities, hasLength(oldEntities.length));
+    // Later additive capabilities may introduce entities; this regression
+    // protects the identities and properties of every pre-cursor entity.
+    expect(newEntities.length, greaterThanOrEqualTo(oldEntities.length));
     for (final oldEntity in oldEntities) {
       final newEntity = newEntities.singleWhere(
         (value) => value['id'] == oldEntity['id'],

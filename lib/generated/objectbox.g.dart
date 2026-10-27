@@ -14,6 +14,8 @@ import 'package:objectbox/internal.dart'
 import 'package:objectbox/objectbox.dart' as obx;
 import 'package:objectbox_flutter_libs/objectbox_flutter_libs.dart';
 
+import '../data/data-sources/admin_submission_draft_entity.dart';
+import '../data/data-sources/admin_submission_staged_asset_entity.dart';
 import '../data/data-sources/app_settings.dart';
 import '../data/data-sources/city_entity.dart';
 import '../data/data-sources/content_submission_draft_entry.dart';
@@ -603,6 +605,101 @@ final _entities = <obx_int.ModelEntity>[
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[],
   ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(22, 3156647948473703965),
+    name: 'AdminSubmissionDraftEntity',
+    lastPropertyId: const obx_int.IdUid(6, 1312570068438228019),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 721909354471812203),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 1662650590647165792),
+        name: 'lookupKey',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(52, 2856286786408175038),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 4670428331277357059),
+        name: 'accountId',
+        type: 9,
+        flags: 2048,
+        indexId: const obx_int.IdUid(53, 8011206763246532662),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 3035539499604656572),
+        name: 'sessionId',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(54, 3769900885099713965),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 7694538358178906550),
+        name: 'submissionId',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 1312570068438228019),
+        name: 'payload',
+        type: 9,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(23, 9022804856010631971),
+    name: 'AdminSubmissionStagedAssetEntity',
+    lastPropertyId: const obx_int.IdUid(6, 3148748881204609058),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 7051017442864704928),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 5840747899017396852),
+        name: 'accountId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 9109882918227830044),
+        name: 'sessionId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 2170614253733531185),
+        name: 'submissionId',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 1244875758301198355),
+        name: 'digest',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 3148748881204609058),
+        name: 'relativePath',
+        type: 9,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
 ];
 
 /// Shortcut for [obx.Store.new] that passes [getObjectBoxModel] and for Flutter
@@ -648,8 +745,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
     // Typically, this is done with `dart run build_runner build`.
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(21, 4363184663950376915),
-    lastIndexId: const obx_int.IdUid(51, 4917123769674284820),
+    lastEntityId: const obx_int.IdUid(23, 9022804856010631971),
+    lastIndexId: const obx_int.IdUid(54, 3769900885099713965),
     lastRelationId: const obx_int.IdUid(2, 6027552760664793313),
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [
@@ -1716,6 +1813,131 @@ obx_int.ModelDefinition getObjectBoxModel() {
             return object;
           },
         ),
+    AdminSubmissionDraftEntity:
+        obx_int.EntityDefinition<AdminSubmissionDraftEntity>(
+          model: _entities[8],
+          toOneRelations: (AdminSubmissionDraftEntity object) => [],
+          toManyRelations: (AdminSubmissionDraftEntity object) => {},
+          getId: (AdminSubmissionDraftEntity object) => object.id,
+          setId: (AdminSubmissionDraftEntity object, int id) {
+            object.id = id;
+          },
+          objectToFB: (AdminSubmissionDraftEntity object, fb.Builder fbb) {
+            final lookupKeyOffset = fbb.writeString(object.lookupKey);
+            final accountIdOffset = fbb.writeString(object.accountId);
+            final sessionIdOffset = fbb.writeString(object.sessionId);
+            final payloadOffset = fbb.writeString(object.payload);
+            fbb.startTable(7);
+            fbb.addInt64(0, object.id);
+            fbb.addOffset(1, lookupKeyOffset);
+            fbb.addOffset(2, accountIdOffset);
+            fbb.addOffset(3, sessionIdOffset);
+            fbb.addInt64(4, object.submissionId);
+            fbb.addOffset(5, payloadOffset);
+            fbb.finish(fbb.endTable());
+            return object.id;
+          },
+          objectFromFB: (obx.Store store, ByteData fbData) {
+            final buffer = fb.BufferContext(fbData);
+            final rootOffset = buffer.derefObject(0);
+            final lookupKeyParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGet(buffer, rootOffset, 6, '');
+            final accountIdParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGet(buffer, rootOffset, 8, '');
+            final sessionIdParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGet(buffer, rootOffset, 10, '');
+            final submissionIdParam = const fb.Int64Reader().vTableGetNullable(
+              buffer,
+              rootOffset,
+              12,
+            );
+            final payloadParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGet(buffer, rootOffset, 14, '');
+            final idParam = const fb.Int64Reader().vTableGet(
+              buffer,
+              rootOffset,
+              4,
+              0,
+            );
+            final object = AdminSubmissionDraftEntity(
+              lookupKey: lookupKeyParam,
+              accountId: accountIdParam,
+              sessionId: sessionIdParam,
+              submissionId: submissionIdParam,
+              payload: payloadParam,
+              id: idParam,
+            );
+
+            return object;
+          },
+        ),
+    AdminSubmissionStagedAssetEntity:
+        obx_int.EntityDefinition<AdminSubmissionStagedAssetEntity>(
+          model: _entities[9],
+          toOneRelations: (AdminSubmissionStagedAssetEntity object) => [],
+          toManyRelations: (AdminSubmissionStagedAssetEntity object) => {},
+          getId: (AdminSubmissionStagedAssetEntity object) => object.id,
+          setId: (AdminSubmissionStagedAssetEntity object, int id) {
+            object.id = id;
+          },
+          objectToFB:
+              (AdminSubmissionStagedAssetEntity object, fb.Builder fbb) {
+                final accountIdOffset = fbb.writeString(object.accountId);
+                final sessionIdOffset = fbb.writeString(object.sessionId);
+                final digestOffset = fbb.writeString(object.digest);
+                final relativePathOffset = fbb.writeString(object.relativePath);
+                fbb.startTable(7);
+                fbb.addInt64(0, object.id);
+                fbb.addOffset(1, accountIdOffset);
+                fbb.addOffset(2, sessionIdOffset);
+                fbb.addInt64(3, object.submissionId);
+                fbb.addOffset(4, digestOffset);
+                fbb.addOffset(5, relativePathOffset);
+                fbb.finish(fbb.endTable());
+                return object.id;
+              },
+          objectFromFB: (obx.Store store, ByteData fbData) {
+            final buffer = fb.BufferContext(fbData);
+            final rootOffset = buffer.derefObject(0);
+            final accountIdParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGet(buffer, rootOffset, 6, '');
+            final sessionIdParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGet(buffer, rootOffset, 8, '');
+            final submissionIdParam = const fb.Int64Reader().vTableGetNullable(
+              buffer,
+              rootOffset,
+              10,
+            );
+            final digestParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGet(buffer, rootOffset, 12, '');
+            final relativePathParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGet(buffer, rootOffset, 14, '');
+            final idParam = const fb.Int64Reader().vTableGet(
+              buffer,
+              rootOffset,
+              4,
+              0,
+            );
+            final object = AdminSubmissionStagedAssetEntity(
+              accountId: accountIdParam,
+              sessionId: sessionIdParam,
+              submissionId: submissionIdParam,
+              digest: digestParam,
+              relativePath: relativePathParam,
+              id: idParam,
+            );
+
+            return object;
+          },
+        ),
   };
 
   return obx_int.ModelDefinition(model, bindings);
@@ -2141,5 +2363,77 @@ class ContentSubmissionStagedAssetEntity_ {
   static final relativePath =
       obx.QueryStringProperty<ContentSubmissionStagedAssetEntity>(
         _entities[7].properties[3],
+      );
+}
+
+/// [AdminSubmissionDraftEntity] entity fields to define ObjectBox queries.
+class AdminSubmissionDraftEntity_ {
+  /// See [AdminSubmissionDraftEntity.id].
+  static final id = obx.QueryIntegerProperty<AdminSubmissionDraftEntity>(
+    _entities[8].properties[0],
+  );
+
+  /// See [AdminSubmissionDraftEntity.lookupKey].
+  static final lookupKey = obx.QueryStringProperty<AdminSubmissionDraftEntity>(
+    _entities[8].properties[1],
+  );
+
+  /// See [AdminSubmissionDraftEntity.accountId].
+  static final accountId = obx.QueryStringProperty<AdminSubmissionDraftEntity>(
+    _entities[8].properties[2],
+  );
+
+  /// See [AdminSubmissionDraftEntity.sessionId].
+  static final sessionId = obx.QueryStringProperty<AdminSubmissionDraftEntity>(
+    _entities[8].properties[3],
+  );
+
+  /// See [AdminSubmissionDraftEntity.submissionId].
+  static final submissionId =
+      obx.QueryIntegerProperty<AdminSubmissionDraftEntity>(
+        _entities[8].properties[4],
+      );
+
+  /// See [AdminSubmissionDraftEntity.payload].
+  static final payload = obx.QueryStringProperty<AdminSubmissionDraftEntity>(
+    _entities[8].properties[5],
+  );
+}
+
+/// [AdminSubmissionStagedAssetEntity] entity fields to define ObjectBox queries.
+class AdminSubmissionStagedAssetEntity_ {
+  /// See [AdminSubmissionStagedAssetEntity.id].
+  static final id = obx.QueryIntegerProperty<AdminSubmissionStagedAssetEntity>(
+    _entities[9].properties[0],
+  );
+
+  /// See [AdminSubmissionStagedAssetEntity.accountId].
+  static final accountId =
+      obx.QueryStringProperty<AdminSubmissionStagedAssetEntity>(
+        _entities[9].properties[1],
+      );
+
+  /// See [AdminSubmissionStagedAssetEntity.sessionId].
+  static final sessionId =
+      obx.QueryStringProperty<AdminSubmissionStagedAssetEntity>(
+        _entities[9].properties[2],
+      );
+
+  /// See [AdminSubmissionStagedAssetEntity.submissionId].
+  static final submissionId =
+      obx.QueryIntegerProperty<AdminSubmissionStagedAssetEntity>(
+        _entities[9].properties[3],
+      );
+
+  /// See [AdminSubmissionStagedAssetEntity.digest].
+  static final digest =
+      obx.QueryStringProperty<AdminSubmissionStagedAssetEntity>(
+        _entities[9].properties[4],
+      );
+
+  /// See [AdminSubmissionStagedAssetEntity.relativePath].
+  static final relativePath =
+      obx.QueryStringProperty<AdminSubmissionStagedAssetEntity>(
+        _entities[9].properties[5],
       );
 }

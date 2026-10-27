@@ -71,3 +71,21 @@ final class AdminBackendRequestFailed extends LogEvent {
   @override
   String get name => 'admin_backend_request_failed';
 }
+
+/// A local Admin persistence stage failed without disclosing private paths.
+final class AdminLocalStorageFailed extends LogEvent {
+  /// Identifies the stable operation name rather than a file or owner path.
+  const AdminLocalStorageFailed({required this.operation});
+
+  /// Local persistence stage, without user content or filesystem locations.
+  final String operation;
+
+  @override
+  Map<String, Object?> get data => {'operation': operation};
+
+  @override
+  AppLogLevel get level => AppLogLevel.warning;
+
+  @override
+  String get name => 'admin_local_storage_failed';
+}
