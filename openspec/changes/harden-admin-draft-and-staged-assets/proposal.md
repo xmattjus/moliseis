@@ -2,30 +2,30 @@
 
 ## Why
 
-Admin editor fields currently live only in a route-owned ViewModel, and its picker has no durable local owner or recovery contract. Public has durable drafts and staged files, but its route-triggered Android lost-data consumer cannot safely distinguish Public from Admin; copying its single-draft cleanup policy would also delete recoverable Admin sessions.
+Admin lacks reusable durable draft and private staged-file boundaries. Activating those boundaries alongside the current remote Save workflow would require disposable compatibility states, while the installed Android picker cannot safely settle or correlate every interrupted operation. Deliver the local foundation without changing either feature's working production path.
 
 ## What Changes
 
-- Introduce immutable, account-owned Admin drafts, explicit local checkpoints, separate remote baselines, and recoverable per-target sessions behind the existing Provider architecture.
-- Add Admin-specific ObjectBox descriptors and private staged copies with bounded size/capacity, digest deduplication, contained paths, ordered publication and deterministic reconciliation.
-- Introduce one application-startup Android picker recovery coordinator, durable pre-launch ownership and a bounded durable handoff inbox. Preserve the documented plugin-consumption loss window; do not claim crash-safe exactly-once delivery.
-- Narrowly integrate Public with that shared ownership/retrieval boundary while preserving Public draft, staging, submit and navigation guarantees.
-- Keep new-mode asset selection unavailable until Plan 2. Preserve existing remote Save, moderation, previews, event resolution and immediate persisted pending asset actions, adding only necessary ownership and local-retirement guards.
-- Record disposition of the obsolete `improve-admin-submission-editor-workflow` proposal without archiving it as implemented or syncing its unimplemented requirements.
+- Add an immutable, account-owned Admin draft, explicit checkpoint persistence and a small local-only session component with separate effective, physical and remote baselines.
+- Add Admin-specific ObjectBox entities, mapping and private staged-file acquisition, deduplication, capacity checks and reconciliation. Preserve owners and inactive sessions; field snapshot replacement never deletes asset ownership.
+- Keep these foundations unregistered and unreachable from production routes, startup and pickers until Plan 2. Their source/real-store tests are the first consumer; Plan 2's editor is the defined production consumer.
+- Reuse staged-file acquisition as the low-level intake for a future verified recovery handoff. Do not implement speculative tickets, inbox schemas, a platform coordinator or native changes in Plan 1.
+- Preserve Public's existing recovery, staging, submission and navigation contracts and Admin's existing Create/Update, moderation and immediate persisted-image path.
+- Preserve the obsolete Admin proposal with an accurate supersession/disposition notice, without claiming its implementation or synchronizing unimplemented requirements.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `admin-draft-persistence`: incomplete immutable fields, account/session identity, explicit checkpoints, recoverable activation, remote/local truth separation and lifecycle compatibility.
-- `admin-local-asset-staging`: private ordered Admin staging, reconciliation, isolation, capacity and safe recovered-asset consumption without remote replay.
+- `admin-draft-persistence`: reusable local identity, incomplete immutable snapshots, checkpoint/baseline semantics, exact-owner recovery and retention. This capability does not activate the editor.
+- `admin-local-asset-staging`: account/session-owned private files, safe commit ordering, limits, reconciliation and owner preservation without upload or platform access.
 
 ### Modified Capabilities
 
-- `content-submission-local-asset-staging`: replace feature-local route-triggered lost-data acquisition with shared startup retrieval and durable attribution for both features; retain all other Public storage, admission, rotation and submission contracts.
+- `content-submission-local-asset-staging`: add storage-boundary isolation from Admin and prohibit local storage from independently consuming picker recovery. Existing Public requirements are not replaced or weakened.
 
 ## Impact
 
-Future implementation touches Admin domain models/repositories, additive ObjectBox entities/mappers/generated schema, local filesystem repositories, the existing Admin ViewModel/screen/routes and `config/dependencies.dart`; application startup and Public picker recovery need narrow integration. Existing `EventDateDraft`, `EventTimePolicy`, Delta freezing, `Result`, Command admission and test support remain authoritative patterns. No new dependency, state-management library, Supabase migration, RPC, Edge Function, Cloudinary contract or remote idempotency key is needed for this foundation.
+Plan 1 implementation is limited to Admin domain/local orchestration, two additive ObjectBox entities and their generated mappings, data repositories/filesystem code and focused tests. It adds no dependencies, Provider registration, auth subscription, route/startup/picker changes, UI, Supabase contract or Cloudinary operation.
 
-Plan 2 owns Save & Progress Route, create-ID adoption, staged uploads and post-Save navigation. Plan 3 owns remote stale recovery; Plan 4 owns dirty exit. This definition is planning only: all implementation tasks remain unchecked. Validation of artifacts is not evidence of implementation or release readiness.
+Plan 2 must activate application-owned Admin editing, durable restoration, integrated Save/Progress, remote ID adoption and staged persistence together. It must first evaluate server-authoritative Admin Create/association idempotency and obtain a verified picker attribution/settlement contract before shared recovery activation. The current plugin's gap remains an explicit blocked integration dependency, not a globally blocking product behavior shipped by Plan 1. Plan 3 retains stale/outcome recovery; Plan 4 retains dirty exit. All implementation tasks remain future work.

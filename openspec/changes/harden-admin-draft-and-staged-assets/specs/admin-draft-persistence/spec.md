@@ -1,222 +1,167 @@
 ## Purpose
 
-Provide account-isolated, recoverable Admin editor checkpoints while preserving the distinction between incomplete local work and confirmed remote submission state.
+Provide reusable, account-isolated Admin draft persistence and local session semantics without activating a replacement editor or transitional remote Save workflow.
 
 ## ADDED Requirements
 
-### Requirement: Admin draft identity is distinct from remote and storage identity
-The system SHALL give each logical Admin draft a stable local session identity owned by an authenticated Admin account, separately from its technical storage key and optional existing remote submission ID. Opening an untouched new editor SHALL NOT write storage. Ownership SHALL use account identity rather than mutable email or display name.
+### Requirement: Draft foundations remain outside active editor workflows
+The local draft foundation SHALL perform no remote Save, auth subscription, route binding or platform picker work. Its availability SHALL NOT activate durable editing in the existing production editor. Application-owned editor integration SHALL remain outside this capability's first delivery.
 
-#### Scenario: New draft has no remote identity
-- **WHEN** an authorized administrator opens an untouched new editor
-- **THEN** a fresh stable local identity exists without a remote ID or local write
-- **AND** repeated edits and checkpoint failures retain that identity
+#### Scenario: Foundation is available alongside existing editor
+- **WHEN** the application contains the local foundation and an administrator uses the existing editor
+- **THEN** its existing Create/Update, moderation, validation, picker and navigation behavior remains unchanged
+- **AND** no new checkpoint, uncertain-Create or session-switch UI appears
 
-#### Scenario: Existing submission has a separate local owner
-- **WHEN** account A edits an existing submission created by contributor B
-- **THEN** the local draft belongs to A and references the remote submission separately
-- **AND** changing A's display name or email does not rotate local ownership
+### Requirement: Local identity binds exact account session and target
+A local draft SHALL have a stable secure local session identity and editing-account identity distinct from its technical storage key and optional remote submission ID. Durable lookup SHALL distinguish a new target from each existing remote target. Account/target changes SHALL NOT reassign an existing session's fields or assets.
 
-#### Scenario: Restoration retains exact identity
-- **WHEN** a valid checkpoint is restored after process recreation
-- **THEN** its local identity, account and remote target are restored together
-- **AND** no constructor-generated identity replaces them
+#### Scenario: Untouched local context
+- **WHEN** a caller prepares a fresh local context without requesting persistence
+- **THEN** it receives a stable local identity without any disk write or remote ID
 
-### Requirement: Checkpoints faithfully represent incomplete immutable fields
-The system SHALL checkpoint structurally immutable category, city, name, description, rich-text operations, full event temporal draft and exact coordinate text. Checkpoints SHALL preserve incomplete or invalid editable state without validating it as remote input. Transient presentation, search, preview, acknowledgement and command state SHALL NOT be persisted as editable content.
+#### Scenario: Admin edits another contributor's submission
+- **WHEN** account A prepares local work for a remote submission created by B
+- **THEN** A owns the local session independently of the contributor
+- **AND** mutable display name/email changes do not rotate ownership
 
-#### Scenario: Incomplete event and coordinate text round-trip
-- **WHEN** a checkpoint contains an enabled event with unresolved start, retained end civil day, temporal mode and invalid half-pair coordinate text
-- **THEN** restoration retains those exact editable values without inventing times or numeric coordinates
-- **AND** remote Save validation still rejects invalid remote input
+#### Scenario: Inactive session is retained
+- **WHEN** a caller activates another account or target
+- **THEN** prior durable sessions and their files remain isolated and recoverable
 
-#### Scenario: Caller mutates original Delta
-- **WHEN** caller-owned nested description operations are mutated after a snapshot is captured
-- **THEN** the captured checkpoint and equality outcome remain unchanged
+### Requirement: Incomplete fields are immutable and losslessly checkpointed
+A draft snapshot SHALL preserve nullable category, city, name, description, deeply immutable rich-text operations, complete event temporal state and exact coordinate text. Persistence SHALL not require valid remote input or include transient presentation, search, preview, acknowledgement or command state. Structural equality SHALL include every editable value and owner identity.
 
-#### Scenario: Snapshot equality is deterministic
-- **WHEN** equivalent snapshots are independently constructed or one raw coordinate string changes
-- **THEN** equality respectively remains true or becomes false
-- **AND** transient loading/dialog state has no effect on equality
+#### Scenario: Incomplete temporal and coordinate values round-trip
+- **WHEN** an enabled event has an unresolved start, retained final civil day, all-day mode or invalid raw coordinate half-pair
+- **THEN** checkpoint restoration retains those exact values without inventing a time or numeric pair
 
-### Requirement: Local persistence requires explicit captured checkpoints
-An effective field mutation SHALL NOT autosave. An explicit checkpoint SHALL persist its captured immutable snapshot and advance only the successful local baseline. Equal known-durable checkpoints and untouched ordinary checkpoints SHALL be no-ops. A caller requiring durable ownership SHALL force the initial write. Local checkpoint success SHALL NOT confirm remote changes.
+#### Scenario: Original description is mutated
+- **WHEN** nested caller-owned rich-text data changes after snapshot capture
+- **THEN** the snapshot, equality and hash remain unchanged
 
-#### Scenario: Mutation has no delayed autosave
-- **WHEN** fields change and time advances without an explicit persistence action
-- **THEN** the current draft changes and no checkpoint write occurs
+#### Scenario: Local text remains exact
+- **WHEN** whitespace or decimal-comma coordinate text changes
+- **THEN** structural local equality reflects the exact text change
+- **AND** persistence does not coerce it through remote validation
 
-#### Scenario: A finishes after current state becomes B
-- **WHEN** checkpoint A is pending, current draft changes to B, and A succeeds
-- **THEN** A becomes the local baseline and B remains current and locally dirty
+### Requirement: Effective local baseline is separate from physical durability
+Local user dirtiness SHALL compare current fields with their effective comparison baseline, separately from the last physically persisted checkpoint and confirmed remote baseline. Authoritative hydration SHALL NOT claim a local write or mark an unmodified editor locally dirty. Known owner existence SHALL NOT imply that current fields match disk.
 
-#### Scenario: Checkpoint failure preserves baseline
-- **WHEN** a dirty checkpoint fails
-- **THEN** the prior checkpoint, identity and current fields remain unchanged
-- **AND** the persistence error is returned
+#### Scenario: Clean A is authoritatively hydrated to B
+- **WHEN** checkpoint A has no unconfirmed remote edits and verified remote B is accepted without user mutation
+- **THEN** current/effective state becomes B and local dirtiness remains false
+- **AND** physical checkpoint remains A without a write
 
-#### Scenario: Equal snapshots with different durability
-- **WHEN** an ordinary checkpoint is requested for an untouched editor or equal known-durable snapshot
-- **THEN** no redundant storage write occurs
-- **AND** a later picker preparation for an absent durable owner performs the required initial write
+#### Scenario: Switch immediately after hydration
+- **WHEN** B was authoritatively hydrated over clean A and another target is requested without user edits
+- **THEN** the local component permits switching without forcing a checkpoint of B
 
-#### Scenario: Local success does not authorize moderation
-- **WHEN** remotely dirty fields are successfully checkpointed locally
-- **THEN** local dirtiness clears only for that snapshot
-- **AND** remote dirtiness and moderation eligibility remain governed by remote confirmation
+#### Scenario: User changes hydrated B to C
+- **WHEN** the user changes accepted B into C
+- **THEN** C differs from effective baseline B and is locally dirty
+- **AND** the existing physical checkpoint A remains separately identifiable
 
-### Requirement: One active editor preserves other recoverable targets
-The system SHALL keep one active Admin editor in memory and recoverable checkpoints by account and new-or-existing target. Reopening the active target SHALL preserve uncheckpointed memory. A different-target activation SHALL refuse to abandon uncheckpointed fields or unsettled mutations; it SHALL NOT autosave or delete inactive recoverable sessions.
+#### Scenario: Restart before B is checkpointed
+- **WHEN** the component restarts after hydration B with no later checkpoint
+- **THEN** it restores physical A and its recorded remote baseline
+- **AND** it does not report B as persisted or the saved remote context as freshly verified
 
-#### Scenario: Checkpointed A to B to A
-- **WHEN** account A checkpoints target X, opens target Y, then reopens X
-- **THEN** X restores its exact checkpoint/assets with a new activation generation
-- **AND** Y and all other valid account-owned checkpoints remain recoverable
+### Requirement: Checkpoint completion confirms only its captured snapshot
+Field mutations SHALL NOT autosave. Explicit checkpoint success SHALL advance the physical checkpoint and effective baseline only to the captured immutable snapshot; failure SHALL preserve both. An equal known physical snapshot SHALL skip rewriting. An untouched absent ordinary checkpoint SHALL be a no-op, while required durable ownership SHALL force its first write.
 
-#### Scenario: Switch would abandon uncheckpointed work
-- **WHEN** target X has uncheckpointed edits and target Y is requested
-- **THEN** X remains active and the switch reports why it was refused
-- **AND** the current editor offers explicit local checkpoint and return navigation without an exit dialog
+#### Scenario: Checkpoint A finishes while current fields are B
+- **WHEN** A is being persisted, fields change to B, and A succeeds
+- **THEN** physical/effective checkpoint becomes A while current B remains locally dirty
 
-#### Scenario: Untouched session switches without a write
-- **WHEN** a fresh unmodified session switches to another target with no work in flight
-- **THEN** the switch does not create a checkpoint for the untouched session
+#### Scenario: Failed checkpoint preserves all baselines
+- **WHEN** captured C fails to persist
+- **THEN** current C remains available and neither effective nor physical checkpoint advances
 
-#### Scenario: Route detaches and returns
-- **WHEN** the editor route detaches and the same account/target returns in the same process
-- **THEN** current uncheckpointed memory remains available
-- **AND** old route terminals are not replayed as new navigation effects
+#### Scenario: Checkpoint after hydration
+- **WHEN** B is effective/current, physical checkpoint is A, and an explicit checkpoint is requested
+- **THEN** B is physically written despite local dirtiness being false
+- **AND** success makes B the physical/effective checkpoint without confirming a remote Save
 
-### Requirement: Initialization distinguishes absent restored and unknown ownership
-Concurrent initialization for one activation SHALL share one completion. Valid restoration SHALL publish fields and reconciled assets coherently. Authoritative absence SHALL be scoped to the exact target. Read or decoding failure SHALL preserve unknown storage, block identity-dependent mutations and prohibit destructive reconciliation as absence.
+#### Scenario: Checkpoint edited C
+- **WHEN** B was hydrated, user edits C, and C checkpoints successfully
+- **THEN** physical/effective checkpoint becomes C and confirmed remote baseline remains B
 
-#### Scenario: Concurrent initialization waits for assets
-- **WHEN** activation and checkpoint callers await the same pending initialization
-- **THEN** the draft loads once and readiness waits for staged reconciliation
-- **AND** no provisional constructor identity is checkpointed over the restored identity
+#### Scenario: Known equal physical checkpoint
+- **WHEN** current and effective fields equal the known physical snapshot
+- **THEN** another explicit checkpoint succeeds without a redundant write
 
-#### Scenario: Hard read failure
-- **WHEN** draft lookup fails or returns an unsupported/corrupt payload
-- **THEN** identity-dependent writes and picking are unavailable
-- **AND** existing descriptors, rows and files remain preserved for retry
+#### Scenario: Fresh ordinary versus required checkpoint
+- **WHEN** a fresh untouched absent context requests an ordinary checkpoint and later requires a durable owner
+- **THEN** the ordinary request makes no write and the ownership request performs the first real checkpoint before file acquisition
 
-#### Scenario: Target absent while other targets exist
-- **WHEN** target X is authoritatively absent but target Y has a checkpoint
-- **THEN** X starts without adopting old assets
-- **AND** Y is not eligible for deletion merely because X is active
+### Requirement: Hydration preserves unconfirmed local intent
+Remote hydration supplied by a caller SHALL be accepted only when it cannot overwrite uncheckpointed edits or a checkpoint containing incompatible unconfirmed remote edits. Rejected hydration SHALL preserve local content and durability. Local checkpoint success SHALL never imply remote Save success, fresh authorization or moderation readiness.
 
-#### Scenario: Reconciliation fails
-- **WHEN** an infrastructure failure prevents complete asset reconciliation
-- **THEN** initialization completes as unavailable without partial runtime publication
-- **AND** explicit retry shares a new attempt without opening a picker prematurely
+#### Scenario: Checkpointed dirty remote intent is protected
+- **WHEN** a restored checkpoint equals its effective baseline but contains edits relative to its recorded remote baseline and new remote detail conflicts
+- **THEN** hydration returns a preserved/blocked outcome without replacing its fields/checkpoint
 
-### Requirement: Restored edits retain a separate authoritative remote baseline
-Existing-target checkpoints SHALL retain the last confirmed remote editable baseline separately from local fields. Restoration SHALL fetch current remote context before allowing remote actions. Matching pending context SHALL preserve local edits; changed, missing, final or unavailable context SHALL preserve the checkpoint and block unsafe remote actions without automatic rebase or discard.
+#### Scenario: Uncheckpointed typing is protected
+- **WHEN** current fields differ from effective baseline as a remote candidate arrives
+- **THEN** that candidate cannot replace current fields by convenience
 
-#### Scenario: Local checkpoint differs from unchanged remote baseline
-- **WHEN** incomplete local edits restore and fetched pending remote context matches their saved baseline
-- **THEN** local edits remain current and remotely dirty while status/assets come from current remote context
+#### Scenario: Local checkpoint cannot confirm remote fields
+- **WHEN** a remotely unconfirmed local snapshot checkpoints successfully
+- **THEN** only local durability changes and its remote confirmation remains outstanding
 
-#### Scenario: Dirty checkpoint encounters changed remote context
-- **WHEN** fresh detail differs from a remotely dirty checkpoint's saved baseline or is missing/final/unavailable
-- **THEN** local fields remain recoverable in a blocked read-only state
-- **AND** Save, moderation and remote asset mutation cannot overwrite that context
+### Requirement: Initialization preserves absent valid and unknown ownership
+Concurrent local initialization callers for one activation SHALL share completion. Valid restoration SHALL expose the exact checkpoint and fully reconciled assets. Authoritative absence SHALL be scoped to its account/target. Loading or decoding failure SHALL preserve unknown ownership and block identity-dependent writes/cleanup instead of overwriting it with a fresh session.
 
-#### Scenario: Remotely clean checkpoint can use fresh detail
-- **WHEN** a restored checkpoint has no remote field changes and fresh detail loads
-- **THEN** fresh detail may hydrate the editor without an implicit local checkpoint
+#### Scenario: Concurrent callers wait for one complete restoration
+- **WHEN** activation and checkpoint requests await initialization
+- **THEN** the draft loads once and readiness waits for reconciliation
+- **AND** provisional constructor identity does not overwrite restored identity
 
-#### Scenario: Detail finishes after local changes
-- **WHEN** a captured detail request settles after the editor has acquired later field/session revisions
-- **THEN** it does not overwrite those fields or publish into another activation
+#### Scenario: Store or decoding failure
+- **WHEN** draft loading fails or an unsupported/conflicting row is encountered
+- **THEN** no fresh checkpoint or destructive absence cleanup is authorized
+- **AND** durable rows/files remain preserved for explicit retry
 
-### Requirement: Authentication and activation revoke stale authority
-Every async editor action SHALL bind account, session, activation and target before deferred work. Logout, privilege loss, account change, session retirement and application disposal SHALL revoke publication and unstarted phases. Old operations SHALL NOT regain authority when the same target is later reopened. Durable work SHALL remain isolated to its original owner.
+#### Scenario: One target is absent
+- **WHEN** target X is authoritatively absent and Y remains stored
+- **THEN** X does not adopt Y's assets and Y is not orphaned
 
-#### Scenario: Account changes during an operation
-- **WHEN** account A loses privilege or account B becomes active while A's work is pending
-- **THEN** A's private UI state is removed and no late result publishes or starts a later remote phase
-- **AND** A's already-durable checkpoints remain inaccessible to B
+#### Scenario: Reconciliation fails before readiness
+- **WHEN** full asset restoration fails
+- **THEN** initialization settles as unavailable without partial publication or indefinite loading
+- **AND** an explicit retry shares a new attempt
 
-#### Scenario: Original account returns
-- **WHEN** A later reauthenticates and explicitly activates the matching target
-- **THEN** only A's valid checkpoints may restore under a new activation
-- **AND** a completion captured before revocation has no publication authority
+### Requirement: Local actions retain activation authority
+Local initialization, checkpoint, acquisition, removal and hydration SHALL bind account, session, target and activation generation. Replacement or explicit revocation SHALL suppress late runtime publication into a new context. Already-started durable work SHALL remain with its captured owner. Normal switches SHALL refuse uncheckpointed work or unsettled local mutation without autosaving it.
 
-#### Scenario: A to B to A rejects original A completion
-- **WHEN** a read for activation A1 completes after activation B then A2
-- **THEN** identity equality alone cannot authorize that result and A2 remains unchanged
+#### Scenario: A to B to A rejects old completion
+- **WHEN** activation A1 work settles after B then A2 becomes current
+- **THEN** the old completion cannot publish into A2 solely because the target matches
 
-#### Scenario: Disposal waits for physical settlement
-- **WHEN** application ownership is disposed with a command in flight
-- **THEN** no runtime publication or new phase occurs after revocation
-- **AND** command release waits for physical settlement without disposed-notifier access
+#### Scenario: Account revocation
+- **WHEN** a caller revokes A and activates B while local work is pending
+- **THEN** A's private runtime state is not exposed to B
+- **AND** already-started commits remain recoverable only under A's owner
 
-### Requirement: Legacy remote Save cannot resurrect completed local drafts
-Legacy Create and Update SHALL retain their remote APIs and navigation semantics. Create SHALL lock editable fields through settlement and prevent repeated creation after confirmed success. Already-durable new drafts SHALL record an attempt fence before Create; a surviving fence SHALL block replay until outcome verification. Local repair after remote success SHALL NOT repeat a remote write or adopt a remote ID in place.
+#### Scenario: Dirty switch is refused
+- **WHEN** a normal target switch would abandon current uncheckpointed fields
+- **THEN** the local component refuses it without saving or deleting those fields
 
-#### Scenario: Failure fencing prevents Create
-- **WHEN** a durable new draft cannot record its Create attempt fence
-- **THEN** no remote Create starts and the original local checkpoint remains recoverable
+#### Scenario: Hydration and checkpoint are ordered
+- **WHEN** checkpoint completion and authoritative hydration both request the local boundary
+- **THEN** their baseline effects have a deterministic order and an earlier checkpoint cannot reset a later accepted hydration
 
-#### Scenario: Crash around fenced Create
-- **WHEN** the process stops after recording the fence, before or after sending Create
-- **THEN** restart retains the draft as requiring remote outcome verification
-- **AND** no automatic or ordinary retry Create is permitted for that fenced session
+### Requirement: Field persistence never retires recoverable ownership
+Replacing a checkpoint or accepting remote baseline data SHALL preserve the durable session owner and every valid asset belonging to it. This delivery SHALL expose no owner-retirement or remote-success-finalization path. Removing the last staged item SHALL retain its owner. Future retirement SHALL require absence of all staged, inbox and in-flight recovery obligations, not merely a superseded field checkpoint.
 
-#### Scenario: Checkpoint cannot make an in-flight non-durable Create recoverable
-- **WHEN** a non-durable new session has reserved Create and an explicit checkpoint is requested before settlement
-- **THEN** that checkpoint is refused without persisting an unfenced new row
-- **AND** an earlier pending checkpoint settles before deciding whether Create needs a fence
+#### Scenario: Snapshot changes while files remain
+- **WHEN** a session with valid staged bytes checkpoints new fields or accepts authoritative baseline data
+- **THEN** the same durable owner remains and restart can still restore those bytes
 
-#### Scenario: A separate new draft preserves uncertain history
-- **WHEN** an administrator explicitly chooses a separate new draft from the fenced-outcome message
-- **THEN** the uncertain session is retained under its own historical key before releasing the new-draft slot
-- **AND** a fresh identity starts without adopting the old fields/assets or retrying its remote operation
-- **AND** failure retaining that history preserves the original session instead of switching
+#### Scenario: Last staged asset is removed
+- **WHEN** exact-owner local removal deletes the final staged item
+- **THEN** the durable draft owner is not implicitly retired
 
-#### Scenario: Create confirmed but local retirement fails
-- **WHEN** Create succeeds and retiring its local checkpoint fails
-- **THEN** the session cannot Create again and reports local finalization failure
-- **AND** retry repairs only local retirement without invoking Create
-
-#### Scenario: Create locks fields and covered success stays complete
-- **WHEN** fields are changed during initial Create or its successful route is covered
-- **THEN** in-flight field changes are refused and a confirmed completed session cannot Create again on return
-- **AND** a current authorized route retains its existing successful close behavior after local retirement
-
-#### Scenario: Update A succeeds after B is typed
-- **WHEN** Update A succeeds while current fields contain B
-- **THEN** only A becomes the confirmed remote baseline and B remains remotely dirty
-- **AND** the old success cannot close the editor or clear confirmed associated assets
-
-#### Scenario: New checkpoint arrives during Update
-- **WHEN** a newer explicit checkpoint B commits after Update A was admitted and A later succeeds
-- **THEN** B remains durable with A as its confirmed remote baseline
-- **AND** B is not declared remotely saved or replaced by current uncheckpointed fields
-
-#### Scenario: Earlier checkpoint is superseded by confirmed Update
-- **WHEN** Update succeeds and no newer explicit checkpoint has committed since its admission
-- **THEN** the superseded checkpoint may retire only through its exact local owner
-- **AND** local cleanup failure is repaired locally without replaying Update
-
-#### Scenario: No backend exactly-once claim
-- **WHEN** a non-durable live Create fails with an ambiguous response
-- **THEN** existing error/retry behavior does not imply backend deduplication
-- **AND** local session identity is not sent as an invented Admin idempotency contract
-
-### Requirement: Existing editor behavior remains compatible with the foundation
-Pending/final guards, validation, moderation, event resolution, previews, command exclusion and route effects SHALL remain in force. New-mode asset selection and staged remote Save SHALL remain unavailable. Local recovered assets SHALL block legacy Save that cannot persist them. Local checkpoint controls SHALL be clearly distinguished from remote Save.
-
-#### Scenario: Ordinary persisted workflow remains functional
-- **WHEN** a valid pending editor uses Update, Reject, Promote, Link, Apply or preview
-- **THEN** existing validation, readiness, source tokens, execution exclusion and authorized effects remain effective
-
-#### Scenario: Foundation cannot expose incomplete Save
-- **WHEN** new-mode UI is shown or recovered staged assets exist
-- **THEN** new-mode photo selection remains disabled
-- **AND** legacy Save with staged assets returns an actionable unavailable explanation before any remote call
-
-#### Scenario: Final status remains read-only
-- **WHEN** an accepted or rejected submission opens
-- **THEN** field and asset mutation remain unavailable regardless of local durability
+#### Scenario: No remote-success deletion path
+- **WHEN** callers use the local foundation API
+- **THEN** no field-only success or remote confirmation can invoke owner deletion or a temporary Create/Update finalization workflow
