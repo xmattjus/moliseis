@@ -639,19 +639,27 @@ export function createHandler(
               422,
             );
           }
-          const submission = await store.create({
+          const result = await store.create({
             ...parsed.value.input,
             user_id: user.id,
+            client_submission_id: parsed.value.client_submission_id,
             user_email: createProfile.userEmail,
             user_name: createProfile.userName,
           });
-          return jsonResponse({ submission: toSubmissionWire(submission) });
+          return jsonResponse({
+            outcome: result.outcome,
+            submission: toSubmissionWire(
+              result.detail.submission,
+              result.detail.assets,
+              result.detail.currentSource ?? null,
+            ),
+          });
         }
         case "update": {
           const result = await store.update(
             parsed.value.submission_id,
             parsed.value.input,
-            dependencies.nowIso(),
+            parsed.value.expected_modified_at,
           );
           if (result.outcome === "not_found") {
             return errorResponse("NOT_FOUND", "Submission not found.", 404);
@@ -660,6 +668,13 @@ export function createHandler(
             return errorResponse(
               "INVALID_STATUS_TRANSITION",
               "Only pending submissions can be changed.",
+              409,
+            );
+          }
+          if (result.outcome === "submission_changed") {
+            return errorResponse(
+              "SUBMISSION_CHANGED",
+              "Submission changed since its exact field version was loaded.",
               409,
             );
           }
@@ -847,11 +862,17 @@ export function createHandler(
           });
           return promotionResponse(result, parsed.value.target);
         }
-        case "addAsset": {
-          const result = await store.addAsset(
-            parsed.value.submission_id,
-            parsed.value.asset,
-          );
+        case "addAsset":
+        case "associateStagedAsset": {
+          const result = parsed.value.operation === "associateStagedAsset"
+            ? await store.associateStagedAsset(
+              parsed.value.submission_id,
+              parsed.value.asset,
+            )
+            : await store.addAsset(
+              parsed.value.submission_id,
+              parsed.value.asset,
+            );
           if (result.outcome === "not_found") {
             return errorResponse("NOT_FOUND", "Submission not found.", 404);
           }
@@ -869,7 +890,19 @@ export function createHandler(
               409,
             );
           }
-          return jsonResponse({ asset: toAssetWire(result.asset) });
+          if (result.outcome === "metadata_conflict") {
+            return errorResponse(
+              "ASSET_METADATA_CONFLICT",
+              "The uploaded URL already has different metadata.",
+              409,
+            );
+          }
+          return jsonResponse({
+            ...(parsed.value.operation === "associateStagedAsset"
+              ? { outcome: result.outcome }
+              : {}),
+            asset: toAssetWire(result.asset),
+          });
         }
         case "deleteAsset": {
           const result = await store.deleteAsset(

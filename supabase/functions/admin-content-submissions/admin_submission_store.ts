@@ -64,9 +64,24 @@ export type SubmissionAssetRecord = Pick<
 
 export type AdminSubmissionCreateValues = ValidatedAdminSubmissionInput & {
   user_id: string;
+  client_submission_id: string;
   user_email: string;
   user_name: string;
 };
+
+export type AdminSubmissionDetail = {
+  submission: SubmissionRecord;
+  assets: SubmissionAssetRecord[];
+  currentSource?: SubmissionRecord["currentSource"];
+};
+export type CreateStoreResult = {
+  outcome: "created" | "replayed";
+  detail: AdminSubmissionDetail;
+};
+export type AssociateStagedAssetStoreResult =
+  | AddAssetStoreResult
+  | { outcome: "replayed"; asset: SubmissionAssetRecord }
+  | { outcome: "metadata_conflict" };
 
 export type ChangeStatusStoreResult =
   | "updated"
@@ -81,7 +96,8 @@ export type UpdateStoreResult =
   | { outcome: "updated"; submission: SubmissionRecord }
   | { outcome: "not_found" }
   | { outcome: "not_pending" }
-  | { outcome: "start_date_required" };
+  | { outcome: "start_date_required" }
+  | { outcome: "submission_changed" };
 
 export type AddAssetStoreResult =
   | { outcome: "created"; asset: SubmissionAssetRecord }
@@ -200,22 +216,12 @@ export interface AdminSubmissionStore {
   listIgnoredSources(): Promise<IgnoredSourceRecord[]>;
   unIgnoreSource(id: number): Promise<UnIgnoreStoreResult>;
   list(): Promise<SubmissionRecord[]>;
-  getById(id: number): Promise<
-    {
-      submission: SubmissionRecord;
-      assets: SubmissionAssetRecord[];
-      currentSource?: {
-        moderation_hash: string;
-        normalized: Json;
-        event_id?: number | null;
-      } | null;
-    } | null
-  >;
-  create(values: AdminSubmissionCreateValues): Promise<SubmissionRecord>;
+  getById(id: number): Promise<AdminSubmissionDetail | null>;
+  create(values: AdminSubmissionCreateValues): Promise<CreateStoreResult>;
   update(
     id: number,
     input: ValidatedAdminSubmissionInput,
-    modifiedAt: string,
+    expectedModifiedAt: string,
   ): Promise<UpdateStoreResult>;
   changeStatus(params: {
     id: number;
@@ -237,6 +243,10 @@ export interface AdminSubmissionStore {
     submissionId: number,
     asset: ValidatedSubmissionAsset,
   ): Promise<AddAssetStoreResult>;
+  associateStagedAsset(
+    submissionId: number,
+    asset: ValidatedSubmissionAsset,
+  ): Promise<AssociateStagedAssetStoreResult>;
   deleteAsset(
     submissionId: number,
     assetId: number,
@@ -584,39 +594,40 @@ export function createAdminSubmissionStore(
       return { submission, assets: assets ?? [], currentSource };
     },
 
-    async create(values): Promise<SubmissionRecord> {
-      const { data, error } = await client
-        .from("content_submissions")
-        .insert({
-          category: values.category,
-          city: values.city,
-          name: values.name,
-          description: values.description,
-          description_delta: values.description_delta,
-          start_date: values.start_date,
-          end_date: values.end_date,
-          all_day: values.all_day,
-          user_id: values.user_id,
-          user_email: values.user_email,
-          user_name: values.user_name,
-          latitude: values.latitude,
-          longitude: values.longitude,
-        })
-        .select(SUBMISSION_SELECT)
-        .single();
+    async create(values): Promise<CreateStoreResult> {
+      const { user_id, client_submission_id, user_email, user_name, ...input } =
+        values;
+      const { data, error } = await client.rpc("admin_create_submission", {
+        p_user_id: user_id,
+        p_client_submission_id: client_submission_id,
+        p_user_email: user_email,
+        p_user_name: user_name,
+        p_input: input as Json,
+      });
       throwOnError(error);
-      if (!data) {
+      const result = data?.[0];
+      if (
+        data?.length !== 1 || !result ||
+        !["created", "replayed"].includes(result.outcome) ||
+        !Number.isSafeInteger(result.submission_id) || result.submission_id <= 0
+      ) {
         throw new AdminSubmissionStoreError(
-          new Error("Insert returned no row"),
+          new Error("Create returned malformed replay outcome"),
         );
       }
-      return data;
+      const detail = await this.getById(result.submission_id);
+      if (!detail) {
+        throw new AdminSubmissionStoreError(
+          new Error("Created submission is unavailable"),
+        );
+      }
+      return { outcome: result.outcome as "created" | "replayed", detail };
     },
 
     async update(
       id,
       input,
-      _modifiedAt,
+      expectedModifiedAt,
     ): Promise<UpdateStoreResult> {
       // Pending-only predicate: the guarded UPDATE itself is the race
       // protection against a concurrent promotion. Under READ COMMITTED it
@@ -638,7 +649,8 @@ export function createAdminSubmissionStore(
           longitude: input.longitude,
         })
         .eq("id", id)
-        .eq("status", "pending");
+        .eq("status", "pending")
+        .eq("modified_at", expectedModifiedAt);
       // Predicate is rechecked under the row lock, including concurrent
       // migration from human to verified imported provenance.
       if (input.start_date === null) {
@@ -663,7 +675,11 @@ export function createAdminSubmissionStore(
         existing.status === "pending" &&
         existing.external_event_record_id !== null && input.start_date === null
       ) return { outcome: "start_date_required" };
-      return { outcome: "not_pending" };
+      return {
+        outcome: existing.status === "pending"
+          ? "submission_changed"
+          : "not_pending",
+      };
     },
 
     async changeStatus(
@@ -904,6 +920,69 @@ export function createAdminSubmissionStore(
         default:
           throw new AdminSubmissionStoreError(
             new Error("Asset insertion returned an unknown outcome"),
+          );
+      }
+    },
+
+    async associateStagedAsset(
+      submissionId,
+      asset,
+    ): Promise<AssociateStagedAssetStoreResult> {
+      const { data, error } = await client.rpc(
+        "add_admin_submission_asset_once",
+        {
+          p_submission_id: submissionId,
+          p_asset: asset as Json,
+        },
+      );
+      throwOnError(error);
+      const result = data?.[0];
+      if (data?.length !== 1 || !result) {
+        throw new AdminSubmissionStoreError(
+          new Error("Association returned no singleton outcome"),
+        );
+      }
+      switch (result.outcome) {
+        case "not_found":
+        case "not_pending":
+        case "limit_reached":
+        case "metadata_conflict":
+          if (
+            result.id !== null || result.url !== null ||
+            result.width !== null || result.height !== null
+          ) {
+            throw new AdminSubmissionStoreError(
+              new Error("Association failure carried a payload"),
+            );
+          }
+          return { outcome: result.outcome };
+        case "created":
+        case "replayed":
+          if (
+            !Number.isSafeInteger(result.id) || result.id === null ||
+            result.id <= 0 ||
+            typeof result.url !== "string" || result.url !== asset.url ||
+            !Number.isInteger(result.width) || result.width === null ||
+            result.width !== asset.width ||
+            !Number.isInteger(result.height) || result.height === null ||
+            result.height !== asset.height
+          ) {
+            throw new AdminSubmissionStoreError(
+              new Error("Association returned incomplete row"),
+            );
+          }
+          return {
+            outcome: result.outcome,
+            asset: {
+              id: result.id,
+              url: result.url,
+              width: result.width,
+              height: result.height,
+            },
+          };
+        default:
+          throw new AdminSubmissionStoreError(
+            new Error("Association returned unknown outcome"),
           );
       }
     },

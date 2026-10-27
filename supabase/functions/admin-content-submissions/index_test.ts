@@ -5,7 +5,9 @@ import {
   type AddAssetStoreResult,
   type AdminSubmissionStore,
   AdminSubmissionStoreError,
+  type AssociateStagedAssetStoreResult,
   type ChangeStatusStoreResult,
+  type CreateStoreResult,
   type DeleteAssetStoreResult,
   type PromoteStoreResult,
   type SubmissionRecord,
@@ -137,7 +139,8 @@ class FakeStore implements AdminSubmissionStore {
       height: 80,
     }],
   };
-  createResult = { ...record, status: "pending" as const };
+  createOutcome: "created" | "replayed" = "created";
+  createResult: SubmissionRecord = { ...record, status: "pending" };
   updateResults: UpdateStoreResult[] = [
     { outcome: "updated", submission: { ...record, status: "pending" } },
   ];
@@ -188,11 +191,14 @@ class FakeStore implements AdminSubmissionStore {
 
   async create(
     values: Parameters<AdminSubmissionStore["create"]>[0],
-  ): Promise<SubmissionRecord> {
+  ): Promise<CreateStoreResult> {
     this.calls.push("create");
     this.createValues = values;
     if (this.error) throw this.error;
-    return this.createResult;
+    return {
+      outcome: this.createOutcome,
+      detail: { submission: this.createResult, assets: [] },
+    };
   }
 
   async update(
@@ -232,6 +238,24 @@ class FakeStore implements AdminSubmissionStore {
     if (this.error) throw this.error;
     return this.addAssetResults.shift() ?? { outcome: "not_pending" };
   }
+
+  async associateStagedAsset(
+    ...args: Parameters<AdminSubmissionStore["associateStagedAsset"]>
+  ): Promise<AssociateStagedAssetStoreResult> {
+    this.calls.push("associateStagedAsset");
+    this.addAssetValues = args;
+    if (this.error) throw this.error;
+    return this.stagedAssetResult;
+  }
+  stagedAssetResult: AssociateStagedAssetStoreResult = {
+    outcome: "replayed",
+    asset: {
+      id: 3,
+      url: "https://res.cloudinary.com/demo/image/upload/v1/new.jpg",
+      width: 1600,
+      height: 1200,
+    },
+  };
 
   async deleteAsset(
     ...args: Parameters<AdminSubmissionStore["deleteAsset"]>
@@ -494,11 +518,16 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   createdStore.createResult = { ...locatedRecord, status: "pending" as const };
   const created = testHandler(adminUser(), createdStore);
   const createResponse = await created.handler(
-    request({ operation: "create", input: createdInput }),
+    request({
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: createdInput,
+    }),
   );
   assertEquals(createResponse.status, 200);
   assertEquals(created.store.createValues, {
     ...persistedInput(createdInput),
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     user_id: "00000000-0000-4000-8000-000000000001",
     user_email: "admin@example.test",
     user_name: "Plan Admin",
@@ -506,6 +535,7 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   assertEquals(
     await responseJson(createResponse),
     {
+      outcome: "created",
       submission: {
         ...locatedRecord,
         assets: [],
@@ -531,6 +561,7 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
   const updateResponse = await updated.handler(
     request({
       operation: "update",
+      expected_modified_at: "2026-08-21T11:00:00.000Z",
       submission_id: 7,
       input: updatedInput,
     }),
@@ -559,12 +590,17 @@ Deno.test("passes validated coordinates to the store and round-trips them", asyn
 Deno.test("creates with server-authoritative identity and validates the admin profile first", async () => {
   const success = testHandler();
   const response = await success.handler(
-    request({ operation: "create", input: input() }),
+    request({
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input(),
+    }),
   );
   assertEquals(response.status, 200);
   assertEquals(success.created(), 1);
   assertEquals(success.store.createValues, {
     ...persistedInput(input()),
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     user_id: "00000000-0000-4000-8000-000000000001",
     user_email: "admin@example.test",
     user_name: "Plan Admin",
@@ -585,7 +621,11 @@ Deno.test("creates with server-authoritative identity and validates the admin pr
   ) {
     const incomplete = testHandler(user);
     const incompleteResponse = await incomplete.handler(
-      request({ operation: "create", input: input() }),
+      request({
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: input(),
+      }),
     );
     assertEquals(incompleteResponse.status, 422);
     assertEquals(
@@ -599,7 +639,12 @@ Deno.test("creates with server-authoritative identity and validates the admin pr
 Deno.test("maps pending-guarded update outcomes without collapsing 409", async () => {
   const updated = testHandler();
   const updatedResponse = await updated.handler(
-    request({ operation: "update", submission_id: 7, input: input() }),
+    request({
+      operation: "update",
+      expected_modified_at: "2026-08-21T11:00:00.000Z",
+      submission_id: 7,
+      input: input(),
+    }),
   );
   assertEquals(updatedResponse.status, 200);
   assertEquals(updated.created(), 1);
@@ -623,7 +668,12 @@ Deno.test("maps pending-guarded update outcomes without collapsing 409", async (
   const missing = testHandler();
   missing.store.updateResults = [{ outcome: "not_found" }];
   const missingResponse = await missing.handler(
-    request({ operation: "update", submission_id: 8, input: input() }),
+    request({
+      operation: "update",
+      expected_modified_at: "2026-08-21T11:00:00.000Z",
+      submission_id: 8,
+      input: input(),
+    }),
   );
   assertEquals(missingResponse.status, 404);
   assertEquals((await responseJson(missingResponse)).code, "NOT_FOUND");
@@ -631,7 +681,12 @@ Deno.test("maps pending-guarded update outcomes without collapsing 409", async (
   const moderated = testHandler();
   moderated.store.updateResults = [{ outcome: "not_pending" }];
   const moderatedResponse = await moderated.handler(
-    request({ operation: "update", submission_id: 7, input: input() }),
+    request({
+      operation: "update",
+      expected_modified_at: "2026-08-21T11:00:00.000Z",
+      submission_id: 7,
+      input: input(),
+    }),
   );
   assertEquals(moderatedResponse.status, 409);
   assertEquals(
@@ -968,7 +1023,11 @@ Deno.test("Admin handler creates, reads and updates both temporal modes without 
       end_calendar_date: allDay ? "2026-03-29" : null,
     };
     const createResponse = await harness.handler(
-      request({ operation: "create", input: temporal }),
+      request({
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: temporal,
+      }),
     );
     assertEquals(createResponse.status, 200);
     const created = harness.store.createValues as Record<string, unknown>;
@@ -983,7 +1042,12 @@ Deno.test("Admin handler creates, reads and updates both temporal modes without 
     );
     assertEquals(Object.hasOwn(created, "start_calendar_date"), false);
     const updateResponse = await harness.handler(
-      request({ operation: "update", submission_id: 7, input: temporal }),
+      request({
+        operation: "update",
+        expected_modified_at: "2026-08-21T11:00:00.000Z",
+        submission_id: 7,
+        input: temporal,
+      }),
     );
     assertEquals(updateResponse.status, 200);
     const updatedInput = (harness.store.updateValues as unknown[])[1] as Record<
@@ -1351,6 +1415,7 @@ Deno.test("Imported Save null-start rejection maps422 and does not accept proven
   test.store.updateResults = [{ outcome: "start_date_required" }];
   const body = {
     operation: "update",
+    expected_modified_at: "2026-08-21T11:00:00.000Z",
     submission_id: 7,
     input: { ...input(), start_date: null, end_date: null, all_day: false },
   };
@@ -1670,4 +1735,68 @@ Deno.test("list DTO exposes nullable human and authoritative imported create/upd
     ["update", 42],
   ]);
   assertEquals(rows[2].current_source_normalized, { name: "Update" });
+});
+
+Deno.test("Admin staged replay dispatch and stale Update return explicit outcomes", async () => {
+  const replay = testHandler();
+  replay.store.createOutcome = "replayed";
+  replay.store.createResult = { ...record, status: "accepted" };
+  const created = await replay.handler(
+    request({
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input(),
+    }),
+  );
+  assertEquals(created.status, 200);
+  assertEquals((await responseJson(created)).outcome, "replayed");
+  const stale = testHandler();
+  stale.store.updateResults = [{ outcome: "submission_changed" }];
+  const response = await stale.handler(
+    request({
+      operation: "update",
+      submission_id: 7,
+      expected_modified_at: "2026-08-21T11:00:00.000001Z",
+      input: input(),
+    }),
+  );
+  assertEquals(response.status, 409);
+  assertEquals((await responseJson(response)).code, "SUBMISSION_CHANGED");
+  const staged = testHandler();
+  const body = {
+    operation: "associateStagedAsset",
+    submission_id: 7,
+    asset: {
+      url: "https://res.cloudinary.com/demo/image/upload/v1/new.jpg",
+      width: 1600,
+      height: 1200,
+      mime_type: "image/jpeg",
+      duration_seconds: null,
+    },
+  };
+  const associated = await staged.handler(request(body));
+  assertEquals(associated.status, 200);
+  assertEquals((await responseJson(associated)).outcome, "replayed");
+  assertEquals(staged.store.calls, ["associateStagedAsset"]);
+  staged.store.stagedAssetResult = { outcome: "metadata_conflict" };
+  const conflict = await staged.handler(request(body));
+  assertEquals(conflict.status, 409);
+  assertEquals((await responseJson(conflict)).code, "ASSET_METADATA_CONFLICT");
+  const forbidden = testHandler(adminUser({ app_metadata: {} }));
+  assertEquals((await forbidden.handler(request(body))).status, 403);
+  assertEquals(forbidden.created(), 0);
+});
+
+Deno.test("legacy Save envelopes fail closed before constructing the privileged store", async () => {
+  for (
+    const body of [{ operation: "create", input: input() }, {
+      operation: "update",
+      submission_id: 7,
+      input: input(),
+    }]
+  ) {
+    const test = testHandler();
+    assertEquals((await test.handler(request(body))).status, 400);
+    assertEquals(test.created(), 0);
+  }
 });

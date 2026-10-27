@@ -507,6 +507,30 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_create_submission: {
+        Args: {
+          p_client_submission_id: string;
+          p_input: Json;
+          p_user_email: string;
+          p_user_id: string;
+          p_user_name: string;
+        };
+        Returns: {
+          outcome: string;
+          submission_id: number;
+        }[];
+      };
+      add_admin_submission_asset_once: {
+        Args: { p_asset: Json; p_submission_id: number };
+        Returns: {
+          height: number;
+          id: number;
+          outcome: string;
+          url: string;
+          width: number;
+        }[];
+      };
+
       add_submission_assets: {
         Args: { p_assets: Json; p_submission_id: number };
         Returns: {

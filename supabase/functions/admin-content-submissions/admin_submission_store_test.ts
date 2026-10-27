@@ -185,6 +185,9 @@ Deno.test("update applies the pending-only guarded predicate", async () => {
   // Both guards must be present on the UPDATE itself: the id predicate AND the
   // status predicate that blocks accepted/rejected sources.
   assertEquals(query.filters, [["id", 7], ["status", "pending"], [
+    "modified_at",
+    "2026-08-21T11:00:00.000Z",
+  ], [
     "external_event_record_id",
     null,
   ]]);
@@ -639,30 +642,39 @@ Deno.test("Admin create/update/read carry normalized all-day mode with the dates
     const store = createAdminSubmissionStore(
       client as unknown as SupabaseClient<Database>,
     );
+    client.queueRpc({
+      data: [{ outcome: "created", submission_id: 7 }],
+      error: null,
+    });
     client.queueQuery({ data: stored, error: null });
+    client.queueQuery({ data: [], error: null });
     assertEquals(
       await store.create({
         ...values,
         user_id: "00000000-0000-4000-8000-000000000002",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
         user_email: "test@example.test",
         user_name: "Test",
       }),
-      stored,
+      {
+        outcome: "created",
+        detail: { submission: stored, assets: [], currentSource: null },
+      },
     );
-    assertEquals(client.queries[0].insertValues?.all_day, allDay);
-    assertEquals(client.queries[0].insertValues?.start_date, values.start_date);
-    assertEquals(client.queries[0].insertValues?.end_date, values.end_date);
+    const createArgs = client.rpcCalls[0].args as { p_input: typeof values };
+    assertEquals(createArgs.p_input, values);
     client.queueQuery({ data: stored, error: null });
     assertEquals(await store.update(7, values, "2026-10-01T12:00:00Z"), {
       outcome: "updated",
       submission: stored,
     });
-    assertEquals(client.queries[1].updateValues, {
+    assertEquals(client.queries[2].updateValues, {
       ...values,
     });
-    assertEquals(client.queries[1].filters, [
+    assertEquals(client.queries[2].filters, [
       ["id", 7],
       ["status", "pending"],
+      ["modified_at", "2026-10-01T12:00:00Z"],
       ...(values.start_date === null
         ? [["external_event_record_id", null] as [string, unknown]]
         : []),
@@ -1116,6 +1128,9 @@ Deno.test("Imported Save cannot remove Event start; persisted predicate covers h
     outcome: "start_date_required",
   });
   assertEquals(client.queries[0].filters, [["id", 7], ["status", "pending"], [
+    "modified_at",
+    "ignored",
+  ], [
     "external_event_record_id",
     null,
   ]]);
@@ -1181,4 +1196,212 @@ Deno.test("list batch-loads source mode and current state for create/update/huma
   assertEquals(rows[2].currentSource, null);
   assertEquals(client.queries.length, 2);
   assertEquals(client.queries[1].filters, [["id", [12, 13]]]);
+});
+
+Deno.test("Create replay fetches current authoritative final detail and assets without direct insert", async () => {
+  const client = new FakeAdminClient();
+  client.queueRpc({
+    data: [{ outcome: "replayed", submission_id: 7 }],
+    error: null,
+  });
+  client.queueQuery({ data: { ...record, status: "accepted" }, error: null });
+  const assets = [{
+    id: 3,
+    url: "https://example.test/confirmed.jpg",
+    width: 100,
+    height: 80,
+  }];
+  client.queueQuery({ data: assets, error: null });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  const { user_name, user_email } = record;
+  const result = await store.create({
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
+    user_id: "00000000-0000-4000-8000-000000000001",
+    user_email,
+    user_name,
+    category: record.category,
+    city: record.city,
+    name: "Changed replay input",
+    description: null,
+    description_delta: null,
+    start_date: null,
+    end_date: null,
+    all_day: false,
+    latitude: null,
+    longitude: null,
+  });
+  assertEquals(result.outcome, "replayed");
+  assertEquals(result.detail.submission.status, "accepted");
+  assertEquals(result.detail.assets, assets);
+  assertEquals(client.rpcCalls[0].functionName, "admin_create_submission");
+  assert(
+    client.queries.every((query) =>
+      query.insertValues === null && query.updateValues === null
+    ),
+  );
+});
+
+Deno.test("conditional Update passes the exact microsecond token and classifies a stale pending row", async () => {
+  const client = new FakeAdminClient();
+  client.queueQuery({ data: null, error: null });
+  client.queueQuery({
+    data: { id: 7, status: "pending", external_event_record_id: null },
+    error: null,
+  });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  const token = "2026-08-21T10:00:00.000001+00:00";
+  assertEquals(
+    await store.update(7, {
+      category: record.category,
+      city: record.city,
+      name: "A",
+      description: null,
+      description_delta: null,
+      start_date: null,
+      end_date: null,
+      all_day: false,
+      latitude: null,
+      longitude: null,
+    }, token),
+    { outcome: "submission_changed" },
+  );
+  assert(
+    client.queries[0].filters.some(([key, value]) =>
+      key === "modified_at" && value === token
+    ),
+  );
+  assertEquals(client.queries[1].updateValues, null);
+});
+
+Deno.test("staged association uses its singleton RPC and rejects malformed replay payloads", async () => {
+  const receipt = {
+    url: "https://res.cloudinary.com/demo/image/upload/v1/a.jpg",
+    width: 100,
+    height: 80,
+    mime_type: "image/jpeg",
+    duration_seconds: null,
+  };
+  for (
+    const outcome of [
+      "created",
+      "replayed",
+      "metadata_conflict",
+      "not_pending",
+      "limit_reached",
+      "not_found",
+    ]
+  ) {
+    const client = new FakeAdminClient();
+    const success = outcome === "created" || outcome === "replayed";
+    client.queueRpc({
+      data: [{
+        outcome,
+        id: success ? 3 : null,
+        url: success ? receipt.url : null,
+        width: success ? 100 : null,
+        height: success ? 80 : null,
+      }],
+      error: null,
+    });
+    const store = createAdminSubmissionStore(
+      client as unknown as SupabaseClient<Database>,
+    );
+    const result = await store.associateStagedAsset(7, receipt);
+    assertEquals(result.outcome, outcome);
+    assertEquals(client.rpcCalls, [{
+      functionName: "add_admin_submission_asset_once",
+      args: { p_submission_id: 7, p_asset: receipt },
+    }]);
+    assertEquals(client.queries, []);
+  }
+  for (
+    const rows of [[], [{ outcome: "unknown" }], [{
+      outcome: "replayed",
+      id: null,
+      url: receipt.url,
+      width: 100,
+      height: 80,
+    }], [{
+      outcome: "replayed",
+      id: 3,
+      url: "https://wrong.test/a.jpg",
+      width: 100,
+      height: 80,
+    }], [{
+      outcome: "metadata_conflict",
+      id: 3,
+      url: null,
+      width: null,
+      height: null,
+    }], [{
+      outcome: "created",
+      id: 3,
+      url: receipt.url,
+      width: 100,
+      height: 80,
+    }, { outcome: "created", id: 4, url: receipt.url, width: 100, height: 80 }]]
+  ) {
+    const client = new FakeAdminClient();
+    client.queueRpc({ data: rows, error: null });
+    const store = createAdminSubmissionStore(
+      client as unknown as SupabaseClient<Database>,
+    );
+    await assertRejects(
+      () => store.associateStagedAsset(7, receipt),
+      AdminSubmissionStoreError,
+    );
+  }
+});
+
+Deno.test("Create rejects malformed replay results and missing authoritative detail", async () => {
+  const values = {
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
+    user_id: "00000000-0000-4000-8000-000000000001",
+    user_email: "admin@example.test",
+    user_name: "Admin",
+    category: "history" as const,
+    city: "Campobasso",
+    name: "A",
+    description: null,
+    description_delta: null,
+    start_date: null,
+    end_date: null,
+    all_day: false,
+    latitude: null,
+    longitude: null,
+  };
+  for (
+    const rows of [
+      [],
+      [{ outcome: "unknown", submission_id: 7 }],
+      [{ outcome: "created", submission_id: null }],
+      [{ outcome: "replayed", submission_id: 0 }],
+      [{ outcome: "created", submission_id: 7 }, {
+        outcome: "replayed",
+        submission_id: 7,
+      }],
+    ]
+  ) {
+    const client = new FakeAdminClient();
+    client.queueRpc({ data: rows, error: null });
+    const store = createAdminSubmissionStore(
+      client as unknown as SupabaseClient<Database>,
+    );
+    await assertRejects(() => store.create(values), AdminSubmissionStoreError);
+    assertEquals(client.queries, []);
+  }
+  const client = new FakeAdminClient();
+  client.queueRpc({
+    data: [{ outcome: "replayed", submission_id: 7 }],
+    error: null,
+  });
+  client.queueQuery({ data: null, error: null });
+  const store = createAdminSubmissionStore(
+    client as unknown as SupabaseClient<Database>,
+  );
+  await assertRejects(() => store.create(values), AdminSubmissionStoreError);
 });
