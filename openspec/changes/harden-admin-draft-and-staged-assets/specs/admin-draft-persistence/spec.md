@@ -109,6 +109,33 @@ Remote hydration supplied by a caller SHALL be accepted only when it cannot over
 - **WHEN** a remotely unconfirmed local snapshot checkpoints successfully
 - **THEN** only local durability changes and its remote confirmation remains outstanding
 
+### Requirement: Hydration publication follows latest request admission
+Within an activation, each hydration request SHALL receive an increasing admission revision. Only the latest admitted token with matching owner/target/activation SHALL publish success or failure after rechecking inside local arbitration. Stale results SHALL change none of C/E/P/R, readiness or accepted context metadata and SHALL NOT checkpoint. Newer failure SHALL NOT revive older authority. The local component SHALL not fetch remote data.
+
+#### Scenario: HYDRATION-01 Older request completes last
+- **WHEN** B1 is admitted, B2 supersedes it, B2 is accepted and B1 completes afterward
+- **THEN** B1 changes no state or readiness and cannot replace accepted B2
+
+#### Scenario: HYDRATION-02 Older request completes first
+- **WHEN** B1 is admitted, B2 supersedes it and B1 completes before B2
+- **THEN** B1 is already stale and cannot publish
+- **AND** only B2 may publish if its token remains authoritative and local-intent checks permit it
+
+#### Scenario: HYDRATION-03 Newer request fails
+- **WHEN** B2 supersedes B1, B2 fails and B1 later completes
+- **THEN** B1 remains stale and cannot replace B2's failure/readiness outcome or change any baseline
+- **AND** another attempt requires a new admission token, without a local checkpoint caused by stale rejection
+
+#### Scenario: HYDRATION-04 Checkpoint overlaps hydration
+- **WHEN** checkpoint A starts and a newer hydration is admitted while results become available in either order
+- **THEN** the actual checkpoint write and baseline settlement finish inside local arbitration before a waiting hydration can publish
+- **AND** physical P reports only successful writes, while hydration rechecks latest-request authority after waiting
+- **AND** a checkpoint entering after accepted hydration captures current state rather than replaying an older snapshot
+
+#### Scenario: HYDRATION-05 Activation replacement
+- **WHEN** an A1 hydration completes after B then A2 has started, even with an equal request revision
+- **THEN** its old activation token prevents all publication independently of same-activation ordering
+
 ### Requirement: Initialization preserves absent valid and unknown ownership
 Concurrent local initialization callers for one activation SHALL share completion. Valid restoration SHALL expose the exact checkpoint and fully reconciled assets. Authoritative absence SHALL be scoped to its account/target. Loading or decoding failure SHALL preserve unknown ownership and block identity-dependent writes/cleanup instead of overwriting it with a fresh session.
 
@@ -121,6 +148,12 @@ Concurrent local initialization callers for one activation SHALL share completio
 - **WHEN** draft loading fails or an unsupported/conflicting row is encountered
 - **THEN** no fresh checkpoint or destructive absence cleanup is authorized
 - **AND** durable rows/files remain preserved for explicit retry
+
+#### Scenario: Restored and fresh baselines are distinct
+- **WHEN** lookup returns a valid checkpoint, authoritative absence or a read failure
+- **THEN** a valid restoration sets C = E = P = restoredSnapshot with historical R
+- **AND** absence sets C = E = freshSnapshot and P = null, with a stable unpersisted identity and clean local state
+- **AND** read failure instead leaves P/ownership unknown and owner-dependent writes/acquisition unavailable
 
 #### Scenario: One target is absent
 - **WHEN** target X is authoritatively absent and Y remains stored

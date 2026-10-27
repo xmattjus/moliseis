@@ -81,6 +81,36 @@ Storage SHALL deduplicate within exact owner/session, enforce the existing per-f
 - **WHEN** newly supplied verified associated count plus valid staged count exceeds five
 - **THEN** all valid committed local files remain preserved, intake reports over-capacity and exact-owner local removal remains available
 
+### Requirement: Capacity context matches the accepted owner and remote context
+Acquisition SHALL validate account, local session, activation, target and associated count against current local context inside arbitration. Existing-target count SHALL belong to its exact accepted remote detail/baseline revision; missing, invalid or incompatible context SHALL return unavailable capacity without asset mutation. A genuine new target SHALL derive zero remote associations from its own identity, not an empty query. Storage SHALL not fetch remotely.
+
+#### Scenario: CAPACITY-01 Different target
+- **WHEN** capacity from target A is supplied while B is active, including a different account/session/activation
+- **THEN** acquisition is refused without mutating either target's assets
+
+#### Scenario: CAPACITY-02 Superseded remote snapshot
+- **WHEN** a count belongs to an older accepted remote context than the active one, even with equal editable fields or server timestamp
+- **THEN** acquisition is refused until a compatible context is supplied
+- **AND** queued work rechecks compatibility inside arbitration before acquisition
+
+#### Scenario: CAPACITY-03 New local submission
+- **WHEN** the exact authorized new-target session has no remote ID
+- **THEN** combined capacity uses zero remote associations plus that session's staged count without querying or inventing a remote row
+- **AND** a previous persisted target's count/context cannot authorize acquisition
+
+#### Scenario: CAPACITY-04 Unknown context
+- **WHEN** count, ownership or accepted remote revision is missing, invalid or unverifiable for an existing target
+- **THEN** unavailable capacity prevents new acquisition and existing staged work remains untouched
+
+#### Scenario: CAPACITY-05 Over-capacity restoration
+- **WHEN** a compatible latest remote count makes restored associated-plus-staged count exceed five
+- **THEN** all valid local assets remain durable and removable without automatic deletion or truncation
+
+#### Scenario: CAPACITY-06 Backend changes after local validation
+- **WHEN** local admission succeeds and concurrent backend changes later consume capacity or finalize the submission
+- **THEN** local validation provides no guarantee of remote acceptance
+- **AND** future remote association must handle the server's pending-only/max-five rejection, without a backend call from local storage
+
 ### Requirement: Reconciliation requires reliable owner knowledge
 Reconciliation SHALL restore valid exact-owner descriptor/file pairs, retain one deterministic valid duplicate and remove invalid descriptors or contained temp/orphan residue. Hard storage failure SHALL return unavailable state without partial runtime publication. Failed draft loading SHALL not authorize absence cleanup, and inactive valid sessions SHALL not be treated as orphaned.
 
