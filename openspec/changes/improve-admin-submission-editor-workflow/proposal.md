@@ -1,3 +1,5 @@
+> Planning status: the local staging and route-ownership assumptions in this proposal are superseded by [harden-admin-draft-and-staged-assets](../harden-admin-draft-and-staged-assets/proposal.md). Its [requirements disposition](../harden-admin-draft-and-staged-assets/design.md#obsolete-admin-requirements-disposition) assigns inert local foundations to Plan 1 and application-owned editor, integrated Save/Progress and safely contracted shared picker activation to Plan 2; Stale Recovery and Dirty Exit remain later plans. This historical proposal remains unimplemented and must not be applied alongside its replacement. Preserve it pending explicit reviewed withdrawal/supersession; do not archive or synchronize it as delivered.
+
 ## Why
 
 The admin submission editor currently closes after a successful Save and hides image selection until a new submission has first been persisted, forcing administrators through unnecessary reopen cycles. Both problems require the same editor session to transition safely from an in-memory draft to a persisted pending submission while preserving retryable local work.

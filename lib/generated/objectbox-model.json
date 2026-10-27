@@ -474,10 +474,94 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "22:3156647948473703965",
+      "lastPropertyId": "6:1312570068438228019",
+      "name": "AdminSubmissionDraftEntity",
+      "properties": [
+        {
+          "id": "1:721909354471812203",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:1662650590647165792",
+          "name": "lookupKey",
+          "indexId": "52:2856286786408175038",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "3:4670428331277357059",
+          "name": "accountId",
+          "indexId": "53:8011206763246532662",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:3035539499604656572",
+          "name": "sessionId",
+          "indexId": "54:3769900885099713965",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "5:7694538358178906550",
+          "name": "submissionId",
+          "type": 6
+        },
+        {
+          "id": "6:1312570068438228019",
+          "name": "payload",
+          "type": 9
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "23:9022804856010631971",
+      "lastPropertyId": "6:3148748881204609058",
+      "name": "AdminSubmissionStagedAssetEntity",
+      "properties": [
+        {
+          "id": "1:7051017442864704928",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:5840747899017396852",
+          "name": "accountId",
+          "type": 9
+        },
+        {
+          "id": "3:9109882918227830044",
+          "name": "sessionId",
+          "type": 9
+        },
+        {
+          "id": "4:2170614253733531185",
+          "name": "submissionId",
+          "type": 6
+        },
+        {
+          "id": "5:1244875758301198355",
+          "name": "digest",
+          "type": 9
+        },
+        {
+          "id": "6:3148748881204609058",
+          "name": "relativePath",
+          "type": 9
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "21:4363184663950376915",
-  "lastIndexId": "51:4917123769674284820",
+  "lastEntityId": "23:9022804856010631971",
+  "lastIndexId": "54:3769900885099713965",
   "lastRelationId": "2:6027552760664793313",
   "lastSequenceId": "0:0",
   "modelVersion": 5,
