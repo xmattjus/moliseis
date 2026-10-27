@@ -657,7 +657,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(23, 9022804856010631971),
     name: 'AdminSubmissionStagedAssetEntity',
-    lastPropertyId: const obx_int.IdUid(6, 3148748881204609058),
+    lastPropertyId: const obx_int.IdUid(7, 1179791889762300209),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -693,6 +693,12 @@ final _entities = <obx_int.ModelEntity>[
       obx_int.ModelProperty(
         id: const obx_int.IdUid(6, 3148748881204609058),
         name: 'relativePath',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 1179791889762300209),
+        name: 'progressPayload',
         type: 9,
         flags: 0,
       ),
@@ -1890,13 +1896,17 @@ obx_int.ModelDefinition getObjectBoxModel() {
                 final sessionIdOffset = fbb.writeString(object.sessionId);
                 final digestOffset = fbb.writeString(object.digest);
                 final relativePathOffset = fbb.writeString(object.relativePath);
-                fbb.startTable(7);
+                final progressPayloadOffset = object.progressPayload == null
+                    ? null
+                    : fbb.writeString(object.progressPayload!);
+                fbb.startTable(8);
                 fbb.addInt64(0, object.id);
                 fbb.addOffset(1, accountIdOffset);
                 fbb.addOffset(2, sessionIdOffset);
                 fbb.addInt64(3, object.submissionId);
                 fbb.addOffset(4, digestOffset);
                 fbb.addOffset(5, relativePathOffset);
+                fbb.addOffset(6, progressPayloadOffset);
                 fbb.finish(fbb.endTable());
                 return object.id;
               },
@@ -1926,6 +1936,9 @@ obx_int.ModelDefinition getObjectBoxModel() {
               4,
               0,
             );
+            final progressPayloadParam = const fb.StringReader(
+              asciiOptimization: true,
+            ).vTableGetNullable(buffer, rootOffset, 16);
             final object = AdminSubmissionStagedAssetEntity(
               accountId: accountIdParam,
               sessionId: sessionIdParam,
@@ -1933,6 +1946,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
               digest: digestParam,
               relativePath: relativePathParam,
               id: idParam,
+              progressPayload: progressPayloadParam,
             );
 
             return object;
@@ -2435,5 +2449,11 @@ class AdminSubmissionStagedAssetEntity_ {
   static final relativePath =
       obx.QueryStringProperty<AdminSubmissionStagedAssetEntity>(
         _entities[9].properties[5],
+      );
+
+  /// See [AdminSubmissionStagedAssetEntity.progressPayload].
+  static final progressPayload =
+      obx.QueryStringProperty<AdminSubmissionStagedAssetEntity>(
+        _entities[9].properties[6],
       );
 }

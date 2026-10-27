@@ -10,13 +10,18 @@ import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
+import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_input.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
+import 'package:moliseis/domain/models/admin_submission_staged_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/image_upload_task.dart';
+import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
+import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
+import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
@@ -29,6 +34,9 @@ typedef _SaveDraft = ({
   Exception? error,
   EventTimeIssue? issue,
   int revision,
+  AdminDraftSnapshot snapshot,
+  List<AdminSubmissionStagedAsset> assets,
+  AdminSubmissionDraft? physicalCheckpoint,
 });
 typedef _SourceAcknowledgment = ({
   bool? acknowledge,
@@ -36,10 +44,22 @@ typedef _SourceAcknowledgment = ({
   bool? ignore,
 });
 
-/// Route-scoped state for creating or editing an admin submission.
-///
-/// The editor keeps its draft only in memory and deliberately has no public
-/// draft-repository dependency.
+/// Visible phase of the existing single-flight Save command.
+enum AdminSavePhase {
+  idle,
+  checkpoint,
+  fields,
+  adoption,
+  upload,
+  association,
+  completed,
+  partialFailure,
+  failed,
+  unknownOutcome,
+  conflict,
+}
+
+/// Application-owned Admin editor, composed with the exact-owner local session.
 class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Creates editor state for a new submission or the supplied [submissionId].
   ///
@@ -49,10 +69,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     required AdminContentSubmissionRepository repository,
     required ContentSubmissionRepository contentSubmissionRepository,
     ImagePicker? imagePicker,
-    this.submissionId,
+    int? submissionId,
+    AdminDraftSession? draftSession,
     String? creatorName,
     String? creatorEmail,
-  }) : _repository = repository,
+  }) : _legacySubmissionId = submissionId,
+       _draftSession = draftSession,
+       _repository = repository,
        _contentSubmissionRepository = contentSubmissionRepository,
        _imagePicker = imagePicker ?? ImagePicker(),
        _contributorName = creatorName,
@@ -98,27 +121,312 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   final ContentSubmissionRepository _contentSubmissionRepository;
   final ImagePicker _imagePicker;
 
-  /// The persisted identifier being edited, or null for a new submission.
-  final int? submissionId;
+  final AdminDraftSession? _draftSession;
+  final int? _legacySubmissionId;
+  AdminDraftSnapshot _legacySnapshot = AdminDraftSnapshot();
+  int _generation = 0;
+  bool _revoked = false;
+  AdminAuthViewModel? _auth;
+  String? _activeAccountId;
+  final _commandGenerations = <commands.Command<dynamic, dynamic>, int>{};
 
-  ContentCategory? _category;
-  String? _city;
-  String? _name;
-  String? _description;
-  List<Map<String, dynamic>>? _descriptionDelta;
+  /// Current local activation, captured when establishing rendered callbacks.
+  AdminDraftActivation? get activation => _draftSession?.captureActivation();
+
+  /// Whether this exact session has a verified durable owner.
+  bool get hasDurableDraft =>
+      _draftSession?.state?.durability == AdminDraftDurability.durable;
+
+  /// Original authenticated owner, independently of contributor identity.
+  String? get accountId => _activeAccountId;
+
+  /// Stable local UUID, retained after Create adoption.
+  String? get sessionId => _draftSession?.state?.owner.sessionId;
+
+  /// Current persisted target, including an adopted Create identity.
+  int? get submissionId =>
+      _draftSession?.state?.owner.submissionId ?? _legacySubmissionId;
+
+  /// Whether the supplied rendered callback still owns this exact activation.
+  bool isActivationCurrent(AdminDraftActivation? token) {
+    if (_disposed || _revoked) return false;
+    if (_draftSession == null) return token == null;
+    return _draftSession.isActivationCurrent(token);
+  }
+
+  bool _authority(AdminDraftActivation? token) => isActivationCurrent(token);
+  bool _obsolete(int generation) =>
+      _disposed || _revoked || generation != _generation;
+
+  /// Attaches directly so auth revocation precedes deferred Provider rebuilds.
+  void bindAuth(AdminAuthViewModel auth) {
+    if (identical(_auth, auth)) return;
+    _auth?.removeListener(_onAuthChanged);
+    _auth = auth;
+    auth.addListener(_onAuthChanged);
+    _onAuthChanged();
+  }
+
+  void _onAuthChanged() {
+    final auth = _auth;
+    if (auth == null) return;
+    if (!auth.isAdmin ||
+        (_activeAccountId != null &&
+            auth.currentUser?.id != _activeAccountId)) {
+      revoke();
+    }
+  }
+
+  /// Synchronously removes every old continuation's publication authority.
+  void revoke() {
+    if (_disposed) return;
+    _generation++;
+    _revoked = true;
+    _abandonPicker();
+    _activeImageUploadTask?.cancel();
+    _draftSession?.revoke();
+    _activeAccountId = null;
+    _clearContext();
+    _notifyListeners();
+  }
+
+  /// Activates a durable target without replacing dirty or admitted work.
+  Future<Result<void>> activate({
+    required String accountId,
+    int? submissionId,
+    String? sessionId,
+    String? creatorName,
+    String? creatorEmail,
+  }) async {
+    final session = _draftSession;
+    if (_disposed ||
+        session == null ||
+        (_auth != null &&
+            (!_auth!.isAdmin || _auth!.currentUser?.id != accountId))) {
+      return _unavailable();
+    }
+    final activationGeneration = _generation;
+    final previous = session.state?.owner;
+    final same =
+        !_revoked &&
+        previous?.accountId == accountId &&
+        (sessionId != null
+            ? previous?.sessionId == sessionId
+            : previous?.submissionId == submissionId);
+    if (same) return await session.initialize();
+    if (!_revoked && operationRunning) {
+      return Result.error(
+        Exception('Attendi il completamento dell’operazione corrente.'),
+      );
+    }
+    final result = sessionId == null
+        ? await session.activate(
+            AdminDraftOwner(accountId: accountId, submissionId: submissionId),
+          )
+        : await session.activateBySession(
+            accountId: accountId,
+            sessionId: sessionId,
+          );
+    if (_disposed ||
+        activationGeneration != _generation ||
+        (_auth != null &&
+            (!_auth!.isAdmin || _auth!.currentUser?.id != accountId))) {
+      return _unavailable();
+    }
+    if (result is Error<void>) return result;
+    _generation++;
+    _revoked = false;
+    _activeAccountId = accountId;
+    _clearContext();
+    _contributorName = creatorName;
+    _contributorEmail = creatorEmail;
+    _hydrationRevision++;
+    _notifyListeners();
+    return const Result.success(null);
+  }
+
+  void _clearContext() {
+    _isDirty = false;
+    _loadEffectId = null;
+    _saveEffectId = null;
+    _rejectEffectId = null;
+    _promoteEffectId = null;
+    _linkEffectId = null;
+    _previewEffectId = null;
+    _candidatesEffectId = null;
+    _applyEffectId = null;
+    _keepEffectId = null;
+    _addEffectId = null;
+    _deleteEffectId = null;
+    _saveSessionId = null;
+    _lastSaveAttempt = null;
+    _eventTimeIssue = null;
+    _status = null;
+    _promotion = null;
+    _externalEvent = null;
+    _createdAt = null;
+    _modifiedAt = null;
+    _modifiedAtToken = null;
+    _assets.clear();
+    _hasLoadedDetail = false;
+    _contributorName = null;
+    _contributorEmail = null;
+    _targetEventId = null;
+    _mergePreview = null;
+    _candidates = null;
+    _acknowledgeCurrentSource = false;
+    _acknowledgedSourceHash = null;
+    _ignoreSource = false;
+    _candidateSearch = '';
+    _editorRevision++;
+    _draftRevision++;
+    _savePhase =
+        _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent != null
+        ? AdminSavePhase.unknownOutcome
+        : AdminSavePhase.idle;
+    _remoteUnavailable = false;
+    _confirmedFields = null;
+    _liveReceipts.clear();
+    _loadSnapshot = const commands.CommandResult(null, null, null, false);
+    _saveSnapshot = const commands.CommandResult(null, null, null, false);
+    _rejectSnapshot = const commands.CommandResult(null, null, null, false);
+    _promoteSnapshot = const commands.CommandResult(null, null, null, false);
+    _linkSnapshot = const commands.CommandResult(null, null, null, false);
+    _applySnapshot = const commands.CommandResult(null, null, null, false);
+    _keepSnapshot = const commands.CommandResult(null, null, null, false);
+    _addSnapshot = const commands.CommandResult(null, null, null, false);
+    _deleteSnapshot = const commands.CommandResult(null, null, null, false);
+    _previewSnapshot = const commands.CommandResult(null, null, null, false);
+    _candidatesSnapshot = const commands.CommandResult(null, null, null, false);
+  }
+
+  /// Whether explicit local parking can be admitted without remote work.
+  bool get canCheckpoint =>
+      !_disposed && !_revoked && (_draftSession?.state?.ready ?? false);
+
+  /// Durably parks incomplete values without executing a remote mutation.
+  Future<Result<void>> checkpointLocal() async {
+    if (!canCheckpoint) return _unavailable();
+    final ownerGeneration = _generation;
+    final result = await _draftSession!.checkpoint(requireDurableOwner: true);
+    if (_obsolete(ownerGeneration)) return _unavailable();
+    _notifyListeners();
+    return result;
+  }
+
+  AdminDraftSnapshot get _fields =>
+      _draftSession?.state?.current ?? _legacySnapshot;
+  void _writeFields(AdminDraftSnapshot value) {
+    final session = _draftSession;
+    if (session == null) {
+      _legacySnapshot = value;
+      return;
+    }
+    final token = activation;
+    if (token != null) session.setSnapshot(value, activation: token);
+  }
+
+  ContentCategory? get _category => _fields.category;
+  set _category(ContentCategory? value) =>
+      _writeFields(_fields.copyWith(category: value));
+  String? get _city => _fields.city;
+  set _city(String? value) => _writeFields(_fields.copyWith(city: value));
+  String? get _name => _fields.name;
+  set _name(String? value) => _writeFields(_fields.copyWith(name: value));
+  String? get _description => _fields.description;
+  set _description(String? value) =>
+      _writeFields(_fields.copyWith(description: value));
+  List<Map<String, dynamic>>? get _descriptionDelta => _fields.descriptionDelta;
+  set _descriptionDelta(List<Map<String, dynamic>>? value) =>
+      _writeFields(_fields.copyWith(descriptionDelta: value));
+  EventDateDraft get _eventDates => _fields.eventDates;
+  set _eventDates(EventDateDraft value) =>
+      _writeFields(_fields.copyWith(eventDates: value));
+  String get _latitudeText => _fields.latitudeText;
+  set _latitudeText(String value) =>
+      _writeFields(_fields.copyWith(latitudeText: value));
+  String get _longitudeText => _fields.longitudeText;
+  set _longitudeText(String value) =>
+      _writeFields(_fields.copyWith(longitudeText: value));
   final EventTimePolicy _eventTimePolicy = EventTimePolicy();
-  EventDateDraft _eventDates = const EventDateDraft.disabled();
   EventTimeIssue? _eventTimeIssue;
-  String _latitudeText = '';
-  String _longitudeText = '';
   String? _contributorName;
   String? _contributorEmail;
   AdminSubmissionStatus? _status;
   AdminSubmissionPromotion? _promotion;
   DateTime? _createdAt;
   DateTime? _modifiedAt;
+  String? _modifiedAtToken;
+  bool _remoteUnavailable = false;
+  ({AdminFieldWriteIntent intent, AdminSubmission detail, bool replayed})?
+  _confirmedFields;
+  final _liveReceipts = <String, AdminStagedAssetProgress>{};
+  AdminSavePhase _savePhase = AdminSavePhase.idle;
+  String? _saveSessionId;
+  _SaveDraft? _lastSaveAttempt;
+
+  /// Current operation phase, separate from command admission.
+  AdminSavePhase get savePhase => _savePhase;
+
+  /// Exact session that admitted the displayed Save.
+  String? get saveSessionId => _saveSessionId;
+
+  /// Private committed files awaiting remote persistence.
+  List<AdminSubmissionStagedAsset> get stagedAssets =>
+      _draftSession?.state?.assets ?? const [];
   final List<AdminSubmissionAsset> _assets = <AdminSubmissionAsset>[];
   ImageUploadTask? _activeImageUploadTask;
+  Completer<void>? _pickerAbandonment;
+  String? _pickerNonce;
+
+  /// Whether this Admin request is awaiting its original native callback.
+  bool get pickerWaiting => _pickerNonce != null;
+
+  /// Identity captured by the currently rendered local escape action.
+  String? get pickerRequestNonce => _pickerNonce;
+
+  /// Releases only the rendered request; native cancellation is not claimed.
+  void abandonPicker({required String requestNonce}) {
+    if (_pickerNonce != requestNonce) return;
+    _abandonPicker();
+    _notifyListeners();
+  }
+
+  void _abandonPicker() {
+    final pending = _pickerAbandonment;
+    _pickerNonce = null;
+    _pickerAbandonment = null;
+    if (pending != null && !pending.isCompleted) pending.complete();
+  }
+
+  /// Resolves committed private bytes for an owner-checked preview.
+  Future<Result<File>> stagedAssetFile(AdminSubmissionStagedAsset asset) =>
+      _draftSession?.resolveAssetFile(asset) ??
+      Future.value(_unavailable<File>());
+
+  /// Removes only a captured local descriptor while no mutation owns it.
+  bool requestRemoveStagedAsset(
+    AdminSubmissionStagedAsset asset, {
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation) ||
+        !_canAdmit(_deleteCommand) ||
+        _draftSession == null) {
+      return false;
+    }
+    final ownerGeneration = _generation;
+    _deleteEffectId = ++_nextEffectId;
+    _deleteSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_deleteCommand, () async {
+      if (_obsolete(ownerGeneration) || !_authority(activation)) {
+        return _unavailable<void>();
+      }
+      final result = await _draftSession.remove(asset);
+      if (!_obsolete(ownerGeneration)) _notifyListeners();
+      return result;
+    });
+  }
+
   var _hasLoadedDetail = false;
   var _isDirty = false;
   var _disposed = false;
@@ -187,8 +495,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       Map<commands.Command<dynamic, dynamic>, VoidCallback>.identity();
   int _draftRevision = 0;
   int _editorRevision = 0;
-  int? _savedExecutionId;
-  int? _savedDraftRevision;
   String _candidateSearch = '';
   int _candidateRevision = 0;
   AdminEventCandidates? _candidates;
@@ -205,15 +511,6 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Whether this owner has revoked admission and publication authority.
   bool get isDisposed => _disposed;
 
-  /// A current clean Save success remains close-authorized after settlement.
-  bool get canCloseAfterSave =>
-      !_disposed &&
-      !_isDirty &&
-      _savedExecutionId == _saveEffectId &&
-      _savedExecutionId != null &&
-      _savedDraftRevision == _draftRevision &&
-      _saveSnapshot.completed;
-
   bool _acknowledgeCurrentSource = false;
   String? _acknowledgedSourceHash;
   bool _ignoreSource = false;
@@ -225,7 +522,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool get ignoreSource => _ignoreSource;
   AdminSubmission? get followupSubmission => _followupSubmission;
 
-  void setAcknowledgeCurrentSource({required bool selected}) {
+  void setAcknowledgeCurrentSource({
+    required bool selected,
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return;
     if (!_canChangeContext) return;
     _acknowledgeCurrentSource = selected && isSourceStale;
     _acknowledgedSourceHash = _acknowledgeCurrentSource
@@ -234,7 +535,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _notifyListeners();
   }
 
-  void setIgnoreSource({required bool ignored}) {
+  void setIgnoreSource({
+    required bool ignored,
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return;
     if (!_canChangeContext) return;
     _ignoreSource = ignored && _externalEvent != null;
     _notifyListeners();
@@ -256,7 +561,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   AdminEventMergePreview? get mergePreview => _mergePreview;
 
   /// Selecting a different target invalidates its preview.
-  void selectTargetEvent(int? id) {
+  void selectTargetEvent(int? id, {AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return;
     if (!_canChangeContext) return;
     _targetEventId = id;
     _editorRevision++;
@@ -345,7 +651,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Create mode is always editable; an existing submission stays editable
   /// only while it is pending. Accepted and rejected rows are read-only.
   bool get isEditable =>
-      !isEditMode || _status == AdminSubmissionStatus.pending;
+      !_revoked &&
+      (!isEditMode ||
+          _status == AdminSubmissionStatus.pending ||
+          (_status == null &&
+              _draftSession?.state?.remoteBaseline?.status ==
+                  AdminSubmissionStatus.pending));
 
   /// Timestamp at which the loaded submission was created.
   DateTime? get createdAt => _createdAt;
@@ -364,7 +675,14 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool get loading => _reserved.contains(_loadCommand);
 
   /// Whether edits have not yet been saved.
-  bool get isDirty => _isDirty;
+  bool get isDirty {
+    final state = _draftSession?.state;
+    if (state == null) return _isDirty;
+    return state.remoteBaseline == null ||
+        !state.current.sameRemoteProjection(state.remoteBaseline!.snapshot) ||
+        state.assets.isNotEmpty ||
+        state.physicalCheckpoint?.fieldWriteIntent != null;
+  }
 
   /// Whether an asset add or delete operation is in progress.
   bool get assetMutationRunning =>
@@ -390,18 +708,31 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _candidatesCommand,
   ];
 
-  bool get _canChangeContext => !_disposed && !loading && !operationRunning;
+  bool get _canChangeContext =>
+      !_disposed && !_revoked && !loading && !operationRunning;
   bool get _canChangeFields =>
       !_disposed &&
-      !loading &&
-      (!operationRunning || _reserved.contains(_saveCommand));
+      !_revoked &&
+      (_draftSession != null || !loading) &&
+      (!_mutations.any(
+        (command) =>
+            _reserved.contains(command) &&
+            _commandGenerations[command] == _generation &&
+            !identical(command, _saveCommand),
+      ));
 
   bool _canAdmit(commands.Command<dynamic, dynamic> command) {
-    if (_disposed || _stopped || _reserved.contains(command) || loading) {
+    if (_disposed ||
+        _revoked ||
+        (_draftSession != null && !(_draftSession.state?.ready ?? false)) ||
+        _stopped ||
+        _reserved.contains(command) ||
+        loading) {
       return false;
     }
     if (identical(command, _loadCommand)) {
-      return !(_hasLoadedDetail && _isDirty) && _reserved.isEmpty;
+      return (_draftSession != null || !(_hasLoadedDetail && isDirty)) &&
+          _reserved.isEmpty;
     }
     if (identical(command, _candidatesCommand)) return true;
     if (identical(command, _previewCommand)) return !operationRunning;
@@ -411,21 +742,27 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Updates the selected category and marks the editor dirty.
-  void setCategory(ContentCategory? category) {
+  void setCategory(
+    ContentCategory? category, {
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return;
     if (!_canChangeFields) return;
     _category = category;
     _markDirty();
   }
 
   /// Updates the city and marks the editor dirty.
-  void setCity(String? city) {
+  void setCity(String? city, {AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return;
     if (!_canChangeFields) return;
     _city = city;
     _markDirty();
   }
 
   /// Updates the place or event name and marks the editor dirty.
-  void setName(String? name) {
+  void setName(String? name, {AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return;
     if (!_canChangeFields) return;
     _name = name;
     _markDirty();
@@ -435,7 +772,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   void setDescription({
     required String? description,
     required List<Map<String, dynamic>>? descriptionDelta,
+    AdminDraftActivation? activation,
   }) {
+    if (!_authority(activation)) return;
     if (!_canChangeFields) return;
     _description = description;
     _descriptionDelta = descriptionDelta;
@@ -444,13 +783,18 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Enables or disables event mode without inventing an instant.
   /// Changes precision without restoring an old or technical clock.
-  void setAllDay({required bool allDay}) {
+  void setAllDay({required bool allDay, AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return;
     _applyTemporalEdit(
       _eventTimePolicy.changeAllDay(_eventDates, allDay: allDay),
     );
   }
 
-  void setEventEnabled({required bool enabled}) {
+  void setEventEnabled({
+    required bool enabled,
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return;
     if (!_canChangeFields) return;
     if (_externalEvent != null && !enabled) return;
     _eventDates = enabled
@@ -461,7 +805,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Changes the start's Rome calendar day while preserving exact precision.
-  void setStartCalendarDate(EventCalendarDate date) {
+  void setStartCalendarDate(
+    EventCalendarDate date, {
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return;
     _applyTemporalEdit(
       _eventTimePolicy.changeStartCalendarDate(
         _eventTimePolicy.enable(_eventDates),
@@ -471,13 +819,21 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Changes the start's Rome clock time while preserving sub-minute precision.
-  void setStartClockTime(EventClockTime time) {
+  void setStartClockTime(
+    EventClockTime time, {
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return;
     final draft = _eventTimePolicy.enable(_eventDates);
     _applyTemporalEdit(_eventTimePolicy.changeStartClockTime(draft, time));
   }
 
   /// Changes the inclusive Rome calendar day for the event end.
-  void setEndCalendarDate(EventCalendarDate date) {
+  void setEndCalendarDate(
+    EventCalendarDate date, {
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return;
     _applyTemporalEdit(
       _eventTimePolicy.changeEndCalendarDate(
         _eventTimePolicy.enable(_eventDates),
@@ -515,14 +871,16 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   ///
   /// Invalid or partial text is kept as-is so it stays visible and blocks
   /// Save until corrected.
-  void setLatitudeText(String value) {
+  void setLatitudeText(String value, {AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return;
     if (!_canChangeFields) return;
     _latitudeText = value;
     _markDirty();
   }
 
   /// Updates the raw longitude draft and marks the editor dirty.
-  void setLongitudeText(String value) {
+  void setLongitudeText(String value, {AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return;
     if (!_canChangeFields) return;
     _longitudeText = value;
     _markDirty();
@@ -532,7 +890,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   ///
   /// This is one logical change: both drafts are written with six-decimal
   /// formatting and the editor is marked dirty exactly once.
-  void setCoordinates(double latitude, double longitude) {
+  void setCoordinates(
+    double latitude,
+    double longitude, {
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return;
     if (!_canChangeFields) return;
     _latitudeText = latitude.toStringAsFixed(6);
     _longitudeText = longitude.toStringAsFixed(6);
@@ -540,7 +903,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Changes desired query and invalidates older results without starting I/O.
-  void setCandidateSearch(String value) {
+  void setCandidateSearch(String value, {AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return;
     if (_disposed || value == _candidateSearch) return;
     _candidateSearch = value;
     _candidateRevision++;
@@ -564,7 +928,87 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   int? get saveExecutionId => _saveEffectId;
 
   /// Whether save can synchronously reserve its operation.
-  bool get canRequestSave => _canAdmit(_saveCommand);
+  bool get canRequestSave =>
+      _canAdmit(_saveCommand) &&
+      !_remoteUnavailable &&
+      (_draftSession?.state?.physicalCheckpoint?.fieldWriteIntent?.kind !=
+              AdminFieldWriteKind.update ||
+          _confirmedFields != null);
+
+  /// Whether explicit continuation can retain captured fields and staged work.
+  bool get canResumeCapturedSave {
+    if (!canRequestSave) return false;
+    if (_draftSession?.state?.physicalCheckpoint?.fieldWriteIntent?.kind ==
+            AdminFieldWriteKind.create ||
+        _confirmedFields != null) {
+      return true;
+    }
+    final previous = _lastSaveAttempt;
+    if (previous != null) {
+      final captured = previous.assets.map((item) => item.digest).toSet();
+      return stagedAssets.any((item) => captured.contains(item.digest));
+    }
+    return _hasLoadedDetail &&
+        stagedAssets.isNotEmpty &&
+        _draftSession?.state?.remoteBaseline?.modifiedAtToken != null;
+  }
+
+  _SaveDraft _captureContinuation(_SaveDraft current) {
+    final intent = _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent;
+    if (intent != null) {
+      return (
+        input: _inputFor(intent.snapshot),
+        error: null,
+        issue: null,
+        revision: current.revision,
+        snapshot: intent.snapshot,
+        assets: current.assets,
+        physicalCheckpoint: current.physicalCheckpoint,
+      );
+    }
+    final previous = _lastSaveAttempt;
+    if (previous != null) {
+      final remaining = stagedAssets.map((item) => item.digest).toSet();
+      return (
+        input: previous.input,
+        error: null,
+        issue: null,
+        revision: previous.revision,
+        snapshot: previous.snapshot,
+        assets: previous.assets
+            .where((item) => remaining.contains(item.digest))
+            .toList(growable: false),
+        physicalCheckpoint: previous.physicalCheckpoint,
+      );
+    }
+    final baseline = _draftSession!.state!.remoteBaseline!;
+    return (
+      input: _inputFor(baseline.snapshot),
+      error: null,
+      issue: null,
+      revision: current.revision,
+      snapshot: baseline.snapshot,
+      assets: current.assets,
+      physicalCheckpoint: current.physicalCheckpoint,
+    );
+  }
+
+  /// Physical Save reservation, including its synchronous admission turn.
+  bool get isSaveRunning => _reserved.contains(_saveCommand);
+
+  /// Explicit observation is the only recovery for unresolved Update intent.
+  bool get canRequestSaveReadBack =>
+      _canAdmit(_loadCommand) &&
+      _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent?.kind ==
+          AdminFieldWriteKind.update;
+
+  /// Reads back captured A without resending an uncertain Update.
+  bool requestSaveReadBack({AdminDraftActivation? activation}) {
+    if (!_authority(activation) || !canRequestSaveReadBack) return false;
+    _loadEffectId = ++_nextEffectId;
+    _loadSnapshot = const commands.CommandResult.isLoading();
+    return _admit(_loadCommand, _readBackSave);
+  }
 
   /// Last authorized reject state, frozen when the owner is revoked.
   commands.CommandResult<void, Result<void>?> get rejectSnapshot =>
@@ -657,7 +1101,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool get canRequestDeleteAsset => _canAdmit(_deleteCommand);
 
   /// Reserves an exclusive initial or explicit detail refresh.
-  bool requestLoad() {
+  bool requestLoad({AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return false;
     if (!canRequestLoad) return false;
     _loadEffectId = ++_nextEffectId;
     _loadSnapshot = const commands.CommandResult.isLoading();
@@ -665,17 +1110,30 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Captures the complete current draft before notifying or deferred entry.
-  bool requestSave() {
-    if (!canRequestSave) return false;
-    final draft = _captureSave();
-    final effectId = _nextEffectId + 1;
+  bool requestSave({
+    AdminDraftActivation? activation,
+    bool resumeCaptured = false,
+  }) {
+    if (!_authority(activation)) return false;
+    if (!canRequestSave || (resumeCaptured && !canResumeCapturedSave)) {
+      return false;
+    }
+    var draft = _captureSave();
+    if (resumeCaptured ||
+        _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent != null) {
+      draft = _captureContinuation(draft);
+    }
+    if (draft.error == null) _lastSaveAttempt = draft;
+    _saveSessionId = sessionId;
+    _savePhase = AdminSavePhase.checkpoint;
     _saveEffectId = ++_nextEffectId;
     _saveSnapshot = const commands.CommandResult.isLoading();
-    return _admit(_saveCommand, () => _save(draft, saveEffectId: effectId));
+    return _admit(_saveCommand, () => _save(draft));
   }
 
   /// Reserves rejection with immutable source acknowledgment.
-  bool requestReject() {
+  bool requestReject({AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return false;
     if (!canRequestReject) return false;
     final guard = _moderationGuardError();
     final source = _sourceAcknowledgment;
@@ -685,7 +1143,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Reserves publication to the explicitly selected target.
-  bool requestPromote(AdminPromotionTarget target) {
+  bool requestPromote(
+    AdminPromotionTarget target, {
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return false;
     if (!canRequestPromote) return false;
     var guard = _moderationGuardError();
     EventTimeIssue? issue;
@@ -717,7 +1179,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Reserves a link without copying canonical Event fields or media.
-  bool requestLink(int target) {
+  bool requestLink(int target, {AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return false;
     if (!canRequestLink) return false;
     final guard =
         _moderationGuardError() ??
@@ -731,11 +1194,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Captures current target and generation for an explicit preview.
-  bool requestPreview() {
+  bool requestPreview({AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return false;
     if (!canRequestPreview) return false;
     final target = _targetEventId;
     final generation = _previewGeneration;
-    final eligible = submissionId != null && target != null && !_isDirty;
+    final eligible = submissionId != null && target != null && !isDirty;
     _previewEffectId = ++_nextEffectId;
     _previewSnapshot = const commands.CommandResult.isLoading();
     return _admit(
@@ -745,7 +1209,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Searches desired input; refusal has no observable side effects.
-  bool requestFindCandidates() {
+  bool requestFindCandidates({AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return false;
     if (!canRequestFindCandidates) return false;
     final search = _candidateSearch.trim();
     final revision = _candidateRevision;
@@ -760,7 +1225,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Captures opaque preview tokens and source acknowledgment unchanged.
-  bool requestApply() {
+  bool requestApply({AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return false;
     if (!canRequestApply) return false;
     final guard = _moderationGuardError();
     final value = _mergePreview;
@@ -772,14 +1238,18 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Owns one complete copy, private persistence and private preview chain.
-  bool requestKeepCurrent(AdminEventMergeGroup group) {
+  bool requestKeepCurrent(
+    AdminEventMergeGroup group, {
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation)) return false;
     if (!canRequestKeepCurrent) return false;
     final preview = _mergePreview;
     final target = _targetEventId;
     final generation = _previewGeneration;
     final eligible =
         isEditable &&
-        !_isDirty &&
+        !isDirty &&
         preview?.groups.any((value) => identical(value, group)) == true;
     _keepEffectId = ++_nextEffectId;
     _keepSnapshot = const commands.CommandResult.isLoading();
@@ -796,7 +1266,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Reserves picker, upload and persisted association as one attempt.
-  bool requestAddAsset() {
+  bool requestAddAsset({AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return false;
     if (!canRequestAddAsset) return false;
     final guard = _assetGuard(add: true);
     _addEffectId = ++_nextEffectId;
@@ -805,7 +1276,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   /// Reserves removal of the exact captured persisted association.
-  bool requestDeleteAsset(int assetId) {
+  bool requestDeleteAsset(int assetId, {AdminDraftActivation? activation}) {
+    if (!_authority(activation)) return false;
     if (!canRequestDeleteAsset) return false;
     final guard =
         _assetGuard(add: false) ??
@@ -823,71 +1295,159 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     ignore: _ignoreSource ? true : null,
   );
 
-  Future<Result<void>> _loadDetail() async {
-    final submissionId = this.submissionId;
-    if (submissionId == null) return const Result.success(null);
+  AdminDraftSnapshot _snapshotFor(AdminSubmission submission) {
+    final start = submission.startDate?.toUtc();
+    final end = submission.endDate?.toUtc();
+    final dates = switch ((start, end)) {
+      (final start?, final end) => EventDateDraft.exact(
+        startCalendarDate: _eventTimePolicy.calendarDateForUtc(start),
+        startInstantUtc: start,
+        endInstantUtc: end,
+        allDay: submission.allDay,
+      ),
+      (null, null) => const EventDateDraft.disabled(),
+      _ => throw StateError('Persisted end date without start date.'),
+    };
+    return AdminDraftSnapshot(
+      category: submission.category,
+      city: submission.city,
+      name: submission.name,
+      description: submission.description,
+      descriptionDelta: submission.descriptionDelta,
+      eventDates: dates,
+      latitudeText: submission.latitude?.toString() ?? '',
+      longitudeText: submission.longitude?.toString() ?? '',
+    );
+  }
 
-    final draftRevision = _draftRevision;
-    final result = await _repository.getById(submissionId);
-    return result.map((submission) {
-      if (_disposed) return;
-      if (_draftRevision != draftRevision) {
-        if (loading) {
-          _loadSnapshot = const commands.CommandResult(null, null, null, false);
-        }
-        return;
-      }
-      _hydrationRevision++;
-      _editorRevision++;
-      _draftRevision++;
-      _invalidateCandidates();
-      _invalidatePreview();
-      _category = submission.category;
-      _city = submission.city;
-      _name = submission.name;
-      _description = submission.description;
-      _descriptionDelta = submission.descriptionDelta;
-      final start = submission.startDate?.toUtc();
-      final end = submission.endDate?.toUtc();
-      _eventDates = switch ((start, end)) {
-        (final start?, final end) => EventDateDraft.exact(
-          startCalendarDate: _eventTimePolicy.calendarDateForUtc(start),
-          startInstantUtc: start,
-          endInstantUtc: end,
-          allDay: submission.allDay,
-        ),
-        (null, final end?) => throw StateError(
-          'Persisted submission $submissionId has an end date without a '
-          'start date: $end.',
-        ),
-        (null, null) => const EventDateDraft.disabled(),
-      };
-      _eventTimeIssue = null;
-      // Lossless hydration: double.toString() round-trips exactly, unlike a
-      // fixed-precision rendering.
-      _latitudeText = submission.latitude?.toString() ?? '';
-      _longitudeText = submission.longitude?.toString() ?? '';
-      _contributorName = submission.userName;
-      _contributorEmail = submission.userEmail;
-      _status = submission.status;
-      _promotion = submission.promotion;
-      _externalEvent = submission.externalEvent;
-      _acknowledgeCurrentSource = false;
-      _acknowledgedSourceHash = null;
-      _ignoreSource = false;
-      _targetEventId =
-          submission.externalEvent?.eventId ?? submission.targetEventId;
-      _previewGeneration++;
-      _mergePreview = null;
-      _createdAt = submission.createdAt;
-      _modifiedAt = submission.modifiedAt;
+  AdminRemoteBaseline _baselineFor(AdminSubmission detail) =>
+      AdminRemoteBaseline(
+        snapshot: _snapshotFor(detail),
+        status: detail.status,
+        modifiedAt: detail.modifiedAt,
+        modifiedAtToken: detail.modifiedAtToken,
+      );
+
+  void _publishDetail(
+    AdminSubmission detail, {
+    bool completeAssets = true,
+    bool replaceSelection = false,
+  }) {
+    _contributorName = detail.userName;
+    _contributorEmail = detail.userEmail;
+    _status = detail.status;
+    _promotion = detail.promotion;
+    _externalEvent = detail.externalEvent;
+    if (replaceSelection) {
+      _targetEventId = detail.externalEvent?.eventId ?? detail.targetEventId;
+    }
+    _createdAt = detail.createdAt;
+    _modifiedAt = detail.modifiedAt;
+    _modifiedAtToken = detail.modifiedAtToken;
+    if (completeAssets) {
       _assets
         ..clear()
-        ..addAll(submission.assets);
-      _hasLoadedDetail = true;
+        ..addAll(detail.assets);
+    }
+    _hasLoadedDetail = true;
+    _editorRevision++;
+    _invalidateCandidates();
+    _invalidatePreview();
+  }
+
+  Future<Result<void>> _loadDetail() async {
+    final ownerGeneration = _generation;
+    final id = submissionId;
+    if (id == null) return const Result.success(null);
+    final session = _draftSession;
+    final token = session?.admitHydration();
+    final revision = _draftRevision;
+    final result = await _repository.getById(id);
+    if (_obsolete(ownerGeneration)) return _unavailable();
+    if (result case Error<AdminSubmission>(:final error)) {
+      if (session != null) _remoteUnavailable = true;
+      if (session != null && token != null) {
+        await session.rejectHydration(token, error);
+      }
+      return Result.error(error);
+    }
+    final detail = (result as Success<AdminSubmission>).value;
+    if (session != null) {
+      if (token == null) return _unavailable();
+      final accepted = await session.acceptHydration(
+        token,
+        _baselineFor(detail),
+        associatedCount: detail.assets.length,
+      );
+      if (_obsolete(ownerGeneration)) return _unavailable();
+      if (accepted case Error<bool>(:final error)) return Result.error(error);
+      _remoteUnavailable = !(accepted as Success<bool>).value;
+      _publishDetail(detail, replaceSelection: true);
+      if (_remoteUnavailable) {
+        _savePhase = AdminSavePhase.conflict;
+        _notifyListeners();
+        return Result.error(
+          Exception(
+            'La bozza locale è protetta. '
+            'Ricarica per verificare il contenuto remoto.',
+          ),
+        );
+      }
+    } else {
+      if (_draftRevision != revision) return const Result.success(null);
+      _legacySnapshot = _snapshotFor(detail);
+      _publishDetail(detail, replaceSelection: true);
       _isDirty = false;
+    }
+    _hydrationRevision++;
+    _eventTimeIssue = null;
+    _notifyListeners();
+    return const Result.success(null);
+  }
+
+  Future<Result<void>> _readBackSave() async {
+    final ownerGeneration = _generation;
+    final token = activation;
+    final session = _draftSession;
+    final intent = session?.state?.physicalCheckpoint?.fieldWriteIntent;
+    final id = submissionId;
+    if (token == null ||
+        session == null ||
+        id == null ||
+        intent?.kind != AdminFieldWriteKind.update) {
+      return _unavailable();
+    }
+    final result = await _repository.getById(id);
+    if (_obsolete(ownerGeneration) || !_authority(token)) return _unavailable();
+    if (result case Error<AdminSubmission>(:final error)) {
+      return Result.error(error);
+    }
+    final detail = (result as Success<AdminSubmission>).value;
+    _publishDetail(detail);
+    if (detail.status != AdminSubmissionStatus.pending ||
+        detail.modifiedAtToken == null ||
+        !intent!.snapshot.sameRemoteProjection(_snapshotFor(detail))) {
+      _savePhase = AdminSavePhase.conflict;
+      _remoteUnavailable = true;
       _notifyListeners();
-    });
+      return Result.error(
+        Exception('Esito remoto non confermato: conserva la bozza e ricarica.'),
+      );
+    }
+    final confirmed = await session.confirmFieldWrite(
+      activation: token,
+      attemptId: intent.attemptId,
+      baseline: _baselineFor(detail),
+    );
+    if (_obsolete(ownerGeneration)) return _unavailable();
+    if (confirmed is Success<void>) {
+      _remoteUnavailable = false;
+      _savePhase = stagedAssets.isEmpty
+          ? AdminSavePhase.completed
+          : AdminSavePhase.partialFailure;
+    }
+    _notifyListeners();
+    return confirmed;
   }
 
   _SaveDraft _captureSave() {
@@ -899,7 +1459,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
     final city = _city;
     final name = _name;
-    if (city == null || city.isEmpty || name == null || name.isEmpty) {
+    if (city == null ||
+        city.trim().isEmpty ||
+        name == null ||
+        name.trim().isEmpty) {
       error ??= Exception('Compila i campi obbligatori.');
     }
     final issue =
@@ -925,35 +1488,375 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
             longitude: coordinates.$2,
           )
         : null;
-    return (input: input, error: error, issue: issue, revision: _draftRevision);
+    return (
+      input: input,
+      error: error,
+      issue: issue,
+      revision: _draftRevision,
+      snapshot: _fields,
+      assets: List.unmodifiable(stagedAssets),
+      physicalCheckpoint: _draftSession?.state?.physicalCheckpoint,
+    );
   }
 
-  Future<Result<void>> _save(_SaveDraft draft, {int? saveEffectId}) async {
-    if (draft.error != null) {
-      if (!_disposed &&
-          draft.issue != null &&
-          draft.revision == _draftRevision) {
-        _eventTimeIssue = draft.issue;
-        _notifyListeners();
+  AdminSubmissionInput _inputFor(AdminDraftSnapshot fields) {
+    double? coordinate(String value) => value.trim().isEmpty
+        ? null
+        : double.parse(value.trim().replaceFirst(',', '.'));
+    return AdminSubmissionInput(
+      category: fields.category ?? ContentCategory.unknown,
+      city: fields.city!,
+      name: fields.name!,
+      description: fields.description,
+      descriptionDelta: fields.descriptionDelta,
+      allDay: fields.eventDates.allDay,
+      startDate: fields.eventDates.startInstantUtc,
+      endDate: fields.eventDates.endInstantUtc,
+      latitude: coordinate(fields.latitudeText),
+      longitude: coordinate(fields.longitudeText),
+    );
+  }
+
+  void _phase(AdminSavePhase phase) {
+    _savePhase = phase;
+    _notifyListeners();
+  }
+
+  Future<Result<void>> _save(_SaveDraft draft) async {
+    final ownerGeneration = _generation;
+    final session = _draftSession;
+    if (session == null) {
+      if (draft.error != null) {
+        if (draft.issue != null && draft.revision == _draftRevision) {
+          _eventTimeIssue = draft.issue;
+          _notifyListeners();
+        }
+        return Result.error(draft.error!);
       }
+      final id = submissionId;
+      final Result<dynamic> result = id == null
+          ? await _repository.create(draft.input!)
+          : await _repository.update(
+              id,
+              draft.input!,
+              expectedModifiedAt: _modifiedAtToken,
+            );
+      if (_obsolete(ownerGeneration)) return _unavailable();
+      return result.map((_) {
+        _isDirty = _draftRevision != draft.revision;
+        _contextCommitted();
+      });
+    }
+    var token = activation;
+    if (token == null) return _unavailable();
+    var intent = session.state?.physicalCheckpoint?.fieldWriteIntent;
+    if (intent?.kind == AdminFieldWriteKind.update &&
+        _confirmedFields == null) {
+      _phase(AdminSavePhase.unknownOutcome);
+      return Result.error(
+        Exception('Verifica il salvataggio remoto prima di riprovare.'),
+      );
+    }
+    if (draft.error != null && intent == null) {
+      _phase(AdminSavePhase.failed);
       return Result.error(draft.error!);
     }
-    final id = submissionId;
-    final result = id == null
-        ? await _repository.create(draft.input!)
-        : await _repository.update(id, draft.input!);
-    return result.map((_) {
-      if (_disposed) return;
-      _editorRevision++;
-      _invalidatePreview();
-      _invalidateCandidates();
-      _isDirty = _draftRevision != draft.revision;
-      if (saveEffectId != null) {
-        _savedExecutionId = saveEffectId;
-        _savedDraftRevision = draft.revision;
+    final capturedDigests = draft.assets
+        .map((item) => item.digest)
+        .toList(growable: false);
+    final baseline = session.state?.remoteBaseline;
+    final skipFields =
+        intent == null &&
+        submissionId != null &&
+        baseline?.modifiedAtToken != null &&
+        draft.snapshot.sameRemoteProjection(baseline!.snapshot);
+    if (!skipFields) {
+      if (intent == null) {
+        final id = submissionId;
+        if (id != null && (!_hasLoadedDetail || _modifiedAtToken == null)) {
+          _phase(AdminSavePhase.failed);
+          return Result.error(
+            Exception('Ricarica il contributo prima di salvare.'),
+          );
+        }
+        intent = AdminFieldWriteIntent(
+          kind: id == null
+              ? AdminFieldWriteKind.create
+              : AdminFieldWriteKind.update,
+          attemptId: AdminDraftOwner(
+            accountId: token.owner.accountId,
+          ).sessionId,
+          snapshot: draft.snapshot,
+          expectedModifiedAt: id == null ? null : _modifiedAtToken,
+        );
       }
-      _notifyListeners();
-    });
+      _phase(AdminSavePhase.checkpoint);
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      final checkpoint = await session.beginFieldWrite(
+        intent,
+        activation: token,
+        checkpointAtCapture: draft.physicalCheckpoint,
+      );
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      if (checkpoint is Error<void>) {
+        _phase(AdminSavePhase.failed);
+        return checkpoint;
+      }
+      _phase(AdminSavePhase.fields);
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      var confirmation = _confirmedFields;
+      if (confirmation == null || confirmation.intent != intent) {
+        final id = submissionId;
+        late final AdminSubmission detail;
+        var replayed = false;
+        if (intent.kind == AdminFieldWriteKind.create) {
+          final created = await _repository.create(
+            _inputFor(intent.snapshot),
+            clientSubmissionId: token.owner.sessionId,
+          );
+          if (_obsolete(ownerGeneration) || !_authority(token)) {
+            return _unavailable();
+          }
+          if (created case Error<AdminSubmissionCreateResult>(:final error)) {
+            _phase(AdminSavePhase.unknownOutcome);
+            return Result.error(error);
+          }
+          final value = (created as Success<AdminSubmissionCreateResult>).value;
+          detail = value.submission;
+          replayed = value.replayed;
+        } else {
+          final updated = await _repository.update(
+            id!,
+            _inputFor(intent.snapshot),
+            expectedModifiedAt: intent.expectedModifiedAt,
+          );
+          if (_obsolete(ownerGeneration) || !_authority(token)) {
+            return _unavailable();
+          }
+          if (updated case Error<AdminSubmission>(:final error)) {
+            _phase(
+              error is AdminContentSubmissionApiException &&
+                      error.code == 'SUBMISSION_CHANGED'
+                  ? AdminSavePhase.conflict
+                  : AdminSavePhase.unknownOutcome,
+            );
+            return Result.error(error);
+          }
+          detail = (updated as Success<AdminSubmission>).value;
+        }
+        confirmation = (intent: intent, detail: detail, replayed: replayed);
+        _confirmedFields = confirmation;
+      }
+      final detail = confirmation.detail;
+      final compatible =
+          intent.snapshot.sameRemoteProjection(_snapshotFor(detail)) &&
+          detail.status == AdminSubmissionStatus.pending;
+      _phase(AdminSavePhase.adoption);
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      final settled = intent.kind == AdminFieldWriteKind.create
+          ? await session.adoptRemoteIdentity(
+              activation: token,
+              attemptId: intent.attemptId,
+              submissionId: detail.id,
+              baseline: _baselineFor(detail),
+            )
+          : await session.confirmFieldWrite(
+              activation: token,
+              attemptId: intent.attemptId,
+              baseline: _baselineFor(detail),
+            );
+      if (_obsolete(ownerGeneration)) return _unavailable();
+      if (settled is Error<void>) {
+        _phase(AdminSavePhase.partialFailure);
+        return settled;
+      }
+      token = activation;
+      if (token == null) return _unavailable();
+      _confirmedFields = null;
+      _publishDetail(
+        detail,
+        completeAssets: intent.kind == AdminFieldWriteKind.create,
+      );
+      if (!compatible) {
+        _remoteUnavailable = true;
+        _phase(AdminSavePhase.conflict);
+        return Result.error(
+          Exception(
+            'Il contributo remoto è cambiato. La bozza locale è conservata.',
+          ),
+        );
+      }
+    } else {
+      final checkpoint = await session.checkpoint(requireDurableOwner: true);
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      if (checkpoint is Error<void>) {
+        _phase(AdminSavePhase.failed);
+        return checkpoint;
+      }
+    }
+    final remoteId = token.owner.submissionId;
+    if (remoteId == null) return _unavailable();
+    for (final digest in capturedDigests) {
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      final matches = stagedAssets.where((item) => item.digest == digest);
+      if (matches.isEmpty) {
+        _phase(AdminSavePhase.partialFailure);
+        return Result.error(
+          Exception('La foto selezionata non è più disponibile.'),
+        );
+      }
+      var asset = matches.single;
+      if (asset.progressInvalid) {
+        _phase(AdminSavePhase.partialFailure);
+        return Result.error(
+          Exception('Conferma locale della foto non leggibile.'),
+        );
+      }
+      var progress = _liveReceipts[digest] ?? asset.progress;
+      if (progress == null) {
+        _phase(AdminSavePhase.upload);
+        if (_obsolete(ownerGeneration) || !_authority(token)) {
+          return _unavailable();
+        }
+        final file = await session.resolveAssetFile(asset);
+        if (_obsolete(ownerGeneration) || !_authority(token)) {
+          return _unavailable();
+        }
+        if (file case Error<File>(:final error)) {
+          _phase(AdminSavePhase.partialFailure);
+          return Result.error(error);
+        }
+        final task = _contentSubmissionRepository.uploadImageTask(
+          (file as Success<File>).value,
+        );
+        _activeImageUploadTask = task;
+        late final Result<SubmissionAsset> uploaded;
+        try {
+          uploaded = await task.result;
+        } finally {
+          if (identical(_activeImageUploadTask, task)) {
+            _activeImageUploadTask = null;
+          }
+        }
+        if (_obsolete(ownerGeneration) || !_authority(token)) {
+          return _unavailable();
+        }
+        if (uploaded case Error(:final error)) {
+          _phase(AdminSavePhase.partialFailure);
+          return Result.error(error);
+        }
+        progress = AdminStagedAssetProgress(
+          upload: (uploaded as Success<SubmissionAsset>).value,
+        );
+        _liveReceipts[digest] = progress;
+      }
+      var persisted = await session.saveAssetProgress(
+        asset,
+        progress,
+        activation: token,
+      );
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      if (persisted is Error<void>) {
+        _phase(AdminSavePhase.partialFailure);
+        return persisted;
+      }
+      if (progress.associationId == null) {
+        _phase(AdminSavePhase.association);
+        if (_obsolete(ownerGeneration) || !_authority(token)) {
+          return _unavailable();
+        }
+        final associated = await _repository.associateStagedAsset(
+          remoteId,
+          progress.upload,
+        );
+        if (_obsolete(ownerGeneration) || !_authority(token)) {
+          return _unavailable();
+        }
+        if (associated case Error<AdminSubmissionAsset>(:final error)) {
+          final terminal =
+              error is AdminContentSubmissionApiException &&
+              const {
+                'NOT_FOUND',
+                'INVALID_STATUS_TRANSITION',
+                'ASSET_LIMIT_REACHED',
+                'ASSET_METADATA_CONFLICT',
+              }.contains(error.code);
+          if (terminal) _remoteUnavailable = true;
+          _phase(
+            terminal ? AdminSavePhase.conflict : AdminSavePhase.partialFailure,
+          );
+          return Result.error(error);
+        }
+        final remote = (associated as Success<AdminSubmissionAsset>).value;
+        progress = AdminStagedAssetProgress(
+          upload: progress.upload,
+          associationId: remote.id,
+        );
+        _liveReceipts[digest] = progress;
+        asset = stagedAssets.firstWhere((item) => item.digest == digest);
+        persisted = await session.saveAssetProgress(
+          asset,
+          progress,
+          activation: token,
+        );
+        if (_obsolete(ownerGeneration) || !_authority(token)) {
+          return _unavailable();
+        }
+        if (persisted is Error<void>) {
+          _phase(AdminSavePhase.partialFailure);
+          return persisted;
+        }
+        if (!_assets.any((item) => item.id == remote.id)) _assets.add(remote);
+      }
+      asset = stagedAssets.firstWhere((item) => item.digest == digest);
+      final removed = await session.remove(asset);
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      if (removed is Error<void>) {
+        _phase(AdminSavePhase.partialFailure);
+        return removed;
+      }
+      _liveReceipts.remove(digest);
+    }
+    // Refresh complete associations only; this never overwrites current fields.
+    if (_obsolete(ownerGeneration) || !_authority(token)) return _unavailable();
+    final refreshed = await _repository.getById(remoteId);
+    if (_obsolete(ownerGeneration) || !_authority(token)) return _unavailable();
+    if (refreshed case Error<AdminSubmission>(:final error)) {
+      _remoteUnavailable = true;
+      _phase(AdminSavePhase.partialFailure);
+      return Result.error(error);
+    }
+    final complete = (refreshed as Success<AdminSubmission>).value;
+    final capacity = await session.confirmAssociatedContext(
+      activation: token,
+      baseline: _baselineFor(complete),
+      associatedCount: complete.assets.length,
+    );
+    if (_obsolete(ownerGeneration) || !_authority(token)) return _unavailable();
+    _publishDetail(complete);
+    if (capacity is Error<void>) {
+      _remoteUnavailable = true;
+      _phase(AdminSavePhase.conflict);
+      return capacity;
+    }
+    _phase(AdminSavePhase.completed);
+    return const Result.success(null);
   }
 
   /// Parses the coordinate drafts into a nullable pair at the save boundary.
@@ -1007,10 +1910,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (submissionId == null) {
       return Exception('Non puoi moderare un nuovo contributo.');
     }
-    if (!_hasLoadedDetail) {
+    if (!_hasLoadedDetail || _remoteUnavailable) {
       return Exception('Carica il contributo prima di moderarlo.');
     }
-    if (_isDirty) {
+    if (isDirty) {
       return Exception('Salva le modifiche prima di pubblicare o rifiutare.');
     }
     if (_status != AdminSubmissionStatus.pending) {
@@ -1023,6 +1926,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     Exception? guard,
     _SourceAcknowledgment source,
   ) async {
+    final ownerGeneration = _generation;
     if (guard != null) return Result.error(guard);
     final result = await _repository.reject(
       submissionId!,
@@ -1030,9 +1934,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       acknowledgeCurrentSource: source.acknowledge,
       expectedSourceHash: source.hash,
     );
+    if (_obsolete(ownerGeneration)) return _unavailable();
     await _refreshAfterResolution(result);
     return result.map((_) {
-      if (_disposed) return;
+      if (_obsolete(ownerGeneration)) return;
       _status = AdminSubmissionStatus.rejected;
       _contextCommitted();
     });
@@ -1043,6 +1948,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     Exception? guard,
     _SourceAcknowledgment source,
   ) async {
+    final ownerGeneration = _generation;
     if (guard != null) return Result.error(guard);
     final result = await _repository.promote(
       submissionId!,
@@ -1050,9 +1956,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       acknowledgeCurrentSource: source.acknowledge,
       expectedSourceHash: source.hash,
     );
+    if (_obsolete(ownerGeneration)) return _unavailable();
     await _refreshAfterResolution(result);
     return result.map((promotion) {
-      if (!_disposed) {
+      if (!_obsolete(ownerGeneration)) {
         _status = AdminSubmissionStatus.accepted;
         _promotion = promotion;
         _contextCommitted();
@@ -1066,6 +1973,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     Exception? guard,
     _SourceAcknowledgment source,
   ) async {
+    final ownerGeneration = _generation;
     if (guard != null) return Result.error(guard);
     final result = await _repository.link(
       submissionId!,
@@ -1073,9 +1981,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       acknowledgeCurrentSource: source.acknowledge,
       expectedSourceHash: source.hash,
     );
+    if (_obsolete(ownerGeneration)) return _unavailable();
     await _refreshAfterResolution(result);
     return result.map((resolution) {
-      if (!_disposed) {
+      if (!_obsolete(ownerGeneration)) {
         _status = AdminSubmissionStatus.accepted;
         _targetEventId = resolution.eventId;
         _contextCommitted();
@@ -1090,6 +1999,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     int revision,
     int context,
   ) async {
+    final ownerGeneration = _generation;
     if (!eligible) {
       return Result.error(
         Exception('Carica un contributo evento prima di cercare.'),
@@ -1100,7 +2010,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       searchName: search.isEmpty ? null : search,
     );
     return result.map((value) {
-      if (_disposed ||
+      if (_obsolete(ownerGeneration) ||
           revision != _candidateRevision ||
           context != _editorRevision) {
         return;
@@ -1115,6 +2025,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     int generation, {
     required bool eligible,
   }) async {
+    final ownerGeneration = _generation;
     if (!eligible) {
       return Result.error(
         Exception(
@@ -1124,8 +2035,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
     final result = await _repository.mergePreview(submissionId!, target!);
     return result.map((value) {
-      if (_disposed ||
-          _isDirty ||
+      if (_obsolete(ownerGeneration) ||
+          isDirty ||
           _targetEventId != target ||
           _previewGeneration != generation) {
         return;
@@ -1161,6 +2072,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     required int generation,
     required AdminEventMergePreview? preview,
   }) async {
+    final ownerGeneration = _generation;
     // Mutation admission itself invalidates the old preview once.
     if (!eligible ||
         preview == null ||
@@ -1198,10 +2110,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
     _hydrationRevision++;
     _markDirty();
-    if (_disposed) return _unavailable();
+    if (_obsolete(ownerGeneration)) return _unavailable();
     final result = await _save(_captureSave());
-    if (_disposed) return _unavailable();
-    if (result is Success<void> && _isDirty) {
+    if (_obsolete(ownerGeneration)) return _unavailable();
+    if (result is Success<void> && isDirty) {
       return Result.error(
         Exception('Salva le nuove modifiche prima dell’anteprima.'),
       );
@@ -1213,7 +2125,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       (_) => _preview(
         target,
         _previewGeneration,
-        eligible: submissionId != null && _targetEventId != null && !_isDirty,
+        eligible: submissionId != null && _targetEventId != null && !isDirty,
       ),
     );
   }
@@ -1224,6 +2136,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     Exception? guard,
     _SourceAcknowledgment source,
   ) async {
+    final ownerGeneration = _generation;
     if (guard != null) return Result.error(guard);
     if (!external || preview == null) {
       return Result.error(
@@ -1238,16 +2151,17 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     );
     if (result case Error(
       :final AdminContentSubmissionApiException error,
-    ) when !_disposed) {
+    ) when !_obsolete(ownerGeneration)) {
       if (error.code == 'EVENT_CHANGED' || error.code == 'SUBMISSION_CHANGED') {
         _editorRevision++;
         _invalidatePreview();
         _notifyListeners();
       }
     }
+    if (_obsolete(ownerGeneration)) return _unavailable();
     await _refreshAfterResolution(result);
     return result.map((resolution) {
-      if (!_disposed) {
+      if (!_obsolete(ownerGeneration)) {
         _status = AdminSubmissionStatus.accepted;
         _targetEventId = resolution.eventId;
         _contextCommitted();
@@ -1257,7 +2171,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   Future<void> _refreshAfterResolution<T>(Result<T> result) async {
-    if (_disposed || _externalEvent == null) return;
+    final ownerGeneration = _generation;
+    if (_obsolete(ownerGeneration) || _externalEvent == null) return;
     final sourceChanged = switch (result) {
       Error(:final AdminContentSubmissionApiException error) =>
         error.code == 'SOURCE_CHANGED',
@@ -1267,27 +2182,55 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _acknowledgeCurrentSource = false;
     _acknowledgedSourceHash = null;
     _contextCommitted();
-    if (_disposed) return;
+    if (_obsolete(ownerGeneration)) return;
     await _loadDetail();
-    if (_disposed) return;
+    if (_obsolete(ownerGeneration)) return;
     final pending = switch (result) {
       Success(:final AdminEventResolution value) => value.pendingId,
       _ => null,
     };
     if (pending != null) {
       final followup = await _repository.getById(pending);
-      if (_disposed) return;
+      if (_obsolete(ownerGeneration)) return;
       followup.map((value) => _followupSubmission = value);
       _notifyListeners();
     }
   }
 
+  /// Remote associations and unfinished files.
+  ///
+  /// Each confirmed receipt occupies one capacity slot.
+  int get imageCount {
+    final associatedIds = _assets.map((asset) => asset.id).toSet();
+    var unconfirmedCount = 0;
+    for (final asset in stagedAssets) {
+      final associationId =
+          (_liveReceipts[asset.digest] ?? asset.progress)?.associationId;
+      if (associationId == null) {
+        unconfirmedCount++;
+      } else {
+        associatedIds.add(associationId);
+      }
+    }
+    return associatedIds.length + unconfirmedCount;
+  }
+
   Exception? _assetGuard({required bool add}) {
     if (submissionId == null) {
+      if (_draftSession != null &&
+          add &&
+          (_draftSession.state?.ready ?? false)) {
+        return stagedAssets.length >= kMaximumSubmissionAssetCount
+            ? Exception('Hai raggiunto il limite di foto.')
+            : null;
+      }
+      return Exception('Contributo non disponibile.');
+    }
+    if (_remoteUnavailable ||
+        _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent?.kind ==
+            AdminFieldWriteKind.update) {
       return Exception(
-        add
-            ? 'Aggiungi foto solo dopo aver creato il contributo.'
-            : 'Non puoi rimuovere foto da un nuovo contributo.',
+        'Verifica il salvataggio remoto prima di modificare le foto.',
       );
     }
     if (!_hasLoadedDetail) {
@@ -1302,49 +2245,126 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         'Puoi modificare le foto solo dei contributi in attesa.',
       );
     }
-    if (add && _assets.length >= kMaximumSubmissionAssetCount) {
+    if (add && imageCount >= kMaximumSubmissionAssetCount) {
       return Exception('Hai raggiunto il limite di foto.');
     }
     return null;
   }
 
   Future<Result<void>> _addAsset(Exception? guard) async {
+    final ownerGeneration = _generation;
     if (guard != null) return Result.error(guard);
-    final selectedImage = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-    );
-    if (_disposed) return _unavailable();
-    if (selectedImage == null) return const Result.success(null);
-    final task = _contentSubmissionRepository.uploadImageTask(
-      File(selectedImage.path),
-    );
-    _activeImageUploadTask = task;
-    try {
-      final upload = await task.result;
-      if (_disposed) return _unavailable();
-      return await upload.asyncFlatMap((uploadedAsset) async {
-        final persisted = await _repository.addAsset(
-          submissionId!,
-          uploadedAsset,
-        );
-        if (_disposed) return _unavailable();
-        return persisted.map((asset) {
-          _assets.add(asset);
-          _contextCommitted();
-        });
-      });
-    } finally {
-      if (identical(_activeImageUploadTask, task)) {
-        _activeImageUploadTask = null;
+    final session = _draftSession;
+    final token = activation;
+    final id = submissionId;
+    final nonce = token == null
+        ? 'legacy'
+        : AdminDraftOwner(accountId: token.owner.accountId).sessionId;
+    if (session != null) {
+      if (token == null) return _unavailable();
+      final persisted = await session.setNavigationIntent(
+        activation: token,
+        requestNonce: nonce,
+      );
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
       }
+      if (persisted is Error<void>) return persisted;
+    }
+    final abandoned = Completer<void>();
+    _pickerNonce = nonce;
+    _pickerAbandonment = abandoned;
+    _notifyListeners();
+    var normalTerminal = false;
+    try {
+      if (_obsolete(ownerGeneration) ||
+          !_authority(token) ||
+          _pickerNonce != nonce) {
+        return _unavailable();
+      }
+      final selected = await Future.any<({XFile? image, bool abandoned})>([
+        _imagePicker
+            .pickImage(source: ImageSource.gallery)
+            .then((image) => (image: image, abandoned: false)),
+        abandoned.future.then((_) => (image: null, abandoned: true)),
+      ]);
+      if (selected.abandoned ||
+          _obsolete(ownerGeneration) ||
+          _pickerNonce != nonce ||
+          !_authority(token)) {
+        return _unavailable();
+      }
+      normalTerminal = true;
+      _pickerNonce = null;
+      _pickerAbandonment = null;
+      _notifyListeners();
+      if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      final image = selected.image;
+      if (image == null) return const Result.success(null);
+      if (id == null && session != null) {
+        final acquired = await session.acquire(
+          File(image.path),
+          capacity: session.capacityContext,
+        );
+        if (_obsolete(ownerGeneration) || !_authority(token)) {
+          return _unavailable();
+        }
+        _notifyListeners();
+        return acquired.map((_) {});
+      }
+      final task = _contentSubmissionRepository.uploadImageTask(
+        File(image.path),
+      );
+      _activeImageUploadTask = task;
+      try {
+        final upload = await task.result;
+        if (_obsolete(ownerGeneration) || !_authority(token)) {
+          return _unavailable();
+        }
+        return await upload.asyncFlatMap((uploaded) async {
+          final persisted = await _repository.addAsset(id!, uploaded);
+          if (_obsolete(ownerGeneration) || !_authority(token)) {
+            return _unavailable();
+          }
+          return persisted.map((asset) {
+            _assets.add(asset);
+            _contextCommitted();
+          });
+        });
+      } finally {
+        if (identical(_activeImageUploadTask, task)) {
+          _activeImageUploadTask = null;
+        }
+      }
+    } finally {
+      // Native errors settle normally while this request retains authority.
+      if (_pickerNonce == nonce && !_obsolete(ownerGeneration)) {
+        normalTerminal = true;
+        _pickerNonce = null;
+        _pickerAbandonment = null;
+      }
+      if (normalTerminal &&
+          !_obsolete(ownerGeneration) &&
+          _authority(token) &&
+          session != null &&
+          token != null) {
+        await session.clearNavigationIntent(
+          activation: token,
+          requestNonce: nonce,
+        );
+      }
+      if (!_obsolete(ownerGeneration)) _notifyListeners();
     }
   }
 
   Future<Result<void>> _deleteAsset(int assetId, Exception? guard) async {
+    final ownerGeneration = _generation;
     if (guard != null) return Result.error(guard);
     final result = await _repository.deleteAsset(submissionId!, assetId);
     return result.map((_) {
-      if (_disposed) return;
+      if (_obsolete(ownerGeneration)) return;
       _assets.removeWhere((asset) => asset.id == assetId);
       _contextCommitted();
     });
@@ -1402,7 +2422,17 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
           _release(command);
           return;
         }
+        if (_commandGenerations.remove(command) != _generation || _revoked) {
+          _notifyListeners();
+          return;
+        }
         final terminal = command.results.value;
+        if (identical(command, _saveCommand) &&
+            (terminal.error != null || terminal.isRunning)) {
+          _savePhase = _savePhase == AdminSavePhase.fields
+              ? AdminSavePhase.unknownOutcome
+              : AdminSavePhase.failed;
+        }
         if (terminal.isRunning) {
           // An assertion bypasses normal terminal routing. Keep it fail-loud
           // and require a new owner without reporting synthetic success.
@@ -1433,11 +2463,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     ResultCommand<_EditorAction<T>, T> command,
     _EditorAction<T> action,
   ) {
+    final ownerGeneration = _generation;
+    _commandGenerations[command] = ownerGeneration;
     _reserved.add(command);
-    if (identical(command, _saveCommand)) {
-      _savedExecutionId = null;
-      _savedDraftRevision = null;
-    }
     if (_mutations.contains(command)) {
       _invalidateCandidates();
       // Apply already captured its committed tokens in the request closure.
@@ -1450,7 +2478,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _reserved.remove(command);
       _afterCommandTurn(() => _release(command));
     } else {
-      command.run(action);
+      command.run(
+        () => _obsolete(ownerGeneration)
+            ? Future.value(_unavailable<T>())
+            : action(),
+      );
     }
     return true;
   }
@@ -1490,6 +2522,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _auth?.removeListener(_onAuthChanged);
+    if (_draftSession != null) _abandonPicker();
+    _draftSession?.revoke();
     _activeImageUploadTask?.cancel();
     _activeImageUploadTask = null;
     _afterCommandTurn(() {

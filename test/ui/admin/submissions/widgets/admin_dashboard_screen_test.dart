@@ -956,7 +956,8 @@ void main() {
 
     for (final changed in [null, false, true]) {
       testOwnerUI(
-        'D3 editor result $changed refreshes only changed ignored selection',
+        'D3 editor result $changed refreshes both lists '
+        'independently of pop value',
         (tester) async {
           editorChanged = changed;
           repository.listResult = Result.success([sampleAdminSubmission()]);
@@ -970,8 +971,8 @@ void main() {
           viewModel.setIgnoredFilter();
           await tester.tap(find.text('EDIT_EDITOR_MARKER'));
           await tester.pumpAndSettle();
-          expect(repository.listCallCount, changed == true ? 2 : 1);
-          expect(repository.ignoredListCalls, changed == true ? 1 : 0);
+          expect(repository.listCallCount, 2);
+          expect(repository.ignoredListCalls, 1);
         },
         disposeOwners: () {
           viewModel.dispose();

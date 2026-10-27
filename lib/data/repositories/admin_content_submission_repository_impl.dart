@@ -47,24 +47,54 @@ final class AdminContentSubmissionRepositoryImpl
   }
 
   @override
-  Future<Result<AdminSubmission>> create(AdminSubmissionInput input) {
+  Future<Result<AdminSubmissionCreateResult>> create(
+    AdminSubmissionInput input, {
+    String? clientSubmissionId,
+  }) {
+    if (clientSubmissionId == null ||
+        !RegExp(
+          '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-'
+          r'[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+        ).hasMatch(clientSubmissionId)) {
+      return Future.value(
+        const Result.error(
+          FormatException('clientSubmissionId must be a UUID-v4'),
+        ),
+      );
+    }
     return _invoke(
       operation: 'create',
       body: <String, dynamic>{
         'operation': 'create',
+        'client_submission_id': clientSubmissionId,
         'input': adminSubmissionInputToWireMap(input),
       },
-      parse: _submissionFromEnvelope,
+      parse: _createFromEnvelope,
     );
   }
 
   @override
-  Future<Result<AdminSubmission>> update(int id, AdminSubmissionInput input) {
+  Future<Result<AdminSubmission>> update(
+    int id,
+    AdminSubmissionInput input, {
+    String? expectedModifiedAt,
+  }) {
+    if (expectedModifiedAt == null ||
+        !RegExp(
+          r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$',
+        ).hasMatch(expectedModifiedAt)) {
+      return Future.value(
+        const Result.error(
+          FormatException('expectedModifiedAt must be an exact backend token'),
+        ),
+      );
+    }
     return _invoke(
       operation: 'update',
       body: <String, dynamic>{
         'operation': 'update',
         'submission_id': id,
+        'expected_modified_at': expectedModifiedAt,
         'input': adminSubmissionInputToWireMap(input),
       },
       parse: _submissionFromEnvelope,
@@ -221,6 +251,34 @@ final class AdminContentSubmissionRepositoryImpl
   }
 
   @override
+  Future<Result<AdminSubmissionAsset>> associateStagedAsset(
+    int submissionId,
+    SubmissionAsset asset,
+  ) => _invoke(
+    operation: 'associateStagedAsset',
+    body: {
+      'operation': 'associateStagedAsset',
+      'submission_id': submissionId,
+      'asset': asset.toDto().toMap(),
+    },
+    parse: (value) {
+      final envelope = _object(value, 'staged association response');
+      if (envelope['outcome'] != 'created' &&
+          envelope['outcome'] != 'replayed') {
+        throw const FormatException('association outcome is invalid');
+      }
+      final confirmed = adminSubmissionAssetFromWire(envelope['asset']);
+      if (confirmed.id <= 0 ||
+          confirmed.url != asset.secureUrl ||
+          confirmed.width != asset.width ||
+          confirmed.height != asset.height) {
+        throw const FormatException('association receipt does not match');
+      }
+      return confirmed;
+    },
+  );
+
+  @override
   Future<Result<void>> deleteAsset(int submissionId, int assetId) {
     return _invoke<void>(
       operation: 'deleteAsset',
@@ -359,3 +417,15 @@ Map<String, dynamic> _object(Object? value, String path) {
 
 Map<String, dynamic> _sourceAcknowledgement(bool? acknowledge, String? hash) =>
     {'acknowledge_current_source': ?acknowledge, 'expected_source_hash': ?hash};
+
+AdminSubmissionCreateResult _createFromEnvelope(Object? value) {
+  final envelope = _object(value, 'create response');
+  final outcome = envelope['outcome'];
+  if (outcome != 'created' && outcome != 'replayed') {
+    throw const FormatException('create outcome is invalid');
+  }
+  return AdminSubmissionCreateResult(
+    submission: adminSubmissionFromWire(envelope['submission']),
+    replayed: outcome == 'replayed',
+  );
+}

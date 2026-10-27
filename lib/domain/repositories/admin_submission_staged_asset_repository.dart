@@ -22,6 +22,12 @@ abstract interface class AdminSubmissionStagedAssetRepository {
     required int associatedCount,
   });
 
+  /// Monotonically records remote confirmation on an exact retained descriptor.
+  Future<Result<void>> saveProgress({
+    required AdminSubmissionStagedAsset asset,
+    required AdminStagedAssetProgress progress,
+  });
+
   /// Resolves a structurally contained file without following owned links.
   Future<Result<File>> resolveAbsolutePath(AdminSubmissionStagedAsset asset);
 

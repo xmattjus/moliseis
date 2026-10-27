@@ -278,7 +278,6 @@ void main() {
           expect(harness.owner.mergePreview, isNull);
           expect(harness.owner.previewSnapshot.completed, isFalse);
           expect(harness.owner.saveSnapshot.completed, isTrue);
-          expect(harness.owner.canCloseAfterSave, isTrue);
           expect(harness.repository.updateIds, [1]);
         } finally {
           harness.owner.dispose();
@@ -393,7 +392,6 @@ void main() {
           expect(harness.owner.keepCurrentSnapshot.hasFailure, isTrue);
           expect(harness.owner.saveExecutionId, isNull);
           expect(harness.owner.saveSnapshot.idle, isTrue);
-          expect(harness.owner.canCloseAfterSave, isFalse);
           expect(harness.owner.previewSnapshot.hasFailure, isFalse);
           expect(harness.owner.mergePreview, isNull);
           if (failure == 'expected') {

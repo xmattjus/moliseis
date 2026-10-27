@@ -25,6 +25,7 @@ class AdminSubmission {
     required this.status,
     required this.createdAt,
     required this.modifiedAt,
+    this.modifiedAtToken,
     this.description,
     List<Map<String, dynamic>>? descriptionDelta,
     this.startDate,
@@ -81,6 +82,11 @@ class AdminSubmission {
   /// Timestamp at which the submission was last modified.
   final DateTime modifiedAt;
 
+  /// Exact backend-owned concurrency token.
+  ///
+  /// Never reconstructed from the display value [modifiedAt].
+  final String? modifiedAtToken;
+
   /// Optional geographical latitude in decimal degrees, when present.
   ///
   /// Loaded values are transported faithfully; ranges and pairing are enforced
@@ -133,6 +139,7 @@ class AdminSubmission {
         other.status == status &&
         other.createdAt == createdAt &&
         other.modifiedAt == modifiedAt &&
+        other.modifiedAtToken == modifiedAtToken &&
         other.latitude == latitude &&
         other.longitude == longitude &&
         other.promotion == promotion &&
@@ -157,6 +164,7 @@ class AdminSubmission {
     status,
     createdAt,
     modifiedAt,
+    modifiedAtToken,
     latitude,
     longitude,
     promotion,
@@ -164,4 +172,19 @@ class AdminSubmission {
     targetEventId,
     const DeepCollectionEquality().hash(assets),
   ]);
+}
+
+/// First-write-wins Create result, including the authoritative current detail.
+class AdminSubmissionCreateResult {
+  /// Creates a confirmed Create outcome without discarding replay information.
+  const AdminSubmissionCreateResult({
+    required this.submission,
+    required this.replayed,
+  });
+
+  /// Current detail, which may already be moderated when a Create is replayed.
+  final AdminSubmission submission;
+
+  /// Whether the server found an earlier write for the same account and UUID.
+  final bool replayed;
 }

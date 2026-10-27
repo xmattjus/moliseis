@@ -143,16 +143,21 @@ void main() {
       },
     );
 
-    test('logs auth stream errors without changing state', () async {
+    test('revokes private authority and logs auth stream errors', () async {
       final auth = ControllableAdminAuth();
       addTearDown(auth.dispose);
-      final user = auth.viewModel.currentUser;
+      auth
+        ..setUser(makeAuthUser(isAdmin: true))
+        ..emit(AuthChangeEvent.signedIn);
+      await pumpEventQueue();
+      expect(auth.viewModel.isAdmin, isTrue);
       const error = AuthException('Synthetic auth-state failure');
 
       auth.events.addError(error, StackTrace.current);
       await pumpEventQueue();
 
-      expect(auth.viewModel.currentUser, same(user));
+      expect(auth.viewModel.currentUser, isNull);
+      expect(auth.viewModel.isAdmin, isFalse);
       expect(auth.logger.eventsOfType<AdminAuthStateError>(), hasLength(1));
       expect(
         auth.logger.firstCallOfType<AdminAuthStateError>()!.error,

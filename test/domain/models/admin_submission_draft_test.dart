@@ -123,6 +123,61 @@ void main() {
     );
   });
 
+  test(
+    'remote projection normalizes server fields without changing raw equality',
+    () {
+      final raw = AdminDraftSnapshot(
+        city: ' Town ',
+        name: ' Name ',
+        latitudeText: '41,0',
+        longitudeText: ' 14.00 ',
+      );
+      final remote = AdminDraftSnapshot(
+        category: ContentCategory.unknown,
+        city: 'Town',
+        name: 'Name',
+        latitudeText: '41.0',
+        longitudeText: '14.0',
+      );
+      expect(raw.sameRemoteProjection(remote), isTrue);
+      expect(remote.sameRemoteProjection(raw), isTrue);
+      expect(raw.fieldsEqualTo(remote), isFalse);
+      expect(raw.fieldsEqualTo(remote, semanticCoordinates: true), isFalse);
+      expect(raw.category, isNull);
+      expect(raw.city, ' Town ');
+      expect(raw.name, ' Name ');
+      expect(raw.latitudeText, '41,0');
+      expect(
+        raw.sameRemoteProjection(remote.copyWith(name: 'Different')),
+        isFalse,
+      );
+      expect(
+        raw.sameRemoteProjection(
+          remote.copyWith(category: ContentCategory.nature),
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'remote projection never confirms incomplete or invalid coordinates',
+    () {
+      final remote = AdminDraftSnapshot(
+        category: ContentCategory.unknown,
+        city: 'Town',
+        name: 'Name',
+        latitudeText: '41.0',
+        longitudeText: '14.0',
+      );
+      for (final latitude in ['-', 'NaN', 'Infinity', '91', '']) {
+        final raw = remote.copyWith(latitudeText: latitude);
+        expect(raw.sameRemoteProjection(remote), isFalse, reason: latitude);
+        expect(raw.sameRemoteProjection(raw), isFalse, reason: latitude);
+      }
+    },
+  );
+
   test('semantic remote coordinates do not change exact local equality', () {
     final a = AdminDraftSnapshot(
       latitudeText: ' 41,0 ',

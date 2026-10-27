@@ -8,6 +8,8 @@ import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart';
 import 'package:moliseis/data/core/supabase_sync_cursor_source.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_repository_impl.dart';
+import 'package:moliseis/data/repositories/admin_submission_draft_repository_impl.dart';
+import 'package:moliseis/data/repositories/admin_submission_staged_asset_repository_impl.dart';
 import 'package:moliseis/data/repositories/city_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_repository_impl.dart';
@@ -26,6 +28,8 @@ import 'package:moliseis/data/services/api/weather/weather_api_client.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/services/services.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
+import 'package:moliseis/domain/repositories/admin_submission_staged_asset_repository.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
@@ -37,7 +41,9 @@ import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
+import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
+import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
@@ -121,6 +127,26 @@ List<SingleChildWidget> providers(
             )
             as AdminContentSubmissionRepository,
   ),
+  Provider<AdminSubmissionDraftRepository>(
+    create: (context) => AdminSubmissionDraftRepositoryImpl(
+      objectBoxI: objectBox,
+      logger: context.read(),
+    ),
+  ),
+  Provider<AdminSubmissionStagedAssetRepository>(
+    create: (context) => AdminSubmissionStagedAssetRepositoryImpl(
+      objectBoxI: objectBox,
+      logger: context.read(),
+      draftRepository: context.read(),
+    ),
+  ),
+  Provider<AdminDraftSession>(
+    create: (context) => AdminDraftSession(
+      draftRepository: context.read(),
+      stagedAssetRepository: context.read(),
+    ),
+    dispose: (_, session) => session.revoke(),
+  ),
   Provider<PlaceRepository>(
     create: (context) =>
         PlaceRepositoryImpl(
@@ -202,6 +228,13 @@ List<SingleChildWidget> providers(
       authClient: supabase.client.auth,
       logger: context.read(),
     ),
+  ),
+  ChangeNotifierProvider<AdminSubmissionEditorViewModel>(
+    create: (context) => AdminSubmissionEditorViewModel(
+      repository: context.read(),
+      contentSubmissionRepository: context.read(),
+      draftSession: context.read(),
+    )..bindAuth(context.read<AdminAuthViewModel>()),
   ),
   ChangeNotifierProvider<ThemeViewModel>(
     create: (context) {

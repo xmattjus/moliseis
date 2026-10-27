@@ -151,7 +151,7 @@ typedef AdminAssetCapacityContext = ({
   int? acceptedRemoteRevision,
 });
 
-/// Local draft/file arbitration, deliberately unregistered in the application.
+/// Local draft/file arbitration shared by the application-owned Admin editor.
 ///
 /// Callers own authentication and remote/platform work. No operation here
 /// retires a durable owner. Revocation removes runtime authority immediately;
@@ -293,6 +293,10 @@ final class AdminDraftSession {
         : AdminDraftActivation._(this, owner, _generation);
   }
 
+  /// Validates this boundary's own token, including private session identity.
+  bool isActivationCurrent(AdminDraftActivation? activation) =>
+      activation != null && _validActivation(activation);
+
   /// Replaces immutable C only for the caller's captured activation.
   ///
   /// Stale or foreign authority returns an error without changing any state.
@@ -358,6 +362,8 @@ final class AdminDraftSession {
       owner: owner,
       snapshot: captured.current,
       remoteBaseline: captured.remoteBaseline,
+      fieldWriteIntent: captured.physicalCheckpoint?.fieldWriteIntent,
+      navigationIntent: captured.physicalCheckpoint?.navigationIntent,
     );
     if (captured.durability == AdminDraftDurability.durable &&
         captured.physicalCheckpoint == draft) {
@@ -374,6 +380,277 @@ final class AdminDraftSession {
     }
     return saved;
   }
+
+  /// Restores the exact stable session, including its already-adopted target.
+  Future<Result<void>> activateBySession({
+    required String accountId,
+    required String sessionId,
+  }) async {
+    final generation = _generation;
+    final result = await _drafts.loadDraftBySession(
+      accountId: accountId,
+      sessionId: sessionId,
+    );
+    if (generation != _generation) return _unavailable();
+    if (result case Error<AdminSubmissionDraft?>(:final error)) {
+      return Result.error(error);
+    }
+    final draft = (result as Success<AdminSubmissionDraft?>).value;
+    if (draft == null) return _unavailable('Resume session unavailable.');
+    return await activate(draft.owner);
+  }
+
+  /// Checkpoints captured A while preserving a newer explicit checkpoint B.
+  ///
+  /// A newer checkpoint B cannot replace an unresolved remote request A.
+  Future<Result<void>> beginFieldWrite(
+    AdminFieldWriteIntent intent, {
+    required AdminDraftActivation activation,
+    required AdminSubmissionDraft? checkpointAtCapture,
+  }) => _serialize(() async {
+    if (!_validActivation(activation)) return _unavailable();
+    final current = _state!;
+    final previous = current.physicalCheckpoint?.fieldWriteIntent;
+    if (previous != null && previous != intent) {
+      return _unavailable('Unresolved field write requires settlement.');
+    }
+    if (previous == intent) return const Result.success(null);
+    if ((intent.kind == AdminFieldWriteKind.create) !=
+        (current.owner.submissionId == null)) {
+      return _unavailable();
+    }
+    final snapshot =
+        current.physicalCheckpoint?.snapshot != checkpointAtCapture?.snapshot
+        ? current.physicalCheckpoint!.snapshot
+        : intent.snapshot;
+    final draft = AdminSubmissionDraft(
+      owner: current.owner,
+      snapshot: snapshot,
+      remoteBaseline: current.remoteBaseline,
+      fieldWriteIntent: intent,
+      navigationIntent: current.physicalCheckpoint?.navigationIntent,
+    );
+    final saved = await _drafts.saveDraft(draft);
+    if (saved is Success<void> && _validActivation(activation)) {
+      _state = _state!._copy(
+        physicalCheckpoint: draft,
+        effective: snapshot,
+        durability: AdminDraftDurability.durable,
+      );
+    }
+    return saved;
+  });
+
+  /// Settles only the captured Update; never replaces newer C or checkpoint B.
+  Future<Result<void>> confirmFieldWrite({
+    required AdminDraftActivation activation,
+    required String attemptId,
+    required AdminRemoteBaseline baseline,
+  }) => _serialize(() async {
+    if (!_validActivation(activation)) return _unavailable();
+    final current = _state!;
+    final physical = current.physicalCheckpoint;
+    if (physical == null ||
+        current.owner.submissionId == null ||
+        physical.fieldWriteIntent?.kind != AdminFieldWriteKind.update ||
+        physical.fieldWriteIntent?.attemptId != attemptId) {
+      return _unavailable();
+    }
+    final draft = AdminSubmissionDraft(
+      owner: current.owner,
+      snapshot: physical.snapshot,
+      remoteBaseline: baseline,
+      navigationIntent: physical.navigationIntent,
+    );
+    final saved = await _drafts.saveDraft(draft);
+    if (saved is Success<void> && _validActivation(activation)) {
+      _state = _state!._copy(
+        physicalCheckpoint: draft,
+        remoteBaseline: baseline,
+      );
+    }
+    return saved;
+  });
+
+  /// Atomically adopts a confirmed Create without changing the logical session.
+  ///
+  /// All old target-bound authority becomes stale. Capture fresh authority only
+  /// for the admitted Save continuation and newly rendered editor callbacks.
+  Future<Result<void>> adoptRemoteIdentity({
+    required AdminDraftActivation activation,
+    required String attemptId,
+    required int submissionId,
+    required AdminRemoteBaseline baseline,
+  }) => _serialize(() async {
+    if (!_validActivation(activation)) return _unavailable();
+    final old = _state!;
+    final result = await _drafts.adoptRemoteIdentity(
+      owner: old.owner,
+      submissionId: submissionId,
+      attemptId: attemptId,
+      remoteBaseline: baseline,
+    );
+    if (result case Error<AdminSubmissionDraft>(:final error)) {
+      return Result.error(error);
+    }
+    if (!_validActivation(activation)) return _unavailable();
+    final draft = (result as Success<AdminSubmissionDraft>).value;
+    // Typing remains admitted while storage commits. Preserve the latest C/E
+    // rather than restoring the state captured before that await.
+    final latest = _state!;
+    _generation++;
+    _hydrationRevision = 0;
+    _activeHydration = null;
+    _initializing = null;
+    _state = latest._copy(
+      owner: draft.owner,
+      physicalCheckpoint: draft,
+      remoteBaseline: draft.remoteBaseline,
+      hydrationPending: false,
+      acceptedRemoteRevision: null,
+      associatedCount: null,
+      assets: latest.assets
+          .map(
+            (asset) => AdminSubmissionStagedAsset(
+              owner: draft.owner,
+              digest: asset.digest,
+              relativePath: asset.relativePath,
+              progress: asset.progress,
+              progressInvalid: asset.progressInvalid,
+            ),
+          )
+          .toList(),
+    );
+    return const Result.success(null);
+  });
+
+  /// Accepts fresh complete capacity for the confirmed field projection.
+  ///
+  /// This cannot replace C/E/P or authorize a different remote field version.
+  Future<Result<void>> confirmAssociatedContext({
+    required AdminDraftActivation activation,
+    required AdminRemoteBaseline baseline,
+    required int associatedCount,
+  }) => _serialize(() async {
+    if (!_validActivation(activation) ||
+        associatedCount < 0 ||
+        associatedCount > 5) {
+      return _unavailable();
+    }
+    final confirmed = _state!.remoteBaseline;
+    if (confirmed == null ||
+        confirmed.modifiedAtToken == null ||
+        confirmed.modifiedAtToken != baseline.modifiedAtToken ||
+        confirmed.status != baseline.status ||
+        !confirmed.snapshot.sameRemoteProjection(baseline.snapshot)) {
+      return _unavailable('Remote context changed.');
+    }
+    _activeHydration = null;
+    _state = _state!._copy(
+      acceptedRemoteRevision: ++_hydrationRevision,
+      associatedCount: associatedCount,
+      hydrationPending: false,
+      hydrationError: null,
+    );
+    return const Result.success(null);
+  });
+
+  /// Resolves only an exact current descriptor; no network work occurs here.
+  Future<Result<File>> resolveAssetFile(AdminSubmissionStagedAsset asset) {
+    if (_state?.owner != asset.owner ||
+        !_state!.assets.any(
+          (item) =>
+              item.digest == asset.digest &&
+              item.relativePath == asset.relativePath,
+        )) {
+      return Future.value(Result.error(Exception('Staged owner unavailable.')));
+    }
+    return _staged.resolveAbsolutePath(asset);
+  }
+
+  /// Durably advances a receipt, then publishes only into its captured session.
+  Future<Result<void>> saveAssetProgress(
+    AdminSubmissionStagedAsset asset,
+    AdminStagedAssetProgress progress, {
+    required AdminDraftActivation activation,
+  }) => _serialize(() async {
+    if (!_validActivation(activation) || asset.owner != _state!.owner) {
+      return _unavailable();
+    }
+    final saved = await _staged.saveProgress(asset: asset, progress: progress);
+    if (saved is Success<void> && _validActivation(activation)) {
+      _state = _state!._copy(
+        assets: _state!.assets
+            .map(
+              (item) => item.digest == asset.digest
+                  ? AdminSubmissionStagedAsset(
+                      owner: item.owner,
+                      digest: item.digest,
+                      relativePath: item.relativePath,
+                      progress: progress,
+                    )
+                  : item,
+            )
+            .toList(),
+      );
+    }
+    return saved;
+  });
+
+  /// Writes a route-only nonce after checkpointing the exact durable owner.
+  Future<Result<void>> setNavigationIntent({
+    required AdminDraftActivation activation,
+    required String requestNonce,
+  }) => _serialize(() async {
+    if (!_validActivation(activation)) return _unavailable();
+    final checkpointed = await _checkpoint(
+      activation.owner,
+      activation.generation,
+      requireDurableOwner: true,
+    );
+    if (checkpointed is Error<void> || !_validActivation(activation)) {
+      return checkpointed is Error<void> ? checkpointed : _unavailable();
+    }
+    final saved = await _drafts.saveNavigationIntent(
+      owner: activation.owner,
+      requestNonce: requestNonce,
+    );
+    if (saved case Error<AdminSubmissionDraft>(:final error)) {
+      return Result.error(error);
+    }
+    if (_validActivation(activation)) {
+      _state = _state!._copy(
+        physicalCheckpoint: (saved as Success<AdminSubmissionDraft>).value,
+      );
+    }
+    return const Result.success(null);
+  });
+
+  /// Compares the exact nonce; cleanup A cannot consume a later request B.
+  Future<Result<void>> clearNavigationIntent({
+    required AdminDraftActivation activation,
+    required String requestNonce,
+  }) => _serialize(() async {
+    if (!_validActivation(activation)) return _unavailable();
+    final saved = await _drafts.clearNavigationIntent(
+      owner: activation.owner,
+      requestNonce: requestNonce,
+    );
+    if (saved case Error<AdminSubmissionDraft>(:final error)) {
+      return Result.error(error);
+    }
+    if (_validActivation(activation)) {
+      _state = _state!._copy(
+        physicalCheckpoint: (saved as Success<AdminSubmissionDraft>).value,
+      );
+    }
+    return const Result.success(null);
+  });
+
+  bool _validActivation(AdminDraftActivation activation) =>
+      identical(activation._session, this) &&
+      _matches(activation.owner, activation.generation) &&
+      _state!.ready;
 
   /// Supersedes older remote requests immediately, without fetching anything.
   AdminHydrationToken? admitHydration() {
@@ -421,22 +698,14 @@ final class AdminDraftSession {
     final previous = current.remoteBaseline;
     final savedRemote = physical?.remoteBaseline;
     final unconfirmed =
+        physical?.fieldWriteIntent != null ||
         physical != null &&
-        (savedRemote == null ||
-            !physical.snapshot.fieldsEqualTo(
-              savedRemote.snapshot,
-              semanticCoordinates: true,
-            ));
+            (savedRemote == null ||
+                !physical.snapshot.sameRemoteProjection(savedRemote.snapshot));
     if (unconfirmed &&
-        !current.current.fieldsEqualTo(
-          baseline.snapshot,
-          semanticCoordinates: true,
-        )) {
+        !current.current.sameRemoteProjection(baseline.snapshot)) {
       if (previous == null ||
-          !previous.snapshot.fieldsEqualTo(
-            baseline.snapshot,
-            semanticCoordinates: true,
-          )) {
+          !previous.snapshot.sameRemoteProjection(baseline.snapshot)) {
         _state = current._copy(hydrationPending: false);
         return const Result.success(false);
       }
@@ -557,7 +826,13 @@ final class AdminDraftSession {
       if (!_matches(asset.owner, generation) || !_state!.ready) {
         return _unavailable();
       }
-      if (!_state!.assets.contains(asset)) return const Result.success(null);
+      if (!_state!.assets.any(
+        (item) =>
+            item.digest == asset.digest &&
+            item.relativePath == asset.relativePath,
+      )) {
+        return const Result.success(null);
+      }
       final removed = await _staged.remove(
         owner: asset.owner,
         digest: asset.digest,

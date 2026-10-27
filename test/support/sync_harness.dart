@@ -15,6 +15,7 @@ import 'package:moliseis/data/services/api/weather/model/hourly_forecast/hourly_
 import 'package:moliseis/data/services/api/weather/model/weather_forecast_data_cache_entry.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/city_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/event_repository.dart';
@@ -26,6 +27,7 @@ import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/main.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
+import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
@@ -39,6 +41,7 @@ import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import 'admin_draft_repositories.dart';
 import 'fake_cache_manager.dart';
 import 'fake_repositories.dart';
 import 'mock_gotrue_client.dart';
@@ -207,6 +210,7 @@ List<SingleChildWidget> buildSyncProviders(
     logger: logger,
   );
   final settingsRepository = FakeSettingsRepository();
+  final adminLocal = AdminDraftSessionHarness();
 
   return <SingleChildWidget>[
     Provider<AdminContentSubmissionRepository>.value(
@@ -214,6 +218,15 @@ List<SingleChildWidget> buildSyncProviders(
     ),
     Provider<ContentSubmissionRepository>.value(
       value: FakeContentSubmissionRepository(),
+    ),
+    Provider<AdminSubmissionDraftRepository>.value(value: adminLocal.drafts),
+    ChangeNotifierProvider<AdminSubmissionEditorViewModel>(
+      create: (context) => AdminSubmissionEditorViewModel(
+        repository: context.read<AdminContentSubmissionRepository>(),
+        contentSubmissionRepository: context
+            .read<ContentSubmissionRepository>(),
+        draftSession: adminLocal.session,
+      )..bindAuth(auth.viewModel),
     ),
     Provider<EventRepository>.value(value: eventRepo),
     Provider<PlaceRepository>.value(value: placeRepo),

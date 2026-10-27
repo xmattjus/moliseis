@@ -52,7 +52,6 @@ void main() {
       await pumpCommandTurns(tester);
       expect(owner.saveSnapshot.domainError, same(expectedError));
       expect(owner.canRequestSave, isTrue);
-      expect(owner.canCloseAfterSave, isFalse);
 
       repository.pendingCreate = second;
       expect(owner.requestSave(), isTrue);
@@ -66,17 +65,14 @@ void main() {
       second.complete(Result.success(sampleAdminSubmission(id: 99)));
       await pumpCommandTurns(tester);
       expect(owner.saveSnapshot.completed, isTrue);
-      expect(owner.canCloseAfterSave, isTrue);
       expect(owner.submissionId, isNull);
 
       repository.pendingCreate = third;
       expect(owner.requestSave(), isTrue);
       final thirdId = owner.saveExecutionId;
-      expect(owner.canCloseAfterSave, isFalse);
       await pumpCommandTurns(tester);
       third.complete(Result.success(sampleAdminSubmission(id: 99)));
       await pumpCommandTurns(tester);
-      expect(owner.canCloseAfterSave, isTrue);
       expect(observed, [firstId, secondId, thirdId]);
     },
     disposeOwners: () => owner.dispose(),
@@ -125,13 +121,11 @@ void main() {
     expect(owner.operationRunning, isTrue);
     expect(owner.saveSnapshot.isRunning, isTrue);
     expect(owner.requestSave(), isFalse);
-    expect(owner.canCloseAfterSave, isFalse);
     second.complete(Result.success(sampleAdminSubmission()));
     await pumpCommandTurns(tester);
     expect(repository.createInputs, hasLength(2));
     expect(owner.operationRunning, isFalse);
     expect(owner.saveSnapshot.completed, isTrue);
-    expect(owner.canCloseAfterSave, isTrue);
   }, disposeOwners: () => owner.dispose());
 
   testOwnerUI(
@@ -149,7 +143,6 @@ void main() {
             ..setName('First');
       expect(owner.requestSave(), isTrue);
       await pumpCommandTurns(tester);
-      expect(owner.canCloseAfterSave, isTrue);
       final second = Completer<Result<AdminSubmission>>();
       repository.pendingCreate = second;
       expect(owner.requestSave(), isTrue);
@@ -444,7 +437,6 @@ void main() {
         await pumpCommandTurns(tester);
         expect(owner.name, 'Newer unsaved name');
         expect(owner.isDirty, isTrue);
-        expect(owner.canCloseAfterSave, isFalse);
         expect(owner.submissionId, create ? null : 1);
         expect(logger.calls, hasLength(outcome == 'runtime' ? 1 : 0));
         expect(owner.saveSnapshot.completed, outcome == 'success');
@@ -472,7 +464,6 @@ void main() {
         expect(owner.requestSave(), isTrue);
         await pumpCommandTurns(tester);
         expect(owner.saveExecutionId, greaterThan(firstId!));
-        expect(owner.canCloseAfterSave, isTrue);
         expect(owner.isDirty, isFalse);
         expect(
           (create ? repository.createInputs : repository.updateInputs)
@@ -544,7 +535,6 @@ void main() {
         if (id == null) return;
         if (owner.saveSnapshot.isRunning && !runningIds.contains(id)) {
           runningIds.add(id);
-          expect(owner.canCloseAfterSave, isFalse);
           expect(owner.requestSave(), isFalse);
         } else if (!owner.saveSnapshot.idle &&
             !owner.saveSnapshot.isRunning &&
@@ -555,21 +545,17 @@ void main() {
       expect(owner.requestSave(), isTrue);
       await pumpCommandTurns(tester);
       final a = owner.saveExecutionId;
-      expect(owner.canCloseAfterSave, isTrue);
       final error = TestException('B expected');
       repository.createResult = Result.error(error);
       expect(owner.requestSave(), isTrue);
-      expect(owner.canCloseAfterSave, isFalse);
       await pumpCommandTurns(tester);
       final b = owner.saveExecutionId;
       expect(owner.saveSnapshot.domainError, same(error));
-      expect(owner.canCloseAfterSave, isFalse);
       expect(owner.isDirty, isFalse);
       repository.createResult = result;
       expect(owner.requestSave(), isTrue);
       await pumpCommandTurns(tester);
       final c = owner.saveExecutionId;
-      expect(owner.canCloseAfterSave, isTrue);
       expect(owner.saveSnapshot.data, isA<Success<void>>());
       expect(runningIds, [a, b, c]);
       expect(terminals, [a, b, c]);

@@ -23,6 +23,7 @@ var _nextAuthUserId = 0;
 /// Anonymous users have no e-mail by default so tests cannot accidentally
 /// rely on an address that Supabase anonymous sessions do not provide.
 User makeAuthUser({
+  String? id,
   bool isAdmin = false,
   bool isAnonymous = false,
   String? email,
@@ -31,7 +32,7 @@ User makeAuthUser({
 }) {
   final now = DateTime.utc(2026).toIso8601String();
   return User(
-    id: 'test-auth-user-${_nextAuthUserId++}',
+    id: id ?? 'test-auth-user-${_nextAuthUserId++}',
     appMetadata: {'admin': isAdmin},
     userMetadata: <String, dynamic>{
       if (name case final String name) 'name': name,
