@@ -14,7 +14,7 @@ Android lost-data retrieval SHALL have one process-wide entry point independent 
 - **THEN** only the application entry attempts retrieval, without starting feature Save or uploads
 
 ### Requirement: Unattributed native media is discarded
-Media whose native feature/session attribution is uncertain SHALL never be attached by guessing. With the pinned uncorrelated lost-data API, all lost-data candidates SHALL be discarded even if a persisted navigation intent or only one draft exists. A live callback SHALL require its captured valid account/session/activation and uninterrupted request authority before intake.
+Media whose native feature/session attribution is uncertain SHALL never be attached by guessing. Option B SHALL intentionally withdraw previous Public lost-media recovery: discard all pinned-API lost-data candidates even with a matching Dart intent or one draft. Live intake SHALL require its captured valid account/session/activation and request nonce.
 
 #### Scenario: Cross-feature candidate
 - **GIVEN** an interrupted Admin picker and a visible Public editor, or the reverse
@@ -29,7 +29,7 @@ Media whose native feature/session attribution is uncertain SHALL never be attac
 Empty, missing, cancelled, delayed or exceptional lost-data responses SHALL not imply successful recovery, change valid drafts, crash the app, hold a loading route or create an indefinite picker lease. Normal launch cancellation/error and local interruption abandonment SHALL release runtime admission without claiming native cancellation. Empty retrieval SHALL not be treated as evidence of native cancellation.
 
 #### Scenario: Empty retrieval or exception
-- **WHEN** retrieval returns empty, throws, or finishes after editor restoration
+- **WHEN** retrieval returns empty, throws, never completes, or finishes after editor restoration
 - **THEN** editor access and later explicit picker requests remain usable without a recovery warning for unknown empty cause
 
 #### Scenario: Delayed result and repeated restarts
@@ -40,11 +40,57 @@ Empty, missing, cancelled, delayed or exceptional lost-data responses SHALL not 
 - **WHEN** a valid live request returns cancellation
 - **THEN** no asset is reported recovered, its own launch/navigation intent settles, and another normal selection can be admitted
 
+### Requirement: Normal resume preserves original request authority
+An ordinary resumed or background lifecycle transition SHALL NOT invalidate a pending picker request. While captured owner/session/activation and nonce remain valid, any image, cancellation or error completion of its original Future SHALL be processed normally even if resume happened first. Rebuilds/rebinds retaining the same activation SHALL not abandon it.
+
+#### Scenario: Resume precedes valid image completion
+- **GIVEN** the original request retains valid authority and was not abandoned
+- **WHEN** the normal picker opens, the app resumes, then its Future returns an image
+- **THEN** ordinary owner-checked candidate processing accepts the eligible image
+
+#### Scenario: Resume precedes cancellation completion
+- **WHEN** a valid original picker request resumes before its Future returns cancellation
+- **THEN** cancellation settles normally with no asset and the next selection can be admitted
+
+#### Scenario: Resume precedes error completion
+- **WHEN** a valid original picker request resumes before its Future returns an error
+- **THEN** the existing error path settles the request and the next selection can be admitted
+
+### Requirement: Local abandonment requires revocation or explicit user intent
+Local abandonment SHALL require actual owner/account/session/activation revocation or an explicit request-bound user action. It SHALL revoke publication before settling the wrapper and releasing only its own application admission, without waiting for native completion or claiming native cancellation. Elapsed time, resume, empty retrieval or presumed Activity loss SHALL not suffice.
+
 #### Scenario: Activity detach leaves native callback unresolved
-- **GIVEN** the Dart engine survives but native picker Future never completes
-- **WHEN** interruption/reconstruction or return to resumed abandons that local request
-- **THEN** the feature action and launch lease settle locally, the old callback loses authority, and later explicit selection remains available
-- **AND** a late old callback is discarded rather than assigned to a replacement request
+- **GIVEN** Activity recreation retains the Dart engine and valid editor but the original native Future never completes
+- **WHEN** the user activates Interrompi selezione for that pending nonce
+- **THEN** the wrapper and feature action settle locally, editor/checkpoint access remains usable and application admission becomes available for a separate explicit next pick
+- **AND** no native cancellation, successful recovery or automatic relaunch is claimed
+
+#### Scenario: Actual reconstruction replaces activation
+- **WHEN** route/editor reconstruction actually revokes A1 and establishes a different activation
+- **THEN** A1 is locally abandoned and cannot publish into the replacement
+- **AND** a same-activation rebuild or mere resume does not trigger this path
+
+#### Scenario: Abandoned A completes after B starts
+- **GIVEN** A lost authority before B was admitted
+- **WHEN** A's original Future later returns media or error
+- **THEN** A cannot stage/upload, publish into B, release B's lease or clear B's navigation nonce
+
+#### Scenario: A1 cannot regain authority after returning to A
+- **WHEN** A1 is abandoned, B activates, A2 then activates and A1 completes late
+- **THEN** original activation/nonce guards reject A1 despite equal account/session/target
+
+#### Scenario: Native operation remains active after local abandonment
+- **WHEN** a subsequent explicit picker request is rejected as already_active
+- **THEN** it settles as a native failure with editor access and later explicit retry available
+- **AND** the application does not spin, hold a permanent lease or claim it cancelled the old native operation
+
+### Requirement: Pending selection has a minimal explicit escape
+The authorized current editor SHALL expose Interrompi selezione while its picker wrapper is pending. The request-bound action SHALL remain callable while the add action runs, preserve fields/files/resume intent, and settle locally as interrupted. It SHALL not depend on retrieval, a timer or a new state machine, and SHALL not auto-launch another picker.
+
+#### Scenario: Repeated interruption and subsequent selection
+- **WHEN** pending picks are repeatedly interrupted and explicitly abandoned
+- **THEN** each local admission releases without waiting for its native Future, and a subsequent valid explicit callback can be accepted under its own authority
+- **AND** no global application lock or permanent recovery spinner prevents editor/local-checkpoint access
 
 ### Requirement: Navigation intent is independent of media recovery
 Before picker launch the editor SHALL checkpoint and persist feature/session, per-launch nonce and Admin account/target. Restoration SHALL not await media retrieval. Normal completion SHALL compare-and-clear only its nonce while the editor is usable. Local abandon SHALL retain resume intent through auth/lifecycle interruption. Failed persistence SHALL prevent launch without indefinite loading.
@@ -85,6 +131,15 @@ Admin resume SHALL identify the original durable local session, resolve an adopt
 
 ### Requirement: Interrupted media never uploads automatically
 Restoring an editor or processing a lost-data response SHALL not start upload, association, Save or Submit. Already-committed private staged files SHALL restore through their existing owner-checked storage contracts.
+
+#### Scenario: Native result arrives after local abandonment
+- **WHEN** abandoned native work later supplies lost-data or completes its original callback
+- **THEN** it causes no wrong-owner staging, navigation cleanup or automatic upload
+
+#### Scenario: Process dies with picker open
+- **WHEN** process death destroys the original Dart Future while a picker is open
+- **THEN** Public or authorized Admin editor restoration proceeds from durable state without recreating that Future or awaiting retrieval
+- **AND** committed staged files remain intact and no Save, Submit or upload starts
 
 #### Scenario: Existing pending Admin target resumes
 - **WHEN** the editor and its staged files restore after process death

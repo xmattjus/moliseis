@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Android lost data is acquired early and processed after restoration
-Android lost-data retrieval SHALL use the single application entry independently of Public initialization and route restoration. With the pinned API lacking native feature/session correlation, returned candidates SHALL be discarded. Empty/error/missing/cancelled retrieval SHALL not invalidate staged assets, imply successful recovery, gate editor restoration or block future selection. Public initialization and normal candidate processing SHALL retain their existing storage guarantees.
+Option B SHALL intentionally remove previous Public lost-media staging: the single application entry discards all pinned-API lost-data candidates lacking native feature/session correlation. Empty/error/missing/cancelled or nonterminating retrieval SHALL not mutate committed staging, imply recovery, gate editor restoration or block future selection. Normal live selection and durable draft/staged-file restoration SHALL remain supported.
 
 #### Scenario: Production startup ordering waits after retrieval
 - **GIVEN** draft initialization and application retrieval overlap
@@ -11,9 +11,10 @@ Android lost-data retrieval SHALL use the single application entry independently
 - **THEN** it is discarded without guessed attribution and Public restoration proceeds independently
 
 #### Scenario: Recovery deduplicates against restored assets
-- **GIVEN** initialization restores valid staged assets
-- **WHEN** lost-data returns identical content
-- **THEN** candidates are discarded and committed descriptors/order remain unchanged
+- **GIVEN** Public restores its only durable draft and the previous recovery path would have accepted a returned image
+- **WHEN** lost-data returns that image without native feature/session identity
+- **THEN** no new image is staged, even if the Dart launch record matches
+- **AND** previously committed staged descriptors/files/order remain unchanged
 
 #### Scenario: Clear makes a deferred recovery response stale
 - **GIVEN** Public A existed before clear rotated to B
@@ -45,7 +46,7 @@ Android lost-data retrieval SHALL use the single application entry independently
 - **AND** non-Android performs no retrieval
 
 #### Scenario: Thrown Android recovery still initializes
-- **WHEN** retrieval throws independently of Public initialization
+- **WHEN** retrieval throws or never completes independently of Public initialization
 - **THEN** normal draft/staged restoration still runs and settles on its own result without awaiting retrieval
 - **AND** the editor has no permanent recovery loading state
 
@@ -59,6 +60,12 @@ Native lost-data candidates SHALL not gain attribution from an initialization ou
 #### Scenario: Response precedes initialization
 - **WHEN** lost media arrives before initialization completes
 - **THEN** it is discarded without binding to whatever draft later restores
+
+#### Scenario: Normal resume before a live callback
+- **GIVEN** a normal Public picker retains its captured owner/session/activation and has not been abandoned
+- **WHEN** the app resumes before the original Future returns an image, cancellation or error
+- **THEN** the image enters ordinary candidate processing, cancellation settles without an asset, or error settles through its existing path
+- **AND** resume alone does not invalidate any of those outcomes or block the next selection
 
 #### Scenario: Capacity and deduplication stay shared
 - **WHEN** valid normal selections overlap other local lifecycle mutations

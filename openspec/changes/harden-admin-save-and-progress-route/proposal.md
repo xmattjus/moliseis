@@ -7,13 +7,14 @@ Admin Save discards the returned remote identity, closes the editor, and cannot 
 ## What Changes
 
 - Own one active Admin editor in the application Provider lifecycle, with account isolation, captured activation authority, explicit local checkpoints and protected remote hydration.
-- **BREAKING (Admin wire contract):** Require UUID Create and exact-token Update; older Admin clients omitting them fail closed until upgraded. Public contracts remain compatible.
+- **BREAKING (Admin wire contract):** Require UUID Create and exact-token Update; older Admin clients omitting them fail closed until upgraded. Public backend contracts remain compatible; the Android lost-media behavior change is explicit below.
 - Reuse the local session UUID as a server-enforced Create replay key. Adopt the returned remote identity atomically in local storage without replacing the session or its files; subsequent Saves use Update.
 - Permit private local image selection before Create, persist upload receipts, and process staged images in deterministic order with resumable confirmed progress.
 - Fence Admin Update with the existing exact database field-version token so a request outstanding across process death cannot overwrite a later Save.
 - Add an Admin-only association replay RPC using an exact uploaded receipt under the existing parent lock, without global URL uniqueness or new asset identity fields.
 - Admit Save before opening an observing progress route. Keep the editor open, preserve complete terminal failure behavior, and refresh the dashboard independently of a true pop result.
-- Replace competing Android lost-data consumers with one application entry point. Separate durable editor navigation intent from best-effort media recovery; discard unattributed lost-data candidates and preserve future picker use.
+- **Public Android behavior change (Option B):** Replace the existing successful lost-media staging path with one application entry that discards all lost-data candidates because native ownership cannot be established. This user-authorized best-effort trade-off removes previous Public recovery; committed staged files and ordinary live selections remain supported. Keep editor restoration independent.
+- Preserve normal callbacks when resume precedes native completion. Release stranded local picker admission only on actual authority revocation or explicit Interrompi selezione, without claiming native cancellation.
 - Supersede the strict native correlation/inbox handoff from archived Plan 1 with the user-approved best-effort policy, without rewriting history.
 
 ## Capabilities
