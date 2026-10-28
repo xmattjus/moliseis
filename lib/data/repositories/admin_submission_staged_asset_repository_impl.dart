@@ -69,7 +69,11 @@ final class AdminSubmissionStagedAssetRepositoryImpl
       for (final existing in restored) {
         if (existing.digest == digest) return Result.success(existing);
       }
-      if (restored.length + associatedCount >= 5) {
+      if (restored
+                  .where((asset) => asset.progress?.associationId == null)
+                  .length +
+              associatedCount >=
+          5) {
         throw const FormatException('Asset capacity exhausted.');
       }
       final directory = await _directory(owner, create: true);
@@ -134,8 +138,15 @@ final class AdminSubmissionStagedAssetRepositoryImpl
       }
       final file = await _file(asset, create: false);
       if (file == null || !await _validFile(file, asset.digest)) {
-        await _removeRow(row.id);
         if (file != null) await _cleanup(file, 'invalid_file_cleanup');
+        // A confirmed upload is sufficient for replay-safe association. Never
+        // erase remote progress merely because its former source disappeared.
+        if (asset.progress != null || asset.progressInvalid) {
+          digests.add(asset.digest);
+          restored.add(asset);
+          continue;
+        }
+        await _removeRow(row.id);
         continue;
       }
       digests.add(asset.digest);
@@ -155,15 +166,59 @@ final class AdminSubmissionStagedAssetRepositoryImpl
   }
 
   @override
+  Future<Result<void>> saveProgress({
+    required AdminSubmissionStagedAsset asset,
+    required AdminStagedAssetProgress progress,
+  }) async {
+    try {
+      await _requireOwner(asset.owner);
+      final rows = await _rows(asset.owner);
+      _store.runInTransaction(TxMode.write, () {
+        final matching = rows
+            .where((row) => row.digest == asset.digest)
+            .toList();
+        if (matching.length != 1) {
+          throw const FormatException('Receipt descriptor unavailable.');
+        }
+        final row = _box.get(matching.single.id);
+        final current = row?.toModel();
+        if (current == null ||
+            current.owner != asset.owner ||
+            current.relativePath != asset.relativePath ||
+            current.progressInvalid) {
+          throw const FormatException('Receipt owner unavailable.');
+        }
+        final previous = current.progress;
+        if (previous != null &&
+            (previous.upload != progress.upload ||
+                (previous.associationId != null &&
+                    previous.associationId != progress.associationId))) {
+          throw const FormatException(
+            'Receipt confirmation cannot be replaced.',
+          );
+        }
+        final next = AdminSubmissionStagedAsset(
+          owner: current.owner,
+          digest: current.digest,
+          relativePath: current.relativePath,
+          progress: progress,
+        );
+        _box.put(next.toEntity(id: row!.id));
+      });
+      return const Result.success(null);
+    } on Exception catch (error) {
+      return _failure('receipt', error);
+    }
+  }
+
+  @override
   Future<Result<File>> resolveAbsolutePath(
     AdminSubmissionStagedAsset asset,
   ) async {
     try {
       await _requireOwner(asset.owner);
       final file = await _file(asset, create: false);
-      if (file == null ||
-          FileSystemEntity.typeSync(file.path, followLinks: false) !=
-              FileSystemEntityType.file) {
+      if (file == null || !await _validFile(file, asset.digest)) {
         throw const FormatException('Staged file unavailable.');
       }
       return Result.success(file);

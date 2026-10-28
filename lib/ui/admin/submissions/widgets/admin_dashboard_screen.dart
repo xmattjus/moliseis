@@ -3,14 +3,18 @@ import 'dart:async' show unawaited;
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submissions_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_list_item.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 
@@ -20,6 +24,7 @@ class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({
     required this.viewModel,
     required this.authViewModel,
+    this.draftRepository,
     super.key,
   });
 
@@ -28,6 +33,9 @@ class AdminDashboardScreen extends StatefulWidget {
 
   /// The staff session state used to log out.
   final AdminAuthViewModel authViewModel;
+
+  /// Private, account-checked Android editor navigation resume lookup.
+  final AdminSubmissionDraftRepository? draftRepository;
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
@@ -61,14 +69,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return;
     }
     final router = GoRouter.of(context);
-    final changed = submissionId == null
+    final accountId = widget.authViewModel.currentUser?.id;
+    final wasAdmin = widget.authViewModel.isAdmin;
+    submissionId == null
         ? await router.pushNamed<bool>(RouteNames.adminSubmissionNew)
         : await router.pushNamed<bool>(
             RouteNames.adminSubmissionEditor,
             pathParameters: <String, String>{'id': submissionId.toString()},
           );
     if (!mounted) return;
-    if (changed != true || !_owns(owner)) return;
+    if (!_owns(owner) ||
+        widget.authViewModel.isAdmin != wasAdmin ||
+        widget.authViewModel.currentUser?.id != accountId) {
+      return;
+    }
     await owner.refreshAfterEditorChange();
   }
 
@@ -114,6 +128,40 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final currentAuth = context.read<AdminAuthViewModel?>();
     if (currentAuth != null && !identical(currentAuth, auth)) return;
     router.go(RoutePaths.home);
+  }
+
+  Future<void> _resumeEditor(AdminSubmissionsViewModel owner) async {
+    if (!mounted) return;
+    final auth = widget.authViewModel;
+    final drafts = widget.draftRepository;
+    final account = auth.isAdmin ? auth.currentUser?.id : null;
+    if (!_owns(owner) || account == null || drafts == null) return;
+    final restored = await drafts.loadNavigationDraft(accountId: account);
+    if (!mounted) return;
+    if (!_owns(owner) || !auth.isAdmin || auth.currentUser?.id != account) {
+      return;
+    }
+    if (restored case Success<AdminSubmissionDraft?>(value: final draft?)) {
+      final target = draft.owner.submissionId;
+      await context.pushNamed(
+        target == null
+            ? RouteNames.adminSubmissionNew
+            : RouteNames.adminSubmissionEditor,
+        pathParameters: target == null ? const {} : {'id': '$target'},
+        queryParameters: {'session': draft.owner.sessionId},
+      );
+      if (!mounted) return;
+      if (_owns(owner) && auth.isAdmin && auth.currentUser?.id == account) {
+        await owner.refreshAfterEditorChange();
+      }
+    } else if (restored is Error<AdminSubmissionDraft?>) {
+      showSnackBarGenericError(context: context);
+    } else {
+      showSnackBar(
+        context: context,
+        textContent: 'Nessun editor da riprendere.',
+      );
+    }
   }
 
   Widget _actions(
@@ -187,6 +235,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 sliver: SliverAppBar(
                   title: const Text('Area redazione'),
                   actions: <Widget>[
+                    if (widget.draftRepository != null)
+                      IconButton(
+                        onPressed: () => unawaited(_resumeEditor(viewModel)),
+                        tooltip: 'Riprendi editor',
+                        icon: const Icon(Symbols.restore),
+                      ),
                     ListenableBuilder(
                       listenable: widget.authViewModel,
                       builder: (context, _) =>

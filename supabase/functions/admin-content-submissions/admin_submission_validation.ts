@@ -69,9 +69,14 @@ export type ValidatedAdminContentSubmissionsRequest =
   | { operation: "listIgnoredSources" }
   | { operation: "unIgnoreSource"; external_event_record_id: number }
   | { operation: "getById"; submission_id: number }
-  | { operation: "create"; input: ValidatedAdminSubmissionInput }
+  | {
+    operation: "create";
+    client_submission_id: string;
+    input: ValidatedAdminSubmissionInput;
+  }
   | {
     operation: "update";
+    expected_modified_at: string;
     submission_id: number;
     input: ValidatedAdminSubmissionInput;
   }
@@ -91,7 +96,7 @@ export type ValidatedAdminContentSubmissionsRequest =
     expected_source_hash?: string | null;
   }
   | {
-    operation: "addAsset";
+    operation: "addAsset" | "associateStagedAsset";
     submission_id: number;
     asset: ValidatedSubmissionAsset;
   }
@@ -314,6 +319,7 @@ export function parseAdminContentSubmissionsRequest(
       "promote",
       "link",
       "addAsset",
+      "associateStagedAsset",
       "deleteAsset",
     ].includes(value.operation)
   ) {
@@ -357,16 +363,36 @@ export function parseAdminContentSubmissionsRequest(
         : submissionId;
     }
     case "create": {
-      if (!hasExactKeys(value, ["operation", "input"])) {
+      if (
+        !hasExactKeys(value, ["operation", "client_submission_id", "input"])
+      ) {
         return invalid("Request contains unsupported or missing fields.");
+      }
+      if (
+        typeof value.client_submission_id !== "string" ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+          .test(value.client_submission_id)
+      ) {
+        return invalid("client_submission_id must be a canonical UUID-v4.");
       }
       const input = parseInput(value.input);
       return input.ok
-        ? valid({ operation: "create", input: input.value })
+        ? valid({
+          operation: "create",
+          client_submission_id: value.client_submission_id,
+          input: input.value,
+        })
         : input;
     }
     case "update": {
-      if (!hasExactKeys(value, ["operation", "submission_id", "input"])) {
+      if (
+        !hasExactKeys(value, [
+          "operation",
+          "submission_id",
+          "expected_modified_at",
+          "input",
+        ])
+      ) {
         return invalid("Request contains unsupported or missing fields.");
       }
       const submissionId = parsePositiveSafeInteger(
@@ -374,10 +400,21 @@ export function parseAdminContentSubmissionsRequest(
         "submission_id",
       );
       if (!submissionId.ok) return submissionId;
+      // Preserve the exact DB token; do not round-trip through Date precision.
+      if (
+        typeof value.expected_modified_at !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/
+          .test(value.expected_modified_at)
+      ) {
+        return invalid(
+          "expected_modified_at must be an exact database timestamp token.",
+        );
+      }
       const input = parseInput(value.input);
       return input.ok
         ? valid({
           operation: "update",
+          expected_modified_at: value.expected_modified_at,
           submission_id: submissionId.value,
           input: input.value,
         })
@@ -657,7 +694,8 @@ export function parseAdminContentSubmissionsRequest(
           : {}),
       });
     }
-    case "addAsset": {
+    case "addAsset":
+    case "associateStagedAsset": {
       if (!hasExactKeys(value, ["operation", "submission_id", "asset"])) {
         return invalid("Request contains unsupported or missing fields.");
       }
@@ -669,7 +707,7 @@ export function parseAdminContentSubmissionsRequest(
       const asset = parseSubmissionAsset(value.asset);
       return asset.ok
         ? valid({
-          operation: "addAsset",
+          operation: value.operation,
           submission_id: submissionId.value,
           asset: asset.value,
         })

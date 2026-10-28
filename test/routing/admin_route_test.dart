@@ -13,6 +13,7 @@ import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
@@ -20,6 +21,7 @@ import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/admin/auth/widgets/admin_login_screen.dart';
+import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
@@ -35,6 +37,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../support/admin_draft_repositories.dart';
 import '../support/command_test_support.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
@@ -59,15 +62,13 @@ void main() {
 
         expect(await tester.binding.handlePopRoute(), isFalse);
         await tester.pumpAndSettle();
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.adminLoginLocation,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
         expect(find.byType(AdminLoginScreen), findsOneWidget);
         expect(find.byType(AdminDashboardScreen), findsNothing);
         expect(harness.repository.listCallCount, 0);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -83,14 +84,12 @@ void main() {
         await tester.pumpWidget(harness.app());
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.adminLoginLocation,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
         expect(find.byType(AdminLoginScreen), findsOneWidget);
         expect(harness.repository.listCallCount, 0);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -106,13 +105,11 @@ void main() {
         await tester.pumpWidget(harness.app());
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.adminLoginLocation,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
         expect(harness.repository.listCallCount, 0);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -128,13 +125,11 @@ void main() {
         await tester.pumpWidget(harness.app());
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.adminLoginLocation,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
         expect(harness.repository.listCallCount, 0);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -144,19 +139,22 @@ void main() {
     testOwnerUI(
       'keeps an admin user on the dashboard',
       (tester) async {
-        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
 
         harness.router.go(RoutePaths.admin);
         await tester.pumpWidget(harness.app());
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.admin,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.admin);
         expect(find.byType(AdminDashboardScreen), findsOneWidget);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -166,19 +164,22 @@ void main() {
     testOwnerUI(
       'redirects an admin user from the login to the dashboard',
       (tester) async {
-        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
 
         harness.router.go(RoutePaths.adminLoginLocation);
         await tester.pumpWidget(harness.app());
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.admin,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.admin);
         expect(find.byType(AdminDashboardScreen), findsOneWidget);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -194,13 +195,11 @@ void main() {
         await tester.pumpWidget(harness.app(withSettingsProviders: true));
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.settings,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.settings);
         expect(find.byType(SettingsScreen), findsOneWidget);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -210,19 +209,22 @@ void main() {
     testOwnerUI(
       'keeps an admin user on settings',
       (tester) async {
-        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
 
         harness.router.go(RoutePaths.settings);
         await tester.pumpWidget(harness.app(withSettingsProviders: true));
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.settings,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.settings);
         expect(find.byType(SettingsScreen), findsOneWidget);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -241,18 +243,18 @@ void main() {
         expect(harness.repository.listCallCount, 0);
 
         harness.auth
-          ..setUser(makeAuthUser(isAdmin: true))
+          ..setUser(
+            makeAuthUser(isAdmin: true, id: AdminDraftSessionHarness.accountA),
+          )
           ..emit(AuthChangeEvent.signedIn);
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.admin,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.admin);
         expect(find.byType(AdminLoginScreen), findsNothing);
         expect(harness.repository.listCallCount, 1);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -262,7 +264,12 @@ void main() {
     testOwnerUI(
       'refreshes from dashboard to login after a sign-out event',
       (tester) async {
-        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
 
         harness.router.go(RoutePaths.admin);
         await tester.pumpWidget(harness.app());
@@ -274,13 +281,11 @@ void main() {
           ..emit(AuthChangeEvent.signedOut);
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          RoutePaths.adminLoginLocation,
-        );
+        expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
         expect(find.byType(AdminLoginScreen), findsOneWidget);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -298,7 +303,12 @@ void main() {
           ),
         ).thenAnswer((_) async {
           harness.auth
-            ..setUser(makeAuthUser(isAdmin: true))
+            ..setUser(
+              makeAuthUser(
+                isAdmin: true,
+                id: AdminDraftSessionHarness.accountA,
+              ),
+            )
             ..emit(AuthChangeEvent.signedIn);
           return AuthResponse(
             user: harness.auth.client.currentUser,
@@ -350,6 +360,7 @@ void main() {
         expect(find.byType(SettingsScreen), findsOneWidget);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -383,7 +394,12 @@ void main() {
           await pumpCommandTurns(tester);
           expect(harness.auth.passwordCalls, 1);
           harness.auth
-            ..setUser(makeAuthUser(isAdmin: true))
+            ..setUser(
+              makeAuthUser(
+                isAdmin: true,
+                id: AdminDraftSessionHarness.accountA,
+              ),
+            )
             ..emit(AuthChangeEvent.signedIn);
           final response = AuthResponse(
             user: harness.auth.client.currentUser,
@@ -428,6 +444,7 @@ void main() {
           }
         },
         disposeOwners: () {
+          harness.editor.dispose();
           harness.auth.dispose();
           harness.syncViewModel.dispose();
           harness.router.dispose();
@@ -438,7 +455,12 @@ void main() {
     testOwnerUI(
       'R2 logout auth event and completion leave a single protected redirect',
       (tester) async {
-        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
         final gate = Completer<void>();
         harness.auth.onSignOut = () async {
           harness.auth
@@ -468,6 +490,7 @@ void main() {
         expect(harness.auth.anonymousCalls, 1);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -477,19 +500,22 @@ void main() {
     testOwnerUI(
       'builds the real create editor route for an admin',
       (tester) async {
-        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
 
         harness.router.go('/admin/submissions/new');
         await tester.pumpWidget(harness.app());
         await tester.pumpAndSettle();
 
-        expect(
-          harness.router.routeInformationProvider.value.uri.path,
-          '/admin/submissions/new',
-        );
+        expect(harness.router.state.uri.path, '/admin/submissions/new');
         expect(find.text('Nuovo contributo'), findsOneWidget);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -497,50 +523,57 @@ void main() {
     );
 
     testOwnerUI(
-      'W4 edit route loads once and revokes pending hydration on replacement',
+      'W4 owner blocks target replacement during hydration and permits retry',
       (tester) async {
-        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
         final oldLoad = Completer<Result<AdminSubmission>>();
         harness.repository.onGetById = (id) => id == 1
             ? oldLoad.future
-            : Future.value(Result.success(sampleAdminSubmission(id: id)));
+            : Future.value(
+                Result.success(
+                  sampleAdminSubmission(
+                    id: id,
+                    modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+                  ),
+                ),
+              );
         harness.router.go('/admin/submissions/1');
         await tester.pumpWidget(harness.app());
         await pumpCommandTurns(tester);
-        final oldOwner = tester
-            .widget<AdminSubmissionEditorScreen>(
-              find.byType(AdminSubmissionEditorScreen),
-            )
-            .viewModel;
+        final owner = harness.editor;
+        final activation = owner.activation;
         expect(harness.repository.getByIdIds, [1]);
-        expect(oldOwner.requestLoad(), isFalse);
-        await tester.pump();
-        expect(harness.repository.getByIdIds, [1]);
-
+        expect(owner.requestLoad(activation: activation), isFalse);
         harness.router.go('/admin/submissions/2');
         await tester.pumpAndSettle();
-        final newOwner = tester
-            .widget<AdminSubmissionEditorScreen>(
-              find.byType(AdminSubmissionEditorScreen),
-            )
-            .viewModel;
-        expect(identical(oldOwner, newOwner), isFalse);
-        expect(oldOwner.isDisposed, isTrue);
-        expect(harness.repository.getByIdIds, [1, 2]);
-        expect(newOwner.submissionId, 2);
-        final newLoadSnapshot = newOwner.loadSnapshot;
-        oldLoad.complete(Result.success(sampleAdminSubmission()));
-        await tester.pumpAndSettle();
-        expect(identical(newOwner.loadSnapshot, newLoadSnapshot), isTrue);
-        expect(harness.repository.getByIdIds, [1, 2]);
-        expect(
-          harness.router.routerDelegate.state.uri.path,
-          '/admin/submissions/2',
+        expect(find.textContaining('Impossibile aprire'), findsOneWidget);
+        expect(owner.submissionId, 1);
+        expect(owner.isDisposed, isFalse);
+        expect(harness.repository.getByIdIds, [1]);
+        oldLoad.complete(
+          Result.success(
+            sampleAdminSubmission(
+              modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+            ),
+          ),
         );
-        expect(find.byType(SnackBar), findsNothing);
+        await tester.pumpAndSettle();
+        expect(harness.repository.getByIdIds, [1]);
+        await tester.tap(find.text('Riprova'));
+        await tester.pumpAndSettle();
+        expect(harness.editor, same(owner));
+        expect(owner.submissionId, 2);
+        expect(owner.isActivationCurrent(activation), isFalse);
+        expect(harness.repository.getByIdIds, [1, 2]);
         expect(tester.takeException(), isNull);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -554,7 +587,10 @@ void main() {
             'W4 RF3.2 $operation $outcome after $destination stays isolated',
             (tester) async {
               harness = _AdminRouteHarness(
-                initialUser: makeAuthUser(isAdmin: true),
+                initialUser: makeAuthUser(
+                  isAdmin: true,
+                  id: AdminDraftSessionHarness.accountA,
+                ),
               );
               final logger = MockLogger();
               addTearDown(installCommandTestReporting(logger));
@@ -563,6 +599,7 @@ void main() {
               harness.repository.getByIdResults.addAll({
                 1: Result.success(
                   sampleAdminSubmission(
+                    modifiedAtToken: '2026-08-20T00:00:00.000000Z',
                     assets: const [
                       AdminSubmissionAsset(
                         id: 7,
@@ -573,7 +610,12 @@ void main() {
                     ],
                   ),
                 ),
-                2: Result.success(sampleAdminSubmission(id: 2)),
+                2: Result.success(
+                  sampleAdminSubmission(
+                    modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+                    id: 2,
+                  ),
+                ),
               });
               harness.router.go('/admin/submissions/1');
               await tester.pumpWidget(harness.app());
@@ -586,13 +628,29 @@ void main() {
               switch (operation) {
                 case 'save':
                   harness.repository.pendingUpdate = saveGate;
-                  expect(oldOwner.requestSave(), isTrue);
+                  oldOwner.setName(
+                    'Saved revision',
+                    activation: oldOwner.activation,
+                  );
+                  expect(
+                    oldOwner.requestSave(activation: oldOwner.activation),
+                    isTrue,
+                  );
                 case 'reject':
                   harness.repository.pendingReject = mutationGate;
-                  expect(oldOwner.requestReject(), isTrue);
+                  expect(
+                    oldOwner.requestReject(activation: oldOwner.activation),
+                    isTrue,
+                  );
                 case 'delete asset':
                   harness.repository.pendingDeleteAsset = mutationGate;
-                  expect(oldOwner.requestDeleteAsset(7), isTrue);
+                  expect(
+                    oldOwner.requestDeleteAsset(
+                      7,
+                      activation: oldOwner.activation,
+                    ),
+                    isTrue,
+                  );
               }
               await pumpCommandTurns(tester);
               expect(
@@ -614,8 +672,11 @@ void main() {
                   ..emit(AuthChangeEvent.signedOut);
               }
               await tester.pumpAndSettle();
-              expect(oldOwner.isDisposed, isTrue);
-              expect(oldOwner.requestSave(), isFalse);
+              expect(oldOwner.isDisposed, isFalse);
+              expect(
+                oldOwner.requestSave(activation: oldOwner.activation),
+                isFalse,
+              );
               final expectedPath = destination == 'replacement'
                   ? '/admin/submissions/2'
                   : RoutePaths.adminLoginLocation;
@@ -623,14 +684,14 @@ void main() {
                 harness.router.routerDelegate.state.uri.path,
                 expectedPath,
               );
-              final replacement = destination == 'replacement'
-                  ? tester
-                        .widget<AdminSubmissionEditorScreen>(
-                          find.byType(AdminSubmissionEditorScreen),
-                        )
-                        .viewModel
-                  : null;
-              final replacementLoad = replacement?.loadSnapshot;
+              if (destination == 'replacement') {
+                expect(
+                  find.textContaining('Impossibile aprire'),
+                  findsOneWidget,
+                );
+                expect(oldOwner.submissionId, 1);
+              }
+              final replacementLoad = oldOwner.loadSnapshot;
               // Exceed the documented upstream notifier teardown window while
               // the revoked owner's physical command must remain retained.
               await tester.pump(const Duration(milliseconds: 50));
@@ -639,7 +700,20 @@ void main() {
               if (operation == 'save') {
                 switch (outcome) {
                   case 'success':
-                    saveGate.complete(Result.success(sampleAdminSubmission()));
+                    harness.repository.getByIdResults[1] = Result.success(
+                      sampleAdminSubmission(
+                        name: 'Saved revision',
+                        modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                      ),
+                    );
+                    saveGate.complete(
+                      Result.success(
+                        sampleAdminSubmission(
+                          name: 'Saved revision',
+                          modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                        ),
+                      ),
+                    );
                   case 'expected error':
                     saveGate.complete(Result.error(expectedError));
                   case 'raw failure':
@@ -667,12 +741,13 @@ void main() {
               expect(find.byType(SnackBar), findsNothing);
               expect(
                 harness.repository.getByIdIds,
-                destination == 'replacement' ? [1, 2] : [1],
+                destination == 'replacement' &&
+                        operation == 'save' &&
+                        outcome == 'success'
+                    ? [1, 1]
+                    : [1],
               );
-              expect(
-                identical(replacement?.loadSnapshot, replacementLoad),
-                isTrue,
-              );
+              expect(identical(oldOwner.loadSnapshot, replacementLoad), isTrue);
               expect(
                 logger.calls.where(
                   (call) => identical(call.error, runtimeError),
@@ -682,6 +757,7 @@ void main() {
               expect(tester.takeException(), isNull);
             },
             disposeOwners: () {
+              harness.editor.dispose();
               harness.auth.dispose();
               harness.syncViewModel.dispose();
               harness.router.dispose();
@@ -698,15 +774,27 @@ void main() {
           'behind pushed editor is consumed without effects',
           (tester) async {
             harness = _AdminRouteHarness(
-              initialUser: makeAuthUser(isAdmin: true),
+              initialUser: makeAuthUser(
+                isAdmin: true,
+                id: AdminDraftSessionHarness.accountA,
+              ),
             );
             final logger = MockLogger();
             addTearDown(installCommandTestReporting(logger));
             final saveGate = Completer<Result<AdminSubmission>>();
             final rejectGate = Completer<Result<void>>();
             harness.repository.getByIdResults.addAll({
-              1: Result.success(sampleAdminSubmission()),
-              2: Result.success(sampleAdminSubmission(id: 2)),
+              1: Result.success(
+                sampleAdminSubmission(
+                  modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+                ),
+              ),
+              2: Result.success(
+                sampleAdminSubmission(
+                  modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+                  id: 2,
+                ),
+              ),
             });
             harness.router.go('/admin/submissions/1');
             await tester.pumpWidget(harness.app());
@@ -721,10 +809,14 @@ void main() {
                 .viewModel;
             if (operation == 'save') {
               harness.repository.pendingUpdate = saveGate;
-              expect(ownerA.requestSave(), isTrue);
+              ownerA.setName('Saved revision', activation: ownerA.activation);
+              expect(ownerA.requestSave(activation: ownerA.activation), isTrue);
             } else {
               harness.repository.pendingReject = rejectGate;
-              expect(ownerA.requestReject(), isTrue);
+              expect(
+                ownerA.requestReject(activation: ownerA.activation),
+                isTrue,
+              );
             }
             await pumpCommandTurns(tester);
             var bPopped = false;
@@ -733,17 +825,28 @@ void main() {
             await tester.pumpAndSettle();
             expect(editorA.mounted, isTrue);
             expect(ownerA.isDisposed, isFalse);
-            final editorB = tester.widget<AdminSubmissionEditorScreen>(
-              find.byType(AdminSubmissionEditorScreen),
-            );
-            expect(editorB.viewModel.submissionId, 2);
-            final bSnapshot = editorB.viewModel.loadSnapshot;
+            expect(find.textContaining('Impossibile aprire'), findsOneWidget);
+            expect(ownerA.submissionId, 1);
+            final bSnapshot = ownerA.loadSnapshot;
             final runtimeError = StateError('covered $operation');
             final expectedError = TestException('covered expected $operation');
             if (operation == 'save') {
               switch (outcome) {
                 case 'success':
-                  saveGate.complete(Result.success(sampleAdminSubmission()));
+                  harness.repository.getByIdResults[1] = Result.success(
+                    sampleAdminSubmission(
+                      name: 'Saved revision',
+                      modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                    ),
+                  );
+                  saveGate.complete(
+                    Result.success(
+                      sampleAdminSubmission(
+                        name: 'Saved revision',
+                        modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                      ),
+                    ),
+                  );
                 case 'expected error':
                   saveGate.complete(Result.error(expectedError));
                 case 'raw failure':
@@ -767,14 +870,15 @@ void main() {
               '/admin/submissions/2',
             );
             expect(find.byType(SnackBar), findsNothing);
-            expect(
-              identical(editorB.viewModel.loadSnapshot, bSnapshot),
-              isTrue,
-            );
+            expect(identical(ownerA.loadSnapshot, bSnapshot), isTrue);
             final snapshot = operation == 'save'
                 ? ownerA.saveSnapshot
                 : ownerA.rejectSnapshot;
-            expect(snapshot.completed, outcome == 'success');
+            expect(
+              snapshot.completed,
+              outcome == 'success',
+              reason: '${snapshot.data} / ${ownerA.savePhase}',
+            );
             expect(snapshot.hasFailure, outcome != 'success');
             expect(ownerA.isDisposed, isFalse);
             expect(
@@ -797,6 +901,7 @@ void main() {
             expect(tester.takeException(), isNull);
           },
           disposeOwners: () {
+            harness.editor.dispose();
             harness.auth.dispose();
             harness.syncViewModel.dispose();
             harness.router.dispose();
@@ -808,16 +913,21 @@ void main() {
     for (final dialog in ['Publish', 'Reject']) {
       for (final confirm in [true, false]) {
         testOwnerUI(
-          'CR1.3 $dialog dialog Save success defers one true editor pop '
+          'CR1.3 $dialog dialog Save success keeps the editor open '
           'on ${confirm ? 'confirm' : 'cancel'}',
           (tester) async {
             await tester.binding.setSurfaceSize(const Size(800, 1600));
             addTearDown(() => tester.binding.setSurfaceSize(null));
             harness = _AdminRouteHarness(
-              initialUser: makeAuthUser(isAdmin: true),
+              initialUser: makeAuthUser(
+                isAdmin: true,
+                id: AdminDraftSessionHarness.accountA,
+              ),
             );
             harness.repository.getByIdResults[1] = Result.success(
-              sampleAdminSubmission(),
+              sampleAdminSubmission(
+                modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+              ),
             );
             harness.router.go(RoutePaths.admin);
             await tester.pumpWidget(harness.app());
@@ -847,14 +957,32 @@ void main() {
             expect(find.byType(AlertDialog), findsOneWidget);
             final gate = Completer<Result<AdminSubmission>>();
             harness.repository.pendingUpdate = gate;
-            expect(owner.requestSave(), isTrue);
+            owner.setName('Saved revision', activation: owner.activation);
+            expect(owner.requestSave(activation: owner.activation), isTrue);
             await pumpCommandTurns(tester);
-            gate.complete(Result.success(sampleAdminSubmission()));
+            harness.repository.getByIdResults[1] = Result.success(
+              sampleAdminSubmission(
+                name: 'Saved revision',
+                modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+              ),
+            );
+            gate.complete(
+              Result.success(
+                sampleAdminSubmission(
+                  name: 'Saved revision',
+                  modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                ),
+              ),
+            );
             await tester.pumpAndSettle();
             await pumpCommandTurns(tester);
             expect(find.byType(AlertDialog), findsOneWidget);
             expect(pops, 0);
-            expect(owner.canCloseAfterSave, isTrue);
+            expect(
+              owner.saveSnapshot.completed,
+              isTrue,
+              reason: '${owner.saveSnapshot.data} / ${owner.savePhase}',
+            );
             await tester.tap(
               confirm
                   ? find.widgetWithText(FilledButton, 'Conferma')
@@ -862,11 +990,11 @@ void main() {
             );
             await tester.pumpAndSettle();
             await pumpCommandTurns(tester);
-            expect(pops, 1);
-            expect(routeResult, isTrue);
+            expect(pops, 0);
+            expect(routeResult, isNull);
             expect(
               harness.router.routerDelegate.state.uri.path,
-              RoutePaths.admin,
+              '/admin/submissions/1',
             );
             expect(harness.repository.rejectIds, isEmpty);
             expect(harness.repository.promoteCalls, isEmpty);
@@ -874,6 +1002,7 @@ void main() {
             expect(tester.takeException(), isNull);
           },
           disposeOwners: () {
+            harness.editor.dispose();
             harness.auth.dispose();
             harness.syncViewModel.dispose();
             harness.router.dispose();
@@ -888,11 +1017,23 @@ void main() {
               await tester.binding.setSurfaceSize(const Size(800, 1600));
               addTearDown(() => tester.binding.setSurfaceSize(null));
               harness = _AdminRouteHarness(
-                initialUser: makeAuthUser(isAdmin: true),
+                initialUser: makeAuthUser(
+                  isAdmin: true,
+                  id: AdminDraftSessionHarness.accountA,
+                ),
               );
               harness.repository.getByIdResults.addAll({
-                1: Result.success(sampleAdminSubmission()),
-                2: Result.success(sampleAdminSubmission(id: 2)),
+                1: Result.success(
+                  sampleAdminSubmission(
+                    modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+                  ),
+                ),
+                2: Result.success(
+                  sampleAdminSubmission(
+                    modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+                    id: 2,
+                  ),
+                ),
               });
               harness.router.go('/admin/submissions/1');
               await tester.pumpWidget(harness.app());
@@ -918,10 +1059,24 @@ void main() {
               expect(dialogRoute.isCurrent, isTrue);
               final gate = Completer<Result<AdminSubmission>>();
               harness.repository.pendingUpdate = gate;
-              expect(ownerA.requestSave(), isTrue);
+              ownerA.setName('Saved revision', activation: ownerA.activation);
+              expect(ownerA.requestSave(activation: ownerA.activation), isTrue);
               await pumpCommandTurns(tester);
               if (completeBeforeCover) {
-                gate.complete(Result.success(sampleAdminSubmission()));
+                harness.repository.getByIdResults[1] = Result.success(
+                  sampleAdminSubmission(
+                    name: 'Saved revision',
+                    modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                  ),
+                );
+                gate.complete(
+                  Result.success(
+                    sampleAdminSubmission(
+                      name: 'Saved revision',
+                      modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                    ),
+                  ),
+                );
                 await tester.pumpAndSettle();
                 await pumpCommandTurns(tester);
                 expect(find.byType(AlertDialog), findsOneWidget);
@@ -933,20 +1088,33 @@ void main() {
                     .then((_) => bPopped = true),
               );
               await tester.pumpAndSettle();
-              expect(stateA.mounted, isTrue);
+              expect(stateA.mounted, !completeBeforeCover);
               expect(ownerA.isDisposed, isFalse);
               expect(dialogRoute.isCurrent, isFalse);
-              expect(
-                tester
-                    .widget<AdminSubmissionEditorScreen>(
-                      find.byType(AdminSubmissionEditorScreen),
-                    )
-                    .viewModel
-                    .submissionId,
-                2,
-              );
+              if (completeBeforeCover) {
+                expect(ownerA.submissionId, 2);
+              } else {
+                expect(
+                  find.textContaining('Impossibile aprire'),
+                  findsOneWidget,
+                );
+                expect(ownerA.submissionId, 1);
+              }
               if (!completeBeforeCover) {
-                gate.complete(Result.success(sampleAdminSubmission()));
+                harness.repository.getByIdResults[1] = Result.success(
+                  sampleAdminSubmission(
+                    name: 'Saved revision',
+                    modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                  ),
+                );
+                gate.complete(
+                  Result.success(
+                    sampleAdminSubmission(
+                      name: 'Saved revision',
+                      modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+                    ),
+                  ),
+                );
                 await tester.pumpAndSettle();
                 await pumpCommandTurns(tester);
               }
@@ -957,17 +1125,21 @@ void main() {
               );
               expect(find.byType(SnackBar), findsNothing);
               harness.router.pop();
-              await tester.pumpAndSettle();
+              await tester.pump(const Duration(milliseconds: 400));
+              await pumpCommandTurns(tester);
               expect(bPopped, isTrue);
-              expect(stateA.mounted, isTrue);
-              // go_router retains the pageless dialog with A below B.
-              // Returning to A must not restore that session's authority.
-              expect(find.byType(AlertDialog), findsOneWidget);
-              await tester.tap(
-                confirm
-                    ? find.widgetWithText(FilledButton, 'Conferma')
-                    : find.widgetWithText(TextButton, 'Annulla'),
-              );
+              // Replacing A's activation disposes its obsolete dialog;
+              // refused activation leaves the covered dialog dismissible.
+              if (completeBeforeCover) {
+                expect(find.byType(AlertDialog), findsNothing);
+              } else {
+                expect(find.byType(AlertDialog), findsOneWidget);
+                await tester.tap(
+                  confirm
+                      ? find.widgetWithText(FilledButton, 'Conferma')
+                      : find.widgetWithText(TextButton, 'Annulla'),
+                );
+              }
               await tester.pumpAndSettle();
               await pumpCommandTurns(tester);
               expect(
@@ -975,9 +1147,14 @@ void main() {
                 '/admin/submissions/1',
               );
               expect(
-                tester.state(find.byType(AdminSubmissionEditorScreen)),
-                same(stateA),
+                tester
+                    .widget<AdminSubmissionEditorScreen>(
+                      find.byType(AdminSubmissionEditorScreen),
+                    )
+                    .viewModel,
+                same(ownerA),
               );
+              expect(ownerA.submissionId, 1);
               expect(harness.repository.rejectIds, isEmpty);
               expect(harness.repository.promoteCalls, isEmpty);
               expect(find.byType(SnackBar), findsNothing);
@@ -999,6 +1176,7 @@ void main() {
               expect(tester.takeException(), isNull);
             },
             disposeOwners: () {
+              harness.editor.dispose();
               harness.auth.dispose();
               harness.syncViewModel.dispose();
               harness.router.dispose();
@@ -1011,7 +1189,12 @@ void main() {
     testOwnerUI(
       'shows the route error screen for an invalid submission id',
       (tester) async {
-        harness = _AdminRouteHarness(initialUser: makeAuthUser(isAdmin: true));
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
 
         harness.router.go('/admin/submissions/abc');
         await tester.pumpWidget(harness.app());
@@ -1020,6 +1203,7 @@ void main() {
         expect(find.byType(RouteErrorScreen), findsOneWidget);
       },
       disposeOwners: () {
+        harness.editor.dispose();
         harness.auth.dispose();
         harness.syncViewModel.dispose();
         harness.router.dispose();
@@ -1036,6 +1220,11 @@ final class _AdminRouteHarness {
   _AdminRouteHarness({User? initialUser}) {
     auth = ControllableAdminAuth(initialUser: initialUser);
     repository = FakeAdminContentSubmissionRepository();
+    editor = AdminSubmissionEditorViewModel(
+      repository: repository,
+      contentSubmissionRepository: FakeContentSubmissionRepository(),
+      draftSession: local.session,
+    )..bindAuth(auth.viewModel);
     settingsRepository = FakeSettingsRepository(
       lastSyncedAt: DateTime.now(),
       contentSyncCursorAt: DateTime.utc(2026, 10, 12),
@@ -1057,6 +1246,8 @@ final class _AdminRouteHarness {
     );
   }
 
+  final local = AdminDraftSessionHarness();
+  late final AdminSubmissionEditorViewModel editor;
   late final ControllableAdminAuth auth;
   late final FakeAdminContentSubmissionRepository repository;
   late final FakeSettingsRepository settingsRepository;
@@ -1070,6 +1261,10 @@ final class _AdminRouteHarness {
     return MultiProvider(
       providers: <SingleChildWidget>[
         ChangeNotifierProvider<AdminAuthViewModel>.value(value: auth.viewModel),
+        ChangeNotifierProvider<AdminSubmissionEditorViewModel>.value(
+          value: editor,
+        ),
+        Provider<AdminSubmissionDraftRepository>.value(value: local.drafts),
         Provider<AdminContentSubmissionRepository>.value(value: repository),
         Provider<ContentSubmissionRepository>.value(
           value: FakeContentSubmissionRepository(),

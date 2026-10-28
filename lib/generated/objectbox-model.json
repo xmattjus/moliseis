@@ -522,7 +522,7 @@
     },
     {
       "id": "23:9022804856010631971",
-      "lastPropertyId": "6:3148748881204609058",
+      "lastPropertyId": "7:1179791889762300209",
       "name": "AdminSubmissionStagedAssetEntity",
       "properties": [
         {
@@ -554,6 +554,11 @@
         {
           "id": "6:3148748881204609058",
           "name": "relativePath",
+          "type": 9
+        },
+        {
+          "id": "7:1179791889762300209",
+          "name": "progressPayload",
           "type": 9
         }
       ],

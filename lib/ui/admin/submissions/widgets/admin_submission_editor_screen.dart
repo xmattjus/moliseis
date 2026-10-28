@@ -1,4 +1,5 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show scheduleMicrotask, unawaited;
+import 'dart:io';
 
 import 'package:command_it/command_it.dart' as commands;
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
+import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
@@ -25,7 +28,7 @@ import 'package:moliseis/utils/result_command.dart';
 
 /// Form screen for creating and editing a moderation submission.
 class AdminSubmissionEditorScreen extends StatefulWidget {
-  /// Creates an editor backed by route-scoped [viewModel] state.
+  /// Creates an editor backed by application-owned [viewModel] state.
   const AdminSubmissionEditorScreen({required this.viewModel, super.key});
 
   /// Editor state and commands for this route visit.
@@ -43,9 +46,8 @@ class _AdminSubmissionEditorScreenState
   final _locationFormKey = GlobalKey<FormState>();
   final _consumed = <String, int?>{};
   late AdminSubmissionEditorViewModel _owner;
+  AdminDraftActivation? _boundActivation;
   var _statusDialogOpen = false;
-  var _saveCompletedWhileStatusDialogOpen = false;
-  int? _dialogSaveExecutionId;
   ModalRoute<dynamic>? _statusDialogRoute;
   var _statusDialogRevoked = false;
   var _dialogSession = 0;
@@ -67,12 +69,12 @@ class _AdminSubmissionEditorScreenState
   }
 
   void _bind(AdminSubmissionEditorViewModel owner) {
+    _retireStatusDialog();
     _owner = owner;
+    _boundActivation = owner.activation;
     _routeExited = false;
     _dialogSession++;
     _statusDialogOpen = false;
-    _saveCompletedWhileStatusDialogOpen = false;
-    _dialogSaveExecutionId = null;
     _statusDialogRoute = null;
     _statusDialogRevoked = false;
     // Existing terminals are historical, not new effects for this binding.
@@ -104,6 +106,7 @@ class _AdminSubmissionEditorScreenState
       identical(_owner, owner) &&
       identical(widget.viewModel, owner) &&
       !owner.isDisposed &&
+      owner.isActivationCurrent(_boundActivation) &&
       !_routeExited;
 
   bool _hasRouteEffectAuthority(AdminSubmissionEditorViewModel owner) =>
@@ -131,8 +134,20 @@ class _AdminSubmissionEditorScreenState
     return !_statusDialogRevoked && _statusDialogRoute?.isCurrent == true;
   }
 
+  void _retireStatusDialog() {
+    final dialog = _statusDialogRoute;
+    final navigator = dialog?.navigator;
+    if (dialog == null || navigator == null) return;
+    // Remove only this obsolete dialog, after Navigator's current dispatch.
+    // Captured route/navigator references need no disposed State context.
+    scheduleMicrotask(() {
+      if (navigator.mounted && dialog.isActive) navigator.removeRoute(dialog);
+    });
+  }
+
   @override
   void dispose() {
+    _retireStatusDialog();
     _dialogSession++;
     _owner.removeListener(_onOwnerChanged);
     _eventTargetController.dispose();
@@ -185,15 +200,25 @@ class _AdminSubmissionEditorScreenState
 
   void _onOwnerChanged() {
     final owner = _owner;
+    final next = owner.activation;
+    final previous = _boundActivation;
+    if (next != null &&
+        previous != null &&
+        previous.owner.submissionId == null &&
+        next.owner.submissionId != null &&
+        previous.owner.accountId == next.owner.accountId &&
+        previous.owner.sessionId == next.owner.sessionId) {
+      // Adoption changes only the target. Old callbacks retain old tokens.
+      _boundActivation = next;
+    }
     if (!_owns(owner)) return;
     _syncEventTarget();
-    _consume(
-      owner,
-      'save',
-      owner.saveExecutionId,
-      owner.saveSnapshot,
-      () => _handleSaveCompleted(owner),
-    );
+    _consume(owner, 'save', owner.saveExecutionId, owner.saveSnapshot, () {
+      // Save never closes the editor, including a completion under a dialog.
+      if (owner.saveSnapshot.hasFailure) {
+        _showModerationError(owner.saveSnapshot.data);
+      }
+    });
     _consume(
       owner,
       'reject',
@@ -275,34 +300,6 @@ class _AdminSubmissionEditorScreenState
     }
   }
 
-  void _handleSaveCompleted(AdminSubmissionEditorViewModel owner) {
-    if (!_owns(owner)) return;
-    final save = owner.saveSnapshot;
-    if (save.completed && owner.canCloseAfterSave) {
-      if (_statusDialogOpen) {
-        if (_hasStatusDialogEffectAuthority(owner)) {
-          _saveCompletedWhileStatusDialogOpen = true;
-          _dialogSaveExecutionId = owner.saveExecutionId;
-        }
-        return;
-      }
-      _closeEditor(owner);
-    } else if (save.hasFailure) {
-      if (save.domainError case final AdminContentSubmissionApiException error
-          when error.statusCode == 422 &&
-              error.code == 'ADMIN_PROFILE_INCOMPLETE') {
-        showSnackBar(
-          context: context,
-          textContent:
-              "Il profilo amministratore richiede un nome e un'email validi.",
-          type: SnackBarType.error,
-        );
-      } else {
-        _showModerationError(save.data);
-      }
-    }
-  }
-
   void _handleRejectCompleted(AdminSubmissionEditorViewModel owner) {
     if (!_owns(owner)) return;
     final reject = owner.rejectSnapshot;
@@ -317,6 +314,8 @@ class _AdminSubmissionEditorScreenState
   /// codes fall back to the generic snackbar.
   String? _moderationErrorMessage(String? code) => switch (code
       ?.toUpperCase()) {
+    'ADMIN_PROFILE_INCOMPLETE' =>
+      "Il profilo amministratore richiede un nome e un'email validi.",
     'COORDINATES_REQUIRED' ||
     'INVALID_COORDINATES' ||
     'PROMOTION_COORDINATES_REQUIRED' ||
@@ -391,6 +390,7 @@ class _AdminSubmissionEditorScreenState
     AdminPromotionTarget target,
   ) async {
     if (!mounted) return;
+    final activation = viewModel.activation;
 
     if (!_hasRouteEffectAuthority(viewModel) ||
         viewModel.operationRunning ||
@@ -436,26 +436,19 @@ class _AdminSubmissionEditorScreenState
           _statusDialogRevoked) {
         return;
       }
-      if (_saveCompletedWhileStatusDialogOpen) {
-        if (_dialogSaveExecutionId == viewModel.saveExecutionId &&
-            viewModel.canCloseAfterSave) {
-          _closeEditor(viewModel);
-        }
-        // A superseded successful Save must not fall through to moderation.
-        return;
-      }
       if (confirmed != true ||
           viewModel.operationRunning ||
           revision != viewModel.editorRevision) {
         return;
       }
 
-      _request(viewModel, () => viewModel.requestPromote(target));
+      _request(
+        viewModel,
+        () => viewModel.requestPromote(target, activation: activation),
+      );
     } finally {
       if (session == _dialogSession && identical(_owner, viewModel)) {
         _statusDialogOpen = false;
-        _saveCompletedWhileStatusDialogOpen = false;
-        _dialogSaveExecutionId = null;
         _statusDialogRoute = null;
       }
     }
@@ -463,6 +456,7 @@ class _AdminSubmissionEditorScreenState
 
   Future<void> _confirmReject(AdminSubmissionEditorViewModel viewModel) async {
     if (!mounted) return;
+    final activation = viewModel.activation;
 
     if (!_hasRouteEffectAuthority(viewModel) ||
         viewModel.operationRunning ||
@@ -542,27 +536,20 @@ class _AdminSubmissionEditorScreenState
           _statusDialogRevoked) {
         return;
       }
-      if (_saveCompletedWhileStatusDialogOpen) {
-        if (_dialogSaveExecutionId == viewModel.saveExecutionId &&
-            viewModel.canCloseAfterSave) {
-          _closeEditor(viewModel);
-        }
-        // A superseded successful Save must not fall through to moderation.
-        return;
-      }
       if (confirmed != true ||
           viewModel.operationRunning ||
           revision != viewModel.editorRevision) {
         return;
       }
 
-      viewModel.setIgnoreSource(ignored: ignoreSource);
-      _request(viewModel, viewModel.requestReject);
+      viewModel.setIgnoreSource(ignored: ignoreSource, activation: activation);
+      _request(
+        viewModel,
+        () => viewModel.requestReject(activation: activation),
+      );
     } finally {
       if (session == _dialogSession && identical(_owner, viewModel)) {
         _statusDialogOpen = false;
-        _saveCompletedWhileStatusDialogOpen = false;
-        _dialogSaveExecutionId = null;
         _statusDialogRoute = null;
       }
     }
@@ -573,6 +560,7 @@ class _AdminSubmissionEditorScreenState
     int assetId,
   ) async {
     if (!mounted) return;
+    final activation = viewModel.activation;
 
     if (!_hasRouteEffectAuthority(viewModel) || viewModel.operationRunning) {
       return;
@@ -604,18 +592,64 @@ class _AdminSubmissionEditorScreenState
         !viewModel.assets.any((asset) => asset.id == assetId)) {
       return;
     }
-    _request(viewModel, () => viewModel.requestDeleteAsset(assetId));
+    _request(
+      viewModel,
+      () => viewModel.requestDeleteAsset(assetId, activation: activation),
+    );
   }
 
-  void _save(AdminSubmissionEditorViewModel owner) {
+  Future<void> _checkpoint(
+    AdminSubmissionEditorViewModel owner,
+    AdminDraftActivation? activation,
+  ) async {
+    if (!mounted) return;
+    if (!_owns(owner) || !owner.isActivationCurrent(activation)) return;
+    final result = await owner.checkpointLocal();
+    if (!mounted) return;
+    if (!_owns(owner) || !owner.isActivationCurrent(activation)) return;
+    if (result is Error<void> && _hasRouteEffectAuthority(owner)) {
+      showSnackBarGenericError(context: context);
+    }
+  }
+
+  void _save(
+    AdminSubmissionEditorViewModel owner,
+    AdminDraftActivation? activation, {
+    bool validate = true,
+  }) {
     if (!_owns(owner)) return;
-    final contentOk = _formKey.currentState?.validate() ?? false;
-    final locationOk = _locationFormKey.currentState?.validate() ?? false;
-    final eventTimeOk = owner.validateEventTimeForSave();
+    if (!owner.isActivationCurrent(activation)) return;
+    final contentOk = !validate || (_formKey.currentState?.validate() ?? false);
+    final locationOk =
+        !validate || (_locationFormKey.currentState?.validate() ?? false);
+    final eventTimeOk = !validate || owner.validateEventTimeForSave();
     if (contentOk && locationOk && eventTimeOk) {
       _unfocus();
-      _request(owner, owner.requestSave);
+      if (!owner.requestSave(
+        activation: activation,
+        resumeCaptured: !validate,
+      )) {
+        return;
+      }
+      _openSaveProgress(owner);
     }
+  }
+
+  void _openSaveProgress(AdminSubmissionEditorViewModel owner) {
+    if (!mounted) return;
+    if (!_owns(owner)) return;
+    final session = owner.sessionId;
+    if (session == null) return;
+    unawaited(
+      context.pushNamed(
+        RouteNames.adminSubmissionSaveProgress,
+        queryParameters: {
+          'session': session,
+          'attempt': '${owner.saveExecutionId}',
+          'editor': '${owner.submissionId ?? 'new'}',
+        },
+      ),
+    );
   }
 
   @override
@@ -626,6 +660,8 @@ class _AdminSubmissionEditorScreenState
       body: ListenableBuilder(
         listenable: viewModel,
         builder: (context, _) {
+          final activation = viewModel.activation;
+          final pickerRequest = viewModel.pickerRequestNonce;
           final status = viewModel.status;
 
           if (viewModel.isEditMode &&
@@ -641,18 +677,21 @@ class _AdminSubmissionEditorScreenState
             return EmptyView.error(
               text: const Text('Impossibile caricare il contributo'),
               action: FilledButton(
-                onPressed: () => _request(viewModel, viewModel.requestLoad),
+                onPressed: () => _request(
+                  viewModel,
+                  () => viewModel.requestLoad(activation: activation),
+                ),
                 child: const Text('Riprova'),
               ),
             );
           }
 
-          // Draft interaction is locked both for final read-only states and
-          // while any mutation is running, so edits made after the request
-          // snapshot cannot be silently lost when success pops the route.
+          // New typing may coexist with a captured Save. Other mutation lanes
+          // keep their existing interaction protection.
           final lockEditor =
               !viewModel.isEditable ||
-              viewModel.operationRunning ||
+              (viewModel.operationRunning &&
+                  !viewModel.saveSnapshot.isRunning) ||
               viewModel.loading;
 
           return CustomScrollView(
@@ -670,6 +709,55 @@ class _AdminSubmissionEditorScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverList.list(
                   children: <Widget>[
+                    if (viewModel.savePhase == AdminSavePhase.conflict)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'Il contributo remoto è cambiato. '
+                          'Le modifiche locali sono conservate. '
+                          'Puoi salvare la bozza locale e tornare alla lista.',
+                        ),
+                      ),
+                    if (viewModel.canRequestFieldSettlement)
+                      TextButton(
+                        onPressed: () {
+                          if (_owns(viewModel) &&
+                              viewModel.requestFieldSettlement(
+                                activation: activation,
+                              )) {
+                            _openSaveProgress(viewModel);
+                          }
+                        },
+                        child: const Text('Ripristina salvataggio locale'),
+                      ),
+                    if (viewModel.canRefreshSaveAuthority)
+                      TextButton(
+                        onPressed: () => _request(
+                          viewModel,
+                          () => viewModel.requestLoad(activation: activation),
+                        ),
+                        child: const Text('Ricarica stato remoto'),
+                      ),
+                    if (viewModel.canResumeCapturedSave)
+                      TextButton(
+                        onPressed: () =>
+                            _save(viewModel, activation, validate: false),
+                        child: const Text('Riprendi salvataggio'),
+                      ),
+                    if (viewModel.canRequestSaveReadBack)
+                      TextButton(
+                        onPressed: () => viewModel.requestSaveReadBack(
+                          activation: activation,
+                        ),
+                        child: const Text('Verifica esito remoto'),
+                      ),
+                    if (viewModel.canCheckpoint)
+                      TextButton(
+                        onPressed: () {
+                          unawaited(_checkpoint(viewModel, activation));
+                        },
+                        child: const Text('Salva bozza locale'),
+                      ),
                     Focus(
                       canRequestFocus: !lockEditor,
                       descendantsAreFocusable: !lockEditor,
@@ -693,7 +781,10 @@ class _AdminSubmissionEditorScreenState
                             allDay: viewModel.allDay,
                             onAllDayChanged: (allDay) => _request(
                               viewModel,
-                              () => viewModel.setAllDay(allDay: allDay),
+                              () => viewModel.setAllDay(
+                                allDay: allDay,
+                                activation: activation,
+                              ),
                             ),
                             startCalendarDate: viewModel.startCalendarDate,
                             startClockTime: viewModel.startClockTime,
@@ -701,19 +792,31 @@ class _AdminSubmissionEditorScreenState
                             eventTimeIssue: viewModel.eventTimeIssue,
                             onCategorySelected: (value) => _request(
                               viewModel,
-                              () => viewModel.setCategory(value),
+                              () => viewModel.setCategory(
+                                value,
+                                activation: activation,
+                              ),
                             ),
                             onCategoryDeleted: () => _request(
                               viewModel,
-                              () => viewModel.setCategory(null),
+                              () => viewModel.setCategory(
+                                null,
+                                activation: activation,
+                              ),
                             ),
                             onCityChanged: (value) => _request(
                               viewModel,
-                              () => viewModel.setCity(value),
+                              () => viewModel.setCity(
+                                value,
+                                activation: activation,
+                              ),
                             ),
                             onNameChanged: (value) => _request(
                               viewModel,
-                              () => viewModel.setName(value),
+                              () => viewModel.setName(
+                                value,
+                                activation: activation,
+                              ),
                             ),
                             onDescriptionChanged:
                                 ({
@@ -722,25 +825,38 @@ class _AdminSubmissionEditorScreenState
                                 }) => _request(
                                   viewModel,
                                   () => viewModel.setDescription(
+                                    activation: activation,
                                     description: description,
                                     descriptionDelta: descriptionDelta,
                                   ),
                                 ),
                             onEventChanged: (enabled) => _request(
                               viewModel,
-                              () => viewModel.setEventEnabled(enabled: enabled),
+                              () => viewModel.setEventEnabled(
+                                enabled: enabled,
+                                activation: activation,
+                              ),
                             ),
                             onStartDateChanged: (value) => _request(
                               viewModel,
-                              () => viewModel.setStartCalendarDate(value),
+                              () => viewModel.setStartCalendarDate(
+                                value,
+                                activation: activation,
+                              ),
                             ),
                             onStartTimeChanged: (value) => _request(
                               viewModel,
-                              () => viewModel.setStartClockTime(value),
+                              () => viewModel.setStartClockTime(
+                                value,
+                                activation: activation,
+                              ),
                             ),
                             onEndDateChanged: (value) => _request(
                               viewModel,
-                              () => viewModel.setEndCalendarDate(value),
+                              () => viewModel.setEndCalendarDate(
+                                value,
+                                activation: activation,
+                              ),
                             ),
                           ),
                         ),
@@ -768,11 +884,17 @@ class _AdminSubmissionEditorScreenState
                             formKey: _locationFormKey,
                             onLatitudeTextChanged: (value) => _request(
                               viewModel,
-                              () => viewModel.setLatitudeText(value),
+                              () => viewModel.setLatitudeText(
+                                value,
+                                activation: activation,
+                              ),
                             ),
                             onLongitudeTextChanged: (value) => _request(
                               viewModel,
-                              () => viewModel.setLongitudeText(value),
+                              () => viewModel.setLongitudeText(
+                                value,
+                                activation: activation,
+                              ),
                             ),
                             onMapCoordinatesSelected: (latitude, longitude) =>
                                 _request(
@@ -780,6 +902,7 @@ class _AdminSubmissionEditorScreenState
                                   () => viewModel.setCoordinates(
                                     latitude,
                                     longitude,
+                                    activation: activation,
                                   ),
                                 ),
                           ),
@@ -789,7 +912,7 @@ class _AdminSubmissionEditorScreenState
                   ),
                 ],
               ),
-              if (viewModel.isEditMode && viewModel.hasLoadedDetail)
+              if (!viewModel.isEditMode || viewModel.hasLoadedDetail)
                 SliverList.list(
                   children: <Widget>[
                     const TextSectionDivider('Foto'),
@@ -800,13 +923,46 @@ class _AdminSubmissionEditorScreenState
                         spacing: 8,
                         children: <Widget>[
                           Text(
-                            '${viewModel.assets.length} / '
+                            '${viewModel.imageCount} / '
                             '$kMaximumSubmissionAssetCount',
                           ),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: <Widget>[
+                              ...viewModel.stagedAssets.map(
+                                (asset) => ContentSubmissionAssetListItem(
+                                  key: ValueKey('admin_staged_${asset.digest}'),
+                                  image: FutureBuilder<Result<File>>(
+                                    future: viewModel.stagedAssetFile(asset),
+                                    builder: (context, snapshot) =>
+                                        switch (snapshot.data) {
+                                          Success<File>(:final value) =>
+                                            Image.file(
+                                              value,
+                                              width: contentSubmissionAssetSize
+                                                  .width,
+                                              height: contentSubmissionAssetSize
+                                                  .height,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          _ => const SizedBox(
+                                            width: 80,
+                                            height: 80,
+                                            child: Icon(Icons.image),
+                                          ),
+                                        },
+                                  ),
+                                  showRemoveIcon: viewModel.isEditable,
+                                  onRemove: viewModel.operationRunning
+                                      ? null
+                                      : () =>
+                                            viewModel.requestRemoveStagedAsset(
+                                              asset,
+                                              activation: activation,
+                                            ),
+                                ),
+                              ),
                               ...viewModel.assets.map((asset) {
                                 return ContentSubmissionAssetListItem(
                                   key: ValueKey<String>(
@@ -831,8 +987,10 @@ class _AdminSubmissionEditorScreenState
                                         ),
                                 );
                               }),
-                              if ((status == AdminSubmissionStatus.pending &&
-                                      viewModel.assets.length <
+                              if (((!viewModel.isEditMode ||
+                                          status ==
+                                              AdminSubmissionStatus.pending) &&
+                                      viewModel.imageCount <
                                           kMaximumSubmissionAssetCount) &&
                                   viewModel.canRequestAddAsset)
                                 ContentSubmissionAddAssetButton(
@@ -845,9 +1003,26 @@ class _AdminSubmissionEditorScreenState
                                           _unfocus();
                                           _request(
                                             viewModel,
-                                            viewModel.requestAddAsset,
+                                            () => viewModel.requestAddAsset(
+                                              activation: activation,
+                                            ),
                                           );
                                         },
+                                ),
+                              if (viewModel.pickerWaiting)
+                                TextButton(
+                                  onPressed: () {
+                                    if (viewModel.isActivationCurrent(
+                                      activation,
+                                    )) {
+                                      if (pickerRequest != null) {
+                                        viewModel.abandonPicker(
+                                          requestNonce: pickerRequest,
+                                        );
+                                      }
+                                    }
+                                  },
+                                  child: const Text('Interrompi selezione'),
                                 ),
                               if (viewModel.operationRunning)
                                 const Padding(
@@ -944,6 +1119,7 @@ class _AdminSubmissionEditorScreenState
                                         () => viewModel
                                             .setAcknowledgeCurrentSource(
                                               selected: value ?? false,
+                                              activation: activation,
                                             ),
                                       ),
                               ),
@@ -960,7 +1136,10 @@ class _AdminSubmissionEditorScreenState
                                   initialValue: viewModel.candidateSearch,
                                   onChanged: (value) => _request(
                                     viewModel,
-                                    () => viewModel.setCandidateSearch(value),
+                                    () => viewModel.setCandidateSearch(
+                                      value,
+                                      activation: activation,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -969,7 +1148,9 @@ class _AdminSubmissionEditorScreenState
                                     ? null
                                     : () => _request(
                                         viewModel,
-                                        viewModel.requestFindCandidates,
+                                        () => viewModel.requestFindCandidates(
+                                          activation: activation,
+                                        ),
                                       ),
                                 child: const Text('Cerca eventi'),
                               ),
@@ -1008,6 +1189,7 @@ class _AdminSubmissionEditorScreenState
                                             viewModel,
                                             () => viewModel.selectTargetEvent(
                                               candidate.id,
+                                              activation: activation,
                                             ),
                                           ),
                                   ),
@@ -1028,6 +1210,7 @@ class _AdminSubmissionEditorScreenState
                                   viewModel,
                                   () => viewModel.selectTargetEvent(
                                     int.tryParse(value),
+                                    activation: activation,
                                   ),
                                 ),
                               ),
@@ -1041,6 +1224,7 @@ class _AdminSubmissionEditorScreenState
                                         viewModel,
                                         () => viewModel.requestLink(
                                           viewModel.targetEventId!,
+                                          activation: activation,
                                         ),
                                       ),
                                 child: const Text('Collega a evento'),
@@ -1053,7 +1237,9 @@ class _AdminSubmissionEditorScreenState
                                       ? null
                                       : () => _request(
                                           viewModel,
-                                          viewModel.requestPreview,
+                                          () => viewModel.requestPreview(
+                                            activation: activation,
+                                          ),
                                         ),
                                   child: const Text('Anteprima aggiornamento'),
                                 ),
@@ -1111,6 +1297,8 @@ class _AdminSubmissionEditorScreenState
                                                       () => viewModel
                                                           .requestKeepCurrent(
                                                             group,
+                                                            activation:
+                                                                activation,
                                                           ),
                                                     ),
                                               child: const Text(
@@ -1127,7 +1315,9 @@ class _AdminSubmissionEditorScreenState
                                         ? null
                                         : () => _request(
                                             viewModel,
-                                            viewModel.requestApply,
+                                            () => viewModel.requestApply(
+                                              activation: activation,
+                                            ),
                                           ),
                                     child: const Text('Applica aggiornamento'),
                                   ),
@@ -1206,7 +1396,7 @@ class _AdminSubmissionEditorScreenState
                       child: FilledButton.icon(
                         onPressed: !viewModel.canRequestSave
                             ? null
-                            : () => _save(viewModel),
+                            : () => _save(viewModel, activation),
                         icon: const Icon(Symbols.save),
                         label: Text(
                           viewModel.isEditMode

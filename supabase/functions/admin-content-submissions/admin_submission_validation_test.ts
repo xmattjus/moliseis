@@ -37,8 +37,17 @@ Deno.test("accepts all operation envelopes and normalizes editor input", () => {
   const requests = [
     { operation: "list" },
     { operation: "getById", submission_id: 1 },
-    { operation: "create", input: input() },
-    { operation: "update", submission_id: 1, input: input() },
+    {
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input(),
+    },
+    {
+      operation: "update",
+      expected_modified_at: "2026-08-21T11:00:00.000Z",
+      submission_id: 1,
+      input: input(),
+    },
     { operation: "changeStatus", submission_id: 1, status: "rejected" },
     { operation: "promote", submission_id: 1, target: "place" },
     { operation: "promote", submission_id: 2, target: "event" },
@@ -51,6 +60,7 @@ Deno.test("accepts all operation envelopes and normalizes editor input", () => {
 
   const created = parseAdminContentSubmissionsRequest({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input(),
   });
   assert(created.ok && created.value.operation === "create");
@@ -146,9 +156,20 @@ Deno.test("rejects invalid request envelopes, IDs, and status", () => {
       { operation: "getById" },
       { operation: "getById", submission_id: 1, extra: true },
       { operation: "create" },
-      { operation: "create", input: input(), extra: true },
+      {
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: input(),
+        extra: true,
+      },
       { operation: "update" },
-      { operation: "update", submission_id: 1, input: input(), extra: true },
+      {
+        operation: "update",
+        expected_modified_at: "2026-08-21T11:00:00.000Z",
+        submission_id: 1,
+        input: input(),
+        extra: true,
+      },
       { operation: "changeStatus", submission_id: 1 },
       {
         operation: "changeStatus",
@@ -193,7 +214,11 @@ Deno.test("rejects invalid request envelopes, IDs, and status", () => {
 
 Deno.test("requires the exact twelve editor input fields and rejects spoofing", () => {
   expectInvalid(
-    { operation: "create", input: {} },
+    {
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: {},
+    },
     "input contains unsupported or missing fields.",
   );
   for (
@@ -207,12 +232,20 @@ Deno.test("requires the exact twelve editor input fields and rejects spoofing", 
     ]
   ) {
     expectInvalid(
-      { operation: "create", input: input({ [spoofedKey]: true }) },
+      {
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: input({ [spoofedKey]: true }),
+      },
       "input contains unsupported or missing fields.",
     );
   }
   expectInvalid(
-    { operation: "create", input: [] },
+    {
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: [],
+    },
     "input must be a JSON object.",
   );
 });
@@ -232,34 +265,50 @@ Deno.test("validates categories, city, and name boundaries", () => {
     assert(
       parseAdminContentSubmissionsRequest({
         operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
         input: input({ category }),
       }).ok,
     );
   }
   expectInvalid(
-    { operation: "create", input: input({ category: "other" }) },
+    {
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input({ category: "other" }),
+    },
     "category is not supported.",
   );
   expectInvalid(
-    { operation: "create", input: input({ city: "  " }) },
+    {
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input({ city: "  " }),
+    },
     "city must be a non-empty string.",
   );
   expectInvalid(
-    { operation: "create", input: input({ name: "  " }) },
+    {
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input({ name: "  " }),
+    },
     "name must be a non-empty string.",
   );
   assert(
     parseAdminContentSubmissionsRequest({
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ city: "a".repeat(100), name: "a".repeat(150) }),
     }).ok,
   );
   expectInvalid({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({ city: "a".repeat(101) }),
   }, "city exceeds maximum length of 100 characters.");
   expectInvalid({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({ name: "a".repeat(151) }),
   }, "name exceeds maximum length of 150 characters.");
 });
@@ -268,6 +317,7 @@ Deno.test("preserves descriptions and applies the shared canonical Delta rules",
   const delta = [{ insert: "  Text\n" }];
   const result = parseAdminContentSubmissionsRequest({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({ description: "  Text", description_delta: delta }),
   });
   assert(result.ok && result.value.operation === "create");
@@ -276,29 +326,38 @@ Deno.test("preserves descriptions and applies the shared canonical Delta rules",
   assert(
     parseAdminContentSubmissionsRequest({
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ description: "legacy", description_delta: null }),
     }).ok,
   );
   expectInvalid(
-    { operation: "create", input: input({ description: 1 }) },
+    {
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input({ description: 1 }),
+    },
     "description must be a string or null.",
   );
   assert(
     parseAdminContentSubmissionsRequest({
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ description: "a".repeat(5000), description_delta: null }),
     }).ok,
   );
   expectInvalid({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({ description: "a".repeat(5001) }),
   }, "description exceeds maximum length of 5000 characters.");
   expectInvalid({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({ description: "x", description_delta: [{ insert: "x" }] }),
   }, "description_delta must end with a terminal newline");
   expectInvalid({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({ description: null, description_delta: [{ insert: "x\n" }] }),
   }, "description_delta requires a non-null description");
 });
@@ -319,6 +378,7 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
   ) {
     const result = parseAdminContentSubmissionsRequest({
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ start_date: startDate }),
     });
     assert(result.ok && result.value.operation === "create");
@@ -352,13 +412,18 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
     ]
   ) {
     assert(
-      parseAdminContentSubmissionsRequest({ operation: "create", input: valid })
+      parseAdminContentSubmissionsRequest({
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: valid,
+      })
         .ok,
     );
   }
 
   const ordered = parseAdminContentSubmissionsRequest({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({
       start_date: "2026-08-20T10:00:00.000+02:00",
       end_date: "2026-08-20T09:00:00.000Z",
@@ -370,6 +435,7 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
 
   const precise = parseAdminContentSubmissionsRequest({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({
       start_date: subMillisecondStart,
       end_date: subMillisecondEnd,
@@ -406,8 +472,17 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
     for (const operation of ["create", "update"] as const) {
       expectInvalid(
         operation === "create"
-          ? { operation, input: invalid }
-          : { operation, submission_id: 1, input: invalid },
+          ? {
+            operation,
+            client_submission_id: "11111111-1111-4111-8111-111111111111",
+            input: invalid,
+          }
+          : {
+            operation,
+            expected_modified_at: "2026-08-21T11:00:00.000Z",
+            submission_id: 1,
+            input: invalid,
+          },
         message,
       );
     }
@@ -433,7 +508,11 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
     ] as const
   ) {
     expectInvalid(
-      { operation: "create", input: input({ [key]: value }) },
+      {
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: input({ [key]: value }),
+      },
       message,
     );
   }
@@ -449,9 +528,14 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
     for (const operation of ["create", "update"] as const) {
       expectInvalid(
         operation === "create"
-          ? { operation, input: input({ start_date: invalidDate }) }
+          ? {
+            operation,
+            client_submission_id: "11111111-1111-4111-8111-111111111111",
+            input: input({ start_date: invalidDate }),
+          }
           : {
             operation,
+            expected_modified_at: "2026-08-21T11:00:00.000Z",
             submission_id: 1,
             input: input({ start_date: invalidDate }),
           },
@@ -461,6 +545,7 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
         operation === "create"
           ? {
             operation,
+            client_submission_id: "11111111-1111-4111-8111-111111111111",
             input: input({
               start_date: "2026-08-20",
               end_date: invalidDate,
@@ -468,6 +553,7 @@ Deno.test("validates nullable dates and enforces date pairing and ordering", () 
           }
           : {
             operation,
+            expected_modified_at: "2026-08-21T11:00:00.000Z",
             submission_id: 1,
             input: input({
               start_date: "2026-08-20",
@@ -484,18 +570,21 @@ Deno.test("accepts null and valid coordinate pairs with exact boundaries", () =>
   assert(
     parseAdminContentSubmissionsRequest({
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input(),
     }).ok,
   );
   assert(
     parseAdminContentSubmissionsRequest({
       operation: "update",
+      expected_modified_at: "2026-08-21T11:00:00.000Z",
       submission_id: 1,
       input: input({ latitude: null, longitude: null }),
     }).ok,
   );
   const paired = parseAdminContentSubmissionsRequest({
     operation: "create",
+    client_submission_id: "11111111-1111-4111-8111-111111111111",
     input: input({ latitude: 41.5575078, longitude: 14.6485406 }),
   });
   assert(paired.ok && paired.value.operation === "create");
@@ -510,6 +599,7 @@ Deno.test("accepts null and valid coordinate pairs with exact boundaries", () =>
   ) {
     const boundary = parseAdminContentSubmissionsRequest({
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ latitude, longitude }),
     });
     assert(boundary.ok && boundary.value.operation === "create");
@@ -522,6 +612,7 @@ Deno.test("rejects out-of-range coordinates with stable messages", () => {
   expectInvalid(
     {
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ latitude: -90.000001, longitude: 0 }),
     },
     "latitude must be between -90 and 90.",
@@ -529,6 +620,7 @@ Deno.test("rejects out-of-range coordinates with stable messages", () => {
   expectInvalid(
     {
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ latitude: 90.000001, longitude: 0 }),
     },
     "latitude must be between -90 and 90.",
@@ -536,6 +628,7 @@ Deno.test("rejects out-of-range coordinates with stable messages", () => {
   expectInvalid(
     {
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ latitude: 0, longitude: -180.000001 }),
     },
     "longitude must be between -180 and 180.",
@@ -543,6 +636,7 @@ Deno.test("rejects out-of-range coordinates with stable messages", () => {
   expectInvalid(
     {
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ latitude: 0, longitude: 180.000001 }),
     },
     "longitude must be between -180 and 180.",
@@ -553,6 +647,7 @@ Deno.test("rejects half-pairs, non-numbers, and non-finite numbers", () => {
   expectInvalid(
     {
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ latitude: 41.5575078 }),
     },
     "latitude and longitude must be provided together.",
@@ -560,6 +655,7 @@ Deno.test("rejects half-pairs, non-numbers, and non-finite numbers", () => {
   expectInvalid(
     {
       operation: "update",
+      expected_modified_at: "2026-08-21T11:00:00.000Z",
       submission_id: 1,
       input: input({ longitude: 14.6485406 }),
     },
@@ -567,21 +663,34 @@ Deno.test("rejects half-pairs, non-numbers, and non-finite numbers", () => {
   );
   for (const badValue of ["41.55", true]) {
     expectInvalid(
-      { operation: "create", input: input({ latitude: badValue }) },
+      {
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: input({ latitude: badValue }),
+      },
       "latitude must be a finite number.",
     );
     expectInvalid(
-      { operation: "create", input: input({ longitude: badValue }) },
+      {
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: input({ longitude: badValue }),
+      },
       "longitude must be a finite number.",
     );
   }
   expectInvalid(
-    { operation: "create", input: input({ latitude: Number.NaN }) },
+    {
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input({ latitude: Number.NaN }),
+    },
     "latitude must be a finite number.",
   );
   expectInvalid(
     {
       operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
       input: input({ latitude: 0, longitude: Number.POSITIVE_INFINITY }),
     },
     "longitude must be a finite number.",
@@ -607,7 +716,12 @@ Deno.test("Admin complete input shares civil normalization and mode transitions"
     ) {
       const result = parseAdminContentSubmissionsRequest({
         operation,
-        ...(operation === "update" ? { submission_id: 1 } : {}),
+        ...(operation === "update"
+          ? {
+            submission_id: 1,
+            expected_modified_at: "2026-08-21T11:00:00.000Z",
+          }
+          : { client_submission_id: "11111111-1111-4111-8111-111111111111" }),
         input: input(fields),
       });
       assert(
@@ -634,7 +748,11 @@ Deno.test("Admin requires every temporal key and rejects invalid temporal repres
     const missing: Record<string, unknown> = input();
     delete missing[key];
     expectInvalid(
-      { operation: "create", input: missing },
+      {
+        operation: "create",
+        client_submission_id: "11111111-1111-4111-8111-111111111111",
+        input: missing,
+      },
       "input contains unsupported or missing fields.",
     );
   }
@@ -670,7 +788,11 @@ Deno.test("Admin requires every temporal key and rejects invalid temporal repres
       ],
     ] as const
   ) {
-    expectInvalid({ operation: "create", input: input(fields) }, message);
+    expectInvalid({
+      operation: "create",
+      client_submission_id: "11111111-1111-4111-8111-111111111111",
+      input: input(fields),
+    }, message);
   }
 });
 
@@ -855,4 +977,58 @@ Deno.test("Apply accepts opaque tokens and rejects caller actor/group authority"
     }).ok,
     false,
   );
+});
+
+Deno.test("Save requires replay identity and exact timestamp tokens without precision loss", () => {
+  expectInvalid(
+    { operation: "create", input: input() },
+    "Request contains unsupported or missing fields.",
+  );
+  for (
+    const key of [
+      null,
+      "not-a-uuid",
+      "11111111-1111-3111-8111-111111111111",
+      "11111111-1111-4111-7111-111111111111",
+    ]
+  ) {
+    expectInvalid({
+      operation: "create",
+      client_submission_id: key,
+      input: input(),
+    }, "client_submission_id must be a canonical UUID-v4.");
+  }
+  expectInvalid(
+    { operation: "update", submission_id: 7, input: input() },
+    "Request contains unsupported or missing fields.",
+  );
+  for (const token of [null, "", "not-a-token", "2026-08-21"]) {
+    expectInvalid({
+      operation: "update",
+      submission_id: 7,
+      expected_modified_at: token,
+      input: input(),
+    }, "expected_modified_at must be an exact database timestamp token.");
+  }
+  for (
+    const token of [
+      "2026-08-21T11:00:00.000001+00:00",
+      "2026-08-21T11:00:00.000999Z",
+    ]
+  ) {
+    const result = parseAdminContentSubmissionsRequest({
+      operation: "update",
+      submission_id: 7,
+      expected_modified_at: token,
+      input: input(),
+    });
+    assert(result.ok && result.value.operation === "update");
+    assertEquals(result.value.expected_modified_at, token);
+  }
+  const staged = parseAdminContentSubmissionsRequest({
+    operation: "associateStagedAsset",
+    submission_id: 7,
+    asset: asset(),
+  });
+  assert(staged.ok && staged.value.operation === "associateStagedAsset");
 });

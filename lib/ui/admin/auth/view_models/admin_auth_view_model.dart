@@ -318,6 +318,9 @@ class AdminAuthViewModel extends ChangeNotifier {
 
   void _handleAuthStreamError(Object error, StackTrace stackTrace) {
     if (_disposed) return;
+    // A failed authority stream cannot keep publishing private editor state.
+    _currentUser = null;
+    notifyListeners();
     _logger.log(
       const AdminAuthStateError(),
       error: error,

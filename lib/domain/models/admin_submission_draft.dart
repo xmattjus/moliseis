@@ -116,11 +116,29 @@ final class AdminDraftSnapshot {
   bool fieldsEqualTo(
     AdminDraftSnapshot other, {
     bool semanticCoordinates = false,
+  }) => _fieldsEqualTo(other, semanticCoordinates: semanticCoordinates);
+
+  /// Compares the projection accepted by Admin Save without rewriting raw C/P.
+  ///
+  /// Admin input defaults an absent category to unknown and the server trims
+  /// required city/name. Coordinates retain the existing validated comparison.
+  bool sameRemoteProjection(AdminDraftSnapshot other) =>
+      _fieldsEqualTo(other, normalizeRemote: true, semanticCoordinates: true);
+
+  bool _fieldsEqualTo(
+    AdminDraftSnapshot other, {
+    bool normalizeRemote = false,
+    bool semanticCoordinates = false,
   }) {
     final fieldsEqual =
-        category == other.category &&
-        city == other.city &&
-        name == other.name &&
+        (normalizeRemote ? category ?? ContentCategory.unknown : category) ==
+            (normalizeRemote
+                ? other.category ?? ContentCategory.unknown
+                : other.category) &&
+        (normalizeRemote ? city?.trim() : city) ==
+            (normalizeRemote ? other.city?.trim() : other.city) &&
+        (normalizeRemote ? name?.trim() : name) ==
+            (normalizeRemote ? other.name?.trim() : other.name) &&
         description == other.description &&
         const DeepCollectionEquality().equals(
           descriptionDelta,
@@ -210,6 +228,7 @@ final class AdminRemoteBaseline {
     required this.snapshot,
     required this.status,
     required DateTime modifiedAt,
+    this.modifiedAtToken,
   }) : modifiedAt = modifiedAt.toUtc();
 
   /// Editable fields confirmed by the remote response.
@@ -218,7 +237,10 @@ final class AdminRemoteBaseline {
   /// Moderation status observed in that same response.
   final AdminSubmissionStatus status;
 
-  /// Observed server timestamp, not a compare-and-swap or idempotency key.
+  /// Exact server text used only for conditional writes; absent in legacy rows.
+  final String? modifiedAtToken;
+
+  /// Observed server timestamp for display; never substitute it for the token.
   final DateTime modifiedAt;
 
   @override
@@ -226,10 +248,12 @@ final class AdminRemoteBaseline {
       other is AdminRemoteBaseline &&
       snapshot == other.snapshot &&
       status == other.status &&
-      modifiedAt == other.modifiedAt;
+      modifiedAt == other.modifiedAt &&
+      modifiedAtToken == other.modifiedAtToken;
 
   @override
-  int get hashCode => Object.hash(snapshot, status, modifiedAt);
+  int get hashCode =>
+      Object.hash(snapshot, status, modifiedAt, modifiedAtToken);
 }
 
 /// One durable checkpoint and the remote baseline known when it was captured.
@@ -240,6 +264,8 @@ final class AdminSubmissionDraft {
     required this.owner,
     required this.snapshot,
     this.remoteBaseline,
+    this.fieldWriteIntent,
+    this.navigationIntent,
   });
 
   /// Exact account/session/target identity retained by every replacement.
@@ -251,13 +277,94 @@ final class AdminSubmissionDraft {
   /// Historical remote truth; local persistence never confirms a remote Save.
   final AdminRemoteBaseline? remoteBaseline;
 
+  /// Unresolved remote field write; preserved across unrelated checkpoints.
+  final AdminFieldWriteIntent? fieldWriteIntent;
+
+  /// Admin-only navigation resume hint, never native media provenance.
+  final AdminNavigationIntent? navigationIntent;
+
   @override
   bool operator ==(Object other) =>
       other is AdminSubmissionDraft &&
       owner == other.owner &&
       snapshot == other.snapshot &&
-      remoteBaseline == other.remoteBaseline;
+      remoteBaseline == other.remoteBaseline &&
+      fieldWriteIntent == other.fieldWriteIntent &&
+      navigationIntent == other.navigationIntent;
 
   @override
-  int get hashCode => Object.hash(owner, snapshot, remoteBaseline);
+  int get hashCode => Object.hash(
+    owner,
+    snapshot,
+    remoteBaseline,
+    fieldWriteIntent,
+    navigationIntent,
+  );
+}
+
+/// The two remote field boundaries whose unresolved outcome must survive death.
+enum AdminFieldWriteKind { create, update }
+
+/// One captured field write, not a history or a remote execution instruction.
+@immutable
+final class AdminFieldWriteIntent {
+  /// Captures validated fields before HTTP; Update requires the exact DB token.
+  AdminFieldWriteIntent({
+    required this.kind,
+    required this.attemptId,
+    required this.snapshot,
+    this.expectedModifiedAt,
+  }) {
+    if (!AdminDraftOwner.isValidSessionId(attemptId) ||
+        (kind == AdminFieldWriteKind.update &&
+            (expectedModifiedAt == null || expectedModifiedAt!.isEmpty)) ||
+        (kind == AdminFieldWriteKind.create && expectedModifiedAt != null)) {
+      throw ArgumentError('Invalid Admin field write intent.');
+    }
+  }
+
+  /// Remote boundary whose outcome has not been durably confirmed.
+  final AdminFieldWriteKind kind;
+
+  /// Stable UUID for this captured attempt, retained across local retries.
+  final String attemptId;
+
+  /// Original immutable valid fields, independent of later checkpoints.
+  final AdminDraftSnapshot snapshot;
+
+  /// Unmodified DB-owned token required only by Update.
+  final String? expectedModifiedAt;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AdminFieldWriteIntent &&
+      kind == other.kind &&
+      attemptId == other.attemptId &&
+      snapshot == other.snapshot &&
+      expectedModifiedAt == other.expectedModifiedAt;
+
+  @override
+  int get hashCode =>
+      Object.hash(kind, attemptId, snapshot, expectedModifiedAt);
+}
+
+/// A request-bound Admin route hint; its nonce does not identify native media.
+@immutable
+final class AdminNavigationIntent {
+  /// Captures the request used for nonce-safe route cleanup.
+  AdminNavigationIntent({required this.requestNonce}) {
+    if (!AdminDraftOwner.isValidSessionId(requestNonce)) {
+      throw ArgumentError('Invalid Admin navigation nonce.');
+    }
+  }
+
+  /// UUID for local navigation authority, not native picker provenance.
+  final String requestNonce;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AdminNavigationIntent && requestNonce == other.requestNonce;
+
+  @override
+  int get hashCode => requestNonce.hashCode;
 }

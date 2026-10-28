@@ -5,6 +5,7 @@ abstract class RoutePaths {
   // children of /admin; login is a separate root route.
   static const adminLogin = 'login';
   static const adminSubmissionsNew = 'submissions/new';
+  static const adminSubmissionSaveProgress = 'submissions/save-progress';
   static const adminSubmission = 'submissions/:id';
 
   /// Full location of the staff login page.

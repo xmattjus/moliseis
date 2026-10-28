@@ -18,6 +18,8 @@ import '../../support/mock_logger.dart';
 import '../../support/recording_supabase_functions_http_client.dart';
 
 void main() {
+  const clientSubmissionId = '12345678-1234-4234-8234-123456789abc';
+  const exactToken = '2026-08-22T11:00:00.123456+00:00';
   final submission = <String, dynamic>{
     'id': 7,
     'city': 'Isernia',
@@ -56,6 +58,40 @@ void main() {
   });
 
   tearDown(() => client.dispose());
+
+  for (final rejection in [
+    (400, 'VALIDATION_ERROR', true),
+    (422, 'ADMIN_PROFILE_INCOMPLETE', true),
+    (422, 'START_DATE_REQUIRED', false),
+    (409, 'SUBMISSION_CHANGED', false),
+    (409, 'INVALID_STATUS_TRANSITION', false),
+    (404, 'NOT_FOUND', false),
+    (500, 'DATABASE_ERROR', false),
+    (409, 'UNKNOWN_SERVER_ERROR', false),
+  ]) {
+    test('field-write error normalization preserves ${rejection.$2}', () async {
+      httpClient.queueJson({
+        'code': rejection.$2,
+        'message': 'Controlled endpoint response',
+      }, status: rejection.$1);
+      final input = AdminSubmissionInput(
+        category: ContentCategory.history,
+        city: 'Isernia',
+        name: 'Palazzo',
+      );
+      final Result<dynamic> result = rejection.$3
+          ? await repository.create(
+              input,
+              clientSubmissionId: clientSubmissionId,
+            )
+          : await repository.update(7, input, expectedModifiedAt: exactToken);
+      final error = (result as Error).error;
+      expect(error, isA<AdminContentSubmissionApiException>());
+      expect((error as AdminContentSubmissionApiException).code, rejection.$2);
+      expect(error.statusCode, rejection.$1);
+      expect(httpClient.requests, hasLength(1));
+    });
+  }
 
   test(
     'preview tokens survive Edge JSON to Apply request byte for byte',
@@ -355,17 +391,176 @@ void main() {
       expect(httpClient.requests, hasLength(1));
     });
 
+    test('writes reject missing or invalid identity before HTTP', () async {
+      final input = AdminSubmissionInput(
+        category: ContentCategory.history,
+        city: 'Isernia',
+        name: 'Palazzo',
+      );
+      expect(
+        await repository.create(input),
+        isA<Error<AdminSubmissionCreateResult>>(),
+      );
+      expect(
+        await repository.create(input, clientSubmissionId: 'not-a-uuid'),
+        isA<Error<AdminSubmissionCreateResult>>(),
+      );
+      expect(await repository.update(7, input), isA<Error<AdminSubmission>>());
+      expect(
+        await repository.update(7, input, expectedModifiedAt: 'today'),
+        isA<Error<AdminSubmission>>(),
+      );
+      expect(httpClient.requests, isEmpty);
+    });
+
+    test(
+      'Create replay retains current moderated detail, assets and raw token',
+      () async {
+        httpClient.queueJson({
+          'outcome': 'replayed',
+          'submission': {
+            ...submission,
+            'status': 'accepted',
+            'modified_at': exactToken,
+            'assets': [
+              {
+                'id': 9,
+                'url': 'https://example.com/a.jpg',
+                'width': 100,
+                'height': 90,
+              },
+            ],
+          },
+        });
+        final result = await repository.create(
+          AdminSubmissionInput(
+            category: ContentCategory.history,
+            city: 'Isernia',
+            name: 'different retry',
+          ),
+          clientSubmissionId: clientSubmissionId,
+        );
+        final confirmed =
+            (result as Success<AdminSubmissionCreateResult>).value;
+        expect(confirmed.replayed, isTrue);
+        expect(confirmed.submission.name, 'Palazzo storico');
+        expect(confirmed.submission.status.name, 'accepted');
+        expect(confirmed.submission.assets.single.id, 9);
+        expect(confirmed.submission.modifiedAtToken, exactToken);
+        expect(
+          (httpClient.requests.single.body! as Map)['client_submission_id'],
+          clientSubmissionId,
+        );
+      },
+    );
+
+    test(
+      'Create rejects unknown replay outcome rather than assuming success',
+      () async {
+        httpClient.queueJson({'outcome': 'unknown', 'submission': submission});
+        expect(
+          await repository.create(
+            AdminSubmissionInput(
+              category: ContentCategory.history,
+              city: 'Isernia',
+              name: 'Palazzo',
+            ),
+            clientSubmissionId: clientSubmissionId,
+          ),
+          isA<Error<AdminSubmissionCreateResult>>(),
+        );
+      },
+    );
+
+    test(
+      'stale Update and receipt metadata conflict retain typed API codes',
+      () async {
+        httpClient.queueJson({
+          'code': 'SUBMISSION_CHANGED',
+          'message': 'Changed',
+        }, status: 409);
+        final stale = await repository.update(
+          7,
+          AdminSubmissionInput(
+            category: ContentCategory.history,
+            city: 'Isernia',
+            name: 'Palazzo',
+          ),
+          expectedModifiedAt: exactToken,
+        );
+        expect(
+          ((stale as Error).error as AdminContentSubmissionApiException).code,
+          'SUBMISSION_CHANGED',
+        );
+        expect(
+          (httpClient.requests.single.body! as Map)['expected_modified_at'],
+          exactToken,
+        );
+        httpClient.queueJson({
+          'code': 'ASSET_METADATA_CONFLICT',
+          'message': 'Conflict',
+        }, status: 409);
+        final conflict = await repository.associateStagedAsset(
+          7,
+          const SubmissionAsset(
+            secureUrl: 'https://example.com/a.jpg',
+            width: 100,
+            height: 90,
+          ),
+        );
+        expect(
+          ((conflict as Error).error as AdminContentSubmissionApiException)
+              .code,
+          'ASSET_METADATA_CONFLICT',
+        );
+      },
+    );
+
+    test('staged association validates exact receipt metadata', () async {
+      const asset = SubmissionAsset(
+        secureUrl: 'https://example.com/a.jpg',
+        width: 100,
+        height: 90,
+      );
+      httpClient.queueJson({
+        'outcome': 'replayed',
+        'asset': {'id': 9, 'url': asset.secureUrl, 'width': 100, 'height': 90},
+      });
+      expect(
+        (await repository.associateStagedAsset(7, asset)).getOrNull()!.id,
+        9,
+      );
+      expect(
+        (httpClient.requests.single.body! as Map)['operation'],
+        'associateStagedAsset',
+      );
+      httpClient.queueJson({
+        'outcome': 'created',
+        'asset': {'id': 9, 'url': asset.secureUrl, 'width': 101, 'height': 90},
+      });
+      expect(
+        await repository.associateStagedAsset(7, asset),
+        isA<Error<AdminSubmissionAsset>>(),
+      );
+    });
+
     test('create sends only the twelve editor-owned fields', () async {
-      httpClient.queueJson(<String, dynamic>{'submission': submission});
+      httpClient.queueJson(<String, dynamic>{
+        'outcome': 'created',
+        'submission': submission,
+      });
       final input = AdminSubmissionInput(
         category: ContentCategory.history,
         city: 'Isernia',
         name: 'Palazzo storico',
       );
 
-      final result = await repository.create(input);
+      final result = await repository.create(
+        input,
+        clientSubmissionId: clientSubmissionId,
+      );
 
-      expect(result, isA<Success<AdminSubmission>>());
+      expect(result, isA<Success<AdminSubmissionCreateResult>>());
       final Map<String, dynamic> body;
       switch (httpClient.requests.single.body) {
         case final Map<String, dynamic> value:
@@ -398,8 +593,14 @@ void main() {
 
     test('create and update include populated coordinates when set', () async {
       httpClient
-        ..queueJson(<String, dynamic>{'submission': submission})
-        ..queueJson(<String, dynamic>{'submission': submission});
+        ..queueJson(<String, dynamic>{
+          'outcome': 'created',
+          'submission': submission,
+        })
+        ..queueJson(<String, dynamic>{
+          'outcome': 'created',
+          'submission': submission,
+        });
       final input = AdminSubmissionInput(
         category: ContentCategory.history,
         city: 'Isernia',
@@ -408,8 +609,8 @@ void main() {
         longitude: 14.6485406,
       );
 
-      await repository.create(input);
-      await repository.update(7, input);
+      await repository.create(input, clientSubmissionId: clientSubmissionId);
+      await repository.update(7, input, expectedModifiedAt: exactToken);
 
       for (final request in httpClient.requests) {
         final body = request.body! as Map<String, dynamic>;
@@ -420,7 +621,10 @@ void main() {
     });
 
     test('update maps its response without a follow-up request', () async {
-      httpClient.queueJson(<String, dynamic>{'submission': submission});
+      httpClient.queueJson(<String, dynamic>{
+        'outcome': 'created',
+        'submission': submission,
+      });
 
       final result = await repository.update(
         7,
@@ -429,12 +633,14 @@ void main() {
           city: 'Isernia',
           name: 'Palazzo aggiornato',
         ),
+        expectedModifiedAt: exactToken,
       );
 
       expect((result as Success<AdminSubmission>).value.assets, isEmpty);
       expect(httpClient.requests.single.body, <String, dynamic>{
         'operation': 'update',
         'submission_id': 7,
+        'expected_modified_at': exactToken,
         'input': <String, dynamic>{
           'category': 'history',
           'city': 'Isernia',
@@ -620,6 +826,7 @@ void main() {
             city: 'Isernia',
             name: 'Palazzo',
           ),
+          clientSubmissionId: clientSubmissionId,
         );
         final update = await repository.update(
           7,
@@ -628,6 +835,7 @@ void main() {
             city: 'Isernia',
             name: 'Palazzo',
           ),
+          expectedModifiedAt: exactToken,
         );
         final invalidStatus = await repository.reject(7);
         final malformedPromotion = await repository.promote(
@@ -641,7 +849,7 @@ void main() {
 
         expect(list, isA<Error<List<dynamic>>>());
         expect(detail, isA<Error<AdminSubmission>>());
-        expect(create, isA<Error<AdminSubmission>>());
+        expect(create, isA<Error<AdminSubmissionCreateResult>>());
         expect(update, isA<Error<AdminSubmission>>());
         expect(invalidStatus, isA<Error<void>>());
         expect(malformedPromotion, isA<Error<AdminSubmissionPromotion>>());
@@ -703,6 +911,7 @@ void main() {
             city: 'Isernia',
             name: 'Palazzo',
           ),
+          clientSubmissionId: clientSubmissionId,
         );
         final invalidTransition = await repository.promote(
           7,
@@ -809,6 +1018,7 @@ void main() {
     'Admin all-day full input and stored response retain the mode',
     () async {
       httpClient.queueJson({
+        'outcome': 'created',
         'submission': {
           ...submission,
           'all_day': true,
@@ -824,8 +1034,9 @@ void main() {
           allDay: true,
           startDate: DateTime.utc(2026, 10, 11, 22),
         ),
+        clientSubmissionId: clientSubmissionId,
       );
-      expect(result.getOrNull()!.allDay, isTrue);
+      expect(result.getOrNull()!.submission.allDay, isTrue);
       final body = httpClient.requests.single.body! as Map<String, dynamic>;
       final input = body['input'] as Map<String, dynamic>;
       expect(input['all_day'], isTrue);

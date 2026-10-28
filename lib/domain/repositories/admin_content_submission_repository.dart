@@ -8,9 +8,8 @@ import 'package:moliseis/utils/result.dart';
 
 /// Administration access to content submissions.
 ///
-/// Backend-agnostic on purpose: no endpoint names, table names, or DTO shapes
-/// are committed to here. The production implementation is a typed-error
-/// placeholder until the backend round defines the contract.
+/// Transport details remain in the data layer; account identity and write
+/// predicates are enforced by the authenticated backend.
 abstract class AdminContentSubmissionRepository {
   /// Lists submissions for moderation.
   Future<Result<List<AdminSubmission>>> list();
@@ -20,12 +19,22 @@ abstract class AdminContentSubmissionRepository {
 
   /// Creates a submission from the editable [input].
   ///
-  /// Contributor identity is not part of [input]; the future backend derives it
-  /// from the authenticated session.
-  Future<Result<AdminSubmission>> create(AdminSubmissionInput input);
+  /// The same stable UUID-v4 [clientSubmissionId] replays the original write.
+  /// Missing identity fails closed; contributor identity is server-derived.
+  Future<Result<AdminSubmissionCreateResult>> create(
+    AdminSubmissionInput input, {
+    String? clientSubmissionId,
+  });
 
   /// Updates the editable fields of submission [id].
-  Future<Result<AdminSubmission>> update(int id, AdminSubmissionInput input);
+  ///
+  /// [expectedModifiedAt] must be the exact backend token, including precision.
+  /// Missing tokens fail closed; stale writes return a typed API conflict.
+  Future<Result<AdminSubmission>> update(
+    int id,
+    AdminSubmissionInput input, {
+    String? expectedModifiedAt,
+  });
 
   /// Rejects the pending submission [id].
   ///
@@ -90,6 +99,12 @@ abstract class AdminContentSubmissionRepository {
 
   /// Persists an uploaded [asset] association for submission [submissionId].
   Future<Result<AdminSubmissionAsset>> addAsset(
+    int submissionId,
+    SubmissionAsset asset,
+  );
+
+  /// Replays a staged receipt without creating duplicate associations.
+  Future<Result<AdminSubmissionAsset>> associateStagedAsset(
     int submissionId,
     SubmissionAsset asset,
   );

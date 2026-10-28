@@ -52,6 +52,7 @@ AdminSubmission adminSubmissionFromWire(Object? value) {
     status: adminSubmissionStatusFromWire(object['status']),
     createdAt: _requiredDateTime(object, 'created_at'),
     modifiedAt: _requiredDateTime(object, 'modified_at'),
+    modifiedAtToken: _required<String>(object, 'modified_at'),
     latitude: _nullableDouble(object['latitude'], 'latitude'),
     longitude: _nullableDouble(object['longitude'], 'longitude'),
     promotion: _promotionFromLinks(

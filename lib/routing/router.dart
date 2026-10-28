@@ -3,8 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
-import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
-import 'package:moliseis/domain/repositories/content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
@@ -15,7 +14,8 @@ import 'package:moliseis/ui/admin/auth/widgets/admin_login_screen.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submissions_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dart';
-import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_route.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_save_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_progress_screen.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_screen.dart';
@@ -264,6 +264,7 @@ GoRouter buildAppRouter({
             builder: (context, _) => AdminDashboardScreen(
               viewModel: context.read<AdminSubmissionsViewModel>(),
               authViewModel: context.read<AdminAuthViewModel>(),
+              draftRepository: context.read<AdminSubmissionDraftRepository>(),
             ),
           );
         },
@@ -271,19 +272,47 @@ GoRouter buildAppRouter({
           GoRoute(
             path: RoutePaths.adminSubmissionsNew,
             name: RouteNames.adminSubmissionNew,
-            builder: (context, _) {
+            builder: (context, state) {
               final auth = context.read<AdminAuthViewModel>();
-              return ChangeNotifierProvider<AdminSubmissionEditorViewModel>(
-                create: (context) => AdminSubmissionEditorViewModel(
-                  repository: context.read<AdminContentSubmissionRepository>(),
-                  contentSubmissionRepository: context
-                      .read<ContentSubmissionRepository>(),
-                  creatorName: auth.displayName ?? auth.email,
-                  creatorEmail: auth.email,
+              return AdminSubmissionEditorRoute(
+                viewModel: context.read<AdminSubmissionEditorViewModel>(),
+                auth: auth,
+                sessionId: state.uri.queryParameters['session'],
+              );
+            },
+          ),
+          GoRoute(
+            path: RoutePaths.adminSubmissionSaveProgress,
+            name: RouteNames.adminSubmissionSaveProgress,
+            onExit: (context, state) {
+              final owner = context.read<AdminSubmissionEditorViewModel>();
+              final session = state.uri.queryParameters['session'];
+              final attempt = int.tryParse(
+                state.uri.queryParameters['attempt'] ?? '',
+              );
+              return !adminAuthViewModel.isAdmin ||
+                  owner.sessionId != session ||
+                  owner.saveExecutionId != attempt ||
+                  !owner.isSaveRunning;
+            },
+            builder: (context, state) {
+              final owner = context.read<AdminSubmissionEditorViewModel>();
+              final session = state.uri.queryParameters['session'];
+              final progress = AdminSubmissionSaveProgressScreen(
+                viewModel: owner,
+                sessionId: session,
+                attemptId: int.tryParse(
+                  state.uri.queryParameters['attempt'] ?? '',
                 ),
-                builder: (context, _) => AdminSubmissionEditorScreen(
-                  viewModel: context.read<AdminSubmissionEditorViewModel>(),
-                ),
+                editorTarget: state.uri.queryParameters['editor'],
+              );
+              // Missing or malformed presentation metadata cannot admit work.
+              if (session == null) return progress;
+              return AdminSubmissionEditorRoute(
+                viewModel: owner,
+                auth: context.read<AdminAuthViewModel>(),
+                sessionId: session,
+                child: progress,
               );
             },
           ),
@@ -303,21 +332,11 @@ GoRouter buildAppRouter({
                 );
               }
 
-              return ChangeNotifierProvider<AdminSubmissionEditorViewModel>(
-                key: ValueKey<int>(id),
-                create: (context) {
-                  final viewModel = AdminSubmissionEditorViewModel(
-                    repository: context
-                        .read<AdminContentSubmissionRepository>(),
-                    contentSubmissionRepository: context
-                        .read<ContentSubmissionRepository>(),
-                    submissionId: id,
-                  )..requestLoad();
-                  return viewModel;
-                },
-                builder: (context, _) => AdminSubmissionEditorScreen(
-                  viewModel: context.read<AdminSubmissionEditorViewModel>(),
-                ),
+              return AdminSubmissionEditorRoute(
+                viewModel: context.read<AdminSubmissionEditorViewModel>(),
+                auth: context.read<AdminAuthViewModel>(),
+                submissionId: id,
+                sessionId: state.uri.queryParameters['session'],
               );
             },
           ),

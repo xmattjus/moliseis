@@ -801,50 +801,52 @@ void main() {
       expect(find.textContaining('00:00'), findsNothing);
     }, disposeOwners: () => viewModel.dispose());
 
-    testOwnerUI('renders the shared create fields without an asset section', (
-      tester,
-    ) async {
-      await tester.binding.setSurfaceSize(const Size(800, 1600));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      viewModel = AdminSubmissionEditorViewModel(
-        repository: repository,
-        contentSubmissionRepository: contentSubmissionRepository,
-        creatorName: 'Redattore',
-        creatorEmail: 'redattore@example.com',
-      );
-      await tester.pumpWidget(app);
-      await tester.pumpAndSettle();
-      unawaited(router.push('/editor'));
-      await tester.pumpAndSettle();
+    testOwnerUI(
+      'renders the shared create fields with the local asset section',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          creatorName: 'Redattore',
+          creatorEmail: 'redattore@example.com',
+        );
+        await tester.pumpWidget(app);
+        await tester.pumpAndSettle();
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Nuovo contributo'), findsOneWidget);
-      expect(find.text('Categoria'), findsOneWidget);
-      expect(find.text('Dettagli'), findsOneWidget);
-      expect(find.widgetWithText(TextFormField, 'Città'), findsOneWidget);
-      expect(
-        find.widgetWithText(TextFormField, 'Luogo o evento'),
-        findsOneWidget,
-      );
-      expect(find.text('È un evento?'), findsOneWidget);
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Crea contributo'),
-        200,
-        scrollable: scrollable,
-      );
-      expect(
-        find.widgetWithText(FilledButton, 'Crea contributo'),
-        findsOneWidget,
-      );
-      expect(find.text('Foto'), findsNothing);
-    }, disposeOwners: () => viewModel.dispose());
+        expect(find.text('Nuovo contributo'), findsOneWidget);
+        expect(find.text('Categoria'), findsOneWidget);
+        expect(find.text('Dettagli'), findsOneWidget);
+        expect(find.widgetWithText(TextFormField, 'Città'), findsOneWidget);
+        expect(
+          find.widgetWithText(TextFormField, 'Luogo o evento'),
+          findsOneWidget,
+        );
+        expect(find.text('È un evento?'), findsOneWidget);
+        final scrollable = find
+            .descendant(
+              of: find.byKey(
+                const ValueKey<String>('admin_submission_editor_scroll'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(
+          find.widgetWithText(FilledButton, 'Crea contributo'),
+          200,
+          scrollable: scrollable,
+        );
+        expect(
+          find.widgetWithText(FilledButton, 'Crea contributo'),
+          findsOneWidget,
+        );
+        expect(find.text('Foto'), findsOneWidget);
+      },
+      disposeOwners: () => viewModel.dispose(),
+    );
 
     testOwnerUI('shows creator identity read-only without public fields', (
       tester,
@@ -1385,7 +1387,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.updateIds, <int>[1]);
-      expect(find.text('SHELL_MARKER'), findsOneWidget);
+      expect(find.text('SHELL_MARKER'), findsNothing);
     }, disposeOwners: () => viewModel.dispose());
 
     testOwnerUI('requires a concrete saved category before publication', (
@@ -1452,7 +1454,7 @@ void main() {
 
       expect(repository.updateInputs.single.category, ContentCategory.nature);
       expect(viewModel.isDirty, isFalse);
-      expect(find.text('SHELL_MARKER'), findsOneWidget);
+      expect(find.text('SHELL_MARKER'), findsNothing);
 
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
@@ -1570,10 +1572,10 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, 'Annulla'));
       await tester.pumpAndSettle();
 
-      // The save completed while the dialog was open: closing the editor
+      // Save completes under the dialog without closing the editor:
       // refreshes the dashboard instead of running a stale moderation.
       expect(repository.promoteCalls, isEmpty);
-      expect(find.text('SHELL_MARKER'), findsOneWidget);
+      expect(find.text('SHELL_MARKER'), findsNothing);
     }, disposeOwners: () => viewModel.dispose());
 
     for (final dialogAction in ['Annulla', 'Conferma']) {
@@ -1628,7 +1630,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(repository.rejectIds, isEmpty);
-        expect(find.text('SHELL_MARKER'), findsOneWidget);
+        expect(find.text('SHELL_MARKER'), findsNothing);
       }, disposeOwners: () => viewModel.dispose());
     }
 
@@ -2209,8 +2211,8 @@ void main() {
 
       pendingUpdate.complete(Result.success(sampleAdminSubmission()));
       await tester.pumpAndSettle();
-      // The save success pops the editor back to the shell.
-      expect(find.text('SHELL_MARKER'), findsOneWidget);
+      // Save keeps the editor open for further edits.
+      expect(find.text('SHELL_MARKER'), findsNothing);
     }, disposeOwners: () => viewModel.dispose());
     testOwnerUI('renders historical accepted rows read-only without Save', (
       tester,
@@ -2502,7 +2504,6 @@ void main() {
         await pumpCommandTurns(tester);
         first.complete(Result.success(sampleAdminSubmission()));
         await tester.pumpAndSettle();
-        expect(viewModel.canCloseAfterSave, isTrue);
         expect(pops, 0);
 
         if (retrySucceeds) viewModel.setCity('Termoli');
@@ -2511,12 +2512,10 @@ void main() {
         expect(viewModel.requestSave(), isTrue);
         final secondId = viewModel.saveExecutionId;
         expect(secondId, greaterThan(firstId!));
-        expect(viewModel.canCloseAfterSave, isFalse);
         await pumpCommandTurns(tester);
         second.complete(Result.error(TestException('second save failed')));
         await tester.pumpAndSettle();
         expect(viewModel.saveSnapshot.hasFailure, isTrue);
-        expect(viewModel.canCloseAfterSave, isFalse);
         expect(pops, 0);
         expect(
           find.text('Si è verificato un errore, riprova più tardi'),
@@ -2539,7 +2538,6 @@ void main() {
           await pumpCommandTurns(tester);
           third.complete(Result.success(sampleAdminSubmission()));
           await tester.pumpAndSettle();
-          expect(viewModel.canCloseAfterSave, isTrue);
           expect(pops, 0);
         } else {
           expect(viewModel.isDirty, isFalse);
@@ -2548,14 +2546,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(repository.promoteCalls, isEmpty);
         expect(repository.rejectIds, isEmpty);
-        expect(pops, retrySucceeds ? 1 : 0);
-        expect(returned, retrySucceeds ? isTrue : isNull);
-        expect(
-          find.byType(AdminSubmissionEditorScreen),
-          retrySucceeds ? findsNothing : findsOneWidget,
-        );
+        expect(pops, 0);
+        expect(returned, isNull);
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
         await pumpCommandTurns(tester);
-        expect(pops, retrySucceeds ? 1 : 0);
+        expect(pops, 0);
         expect(tester.takeException(), isNull);
       }, disposeOwners: () => viewModel.dispose());
     }
@@ -2678,7 +2673,7 @@ void main() {
         repository.pendingUpdate = null;
         expect(viewModel.requestSave(), isTrue);
         await tester.pumpAndSettle();
-        expect(find.text('SHELL_MARKER'), findsOneWidget);
+        expect(find.text('SHELL_MARKER'), findsNothing);
         expect(tester.takeException(), isNull);
       }, disposeOwners: () => viewModel.dispose());
     }
@@ -2705,6 +2700,9 @@ void main() {
         await tester.tap(control);
         await tester.pumpAndSettle();
         expect(find.byType(AlertDialog), findsOneWidget);
+        final obsoleteConfirmation = tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Conferma'))
+            .onPressed!;
         final oldOwner = viewModel;
         viewModel = AdminSubmissionEditorViewModel(
           repository: repository,
@@ -2716,7 +2714,8 @@ void main() {
         oldOwner.dispose();
         rebuildEditor(() {});
         await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
+        expect(find.byType(AlertDialog), findsNothing);
+        obsoleteConfirmation();
         await tester.pumpAndSettle();
         expect(repository.promoteCalls, isEmpty);
         expect(repository.rejectIds, isEmpty);
@@ -2946,7 +2945,7 @@ void main() {
         expect(repository.createInputs, isNotEmpty);
         expect(repository.createInputs.single.latitude, isNull);
         expect(repository.createInputs.single.longitude, isNull);
-        expect(find.text('SHELL_MARKER'), findsOneWidget);
+        expect(find.text('SHELL_MARKER'), findsNothing);
       }, disposeOwners: () => viewModel.dispose());
 
       testOwnerUI('successful Save persists the updated coordinate pair', (
@@ -2985,7 +2984,7 @@ void main() {
         expect(repository.updateIds, <int>[1]);
         expect(repository.updateInputs.single.latitude, 41.55);
         expect(repository.updateInputs.single.longitude, 14.64);
-        expect(find.text('SHELL_MARKER'), findsOneWidget);
+        expect(find.text('SHELL_MARKER'), findsNothing);
       }, disposeOwners: () => viewModel.dispose());
     });
   });

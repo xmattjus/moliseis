@@ -115,6 +115,7 @@ AdminSubmission sampleAdminSubmission({
   AdminSubmissionStatus status = AdminSubmissionStatus.pending,
   DateTime? createdAt,
   DateTime? modifiedAt,
+  String? modifiedAtToken,
   double? latitude,
   double? longitude,
   AdminSubmissionPromotion? promotion,
@@ -138,6 +139,7 @@ AdminSubmission sampleAdminSubmission({
     status: status,
     createdAt: createdAt ?? timestamp,
     modifiedAt: modifiedAt ?? timestamp,
+    modifiedAtToken: modifiedAtToken,
     latitude: latitude,
     longitude: longitude,
     promotion: promotion,
@@ -224,6 +226,8 @@ final class FakeAdminContentSubmissionRepository
 
   final getByIdIds = <int>[];
   final createInputs = <AdminSubmissionInput>[];
+  final createClientSubmissionIds = <String?>[];
+  final updateExpectedModifiedAt = <String?>[];
   final updateIds = <int>[];
   final updateInputs = <AdminSubmissionInput>[];
   final rejectIds = <int>[];
@@ -272,19 +276,28 @@ final class FakeAdminContentSubmissionRepository
   }
 
   @override
-  Future<Result<AdminSubmission>> create(AdminSubmissionInput input) async {
+  Future<Result<AdminSubmissionCreateResult>> create(
+    AdminSubmissionInput input, {
+    String? clientSubmissionId,
+  }) async {
     createInputs.add(input);
+    createClientSubmissionIds.add(clientSubmissionId);
     final pending = pendingCreate;
-    if (pending != null) return await pending.future;
-    return createResult;
+    final result = pending != null ? await pending.future : createResult;
+    return result.map(
+      (submission) =>
+          AdminSubmissionCreateResult(submission: submission, replayed: false),
+    );
   }
 
   @override
   Future<Result<AdminSubmission>> update(
     int id,
-    AdminSubmissionInput input,
-  ) async {
+    AdminSubmissionInput input, {
+    String? expectedModifiedAt,
+  }) async {
     updateIds.add(id);
+    updateExpectedModifiedAt.add(expectedModifiedAt);
     updateInputs.add(input);
     final pending = pendingUpdate;
     if (pending != null) return await pending.future;
@@ -454,6 +467,14 @@ final class FakeAdminContentSubmissionRepository
     final pending = pendingAddAsset;
     if (pending != null) return await pending.future;
     return addAssetResult;
+  }
+
+  @override
+  Future<Result<AdminSubmissionAsset>> associateStagedAsset(
+    int submissionId,
+    SubmissionAsset asset,
+  ) async {
+    return await addAsset(submissionId, asset);
   }
 
   @override

@@ -11,6 +11,7 @@ class AdminSubmissionStagedAssetEntity {
     required this.digest,
     required this.relativePath,
     this.id = 0,
+    this.progressPayload,
   });
 
   /// Technical order and identity, distinct from the session UUID.
@@ -28,6 +29,9 @@ class AdminSubmissionStagedAssetEntity {
 
   /// Lowercase SHA-1 accidental content key within this owner.
   final String digest;
+
+  /// Optional versioned remote receipt; legacy local-only rows remain null.
+  final String? progressPayload;
 
   /// Canonical account/session/digest path relative to Admin staging.
   final String relativePath;

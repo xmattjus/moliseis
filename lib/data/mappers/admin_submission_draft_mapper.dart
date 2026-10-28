@@ -24,7 +24,7 @@ extension AdminSubmissionDraftEntityMapper on AdminSubmissionDraftEntity {
       throw const FormatException('Invalid Admin account/target key.');
     }
     final data = _object(jsonDecode(payload));
-    if (data['version'] is! int || data['version'] != 1) {
+    if (data['version'] != 1 && data['version'] != 2) {
       throw const FormatException('Unsupported Admin checkpoint version.');
     }
     final remote = data['remote'];
@@ -45,12 +45,17 @@ extension AdminSubmissionDraftEntityMapper on AdminSubmissionDraftEntity {
         snapshot: _snapshot(value['snapshot']),
         status: matched.single,
         modifiedAt: _instant(value['modifiedAt']),
+        modifiedAtToken: _nullableString(value['modifiedAtToken']),
       );
     }
     return AdminSubmissionDraft(
       owner: owner,
       snapshot: _snapshot(data['snapshot']),
       remoteBaseline: baseline,
+      fieldWriteIntent: _intent(data['fieldWriteIntent'], owner),
+      navigationIntent: data['navigationNonce'] == null
+          ? null
+          : _navigation(data['navigationNonce']),
     );
   }
 }
@@ -62,6 +67,7 @@ extension AdminSubmissionDraftMapper on AdminSubmissionDraft {
     if (owner.submissionId == null && remoteBaseline != null) {
       throw const FormatException('New target cannot have remote history.');
     }
+    _validateIntent(fieldWriteIntent, owner);
     final baseline = remoteBaseline;
     return AdminSubmissionDraftEntity(
       id: id,
@@ -70,14 +76,25 @@ extension AdminSubmissionDraftMapper on AdminSubmissionDraft {
       sessionId: owner.sessionId,
       submissionId: owner.submissionId,
       payload: jsonEncode({
-        'version': 1,
+        'version': 2,
         'snapshot': _encodeSnapshot(snapshot),
+        'fieldWriteIntent': fieldWriteIntent == null
+            ? null
+            : {
+                'version': 1,
+                'kind': fieldWriteIntent!.kind.name,
+                'attemptId': fieldWriteIntent!.attemptId,
+                'snapshot': _encodeSnapshot(fieldWriteIntent!.snapshot),
+                'expectedModifiedAt': fieldWriteIntent!.expectedModifiedAt,
+              },
+        'navigationNonce': navigationIntent?.requestNonce,
         'remote': baseline == null
             ? null
             : {
                 'snapshot': _encodeSnapshot(baseline.snapshot),
                 'status': baseline.status.name,
                 'modifiedAt': baseline.modifiedAt.toUtc().toIso8601String(),
+                'modifiedAtToken': baseline.modifiedAtToken,
               },
       }),
     );
@@ -215,4 +232,46 @@ EventCalendarDate? _day(Object? value) {
     throw const FormatException('Invalid checkpoint civil day.');
   }
   return EventCalendarDate(year, month, day);
+}
+
+AdminFieldWriteIntent? _intent(Object? raw, AdminDraftOwner owner) {
+  if (raw == null) return null;
+  final data = _object(raw);
+  if (data['version'] != 1) {
+    throw const FormatException('Unsupported Admin field intent.');
+  }
+  final kinds = AdminFieldWriteKind.values.where((k) => k.name == data['kind']);
+  if (kinds.isEmpty) throw const FormatException('Invalid Admin field intent.');
+  final attemptId = _string(data['attemptId']);
+  final expected = _nullableString(data['expectedModifiedAt']);
+  if (!AdminDraftOwner.isValidSessionId(attemptId) ||
+      (kinds.single == AdminFieldWriteKind.create && expected != null) ||
+      (kinds.single == AdminFieldWriteKind.update &&
+          (expected == null || expected.isEmpty))) {
+    throw const FormatException('Invalid Admin field intent.');
+  }
+  final result = AdminFieldWriteIntent(
+    kind: kinds.single,
+    attemptId: attemptId,
+    snapshot: _snapshot(data['snapshot']),
+    expectedModifiedAt: expected,
+  );
+  _validateIntent(result, owner);
+  return result;
+}
+
+void _validateIntent(AdminFieldWriteIntent? intent, AdminDraftOwner owner) {
+  if (intent != null &&
+      ((intent.kind == AdminFieldWriteKind.create) !=
+          (owner.submissionId == null))) {
+    throw const FormatException('Admin intent target mismatch.');
+  }
+}
+
+AdminNavigationIntent _navigation(Object? raw) {
+  final nonce = _string(raw);
+  if (!AdminDraftOwner.isValidSessionId(nonce)) {
+    throw const FormatException('Invalid Admin navigation nonce.');
+  }
+  return AdminNavigationIntent(requestNonce: nonce);
 }
