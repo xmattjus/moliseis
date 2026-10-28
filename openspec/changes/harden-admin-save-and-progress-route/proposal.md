@@ -34,7 +34,7 @@ Admin Save discards the returned remote identity, closes the editor, and cannot 
 
 Flutter domain/local repositories, ObjectBox generator inputs and mappings, Admin ViewModel/screens, Provider composition, auth integration, Admin router constants/restoration. Public production code, picker/recovery integration, initialization, lifecycle and tests are not modification targets. Backend changes affect Admin validation/dispatch/store, a small Create RPC, conditional pending Update and singleton association RPC, service-role-only grants, shared database types and focused Edge/real-PostgreSQL tests. Existing schema uniqueness and pending/five-image boundaries are reused. No new package or native dependency is proposed.
 
-Plan 1 is complete at baseline `9598e80c05f4483d7fabbda064cdaf71ac503609` (the exact audited hash is recorded in design). Backend contracts must pass before client activation. Deployment state is unverified; repository migrations are not deployment evidence.
+Plan 1 is complete at baseline `9598e80c05f4483d7fabbda064cdaf71ac503609` (the exact audited hash is recorded in design). Backend contracts must pass before client activation. At planning time deployment state was unverified; repository migrations were not deployment evidence. Subsequent implementation, Android acceptance and separately authorized production deployment/read-only parity verification are recorded in tasks.md, including the Admin-only compatibility window and rollback decision.
 
 ## Non-goals and dependency decisions
 
