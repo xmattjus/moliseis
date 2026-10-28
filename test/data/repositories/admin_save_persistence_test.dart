@@ -519,4 +519,329 @@ void main() {
       );
     },
   );
+  for (final kind in AdminFieldWriteKind.values) {
+    test('settled ${kind.name} intent stays absent after ObjectBox reopen '
+        'without losing newer fields, receipts or files', () async {
+      if (kind == AdminFieldWriteKind.update) {
+        owner = AdminDraftOwner(accountId: account, submissionId: 7);
+      }
+      final a = AdminDraftSnapshot(name: 'request A');
+      await drafts.saveDraft(
+        AdminSubmissionDraft(
+          owner: owner,
+          snapshot: a,
+          remoteBaseline: kind == AdminFieldWriteKind.update ? baseline : null,
+        ),
+      );
+      final source = await File(
+        '${support.path}/settlement-source',
+      ).writeAsBytes([7, 8, 9]);
+      final acquired = (await staged.acquire(
+        owner: owner,
+        source: source,
+        associatedCount: 0,
+      )).getOrNull()!;
+      final progress = AdminStagedAssetProgress(
+        upload: const SubmissionAsset(
+          secureUrl: 'https://example.test/settled.jpg',
+          width: 20,
+          height: 30,
+        ),
+        associationId: kind == AdminFieldWriteKind.update ? 90 : null,
+      );
+      if (kind == AdminFieldWriteKind.update) {
+        expect(
+          await staged.saveProgress(asset: acquired, progress: progress),
+          isA<Success<void>>(),
+        );
+      }
+      await session.activate(owner);
+      final activation = session.captureActivation()!;
+      final asset = session.state!.assets.single;
+      final file = (await staged.resolveAbsolutePath(asset)).getOrNull()!;
+      await session.beginFieldWrite(
+        AdminFieldWriteIntent(
+          kind: kind,
+          attemptId: attempt,
+          snapshot: a,
+          expectedModifiedAt: kind == AdminFieldWriteKind.update ? token : null,
+        ),
+        activation: activation,
+        checkpointAtCapture: session.state!.physicalCheckpoint,
+      );
+      final b = AdminDraftSnapshot(
+        name: 'newer checkpoint B',
+        latitudeText: '41,',
+      );
+      session.setSnapshot(b, activation: activation);
+      await session.checkpoint();
+      await session.setNavigationIntent(
+        activation: activation,
+        requestNonce: nextNonce,
+      );
+      session.setSnapshot(
+        b.copyWith(name: 'uncheckpointed C'),
+        activation: activation,
+      );
+      final draftRowId = env.store
+          .box<AdminSubmissionDraftEntity>()
+          .getAll()
+          .single
+          .id;
+      final stagedRowId = env.store
+          .box<AdminSubmissionStagedAssetEntity>()
+          .getAll()
+          .single
+          .id;
+      expect(
+        await session.settleFieldWriteIntent(
+          activation: activation,
+          attemptId: attempt,
+          kind: kind,
+        ),
+        isA<Success<void>>(),
+      );
+      expect(session.state!.current.name, 'uncheckpointed C');
+      expect(session.state!.physicalCheckpoint!.snapshot, b);
+      expect(
+        session.state!.assets.single.progress,
+        kind == AdminFieldWriteKind.update ? progress : null,
+      );
+      env.close();
+      final reopened = await openStore(directory: env.directory.path);
+      addTearDown(reopened.close);
+      final restoredDrafts = AdminSubmissionDraftRepositoryImpl(
+        objectBoxI: TestObjectBox(reopened),
+        logger: MockLogger(),
+      );
+      final restoredStaged = AdminSubmissionStagedAssetRepositoryImpl(
+        objectBoxI: TestObjectBox(reopened),
+        logger: MockLogger(),
+        draftRepository: restoredDrafts,
+        getSupportDirectory: () async => support,
+      );
+      final restored = AdminDraftSession(
+        draftRepository: restoredDrafts,
+        stagedAssetRepository: restoredStaged,
+      );
+      expect(
+        await restored.activateBySession(
+          accountId: account,
+          sessionId: owner.sessionId,
+        ),
+        isA<Success<void>>(),
+      );
+      expect(restored.state!.owner, owner);
+      expect(restored.state!.current, b);
+      expect(restored.state!.physicalCheckpoint!.fieldWriteIntent, isNull);
+      expect(
+        restored.state!.physicalCheckpoint!.remoteBaseline,
+        kind == AdminFieldWriteKind.update ? baseline : null,
+      );
+      expect(
+        restored.state!.physicalCheckpoint!.navigationIntent!.requestNonce,
+        nextNonce,
+      );
+      expect(
+        restored.state!.assets.single.progress,
+        kind == AdminFieldWriteKind.update ? progress : null,
+      );
+      expect(restored.state!.assets.single.relativePath, asset.relativePath);
+      expect(
+        reopened.box<AdminSubmissionDraftEntity>().getAll().single.id,
+        draftRowId,
+      );
+      expect(
+        reopened.box<AdminSubmissionStagedAssetEntity>().getAll().single.id,
+        stagedRowId,
+      );
+      expect(await file.readAsBytes(), [7, 8, 9]);
+      if (kind == AdminFieldWriteKind.update) {
+        expect(restored.capacityContext, isNull);
+      }
+    });
+  }
+
+  test('closed-store settlement cannot claim removal and reopen permits '
+      'exact local retry', () async {
+    owner = AdminDraftOwner(accountId: account, submissionId: 7);
+    await drafts.saveDraft(
+      AdminSubmissionDraft(
+        owner: owner,
+        snapshot: AdminDraftSnapshot(name: 'server'),
+        remoteBaseline: baseline,
+      ),
+    );
+    await session.activate(owner);
+    final activation = session.captureActivation()!;
+    await session.beginFieldWrite(
+      AdminFieldWriteIntent(
+        kind: AdminFieldWriteKind.update,
+        attemptId: attempt,
+        snapshot: AdminDraftSnapshot(name: 'request A'),
+        expectedModifiedAt: token,
+      ),
+      activation: activation,
+      checkpointAtCapture: session.state!.physicalCheckpoint,
+    );
+    final b = AdminDraftSnapshot(name: 'checkpoint B', latitudeText: '-');
+    session.setSnapshot(b, activation: activation);
+    await session.checkpoint();
+    env.close();
+    expect(
+      await session.settleFieldWriteIntent(
+        activation: activation,
+        attemptId: attempt,
+        kind: AdminFieldWriteKind.update,
+      ),
+      isA<Error<void>>(),
+    );
+    expect(
+      session.state!.physicalCheckpoint!.fieldWriteIntent!.attemptId,
+      attempt,
+    );
+    final reopened = await openStore(directory: env.directory.path);
+    addTearDown(reopened.close);
+    final restoredDrafts = AdminSubmissionDraftRepositoryImpl(
+      objectBoxI: TestObjectBox(reopened),
+      logger: MockLogger(),
+    );
+    final restoredStaged = AdminSubmissionStagedAssetRepositoryImpl(
+      objectBoxI: TestObjectBox(reopened),
+      logger: MockLogger(),
+      draftRepository: restoredDrafts,
+      getSupportDirectory: () async => support,
+    );
+    final restored = AdminDraftSession(
+      draftRepository: restoredDrafts,
+      stagedAssetRepository: restoredStaged,
+    );
+    await restored.activate(owner);
+    expect(
+      restored.state!.physicalCheckpoint!.fieldWriteIntent!.attemptId,
+      attempt,
+    );
+    expect(restored.state!.current, b);
+    expect(
+      await restored.settleFieldWriteIntent(
+        activation: restored.captureActivation()!,
+        attemptId: attempt,
+        kind: AdminFieldWriteKind.update,
+      ),
+      isA<Success<void>>(),
+    );
+    expect(
+      (await restoredDrafts.loadDraft(
+        accountId: account,
+        submissionId: 7,
+      )).getOrNull()!.fieldWriteIntent,
+      isNull,
+    );
+    expect(
+      (await restoredDrafts.loadDraft(
+        accountId: account,
+        submissionId: 7,
+      )).getOrNull()!.snapshot,
+      b,
+    );
+  });
+
+  test('corrected Create intent reopens under the same UUID with newer B2 '
+      'and unchanged private file', () async {
+    await session.activate(owner);
+    final activation = session.captureActivation()!;
+    final a = AdminDraftSnapshot(name: 'rejected request A');
+    await session.beginFieldWrite(
+      AdminFieldWriteIntent(
+        kind: AdminFieldWriteKind.create,
+        attemptId: attempt,
+        snapshot: a,
+      ),
+      activation: activation,
+      checkpointAtCapture: null,
+    );
+    final source = await File(
+      '${support.path}/correction-source',
+    ).writeAsBytes([4, 5, 6]);
+    final asset = (await session.acquire(
+      source,
+      capacity: session.capacityContext,
+    )).getOrNull()!;
+    final checkpointAtCapture = session.state!.physicalCheckpoint;
+    final b2 = AdminDraftSnapshot(name: 'newer durable B2', latitudeText: '-');
+    session.setSnapshot(b2, activation: activation);
+    await session.checkpoint();
+    await session.setNavigationIntent(
+      activation: activation,
+      requestNonce: nextNonce,
+    );
+    final correction = AdminFieldWriteIntent(
+      kind: AdminFieldWriteKind.create,
+      attemptId: nextNonce,
+      snapshot: AdminDraftSnapshot(name: 'valid corrected B'),
+    );
+    final rowId = env.store
+        .box<AdminSubmissionDraftEntity>()
+        .getAll()
+        .single
+        .id;
+    final descriptorId = env.store
+        .box<AdminSubmissionStagedAssetEntity>()
+        .getAll()
+        .single
+        .id;
+    expect(
+      await session.replaceRejectedCreateIntent(
+        activation: activation,
+        attemptId: attempt,
+        replacement: correction,
+        checkpointAtCapture: checkpointAtCapture,
+      ),
+      isA<Success<void>>(),
+    );
+    expect(session.state!.owner, owner);
+    expect(session.state!.physicalCheckpoint!.snapshot, b2);
+    env.close();
+    final reopened = await openStore(directory: env.directory.path);
+    addTearDown(reopened.close);
+    final restoredDrafts = AdminSubmissionDraftRepositoryImpl(
+      objectBoxI: TestObjectBox(reopened),
+      logger: MockLogger(),
+    );
+    final restoredStaged = AdminSubmissionStagedAssetRepositoryImpl(
+      objectBoxI: TestObjectBox(reopened),
+      logger: MockLogger(),
+      draftRepository: restoredDrafts,
+      getSupportDirectory: () async => support,
+    );
+    final restored = AdminDraftSession(
+      draftRepository: restoredDrafts,
+      stagedAssetRepository: restoredStaged,
+    );
+    await restored.activate(owner);
+    expect(restored.state!.owner.sessionId, owner.sessionId);
+    expect(restored.state!.owner.submissionId, isNull);
+    expect(restored.state!.current, b2);
+    expect(restored.state!.physicalCheckpoint!.fieldWriteIntent, correction);
+    expect(
+      restored.state!.physicalCheckpoint!.navigationIntent!.requestNonce,
+      nextNonce,
+    );
+    expect(restored.state!.assets.single.progress, isNull);
+    expect(restored.state!.assets.single.relativePath, asset.relativePath);
+    expect(
+      reopened.box<AdminSubmissionDraftEntity>().getAll().single.id,
+      rowId,
+    );
+    expect(
+      reopened.box<AdminSubmissionStagedAssetEntity>().getAll().single.id,
+      descriptorId,
+    );
+    expect(
+      await (await restoredStaged.resolveAbsolutePath(
+        restored.state!.assets.single,
+      )).getOrNull()!.readAsBytes(),
+      [4, 5, 6],
+    );
+  });
 }

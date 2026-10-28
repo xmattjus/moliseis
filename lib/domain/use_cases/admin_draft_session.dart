@@ -382,9 +382,13 @@ final class AdminDraftSession {
   }
 
   /// Restores the exact stable session, including its already-adopted target.
+  ///
+  /// An explicit remote route must match [expectedSubmissionId]. A targetless
+  /// resume hint, such as `/new` after adoption, does not impose this constraint.
   Future<Result<void>> activateBySession({
     required String accountId,
     required String sessionId,
+    int? expectedSubmissionId,
   }) async {
     final generation = _generation;
     final result = await _drafts.loadDraftBySession(
@@ -397,6 +401,10 @@ final class AdminDraftSession {
     }
     final draft = (result as Success<AdminSubmissionDraft?>).value;
     if (draft == null) return _unavailable('Resume session unavailable.');
+    if (expectedSubmissionId != null &&
+        draft.owner.submissionId != expectedSubmissionId) {
+      return _unavailable('Resume session target mismatch.');
+    }
     return await activate(draft.owner);
   }
 
@@ -428,6 +436,83 @@ final class AdminDraftSession {
       snapshot: snapshot,
       remoteBaseline: current.remoteBaseline,
       fieldWriteIntent: intent,
+      navigationIntent: current.physicalCheckpoint?.navigationIntent,
+    );
+    final saved = await _drafts.saveDraft(draft);
+    if (saved is Success<void> && _validActivation(activation)) {
+      _state = _state!._copy(
+        physicalCheckpoint: draft,
+        effective: snapshot,
+        durability: AdminDraftDurability.durable,
+      );
+    }
+    return saved;
+  });
+
+  /// Retires an exactly rejected or fenced intent.
+  ///
+  /// The caller owns the remote proof. Historical R remains evidence, not fresh
+  /// mutation authority. An absent intent is a local no-op, never confirmation.
+  Future<Result<void>> settleFieldWriteIntent({
+    required AdminDraftActivation activation,
+    required String attemptId,
+    required AdminFieldWriteKind kind,
+  }) => _serialize(() async {
+    if (!_validActivation(activation)) return _unavailable();
+    final physical = _state!.physicalCheckpoint;
+    final intent = physical?.fieldWriteIntent;
+    if (intent == null) return const Result.success(null);
+    if (intent.attemptId != attemptId || intent.kind != kind) {
+      return _unavailable('Field write settlement authority mismatch.');
+    }
+    final draft = AdminSubmissionDraft(
+      owner: physical!.owner,
+      snapshot: physical.snapshot,
+      remoteBaseline: physical.remoteBaseline,
+      navigationIntent: physical.navigationIntent,
+    );
+    final saved = await _drafts.saveDraft(draft);
+    if (saved is Success<void> && _validActivation(activation)) {
+      _activeHydration = null;
+      _state = _state!._copy(
+        physicalCheckpoint: draft,
+        acceptedRemoteRevision: null,
+        associatedCount: null,
+        hydrationPending: false,
+      );
+    }
+    return saved;
+  });
+
+  /// Captures an explicit Create correction while retaining its server UUID.
+  ///
+  /// This is not a non-application claim: an earlier Create can still win the
+  /// first-write-wins RPC. Only the latest request snapshot is replaced.
+  Future<Result<void>> replaceRejectedCreateIntent({
+    required AdminDraftActivation activation,
+    required String attemptId,
+    required AdminFieldWriteIntent replacement,
+    required AdminSubmissionDraft? checkpointAtCapture,
+  }) => _serialize(() async {
+    if (!_validActivation(activation)) return _unavailable();
+    final current = _state!;
+    final old = current.physicalCheckpoint?.fieldWriteIntent;
+    if (current.owner.submissionId != null ||
+        old?.kind != AdminFieldWriteKind.create ||
+        old?.attemptId != attemptId ||
+        replacement.kind != AdminFieldWriteKind.create ||
+        replacement.attemptId == attemptId) {
+      return _unavailable('Create correction authority mismatch.');
+    }
+    final snapshot =
+        current.physicalCheckpoint?.snapshot != checkpointAtCapture?.snapshot
+        ? current.physicalCheckpoint!.snapshot
+        : replacement.snapshot;
+    final draft = AdminSubmissionDraft(
+      owner: current.owner,
+      snapshot: snapshot,
+      remoteBaseline: current.physicalCheckpoint?.remoteBaseline,
+      fieldWriteIntent: replacement,
       navigationIntent: current.physicalCheckpoint?.navigationIntent,
     );
     final saved = await _drafts.saveDraft(draft);

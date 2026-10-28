@@ -2,6 +2,8 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
+import 'package:moliseis/domain/models/admin_submission_draft.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
@@ -18,7 +20,35 @@ import 'sync_harness.dart';
 
 /// Production Admin routes composed with the existing sync and local fakes.
 final class AdminSaveRouteHarness {
-  AdminSaveRouteHarness() {
+  AdminSaveRouteHarness({Iterable<int> persistedTargets = const []}) {
+    for (final id in persistedTargets) {
+      final draftOwner = AdminDraftOwner(
+        accountId: AdminDraftSessionHarness.accountA,
+        submissionId: id,
+      );
+      final detail = sampleAdminSubmission(
+        id: id,
+        name: 'Target $id',
+        description: null,
+        modifiedAtToken: '2026-08-20T00:00:00.123456Z',
+      );
+      final fields = AdminDraftSnapshot(
+        category: ContentCategory.history,
+        city: 'Campobasso',
+        name: 'Target $id',
+      );
+      local.drafts.drafts[draftOwner.lookupKey] = AdminSubmissionDraft(
+        owner: draftOwner,
+        snapshot: fields,
+        remoteBaseline: AdminRemoteBaseline(
+          snapshot: fields,
+          status: detail.status,
+          modifiedAt: detail.modifiedAt,
+          modifiedAtToken: detail.modifiedAtToken,
+        ),
+      );
+      repository.getByIdResults[id] = Result.success(detail);
+    }
     final user = User.fromJson({
       ...makeAuthUser(isAdmin: true).toJson(),
       'id': AdminDraftSessionHarness.accountA,

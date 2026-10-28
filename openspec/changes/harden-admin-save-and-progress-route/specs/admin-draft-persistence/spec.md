@@ -29,7 +29,7 @@ A confirmed new-to-persisted identity transition SHALL retain account/local UUID
 - **THEN** lookup resolves its adopted remote target without allocating a new owner
 
 ### Requirement: Unresolved field-write intent survives later local checkpoints
-Each Create or Update SHALL durably retain its captured valid input, kind, target, expected field-version token for Update and stable session identity before HTTP. Later checkpoints SHALL preserve the unresolved intent. Confirmed adoption or durable Update baseline settlement SHALL clear only the matching intent. Restored Update intent SHALL require read-back without ordinary resend; initialization SHALL not replay remotely.
+Each Create or Update SHALL durably retain its captured valid input, kind, target, expected field-version token for Update and stable session identity before HTTP. Later checkpoints SHALL preserve the unresolved intent. Confirmed adoption or durable Update baseline settlement SHALL clear only the matching intent. Restored Update intent SHALL require read-back before any explicit original A/V continuation, without ordinary resend; initialization SHALL not replay remotely.
 
 #### Scenario: Local B is incomplete after ambiguous Create A
 - **WHEN** checkpoint B replaces editable fields after Create A lost its response
@@ -58,3 +58,39 @@ Successful remote Save, baseline replacement, association cleanup and last-asset
 #### Scenario: Revocation or failed cleanup
 - **WHEN** authorization changes during a local commit or file cleanup fails after descriptor deletion
 - **THEN** committed work stays private to its original owner and failed cleanup cannot authorize owner deletion or media resurrection
+
+### Requirement: Exact field-intent settlement preserves local work
+A proven first-dispatch rejection or an observed field-version fence SHALL retire only the matching intent under exact account/session/activation, attempt and kind. Settlement SHALL preserve newest C/E/P, historical remote evidence, staging receipts/files and navigation, and SHALL NOT confirm remote success or grant fresh mutation authority. Empty intent SHALL be an idempotent local no-op; another intent or obsolete activation SHALL fail closed.
+
+#### Scenario: Rejected A with newer checkpoint B
+- **GIVEN** the current live Save first captured A and a typed response proves its only dispatch did not write
+- **WHEN** A is durably settled after B checkpoints
+- **THEN** B and all retained local assets remain unchanged, and reopen does not restore A’s intent
+- **AND** an Update requires compatible fresh remote authority before another field mutation
+
+#### Scenario: Settlement persistence fails
+- **WHEN** removing the matching rejected intent fails locally
+- **THEN** the durable intent remains and normal remote Save is not admitted
+- **AND** an explicit request-bound local-only settlement retry is available while its proof survives
+
+#### Scenario: A later rejection does not settle an earlier ambiguous request
+- **GIVEN** an intent was restored or retried and an earlier request might still have committed
+- **WHEN** the current HTTP request is rejected before dispatch or by its conditional predicate
+- **THEN** that response alone SHALL NOT declare the entire intent unapplied
+- **AND** Update uses observed projection/version recovery; Create retains the original server UUID
+
+### Requirement: Explicit corrected Create retains uncertain server identity
+After a verified pre-dispatch rejection of a restored/ambiguous Create, explicit Save of corrected valid fields MAY replace the captured Create request with a new local attempt under the SAME session UUID. It SHALL preserve newer checkpoints and prior-outcome uncertainty. Replay SHALL adopt the authoritative existing/created record and stop on differing or moderated fields without overwriting it.
+
+#### Scenario: Earlier Create A may have committed while corrected B is submitted
+- **WHEN** the user explicitly saves valid B after the current request for A was rejected before dispatch
+- **THEN** the request still uses A’s original client submission UUID
+- **AND** an earlier committed A is discovered rather than duplicated, while B remains local and later phases stop on conflict
+
+### Requirement: Explicit remote routes and resume identities agree
+A session hint on an explicit remote-ID editor route SHALL resolve under the current account and match that ID before any activation. Rejection SHALL preserve previously active work. New-editor and Progress bindings without an explicit remote target SHALL retain adopted-session restoration.
+
+#### Scenario: Route 123 carries session 456
+- **WHEN** `/admin/submissions/123` supplies a same-account session belonging to remote submission 456
+- **THEN** the route is settled unavailable and submission 456 is not activated or published through route 123
+- **AND** neither existing draft is overwritten or discarded

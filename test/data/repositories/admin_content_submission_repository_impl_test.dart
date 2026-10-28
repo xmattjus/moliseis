@@ -59,6 +59,40 @@ void main() {
 
   tearDown(() => client.dispose());
 
+  for (final rejection in [
+    (400, 'VALIDATION_ERROR', true),
+    (422, 'ADMIN_PROFILE_INCOMPLETE', true),
+    (422, 'START_DATE_REQUIRED', false),
+    (409, 'SUBMISSION_CHANGED', false),
+    (409, 'INVALID_STATUS_TRANSITION', false),
+    (404, 'NOT_FOUND', false),
+    (500, 'DATABASE_ERROR', false),
+    (409, 'UNKNOWN_SERVER_ERROR', false),
+  ]) {
+    test('field-write error normalization preserves ${rejection.$2}', () async {
+      httpClient.queueJson({
+        'code': rejection.$2,
+        'message': 'Controlled endpoint response',
+      }, status: rejection.$1);
+      final input = AdminSubmissionInput(
+        category: ContentCategory.history,
+        city: 'Isernia',
+        name: 'Palazzo',
+      );
+      final Result<dynamic> result = rejection.$3
+          ? await repository.create(
+              input,
+              clientSubmissionId: clientSubmissionId,
+            )
+          : await repository.update(7, input, expectedModifiedAt: exactToken);
+      final error = (result as Error).error;
+      expect(error, isA<AdminContentSubmissionApiException>());
+      expect((error as AdminContentSubmissionApiException).code, rejection.$2);
+      expect(error.statusCode, rejection.$1);
+      expect(httpClient.requests, hasLength(1));
+    });
+  }
+
   test(
     'preview tokens survive Edge JSON to Apply request byte for byte',
     () async {

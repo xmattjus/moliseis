@@ -43,6 +43,11 @@ typedef _SourceAcknowledgment = ({
   String? hash,
   bool? ignore,
 });
+typedef _RejectedFieldWrite = ({
+  AdminFieldWriteIntent intent,
+  Exception error,
+  bool conflict,
+});
 
 /// Visible phase of the existing single-flight Save command.
 enum AdminSavePhase {
@@ -207,6 +212,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     }
     final activationGeneration = _generation;
     final previous = session.state?.owner;
+    if (sessionId != null &&
+        previous?.accountId == accountId &&
+        previous?.sessionId == sessionId &&
+        submissionId != null &&
+        previous?.submissionId != submissionId) {
+      return _unavailable();
+    }
     final same =
         !_revoked &&
         previous?.accountId == accountId &&
@@ -226,6 +238,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         : await session.activateBySession(
             accountId: accountId,
             sessionId: sessionId,
+            expectedSubmissionId: submissionId,
           );
     if (_disposed ||
         activationGeneration != _generation ||
@@ -260,6 +273,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _deleteEffectId = null;
     _saveSessionId = null;
     _lastSaveAttempt = null;
+    _pendingFieldSettlement = null;
+    _retryableUpdateAttempt = null;
+    _correctableCreateAttempt = null;
     _eventTimeIssue = null;
     _status = null;
     _promotion = null;
@@ -364,6 +380,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   AdminSavePhase _savePhase = AdminSavePhase.idle;
   String? _saveSessionId;
   _SaveDraft? _lastSaveAttempt;
+  _RejectedFieldWrite? _pendingFieldSettlement;
+  String? _retryableUpdateAttempt;
+  String? _correctableCreateAttempt;
 
   /// Current operation phase, separate from command admission.
   AdminSavePhase get savePhase => _savePhase;
@@ -930,6 +949,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Whether save can synchronously reserve its operation.
   bool get canRequestSave =>
       _canAdmit(_saveCommand) &&
+      _pendingFieldSettlement == null &&
       !_remoteUnavailable &&
       (_draftSession?.state?.physicalCheckpoint?.fieldWriteIntent?.kind !=
               AdminFieldWriteKind.update ||
@@ -937,6 +957,14 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Whether explicit continuation can retain captured fields and staged work.
   bool get canResumeCapturedSave {
+    final pending = _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent;
+    if (_pendingFieldSettlement == null &&
+        _canAdmit(_saveCommand) &&
+        !_remoteUnavailable &&
+        pending?.kind == AdminFieldWriteKind.update &&
+        pending?.attemptId == _retryableUpdateAttempt) {
+      return true;
+    }
     if (!canRequestSave) return false;
     if (_draftSession?.state?.physicalCheckpoint?.fieldWriteIntent?.kind ==
             AdminFieldWriteKind.create ||
@@ -998,6 +1026,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Explicit observation is the only recovery for unresolved Update intent.
   bool get canRequestSaveReadBack =>
+      _pendingFieldSettlement == null &&
       _canAdmit(_loadCommand) &&
       _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent?.kind ==
           AdminFieldWriteKind.update;
@@ -1008,6 +1037,29 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _loadEffectId = ++_nextEffectId;
     _loadSnapshot = const commands.CommandResult.isLoading();
     return _admit(_loadCommand, _readBackSave);
+  }
+
+  /// Local-only repair of a proven rejection whose metadata commit failed.
+  bool get canRequestFieldSettlement =>
+      _pendingFieldSettlement != null && _canAdmit(_saveCommand);
+
+  /// A rejected/fenced write cannot reuse its cached field-version authority.
+  bool get canRefreshSaveAuthority =>
+      _remoteUnavailable &&
+      _pendingFieldSettlement == null &&
+      _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent == null &&
+      canRequestLoad;
+
+  bool requestFieldSettlement({AdminDraftActivation? activation}) {
+    if (!_authority(activation) || !canRequestFieldSettlement) return false;
+    final rejected = _pendingFieldSettlement!;
+    _saveSessionId = sessionId;
+    _saveEffectId = ++_nextEffectId;
+    _saveSnapshot = const commands.CommandResult.isLoading();
+    return _admit(
+      _saveCommand,
+      () => _settleRejectedWrite(rejected, activation!),
+    );
   }
 
   /// Last authorized reject state, frozen when the owner is revoked.
@@ -1115,12 +1167,23 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     bool resumeCaptured = false,
   }) {
     if (!_authority(activation)) return false;
-    if (!canRequestSave || (resumeCaptured && !canResumeCapturedSave)) {
+    final allowedResume = resumeCaptured && canResumeCapturedSave;
+    if ((!canRequestSave && !allowedResume) ||
+        (resumeCaptured && !allowedResume)) {
       return false;
     }
     var draft = _captureSave();
-    if (resumeCaptured ||
-        _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent != null) {
+    final pending = _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent;
+    final correctingCreate =
+        !resumeCaptured &&
+        draft.error == null &&
+        pending?.kind == AdminFieldWriteKind.create &&
+        pending?.attemptId == _correctableCreateAttempt;
+    final retryUpdate = allowedResume ? _retryableUpdateAttempt : null;
+    if (!correctingCreate &&
+        (resumeCaptured ||
+            _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent !=
+                null)) {
       draft = _captureContinuation(draft);
     }
     if (draft.error == null) _lastSaveAttempt = draft;
@@ -1128,7 +1191,15 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _savePhase = AdminSavePhase.checkpoint;
     _saveEffectId = ++_nextEffectId;
     _saveSnapshot = const commands.CommandResult.isLoading();
-    return _admit(_saveCommand, () => _save(draft));
+    _retryableUpdateAttempt = null;
+    return _admit(
+      _saveCommand,
+      () => _save(
+        draft,
+        retryUpdateAttempt: retryUpdate,
+        replaceCreateAttempt: correctingCreate ? pending!.attemptId : null,
+      ),
+    );
   }
 
   /// Reserves rejection with immutable source acknowledgment.
@@ -1405,6 +1476,80 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     return const Result.success(null);
   }
 
+  // These codes are proven by this endpoint's validation/zero-row branches.
+  // They describe one request, never all requests for a restored intent.
+  bool _preDispatchRejection(Exception error) =>
+      error is AdminContentSubmissionApiException &&
+      ((error.statusCode == 400 && error.code == 'VALIDATION_ERROR') ||
+          (error.statusCode == 422 &&
+              error.code == 'ADMIN_PROFILE_INCOMPLETE'));
+
+  bool _definitiveFieldRejection(Exception error, AdminFieldWriteKind kind) =>
+      _preDispatchRejection(error) ||
+      (kind == AdminFieldWriteKind.update &&
+          error is AdminContentSubmissionApiException &&
+          ((error.statusCode == 409 &&
+                  const [
+                    'SUBMISSION_CHANGED',
+                    'INVALID_STATUS_TRANSITION',
+                  ].contains(error.code)) ||
+              (error.statusCode == 422 &&
+                  error.code == 'START_DATE_REQUIRED') ||
+              (error.statusCode == 404 && error.code == 'NOT_FOUND')));
+
+  Future<Result<void>> _settleRejectedWrite(
+    _RejectedFieldWrite rejected,
+    AdminDraftActivation token,
+  ) async {
+    final generation = _generation;
+    if (!_authority(token)) return _unavailable();
+    _pendingFieldSettlement = rejected;
+    _retryableUpdateAttempt = null;
+    final saved = await _draftSession!.settleFieldWriteIntent(
+      activation: token,
+      attemptId: rejected.intent.attemptId,
+      kind: rejected.intent.kind,
+    );
+    if (_obsolete(generation) || !_authority(token)) return _unavailable();
+    if (saved is Error<void>) {
+      _phase(AdminSavePhase.partialFailure);
+      return saved;
+    }
+    _pendingFieldSettlement = null;
+    _confirmedFields = null;
+    _lastSaveAttempt = null;
+    _correctableCreateAttempt = null;
+    if (rejected.intent.kind == AdminFieldWriteKind.update) {
+      _modifiedAtToken = null;
+      _remoteUnavailable = true;
+    }
+    _phase(rejected.conflict ? AdminSavePhase.conflict : AdminSavePhase.failed);
+    // Settlement is local repair, not a successful remote Save.
+    return Result.error(rejected.error);
+  }
+
+  Future<Result<void>> _fieldWriteFailed(
+    AdminFieldWriteIntent intent,
+    Exception error,
+    AdminDraftActivation token, {
+    required bool noEarlierDispatch,
+  }) async {
+    if (noEarlierDispatch && _definitiveFieldRejection(error, intent.kind)) {
+      return await _settleRejectedWrite((
+        intent: intent,
+        error: error,
+        conflict: intent.kind == AdminFieldWriteKind.update,
+      ), token);
+    }
+    if (intent.kind == AdminFieldWriteKind.create &&
+        _preDispatchRejection(error)) {
+      // Keep the uncertain chain. Explicit correction still uses its UUID.
+      _correctableCreateAttempt = intent.attemptId;
+    }
+    _phase(AdminSavePhase.unknownOutcome);
+    return Result.error(error);
+  }
+
   Future<Result<void>> _readBackSave() async {
     final ownerGeneration = _generation;
     final token = activation;
@@ -1417,16 +1562,48 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         intent?.kind != AdminFieldWriteKind.update) {
       return _unavailable();
     }
+    _retryableUpdateAttempt = null;
     final result = await _repository.getById(id);
     if (_obsolete(ownerGeneration) || !_authority(token)) return _unavailable();
     if (result case Error<AdminSubmission>(:final error)) {
+      final missing =
+          error is AdminContentSubmissionApiException &&
+          error.statusCode == 404 &&
+          error.code == 'NOT_FOUND';
+      if (missing) _remoteUnavailable = true;
+      _phase(missing ? AdminSavePhase.conflict : AdminSavePhase.unknownOutcome);
       return Result.error(error);
     }
     final detail = (result as Success<AdminSubmission>).value;
     _publishDetail(detail);
-    if (detail.status != AdminSubmissionStatus.pending ||
-        detail.modifiedAtToken == null ||
-        !intent!.snapshot.sameRemoteProjection(_snapshotFor(detail))) {
+    final compatible =
+        detail.status == AdminSubmissionStatus.pending &&
+        detail.modifiedAtToken != null &&
+        !(detail.externalEvent != null &&
+            intent!.snapshot.eventDates.startInstantUtc == null);
+    final matches = intent!.snapshot.sameRemoteProjection(_snapshotFor(detail));
+    if (compatible &&
+        !matches &&
+        detail.modifiedAtToken == intent.expectedModifiedAt) {
+      // Observation does not cancel old HTTP. Only original A/V is retryable.
+      _retryableUpdateAttempt = intent.attemptId;
+      _remoteUnavailable = false;
+      _phase(AdminSavePhase.unknownOutcome);
+      return const Result.success(null);
+    }
+    if (!compatible || !matches) {
+      if (detail.modifiedAtToken != null &&
+          detail.modifiedAtToken != intent.expectedModifiedAt) {
+        // V is obsolete: an old A/V cannot apply after this observed version.
+        // This does not claim that A never committed historically.
+        return await _settleRejectedWrite((
+          intent: intent,
+          error: Exception(
+            'Il contributo remoto è cambiato. Conserva la bozza.',
+          ),
+          conflict: true,
+        ), token);
+      }
       _savePhase = AdminSavePhase.conflict;
       _remoteUnavailable = true;
       _notifyListeners();
@@ -1441,6 +1618,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     );
     if (_obsolete(ownerGeneration)) return _unavailable();
     if (confirmed is Success<void>) {
+      _confirmedFields = null;
+      _lastSaveAttempt = null;
       _remoteUnavailable = false;
       _savePhase = stagedAssets.isEmpty
           ? AdminSavePhase.completed
@@ -1522,7 +1701,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _notifyListeners();
   }
 
-  Future<Result<void>> _save(_SaveDraft draft) async {
+  Future<Result<void>> _save(
+    _SaveDraft draft, {
+    String? retryUpdateAttempt,
+    String? replaceCreateAttempt,
+  }) async {
     final ownerGeneration = _generation;
     final session = _draftSession;
     if (session == null) {
@@ -1550,8 +1733,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     var token = activation;
     if (token == null) return _unavailable();
     var intent = session.state?.physicalCheckpoint?.fieldWriteIntent;
+    // Only an intent first captured by this invocation has no earlier sender.
+    // Restored, replayed and corrected Create chains remain conservative.
+    final noEarlierDispatch = intent == null && replaceCreateAttempt == null;
     if (intent?.kind == AdminFieldWriteKind.update &&
-        _confirmedFields == null) {
+        _confirmedFields == null &&
+        intent?.attemptId != retryUpdateAttempt) {
       _phase(AdminSavePhase.unknownOutcome);
       return Result.error(
         Exception('Verifica il salvataggio remoto prima di riprovare.'),
@@ -1565,6 +1752,18 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         .map((item) => item.digest)
         .toList(growable: false);
     final baseline = session.state?.remoteBaseline;
+    if (replaceCreateAttempt != null) {
+      if (intent?.kind != AdminFieldWriteKind.create ||
+          intent?.attemptId != replaceCreateAttempt ||
+          draft.error != null) {
+        return _unavailable();
+      }
+      intent = AdminFieldWriteIntent(
+        kind: AdminFieldWriteKind.create,
+        attemptId: AdminDraftOwner(accountId: token.owner.accountId).sessionId,
+        snapshot: draft.snapshot,
+      );
+    }
     final skipFields =
         intent == null &&
         submissionId != null &&
@@ -1594,11 +1793,18 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       if (_obsolete(ownerGeneration) || !_authority(token)) {
         return _unavailable();
       }
-      final checkpoint = await session.beginFieldWrite(
-        intent,
-        activation: token,
-        checkpointAtCapture: draft.physicalCheckpoint,
-      );
+      final checkpoint = replaceCreateAttempt == null
+          ? await session.beginFieldWrite(
+              intent,
+              activation: token,
+              checkpointAtCapture: draft.physicalCheckpoint,
+            )
+          : await session.replaceRejectedCreateIntent(
+              activation: token,
+              attemptId: replaceCreateAttempt,
+              replacement: intent,
+              checkpointAtCapture: draft.physicalCheckpoint,
+            );
       if (_obsolete(ownerGeneration) || !_authority(token)) {
         return _unavailable();
       }
@@ -1606,6 +1812,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         _phase(AdminSavePhase.failed);
         return checkpoint;
       }
+      if (replaceCreateAttempt != null) _correctableCreateAttempt = null;
       _phase(AdminSavePhase.fields);
       if (_obsolete(ownerGeneration) || !_authority(token)) {
         return _unavailable();
@@ -1624,8 +1831,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
             return _unavailable();
           }
           if (created case Error<AdminSubmissionCreateResult>(:final error)) {
-            _phase(AdminSavePhase.unknownOutcome);
-            return Result.error(error);
+            return await _fieldWriteFailed(
+              intent,
+              error,
+              token,
+              noEarlierDispatch: noEarlierDispatch,
+            );
           }
           final value = (created as Success<AdminSubmissionCreateResult>).value;
           detail = value.submission;
@@ -1640,13 +1851,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
             return _unavailable();
           }
           if (updated case Error<AdminSubmission>(:final error)) {
-            _phase(
-              error is AdminContentSubmissionApiException &&
-                      error.code == 'SUBMISSION_CHANGED'
-                  ? AdminSavePhase.conflict
-                  : AdminSavePhase.unknownOutcome,
+            return await _fieldWriteFailed(
+              intent,
+              error,
+              token,
+              noEarlierDispatch: noEarlierDispatch,
             );
-            return Result.error(error);
           }
           detail = (updated as Success<AdminSubmission>).value;
         }

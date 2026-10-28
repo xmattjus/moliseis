@@ -35,6 +35,8 @@ class AdminSubmissionSaveProgressScreen extends StatelessWidget {
       final activation = viewModel.activation;
       final terminal = !running;
       bool ownsPresentation() =>
+          context.mounted &&
+          ModalRoute.of(context)?.isCurrent == true &&
           sessionId != null &&
           sessionId == viewModel.sessionId &&
           attemptId != null &&
@@ -135,6 +137,30 @@ class AdminSubmissionSaveProgressScreen extends StatelessWidget {
                 ? Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (matches && viewModel.canRequestFieldSettlement)
+                        TextButton(
+                          onPressed: () {
+                            if (!ownsPresentation() ||
+                                !viewModel.requestFieldSettlement(
+                                  activation: activation,
+                                )) {
+                              return;
+                            }
+                            if (!context.mounted ||
+                                !viewModel.isActivationCurrent(activation)) {
+                              return;
+                            }
+                            context.replaceNamed(
+                              RouteNames.adminSubmissionSaveProgress,
+                              queryParameters: {
+                                'session': sessionId,
+                                'attempt': '${viewModel.saveExecutionId}',
+                                'editor': ?editorTarget,
+                              },
+                            );
+                          },
+                          child: const Text('Ripristina salvataggio locale'),
+                        ),
                       if (matches && viewModel.canRequestSaveReadBack)
                         TextButton(
                           onPressed: () {
@@ -150,7 +176,8 @@ class AdminSubmissionSaveProgressScreen extends StatelessWidget {
                       // A new operation gets a new presentation identity.
                       if (matches &&
                           phase != AdminSavePhase.completed &&
-                          viewModel.canRequestSave)
+                          (viewModel.canRequestSave ||
+                              viewModel.canResumeCapturedSave))
                         TextButton(
                           onPressed: () {
                             if (!ownsPresentation() ||
@@ -159,6 +186,10 @@ class AdminSubmissionSaveProgressScreen extends StatelessWidget {
                                   resumeCaptured:
                                       viewModel.canResumeCapturedSave,
                                 )) {
+                              return;
+                            }
+                            if (!context.mounted ||
+                                !viewModel.isActivationCurrent(activation)) {
                               return;
                             }
                             context.replaceNamed(

@@ -98,7 +98,7 @@ Progress SHALL distinguish completed, partial, recoverable failure, unknown remo
 #### Scenario: Unknown Update
 - **WHEN** Update response is lost
 - **THEN** the editor retains local fields and progress offers return/read-back without claiming failure or success
-- **AND** equality confirms observed fields and further writes remain conditional on the exact server token, while different/missing/moderated remote state remains settled unknown/conflicting
+- **AND** equality confirms observed fields and further writes remain conditional on the exact server token, while different/missing/moderated remote state follows the guarded recovery branches below
 
 #### Scenario: Local adoption or receipt persistence fails
 - **WHEN** remote work is confirmed but local metadata is not committed
@@ -126,3 +126,27 @@ Returning from either editor entry route SHALL refresh the current authorized da
 #### Scenario: Untouched editor exits
 - **WHEN** an editor returns without changing remote content
 - **THEN** the same harmless dashboard refresh occurs subject to owner/account/mounted checks
+
+### Requirement: Unresolved Update recovery distinguishes version and projection
+Read-back SHALL compare captured A/V with the authoritative row. Compatible pending A SHALL confirm only its observed row/token. A compatible pending row still at V SHALL permit explicit original A/V retry through the existing Save Command. Other outcomes SHALL follow the scenarios below without borrowing a fresh token or inferring old HTTP settlement. All branches SHALL preserve newer C/P.
+
+#### Scenario: Intent committed before dispatch and remote remains V
+- **GIVEN** durable Update A/V and newer local checkpoint B survive process death
+- **WHEN** explicit read-back observes the compatible pending row at V with fields different from A
+- **THEN** the editor/progress offers explicit original A/V continuation, leaving B untouched
+- **AND** initialization, route reconstruction and read-back perform no Update
+
+#### Scenario: Original A and retry race
+- **WHEN** explicit original A/V retry races the old request
+- **THEN** the existing exact-token predicate fences a later incompatible write
+- **AND** token rejection requires read-back again rather than blind retry, fresh-token substitution or presumed success
+
+#### Scenario: Newer remote fields have another token
+- **WHEN** read-back returns fields other than A at a different exact token
+- **THEN** local work remains and the obsolete intent is locally settled as conflict
+- **AND** no immediate Save using the historical token or automatic overwrite with the new token is allowed
+
+#### Scenario: Read-back cannot establish a compatible pending row
+- **WHEN** the row is missing, finalized, provenance-incompatible, or cannot be read
+- **THEN** no remote mutation is admitted and local work is retained
+- **AND** a read failure retains the unresolved intent rather than proving non-application

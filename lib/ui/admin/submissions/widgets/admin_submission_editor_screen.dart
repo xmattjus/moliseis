@@ -631,19 +631,25 @@ class _AdminSubmissionEditorScreenState
       )) {
         return;
       }
-      final session = owner.sessionId;
-      if (session == null) return;
-      unawaited(
-        context.pushNamed(
-          RouteNames.adminSubmissionSaveProgress,
-          queryParameters: {
-            'session': session,
-            'attempt': '${owner.saveExecutionId}',
-            'editor': '${owner.submissionId ?? 'new'}',
-          },
-        ),
-      );
+      _openSaveProgress(owner);
     }
+  }
+
+  void _openSaveProgress(AdminSubmissionEditorViewModel owner) {
+    if (!mounted) return;
+    if (!_owns(owner)) return;
+    final session = owner.sessionId;
+    if (session == null) return;
+    unawaited(
+      context.pushNamed(
+        RouteNames.adminSubmissionSaveProgress,
+        queryParameters: {
+          'session': session,
+          'attempt': '${owner.saveExecutionId}',
+          'editor': '${owner.submissionId ?? 'new'}',
+        },
+      ),
+    );
   }
 
   @override
@@ -711,6 +717,26 @@ class _AdminSubmissionEditorScreenState
                           'Le modifiche locali sono conservate. '
                           'Puoi salvare la bozza locale e tornare alla lista.',
                         ),
+                      ),
+                    if (viewModel.canRequestFieldSettlement)
+                      TextButton(
+                        onPressed: () {
+                          if (_owns(viewModel) &&
+                              viewModel.requestFieldSettlement(
+                                activation: activation,
+                              )) {
+                            _openSaveProgress(viewModel);
+                          }
+                        },
+                        child: const Text('Ripristina salvataggio locale'),
+                      ),
+                    if (viewModel.canRefreshSaveAuthority)
+                      TextButton(
+                        onPressed: () => _request(
+                          viewModel,
+                          () => viewModel.requestLoad(activation: activation),
+                        ),
+                        child: const Text('Ricarica stato remoto'),
                       ),
                     if (viewModel.canResumeCapturedSave)
                       TextButton(

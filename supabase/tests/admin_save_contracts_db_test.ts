@@ -517,6 +517,63 @@ for (const oldIsNoOp of [false, true]) {
   });
 }
 
+for (const winner of ["original", "explicit retry"]) {
+  Deno.test(`unchanged V permits captured A/V retry when ${winner} commits first`, async () => {
+    await withSubmission(async (sql, _userId, _key, id) => {
+      const first = client();
+      const second = client();
+      let pending: Promise<number> | undefined;
+      try {
+        // A restored intent exists in the client, but observing V does not
+        // establish whether its original HTTP request is still outstanding.
+        const token = await version(sql, id);
+        assertEquals(
+          (await sql`select name from public.content_submissions where id = ${id}`)[
+            0
+          ].name,
+          "Original Admin fields",
+        );
+        const waiting = winner === "original" ? "retry" : "original";
+        await identify(second, `admin-same-a-${waiting}-${id}`);
+        await first.begin(async (tx) => {
+          await tx`select id from public.content_submissions where id = ${id} for update`;
+          pending = conditionalUpdate(second, id, token, "Captured A");
+          await waitForLock(sql, `admin-same-a-${waiting}-${id}`);
+          assertEquals(await conditionalUpdate(tx, id, token, "Captured A"), 1);
+        });
+        assertEquals(await pending, 0);
+        const observedToken = await version(sql, id);
+        assert(observedToken !== token);
+        assertEquals(
+          (await sql`select name from public.content_submissions where id = ${id}`)[
+            0
+          ].name,
+          "Captured A",
+        );
+        // Read-back can confirm observed A, with the actual new token, rather
+        // than guessing which request won. Later B still fences every old A/V.
+        assertEquals(
+          await conditionalUpdate(sql, id, observedToken, "New B"),
+          1,
+        );
+        assertEquals(
+          await conditionalUpdate(second, id, token, "Captured A"),
+          0,
+        );
+        assertEquals(
+          (await sql`select name from public.content_submissions where id = ${id}`)[
+            0
+          ].name,
+          "New B",
+        );
+      } finally {
+        await pending?.catch(() => {});
+        await Promise.all([first.end(), second.end()]);
+      }
+    });
+  });
+}
+
 Deno.test("Admin receipt rejects malformed requests and missing parent without inserting", async () => {
   await withSubmission(async (sql, _userId, _key, id) => {
     for (
