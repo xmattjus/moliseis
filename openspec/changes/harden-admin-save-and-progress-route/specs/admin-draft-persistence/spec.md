@@ -80,12 +80,13 @@ A proven first-dispatch rejection or an observed field-version fence SHALL retir
 - **AND** Update uses observed projection/version recovery; Create retains the original server UUID
 
 ### Requirement: Explicit corrected Create retains uncertain server identity
-After a verified pre-dispatch rejection of a restored/ambiguous Create, explicit Save of corrected valid fields MAY replace the captured Create request with a new local attempt under the SAME session UUID. It SHALL preserve newer checkpoints and prior-outcome uncertainty. Replay SHALL adopt the authoritative existing/created record and stop on differing or moderated fields without overwriting it.
+After a verified pre-dispatch rejection of a restored/ambiguous Create, an authorized, explicitly admitted Save of corrected valid fields SHALL replace the captured Create request with a new local attempt identity under the original session UUID. It SHALL preserve newer C/P, staged work and prior-outcome uncertainty. Replay SHALL adopt the authoritative existing/created record and stop on differing or moderated fields without overwriting it.
 
 #### Scenario: Earlier Create A may have committed while corrected B is submitted
 - **WHEN** the user explicitly saves valid B after the current request for A was rejected before dispatch
 - **THEN** the request still uses A’s original client submission UUID
 - **AND** an earlier committed A is discovered rather than duplicated, while B remains local and later phases stop on conflict
+- **AND** replacement requires exact account/session/activation authority and successful local persistence; failure SHALL NOT claim success or authorize an unsafe remote request
 
 ### Requirement: Explicit remote routes and resume identities agree
 A session hint on an explicit remote-ID editor route SHALL resolve under the current account and match that ID before any activation. Rejection SHALL preserve previously active work. New-editor and Progress bindings without an explicit remote target SHALL retain adopted-session restoration.
