@@ -39,3 +39,11 @@ Plan 1 is complete at baseline `9598e80c05f4483d7fabbda064cdaf71ac503609` (the e
 ## Non-goals and dependency decisions
 
 No implementation occurs during planning. No full conflict-resolution UX (Plan 3), dirty-exit dialog (Plan 4), moderation progress-route migration, generic workflow/session/staging framework, Cloudinary protocol change, native fork, shared picker/recovery gateway, cache-isolation protocol, durable recovery inbox or owner retirement. The historical `improve-admin-submission-editor-workflow` remains unimplemented and is not an executable alternative. Canonical specs and archived history remain unchanged until implementation acceptance.
+
+## Post-merge archival record — 2026-10-28
+
+[Implementation PR #17](https://github.com/xmattjus/moliseis/pull/17) merged with final head `d7ac5d81b68e38f20edd49b5ba4ca4c29c52fc48` and merge commit `92863232dac891ff740feefb2adc63a3d9c829c1`. The documentation worktree started from that verified current `origin/main` commit. The earlier planning and acceptance statements above and in design/tasks remain historical records; the subsequent authorization covers canonical synchronization and archival only.
+
+The five completed delta specifications are synchronized into canonical Admin draft persistence, local asset staging, submission editor, Save idempotency and editor picker restoration specifications. All nine original artifacts are retained here, including the five unchanged deltas and the unchanged 39/39 task record. Plan 1 history, Public contracts and the historical Admin proposal remain unchanged.
+
+Android native acceptance, production migration/Edge parity, the controlled Admin compatibility window and documented rollback retain their original evidence and attribution in tasks.md. Physical iOS smoke testing remains an unperformed post-release operational follow-up; macOS remains outside the configured targets. The accepted Android shared-cache attribution limitation remains unresolved. Archival does not rerun or extend implementation, device or production acceptance, and authorizes no deployment, rollback or merge of the separate documentation PR.
