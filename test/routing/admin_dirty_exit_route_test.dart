@@ -926,6 +926,94 @@ void main() {
   );
 
   testOwnerUI(
+    'covered discard rehydrates retained name and city before further typing',
+    (tester) async {
+      harness = AdminSaveRouteHarness(persistedTargets: [1]);
+      await harness.openEditor(tester, target: 1);
+      final nameField = find.widgetWithText(TextFormField, 'Luogo o evento');
+      final cityField = find.widgetWithText(TextFormField, 'Città');
+      await tester.enterText(nameField, 'Discarded name');
+      await tester.enterText(cityField, 'Discarded city');
+      await tester.pumpAndSettle();
+      expect(harness.owner.name, 'Discarded name');
+      expect(harness.owner.city, 'Discarded city');
+      final owner = harness.owner;
+      final navigator = Navigator.of(
+        tester.element(find.byType(AdminSubmissionEditorScreen)),
+      );
+      var covered = false;
+      void coverOnDiscard() {
+        if (covered ||
+            !owner.exitDecisionPending ||
+            owner.hasUncheckpointedChanges) {
+          return;
+        }
+        covered = true;
+        navigator.push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Cover after discard')),
+          ),
+        );
+      }
+
+      owner.addListener(coverOnDiscard);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Esci senza salvare'));
+      await tester.pumpAndSettle();
+      owner.removeListener(coverOnDiscard);
+      expect(covered, isTrue);
+      expect(find.text('Cover after discard'), findsOneWidget);
+      expect(owner.name, 'Target 1');
+      expect(owner.city, 'Campobasso');
+      expect(owner.exitDecisionPending, isFalse);
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+      expect(
+        harness.router.routerDelegate.currentConfiguration.uri.path,
+        '/admin/submissions/1',
+      );
+      final nameInput = find.descendant(
+        of: nameField,
+        matching: find.byType(EditableText),
+      );
+      final cityInput = find.descendant(
+        of: cityField,
+        matching: find.byType(EditableText),
+      );
+      expect(
+        tester.widget<EditableText>(nameInput).controller.text,
+        'Target 1',
+      );
+      expect(
+        tester.widget<EditableText>(cityInput).controller.text,
+        'Campobasso',
+      );
+      await tester.enterText(
+        nameField,
+        '${tester.widget<EditableText>(nameInput).controller.text}X',
+      );
+      await tester.enterText(
+        cityField,
+        '${tester.widget<EditableText>(cityInput).controller.text}X',
+      );
+      expect(owner.name, 'Target 1X');
+      expect(owner.city, 'CampobassoX');
+      expect(harness.local.drafts.saves, isEmpty);
+      expect(harness.repository.createInputs, isEmpty);
+      expect(harness.repository.updateIds, isEmpty);
+      expect(harness.repository.addAssetCalls, isEmpty);
+      expect(harness.repository.deleteAssetCalls, isEmpty);
+      expect(harness.repository.rejectIds, isEmpty);
+      expect(harness.repository.promoteCalls, isEmpty);
+      expect(harness.content.uploadedImages, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+    disposeOwners: () => harness.dispose(),
+  );
+
+  testOwnerUI(
     'covering editor during pending checkpoint permanently revokes exit',
     (tester) async {
       harness = AdminSaveRouteHarness(persistedTargets: [1]);

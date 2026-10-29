@@ -435,6 +435,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       _acknowledgedSourceHash = null;
       _ignoreSource = false;
       _eventTimeIssue = null;
+      _hydrationRevision++;
       _markDirty();
     }
     return result;
