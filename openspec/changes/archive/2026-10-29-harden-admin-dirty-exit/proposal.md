@@ -28,6 +28,6 @@ Public adoption changes no Public requirement; its existing navigation and draft
 
 ## Impact
 
-Implementation seams are the existing router, Admin route binding/editor screen/ViewModel and `AdminDraftSession`, plus one core UI dialog and focused tests extending shared harnesses. No new package, generic navigation framework, session manager, DI system, backend contract, migration, generated model or draft-storage schema is required. Canonical specifications are unchanged by this planning-only change; deltas synchronize only in a later reviewed workflow.
+Implementation seams are the existing router, Admin route binding/editor screen/ViewModel and `AdminDraftSession`, plus one core UI dialog and focused tests extending shared harnesses. No new package, generic navigation framework, session manager, DI system, backend contract, migration, generated model or draft-storage schema is required. Canonical specifications were unchanged during planning and implementation; the completed deltas are synchronized in the separately authorized archival documentation workflow.
 
 Archived Admin Plans 1–3 are authoritative prerequisites. `improve-admin-submission-editor-workflow` remains historical and must not be applied, synchronized, archived as delivered or edited by this change.
