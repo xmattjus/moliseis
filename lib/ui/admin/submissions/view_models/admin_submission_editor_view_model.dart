@@ -171,6 +171,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   String? _activeAccountId;
   final _commandGenerations = <commands.Command<dynamic, dynamic>, int>{};
   AdminDraftExitReview? _exitReview;
+  final _localCheckpointRequests = <Object>{};
 
   /// Current local activation, captured when establishing rendered callbacks.
   AdminDraftActivation? get activation => _draftSession?.captureActivation();
@@ -297,6 +298,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   void _clearContext() {
     _exitReview = null;
+    _localCheckpointRequests.clear();
     _isDirty = false;
     _loadEffectId = null;
     _saveEffectId = null;
@@ -377,6 +379,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       !_disposed &&
       !_revoked &&
       _draftSession != null &&
+      _localCheckpointRequests.isEmpty &&
       !_draftSession.hasPendingLocalWork &&
       !loading &&
       !operationRunning &&
@@ -455,10 +458,22 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   Future<Result<void>> checkpointLocal() async {
     if (!canCheckpoint) return _unavailable();
     final ownerGeneration = _generation;
-    final result = await _draftSession!.checkpoint(requireDurableOwner: true);
-    if (_obsolete(ownerGeneration)) return _unavailable();
-    _notifyListeners();
-    return result;
+    final request = Object();
+    _localCheckpointRequests.add(request);
+    try {
+      // Capture the existing domain request before notifying synchronous
+      // listeners; its ordinary serialization/snapshot timing is unchanged.
+      final checkpoint = _draftSession!.checkpoint(requireDurableOwner: true);
+      _notifyListeners();
+      final result = await checkpoint;
+      if (_obsolete(ownerGeneration)) return _unavailable();
+      return result;
+    } finally {
+      if (_localCheckpointRequests.remove(request) &&
+          !_obsolete(ownerGeneration)) {
+        _notifyListeners();
+      }
+    }
   }
 
   AdminDraftSnapshot get _fields =>
@@ -3155,6 +3170,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _localCheckpointRequests.clear();
     _auth?.removeListener(_onAuthChanged);
     if (_draftSession != null) _abandonPicker();
     _draftSession?.revoke();

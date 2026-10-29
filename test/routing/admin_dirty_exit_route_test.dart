@@ -13,6 +13,7 @@ import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/auth/widgets/admin_login_screen.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_save_progress_screen.dart';
+import 'package:moliseis/ui/core/themes/base_theme_data.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/unsaved_changes_dialog.dart';
 import 'package:moliseis/utils/result.dart';
@@ -463,11 +464,17 @@ void main() {
   );
 
   testOwnerUI(
-    'Android predictive Back reaches the same dirty decision',
+    'Android predictive Back Cancel restores complete editor transition',
     (tester) async {
       harness = AdminSaveRouteHarness(persistedTargets: [1]);
-      await harness.openEditor(tester, target: 1);
+      await harness.openEditor(tester, target: 1, theme: BaseThemeData.get());
+      final route =
+          ModalRoute.of(
+                tester.element(find.byType(AdminSubmissionEditorScreen)),
+              )!
+              as PageRoute<dynamic>;
       harness.owner.setName('Dirty A', activation: harness.owner.activation);
+      await tester.pump();
       await startPredictiveBack(tester);
       await updatePredictiveBack(tester, 0.7);
       await commitPredictiveBack(tester);
@@ -475,6 +482,24 @@ void main() {
       await tester.tap(find.text('Annulla'));
       await tester.pumpAndSettle();
       expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+      expect(route.animation!.value, 1);
+      expect(route.animation!.status, AnimationStatus.completed);
+      expect(route.navigator!.userGestureInProgress, isFalse);
+      expect(harness.owner.name, 'Dirty A');
+      await harness.owner.checkpointLocal();
+      await tester.pumpAndSettle();
+      expect(route.popGestureEnabled, isTrue);
+      await startPredictiveBack(tester);
+      await updatePredictiveBack(tester, 0.4);
+      expect(route.animation!.value, lessThan(1));
+      await cancelPredictiveBack(tester);
+      expect(route.animation!.status, AnimationStatus.completed);
+      await startPredictiveBack(tester);
+      await updatePredictiveBack(tester, 0.7);
+      await commitPredictiveBack(tester);
+      expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+      expect(harness.local.drafts.saves, hasLength(1));
+      expect(harness.repository.updateIds, isEmpty);
     },
     disposeOwners: () => harness.dispose(),
     variant: TargetPlatformVariant.only(TargetPlatform.android),
@@ -676,6 +701,240 @@ void main() {
     expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
     expect(harness.repository.updateIds, [1]);
   }, disposeOwners: () => harness.dispose());
+
+  testOwnerUI(
+    'Android predictive Back cannot strand a running Save transition',
+    (tester) async {
+      harness = AdminSaveRouteHarness(persistedTargets: [1]);
+      await harness.openEditor(tester, target: 1, theme: BaseThemeData.get());
+      final route =
+          ModalRoute.of(
+                tester.element(find.byType(AdminSubmissionEditorScreen)),
+              )!
+              as PageRoute<dynamic>;
+      harness.owner.setName(
+        'Remote save A',
+        activation: harness.owner.activation,
+      );
+      final gate = Completer<Result<AdminSubmission>>();
+      harness.repository.pendingUpdate = gate;
+      expect(
+        harness.owner.requestSave(activation: harness.owner.activation),
+        isTrue,
+      );
+      await pumpCommandTurns(tester);
+      expect(harness.owner.isSaveRunning, isTrue);
+      expect(harness.owner.hasUncheckpointedChanges, isFalse);
+      await startPredictiveBack(tester);
+      await updatePredictiveBack(tester, 0.7);
+      await commitPredictiveBack(tester, settle: false);
+      await pumpCommandTurns(tester);
+      expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+      expect(find.byType(UnsavedChangesDialog), findsNothing);
+      expect(route.animation!.value, 1);
+      expect(route.animation!.status, AnimationStatus.completed);
+      expect(route.navigator!.userGestureInProgress, isFalse);
+      gate.complete(
+        Result.success(
+          sampleAdminSubmission(
+            name: 'Remote save A',
+            description: null,
+            modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(harness.repository.updateIds, [1]);
+      expect(tester.takeException(), isNull);
+    },
+    disposeOwners: () => harness.dispose(),
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  testOwnerUI(
+    'Android predictive Back completed under exit modal restores Cancel source',
+    (tester) async {
+      harness = AdminSaveRouteHarness(persistedTargets: [1]);
+      await harness.openEditor(tester, target: 1, theme: BaseThemeData.get());
+      final route =
+          ModalRoute.of(
+                tester.element(find.byType(AdminSubmissionEditorScreen)),
+              )!
+              as PageRoute<dynamic>;
+      await startPredictiveBack(tester);
+      await updatePredictiveBack(tester, 0.7);
+      harness.owner.setName(
+        'New fields during gesture',
+        activation: harness.owner.activation,
+      );
+      harness.router.go('/admin');
+      await tester.pumpAndSettle();
+      expect(find.byType(UnsavedChangesDialog), findsOneWidget);
+      expect(route.navigator!.userGestureInProgress, isTrue);
+      await commitPredictiveBack(tester);
+      expect(route.navigator!.userGestureInProgress, isFalse);
+      await tester.tap(find.text('Annulla'));
+      await tester.pumpAndSettle();
+      expect(route.animation!.value, 1);
+      expect(route.animation!.status, AnimationStatus.completed);
+      expect(route.navigator!.userGestureInProgress, isFalse);
+      expect(harness.owner.name, 'New fields during gesture');
+      expect(harness.owner.hasUncheckpointedChanges, isTrue);
+      expect(harness.local.drafts.saves, isEmpty);
+      expect(harness.repository.updateIds, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+    disposeOwners: () => harness.dispose(),
+    variant: TargetPlatformVariant.only(TargetPlatform.android),
+  );
+
+  for (final gestureStartedFirst in [false, true]) {
+    testOwnerUI(
+      'Android predictive Back cannot strand an ordinary local checkpoint '
+      'gestureStartedFirst=$gestureStartedFirst',
+      (tester) async {
+        harness = AdminSaveRouteHarness();
+        await harness.openEditor(tester, theme: BaseThemeData.get());
+        final route =
+            ModalRoute.of(
+                  tester.element(find.byType(AdminSubmissionEditorScreen)),
+                )!
+                as PageRoute<dynamic>;
+        final entered = Completer<void>();
+        final released = Completer<Result<void>>();
+        harness.local.drafts.onSave = (_) {
+          entered.complete();
+          return released.future;
+        };
+        if (gestureStartedFirst) {
+          await startPredictiveBack(tester);
+          await updatePredictiveBack(tester, 0.7);
+        }
+        final checkpoint = harness.owner.checkpointLocal();
+        await pumpCommandTurns(tester);
+        expect(entered.isCompleted, isTrue);
+        expect(harness.owner.hasUncheckpointedChanges, isFalse);
+        if (!gestureStartedFirst) {
+          await startPredictiveBack(tester);
+          await updatePredictiveBack(tester, 0.7);
+        }
+        await commitPredictiveBack(tester, settle: false);
+        await pumpCommandTurns(tester);
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(find.byType(UnsavedChangesDialog), findsNothing);
+        expect(route.animation!.value, 1);
+        expect(route.animation!.status, AnimationStatus.completed);
+        expect(route.navigator!.userGestureInProgress, isFalse);
+        released.complete(const Result.success(null));
+        expect(await checkpoint, isA<Success<void>>());
+        await tester.pumpAndSettle();
+        expect(route.popGestureEnabled, isTrue);
+        expect(harness.local.drafts.saves, hasLength(1));
+        expect(harness.repository.createInputs, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () => harness.dispose(),
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
+
+    testOwnerUI(
+      'Android predictive Back cannot strand a pending resume-hint lookup '
+      'gestureStartedFirst=$gestureStartedFirst',
+      (tester) async {
+        harness = AdminSaveRouteHarness(persistedTargets: [1]);
+        await harness.openEditor(tester, target: 1, theme: BaseThemeData.get());
+        final route =
+            ModalRoute.of(
+                  tester.element(find.byType(AdminSubmissionEditorScreen)),
+                )!
+                as PageRoute<dynamic>;
+        final entered = Completer<void>();
+        final released = Completer<Result<AdminSubmissionDraft?>>();
+        harness.local.drafts.onLoadBySession = (_, _) {
+          entered.complete();
+          return released.future;
+        };
+        if (gestureStartedFirst) {
+          await startPredictiveBack(tester);
+          await updatePredictiveBack(tester, 0.7);
+        }
+        harness.router.go(
+          '/admin/submissions/2?session=22222222-2222-4222-8222-222222222222',
+        );
+        await pumpCommandTurns(tester);
+        expect(entered.isCompleted, isTrue);
+        if (!gestureStartedFirst) {
+          await startPredictiveBack(tester);
+          await updatePredictiveBack(tester, 0.7);
+        }
+        await commitPredictiveBack(tester);
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(find.byType(UnsavedChangesDialog), findsNothing);
+        expect(route.animation!.value, 1);
+        expect(route.animation!.status, AnimationStatus.completed);
+        expect(route.navigator!.userGestureInProgress, isFalse);
+        released.complete(const Result.success(null));
+        await tester.pumpAndSettle();
+        expect(harness.owner.submissionId, 1);
+        expect(harness.owner.canRequestExit, isTrue);
+        expect(route.popGestureEnabled, isTrue);
+        expect(harness.local.drafts.saves, isEmpty);
+        expect(harness.repository.updateIds, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () => harness.dispose(),
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
+  }
+
+  testOwnerUI(
+    'obsolete resume lookup cannot release a replacement exit reservation',
+    (tester) async {
+      harness = AdminSaveRouteHarness(persistedTargets: [1]);
+      await harness.openEditor(tester, target: 1);
+      final user = harness.auth.client.currentUser;
+      final entered = Completer<void>();
+      final released = Completer<Result<AdminSubmissionDraft?>>();
+      harness.local.drafts.onLoadBySession = (_, _) {
+        entered.complete();
+        return released.future;
+      };
+      harness.router.go(
+        '/admin/submissions/2?session=22222222-2222-4222-8222-222222222222',
+      );
+      await pumpCommandTurns(tester);
+      expect(entered.isCompleted, isTrue);
+      expect(harness.owner.exitDecisionPending, isTrue);
+      harness.auth.setUser(null);
+      harness.auth.emit(AuthChangeEvent.signedOut);
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminLoginScreen), findsOneWidget);
+      expect(harness.owner.exitDecisionPending, isFalse);
+      harness.auth.setUser(user);
+      harness.auth.emit(AuthChangeEvent.signedIn);
+      harness.router.go('/admin/submissions/1');
+      await tester.pumpAndSettle();
+      harness.owner.setName(
+        'New activation A2',
+        activation: harness.owner.activation,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(UnsavedChangesDialog), findsOneWidget);
+      released.complete(const Result.success(null));
+      await tester.pumpAndSettle();
+      expect(find.byType(UnsavedChangesDialog), findsOneWidget);
+      expect(harness.owner.exitDecisionPending, isTrue);
+      expect(harness.owner.name, 'New activation A2');
+      await tester.tap(find.text('Annulla'));
+      await tester.pumpAndSettle();
+      expect(harness.owner.canRequestExit, isTrue);
+      expect(harness.owner.hasUncheckpointedChanges, isTrue);
+      expect(harness.local.drafts.saves, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+    disposeOwners: () => harness.dispose(),
+  );
 
   testOwnerUI(
     'clean iOS native edge swipe removes only the editor',

@@ -59,6 +59,85 @@ void main() {
   });
 
   group('local exit review', () {
+    test(
+      'ordinary checkpoints publish readiness and settle independently',
+      () async {
+        await vm.activate(accountId: account);
+        final firstEntered = Completer<void>();
+        final secondEntered = Completer<void>();
+        final firstReleased = Completer<Result<void>>();
+        final secondReleased = Completer<Result<void>>();
+        local.drafts.onSave = (draft) {
+          if (draft.snapshot.name == null) {
+            firstEntered.complete();
+            return firstReleased.future;
+          }
+          secondEntered.complete();
+          return secondReleased.future;
+        };
+        final readiness = <bool>[];
+        vm.addListener(() => readiness.add(vm.canRequestExit));
+        final first = vm.checkpointLocal();
+        expect(vm.canRequestExit, isFalse);
+        expect(readiness, [false]);
+        await firstEntered.future;
+        vm.setName('B', activation: vm.activation);
+        final second = vm.checkpointLocal();
+        firstReleased.complete(const Result.success(null));
+        expect(await first, isA<Success<void>>());
+        await secondEntered.future;
+        expect(vm.canRequestExit, isFalse);
+        expect(vm.canCheckpoint, isTrue);
+        secondReleased.complete(const Result.success(null));
+        expect(await second, isA<Success<void>>());
+        expect(vm.canRequestExit, isTrue);
+        expect(readiness.last, isTrue);
+        expect(local.drafts.saves.map((draft) => draft.snapshot.name), [
+          null,
+          'B',
+        ]);
+        expect(vm.name, 'B');
+        expect(remote.createInputs, isEmpty);
+      },
+    );
+
+    test(
+      'obsolete ordinary checkpoint cannot inhibit a replacement owner',
+      () async {
+        await vm.activate(accountId: account);
+        final firstEntered = Completer<void>();
+        final secondEntered = Completer<void>();
+        final firstReleased = Completer<Result<void>>();
+        final secondReleased = Completer<Result<void>>();
+        local.drafts.onSave = (draft) {
+          if (draft.owner.accountId == account) {
+            firstEntered.complete();
+            return firstReleased.future;
+          }
+          secondEntered.complete();
+          return secondReleased.future;
+        };
+        final first = vm.checkpointLocal();
+        await firstEntered.future;
+        vm.revoke();
+        final activation = vm.activate(
+          accountId: AdminDraftSessionHarness.accountB,
+        );
+        firstReleased.complete(const Result.success(null));
+        expect(await activation, isA<Success<void>>());
+        final second = vm.checkpointLocal();
+        expect(await first, isA<Error<void>>());
+        await secondEntered.future;
+        expect(vm.canRequestExit, isFalse);
+        expect(vm.accountId, AdminDraftSessionHarness.accountB);
+        secondReleased.complete(const Result.success(null));
+        expect(await second, isA<Success<void>>());
+        expect(vm.canRequestExit, isTrue);
+        expect(vm.name, isNull);
+        expect(remote.createInputs, isEmpty);
+      },
+    );
+
     test('local field dirtiness is separate from moderation work', () async {
       await vm.activate(accountId: account);
       expect(vm.hasUncheckpointedChanges, isFalse);

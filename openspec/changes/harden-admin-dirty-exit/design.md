@@ -102,7 +102,7 @@ Use `context.appShapes.circular.cornerExtraLarge`, scheme surface/onSurface/onSu
 
 ## Acceptance and verification matrix
 
-All implementation tasks are unchecked. The following are future automated assertions, not claims of execution in this planning PR.
+The following matrix defines the acceptance assertions. Execution results and remaining native limitations are tracked in [verification.md](verification.md) and [tasks.md](tasks.md).
 
 | Layer / existing seam | Required assertions |
 | --- | --- |

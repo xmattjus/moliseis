@@ -39,7 +39,7 @@ Implementation progress for the explicitly authorized apply. Checked tasks have 
 - [x] 5.2 Run `flutter analyze` and the repository Flutter test suite after focused checks; review diagnostics relative to the unchanged baseline and fix attributable regressions. Verify no source generator input, package/backend contract or persistence schema changed unintentionally and review the complete implementation diff against Plans 1–3.
 - [ ] 5.3 Perform separate native-device smoke checks on iOS edge gestures, Android predictive/system Back, desktop keyboard/scaling and auth revocation during owned presentations. Record device/platform and observed outcomes in a concise reviewed verification summary; if unavailable mark native acceptance NOT VERIFIED and do not claim release readiness.
 
-Native acceptance is **NOT VERIFIED**; task 5.3 remains open. Android programmatic fixture smoke now passes, but OS system/predictive Back and the remaining native interaction matrix are **NOT VERIFIED**. See [verification.md](verification.md) for observed platform outcomes and limitations.
+Native acceptance is **NOT VERIFIED**; task 5.3 remains open. Android OS system/predictive Back and iOS Simulator touch acceptance now pass, including native-discovered regression fixes. Foreground macOS keyboard/focus/scaling and its owned-presentation auth checks remain **NOT VERIFIED**. See [verification.md](verification.md) for observed platform outcomes and limitations.
 
 ## Workflow follow-up
 

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
@@ -220,7 +222,15 @@ final class AdminSubmissionExitPolicy {
     final token = Object();
     _pending = token;
     final configuration = router.routerDelegate.currentConfiguration;
+    AdminDraftExitReview? review;
+    VoidCallback? releaseReservation;
     try {
+      // Retain this source's existing mutation/exit admission while its resume
+      // lookup waits; no field action is authorized by the lookup reservation.
+      review = owner.beginExitDecision(visit.activation);
+      if (review == null) return const Block.stop();
+      releaseReservation = () => owner.endExitDecision(review!, notify: false);
+      _releaseReservation = releaseReservation;
       final result = await context
           .read<AdminSubmissionDraftRepository>()
           .loadDraftBySession(accountId: account, sessionId: session);
@@ -243,7 +253,11 @@ final class AdminSubmissionExitPolicy {
         return const Block.stop();
       }
     } finally {
+      if (review != null) owner.endExitDecision(review);
       if (identical(_pending, token)) _pending = null;
+      if (identical(_releaseReservation, releaseReservation)) {
+        _releaseReservation = null;
+      }
     }
     return await _evaluateIncoming(context, current, next, owner);
   }
@@ -339,9 +353,8 @@ final class AdminSubmissionExitPolicy {
     if (visit != null && visit.matchedLocation != state.matchedLocation) {
       return false;
     }
-    if (_pending != null) return false;
     if (visit == null) {
-      return true; // Unavailable binding retains its app owner.
+      return _pending == null; // Unavailable binding retains its app owner.
     }
     final owner = visit.owner;
     final activation = visit.activation;
@@ -350,10 +363,47 @@ final class AdminSubmissionExitPolicy {
         !_presented(visit)) {
       return false;
     }
-    final token = Object();
-    _pending = token;
     final router = GoRouter.of(visit.context);
     final configuration = router.routerDelegate.currentConfiguration;
+    void restoreGuardedPreview() {
+      final route = visit.route;
+      final navigator = route.navigator;
+      final source = configuration.lastOrNull;
+      if (defaultTargetPlatform != TargetPlatform.android ||
+          (_pending == null &&
+              owner.canRequestExit &&
+              !owner.hasUncheckpointedChanges) ||
+          !identical(_visit, visit) ||
+          visit.pageKey != state.pageKey ||
+          visit.matchedLocation != state.matchedLocation ||
+          source?.pageKey != visit.pageKey ||
+          source?.matchedLocation != visit.matchedLocation ||
+          !visit.context.mounted ||
+          !_authorized(owner, activation) ||
+          !route.isActive ||
+          !route.isCurrent ||
+          !identical(
+            router.routerDelegate.currentConfiguration,
+            configuration,
+          ) ||
+          navigator == null ||
+          !navigator.mounted ||
+          navigator.userGestureInProgress ||
+          route.animation?.isCompleted != false) {
+        return;
+      }
+      // GoRouter defers page removal to asynchronous onExit. A committed native
+      // preview can therefore stop short when removal needs consent or refuses.
+      // Restore this source synchronously, balancing the public gesture hooks.
+      route
+        ..handleStartBackGesture(progress: 1)
+        ..handleCancelBackGesture();
+    }
+
+    restoreGuardedPreview();
+    if (_pending != null) return false;
+    final token = Object();
+    _pending = token;
     AdminDraftExitReview? review;
     DialogRoute<UnsavedChangesDecision>? ownedDialog;
     var leaving = false;
@@ -475,6 +525,7 @@ final class AdminSubmissionExitPolicy {
       if (leaving) {
         WidgetsBinding.instance.addPostFrameCallback((_) => release());
       } else {
+        restoreGuardedPreview();
         release();
       }
     }

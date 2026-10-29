@@ -90,7 +90,7 @@ final class AdminSaveRouteHarness {
   late final GoRouter router;
 
   /// Retains one application owner across editor/progress page reconstruction.
-  Widget app() => MultiProvider(
+  Widget app({ThemeData? theme}) => MultiProvider(
     providers: [
       ...buildSyncProviders(sync, auth: auth),
       Provider<AdminContentSubmissionRepository>.value(value: repository),
@@ -104,6 +104,7 @@ final class AdminSaveRouteHarness {
       scaffoldMessengerKey: $scaffoldMessengerKey,
       restorationScopeId: 'admin-save-test',
       routerConfig: router,
+      theme: theme,
       localizationsDelegates: const [
         FlutterQuillLocalizations.delegate,
         ...GlobalMaterialLocalizations.delegates,
@@ -113,11 +114,15 @@ final class AdminSaveRouteHarness {
   );
 
   /// Opens the real editor routes with their dashboard page underneath.
-  Future<void> openEditor(WidgetTester tester, {int? target}) async {
+  Future<void> openEditor(
+    WidgetTester tester, {
+    int? target,
+    ThemeData? theme,
+  }) async {
     router.go(
       target == null ? '/admin/submissions/new' : '/admin/submissions/$target',
     );
-    await tester.pumpWidget(app());
+    await tester.pumpWidget(app(theme: theme));
     await tester.pumpAndSettle();
   }
 
