@@ -1,19 +1,26 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/data/data-sources/admin_submission_draft_entity.dart';
 import 'package:moliseis/data/data-sources/admin_submission_staged_asset_entity.dart';
 import 'package:moliseis/data/mappers/admin_submission_staged_asset_mapper.dart';
 import 'package:moliseis/data/repositories/admin_submission_draft_repository_impl.dart';
 import 'package:moliseis/data/repositories/admin_submission_staged_asset_repository_impl.dart';
+import 'package:moliseis/domain/models/admin_submission_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_staged_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
+import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../support/command_test_support.dart';
+import '../../support/fake_image_picker.dart';
+import '../../support/fake_repositories.dart';
 import '../../support/mock_logger.dart';
 import '../../support/objectbox_test_store.dart';
 
@@ -58,6 +65,440 @@ void main() {
     await env.dispose();
     await support.delete(recursive: true);
   });
+
+  for (final failedWrite in ['association receipt', 'descriptor cleanup']) {
+    test('$failedWrite failure reopens exact evidence without manufacturing '
+        'association confirmation', () async {
+      addTearDown(installCommandTestReporting(MockLogger()));
+      owner = AdminDraftOwner(accountId: account, submissionId: 1);
+      final fields = AdminDraftSnapshot(
+        category: ContentCategory.history,
+        city: 'Campobasso',
+        name: 'A',
+      );
+      final remoteBaseline = AdminRemoteBaseline(
+        snapshot: fields,
+        status: AdminSubmissionStatus.pending,
+        modifiedAt: DateTime.parse(token),
+        modifiedAtToken: token,
+      );
+      await drafts.saveDraft(
+        AdminSubmissionDraft(
+          owner: owner,
+          snapshot: fields,
+          remoteBaseline: remoteBaseline,
+        ),
+      );
+      final source = await File(
+        '${support.path}/source',
+      ).writeAsBytes([1, 2, 3]);
+      final asset = (await staged.acquire(
+        owner: owner,
+        source: source,
+        associatedCount: 0,
+      )).getOrNull()!;
+      const upload = SubmissionAsset(
+        secureUrl: 'https://example.com/confirmed.jpg',
+        width: 10,
+        height: 20,
+      );
+      final confirmed = AdminStagedAssetProgress(
+        upload: upload,
+        associationId: 77,
+      );
+      final durable = failedWrite == 'descriptor cleanup'
+          ? confirmed
+          : AdminStagedAssetProgress(upload: upload);
+      expect(
+        await staged.saveProgress(asset: asset, progress: durable),
+        isA<Success<void>>(),
+      );
+      final rowId = env.store
+          .box<AdminSubmissionStagedAssetEntity>()
+          .getAll()
+          .single
+          .id;
+      final privateFile = (await staged.resolveAbsolutePath(
+        asset,
+      )).getOrNull()!;
+      env.close();
+      expect(
+        failedWrite == 'descriptor cleanup'
+            ? await staged.remove(owner: owner, digest: asset.digest)
+            : await staged.saveProgress(asset: asset, progress: confirmed),
+        isA<Error<void>>(),
+      );
+      expect(await privateFile.readAsBytes(), [1, 2, 3]);
+
+      final reopened = await openStore(directory: env.directory.path);
+      addTearDown(reopened.close);
+      final restoredDrafts = AdminSubmissionDraftRepositoryImpl(
+        objectBoxI: TestObjectBox(reopened),
+        logger: MockLogger(),
+      );
+      final restoredStaged = AdminSubmissionStagedAssetRepositoryImpl(
+        objectBoxI: TestObjectBox(reopened),
+        logger: MockLogger(),
+        draftRepository: restoredDrafts,
+        getSupportDirectory: () async => support,
+      );
+      final restoredSession = AdminDraftSession(
+        draftRepository: restoredDrafts,
+        stagedAssetRepository: restoredStaged,
+      );
+      final remote = FakeAdminContentSubmissionRepository(
+        getByIdResults: {
+          1: Result.success(
+            sampleAdminSubmission(
+              name: 'A',
+              description: null,
+              modifiedAt: DateTime.parse(token),
+              modifiedAtToken: token,
+            ),
+          ),
+        },
+        addAssetResult: const Result.success(
+          AdminSubmissionAsset(
+            id: 77,
+            url: 'https://example.com/confirmed.jpg',
+            width: 10,
+            height: 20,
+          ),
+        ),
+      );
+      const uploadB = SubmissionAsset(
+        secureUrl: 'https://example.com/new.jpg',
+        width: 30,
+        height: 40,
+      );
+      final content = FakeContentSubmissionRepository(
+        uploadImageTaskResult: FakeImageUploadTask.completed(
+          const Result.success(uploadB),
+        ),
+      );
+      final editor = AdminSubmissionEditorViewModel(
+        repository: remote,
+        contentSubmissionRepository: content,
+        draftSession: restoredSession,
+        imagePicker: FakeImagePicker(
+          onPickImage: () async => XFile(source.path),
+        ),
+      );
+      addTearDown(editor.dispose);
+      await editor.activate(accountId: account, submissionId: 1);
+      final restoredAsset = editor.stagedAssets.single;
+      expect(restoredAsset.progress, durable);
+      expect(
+        editor.isStagedAssociationUnavailable(restoredAsset),
+        failedWrite == 'descriptor cleanup',
+      );
+      expect(
+        reopened.box<AdminSubmissionStagedAssetEntity>().getAll().single.id,
+        rowId,
+      );
+      await settleEditorRequest(
+        admitted: editor.requestLoad(activation: editor.activation),
+      );
+      while (editor.loading) {
+        await pumpEventQueue(times: 4);
+      }
+      if (failedWrite == 'descriptor cleanup') {
+        remote.addAssetResult = const Result.success(
+          AdminSubmissionAsset(
+            id: 88,
+            url: 'https://example.com/new.jpg',
+            width: 30,
+            height: 40,
+          ),
+        );
+        await settleEditorRequest(
+          admitted: editor.requestAddAsset(activation: editor.activation),
+        );
+        while (editor.operationRunning) {
+          await pumpEventQueue(times: 4);
+        }
+        expect(editor.assets.single.id, 88);
+      }
+      await settleEditorRequest(
+        admitted: editor.requestSave(activation: editor.activation),
+      );
+      while (editor.operationRunning) {
+        await pumpEventQueue(times: 4);
+      }
+      expect(
+        content.uploadedImages,
+        hasLength(failedWrite == 'descriptor cleanup' ? 1 : 0),
+      );
+      expect(remote.updateIds, isEmpty);
+      if (failedWrite == 'descriptor cleanup') {
+        expect(editor.savePhase, AdminSavePhase.conflict);
+        expect(editor.stagedAssets.single, restoredAsset);
+        expect(
+          reopened.box<AdminSubmissionStagedAssetEntity>().getAll().single.id,
+          rowId,
+        );
+        expect(await privateFile.readAsBytes(), [1, 2, 3]);
+        expect(remote.addAssetCalls, [(1, uploadB)]);
+        await settleEditorRequest(
+          admitted: editor.requestRemoveStagedAsset(
+            restoredAsset,
+            activation: editor.activation,
+          ),
+        );
+        while (editor.operationRunning) {
+          await pumpEventQueue(times: 4);
+        }
+      } else {
+        // Only the new authorized association response permits cleanup.
+        expect(editor.savePhase, AdminSavePhase.completed);
+        expect(remote.addAssetCalls, [(1, upload)]);
+      }
+      expect(editor.stagedAssets, isEmpty);
+      expect(privateFile.existsSync(), isFalse);
+      expect(remote.deleteAssetCalls, isEmpty);
+      expect(
+        (await restoredDrafts.loadDraft(
+          accountId: account,
+          submissionId: 1,
+        )).getOrNull()!.owner,
+        owner,
+      );
+    });
+  }
+
+  for (final checkpoint in [false, true]) {
+    test(
+      'explicit Accept keeps original disk truth until checkpoint=$checkpoint '
+      'and retains receipt/files after real reopen',
+      () async {
+        owner = AdminDraftOwner(accountId: account, submissionId: 7);
+        await drafts.saveDraft(
+          AdminSubmissionDraft(
+            owner: owner,
+            snapshot: baseline.snapshot,
+            remoteBaseline: baseline,
+          ),
+        );
+        await session.activate(owner);
+        final initialRead = session.admitHydration()!;
+        await session.acceptHydration(
+          initialRead,
+          baseline,
+          associatedCount: 0,
+        );
+        final source = await File(
+          '${support.path}/source',
+        ).writeAsBytes([4, 5, 6]);
+        final asset =
+            (await session.acquire(source, capacity: session.capacityContext)
+                    as Success<AdminSubmissionStagedAsset>)
+                .value;
+        final receipt = AdminStagedAssetProgress(
+          upload: const SubmissionAsset(
+            secureUrl: 'https://example.com/confirmed.jpg',
+            width: 10,
+            height: 10,
+          ),
+          associationId: 42,
+        );
+        await session.saveAssetProgress(
+          asset,
+          receipt,
+          activation: session.captureActivation()!,
+        );
+        final fresh = AdminRemoteBaseline(
+          snapshot: AdminDraftSnapshot(name: 'Remote B'),
+          status: AdminSubmissionStatus.pending,
+          modifiedAt: DateTime.parse('2026-10-29T00:00:00.123456Z'),
+          modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+        );
+        // Persisted local intent forces deliberate review of remote B.
+        session.setSnapshot(
+          AdminDraftSnapshot(name: 'local edit'),
+          activation: session.captureActivation()!,
+        );
+        await session.checkpoint();
+        final read = session.admitHydration()!;
+        await session.acceptHydration(read, fresh, associatedCount: 0);
+        final choice = session.captureRecoveryObservation(
+          read,
+          fresh,
+          associatedCount: 0,
+        )!;
+        expect(
+          await session.reconcile(choice, acceptRemote: true),
+          isA<Success<void>>(),
+        );
+        expect(session.state!.pendingRecoveryCheckpoint, isTrue);
+        expect(session.state!.assets.single.progress, receipt);
+        final privateFile =
+            (await staged.resolveAbsolutePath(asset) as Success<File>).value;
+        expect(await privateFile.readAsBytes(), [4, 5, 6]);
+        if (checkpoint) {
+          expect(await session.checkpoint(), isA<Success<void>>());
+          expect(session.state!.pendingRecoveryCheckpoint, isFalse);
+          expect(
+            await session.activate(
+              AdminDraftOwner(accountId: account, submissionId: 8),
+            ),
+            isA<Success<void>>(),
+          );
+        }
+        env.close();
+        final reopened = await openStore(directory: env.directory.path);
+        addTearDown(reopened.close);
+        final restoredDrafts = AdminSubmissionDraftRepositoryImpl(
+          objectBoxI: TestObjectBox(reopened),
+          logger: MockLogger(),
+        );
+        final restoredStaged = AdminSubmissionStagedAssetRepositoryImpl(
+          objectBoxI: TestObjectBox(reopened),
+          logger: MockLogger(),
+          draftRepository: restoredDrafts,
+          getSupportDirectory: () async => support,
+        );
+        final restored = AdminDraftSession(
+          draftRepository: restoredDrafts,
+          stagedAssetRepository: restoredStaged,
+        );
+        expect(await restored.activate(owner), isA<Success<void>>());
+        expect(
+          restored.state!.current.name,
+          checkpoint ? 'Remote B' : 'local edit',
+        );
+        expect(restored.state!.remoteBaseline, checkpoint ? fresh : baseline);
+        expect(restored.state!.pendingRecoveryCheckpoint, isFalse);
+        expect(restored.state!.acceptedRemoteRevision, isNull);
+        expect(restored.state!.assets.single.progress, receipt);
+        final restoredFile =
+            (await restoredStaged.resolveAbsolutePath(
+                      restored.state!.assets.single,
+                    )
+                    as Success<File>)
+                .value;
+        expect(await restoredFile.readAsBytes(), [4, 5, 6]);
+        expect(
+          await restored.remove(restored.state!.assets.single),
+          isA<Success<void>>(),
+        );
+        expect(
+          (await restoredDrafts.loadDraft(
+            accountId: account,
+            submissionId: 7,
+          )).getOrNull(),
+          isNotNull,
+        );
+        expect(restoredFile.existsSync(), isFalse);
+      },
+    );
+  }
+
+  test(
+    'failed real checkpoint keeps acceptance restriction and durable A',
+    () async {
+      owner = AdminDraftOwner(accountId: account, submissionId: 7);
+      await drafts.saveDraft(
+        AdminSubmissionDraft(
+          owner: owner,
+          snapshot: baseline.snapshot,
+          remoteBaseline: baseline,
+        ),
+      );
+      await session.activate(owner);
+      session.setSnapshot(
+        AdminDraftSnapshot(name: 'local edit'),
+        activation: session.captureActivation()!,
+      );
+      final fresh = AdminRemoteBaseline(
+        snapshot: AdminDraftSnapshot(name: 'Remote B'),
+        status: baseline.status,
+        modifiedAt: baseline.modifiedAt,
+        modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+      );
+      final read = session.admitHydration()!;
+      await session.acceptHydration(read, fresh, associatedCount: 0);
+      final choice = session.captureRecoveryObservation(
+        read,
+        fresh,
+        associatedCount: 0,
+      )!;
+      await session.reconcile(choice, acceptRemote: true);
+      env.close();
+      expect(await session.checkpoint(), isA<Error<void>>());
+      expect(session.state!.pendingRecoveryCheckpoint, isTrue);
+      expect(session.state!.physicalCheckpoint!.snapshot, baseline.snapshot);
+      expect(
+        await session.activate(
+          AdminDraftOwner(accountId: account, submissionId: 8),
+        ),
+        isA<Error<void>>(),
+      );
+      final reopened = await openStore(directory: env.directory.path);
+      addTearDown(reopened.close);
+      final restored = AdminSubmissionDraftRepositoryImpl(
+        objectBoxI: TestObjectBox(reopened),
+        logger: MockLogger(),
+      );
+      expect(
+        (await restored.loadDraft(
+          accountId: account,
+          submissionId: 7,
+        )).getOrNull()!.snapshot,
+        baseline.snapshot,
+      );
+    },
+  );
+
+  test(
+    'Keep incomplete fields records fresh R only at explicit real checkpoint',
+    () async {
+      owner = AdminDraftOwner(accountId: account, submissionId: 7);
+      final local = AdminDraftSnapshot(name: 'local edit', latitudeText: '-');
+      await drafts.saveDraft(
+        AdminSubmissionDraft(
+          owner: owner,
+          snapshot: local,
+          remoteBaseline: baseline,
+        ),
+      );
+      await session.activate(owner);
+      final fresh = AdminRemoteBaseline(
+        snapshot: AdminDraftSnapshot(name: 'Remote B'),
+        status: baseline.status,
+        modifiedAt: baseline.modifiedAt,
+        modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+      );
+      final read = session.admitHydration()!;
+      await session.acceptHydration(read, fresh, associatedCount: 0);
+      final choice = session.captureRecoveryObservation(
+        read,
+        fresh,
+        associatedCount: 0,
+      )!;
+      await session.reconcile(choice, acceptRemote: false);
+      expect(
+        (await drafts.loadDraft(
+          accountId: account,
+          submissionId: 7,
+        )).getOrNull()!.remoteBaseline,
+        baseline,
+      );
+      await session.checkpoint();
+      env.close();
+      final reopened = await openStore(directory: env.directory.path);
+      addTearDown(reopened.close);
+      final restored = AdminSubmissionDraftRepositoryImpl(
+        objectBoxI: TestObjectBox(reopened),
+        logger: MockLogger(),
+      );
+      final draft = (await restored.loadDraft(
+        accountId: account,
+        submissionId: 7,
+      )).getOrNull()!;
+      expect(draft.snapshot, local);
+      expect(draft.remoteBaseline, fresh);
+    },
+  );
 
   test('Create adoption is atomic across retained draft and '
       'files and resumes after reopen', () async {

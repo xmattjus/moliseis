@@ -12,6 +12,7 @@ import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_recovery_panel.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
@@ -652,6 +653,33 @@ class _AdminSubmissionEditorScreenState
     );
   }
 
+  String _recoveryMessage(AdminEditorRecoveryState state) => switch (state) {
+    AdminEditorRecoveryState.conflict =>
+      'Il contributo remoto è cambiato. Le modifiche locali sono conservate. '
+          'Confronta le versioni prima di proseguire.',
+    AdminEditorRecoveryState.finalized =>
+      'Il contributo non è più in attesa. Il lavoro locale è conservato; '
+          'puoi salvare la bozza locale e tornare alla lista.',
+    AdminEditorRecoveryState.missing =>
+      'Il contributo remoto non è disponibile. Il lavoro locale è conservato. '
+          'Puoi verificarne di nuovo lo stato o tornare alla lista.',
+    AdminEditorRecoveryState.denied =>
+      'Accesso al contributo non autorizzato. Il salvataggio remoto è sospeso. '
+          'Verifica l’accesso prima di riprovare; '
+          'il lavoro locale è conservato.',
+    AdminEditorRecoveryState.incompatible =>
+      'La versione remota non è utilizzabile. '
+          'Nessun campo locale è stato sostituito. '
+          'Puoi riprovare o tornare alla lista.',
+    AdminEditorRecoveryState.unresolvedIntent =>
+      'L’esito del salvataggio precedente è ancora da verificare. '
+          'Le modifiche locali sono conservate: verifica l’esito remoto '
+          'prima di un nuovo salvataggio.',
+    AdminEditorRecoveryState.none || AdminEditorRecoveryState.retryable =>
+      'Impossibile caricare il contributo. Il lavoro locale è conservato. '
+          'Puoi riprovare o tornare alla lista.',
+  };
+
   @override
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
@@ -663,6 +691,7 @@ class _AdminSubmissionEditorScreenState
           final activation = viewModel.activation;
           final pickerRequest = viewModel.pickerRequestNonce;
           final status = viewModel.status;
+          final observation = viewModel.recoveryObservation;
 
           if (viewModel.isEditMode &&
               viewModel.loading &&
@@ -671,21 +700,6 @@ class _AdminSubmissionEditorScreenState
               text: Text('Caricamento in corso...'),
             );
           }
-          if (viewModel.isEditMode &&
-              viewModel.loadSnapshot.hasFailure &&
-              !viewModel.hasLoadedDetail) {
-            return EmptyView.error(
-              text: const Text('Impossibile caricare il contributo'),
-              action: FilledButton(
-                onPressed: () => _request(
-                  viewModel,
-                  () => viewModel.requestLoad(activation: activation),
-                ),
-                child: const Text('Riprova'),
-              ),
-            );
-          }
-
           // New typing may coexist with a captured Save. Other mutation lanes
           // keep their existing interaction protection.
           final lockEditor =
@@ -709,14 +723,86 @@ class _AdminSubmissionEditorScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 sliver: SliverList.list(
                   children: <Widget>[
-                    if (viewModel.savePhase == AdminSavePhase.conflict)
+                    if (viewModel.recoveryState !=
+                            AdminEditorRecoveryState.none ||
+                        viewModel.loadSnapshot.hasFailure)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(_recoveryMessage(viewModel.recoveryState)),
+                      ),
+                    if (observation != null)
+                      AdminSubmissionRecoveryPanel(
+                        local: observation.localSnapshot,
+                        remote: observation.remoteSnapshot,
+                        status: observation.detail.status,
+                        onAccept:
+                            !viewModel.canReconcile(
+                              observation,
+                              acceptRemote: true,
+                            )
+                            ? null
+                            : () => _request(
+                                viewModel,
+                                () => viewModel.requestReconcile(
+                                  observation,
+                                  acceptRemote: true,
+                                  activation: activation,
+                                ),
+                              ),
+                        onKeep:
+                            !viewModel.canReconcile(
+                              observation,
+                              acceptRemote: false,
+                            )
+                            ? null
+                            : () => _request(
+                                viewModel,
+                                () => viewModel.requestReconcile(
+                                  observation,
+                                  acceptRemote: false,
+                                  activation: activation,
+                                ),
+                              ),
+                      ),
+                    if (viewModel.pendingRecoveryCheckpoint)
                       const Padding(
                         padding: EdgeInsets.all(16),
                         child: Text(
-                          'Il contributo remoto è cambiato. '
-                          'Le modifiche locali sono conservate. '
-                          'Puoi salvare la bozza locale e tornare alla lista.',
+                          'I campi remoti accettati non sono ancora '
+                          'nella bozza locale. '
+                          'Salva la bozza locale prima di aprire '
+                          'un altro contributo.',
                         ),
+                      ),
+                    if ((viewModel.recoveryState !=
+                                AdminEditorRecoveryState.none ||
+                            viewModel.loadSnapshot.hasFailure) &&
+                        !viewModel.canRefreshSaveAuthority)
+                      TextButton(
+                        key: const ValueKey('admin_recovery_reload'),
+                        onPressed: !viewModel.canRequestLoad
+                            ? null
+                            : () => _request(
+                                viewModel,
+                                () => viewModel.requestLoad(
+                                  activation: activation,
+                                ),
+                              ),
+                        child: const Text('Riprova'),
+                      ),
+                    if (viewModel.recoveryState !=
+                            AdminEditorRecoveryState.none ||
+                        viewModel.loadSnapshot.hasFailure)
+                      TextButton(
+                        key: const ValueKey('admin_recovery_return'),
+                        onPressed: () {
+                          if (!_hasRouteEffectAuthority(viewModel) ||
+                              !viewModel.isActivationCurrent(activation)) {
+                            return;
+                          }
+                          context.goNamed(RouteNames.adminDashboard);
+                        },
+                        child: const Text('Torna alla lista'),
                       ),
                     if (viewModel.canRequestFieldSettlement)
                       TextButton(
@@ -732,6 +818,7 @@ class _AdminSubmissionEditorScreenState
                       ),
                     if (viewModel.canRefreshSaveAuthority)
                       TextButton(
+                        key: const ValueKey('admin_recovery_reload'),
                         onPressed: () => _request(
                           viewModel,
                           () => viewModel.requestLoad(activation: activation),
@@ -912,7 +999,9 @@ class _AdminSubmissionEditorScreenState
                   ),
                 ],
               ),
-              if (!viewModel.isEditMode || viewModel.hasLoadedDetail)
+              if (!viewModel.isEditMode ||
+                  viewModel.hasLoadedDetail ||
+                  viewModel.stagedAssets.isNotEmpty)
                 SliverList.list(
                   children: <Widget>[
                     const TextSectionDivider('Foto'),
@@ -926,6 +1015,24 @@ class _AdminSubmissionEditorScreenState
                             '${viewModel.imageCount} / '
                             '$kMaximumSubmissionAssetCount',
                           ),
+                          if (viewModel.stagedAssets.any(
+                            viewModel.isStagedAssociationUnavailable,
+                          ))
+                            const Text(
+                              'La presenza remota di una foto confermata '
+                              'non è verificata. '
+                              'La copia locale è conservata: puoi rimuoverla '
+                              'dalla bozza '
+                              'o verificare di nuovo lo stato remoto.',
+                            ),
+                          if (viewModel.stagedAssets.any(
+                            (asset) => asset.progressInvalid,
+                          ))
+                            const Text(
+                              'La conferma di una foto non è leggibile. '
+                              'I file locali sono conservati; '
+                              'la ripresa è sospesa.',
+                            ),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
@@ -953,7 +1060,7 @@ class _AdminSubmissionEditorScreenState
                                           ),
                                         },
                                   ),
-                                  showRemoveIcon: viewModel.isEditable,
+                                  showRemoveIcon: viewModel.canCheckpoint,
                                   onRemove: viewModel.operationRunning
                                       ? null
                                       : () =>

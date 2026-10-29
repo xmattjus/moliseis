@@ -15,12 +15,14 @@ import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
+import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/content_submission_draft_repository.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_recovery_panel.dart';
 import 'package:moliseis/ui/content_submission/widgets/checkbox_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
@@ -40,6 +42,81 @@ import '../../../../support/mock_logger.dart';
 import '../../../../support/recording_tile_http_client.dart';
 
 void main() {
+  for (final width in [320.0, 800.0]) {
+    testWidgets(
+      'recovery comparison wraps complete field groups at width $width',
+      (tester) async {
+        await tester.binding.setSurfaceSize(Size(width, 1500));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: AdminSubmissionRecoveryPanel(
+                  local: AdminDraftSnapshot(
+                    name: 'Local name',
+                    description: 'Full local description',
+                    descriptionDelta: const [
+                      {'insert': 'Full local description\n'},
+                    ],
+                    eventDates: EventDateDraft.unresolvedStart(
+                      EventCalendarDate(2026, 10, 29),
+                      endCalendarDate: EventCalendarDate(2026, 10, 30),
+                    ),
+                    city: 'Campobasso',
+                    latitudeText: '-',
+                    longitudeText: '14,5',
+                  ),
+                  remote: AdminDraftSnapshot(
+                    name: 'Remote name',
+                    description: 'Full remote description',
+                    descriptionDelta: const [
+                      {
+                        'insert': 'Full remote description\n',
+                        'attributes': {'bold': true},
+                      },
+                    ],
+                    eventDates: EventDateDraft.exact(
+                      startCalendarDate: EventCalendarDate(2026, 10, 31),
+                      startInstantUtc: DateTime.utc(
+                        2026,
+                        10,
+                        31,
+                        12,
+                        15,
+                        20,
+                        123,
+                        456,
+                      ),
+                    ),
+                    city: 'Isernia',
+                    latitudeText: '41.0',
+                    longitudeText: '14.0',
+                  ),
+                  status: AdminSubmissionStatus.pending,
+                  onAccept: () {},
+                  onKeep: () {},
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Full local description'), findsOneWidget);
+        expect(find.text('Full remote description'), findsOneWidget);
+        expect(
+          find.text('Descrizione · formattazione differente'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('ora da definire'), findsOneWidget);
+        expect(find.textContaining('13:15:20.123456'), findsOneWidget);
+        expect(find.textContaining('Latitudine: -'), findsOneWidget);
+        expect(find.textContaining('Longitudine: 14,5'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   group('AdminSubmissionEditorScreen', () {
     late FakeAdminContentSubmissionRepository repository;
     late FakeContentSubmissionRepository contentSubmissionRepository;

@@ -37,6 +37,9 @@ typedef _SaveDraft = ({
   AdminDraftSnapshot snapshot,
   List<AdminSubmissionStagedAsset> assets,
   AdminSubmissionDraft? physicalCheckpoint,
+  AdminRemoteBaseline? baseline,
+  int? remoteRevision,
+  AdminDraftActivation? activation,
 });
 typedef _SourceAcknowledgment = ({
   bool? acknowledge,
@@ -64,6 +67,38 @@ enum AdminSavePhase {
   conflict,
 }
 
+/// Settled availability of the current remote recovery attempt.
+enum AdminEditorRecoveryState {
+  none,
+  conflict,
+  retryable,
+  finalized,
+  missing,
+  denied,
+  incompatible,
+  unresolvedIntent,
+}
+
+/// Immutable comparison shown by the editor; it cannot authorize another owner.
+final class AdminEditorRecoveryObservation {
+  AdminEditorRecoveryObservation._(
+    this.detail,
+    this.localSnapshot,
+    this.remoteSnapshot,
+    this._authority,
+  );
+
+  /// Complete remote status and association metadata from this observation.
+  final AdminSubmission detail;
+
+  /// Exact local fields reviewed, including invalid or incomplete input.
+  final AdminDraftSnapshot localSnapshot;
+
+  /// Observed remote editable fields, without a merge.
+  final AdminDraftSnapshot remoteSnapshot;
+  final AdminRecoveryObservation _authority;
+}
+
 /// Application-owned Admin editor, composed with the exact-owner local session.
 class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Creates editor state for a new submission or the supplied [submissionId].
@@ -85,6 +120,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
        _imagePicker = imagePicker ?? ImagePicker(),
        _contributorName = creatorName,
        _contributorEmail = creatorEmail {
+    _recoveryCommand = _createCommand<void>('reconcile', (_) {});
     _loadCommand = _createCommand<void>('load', (snapshot) {
       if (_loadSnapshot.isRunning) _loadSnapshot = snapshot;
     });
@@ -301,6 +337,13 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         ? AdminSavePhase.unknownOutcome
         : AdminSavePhase.idle;
     _remoteUnavailable = false;
+    _recoveryState =
+        _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent != null
+        ? AdminEditorRecoveryState.unresolvedIntent
+        : AdminEditorRecoveryState.none;
+    _recoveryObservation = null;
+    _requiresFieldDecision = false;
+    _completeAssetObservation = null;
     _confirmedFields = null;
     _liveReceipts.clear();
     _loadSnapshot = const commands.CommandResult(null, null, null, false);
@@ -374,6 +417,110 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   DateTime? _modifiedAt;
   String? _modifiedAtToken;
   bool _remoteUnavailable = false;
+  AdminEditorRecoveryState _recoveryState = AdminEditorRecoveryState.none;
+  AdminEditorRecoveryObservation? _recoveryObservation;
+
+  /// A replay may confirm R without accepting different current local fields.
+  /// Failed reloads must not turn that unresolved decision into write
+  /// authority.
+  bool _requiresFieldDecision = false;
+
+  /// Latest complete association evidence, separate from field-version tokens.
+  List<AdminSubmissionAsset>? _completeAssetObservation;
+  late final ResultCommand<_EditorAction<void>, void> _recoveryCommand;
+
+  /// Classified remote availability, independently of local ownership.
+  AdminEditorRecoveryState get recoveryState => _recoveryState;
+
+  /// Only a current local/remote comparison can produce an actionable choice.
+  AdminEditorRecoveryObservation? get recoveryObservation {
+    final observation = _recoveryObservation;
+    return observation != null &&
+            (_draftSession?.isRecoveryObservationCurrent(
+                  observation._authority,
+                ) ??
+                false)
+        ? observation
+        : null;
+  }
+
+  /// Explicit recovery acceptance still awaiting a real matching checkpoint.
+  bool get pendingRecoveryCheckpoint =>
+      _draftSession?.state?.pendingRecoveryCheckpoint ?? false;
+
+  /// Choices obey the existing mutation lane and unresolved-intent barrier.
+  bool canReconcile(
+    AdminEditorRecoveryObservation observation, {
+    required bool acceptRemote,
+  }) =>
+      identical(recoveryObservation, observation) &&
+      _canAdmit(_recoveryCommand) &&
+      _pendingFieldSettlement == null &&
+      _draftSession?.state?.physicalCheckpoint?.fieldWriteIntent == null &&
+      _recoveryState != AdminEditorRecoveryState.denied &&
+      (acceptRemote ||
+          observation.detail.status == AdminSubmissionStatus.pending);
+
+  /// Reserves one explicit local-only reconciliation; never navigates or Saves.
+  bool requestReconcile(
+    AdminEditorRecoveryObservation observation, {
+    required bool acceptRemote,
+    AdminDraftActivation? activation,
+  }) {
+    if (!_authority(activation) ||
+        !canReconcile(observation, acceptRemote: acceptRemote)) {
+      return false;
+    }
+    final generation = _generation;
+    return _admit(_recoveryCommand, () async {
+      final result = await _draftSession!.reconcile(
+        observation._authority,
+        acceptRemote: acceptRemote,
+      );
+      if (_obsolete(generation) || !_authority(activation)) {
+        return _unavailable<void>();
+      }
+      if (result is Success<void>) {
+        _recoveryObservation = null;
+        _requiresFieldDecision = false;
+        // The protected-load failure was resolved, not a new remote read.
+        _loadSnapshot = const commands.CommandResult(null, null, null, false);
+        _publishDetail(observation.detail, replaceSelection: true);
+        _remoteUnavailable =
+            observation.detail.status != AdminSubmissionStatus.pending;
+        _recoveryState = _remoteUnavailable
+            ? AdminEditorRecoveryState.finalized
+            : AdminEditorRecoveryState.none;
+        _savePhase = AdminSavePhase.idle;
+        _acknowledgeCurrentSource = false;
+        _acknowledgedSourceHash = null;
+        _ignoreSource = false;
+        if (acceptRemote) _hydrationRevision++;
+        _notifyListeners();
+      }
+      return result;
+    });
+  }
+
+  /// Historical receipts need complete current evidence before local cleanup.
+  ///
+  /// Unknown evidence is not confirmation. A new association can still finish
+  /// within its authorized Save after receiving and persisting its own result.
+  bool isStagedAssociationUnavailable(AdminSubmissionStagedAsset asset) {
+    final progress = _liveReceipts[asset.digest] ?? asset.progress;
+    final id = progress?.associationId;
+    final complete = _completeAssetObservation;
+    if (id == null) return false;
+    return complete == null ||
+        !complete.any(
+          (remote) =>
+              remote.id == id &&
+              remote.url == progress!.upload.secureUrl &&
+              remote.width == progress.upload.width &&
+              remote.height == progress.upload.height,
+        );
+  }
+
   ({AdminFieldWriteIntent intent, AdminSubmission detail, bool replayed})?
   _confirmedFields;
   final _liveReceipts = <String, AdminStagedAssetProgress>{};
@@ -712,6 +859,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   List<commands.Command<dynamic, dynamic>> get _mutations => [
     _saveCommand,
+    _recoveryCommand,
     _rejectCommand,
     _promoteCommand,
     _linkCommand,
@@ -992,6 +1140,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         snapshot: intent.snapshot,
         assets: current.assets,
         physicalCheckpoint: current.physicalCheckpoint,
+        baseline: current.baseline,
+        remoteRevision: current.remoteRevision,
+        activation: current.activation,
       );
     }
     final previous = _lastSaveAttempt;
@@ -1007,6 +1158,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
             .where((item) => remaining.contains(item.digest))
             .toList(growable: false),
         physicalCheckpoint: previous.physicalCheckpoint,
+        baseline: current.baseline,
+        remoteRevision: current.remoteRevision,
+        activation: current.activation,
       );
     }
     final baseline = _draftSession!.state!.remoteBaseline!;
@@ -1018,6 +1172,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       snapshot: baseline.snapshot,
       assets: current.assets,
       physicalCheckpoint: current.physicalCheckpoint,
+      baseline: current.baseline,
+      remoteRevision: current.remoteRevision,
+      activation: current.activation,
     );
   }
 
@@ -1416,6 +1573,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _modifiedAt = detail.modifiedAt;
     _modifiedAtToken = detail.modifiedAtToken;
     if (completeAssets) {
+      _completeAssetObservation = List.unmodifiable(detail.assets);
       _assets
         ..clear()
         ..addAll(detail.assets);
@@ -1426,17 +1584,49 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _invalidatePreview();
   }
 
+  void _recordRecoveryFailure(Exception error) {
+    _remoteUnavailable = true;
+    _recoveryObservation = null;
+    _recoveryState = switch (error) {
+      AdminContentSubmissionApiException(:final statusCode)
+          when statusCode == 401 || statusCode == 403 =>
+        AdminEditorRecoveryState.denied,
+      AdminContentSubmissionApiException(statusCode: 404, code: 'NOT_FOUND') =>
+        AdminEditorRecoveryState.missing,
+      FormatException() => AdminEditorRecoveryState.incompatible,
+      _ => AdminEditorRecoveryState.retryable,
+    };
+    if (_recoveryState == AdminEditorRecoveryState.denied) {
+      _acknowledgeCurrentSource = false;
+      _acknowledgedSourceHash = null;
+      _ignoreSource = false;
+      _editorRevision++;
+      _invalidateCandidates();
+      _invalidatePreview();
+    }
+  }
+
+  bool _usableDetail(AdminSubmission detail) =>
+      detail.id == submissionId &&
+      detail.modifiedAtToken != null &&
+      RegExp(
+        r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$',
+      ).hasMatch(detail.modifiedAtToken!);
+
   Future<Result<void>> _loadDetail() async {
     final ownerGeneration = _generation;
     final id = submissionId;
     if (id == null) return const Result.success(null);
     final session = _draftSession;
     final token = session?.admitHydration();
+    _remoteUnavailable = session != null;
+    _recoveryObservation = null;
+    _recoveryState = AdminEditorRecoveryState.retryable;
     final revision = _draftRevision;
     final result = await _repository.getById(id);
     if (_obsolete(ownerGeneration)) return _unavailable();
     if (result case Error<AdminSubmission>(:final error)) {
-      if (session != null) _remoteUnavailable = true;
+      if (session != null) _recordRecoveryFailure(error);
       if (session != null && token != null) {
         await session.rejectHydration(token, error);
       }
@@ -1445,27 +1635,67 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     final detail = (result as Success<AdminSubmission>).value;
     if (session != null) {
       if (token == null) return _unavailable();
+      if (!_usableDetail(detail)) {
+        const error = FormatException('Remote recovery context unavailable.');
+        await session.rejectHydration(token, error);
+        if (_obsolete(ownerGeneration)) return _unavailable();
+        _recordRecoveryFailure(error);
+        _notifyListeners();
+        return const Result.error(error);
+      }
+      final baseline = _baselineFor(detail);
+      final previousBaseline = session.state?.remoteBaseline;
       final accepted = await session.acceptHydration(
         token,
-        _baselineFor(detail),
+        baseline,
         associatedCount: detail.assets.length,
+        requireReconciliation: _requiresFieldDecision,
       );
       if (_obsolete(ownerGeneration)) return _unavailable();
-      if (accepted case Error<bool>(:final error)) return Result.error(error);
-      _remoteUnavailable = !(accepted as Success<bool>).value;
+      if (accepted case Error<bool>(:final error)) {
+        _recordRecoveryFailure(error);
+        return Result.error(error);
+      }
+      final applied = (accepted as Success<bool>).value;
+      final observation = session.captureRecoveryObservation(
+        token,
+        baseline,
+        associatedCount: detail.assets.length,
+      );
+      // A superseded result cannot publish metadata or field authority.
+      if (observation == null) return _unavailable();
+      _remoteUnavailable =
+          !applied || detail.status != AdminSubmissionStatus.pending;
       _publishDetail(detail, replaceSelection: true);
-      if (_remoteUnavailable) {
+      _recoveryState = detail.status != AdminSubmissionStatus.pending
+          ? AdminEditorRecoveryState.finalized
+          : (session.state?.physicalCheckpoint?.fieldWriteIntent != null
+                ? AdminEditorRecoveryState.unresolvedIntent
+                : (applied
+                      ? AdminEditorRecoveryState.none
+                      : AdminEditorRecoveryState.conflict));
+      if (!applied) {
+        _requiresFieldDecision =
+            _requiresFieldDecision ||
+            previousBaseline == null ||
+            !previousBaseline.snapshot.sameRemoteProjection(baseline.snapshot);
+        _recoveryObservation = AdminEditorRecoveryObservation._(
+          detail,
+          _fields,
+          baseline.snapshot,
+          observation,
+        );
         _savePhase = AdminSavePhase.conflict;
         _notifyListeners();
         return Result.error(
           Exception(
-            'La bozza locale è protetta. '
-            'Ricarica per verificare il contenuto remoto.',
+            'La bozza locale è protetta. Confronta il contenuto remoto.',
           ),
         );
       }
     } else {
       if (_draftRevision != revision) return const Result.success(null);
+      _recoveryState = AdminEditorRecoveryState.none;
       _legacySnapshot = _snapshotFor(detail);
       _publishDetail(detail, replaceSelection: true);
       _isDirty = false;
@@ -1522,6 +1752,18 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (rejected.intent.kind == AdminFieldWriteKind.update) {
       _modifiedAtToken = null;
       _remoteUnavailable = true;
+      _recoveryState = switch (rejected.error) {
+        AdminContentSubmissionApiException(
+          statusCode: 404,
+          code: 'NOT_FOUND',
+        ) =>
+          AdminEditorRecoveryState.missing,
+        _
+            when _status == AdminSubmissionStatus.accepted ||
+                _status == AdminSubmissionStatus.rejected =>
+          AdminEditorRecoveryState.finalized,
+        _ => AdminEditorRecoveryState.conflict,
+      };
     }
     _phase(rejected.conflict ? AdminSavePhase.conflict : AdminSavePhase.failed);
     // Settlement is local repair, not a successful remote Save.
@@ -1546,6 +1788,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       // Keep the uncertain chain. Explicit correction still uses its UUID.
       _correctableCreateAttempt = intent.attemptId;
     }
+    _recoveryState = AdminEditorRecoveryState.unresolvedIntent;
     _phase(AdminSavePhase.unknownOutcome);
     return Result.error(error);
   }
@@ -1570,11 +1813,16 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
           error is AdminContentSubmissionApiException &&
           error.statusCode == 404 &&
           error.code == 'NOT_FOUND';
-      if (missing) _remoteUnavailable = true;
+      _recordRecoveryFailure(error);
       _phase(missing ? AdminSavePhase.conflict : AdminSavePhase.unknownOutcome);
       return Result.error(error);
     }
     final detail = (result as Success<AdminSubmission>).value;
+    if (!_usableDetail(detail)) {
+      const error = FormatException('Remote recovery context unavailable.');
+      _recordRecoveryFailure(error);
+      return const Result.error(error);
+    }
     _publishDetail(detail);
     final compatible =
         detail.status == AdminSubmissionStatus.pending &&
@@ -1588,6 +1836,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       // Observation does not cancel old HTTP. Only original A/V is retryable.
       _retryableUpdateAttempt = intent.attemptId;
       _remoteUnavailable = false;
+      _recoveryState = AdminEditorRecoveryState.unresolvedIntent;
       _phase(AdminSavePhase.unknownOutcome);
       return const Result.success(null);
     }
@@ -1606,6 +1855,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       }
       _savePhase = AdminSavePhase.conflict;
       _remoteUnavailable = true;
+      _recoveryState = detail.status == AdminSubmissionStatus.pending
+          ? AdminEditorRecoveryState.incompatible
+          : AdminEditorRecoveryState.finalized;
       _notifyListeners();
       return Result.error(
         Exception('Esito remoto non confermato: conserva la bozza e ricarica.'),
@@ -1615,12 +1867,15 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       activation: token,
       attemptId: intent.attemptId,
       baseline: _baselineFor(detail),
+      associatedCount: detail.assets.length,
     );
     if (_obsolete(ownerGeneration)) return _unavailable();
     if (confirmed is Success<void>) {
       _confirmedFields = null;
       _lastSaveAttempt = null;
       _remoteUnavailable = false;
+      _requiresFieldDecision = false;
+      _recoveryState = AdminEditorRecoveryState.none;
       _savePhase = stagedAssets.isEmpty
           ? AdminSavePhase.completed
           : AdminSavePhase.partialFailure;
@@ -1675,6 +1930,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       snapshot: _fields,
       assets: List.unmodifiable(stagedAssets),
       physicalCheckpoint: _draftSession?.state?.physicalCheckpoint,
+      baseline: _draftSession?.state?.remoteBaseline,
+      remoteRevision: _draftSession?.state?.acceptedRemoteRevision,
+      activation: activation,
     );
   }
 
@@ -1699,6 +1957,19 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   void _phase(AdminSavePhase phase) {
     _savePhase = phase;
     _notifyListeners();
+  }
+
+  /// Rechecks the admitted baseline instead of borrowing presentation metadata.
+  bool _saveAuthorityCurrent(_SaveDraft draft) {
+    final state = _draftSession?.state;
+    return _authority(draft.activation) &&
+        !_remoteUnavailable &&
+        state != null &&
+        !state.hydrationPending &&
+        draft.remoteRevision != null &&
+        state.acceptedRemoteRevision == draft.remoteRevision &&
+        state.remoteBaseline == draft.baseline &&
+        draft.baseline?.status == AdminSubmissionStatus.pending;
   }
 
   Future<Result<void>> _save(
@@ -1751,7 +2022,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     final capturedDigests = draft.assets
         .map((item) => item.digest)
         .toList(growable: false);
-    final baseline = session.state?.remoteBaseline;
+    final baseline = draft.baseline;
+    if (intent == null &&
+        submissionId != null &&
+        !_saveAuthorityCurrent(draft)) {
+      return _unavailable();
+    }
     if (replaceCreateAttempt != null) {
       if (intent?.kind != AdminFieldWriteKind.create ||
           intent?.attemptId != replaceCreateAttempt ||
@@ -1772,7 +2048,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     if (!skipFields) {
       if (intent == null) {
         final id = submissionId;
-        if (id != null && (!_hasLoadedDetail || _modifiedAtToken == null)) {
+        if (id != null &&
+            (!_hasLoadedDetail || baseline?.modifiedAtToken == null)) {
           _phase(AdminSavePhase.failed);
           return Result.error(
             Exception('Ricarica il contributo prima di salvare.'),
@@ -1786,11 +2063,16 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
             accountId: token.owner.accountId,
           ).sessionId,
           snapshot: draft.snapshot,
-          expectedModifiedAt: id == null ? null : _modifiedAtToken,
+          expectedModifiedAt: id == null ? null : baseline!.modifiedAtToken,
         );
       }
       _phase(AdminSavePhase.checkpoint);
       if (_obsolete(ownerGeneration) || !_authority(token)) {
+        return _unavailable();
+      }
+      if (noEarlierDispatch &&
+          submissionId != null &&
+          !_saveAuthorityCurrent(draft)) {
         return _unavailable();
       }
       final checkpoint = replaceCreateAttempt == null
@@ -1842,6 +2124,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
           detail = value.submission;
           replayed = value.replayed;
         } else {
+          if (noEarlierDispatch && !_saveAuthorityCurrent(draft)) {
+            return _unavailable();
+          }
           final updated = await _repository.update(
             id!,
             _inputFor(intent.snapshot),
@@ -1896,7 +2181,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         completeAssets: intent.kind == AdminFieldWriteKind.create,
       );
       if (!compatible) {
+        _requiresFieldDecision = true;
         _remoteUnavailable = true;
+        _recoveryState = detail.status == AdminSubmissionStatus.pending
+            ? AdminEditorRecoveryState.conflict
+            : AdminEditorRecoveryState.finalized;
         _phase(AdminSavePhase.conflict);
         return Result.error(
           Exception(
@@ -1928,6 +2217,17 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         );
       }
       var asset = matches.single;
+      if (isStagedAssociationUnavailable(asset)) {
+        _remoteUnavailable = true;
+        _recoveryState = AdminEditorRecoveryState.conflict;
+        _phase(AdminSavePhase.conflict);
+        return Result.error(
+          Exception(
+            'La presenza remota della foto confermata non è verificata. '
+            'Ricarica il contributo o rimuovi la copia locale.',
+          ),
+        );
+      }
       if (asset.progressInvalid) {
         _phase(AdminSavePhase.partialFailure);
         return Result.error(
@@ -2012,6 +2312,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
           return Result.error(error);
         }
         final remote = (associated as Success<AdminSubmissionAsset>).value;
+        // A confirmed addition does not revoke known absence of another ID.
+        _completeAssetObservation = _completeAssetObservation
+            ?.where((item) => item.id != remote.id)
+            .followedBy([remote])
+            .toList(growable: false);
         progress = AdminStagedAssetProgress(
           upload: progress.upload,
           associationId: remote.id,
@@ -2540,6 +2845,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
           }
           return persisted.map((asset) {
             _assets.add(asset);
+            _completeAssetObservation = _completeAssetObservation
+                ?.where((item) => item.id != asset.id)
+                .followedBy([asset])
+                .toList(growable: false);
             _contextCommitted();
           });
         });
@@ -2576,6 +2885,9 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     return result.map((_) {
       if (_obsolete(ownerGeneration)) return;
       _assets.removeWhere((asset) => asset.id == assetId);
+      _completeAssetObservation = _completeAssetObservation
+          ?.where((asset) => asset.id != assetId)
+          .toList(growable: false);
       _contextCommitted();
     });
   }
@@ -2600,6 +2912,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   void _markDirty() {
+    _recoveryObservation = null;
     _draftRevision++;
     _editorRevision++;
     _invalidatePreview();
@@ -2676,6 +2989,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     final ownerGeneration = _generation;
     _commandGenerations[command] = ownerGeneration;
     _reserved.add(command);
+    if (!identical(command, _recoveryCommand)) {
+      _recoveryObservation = null;
+      if (_mutations.contains(command)) {
+        _draftSession?.invalidateRecoveryObservations();
+      }
+    }
     if (_mutations.contains(command)) {
       _invalidateCandidates();
       // Apply already captured its committed tokens in the request closure.
@@ -2691,7 +3010,18 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
       command.run(
         () => _obsolete(ownerGeneration)
             ? Future.value(_unavailable<T>())
-            : action(),
+            : () async {
+                final result = await action();
+                if (result case Error<T>(
+                  :final error,
+                ) when !_obsolete(ownerGeneration)) {
+                  if (error is AdminContentSubmissionApiException &&
+                      (error.statusCode == 401 || error.statusCode == 403)) {
+                    _recordRecoveryFailure(error);
+                  }
+                }
+                return result;
+              }(),
       );
     }
     return true;

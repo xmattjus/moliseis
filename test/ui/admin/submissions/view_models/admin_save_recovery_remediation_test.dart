@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
@@ -16,6 +17,7 @@ import 'package:moliseis/utils/result_command.dart';
 
 import '../../../../support/admin_draft_repositories.dart';
 import '../../../../support/command_test_support.dart';
+import '../../../../support/fake_image_picker.dart';
 import '../../../../support/fake_repositories.dart';
 import '../../../../support/mock_logger.dart';
 
@@ -91,6 +93,585 @@ void main() {
     );
   });
   tearDown(() => vm.dispose());
+
+  group('explicit stale recovery', () {
+    setUp(() {
+      local.drafts.drafts[owner.lookupKey] = AdminSubmissionDraft(
+        owner: owner,
+        snapshot: a,
+        remoteBaseline: baseline,
+      );
+      remote.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(
+          name: 'Remote W',
+          description: null,
+          modifiedAtToken: nextVersion,
+        ),
+      );
+    });
+
+    test(
+      'historical association is unavailable before complete evidence',
+      () async {
+        final digest = 'a' * 40;
+        final staged = AdminSubmissionStagedAsset(
+          owner: owner,
+          digest: digest,
+          relativePath: '$account/${owner.sessionId}/$digest',
+          progress: AdminStagedAssetProgress(
+            upload: const SubmissionAsset(
+              secureUrl: 'https://example.com/confirmed.jpg',
+              width: 10,
+              height: 20,
+            ),
+            associationId: 77,
+          ),
+        );
+        local.staged.assets[owner] = [staged];
+        await vm.activate(accountId: account, submissionId: 1);
+        expect(vm.isStagedAssociationUnavailable(staged), isTrue);
+        await settleEditorRequest(
+          admitted: vm.requestSave(activation: vm.activation),
+        );
+        expect(local.staged.progressSaves, isEmpty);
+        expect(local.staged.removals, isEmpty);
+        expect(remote.getByIdIds, isEmpty);
+        expect(remote.addAssetCalls, isEmpty);
+        expect(content.uploadedImages, isEmpty);
+      },
+    );
+
+    test(
+      'Keep changes only R and new Save captures W, never display metadata',
+      () async {
+        await vm.activate(accountId: account, submissionId: 1);
+        await settleEditorRequest(
+          admitted: vm.requestLoad(activation: vm.activation),
+        );
+        final observation = vm.recoveryObservation!;
+        expect(vm.canRequestSave, isFalse);
+        expect(
+          vm.requestReconcile(
+            observation,
+            acceptRemote: false,
+            activation: vm.activation,
+          ),
+          isTrue,
+        );
+        await settleEditorRequest(admitted: true);
+        expect(local.session.state!.current, a);
+        expect(local.session.state!.physicalCheckpoint!.snapshot, a);
+        expect(
+          local.session.state!.remoteBaseline!.modifiedAtToken,
+          nextVersion,
+        );
+        expect(remote.updateIds, isEmpty);
+        remote.updateResult = Result.success(
+          sampleAdminSubmission(
+            name: a.name!,
+            description: null,
+            modifiedAtToken: nextVersion,
+          ),
+        );
+        remote.getByIdResults[1] = remote.updateResult;
+        await settleEditorRequest(
+          admitted: vm.requestSave(activation: vm.activation),
+        );
+        expect(remote.updateExpectedModifiedAt, [nextVersion]);
+        expect(remote.updateInputs.single.name, a.name);
+      },
+    );
+
+    test('Accept creates F1 obligation; failed then successful '
+        'checkpoint gates switch', () async {
+      await vm.activate(accountId: account, submissionId: 1);
+      await settleEditorRequest(
+        admitted: vm.requestLoad(activation: vm.activation),
+      );
+      final observation = vm.recoveryObservation!;
+      await settleEditorRequest(
+        admitted: vm.requestReconcile(
+          observation,
+          acceptRemote: true,
+          activation: vm.activation,
+        ),
+      );
+      expect(vm.name, 'Remote W');
+      expect(vm.pendingRecoveryCheckpoint, isTrue);
+      expect(remote.updateIds, isEmpty);
+      expect(local.drafts.saves, isEmpty);
+      expect(
+        await vm.activate(accountId: account, submissionId: 2),
+        isA<Error<void>>(),
+      );
+      local.drafts.onSave = (_) async => Result.error(Exception('disk'));
+      expect(await vm.checkpointLocal(), isA<Error<void>>());
+      expect(vm.pendingRecoveryCheckpoint, isTrue);
+      expect(
+        await vm.activate(accountId: account, submissionId: 2),
+        isA<Error<void>>(),
+      );
+      local.drafts.onSave = null;
+      expect(await vm.checkpointLocal(), isA<Success<void>>());
+      expect(vm.pendingRecoveryCheckpoint, isFalse);
+      expect(
+        await vm.activate(accountId: account, submissionId: 2),
+        isA<Success<void>>(),
+      );
+      await vm.activate(accountId: account, submissionId: 1);
+      expect(vm.name, 'Remote W');
+    });
+
+    test(
+      'unresolved A/V cannot use observed W until existing read-back settlement',
+      () async {
+        local.drafts.drafts[owner.lookupKey] = restored;
+        await vm.activate(accountId: account, submissionId: 1);
+        await settleEditorRequest(
+          admitted: vm.requestLoad(activation: vm.activation),
+        );
+        final observation = vm.recoveryObservation!;
+        expect(
+          vm.requestReconcile(
+            observation,
+            acceptRemote: false,
+            activation: vm.activation,
+          ),
+          isFalse,
+        );
+        expect(vm.requestSave(activation: vm.activation), isFalse);
+        expect(remote.updateIds, isEmpty);
+        await settleEditorRequest(
+          admitted: vm.requestSaveReadBack(activation: vm.activation),
+        );
+        expect(
+          local.session.state!.physicalCheckpoint!.fieldWriteIntent,
+          isNull,
+        );
+        expect(vm.canRequestSave, isFalse);
+      },
+    );
+
+    test('typing and replacement invalidate observations '
+        'including A1 B A2', () async {
+      await vm.activate(accountId: account, submissionId: 1);
+      await settleEditorRequest(
+        admitted: vm.requestLoad(activation: vm.activation),
+      );
+      final first = vm.recoveryObservation!;
+      final activation = vm.activation;
+      vm.setName('new local', activation: activation);
+      expect(
+        vm.requestReconcile(first, acceptRemote: true, activation: activation),
+        isFalse,
+      );
+      await vm.checkpointLocal();
+      await vm.activate(accountId: account, submissionId: 2);
+      await vm.activate(accountId: account, submissionId: 1);
+      expect(
+        vm.requestReconcile(first, acceptRemote: true, activation: activation),
+        isFalse,
+      );
+      expect(vm.name, 'new local');
+    });
+
+    test(
+      'W to X conditional rejection preserves local fields without retry',
+      () async {
+        await vm.activate(accountId: account, submissionId: 1);
+        await settleEditorRequest(
+          admitted: vm.requestLoad(activation: vm.activation),
+        );
+        await settleEditorRequest(
+          admitted: vm.requestReconcile(
+            vm.recoveryObservation!,
+            acceptRemote: false,
+            activation: vm.activation,
+          ),
+        );
+        remote.updateResult = const Result.error(changed);
+        await settleEditorRequest(
+          admitted: vm.requestSave(activation: vm.activation),
+        );
+        expect(remote.updateExpectedModifiedAt, [nextVersion]);
+        expect(vm.name, a.name);
+        expect(vm.canRequestSave, isFalse);
+        expect(local.session.state!.physicalCheckpoint!.snapshot, a);
+      },
+    );
+
+    test('Accept then no-op Save checkpoints without field Update', () async {
+      await vm.activate(accountId: account, submissionId: 1);
+      await settleEditorRequest(
+        admitted: vm.requestLoad(activation: vm.activation),
+      );
+      await settleEditorRequest(
+        admitted: vm.requestReconcile(
+          vm.recoveryObservation!,
+          acceptRemote: true,
+          activation: vm.activation,
+        ),
+      );
+      await settleEditorRequest(
+        admitted: vm.requestSave(activation: vm.activation),
+      );
+      expect(remote.updateIds, isEmpty);
+      expect(vm.pendingRecoveryCheckpoint, isFalse);
+      expect(
+        local.session.state!.physicalCheckpoint!.snapshot.name,
+        'Remote W',
+      );
+    });
+
+    test(
+      'new observation admission invalidates W before choice or Save entry',
+      () async {
+        await vm.activate(accountId: account, submissionId: 1);
+        await settleEditorRequest(
+          admitted: vm.requestLoad(activation: vm.activation),
+        );
+        final observation = vm.recoveryObservation!;
+        final read = Completer<Result<AdminSubmission>>();
+        remote.onGetById = (_) => read.future;
+        expect(vm.requestLoad(activation: vm.activation), isTrue);
+        expect(
+          vm.requestReconcile(
+            observation,
+            acceptRemote: false,
+            activation: vm.activation,
+          ),
+          isFalse,
+        );
+        read.complete(Result.error(Exception('offline')));
+        await settleEditorRequest(admitted: true);
+        expect(vm.recoveryObservation, isNull);
+        expect(vm.canRequestSave, isFalse);
+        expect(vm.name, a.name);
+        expect(remote.updateIds, isEmpty);
+      },
+    );
+
+    test(
+      'accepted W is rechecked after synchronous Save notification',
+      () async {
+        await vm.activate(accountId: account, submissionId: 1);
+        await settleEditorRequest(
+          admitted: vm.requestLoad(activation: vm.activation),
+        );
+        await settleEditorRequest(
+          admitted: vm.requestReconcile(
+            vm.recoveryObservation!,
+            acceptRemote: false,
+            activation: vm.activation,
+          ),
+        );
+        final writesBefore = local.drafts.saves.length;
+        var revoked = false;
+        void supersede() {
+          if (!revoked && vm.isSaveRunning) {
+            revoked = true;
+            local.session.admitHydration();
+          }
+        }
+
+        vm.addListener(supersede);
+        await settleEditorRequest(
+          admitted: vm.requestSave(activation: vm.activation),
+        );
+        vm.removeListener(supersede);
+        expect(revoked, isTrue);
+        expect(remote.updateIds, isEmpty);
+        expect(local.drafts.saves, hasLength(writesBefore));
+        expect(vm.name, a.name);
+      },
+    );
+
+    test('changed Create adoption requires deliberate choice '
+        'even when R already equals remote', () async {
+      local.drafts.drafts.clear();
+      await vm.activate(accountId: account);
+      final activation = vm.activation;
+      vm
+        ..setName(a.name, activation: activation)
+        ..setCity(a.city, activation: activation);
+      remote.createResult = remote.getByIdResults[1]!;
+      await settleEditorRequest(
+        admitted: vm.requestSave(activation: activation),
+      );
+      expect(vm.submissionId, 1);
+      expect(vm.name, a.name);
+      expect(vm.canRequestSave, isFalse);
+      await settleEditorRequest(
+        admitted: vm.requestLoad(activation: vm.activation),
+      );
+      expect(vm.recoveryObservation, isNotNull);
+      expect(vm.canRequestSave, isFalse);
+      expect(remote.createInputs, hasLength(1));
+      expect(remote.updateIds, isEmpty);
+      await settleEditorRequest(
+        admitted: vm.requestReconcile(
+          vm.recoveryObservation!,
+          acceptRemote: false,
+          activation: vm.activation,
+        ),
+      );
+      expect(vm.canRequestSave, isTrue);
+      expect(local.session.state!.remoteBaseline!.modifiedAtToken, nextVersion);
+    });
+
+    for (final invalid in ['token', 'target', 'missingToken']) {
+      test(
+        'invalid $invalid detail grants no recovery or Save authority',
+        () async {
+          await vm.activate(accountId: account, submissionId: 1);
+          remote.getByIdResults[1] = Result.success(
+            sampleAdminSubmission(
+              id: invalid == 'target' ? 2 : 1,
+              modifiedAtToken: invalid == 'token'
+                  ? 'invalid'
+                  : (invalid == 'missingToken' ? null : nextVersion),
+            ),
+          );
+          await settleEditorRequest(
+            admitted: vm.requestLoad(activation: vm.activation),
+          );
+          expect(vm.recoveryObservation, isNull);
+          expect(vm.recoveryState, AdminEditorRecoveryState.incompatible);
+          expect(vm.canRequestSave, isFalse);
+          expect(vm.name, a.name);
+          expect(remote.updateIds, isEmpty);
+        },
+      );
+    }
+
+    test(
+      'authorization loss after field dispatch retains uncertain intent',
+      () async {
+        await vm.activate(accountId: account, submissionId: 1);
+        await settleEditorRequest(
+          admitted: vm.requestLoad(activation: vm.activation),
+        );
+        await settleEditorRequest(
+          admitted: vm.requestReconcile(
+            vm.recoveryObservation!,
+            acceptRemote: false,
+            activation: vm.activation,
+          ),
+        );
+        remote.updateResult = const Result.error(
+          AdminContentSubmissionApiException(
+            statusCode: 403,
+            code: 'FORBIDDEN',
+            message: 'Denied',
+          ),
+        );
+        await settleEditorRequest(
+          admitted: vm.requestSave(activation: vm.activation),
+        );
+        final original =
+            local.session.state!.physicalCheckpoint!.fieldWriteIntent;
+        expect(original, isNotNull);
+        expect(original!.expectedModifiedAt, nextVersion);
+        expect(vm.recoveryState, AdminEditorRecoveryState.denied);
+        expect(vm.canRequestSave, isFalse);
+        await settleEditorRequest(
+          admitted: vm.requestSaveReadBack(activation: vm.activation),
+        );
+        expect(vm.recoveryState, AdminEditorRecoveryState.unresolvedIntent);
+        expect(
+          local.session.state!.physicalCheckpoint!.fieldWriteIntent,
+          original,
+        );
+        expect(remote.updateExpectedModifiedAt, [nextVersion]);
+      },
+    );
+
+    for (final statusCode in [401, 403, 404]) {
+      test('classified $statusCode read keeps fields '
+          'and never settles unknown intent', () async {
+        local.drafts.drafts[owner.lookupKey] = restored;
+        await vm.activate(accountId: account, submissionId: 1);
+        remote.getByIdResults[1] = Result.error(
+          AdminContentSubmissionApiException(
+            statusCode: statusCode,
+            code: statusCode == 404 ? 'NOT_FOUND' : 'FORBIDDEN',
+            message: 'Unavailable',
+          ),
+        );
+        await settleEditorRequest(
+          admitted: vm.requestLoad(activation: vm.activation),
+        );
+        expect(
+          vm.recoveryState,
+          statusCode == 404
+              ? AdminEditorRecoveryState.missing
+              : AdminEditorRecoveryState.denied,
+        );
+        expect(vm.canRequestSave, isFalse);
+        expect(
+          local.session.state!.physicalCheckpoint!.fieldWriteIntent,
+          intent,
+        );
+        expect(vm.name, b.name);
+        expect(remote.updateIds, isEmpty);
+      });
+    }
+
+    for (final receiptState in [
+      'missing',
+      'contradicted',
+      'present',
+      'uploadOnly',
+      'deletedLocally',
+      'addedImmediately',
+      'associatedEarlier',
+    ]) {
+      test(
+        '$receiptState association preserves exact receipt semantics',
+        () async {
+          final digest = 'a' * 40;
+          final staged = AdminSubmissionStagedAsset(
+            owner: owner,
+            digest: digest,
+            relativePath: '$account/${owner.sessionId}/$digest',
+            progress: AdminStagedAssetProgress(
+              upload: const SubmissionAsset(
+                secureUrl: 'https://example.com/confirmed.jpg',
+                width: 10,
+                height: 20,
+              ),
+              associationId: receiptState == 'uploadOnly' ? null : 77,
+            ),
+          );
+          local.staged.assets[owner] = [staged];
+          const uploadB = SubmissionAsset(
+            secureUrl: 'https://example.com/new.jpg',
+            width: 30,
+            height: 40,
+          );
+          const associationB = AdminSubmissionAsset(
+            id: 88,
+            url: 'https://example.com/new.jpg',
+            width: 30,
+            height: 40,
+          );
+          final addsAnother =
+              receiptState == 'addedImmediately' ||
+              receiptState == 'associatedEarlier';
+          if (receiptState == 'addedImmediately') {
+            vm.dispose();
+            vm = AdminSubmissionEditorViewModel(
+              repository: remote,
+              contentSubmissionRepository: content,
+              draftSession: local.session,
+              imagePicker: FakeImagePicker(
+                onPickImage: () async => XFile('selected-b.jpg'),
+              ),
+            );
+            content.uploadImageTaskResult = FakeImageUploadTask.completed(
+              const Result.success(uploadB),
+            );
+          }
+          if (receiptState == 'associatedEarlier') {
+            final digestB = 'b' * 40;
+            local.staged.assets[owner]!.insert(
+              0,
+              AdminSubmissionStagedAsset(
+                owner: owner,
+                digest: digestB,
+                relativePath: '$account/${owner.sessionId}/$digestB',
+                progress: AdminStagedAssetProgress(upload: uploadB),
+              ),
+            );
+          }
+          final association = AdminSubmissionAsset(
+            id: 77,
+            url: 'https://example.com/confirmed.jpg',
+            width: receiptState == 'contradicted' ? 11 : 10,
+            height: 20,
+          );
+          remote.getByIdResults[1] = Result.success(
+            sampleAdminSubmission(
+              name: 'Remote W',
+              description: null,
+              modifiedAtToken: nextVersion,
+              assets: receiptState == 'missing' || addsAnother
+                  ? []
+                  : [association],
+            ),
+          );
+          remote.addAssetResult = Result.success(
+            addsAnother ? associationB : association,
+          );
+          await vm.activate(accountId: account, submissionId: 1);
+          await settleEditorRequest(
+            admitted: vm.requestLoad(activation: vm.activation),
+          );
+          await settleEditorRequest(
+            admitted: vm.requestReconcile(
+              vm.recoveryObservation!,
+              acceptRemote: true,
+              activation: vm.activation,
+            ),
+          );
+          if (receiptState == 'deletedLocally') {
+            await settleEditorRequest(
+              admitted: vm.requestDeleteAsset(77, activation: vm.activation),
+            );
+          }
+          if (receiptState == 'addedImmediately') {
+            await settleEditorRequest(
+              admitted: vm.requestAddAsset(activation: vm.activation),
+            );
+            expect(vm.assets.map((asset) => asset.id), contains(88));
+          }
+          await settleEditorRequest(
+            admitted: vm.requestSave(activation: vm.activation),
+          );
+          if (receiptState == 'missing' ||
+              receiptState == 'contradicted' ||
+              receiptState == 'deletedLocally' ||
+              addsAnother) {
+            expect(vm.stagedAssets.single, staged);
+            expect(local.staged.assets[owner]!.single, staged);
+            expect(
+              local.staged.removals.map((entry) => entry.digest),
+              isNot(contains(digest)),
+            );
+            expect(remote.addAssetCalls, hasLength(addsAnother ? 1 : 0));
+            if (addsAnother) {
+              expect(remote.addAssetCalls.single.$2, uploadB);
+              expect(vm.isStagedAssociationUnavailable(staged), isTrue);
+            }
+            // Explicit local removal remains independent of remote proof.
+            await settleEditorRequest(
+              admitted: vm.requestRemoveStagedAsset(
+                staged,
+                activation: vm.activation,
+              ),
+            );
+            expect(vm.stagedAssets, isEmpty);
+            expect(local.drafts.drafts[owner.lookupKey], isNotNull);
+            expect(
+              remote.deleteAssetCalls,
+              hasLength(receiptState == 'deletedLocally' ? 1 : 0),
+            );
+          } else {
+            expect(vm.stagedAssets, isEmpty);
+            expect(local.staged.removals, hasLength(1));
+            expect(
+              remote.addAssetCalls,
+              hasLength(receiptState == 'uploadOnly' ? 1 : 0),
+            );
+          }
+          expect(
+            content.uploadedImages,
+            hasLength(receiptState == 'addedImmediately' ? 1 : 0),
+          );
+        },
+      );
+    }
+  });
 
   test(
     'fresh conditional rejection settles only A and preserves newer B',
