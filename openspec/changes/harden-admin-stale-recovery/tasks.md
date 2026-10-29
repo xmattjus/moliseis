@@ -45,13 +45,20 @@ Implementation authorized after independent planning review, including F1/F2 rem
 
 ## Workflow follow-up
 
-- Independent adversarial review of the actual implementation diff is next.
-- Remote publication, canonical synchronization, archive, merge and deployment remain unauthorized.
+- Originally prepared as planning-only artifacts against the audited baseline; implementation was subsequently authorized and the 23 tasks above were completed.
+- Implementation commit `067de05d07782560afed9a55f494463b76710ea3` is published in [Draft PR #19](https://github.com/xmattjus/moliseis/pull/19), targeting `main`. Review remediation is authorized on the same branch; the updated diff awaits final independent review.
+- Merge, canonical specification synchronization, archive and deployment remain unauthorized. No production or device verification is claimed.
 
 ## Implementation verification — 2026-10-29
 
 - Baseline four-suite run: 89 tests passed. Domain/session/real-store gate: 96 passed, including 17 real persistence tests. Focused recovery/receipt/authority suite: 55 passed. Expanded editor/routing gate: 157 passed; final F1 valid session-hint regression subset: 12 passed.
-- Integrated affected Admin domain/data/mapper/auth/VM/widget/routing run: 1,100 tests passed. Relevant unchanged Public draft/staging/submit/progress/restoration regressions: 459 passed. Full `flutter analyze --no-pub`: no issues found.
+- Integrated affected Admin domain/data/mapper/auth/VM/widget/routing run: 1,100 tests passed. Relevant unchanged Public draft/staging/submit/progress/restoration regressions: 459 passed. PR CI subsequently demonstrated an overlong documentation comment; its correction and fresh analyzer result are recorded below.
 - Red/green characterization included missing recovery APIs and an unmounted editor consumer; removing its mounted guard allowed a captured Accept callback to mutate retained fields, while the restored guard prevents it.
 - Source review and counterexamples verified F1 transition refusal, matching checkpoint proof, F2 qualified R capture, immutable historical A/V, W-to-X rejection, late/revoked callbacks, receipt contradictions and moderation/Progress preservation. Review fixes covered terminal read-back classification and stale load feedback after successful reconciliation.
-- No production/backend/device verification is claimed. No Supabase, Public source/tests, dependencies, schema, generated bindings, canonical or historical OpenSpec files changed. Logs, analyzer output, temporary manifests and native test runtime files are excluded from the deliverable. Changes remain local and uncommitted.
+- No production/backend/device verification is claimed. No Supabase, Public source/tests, dependencies, schema, generated bindings, canonical or historical OpenSpec files changed. Logs, analyzer output, temporary manifests and native test runtime files are excluded from the deliverable. These implementation results preceded publication in Draft PR #19; current review status is recorded above.
+
+## PR #19 remediation verification
+
+- Reproduced premature historical-receipt cleanup after both immediate addition and an earlier staged association in the same Save. Confirmed additions now preserve existing association evidence; unavailable complete evidence blocks historical cleanup. Newly confirmed associations still settle their receipts before cleanup, without new state or backend calls.
+- Focused recovery/durable-editor/real-store suites: 112 passed. Integrated Admin regressions: 1,105 passed. Public regressions: 459 passed. Final standalone ObjectBox/filesystem suite: 19 passed, including failed receipt/cleanup writes, actual reopen, contradiction followed by addition, byte retention and explicit local removal.
+- Full `flutter analyze --no-pub`: no issues found after wrapping the reported comment. `openspec validate harden-admin-stale-recovery --strict`: passed. The remediation diff awaits final independent review; these checks do not claim production or device verification.

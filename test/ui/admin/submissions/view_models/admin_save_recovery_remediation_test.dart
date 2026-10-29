@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
 import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
@@ -16,6 +17,7 @@ import 'package:moliseis/utils/result_command.dart';
 
 import '../../../../support/admin_draft_repositories.dart';
 import '../../../../support/command_test_support.dart';
+import '../../../../support/fake_image_picker.dart';
 import '../../../../support/fake_repositories.dart';
 import '../../../../support/mock_logger.dart';
 
@@ -107,6 +109,37 @@ void main() {
         ),
       );
     });
+
+    test(
+      'historical association is unavailable before complete evidence',
+      () async {
+        final digest = 'a' * 40;
+        final staged = AdminSubmissionStagedAsset(
+          owner: owner,
+          digest: digest,
+          relativePath: '$account/${owner.sessionId}/$digest',
+          progress: AdminStagedAssetProgress(
+            upload: const SubmissionAsset(
+              secureUrl: 'https://example.com/confirmed.jpg',
+              width: 10,
+              height: 20,
+            ),
+            associationId: 77,
+          ),
+        );
+        local.staged.assets[owner] = [staged];
+        await vm.activate(accountId: account, submissionId: 1);
+        expect(vm.isStagedAssociationUnavailable(staged), isTrue);
+        await settleEditorRequest(
+          admitted: vm.requestSave(activation: vm.activation),
+        );
+        expect(local.staged.progressSaves, isEmpty);
+        expect(local.staged.removals, isEmpty);
+        expect(remote.getByIdIds, isEmpty);
+        expect(remote.addAssetCalls, isEmpty);
+        expect(content.uploadedImages, isEmpty);
+      },
+    );
 
     test(
       'Keep changes only R and new Save captures W, never display metadata',
@@ -490,6 +523,8 @@ void main() {
       'present',
       'uploadOnly',
       'deletedLocally',
+      'addedImmediately',
+      'associatedEarlier',
     ]) {
       test(
         '$receiptState association preserves exact receipt semantics',
@@ -509,6 +544,46 @@ void main() {
             ),
           );
           local.staged.assets[owner] = [staged];
+          const uploadB = SubmissionAsset(
+            secureUrl: 'https://example.com/new.jpg',
+            width: 30,
+            height: 40,
+          );
+          const associationB = AdminSubmissionAsset(
+            id: 88,
+            url: 'https://example.com/new.jpg',
+            width: 30,
+            height: 40,
+          );
+          final addsAnother =
+              receiptState == 'addedImmediately' ||
+              receiptState == 'associatedEarlier';
+          if (receiptState == 'addedImmediately') {
+            vm.dispose();
+            vm = AdminSubmissionEditorViewModel(
+              repository: remote,
+              contentSubmissionRepository: content,
+              draftSession: local.session,
+              imagePicker: FakeImagePicker(
+                onPickImage: () async => XFile('selected-b.jpg'),
+              ),
+            );
+            content.uploadImageTaskResult = FakeImageUploadTask.completed(
+              const Result.success(uploadB),
+            );
+          }
+          if (receiptState == 'associatedEarlier') {
+            final digestB = 'b' * 40;
+            local.staged.assets[owner]!.insert(
+              0,
+              AdminSubmissionStagedAsset(
+                owner: owner,
+                digest: digestB,
+                relativePath: '$account/${owner.sessionId}/$digestB',
+                progress: AdminStagedAssetProgress(upload: uploadB),
+              ),
+            );
+          }
           final association = AdminSubmissionAsset(
             id: 77,
             url: 'https://example.com/confirmed.jpg',
@@ -520,10 +595,14 @@ void main() {
               name: 'Remote W',
               description: null,
               modifiedAtToken: nextVersion,
-              assets: receiptState == 'missing' ? [] : [association],
+              assets: receiptState == 'missing' || addsAnother
+                  ? []
+                  : [association],
             ),
           );
-          remote.addAssetResult = Result.success(association);
+          remote.addAssetResult = Result.success(
+            addsAnother ? associationB : association,
+          );
           await vm.activate(accountId: account, submissionId: 1);
           await settleEditorRequest(
             admitted: vm.requestLoad(activation: vm.activation),
@@ -540,15 +619,43 @@ void main() {
               admitted: vm.requestDeleteAsset(77, activation: vm.activation),
             );
           }
+          if (receiptState == 'addedImmediately') {
+            await settleEditorRequest(
+              admitted: vm.requestAddAsset(activation: vm.activation),
+            );
+            expect(vm.assets.map((asset) => asset.id), contains(88));
+          }
           await settleEditorRequest(
             admitted: vm.requestSave(activation: vm.activation),
           );
           if (receiptState == 'missing' ||
               receiptState == 'contradicted' ||
-              receiptState == 'deletedLocally') {
-            expect(vm.stagedAssets.single.progress!.associationId, 77);
-            expect(local.staged.removals, isEmpty);
-            expect(remote.addAssetCalls, isEmpty);
+              receiptState == 'deletedLocally' ||
+              addsAnother) {
+            expect(vm.stagedAssets.single, staged);
+            expect(local.staged.assets[owner]!.single, staged);
+            expect(
+              local.staged.removals.map((entry) => entry.digest),
+              isNot(contains(digest)),
+            );
+            expect(remote.addAssetCalls, hasLength(addsAnother ? 1 : 0));
+            if (addsAnother) {
+              expect(remote.addAssetCalls.single.$2, uploadB);
+              expect(vm.isStagedAssociationUnavailable(staged), isTrue);
+            }
+            // Explicit local removal remains independent of remote proof.
+            await settleEditorRequest(
+              admitted: vm.requestRemoveStagedAsset(
+                staged,
+                activation: vm.activation,
+              ),
+            );
+            expect(vm.stagedAssets, isEmpty);
+            expect(local.drafts.drafts[owner.lookupKey], isNotNull);
+            expect(
+              remote.deleteAssetCalls,
+              hasLength(receiptState == 'deletedLocally' ? 1 : 0),
+            );
           } else {
             expect(vm.stagedAssets, isEmpty);
             expect(local.staged.removals, hasLength(1));
@@ -557,7 +664,10 @@ void main() {
               hasLength(receiptState == 'uploadOnly' ? 1 : 0),
             );
           }
-          expect(content.uploadedImages, isEmpty);
+          expect(
+            content.uploadedImages,
+            hasLength(receiptState == 'addedImmediately' ? 1 : 0),
+          );
         },
       );
     }

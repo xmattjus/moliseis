@@ -1019,8 +1019,8 @@ class _AdminSubmissionEditorScreenState
                             viewModel.isStagedAssociationUnavailable,
                           ))
                             const Text(
-                              'Una foto confermata non è più associata '
-                              'alla versione remota. '
+                              'La presenza remota di una foto confermata '
+                              'non è verificata. '
                               'La copia locale è conservata: puoi rimuoverla '
                               'dalla bozza '
                               'o verificare di nuovo lo stato remoto.',

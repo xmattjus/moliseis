@@ -419,9 +419,12 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool _remoteUnavailable = false;
   AdminEditorRecoveryState _recoveryState = AdminEditorRecoveryState.none;
   AdminEditorRecoveryObservation? _recoveryObservation;
+
   /// A replay may confirm R without accepting different current local fields.
-  /// Failed reloads must not turn that unresolved decision into write authority.
+  /// Failed reloads must not turn that unresolved decision into write
+  /// authority.
   bool _requiresFieldDecision = false;
+
   /// Latest complete association evidence, separate from field-version tokens.
   List<AdminSubmissionAsset>? _completeAssetObservation;
   late final ResultCommand<_EditorAction<void>, void> _recoveryCommand;
@@ -499,19 +502,23 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     });
   }
 
-  /// A complete fresh list can contradict historical association confirmation.
+  /// Historical receipts need complete current evidence before local cleanup.
+  ///
+  /// Unknown evidence is not confirmation. A new association can still finish
+  /// within its authorized Save after receiving and persisting its own result.
   bool isStagedAssociationUnavailable(AdminSubmissionStagedAsset asset) {
     final progress = _liveReceipts[asset.digest] ?? asset.progress;
     final id = progress?.associationId;
     final complete = _completeAssetObservation;
-    if (id == null || complete == null) return false;
-    return !complete.any(
-      (remote) =>
-          remote.id == id &&
-          remote.url == progress!.upload.secureUrl &&
-          remote.width == progress.upload.width &&
-          remote.height == progress.upload.height,
-    );
+    if (id == null) return false;
+    return complete == null ||
+        !complete.any(
+          (remote) =>
+              remote.id == id &&
+              remote.url == progress!.upload.secureUrl &&
+              remote.width == progress.upload.width &&
+              remote.height == progress.upload.height,
+        );
   }
 
   ({AdminFieldWriteIntent intent, AdminSubmission detail, bool replayed})?
@@ -2216,8 +2223,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         _phase(AdminSavePhase.conflict);
         return Result.error(
           Exception(
-            'La foto confermata non è più presente nel contributo. '
-            'Conserva o rimuovi la copia locale.',
+            'La presenza remota della foto confermata non è verificata. '
+            'Ricarica il contributo o rimuovi la copia locale.',
           ),
         );
       }
@@ -2305,7 +2312,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
           return Result.error(error);
         }
         final remote = (associated as Success<AdminSubmissionAsset>).value;
-        _completeAssetObservation = null;
+        // A confirmed addition does not revoke known absence of another ID.
+        _completeAssetObservation = _completeAssetObservation
+            ?.where((item) => item.id != remote.id)
+            .followedBy([remote])
+            .toList(growable: false);
         progress = AdminStagedAssetProgress(
           upload: progress.upload,
           associationId: remote.id,
@@ -2834,7 +2845,10 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
           }
           return persisted.map((asset) {
             _assets.add(asset);
-            _completeAssetObservation = null;
+            _completeAssetObservation = _completeAssetObservation
+                ?.where((item) => item.id != asset.id)
+                .followedBy([asset])
+                .toList(growable: false);
             _contextCommitted();
           });
         });

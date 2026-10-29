@@ -33,4 +33,4 @@ Audited baseline: `69e1773f168c16d76a3d588588be7cddf97737ac`, current `origin/ma
 
 ## Non-goals
 
-Planning only. No production code, Supabase mutation, deployment, PR, apply or archive. Preserve Public Content Submission and historical `improve-admin-submission-editor-workflow` artifacts. No automatic merge, automatic Update retry, remote replay on initialization, owner deletion, generic conflict framework, progress-route redesign, Dirty Exit/shared Material 3 Expressive dialog (Plan 4), or reopening of the accepted Android shared-cache provenance limitation.
+No Supabase/backend or Public Content Submission changes, deployment, automatic moderation, automatic merge, automatic Update retry, remote replay on initialization, owner deletion, generic conflict framework, progress-route redesign, Dirty Exit/shared Material 3 Expressive dialog (Plan 4), or reopening of the accepted Android shared-cache provenance limitation. Preserve historical `improve-admin-submission-editor-workflow` artifacts.
