@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
+import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
@@ -187,19 +189,61 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
 
   @override
   Widget build(BuildContext context) {
+    final owner = widget.viewModel;
+    final auth = widget.auth;
+    final active = owner.activation;
+    final canReturn =
+        active != null &&
+        auth.isAdmin &&
+        auth.currentUser?.id == active.owner.accountId &&
+        owner.isActivationCurrent(active);
     if (!_ready) {
       return Scaffold(
         appBar: AppBar(),
         body: _error == null
             ? const EmptyView.loading(text: Text('Apertura editor...'))
             : EmptyView.error(
-                text: const Text(
-                  'Impossibile aprire il contributo. '
-                  'Il lavoro locale è conservato.',
+                text: Text(
+                  canReturn && owner.pendingRecoveryCheckpoint
+                      ? 'Salva nella bozza locale i campi remoti '
+                            'accettati prima di aprire un altro contributo.'
+                      : 'Impossibile aprire il contributo. '
+                            'Il lavoro locale è conservato.',
                 ),
-                action: TextButton(
-                  onPressed: () => unawaited(_activate()),
-                  child: const Text('Riprova'),
+                action: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  children: [
+                    TextButton(
+                      onPressed: () => unawaited(_activate()),
+                      child: const Text('Riprova'),
+                    ),
+                    if (canReturn)
+                      TextButton(
+                        key: const ValueKey('admin_return_active_editor'),
+                        onPressed: () {
+                          if (!mounted) return;
+                          if (!identical(widget.viewModel, owner) ||
+                              !identical(widget.auth, auth) ||
+                              !auth.isAdmin ||
+                              auth.currentUser?.id != active.owner.accountId ||
+                              !owner.isActivationCurrent(active)) {
+                            return;
+                          }
+                          final id = active.owner.submissionId;
+                          context.goNamed(
+                            id == null
+                                ? RouteNames.adminSubmissionNew
+                                : RouteNames.adminSubmissionEditor,
+                            pathParameters: {if (id != null) 'id': '$id'},
+                            queryParameters: {
+                              'session': active.owner.sessionId,
+                            },
+                          );
+                        },
+                        child: const Text('Torna all’editor corrente'),
+                      ),
+                  ],
                 ),
               ),
       );

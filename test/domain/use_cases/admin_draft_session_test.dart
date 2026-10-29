@@ -4,6 +4,7 @@ import 'dart:io' show File;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_staged_asset.dart';
+import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -12,6 +13,411 @@ import '../../support/admin_draft_repositories.dart';
 void main() {
   late AdminDraftSessionHarness h;
   setUp(() => h = AdminDraftSessionHarness());
+
+  group('explicit recovery', () {
+    final remoteB = AdminRemoteBaseline(
+      snapshot: AdminDraftSnapshot(name: 'B'),
+      status: AdminSubmissionStatus.pending,
+      modifiedAt: DateTime.utc(2026, 10, 29),
+      modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+    );
+
+    test('Accept preserves P and refuses switching until checkpoint', () async {
+      h.seed(name: 'local');
+      await h.session.activate(h.owner);
+      final before = h.session.state!;
+      final read = h.session.admitHydration()!;
+      expect(
+        await h.session.acceptHydration(read, remoteB, associatedCount: 1),
+        isA<Success<bool>>(),
+      );
+      final choice = h.session.captureRecoveryObservation(
+        read,
+        remoteB,
+        associatedCount: 1,
+      )!;
+      expect(
+        await h.session.reconcile(choice, acceptRemote: true),
+        isA<Success<void>>(),
+      );
+      expect(h.session.state!.current, remoteB.snapshot);
+      expect(h.session.state!.effective, remoteB.snapshot);
+      expect(
+        h.session.state!.physicalCheckpoint,
+        same(before.physicalCheckpoint),
+      );
+      expect(h.session.state!.remoteBaseline, remoteB);
+      expect(h.session.state!.hasUncheckpointedChanges, isFalse);
+      expect(h.session.state!.pendingRecoveryCheckpoint, isTrue);
+      expect(h.drafts.saves, isEmpty);
+      expect(
+        await h.session.activate(
+          AdminDraftOwner(accountId: h.owner.accountId, submissionId: 99),
+        ),
+        isA<Error<void>>(),
+      );
+      expect(await h.session.activate(h.owner), isA<Success<void>>());
+      expect(h.session.state!.pendingRecoveryCheckpoint, isTrue);
+      expect(await h.session.checkpoint(), isA<Success<void>>());
+      expect(h.session.state!.pendingRecoveryCheckpoint, isFalse);
+      expect(h.session.state!.physicalCheckpoint!.snapshot, remoteB.snapshot);
+      expect(
+        await h.session.activate(
+          AdminDraftOwner(accountId: h.owner.accountId, submissionId: 99),
+        ),
+        isA<Success<void>>(),
+      );
+    });
+
+    test(
+      'known replay conflict requires choice even with matching recorded R',
+      () async {
+        h.seed(name: 'local', remoteName: 'B');
+        await h.session.activate(h.owner);
+        final before = h.session.state!;
+        final read = h.session.admitHydration()!;
+        expect(
+          (await h.session.acceptHydration(
+            read,
+            remoteB,
+            associatedCount: 0,
+            requireReconciliation: true,
+          )).getOrNull(),
+          isFalse,
+        );
+        expect(h.session.state!.current, before.current);
+        expect(h.session.state!.remoteBaseline, before.remoteBaseline);
+        expect(h.session.state!.acceptedRemoteRevision, isNull);
+        final choice = h.session.captureRecoveryObservation(
+          read,
+          remoteB,
+          associatedCount: 0,
+        )!;
+        expect(
+          await h.session.reconcile(choice, acceptRemote: false),
+          isA<Success<void>>(),
+        );
+        expect(h.session.state!.remoteBaseline, remoteB);
+      },
+    );
+
+    for (final completeCount in <int?>[null, 3]) {
+      test(
+        'field confirmation qualifies new R with complete count=$completeCount',
+        () async {
+          h.seed(name: 'local');
+          await h.session.activate(h.owner);
+          final read = h.session.admitHydration()!;
+          await h.session.acceptHydration(read, remoteB, associatedCount: 2);
+          final choice = h.session.captureRecoveryObservation(
+            read,
+            remoteB,
+            associatedCount: 2,
+          )!;
+          await h.session.reconcile(choice, acceptRemote: true);
+          final activation = h.session.captureActivation()!;
+          final snapshot = h.session.state!.current;
+          await h.session.beginFieldWrite(
+            AdminFieldWriteIntent(
+              kind: AdminFieldWriteKind.update,
+              attemptId: '22222222-2222-4222-8222-222222222222',
+              snapshot: snapshot,
+              expectedModifiedAt: remoteB.modifiedAtToken,
+            ),
+            activation: activation,
+            checkpointAtCapture: h.session.state!.physicalCheckpoint,
+          );
+          expect(h.session.state!.pendingRecoveryCheckpoint, isFalse);
+          expect(
+            await h.session.confirmFieldWrite(
+              activation: activation,
+              attemptId: '22222222-2222-4222-8222-222222222222',
+              baseline: remoteB,
+              associatedCount: completeCount,
+            ),
+            isA<Success<void>>(),
+          );
+          expect(h.session.state!.acceptedRemoteRevision, isNotNull);
+          expect(h.session.state!.associatedCount, completeCount);
+          expect(h.session.capacityContext?.associatedCount, completeCount);
+          expect(h.session.isRecoveryObservationCurrent(choice), isFalse);
+        },
+      );
+    }
+
+    test('Keep changes R only and consumes its captured choice', () async {
+      h.seed(name: 'local');
+      await h.session.activate(h.owner);
+      final before = h.session.state!;
+      final read = h.session.admitHydration()!;
+      await h.session.acceptHydration(read, remoteB, associatedCount: 2);
+      final choice = h.session.captureRecoveryObservation(
+        read,
+        remoteB,
+        associatedCount: 2,
+      )!;
+      expect(
+        await h.session.reconcile(choice, acceptRemote: false),
+        isA<Success<void>>(),
+      );
+      expect(h.session.state!.current, before.current);
+      expect(h.session.state!.effective, before.effective);
+      expect(
+        h.session.state!.physicalCheckpoint,
+        same(before.physicalCheckpoint),
+      );
+      expect(h.session.state!.remoteBaseline, remoteB);
+      expect(h.session.state!.pendingRecoveryCheckpoint, isFalse);
+      expect(h.session.state!.associatedCount, 2);
+      expect(h.drafts.saves, isEmpty);
+      expect(
+        await h.session.reconcile(choice, acceptRemote: true),
+        isA<Error<void>>(),
+      );
+    });
+
+    test(
+      'failed Accept checkpoint retains obligation and physical A',
+      () async {
+        h.seed(name: 'local');
+        await h.session.activate(h.owner);
+        final physical = h.session.state!.physicalCheckpoint;
+        final read = h.session.admitHydration()!;
+        await h.session.acceptHydration(read, remoteB, associatedCount: 0);
+        final choice = h.session.captureRecoveryObservation(
+          read,
+          remoteB,
+          associatedCount: 0,
+        )!;
+        await h.session.reconcile(choice, acceptRemote: true);
+        h.drafts.onSave = (_) async => Result.error(Exception('disk failure'));
+        expect(await h.session.checkpoint(), isA<Error<void>>());
+        expect(h.session.state!.physicalCheckpoint, same(physical));
+        expect(h.session.state!.current, remoteB.snapshot);
+        expect(h.session.state!.pendingRecoveryCheckpoint, isTrue);
+        expect(
+          await h.session.activate(
+            AdminDraftOwner(accountId: h.owner.accountId, submissionId: 99),
+          ),
+          isA<Error<void>>(),
+        );
+      },
+    );
+
+    test('ordinary clean hydration needs no acceptance checkpoint', () async {
+      h.seed();
+      await h.session.activate(h.owner);
+      final read = h.session.admitHydration()!;
+      await h.session.acceptHydration(read, remoteB, associatedCount: 0);
+      expect(h.session.state!.current, remoteB.snapshot);
+      expect(h.session.state!.currentMatchesDisk, isFalse);
+      expect(h.session.state!.pendingRecoveryCheckpoint, isFalse);
+      expect(
+        await h.session.activate(
+          AdminDraftOwner(accountId: h.owner.accountId, submissionId: 99),
+        ),
+        isA<Success<void>>(),
+      );
+    });
+
+    test('edit and revert makes a captured recovery choice obsolete', () async {
+      h.seed(name: 'local');
+      await h.session.activate(h.owner);
+      final read = h.session.admitHydration()!;
+      await h.session.acceptHydration(read, remoteB, associatedCount: 0);
+      final choice = h.session.captureRecoveryObservation(
+        read,
+        remoteB,
+        associatedCount: 0,
+      )!;
+      final original = h.session.state!.current;
+      final activation = h.session.captureActivation()!;
+      h.session.setSnapshot(
+        original.copyWith(name: 'typed'),
+        activation: activation,
+      );
+      h.session.setSnapshot(original, activation: activation);
+      expect(h.session.isRecoveryObservationCurrent(choice), isFalse);
+      expect(
+        await h.session.reconcile(choice, acceptRemote: true),
+        isA<Error<void>>(),
+      );
+      expect(h.session.state!.current, original);
+      expect(h.session.state!.pendingRecoveryCheckpoint, isFalse);
+      expect(h.drafts.saves, isEmpty);
+    });
+
+    test('superseding read, mutation and A-B-A revoke old choices', () async {
+      h.seed(name: 'local');
+      await h.session.activate(h.owner);
+      final read = h.session.admitHydration()!;
+      await h.session.acceptHydration(read, remoteB, associatedCount: 0);
+      final choice = h.session.captureRecoveryObservation(
+        read,
+        remoteB,
+        associatedCount: 0,
+      )!;
+      final newer = h.session.admitHydration()!;
+      await h.session.rejectHydration(newer, Exception('read failed'));
+      expect(
+        await h.session.reconcile(choice, acceptRemote: false),
+        isA<Error<void>>(),
+      );
+      expect(h.session.capacityContext, isNull);
+      final latest = h.session.admitHydration()!;
+      await h.session.acceptHydration(latest, remoteB, associatedCount: 0);
+      final nextChoice = h.session.captureRecoveryObservation(
+        latest,
+        remoteB,
+        associatedCount: 0,
+      )!;
+      h.session.invalidateRecoveryObservations();
+      expect(
+        await h.session.reconcile(nextChoice, acceptRemote: true),
+        isA<Error<void>>(),
+      );
+      h.session.revoke();
+      await h.session.activate(
+        AdminDraftOwner(
+          accountId: AdminDraftSessionHarness.accountB,
+          submissionId: 99,
+        ),
+      );
+      await h.session.activate(h.owner);
+      expect(
+        await h.session.reconcile(nextChoice, acceptRemote: true),
+        isA<Error<void>>(),
+      );
+      expect(h.session.state!.current.name, 'local');
+    });
+
+    test('unresolved intent prevents both field choices', () async {
+      h.seed(name: 'local');
+      await h.session.activate(h.owner);
+      final activation = h.session.captureActivation()!;
+      await h.session.beginFieldWrite(
+        AdminFieldWriteIntent(
+          kind: AdminFieldWriteKind.update,
+          attemptId: '22222222-2222-4222-8222-222222222222',
+          snapshot: h.session.state!.current,
+          expectedModifiedAt: '2026-10-28T00:00:00.123456Z',
+        ),
+        activation: activation,
+        checkpointAtCapture: h.session.state!.physicalCheckpoint,
+      );
+      final read = h.session.admitHydration()!;
+      await h.session.acceptHydration(read, remoteB, associatedCount: 0);
+      final choice = h.session.captureRecoveryObservation(
+        read,
+        remoteB,
+        associatedCount: 0,
+      )!;
+      final physical = h.session.state!.physicalCheckpoint;
+      for (final accept in [true, false]) {
+        expect(
+          await h.session.reconcile(choice, acceptRemote: accept),
+          isA<Error<void>>(),
+        );
+      }
+      expect(h.session.state!.physicalCheckpoint, same(physical));
+      expect(h.session.state!.current.name, 'local');
+    });
+
+    test(
+      'matching checkpoint settles acceptance but protects later typing',
+      () async {
+        h.seed(name: 'local');
+        await h.session.activate(h.owner);
+        final read = h.session.admitHydration()!;
+        await h.session.acceptHydration(read, remoteB, associatedCount: 0);
+        final choice = h.session.captureRecoveryObservation(
+          read,
+          remoteB,
+          associatedCount: 0,
+        )!;
+        await h.session.reconcile(choice, acceptRemote: true);
+        final started = Completer<void>();
+        final release = Completer<Result<void>>();
+        h.drafts.onSave = (_) {
+          started.complete();
+          return release.future;
+        };
+        final checkpoint = h.session.checkpoint();
+        await started.future;
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'typing C'),
+          activation: h.session.captureActivation()!,
+        );
+        release.complete(const Result.success(null));
+        await checkpoint;
+        expect(h.session.state!.pendingRecoveryCheckpoint, isFalse);
+        expect(h.session.state!.physicalCheckpoint!.snapshot, remoteB.snapshot);
+        expect(h.session.state!.current.name, 'typing C');
+        expect(h.session.state!.hasUncheckpointedChanges, isTrue);
+        expect(
+          await h.session.activate(
+            AdminDraftOwner(accountId: h.owner.accountId, submissionId: 99),
+          ),
+          isA<Error<void>>(),
+        );
+      },
+    );
+
+    test(
+      'old checkpoint and acceptance cannot clear a newer obligation',
+      () async {
+        h.seed(name: 'local');
+        await h.session.activate(h.owner);
+        final read = h.session.admitHydration()!;
+        await h.session.acceptHydration(read, remoteB, associatedCount: 0);
+        final first = h.session.captureRecoveryObservation(
+          read,
+          remoteB,
+          associatedCount: 0,
+        )!;
+        await h.session.reconcile(first, acceptRemote: true);
+        final remoteC = AdminRemoteBaseline(
+          snapshot: AdminDraftSnapshot(name: 'C'),
+          status: remoteB.status,
+          modifiedAt: remoteB.modifiedAt,
+          modifiedAtToken: '2026-10-29T00:00:01.123456Z',
+        );
+        final readC = h.session.admitHydration()!;
+        await h.session.acceptHydration(readC, remoteC, associatedCount: 0);
+        expect(h.session.state!.current, remoteB.snapshot);
+        final second = h.session.captureRecoveryObservation(
+          readC,
+          remoteC,
+          associatedCount: 0,
+        )!;
+        final started = Completer<void>();
+        final release = Completer<Result<void>>();
+        h.drafts.onSave = (_) {
+          started.complete();
+          return release.future;
+        };
+        final checkpoint = h.session.checkpoint();
+        await started.future;
+        final reconcile = h.session.reconcile(second, acceptRemote: true);
+        release.complete(const Result.success(null));
+        await checkpoint;
+        expect(await reconcile, isA<Success<void>>());
+        expect(h.session.state!.physicalCheckpoint!.snapshot, remoteB.snapshot);
+        expect(h.session.state!.current, remoteC.snapshot);
+        expect(h.session.state!.pendingRecoveryCheckpoint, isTrue);
+        expect(
+          await h.session.reconcile(first, acceptRemote: false),
+          isA<Error<void>>(),
+        );
+        expect(h.session.state!.pendingRecoveryCheckpoint, isTrue);
+        h.session.revoke();
+        expect(h.session.state, isNull);
+        await h.session.activate(h.owner);
+        expect(h.session.state!.current, remoteB.snapshot);
+        expect(h.session.state!.pendingRecoveryCheckpoint, isFalse);
+      },
+    );
+  });
 
   group('captured setter authority', () {
     test(

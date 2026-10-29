@@ -59,6 +59,240 @@ void main() {
     await support.delete(recursive: true);
   });
 
+  for (final checkpoint in [false, true]) {
+    test(
+      'explicit Accept keeps original disk truth until checkpoint=$checkpoint '
+      'and retains receipt/files after real reopen',
+      () async {
+        owner = AdminDraftOwner(accountId: account, submissionId: 7);
+        await drafts.saveDraft(
+          AdminSubmissionDraft(
+            owner: owner,
+            snapshot: baseline.snapshot,
+            remoteBaseline: baseline,
+          ),
+        );
+        await session.activate(owner);
+        final initialRead = session.admitHydration()!;
+        await session.acceptHydration(
+          initialRead,
+          baseline,
+          associatedCount: 0,
+        );
+        final source = await File(
+          '${support.path}/source',
+        ).writeAsBytes([4, 5, 6]);
+        final asset =
+            (await session.acquire(source, capacity: session.capacityContext)
+                    as Success<AdminSubmissionStagedAsset>)
+                .value;
+        final receipt = AdminStagedAssetProgress(
+          upload: const SubmissionAsset(
+            secureUrl: 'https://example.com/confirmed.jpg',
+            width: 10,
+            height: 10,
+          ),
+          associationId: 42,
+        );
+        await session.saveAssetProgress(
+          asset,
+          receipt,
+          activation: session.captureActivation()!,
+        );
+        final fresh = AdminRemoteBaseline(
+          snapshot: AdminDraftSnapshot(name: 'Remote B'),
+          status: AdminSubmissionStatus.pending,
+          modifiedAt: DateTime.parse('2026-10-29T00:00:00.123456Z'),
+          modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+        );
+        // Persisted local intent forces deliberate review of remote B.
+        session.setSnapshot(
+          AdminDraftSnapshot(name: 'local edit'),
+          activation: session.captureActivation()!,
+        );
+        await session.checkpoint();
+        final read = session.admitHydration()!;
+        await session.acceptHydration(read, fresh, associatedCount: 0);
+        final choice = session.captureRecoveryObservation(
+          read,
+          fresh,
+          associatedCount: 0,
+        )!;
+        expect(
+          await session.reconcile(choice, acceptRemote: true),
+          isA<Success<void>>(),
+        );
+        expect(session.state!.pendingRecoveryCheckpoint, isTrue);
+        expect(session.state!.assets.single.progress, receipt);
+        final privateFile =
+            (await staged.resolveAbsolutePath(asset) as Success<File>).value;
+        expect(await privateFile.readAsBytes(), [4, 5, 6]);
+        if (checkpoint) {
+          expect(await session.checkpoint(), isA<Success<void>>());
+          expect(session.state!.pendingRecoveryCheckpoint, isFalse);
+          expect(
+            await session.activate(
+              AdminDraftOwner(accountId: account, submissionId: 8),
+            ),
+            isA<Success<void>>(),
+          );
+        }
+        env.close();
+        final reopened = await openStore(directory: env.directory.path);
+        addTearDown(reopened.close);
+        final restoredDrafts = AdminSubmissionDraftRepositoryImpl(
+          objectBoxI: TestObjectBox(reopened),
+          logger: MockLogger(),
+        );
+        final restoredStaged = AdminSubmissionStagedAssetRepositoryImpl(
+          objectBoxI: TestObjectBox(reopened),
+          logger: MockLogger(),
+          draftRepository: restoredDrafts,
+          getSupportDirectory: () async => support,
+        );
+        final restored = AdminDraftSession(
+          draftRepository: restoredDrafts,
+          stagedAssetRepository: restoredStaged,
+        );
+        expect(await restored.activate(owner), isA<Success<void>>());
+        expect(
+          restored.state!.current.name,
+          checkpoint ? 'Remote B' : 'local edit',
+        );
+        expect(restored.state!.remoteBaseline, checkpoint ? fresh : baseline);
+        expect(restored.state!.pendingRecoveryCheckpoint, isFalse);
+        expect(restored.state!.acceptedRemoteRevision, isNull);
+        expect(restored.state!.assets.single.progress, receipt);
+        final restoredFile =
+            (await restoredStaged.resolveAbsolutePath(
+                      restored.state!.assets.single,
+                    )
+                    as Success<File>)
+                .value;
+        expect(await restoredFile.readAsBytes(), [4, 5, 6]);
+        expect(
+          await restored.remove(restored.state!.assets.single),
+          isA<Success<void>>(),
+        );
+        expect(
+          (await restoredDrafts.loadDraft(
+            accountId: account,
+            submissionId: 7,
+          )).getOrNull(),
+          isNotNull,
+        );
+        expect(restoredFile.existsSync(), isFalse);
+      },
+    );
+  }
+
+  test(
+    'failed real checkpoint keeps acceptance restriction and durable A',
+    () async {
+      owner = AdminDraftOwner(accountId: account, submissionId: 7);
+      await drafts.saveDraft(
+        AdminSubmissionDraft(
+          owner: owner,
+          snapshot: baseline.snapshot,
+          remoteBaseline: baseline,
+        ),
+      );
+      await session.activate(owner);
+      session.setSnapshot(
+        AdminDraftSnapshot(name: 'local edit'),
+        activation: session.captureActivation()!,
+      );
+      final fresh = AdminRemoteBaseline(
+        snapshot: AdminDraftSnapshot(name: 'Remote B'),
+        status: baseline.status,
+        modifiedAt: baseline.modifiedAt,
+        modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+      );
+      final read = session.admitHydration()!;
+      await session.acceptHydration(read, fresh, associatedCount: 0);
+      final choice = session.captureRecoveryObservation(
+        read,
+        fresh,
+        associatedCount: 0,
+      )!;
+      await session.reconcile(choice, acceptRemote: true);
+      env.close();
+      expect(await session.checkpoint(), isA<Error<void>>());
+      expect(session.state!.pendingRecoveryCheckpoint, isTrue);
+      expect(session.state!.physicalCheckpoint!.snapshot, baseline.snapshot);
+      expect(
+        await session.activate(
+          AdminDraftOwner(accountId: account, submissionId: 8),
+        ),
+        isA<Error<void>>(),
+      );
+      final reopened = await openStore(directory: env.directory.path);
+      addTearDown(reopened.close);
+      final restored = AdminSubmissionDraftRepositoryImpl(
+        objectBoxI: TestObjectBox(reopened),
+        logger: MockLogger(),
+      );
+      expect(
+        (await restored.loadDraft(
+          accountId: account,
+          submissionId: 7,
+        )).getOrNull()!.snapshot,
+        baseline.snapshot,
+      );
+    },
+  );
+
+  test(
+    'Keep incomplete fields records fresh R only at explicit real checkpoint',
+    () async {
+      owner = AdminDraftOwner(accountId: account, submissionId: 7);
+      final local = AdminDraftSnapshot(name: 'local edit', latitudeText: '-');
+      await drafts.saveDraft(
+        AdminSubmissionDraft(
+          owner: owner,
+          snapshot: local,
+          remoteBaseline: baseline,
+        ),
+      );
+      await session.activate(owner);
+      final fresh = AdminRemoteBaseline(
+        snapshot: AdminDraftSnapshot(name: 'Remote B'),
+        status: baseline.status,
+        modifiedAt: baseline.modifiedAt,
+        modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+      );
+      final read = session.admitHydration()!;
+      await session.acceptHydration(read, fresh, associatedCount: 0);
+      final choice = session.captureRecoveryObservation(
+        read,
+        fresh,
+        associatedCount: 0,
+      )!;
+      await session.reconcile(choice, acceptRemote: false);
+      expect(
+        (await drafts.loadDraft(
+          accountId: account,
+          submissionId: 7,
+        )).getOrNull()!.remoteBaseline,
+        baseline,
+      );
+      await session.checkpoint();
+      env.close();
+      final reopened = await openStore(directory: env.directory.path);
+      addTearDown(reopened.close);
+      final restored = AdminSubmissionDraftRepositoryImpl(
+        objectBoxI: TestObjectBox(reopened),
+        logger: MockLogger(),
+      );
+      final draft = (await restored.loadDraft(
+        accountId: account,
+        submissionId: 7,
+      )).getOrNull()!;
+      expect(draft.snapshot, local);
+      expect(draft.remoteBaseline, fresh);
+    },
+  );
+
   test('Create adoption is atomic across retained draft and '
       'files and resumes after reopen', () async {
     await session.activate(owner);

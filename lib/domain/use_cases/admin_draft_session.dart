@@ -3,6 +3,7 @@ import 'dart:io' show File;
 
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_staged_asset.dart';
+import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/admin_submission_staged_asset_repository.dart';
 import 'package:moliseis/utils/result.dart';
@@ -25,6 +26,8 @@ final class AdminDraftSessionState {
     this.hydrationError,
     this.acceptedRemoteRevision,
     this.associatedCount,
+    this.fieldRevision = 0,
+    this.recoveryCheckpointRevision,
     List<AdminSubmissionStagedAsset> assets = const [],
   }) : assets = List.unmodifiable(assets);
 
@@ -61,6 +64,18 @@ final class AdminDraftSessionState {
   /// Count observed with that exact accepted context; null means unknown.
   final int? associatedCount;
 
+  /// Local field intent ordering, including edit-and-revert sequences.
+  final int fieldRevision;
+
+  /// Runtime revision of an explicit acceptance still requiring checkpoint.
+  ///
+  /// Unlike ordinary hydration, this user decision cannot be abandoned by a
+  /// normal target switch merely because current fields equal effective fields.
+  final int? recoveryCheckpointRevision;
+
+  /// Whether an explicit accepted decision is not yet physically represented.
+  bool get pendingRecoveryCheckpoint => recoveryCheckpointRevision != null;
+
   /// Fully reconciled and explicitly ordered exact-owner descriptors.
   final List<AdminSubmissionStagedAsset> assets;
 
@@ -86,6 +101,8 @@ final class AdminDraftSessionState {
     Object? hydrationError = _unchanged,
     Object? acceptedRemoteRevision = _unchanged,
     Object? associatedCount = _unchanged,
+    int? fieldRevision,
+    Object? recoveryCheckpointRevision = _unchanged,
     List<AdminSubmissionStagedAsset>? assets,
   }) => AdminDraftSessionState(
     owner: owner ?? this.owner,
@@ -109,6 +126,11 @@ final class AdminDraftSessionState {
     associatedCount: identical(associatedCount, _unchanged)
         ? this.associatedCount
         : associatedCount as int?,
+    fieldRevision: fieldRevision ?? this.fieldRevision,
+    recoveryCheckpointRevision:
+        identical(recoveryCheckpointRevision, _unchanged)
+        ? this.recoveryCheckpointRevision
+        : recoveryCheckpointRevision as int?,
     assets: assets ?? this.assets,
   );
 }
@@ -143,6 +165,31 @@ final class AdminHydrationToken {
   final int revision;
 }
 
+/// One usable remote observation bound to the exact local intent it reviews.
+///
+/// It is runtime-only and never grants permission to replay a historical write.
+final class AdminRecoveryObservation {
+  AdminRecoveryObservation._(
+    this._session,
+    this._token,
+    this.baseline,
+    this.associatedCount,
+    this.fieldRevision,
+  );
+
+  final AdminDraftSession _session;
+  final AdminHydrationToken _token;
+
+  /// Complete observed editable projection and exact server field token.
+  final AdminRemoteBaseline baseline;
+
+  /// Complete remote association count from that same detail response.
+  final int associatedCount;
+
+  /// Local field revision presented alongside this observation.
+  final int fieldRevision;
+}
+
 /// Caller-carried admission context; validated again at local action entry.
 typedef AdminAssetCapacityContext = ({
   AdminDraftOwner owner,
@@ -173,6 +220,7 @@ final class AdminDraftSession {
   int _hydrationRevision = 0;
   AdminHydrationToken? _activeHydration;
   int _pending = 0;
+  int _recoveryRevision = 0;
 
   /// Current private local context, or null following explicit revocation.
   AdminDraftSessionState? get state => _state;
@@ -189,10 +237,15 @@ final class AdminDraftSession {
     }
     if (previous != null &&
         (previous.hasUncheckpointedChanges ||
+            previous.pendingRecoveryCheckpoint ||
             _pending != 0 ||
             previous.hydrationPending)) {
       return Future.value(
-        _unavailable('Local work must settle before switching.'),
+        _unavailable(
+          previous.pendingRecoveryCheckpoint
+              ? 'Checkpoint accepted remote fields before switching.'
+              : 'Local work must settle before switching.',
+        ),
       );
     }
     _generation++;
@@ -310,7 +363,12 @@ final class AdminDraftSession {
         _state?.ready != true) {
       return _unavailable();
     }
-    _state = _state!._copy(current: snapshot);
+    if (_state!.current != snapshot) {
+      _state = _state!._copy(
+        current: snapshot,
+        fieldRevision: _state!.fieldRevision + 1,
+      );
+    }
     return const Result.success(null);
   }
 
@@ -367,7 +425,13 @@ final class AdminDraftSession {
     );
     if (captured.durability == AdminDraftDurability.durable &&
         captured.physicalCheckpoint == draft) {
-      _state = _state!._copy(effective: captured.current);
+      _state = _state!._copy(
+        effective: captured.current,
+        recoveryCheckpointRevision: _remainingRecoveryObligation(
+          captured,
+          draft,
+        ),
+      );
       return const Result.success(null);
     }
     final saved = await _drafts.saveDraft(draft);
@@ -375,10 +439,27 @@ final class AdminDraftSession {
       _state = _state!._copy(
         physicalCheckpoint: draft,
         effective: captured.current,
+        recoveryCheckpointRevision: _remainingRecoveryObligation(
+          captured,
+          draft,
+        ),
         durability: AdminDraftDurability.durable,
       );
     }
     return saved;
+  }
+
+  /// Clears only proof captured for the still-current acceptance decision.
+  int? _remainingRecoveryObligation(
+    AdminDraftSessionState captured,
+    AdminSubmissionDraft persisted,
+  ) {
+    final revision = _state!.recoveryCheckpointRevision;
+    return captured.recoveryCheckpointRevision == revision &&
+            persisted.snapshot == captured.current &&
+            persisted.remoteBaseline == captured.remoteBaseline
+        ? null
+        : revision;
   }
 
   /// Restores the exact stable session, including its already-adopted target.
@@ -443,6 +524,10 @@ final class AdminDraftSession {
       _state = _state!._copy(
         physicalCheckpoint: draft,
         effective: snapshot,
+        recoveryCheckpointRevision: _remainingRecoveryObligation(
+          current,
+          draft,
+        ),
         durability: AdminDraftDurability.durable,
       );
     }
@@ -531,8 +616,13 @@ final class AdminDraftSession {
     required AdminDraftActivation activation,
     required String attemptId,
     required AdminRemoteBaseline baseline,
+    int? associatedCount,
   }) => _serialize(() async {
-    if (!_validActivation(activation)) return _unavailable();
+    if (!_validActivation(activation) ||
+        associatedCount != null &&
+            (associatedCount < 0 || associatedCount > 5)) {
+      return _unavailable();
+    }
     final current = _state!;
     final physical = current.physicalCheckpoint;
     if (physical == null ||
@@ -552,7 +642,12 @@ final class AdminDraftSession {
       _state = _state!._copy(
         physicalCheckpoint: draft,
         remoteBaseline: baseline,
+        acceptedRemoteRevision: ++_hydrationRevision,
+        associatedCount: associatedCount,
+        hydrationPending: false,
+        hydrationError: null,
       );
+      _activeHydration = null;
     }
     return saved;
   });
@@ -751,7 +846,12 @@ final class AdminDraftSession {
       ++_hydrationRevision,
     );
     _activeHydration = token;
-    _state = current._copy(hydrationPending: true, hydrationError: null);
+    _state = current._copy(
+      hydrationPending: true,
+      hydrationError: null,
+      acceptedRemoteRevision: null,
+      associatedCount: null,
+    );
     return token;
   }
 
@@ -760,11 +860,95 @@ final class AdminDraftSession {
       _matches(token.owner, token.generation) &&
       token.revision == _hydrationRevision;
 
+  /// Revokes selectable recovery callbacks when another mutation is admitted.
+  ///
+  /// Accepted R and physical truth are unaffected; the mutation's own captured
+  /// authority still governs its later phases.
+  void invalidateRecoveryObservations() {
+    _activeHydration = null;
+  }
+
+  /// Captures a usable latest response without accepting its fields or token.
+  ///
+  /// The caller must supply the response belonging to [token]. Capture after
+  /// hydration publication has settled; field edits invalidate this choice.
+  AdminRecoveryObservation? captureRecoveryObservation(
+    AdminHydrationToken token,
+    AdminRemoteBaseline baseline, {
+    required int associatedCount,
+  }) {
+    if (!_authoritative(token) ||
+        _state?.ready != true ||
+        _state!.hydrationPending ||
+        _state!.hydrationError != null ||
+        associatedCount < 0 ||
+        associatedCount > 5 ||
+        baseline.modifiedAtToken == null) {
+      return null;
+    }
+    return AdminRecoveryObservation._(
+      this,
+      token,
+      baseline,
+      associatedCount,
+      _state!.fieldRevision,
+    );
+  }
+
+  /// Checks the observation's private boundary, activation and local revision.
+  bool isRecoveryObservationCurrent(AdminRecoveryObservation? observation) =>
+      observation != null &&
+      identical(observation._session, this) &&
+      _authoritative(observation._token) &&
+      _state?.ready == true &&
+      !_state!.hydrationPending &&
+      _state!.hydrationError == null &&
+      _state!.fieldRevision == observation.fieldRevision;
+
+  /// Applies a deliberate whole-field decision without persistence or HTTP.
+  ///
+  /// Accept replaces C/E/R; Keep changes R only. Neither can settle a field
+  /// intent or use another activation's observation. Latest-read checks run
+  /// again after any queued local work, immediately before publication.
+  Future<Result<void>> reconcile(
+    AdminRecoveryObservation observation, {
+    required bool acceptRemote,
+  }) => _serialize(() async {
+    if (!isRecoveryObservationCurrent(observation) ||
+        _state!.physicalCheckpoint?.fieldWriteIntent != null ||
+        !acceptRemote &&
+            observation.baseline.status != AdminSubmissionStatus.pending) {
+      return _unavailable('Recovery observation is unavailable.');
+    }
+    final current = _state!;
+    final baseline = observation.baseline;
+    final physicallyRepresented =
+        current.physicalCheckpoint?.snapshot == baseline.snapshot &&
+        current.physicalCheckpoint?.remoteBaseline == baseline;
+    final obligation = acceptRemote
+        ? (physicallyRepresented ? null : ++_recoveryRevision)
+        : (current.pendingRecoveryCheckpoint ? ++_recoveryRevision : null);
+    _activeHydration = null;
+    _state = current._copy(
+      current: acceptRemote ? baseline.snapshot : current.current,
+      effective: acceptRemote ? baseline.snapshot : current.effective,
+      remoteBaseline: baseline,
+      fieldRevision: current.fieldRevision + 1,
+      recoveryCheckpointRevision: obligation,
+      acceptedRemoteRevision: observation._token.revision,
+      associatedCount: observation.associatedCount,
+      hydrationPending: false,
+      hydrationError: null,
+    );
+    return const Result.success(null);
+  });
+
   /// Publishes only the latest supplied response when local intent is safe.
   Future<Result<bool>> acceptHydration(
     AdminHydrationToken token,
     AdminRemoteBaseline baseline, {
     required int associatedCount,
+    bool requireReconciliation = false,
   }) => _serialize(() async {
     if (!_authoritative(token)) return const Result.success(false);
     if (associatedCount < 0 || associatedCount > 5) {
@@ -775,7 +959,9 @@ final class AdminDraftSession {
       return Result.error(Exception('Unavailable associated capacity.'));
     }
     final current = _state!;
-    if (current.hasUncheckpointedChanges) {
+    if (requireReconciliation ||
+        current.hasUncheckpointedChanges ||
+        current.pendingRecoveryCheckpoint) {
       _state = current._copy(hydrationPending: false);
       return const Result.success(false);
     }
@@ -806,6 +992,7 @@ final class AdminDraftSession {
       _state = current._copy(
         current: baseline.snapshot,
         effective: baseline.snapshot,
+        fieldRevision: current.fieldRevision + 1,
         remoteBaseline: baseline,
         hydrationPending: false,
         hydrationError: null,
@@ -838,7 +1025,9 @@ final class AdminDraftSession {
         acceptedRemoteRevision: null,
       );
     }
-    if (current.acceptedRemoteRevision == null ||
+    if (current.hydrationPending ||
+        current.hydrationError != null ||
+        current.acceptedRemoteRevision == null ||
         current.associatedCount == null) {
       return null;
     }
