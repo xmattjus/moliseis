@@ -4,7 +4,7 @@ Verified on 2026-10-29 in timezone `Europe/Rome`.
 
 ## Scope and baseline
 
-Implementation continues on `plan/harden-admin-dirty-exit` in PR #21, from planning commit `b028879273a7f1eb3afe01eca11a2c884880e6c5`. The original main baseline is `c7250f5db274c8b00af53cdd83846076918fd226`. Within PR #21, no backend, schema, dependency, generated model, tracked platform configuration or canonical specification changed. The primary checkout remains on main and clean.
+Implementation continues on `plan/harden-admin-dirty-exit` in PR #21, from planning commit `b028879273a7f1eb3afe01eca11a2c884880e6c5`. The original main baseline is `c7250f5db274c8b00af53cdd83846076918fd226`. Within PR #21, no backend, schema, dependency, generated model, tracked platform configuration or canonical specification changed. At that implementation verification, the primary checkout was on main and clean.
 
 After Android signing PR [#22](https://github.com/xmattjus/moliseis/pull/22) merged, the primary checkout was fast-forwarded to `5f51a39f59d73a5cc2ce68a6173871db39341874`. PR #21 rebased without conflicts from `ad0625e7949bdb6f5eb155c3bf873ffcc004637f` to `1359eb9e82bb646662bbdc00ca11abbe61602c9f`; range-diff and byte-for-byte patch comparison preserved all three original commits' changes. Push used an explicit remote-HEAD lease. The earlier follow-up changed the discard hydration notification, its focused regression and verification records. The later native OS-input follow-up below adds the narrowly scoped predictive-transition/readiness corrections; PR #21 remains Draft.
 
@@ -124,6 +124,31 @@ Ordinary local checkpoints publish an identity-qualified exit-readiness obligati
 
 Seven predictive regression cases were exercised RED then GREEN, covering dirty cancellation, running Save, checkpoint/hint barriers in both orderings, and completion beneath an owned modal. The six focused router/ViewModel suites passed **184 tests**. Final full-suite/analyzer results are recorded in the automated-verification section.
 
-## Remaining acceptance
+## Acceptance status before the mobile release scope decision
 
-**Task 5.3 remains unchecked: native acceptance NOT VERIFIED.** The available automated work is complete (21/22 tasks); Android and iOS OS-input acceptance is recorded above; required macOS keyboard/focus/scaling acceptance remains unsupported. This does not establish release readiness. PR #21 was not merged; no canonical-spec sync or archive was performed. No architectural scope deviation was required.
+At `f4d7e6ac9bf6c92f6c45de89a789389b0193ae4d`, task 5.3 remained unchecked (21/22 tasks): Android and iOS OS-input acceptance was recorded above, but the original blocking native gate also required the unsupported macOS keyboard/focus/scaling checks. The overall verdict at that point was NOT VERIFIED. This historical result is retained; the later approved gate revision below does not convert those macOS scenarios to PASS.
+
+## Final mobile acceptance decision — 2026-10-29
+
+The user explicitly approved native macOS smoke as **deferred and non-blocking for this Android/iOS mobile release**. Android 17/API 37 OS-delivered Back/touch evidence and iOS 26.5 Simulator XCUITest evidence already satisfy the revised task 5.3, including the documented exit choices, gesture cancellation/completion, Progress, ownership and simulated auth-revocation checks. Task 5.3 is therefore complete under its revised wording: **22/22 tasks; READY FOR INDEPENDENT REVIEW**. This is a release-gate decision, not a change to desktop application behavior or a declaration that every platform is fully verified.
+
+The evidence categories remain distinct:
+
+- **Verified native runtime behavior:** Android emulator OS input and iOS Simulator touch/gestures, using production router/widgets/theme with controlled fake authentication and repositories. The existing matrices above retain the actual outcomes, corrections and limitations.
+- **Verified Flutter widget behavior:** the existing suites cover desktop keyboard actions and focus, semantics, responsive widths 320/390/700/1000/1300/1700 dp, 700×320 landscape, both themes and default/2.0 text scaling. This evidence does not establish native macOS event delivery.
+- **Native macOS still NOT VERIFIED:** comprehensive editor/modal Escape, Tab/Shift-Tab containment, Enter/Space choices, focus retention, native resizing/scaling and auth revocation during those owned presentations. These remain deferred/non-blocking, with the narrow manual checklist above retained. Permission and XCTest connectivity limitations prevented reliable automation; further infrastructure solely for this mobile release would be disproportionate. No security permissions were changed.
+- **Outside the verified boundary:** physical devices, real authentication, production-backend behavior and native-storage durability are not claimed verified by the emulator/simulator fake fixtures or widget tests.
+
+### User-reported macOS Escape after the picker
+
+The user manually observed that editing fields, pressing **Insert a photo** (the UI label is `Inserisci una foto`), returning from the picker and pressing Escape closes the editor without the unsaved-changes dialog. The same result was observed both when selecting an image and when cancelling the picker. This is a limited user-reported manual observation, not completion of the macOS native matrix.
+
+Source inspection confirms that `AdminSubmissionEditorViewModel` awaits `AdminDraftSession.setNavigationIntent()` before launching the native picker. That session operation runs the durable local field checkpoint before saving the navigation nonce. After successful checkpoint completion, with no subsequent field edit, C equals E; selecting or cancelling the picker does not itself require another field-discard prompt. The observed Escape behavior is therefore consistent with the implemented local checkpoint contract, not a demonstrated regression or a remote Save.
+
+The user did **not** separately confirm preservation of those edited fields by reopening the exact local draft. That additional manual persistence check remains NOT VERIFIED. Existing deterministic draft-session/checkpoint and picker ViewModel tests are separate evidence; they must not be presented as that unperformed manual check. No code change is authorized or made for this observation.
+
+### Documentation-only finalization and publication boundary
+
+Baseline for this documentation update is `f4d7e6ac9bf6c92f6c45de89a789389b0193ae4d`. Its latest relevant CI [run 40903947887](https://github.com/xmattjus/moliseis/actions/runs/40903947887) completed successfully for **Flutter analyze** and **Autonomous Flutter tests**; CodeRabbit was skipped, not a completed review. The previously recorded local result remains 3,790 passed / 4 existing skips and no analyzer diagnostics. No executable code changed in this finalization, so the full Flutter suite was not rerun.
+
+This update changes only `tasks.md`, `design.md` and this verification record, recording the approved gate and retained limitations. OpenSpec strict validation, complete diff review and documentation/task/link/path hygiene checks pass. PR #21 remains Draft; independent adversarial review of the complete implementation diff is the next separately authorized step. No merge, canonical-spec synchronization, archive or historical Plan 1–3 change is performed.

@@ -116,7 +116,9 @@ The following matrix defines the acceptance assertions. Execution results and re
 
 Reuse `test/support/admin_save_route_harness.dart`, `admin_editor_command_harness.dart`, `admin_draft_repositories.dart`, existing Public harnesses, `testOwnerUI` and repository/image-picker fakes. Extend deferred completion/failure controls and call counters there rather than duplicating local helpers. Load test-support/unit/widget skills before modifying tests; this PR modifies none. ObjectBox storage tests, if implementation changes require them, use the existing real temporary-store harness and its skill, never fake ObjectBox internals.
 
-Native-device smoke verification remains separate: iOS clean interactive swipe and dirty edge refusal/cancellation; Android predictive gesture start/cancel/commit and hardware/system Back while dirty or running; desktop focus/Tab/Shift-Tab/Enter/Space/Escape under scaling; security revocation during each owned presentation. Widget tests cannot prove native gesture animation, platform key dispatch or timing on real devices. Record native results honestly at apply time; do not mark those acceptance checks passed from widget tests alone.
+Native smoke verification remains separate from the automated matrix. For this Android/iOS mobile release, the blocking native gate requires Android OS-delivered system/predictive Back (start/cancel/commit, including dirty/running states) and iOS Simulator-delivered clean/dirty gestures and touch controls, exit decisions, Progress and security revocation during owned presentations. Record the actual environment, inputs, outcomes and fixture limitations; widget tests alone do not establish native interaction.
+
+**User-approved release boundary (2026-10-29):** the original native smoke scope also included desktop focus/Tab/Shift-Tab/Enter/Space/Escape under scaling and auth revocation. Native macOS smoke is now deferred and non-blocking for this mobile release: macOS is not a release target, existing Android/iOS native evidence and desktop widget assertions are available, and overcoming the observed macOS permission/XCTest limitations solely for this release would be disproportionate. This changes the acceptance gate only. Desktop functional requirements, keyboard/focus/semantics, responsive breakpoints and text scaling in the matrix and delta specifications remain unchanged. Unexecuted macOS native scenarios stay NOT VERIFIED; automated desktop coverage does not make them PASS. Emulator/simulator results do not establish physical-device, real-authentication, production-backend or native-storage verification.
 
 ## Risks / Trade-offs
 
@@ -126,9 +128,9 @@ Native-device smoke verification remains separate: iOS clean interactive swipe a
 - **Admission during dialog or local completion** → existing VM reservation seam, reviewed revision validation and post-checkpoint dirty check; UI absorption alone is insufficient.
 - **Runtime recovery obligation is not a new durable journal** → same-session route removal retains the app owner; real process restart still restores P/historical R and requires fresh authority, exactly as Plan 3. This change does not promise that uncheckpointed B survives process death.
 - **Discarded fields can invalidate dependent UI evidence** → use the existing field-change invalidation path without mutating durable intent/receipt state.
-- **Native gesture behavior cannot be established by planning** → explicit automated/native separation and smoke acceptance before release.
+- **Native gesture behavior cannot be established by planning** → explicit automated/native separation and the mobile native smoke gate above before release.
 
-No unresolved material contradiction remains in the intended behavior. Native interaction remains an implementation verification obligation, not evidence already obtained.
+No unresolved material contradiction remains in the intended behavior. Native outcomes and the approved mobile acceptance decision are recorded in [verification.md](verification.md); completion of the revised gate does not imply full-platform verification or replace the independent implementation review before merge.
 
 ## Migration Plan
 
