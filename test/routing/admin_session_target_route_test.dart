@@ -84,8 +84,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Impossibile aprire'), findsOneWidget);
-    expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+    // The known active-session/other-ID mismatch is refused before rebinding.
+    expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+    expect(
+      harness.router.routerDelegate.currentConfiguration.uri.path,
+      '/admin/submissions/456',
+    );
     expect(harness.local.session.state, same(before));
     expect(harness.owner.isActivationCurrent(activation), isTrue);
     expect(harness.owner.name, 'Private uncheckpointed B');

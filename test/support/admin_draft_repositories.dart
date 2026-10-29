@@ -22,6 +22,10 @@ final class FakeAdminDraftRepository implements AdminSubmissionDraftRepository {
   /// Optional controlled read, used for initialization interleavings.
   Future<Result<AdminSubmissionDraft?>> Function(String, int?)? onLoad;
 
+  /// Optional controlled resume lookup, without altering exact-target reads.
+  Future<Result<AdminSubmissionDraft?>> Function(String, String)?
+  onLoadBySession;
+
   /// Optional barrier before identity adoption commits in this domain fake.
   Future<void> Function()? onAdopt;
 
@@ -45,6 +49,9 @@ final class FakeAdminDraftRepository implements AdminSubmissionDraftRepository {
     required String accountId,
     required String sessionId,
   }) async {
+    if (onLoadBySession case final callback?) {
+      return await callback(accountId, sessionId);
+    }
     for (final draft in drafts.values) {
       if (draft.owner.accountId == accountId &&
           draft.owner.sessionId == sessionId) {

@@ -25,6 +25,7 @@ import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_edito
 import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
+import 'package:moliseis/ui/core/ui/unsaved_changes_dialog.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
@@ -550,8 +551,13 @@ void main() {
         expect(harness.repository.getByIdIds, [1]);
         expect(owner.requestLoad(activation: activation), isFalse);
         harness.router.go('/admin/submissions/2');
-        await tester.pumpAndSettle();
-        expect(find.textContaining('Impossibile aprire'), findsOneWidget);
+        // Refusal now happens before replacing the still-loading source page.
+        await pumpCommandTurns(tester);
+        expect(
+          harness.router.routerDelegate.state.uri.path,
+          '/admin/submissions/1',
+        );
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
         expect(owner.submissionId, 1);
         expect(owner.isDisposed, isFalse);
         expect(harness.repository.getByIdIds, [1]);
@@ -564,7 +570,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(harness.repository.getByIdIds, [1]);
-        await tester.tap(find.text('Riprova'));
+        harness.router.go('/admin/submissions/2');
         await tester.pumpAndSettle();
         expect(harness.editor, same(owner));
         expect(owner.submissionId, 2);
@@ -666,6 +672,20 @@ void main() {
               );
               if (destination == 'replacement') {
                 harness.router.go('/admin/submissions/2');
+                await pumpCommandTurns(tester);
+                expect(
+                  harness.router.routerDelegate.state.uri.path,
+                  '/admin/submissions/1',
+                );
+                Navigator.of(
+                  tester.element(find.byType(AdminSubmissionEditorScreen)),
+                ).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const Scaffold(
+                      body: Text('Covering refused replacement'),
+                    ),
+                  ),
+                );
               } else {
                 harness.auth
                   ..setUser(null)
@@ -678,7 +698,7 @@ void main() {
                 isFalse,
               );
               final expectedPath = destination == 'replacement'
-                  ? '/admin/submissions/2'
+                  ? '/admin/submissions/1'
                   : RoutePaths.adminLoginLocation;
               expect(
                 harness.router.routerDelegate.state.uri.path,
@@ -686,7 +706,7 @@ void main() {
               );
               if (destination == 'replacement') {
                 expect(
-                  find.textContaining('Impossibile aprire'),
+                  find.text('Covering refused replacement'),
                   findsOneWidget,
                 );
                 expect(oldOwner.submissionId, 1);
@@ -767,11 +787,78 @@ void main() {
       }
     }
 
+    testOwnerUI(
+      'unavailable pushed editor pop never authorizes dirty source removal',
+      (tester) async {
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
+        harness.repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(modifiedAtToken: '2026-08-20T00:00:00.000000Z'),
+        );
+        harness.router.go('/admin/submissions/1');
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+        final owner = harness.editor;
+        final sourceState = tester.state(
+          find.byType(AdminSubmissionEditorScreen),
+        );
+        owner.setName('Captured remote A', activation: owner.activation);
+        final gate = Completer<Result<AdminSubmission>>();
+        harness.repository.pendingUpdate = gate;
+        expect(owner.requestSave(activation: owner.activation), isTrue);
+        await pumpCommandTurns(tester);
+        owner.setName('Newer source B', activation: owner.activation);
+        unawaited(harness.router.push('/admin/submissions/2'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Impossibile aprire'), findsOneWidget);
+        expect(owner.isSaveRunning, isTrue);
+        expect(owner.submissionId, 1);
+        await tester.binding.handlePopRoute();
+        await pumpCommandTurns(tester);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(
+          harness.router.routerDelegate.state.uri.path,
+          '/admin/submissions/1',
+        );
+        expect(
+          tester.state(find.byType(AdminSubmissionEditorScreen)),
+          same(sourceState),
+        );
+        expect(find.byType(UnsavedChangesDialog), findsNothing);
+        expect(owner.name, 'Newer source B');
+        expect(owner.isSaveRunning, isTrue);
+        gate.complete(
+          Result.success(
+            sampleAdminSubmission(
+              name: 'Captured remote A',
+              modifiedAtToken: '2026-08-20T00:00:01.000000Z',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(owner.hasUncheckpointedChanges, isTrue);
+        expect(owner.name, 'Newer source B');
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(harness.repository.updateIds, [1]);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () {
+        harness.editor.dispose();
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
+
     for (final operation in ['save', 'reject']) {
       for (final outcome in ['success', 'expected error', 'raw failure']) {
         testOwnerUI(
           'CR1.${operation == 'save' ? '1' : '2'} $operation $outcome '
-          'behind pushed editor is consumed without effects',
+          'behind covering route is consumed without effects',
           (tester) async {
             harness = _AdminRouteHarness(
               initialUser: makeAuthUser(
@@ -820,12 +907,19 @@ void main() {
             }
             await pumpCommandTurns(tester);
             var bPopped = false;
-            final pushed = harness.router.push<bool>('/admin/submissions/2');
+            final coveringNavigator = Navigator.of(
+              tester.element(find.byType(AdminSubmissionEditorScreen)),
+            );
+            final pushed = coveringNavigator.push<bool>(
+              MaterialPageRoute<bool>(
+                builder: (_) => const Scaffold(body: Text('Covering editor')),
+              ),
+            );
             unawaited(pushed.then((_) => bPopped = true));
             await tester.pumpAndSettle();
             expect(editorA.mounted, isTrue);
             expect(ownerA.isDisposed, isFalse);
-            expect(find.textContaining('Impossibile aprire'), findsOneWidget);
+            expect(find.text('Covering editor'), findsOneWidget);
             expect(ownerA.submissionId, 1);
             final bSnapshot = ownerA.loadSnapshot;
             final runtimeError = StateError('covered $operation');
@@ -867,7 +961,7 @@ void main() {
             expect(bPopped, isFalse);
             expect(
               harness.router.routerDelegate.state.uri.path,
-              '/admin/submissions/2',
+              '/admin/submissions/1',
             );
             expect(find.byType(SnackBar), findsNothing);
             expect(identical(ownerA.loadSnapshot, bSnapshot), isTrue);
@@ -885,7 +979,7 @@ void main() {
               logger.calls.where((call) => identical(call.error, runtimeError)),
               hasLength(outcome == 'raw failure' ? 1 : 0),
             );
-            harness.router.pop();
+            coveringNavigator.pop();
             await tester.pumpAndSettle();
             await pumpCommandTurns(tester);
             expect(bPopped, isTrue);
@@ -1082,24 +1176,23 @@ void main() {
                 expect(find.byType(AlertDialog), findsOneWidget);
               }
               var bPopped = false;
+              final coveringNavigator = Navigator.of(dialogContext);
               unawaited(
-                harness.router
-                    .push<bool>('/admin/submissions/2')
+                coveringNavigator
+                    .push<bool>(
+                      MaterialPageRoute<bool>(
+                        builder: (_) =>
+                            const Scaffold(body: Text('Covering confirmation')),
+                      ),
+                    )
                     .then((_) => bPopped = true),
               );
               await tester.pumpAndSettle();
-              expect(stateA.mounted, !completeBeforeCover);
+              expect(stateA.mounted, isTrue);
               expect(ownerA.isDisposed, isFalse);
               expect(dialogRoute.isCurrent, isFalse);
-              if (completeBeforeCover) {
-                expect(ownerA.submissionId, 2);
-              } else {
-                expect(
-                  find.textContaining('Impossibile aprire'),
-                  findsOneWidget,
-                );
-                expect(ownerA.submissionId, 1);
-              }
+              expect(find.text('Covering confirmation'), findsOneWidget);
+              expect(ownerA.submissionId, 1);
               if (!completeBeforeCover) {
                 harness.repository.getByIdResults[1] = Result.success(
                   sampleAdminSubmission(
@@ -1121,25 +1214,21 @@ void main() {
               expect(bPopped, isFalse);
               expect(
                 harness.router.routerDelegate.state.uri.path,
-                '/admin/submissions/2',
+                '/admin/submissions/1',
               );
               expect(find.byType(SnackBar), findsNothing);
-              harness.router.pop();
+              coveringNavigator.pop();
               await tester.pump(const Duration(milliseconds: 400));
               await pumpCommandTurns(tester);
               expect(bPopped, isTrue);
-              // Replacing A's activation disposes its obsolete dialog;
-              // refused activation leaves the covered dialog dismissible.
-              if (completeBeforeCover) {
-                expect(find.byType(AlertDialog), findsNothing);
-              } else {
-                expect(find.byType(AlertDialog), findsOneWidget);
-                await tester.tap(
-                  confirm
-                      ? find.widgetWithText(FilledButton, 'Conferma')
-                      : find.widgetWithText(TextButton, 'Annulla'),
-                );
-              }
+              // Coverage permanently revokes this modal even after return,
+              // whether Save completed before or after the covering page.
+              expect(find.byType(AlertDialog), findsOneWidget);
+              await tester.tap(
+                confirm
+                    ? find.widgetWithText(FilledButton, 'Conferma')
+                    : find.widgetWithText(TextButton, 'Annulla'),
+              );
               await tester.pumpAndSettle();
               await pumpCommandTurns(tester);
               expect(

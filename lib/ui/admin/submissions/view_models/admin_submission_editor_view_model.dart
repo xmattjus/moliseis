@@ -170,6 +170,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   AdminAuthViewModel? _auth;
   String? _activeAccountId;
   final _commandGenerations = <commands.Command<dynamic, dynamic>, int>{};
+  AdminDraftExitReview? _exitReview;
+  final _localCheckpointRequests = <Object>{};
 
   /// Current local activation, captured when establishing rendered callbacks.
   AdminDraftActivation? get activation => _draftSession?.captureActivation();
@@ -262,7 +264,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
             ? previous?.sessionId == sessionId
             : previous?.submissionId == submissionId);
     if (same) return await session.initialize();
-    if (!_revoked && operationRunning) {
+    if (!_revoked && (operationRunning || _exitReview != null)) {
       return Result.error(
         Exception('Attendi il completamento dell’operazione corrente.'),
       );
@@ -295,6 +297,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   }
 
   void _clearContext() {
+    _exitReview = null;
+    _localCheckpointRequests.clear();
     _isDirty = false;
     _loadEffectId = null;
     _saveEffectId = null;
@@ -361,16 +365,115 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Whether explicit local parking can be admitted without remote work.
   bool get canCheckpoint =>
-      !_disposed && !_revoked && (_draftSession?.state?.ready ?? false);
+      !_disposed &&
+      !_revoked &&
+      _exitReview == null &&
+      (_draftSession?.state?.ready ?? false);
+
+  /// Local C differs from E, independently of remote moderation dirtiness.
+  bool get hasUncheckpointedChanges =>
+      _draftSession?.state?.hasUncheckpointedChanges ?? false;
+
+  /// Whether an ordinary exit can reserve the initialized, settled editor.
+  bool get canRequestExit =>
+      !_disposed &&
+      !_revoked &&
+      _draftSession != null &&
+      _localCheckpointRequests.isEmpty &&
+      !_draftSession.hasPendingLocalWork &&
+      !loading &&
+      !operationRunning &&
+      !pickerWaiting &&
+      _exitReview == null;
+
+  /// Whether one private exit decision currently owns action admission.
+  bool get exitDecisionPending => _exitReview != null;
+
+  /// Reserves one decision and captures its immutable local review context.
+  AdminDraftExitReview? beginExitDecision(AdminDraftActivation? activation) {
+    if (!_authority(activation) || activation == null || !canRequestExit) {
+      return null;
+    }
+    final review = _draftSession!.captureExitReview(activation);
+    if (review == null) return null;
+    _exitReview = review;
+    _notifyListeners();
+    return review;
+  }
+
+  /// Releases only the supplied decision, never a replacement reservation.
+  ///
+  /// A detaching router binding uses `notify: false` during Navigator rebuild;
+  /// its replacement publishes independently after activation. Ordinary
+  /// cancellation still notifies the retained editor immediately.
+  void endExitDecision(AdminDraftExitReview review, {bool notify = true}) {
+    if (!identical(_exitReview, review)) return;
+    _exitReview = null;
+    if (notify) _notifyListeners();
+  }
+
+  bool _ownsExitDecision(AdminDraftExitReview review) =>
+      identical(_exitReview, review) && _authority(review.activation);
+
+  /// Rechecks reviewed field and baseline facts before a local exit action.
+  bool isExitReviewCurrent(AdminDraftExitReview review) =>
+      _ownsExitDecision(review) && _draftSession!.isExitReviewCurrent(review);
+
+  /// Persists reviewed fields only, with final admission inside local ordering.
+  Future<Result<void>> checkpointForExit(AdminDraftExitReview review) async {
+    if (!_ownsExitDecision(review)) return _unavailable();
+    final result = await _draftSession!.checkpointReviewed(review);
+    if (!_ownsExitDecision(review)) return _unavailable();
+    _notifyListeners();
+    return result;
+  }
+
+  /// Discards uncheckpointed fields without mutating durable recovery evidence.
+  Future<Result<void>> discardForExit(AdminDraftExitReview review) async {
+    if (!_ownsExitDecision(review)) return _unavailable();
+    final result = await _draftSession!.discardReviewed(review);
+    if (!_ownsExitDecision(review)) return _unavailable();
+    if (result is Success<void>) {
+      _acknowledgeCurrentSource = false;
+      _acknowledgedSourceHash = null;
+      _ignoreSource = false;
+      _eventTimeIssue = null;
+      _hydrationRevision++;
+      _markDirty();
+    }
+    return result;
+  }
+
+  /// Confirms only this review's checkpoint and unchanged current field intent.
+  bool isExitCheckpointConfirmed(AdminDraftExitReview review) =>
+      _ownsExitDecision(review) &&
+      _draftSession!.isExitCheckpointConfirmed(review);
+
+  /// Confirms only this review's field discard and preserved recovery facts.
+  bool isExitDiscardConfirmed(AdminDraftExitReview review) =>
+      _ownsExitDecision(review) &&
+      _draftSession!.isExitDiscardConfirmed(review);
 
   /// Durably parks incomplete values without executing a remote mutation.
   Future<Result<void>> checkpointLocal() async {
     if (!canCheckpoint) return _unavailable();
     final ownerGeneration = _generation;
-    final result = await _draftSession!.checkpoint(requireDurableOwner: true);
-    if (_obsolete(ownerGeneration)) return _unavailable();
-    _notifyListeners();
-    return result;
+    final request = Object();
+    _localCheckpointRequests.add(request);
+    try {
+      // Capture the existing domain request before notifying synchronous
+      // listeners; its ordinary serialization/snapshot timing is unchanged.
+      final checkpoint = _draftSession!.checkpoint(requireDurableOwner: true);
+      _notifyListeners();
+      final result = await checkpoint;
+      if (_obsolete(ownerGeneration)) return _unavailable();
+      return result;
+    } finally {
+      if (_localCheckpointRequests.remove(request) &&
+          !_obsolete(ownerGeneration)) {
+        _notifyListeners();
+      }
+    }
   }
 
   AdminDraftSnapshot get _fields =>
@@ -876,7 +979,11 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   ];
 
   bool get _canChangeContext =>
-      !_disposed && !_revoked && !loading && !operationRunning;
+      !_disposed &&
+      !_revoked &&
+      _exitReview == null &&
+      !loading &&
+      !operationRunning;
   bool get _canChangeFields =>
       !_disposed &&
       !_revoked &&
@@ -891,6 +998,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   bool _canAdmit(commands.Command<dynamic, dynamic> command) {
     if (_disposed ||
         _revoked ||
+        _exitReview != null ||
         (_draftSession != null && !(_draftSession.state?.ready ?? false)) ||
         _stopped ||
         _reserved.contains(command) ||
@@ -3062,6 +3170,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _localCheckpointRequests.clear();
     _auth?.removeListener(_onAuthChanged);
     if (_draftSession != null) _abandonPicker();
     _draftSession?.revoke();
