@@ -2,7 +2,7 @@
 
 ## Context
 
-See [proposal.md](proposal.md) for motivation. Planning baseline is `origin/main` at `c7250f5db274c8b00af53cdd83846076918fd226`, after archived Admin Plans 1–3. The change was originally planning-only; implementation and verification status are tracked in [tasks.md](tasks.md) and [verification.md](verification.md).
+See [proposal.md](proposal.md) for motivation. Planning baseline is `origin/main` at `c7250f5db274c8b00af53cdd83846076918fd226`, after archived Admin Plans 1–3. The change was originally planning-only. The source inspection below records that planning baseline; completed implementation, review, merge and archival status are recorded in [tasks.md](tasks.md).
 
 ### Inspected contracts and source
 
@@ -26,7 +26,7 @@ Installed `router.dart` documents `onEnter(current, next, router)` before redire
 
 **Goals:** Protect uncheckpointed fields through one explicit policy; preserve remote admission and recovery safety; share presentation without coupling Public and Admin orchestration; retain normal native clean navigation and accessible desktop use.
 
-**Non-Goals:** No generic navigation framework, parallel session manager, new DI, backend/migration work, draft schema change, owner retirement, automatic remote Save, generic draft deletion, picker provenance redesign, new package or broad form refactor. Do not apply or reinterpret historical `improve-admin-submission-editor-workflow`. Do not synchronize canonical specs in this PR.
+**Non-Goals:** No generic navigation framework, parallel session manager, new DI, backend/migration work, draft schema change, owner retirement, automatic remote Save, generic draft deletion, picker provenance redesign, new package or broad form refactor. Do not apply or reinterpret historical `improve-admin-submission-editor-workflow`. Canonical synchronization was excluded from the implementation PR and belongs to the separate archival documentation workflow.
 
 ## Decisions
 
@@ -102,7 +102,7 @@ Use `context.appShapes.circular.cornerExtraLarge`, scheme surface/onSurface/onSu
 
 ## Acceptance and verification matrix
 
-The following matrix defines the acceptance assertions. Execution results and remaining native limitations are tracked in [verification.md](verification.md) and [tasks.md](tasks.md).
+The following matrix defines the acceptance assertions. Completed acceptance and remaining native limitations are summarized in [tasks.md](tasks.md); detailed execution history remains in Git history and merged PR #21.
 
 | Layer / existing seam | Required assertions |
 | --- | --- |
@@ -114,7 +114,7 @@ The following matrix defines the acceptance assertions. Execution results and re
 | New `test/ui/core/ui/unsaved_changes_dialog_test.dart` | Exact typed choices, nonaffirmative dismissal, semantics/focus/keyboard; 320/390/700/1000/1300/1700 dp × light/dark × default/2.0 text scaling; 700×320 landscape and constrained-height actions; no overflow or unreachable button |
 | Existing Public routing/restoration/screen/VM/progress suites | Existing checkpoint/restore, durable staged work, single-flight, init barriers, submit/finalization, predictive Back, iOS and progress semantics remain green after presentation adoption |
 
-Reuse `test/support/admin_save_route_harness.dart`, `admin_editor_command_harness.dart`, `admin_draft_repositories.dart`, existing Public harnesses, `testOwnerUI` and repository/image-picker fakes. Extend deferred completion/failure controls and call counters there rather than duplicating local helpers. Load test-support/unit/widget skills before modifying tests; this PR modifies none. ObjectBox storage tests, if implementation changes require them, use the existing real temporary-store harness and its skill, never fake ObjectBox internals.
+Reuse `test/support/admin_save_route_harness.dart`, `admin_editor_command_harness.dart`, `admin_draft_repositories.dart`, existing Public harnesses, `testOwnerUI` and repository/image-picker fakes. Extend deferred completion/failure controls and call counters there rather than duplicating local helpers. The implementation reused the repository test-support/unit/widget skills and existing harnesses. ObjectBox storage tests, if implementation changes require them, use the existing real temporary-store harness and its skill, never fake ObjectBox internals.
 
 Native smoke verification remains separate from the automated matrix. For this Android/iOS mobile release, the blocking native gate requires Android OS-delivered system/predictive Back (start/cancel/commit, including dirty/running states) and iOS Simulator-delivered clean/dirty gestures and touch controls, exit decisions, Progress and security revocation during owned presentations. Record the actual environment, inputs, outcomes and fixture limitations; widget tests alone do not establish native interaction.
 
@@ -130,10 +130,10 @@ Native smoke verification remains separate from the automated matrix. For this A
 - **Discarded fields can invalidate dependent UI evidence** → use the existing field-change invalidation path without mutating durable intent/receipt state.
 - **Native gesture behavior cannot be established by planning** → explicit automated/native separation and the mobile native smoke gate above before release.
 
-No unresolved material contradiction remains in the intended behavior. Native outcomes and the approved mobile acceptance decision are recorded in [verification.md](verification.md); completion of the revised gate does not imply full-platform verification or replace the independent implementation review before merge.
+No unresolved material contradiction remains in the intended behavior. The approved mobile acceptance decision and completed independent review are summarized in [tasks.md](tasks.md); completion of the revised gate does not imply full-platform verification.
 
 ## Migration Plan
 
-The original implementation sequence was local state operations, shared presentation, route integration and focused regression tests, followed by broader Flutter analysis/testing. That implementation has been performed in this PR and all 22 tasks are complete under the approved Android/iOS mobile gate. Completed automated/native evidence and the subsequent independent full-diff review are recorded in [verification.md](verification.md). Native macOS smoke remains NOT VERIFIED and non-blocking; the documented physical-device and backend/storage verification limits remain unchanged.
+The original implementation sequence was local state operations, shared presentation, route integration and focused regression tests, followed by broader Flutter analysis/testing. That implementation was completed and merged through PR #21, with all 22 tasks complete under the approved Android/iOS mobile gate. Completed automated/native acceptance and the subsequent independent full-diff review are summarized in [tasks.md](tasks.md). Native macOS smoke remains NOT VERIFIED and non-blocking; the documented physical-device and backend/storage verification limits remain unchanged.
 
-Canonical specification synchronization and archival are reserved for a later, separately authorized documentation workflow after this implementation PR. No data migration or backend deployment is involved. A later rollback reverts route/dialog integration while retaining the existing durable sessions and files; it must not erase checkpoints or reinterpret unresolved writes.
+Canonical specification synchronization and archival are performed in the separately authorized documentation workflow after the implementation merge; their publication remains subject to review in a new Draft PR. No data migration or backend deployment is involved. A later rollback reverts route/dialog integration while retaining the existing durable sessions and files; it must not erase checkpoints or reinterpret unresolved writes.
