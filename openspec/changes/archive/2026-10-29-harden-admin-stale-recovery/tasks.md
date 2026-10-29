@@ -46,8 +46,8 @@ Implementation authorized after independent planning review, including F1/F2 rem
 ## Workflow follow-up
 
 - Originally prepared as planning-only artifacts against the audited baseline; implementation was subsequently authorized and the 23 tasks above were completed.
-- Implementation commit `067de05d07782560afed9a55f494463b76710ea3` is published in [Draft PR #19](https://github.com/xmattjus/moliseis/pull/19), targeting `main`. Review remediation is authorized on the same branch; the updated diff awaits final independent review.
-- Merge, canonical specification synchronization, archive and deployment remain unauthorized. No production or device verification is claimed.
+- Implementation commit `067de05d07782560afed9a55f494463b76710ea3` and final review remediation `d3ea61f98dd5523ec3c4b3f87f6401d0feabd00e` were published in [PR #19](https://github.com/xmattjus/moliseis/pull/19). After independent review, PR #19 merged into `main` as `c66ed631bc3d0d5664c98f884bf1237025a99e15` on 2026-10-29.
+- A separate documentation mission authorizes canonical synchronization and archival from that verified merge baseline. These documentation changes remain subject to independent review in a new Draft PR before integration into `main`. Deployment and worktree cleanup remain outside this mission; no production or device verification is claimed.
 
 ## Implementation verification — 2026-10-29
 
@@ -55,10 +55,18 @@ Implementation authorized after independent planning review, including F1/F2 rem
 - Integrated affected Admin domain/data/mapper/auth/VM/widget/routing run: 1,100 tests passed. Relevant unchanged Public draft/staging/submit/progress/restoration regressions: 459 passed. PR CI subsequently demonstrated an overlong documentation comment; its correction and fresh analyzer result are recorded below.
 - Red/green characterization included missing recovery APIs and an unmounted editor consumer; removing its mounted guard allowed a captured Accept callback to mutate retained fields, while the restored guard prevents it.
 - Source review and counterexamples verified F1 transition refusal, matching checkpoint proof, F2 qualified R capture, immutable historical A/V, W-to-X rejection, late/revoked callbacks, receipt contradictions and moderation/Progress preservation. Review fixes covered terminal read-back classification and stale load feedback after successful reconciliation.
-- No production/backend/device verification is claimed. No Supabase, Public source/tests, dependencies, schema, generated bindings, canonical or historical OpenSpec files changed. Logs, analyzer output, temporary manifests and native test runtime files are excluded from the deliverable. These implementation results preceded publication in Draft PR #19; current review status is recorded above.
+- No production/backend/device verification is claimed. No Supabase, Public source/tests, dependencies, schema, generated bindings, canonical or historical OpenSpec files changed. Logs, analyzer output, temporary manifests and native test runtime files are excluded from the deliverable. These implementation results preceded publication in PR #19; completion status is recorded above.
 
 ## PR #19 remediation verification
 
 - Reproduced premature historical-receipt cleanup after both immediate addition and an earlier staged association in the same Save. Confirmed additions now preserve existing association evidence; unavailable complete evidence blocks historical cleanup. Newly confirmed associations still settle their receipts before cleanup, without new state or backend calls.
 - Focused recovery/durable-editor/real-store suites: 112 passed. Integrated Admin regressions: 1,105 passed. Public regressions: 459 passed. Final standalone ObjectBox/filesystem suite: 19 passed, including failed receipt/cleanup writes, actual reopen, contradiction followed by addition, byte retention and explicit local removal.
-- Full `flutter analyze --no-pub`: no issues found after wrapping the reported comment. `openspec validate harden-admin-stale-recovery --strict`: passed. The remediation diff awaits final independent review; these checks do not claim production or device verification.
+- Full `flutter analyze --no-pub`: no issues found after wrapping the reported comment. `openspec validate harden-admin-stale-recovery --strict`: passed. The remediation was included in the independently reviewed merge recorded above; these historical checks do not claim production or device verification.
+
+## Canonical synchronization and archival — 2026-10-29
+
+- OpenSpec 1.14.3 native archive synchronized the three approved delta specifications and archived this completed 23-task change from merge baseline `c66ed631bc3d0d5664c98f884bf1237025a99e15`.
+- All ten delta requirements and 53 scenarios are retained in the canonical specifications. Two additional canonical scenarios make the reviewed PR #19 historical-evidence versus newly-confirmed-cleanup distinction explicit; the approved delta artifacts remain unchanged.
+- The canonical delivery boundary now recognizes completed Plan 3 recovery while retaining Plan 4 Dirty Exit as future work. Pre-existing requirement and scenario blocks remain unchanged.
+- This archival record belongs to a separate documentation Draft PR. Canonical synchronization and archival are complete on that branch, pending independent review and integration into `main`; no merge, deployment, device testing or worktree cleanup is claimed by this mission.
+- Archival verification: all three affected canonical specifications pass strict validation; requirement/scenario coverage, artifact preservation, duplicate checks and documentation hygiene pass. Global strict validation retains exactly the baseline findings: 15 unrelated specifications with overlong requirement text and the historical `2026-10-07-harden-main-navigation-shell` archive with two incomplete tasks. No unrelated remediation or Flutter suite rerun is included.

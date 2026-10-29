@@ -2,7 +2,7 @@
 
 ## Context
 
-See [proposal.md](proposal.md) for motivation. This is Admin cluster Plan 3, planning only.
+See [proposal.md](proposal.md) for motivation. This is Admin cluster Plan 3. The design below preserves the approved planning baseline; implementation, PR #19 remediation, merge and archival status are recorded in [tasks.md](tasks.md).
 
 ### Verified baseline and evidence boundaries
 
