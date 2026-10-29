@@ -35,7 +35,7 @@ Admin New and Edit SHALL use one exit policy comparing current fields with the e
 - **THEN** exactly one three-choice Save and Exit, Discard and Exit, Cancel dialog is presented
 
 ### Requirement: Save and Exit confirms a local checkpoint
-Save and Exit SHALL require successful explicit local checkpointing of the reviewed activation before authorizing removal. It SHALL accept incomplete fields, preserve unresolved intents and staged work, and explain that local checkpointing is not remote Save. Remote Save and Progress SHALL remain separately admitted actions.
+Save and Exit SHALL checkpoint only immutable reviewed fields for the exact activation, accepting incomplete input and preserving intents and staged work. Superseded field or baseline/recovery state SHALL refuse before persistence, without substituting newer fields. Removal SHALL require confirmed reviewed fields, checkpoint-clean current fields and current decision authority. Copy SHALL distinguish local checkpoint from separately admitted remote Save/Progress.
 
 #### Scenario: Local checkpoint succeeds
 - **WHEN** Save and Exit checkpoints the captured current fields successfully with unchanged exit authority
@@ -46,6 +46,28 @@ Save and Exit SHALL require successful explicit local checkpointing of the revie
 - **WHEN** checkpointing fails, authority becomes stale, or newer edits remain uncheckpointed after it finishes
 - **THEN** removal is refused and all local work remains in the editor
 - **AND** an error is shown only by the still-current private presentation, with explicit retry available
+
+#### Scenario: Reviewed fields superseded before checkpoint execution
+- **GIVEN** the exit decision reviewed immutable fields A and their effective baseline, field revision and recovery context
+- **WHEN** the Exit checkpoint waits behind local work and current fields change to B before its serialized action executes
+- **THEN** that action refuses before any Exit checkpoint write or baseline advancement
+- **AND** it neither persists unreviewed B nor silently reselects it; exit is refused and B remains available
+
+#### Scenario: Newer fields arrive after reviewed persistence begins
+- **GIVEN** the reviewed A passed serialized admission and its persistence has begun
+- **WHEN** current fields become B before that write completes successfully
+- **THEN** the write may finish for A without rollback, P/E become A under the same activation, and current B remains uncheckpointed
+- **AND** B is neither overwritten nor confirmed and the owning exit is refused
+
+#### Scenario: Equal fields do not revive a superseded decision
+- **WHEN** current fields still equal reviewed A but its effective baseline, relevant baseline/recovery identity, field revision or activation has been superseded before persistence
+- **THEN** the Exit checkpoint refuses without writing even if a clean-state check would pass
+- **AND** an obsolete A1 result cannot authorize removal in A2 or another route
+
+#### Scenario: Affirmative exit requires the reviewed checkpoint and current authority
+- **WHEN** the reviewed checkpoint completes and the owning router invocation is about to authorize removal
+- **THEN** it requires confirmed reviewed A, unchanged reviewed field intent, checkpoint-clean current fields and the original route/account/session/target/activation authority
+- **AND** only its own checkpoint baseline advancement and matching recovery-proof settlement are permitted; unrelated supersession refuses exit
 
 ### Requirement: Cancel and discard retain private work boundaries
 Cancel or dismissal SHALL retain the editor unchanged. Discard and Exit SHALL authorize removal only after successful restoration to the reviewed effective baseline with current authority. It SHALL NOT erase physical checkpoints, accepted remote evidence, staged work, unresolved intents or recovery obligations.
