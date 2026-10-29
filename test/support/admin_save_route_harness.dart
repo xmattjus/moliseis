@@ -1,4 +1,5 @@
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
@@ -110,6 +111,15 @@ final class AdminSaveRouteHarness {
       supportedLocales: const [Locale('en'), Locale('it')],
     ),
   );
+
+  /// Opens the real editor routes with their dashboard page underneath.
+  Future<void> openEditor(WidgetTester tester, {int? target}) async {
+    router.go(
+      target == null ? '/admin/submissions/new' : '/admin/submissions/$target',
+    );
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+  }
 
   /// Owners are released by testOwnerUI after unmounting the routes.
   void dispose() {

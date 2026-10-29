@@ -30,10 +30,21 @@ import 'package:moliseis/utils/result_command.dart';
 /// Form screen for creating and editing a moderation submission.
 class AdminSubmissionEditorScreen extends StatefulWidget {
   /// Creates an editor backed by application-owned [viewModel] state.
-  const AdminSubmissionEditorScreen({required this.viewModel, super.key});
+  const AdminSubmissionEditorScreen({
+    required this.viewModel,
+    this.onBack,
+    this.onModerationClose,
+    super.key,
+  });
 
   /// Editor state and commands for this route visit.
   final AdminSubmissionEditorViewModel viewModel;
+
+  /// Explicit Back enters the owning route policy.
+  final VoidCallback? onBack;
+
+  /// Allows only the consumed, source-qualified successful moderation effect.
+  final bool Function(AdminDraftActivation?, String, int?)? onModerationClose;
 
   @override
   State<AdminSubmissionEditorScreen> createState() =>
@@ -170,10 +181,19 @@ class _AdminSubmissionEditorScreenState
     if (_owns(owner)) action();
   }
 
-  void _closeEditor(AdminSubmissionEditorViewModel owner) {
+  void _closeEditor(
+    AdminSubmissionEditorViewModel owner,
+    String lane,
+    int? execution,
+  ) {
     if (!_hasRouteEffectAuthority(owner)) return;
-    _routeExited = true;
-    context.pop(true);
+    final close = widget.onModerationClose;
+    if (close != null) {
+      _routeExited = close(_boundActivation, lane, execution);
+    } else {
+      _routeExited = true;
+      context.pop(true);
+    }
   }
 
   void _consume<T>(
@@ -232,21 +252,36 @@ class _AdminSubmissionEditorScreenState
       'promote',
       owner.promoteExecutionId,
       owner.promoteSnapshot,
-      () => _handleResolutionCompleted(owner, owner.promoteSnapshot),
+      () => _handleResolutionCompleted(
+        owner,
+        owner.promoteSnapshot,
+        'promote',
+        owner.promoteExecutionId,
+      ),
     );
     _consume(
       owner,
       'link',
       owner.linkExecutionId,
       owner.linkSnapshot,
-      () => _handleResolutionCompleted(owner, owner.linkSnapshot),
+      () => _handleResolutionCompleted(
+        owner,
+        owner.linkSnapshot,
+        'link',
+        owner.linkExecutionId,
+      ),
     );
     _consume(
       owner,
       'apply',
       owner.applyExecutionId,
       owner.applySnapshot,
-      () => _handleResolutionCompleted(owner, owner.applySnapshot),
+      () => _handleResolutionCompleted(
+        owner,
+        owner.applySnapshot,
+        'apply',
+        owner.applyExecutionId,
+      ),
     );
     _consume(
       owner,
@@ -271,10 +306,12 @@ class _AdminSubmissionEditorScreenState
   void _handleResolutionCompleted<T>(
     AdminSubmissionEditorViewModel owner,
     commands.CommandResult<void, Result<T>?> snapshot,
+    String lane,
+    int? execution,
   ) {
     if (!_owns(owner)) return;
     if (snapshot.completed) {
-      _closeEditor(owner);
+      _closeEditor(owner, lane, execution);
     } else if (snapshot.hasFailure) {
       _showModerationError(snapshot.data);
     }
@@ -305,7 +342,7 @@ class _AdminSubmissionEditorScreenState
     if (!_owns(owner)) return;
     final reject = owner.rejectSnapshot;
     if (reject.completed) {
-      _closeEditor(owner);
+      _closeEditor(owner, 'reject', owner.rejectExecutionId);
     } else if (reject.hasFailure) {
       _showModerationError(reject.data);
     }
@@ -712,7 +749,7 @@ class _AdminSubmissionEditorScreenState
             key: const ValueKey<String>('admin_submission_editor_scroll'),
             slivers: <Widget>[
               SliverAppBar(
-                leading: const CustomBackButton(),
+                leading: CustomBackButton(onPressed: widget.onBack),
                 title: Text(
                   viewModel.isEditMode
                       ? 'Modifica contributo'

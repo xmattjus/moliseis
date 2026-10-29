@@ -151,6 +151,27 @@ final class AdminDraftActivation {
   final int generation;
 }
 
+/// Immutable local fields and authority reviewed by one exit decision.
+///
+/// The captured effective baseline is independent of physical persistence.
+/// Only this session can issue or validate this runtime-only context.
+final class AdminDraftExitReview {
+  AdminDraftExitReview._(this.activation, this._state);
+
+  /// Exact activation that presented these fields.
+  final AdminDraftActivation activation;
+  final AdminDraftSessionState _state;
+
+  /// Lossless C reviewed before the dialog opened.
+  AdminDraftSnapshot get snapshot => _state.current;
+
+  /// Reviewed E, which can differ from the physical checkpoint.
+  AdminDraftSnapshot get effective => _state.effective;
+
+  /// Intent revision, including edits that later return to the same fields.
+  int get fieldRevision => _state.fieldRevision;
+}
+
 /// Captured authority issued synchronously before an external hydration.
 final class AdminHydrationToken {
   AdminHydrationToken._(this.owner, this.generation, this.revision);
@@ -224,6 +245,10 @@ final class AdminDraftSession {
 
   /// Current private local context, or null following explicit revocation.
   AdminDraftSessionState? get state => _state;
+
+  /// Whether local initialization, arbitration or hydration is unsettled.
+  bool get hasPendingLocalWork =>
+      _state?.ready != true || _pending != 0 || _state!.hydrationPending;
 
   /// Captures a new activation after refusing abandonment of unsaved work.
   Future<Result<void>> activate(
@@ -350,6 +375,103 @@ final class AdminDraftSession {
   bool isActivationCurrent(AdminDraftActivation? activation) =>
       activation != null && _validActivation(activation);
 
+  /// Captures initialized C/E/P/R and existing recovery identities together.
+  AdminDraftExitReview? captureExitReview(AdminDraftActivation activation) {
+    if (!_validActivation(activation) || _state?.ready != true) return null;
+    return AdminDraftExitReview._(activation, _state!);
+  }
+
+  /// Whether no reviewed field, baseline or recovery fact was superseded.
+  bool isExitReviewCurrent(AdminDraftExitReview review) {
+    if (!_validActivation(review.activation) || _state?.ready != true) {
+      return false;
+    }
+    final current = _state!;
+    final captured = review._state;
+    return !current.hydrationPending &&
+        current.current == captured.current &&
+        current.effective == captured.effective &&
+        current.fieldRevision == captured.fieldRevision &&
+        current.physicalCheckpoint == captured.physicalCheckpoint &&
+        _sameExitBaseline(current, captured) &&
+        current.recoveryCheckpointRevision ==
+            captured.recoveryCheckpointRevision;
+  }
+
+  bool _sameExitBaseline(
+    AdminDraftSessionState current,
+    AdminDraftSessionState captured,
+  ) =>
+      current.remoteBaseline == captured.remoteBaseline &&
+      current.acceptedRemoteRevision == captured.acceptedRemoteRevision;
+
+  /// Checkpoints only reviewed C after authoritative serialized validation.
+  ///
+  /// Ordinary checkpoint callers retain their existing capture timing. Once
+  /// this write starts, later typing survives as current, uncheckpointed work.
+  Future<Result<void>> checkpointReviewed(AdminDraftExitReview review) =>
+      _serialize(() async {
+        if (!isExitReviewCurrent(review)) return _unavailable();
+        return await _writeCheckpoint(
+          review._state,
+          review.activation.generation,
+          requireDurableOwner: true,
+        );
+      });
+
+  /// Restores only reviewed E, preserving P/R, intents, staging and obligations.
+  Future<Result<void>> discardReviewed(AdminDraftExitReview review) =>
+      _serialize(() async {
+        if (!isExitReviewCurrent(review)) return _unavailable();
+        final captured = review._state;
+        if (captured.current != captured.effective) {
+          _state = _state!._copy(
+            current: captured.effective,
+            fieldRevision: captured.fieldRevision + 1,
+          );
+        }
+        return const Result.success(null);
+      });
+
+  /// Confirms reviewed persistence without treating newer typing as saved.
+  bool isExitCheckpointConfirmed(AdminDraftExitReview review) {
+    if (!_validActivation(review.activation) || hasPendingLocalWork) {
+      return false;
+    }
+    final current = _state!;
+    final captured = review._state;
+    final expected = AdminSubmissionDraft(
+      owner: captured.owner,
+      snapshot: captured.current,
+      remoteBaseline: captured.remoteBaseline,
+      fieldWriteIntent: captured.physicalCheckpoint?.fieldWriteIntent,
+      navigationIntent: captured.physicalCheckpoint?.navigationIntent,
+    );
+    return current.current == captured.current &&
+        current.effective == captured.current &&
+        current.fieldRevision == captured.fieldRevision &&
+        current.physicalCheckpoint == expected &&
+        _sameExitBaseline(current, captured) &&
+        current.recoveryCheckpointRevision == null;
+  }
+
+  /// Confirms field-only discard without granting authority to another review.
+  bool isExitDiscardConfirmed(AdminDraftExitReview review) {
+    if (!_validActivation(review.activation) || hasPendingLocalWork) {
+      return false;
+    }
+    final current = _state!;
+    final captured = review._state;
+    final changed = captured.current != captured.effective;
+    return current.current == captured.effective &&
+        current.effective == captured.effective &&
+        current.fieldRevision == captured.fieldRevision + (changed ? 1 : 0) &&
+        current.physicalCheckpoint == captured.physicalCheckpoint &&
+        _sameExitBaseline(current, captured) &&
+        current.recoveryCheckpointRevision ==
+            captured.recoveryCheckpointRevision;
+  }
+
   /// Replaces immutable C only for the caller's captured activation.
   ///
   /// Stale or foreign authority returns an error without changing any state.
@@ -407,6 +529,19 @@ final class AdminDraftSession {
   }) async {
     if (!_matches(owner, generation) || !_state!.ready) return _unavailable();
     final captured = _state!;
+    return await _writeCheckpoint(
+      captured,
+      generation,
+      requireDurableOwner: requireDurableOwner,
+    );
+  }
+
+  Future<Result<void>> _writeCheckpoint(
+    AdminDraftSessionState captured,
+    int generation, {
+    required bool requireDurableOwner,
+  }) async {
+    final owner = captured.owner;
     if (captured.durability == AdminDraftDurability.unknown) {
       return _unavailable();
     }

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_staged_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -13,6 +14,296 @@ import '../../support/admin_draft_repositories.dart';
 void main() {
   late AdminDraftSessionHarness h;
   setUp(() => h = AdminDraftSessionHarness());
+
+  group('reviewed exit fields', () {
+    for (final discard in [false, true]) {
+      test(
+        'queued ${discard ? 'discard' : 'checkpoint'} refuses newer B',
+        () async {
+          h.seed();
+          final digest = 'a' * 40;
+          final asset = AdminSubmissionStagedAsset(
+            owner: h.owner,
+            digest: digest,
+            relativePath: '${h.owner.accountId}/${h.owner.sessionId}/$digest',
+          );
+          h.staged.assets[h.owner] = [asset];
+          await h.session.activate(h.owner);
+          final activation = h.session.captureActivation()!;
+          h.session.setSnapshot(
+            AdminDraftSnapshot(name: 'reviewed A'),
+            activation: activation,
+          );
+          final review = h.session.captureExitReview(activation)!;
+          final entered = Completer<void>();
+          final released = Completer<Result<void>>();
+          h.staged.onRemove = (_, _) {
+            entered.complete();
+            return released.future;
+          };
+          final blocking = h.session.remove(asset);
+          await entered.future;
+          final checkpoint = discard
+              ? h.session.discardReviewed(review)
+              : h.session.checkpointReviewed(review);
+          h.session.setSnapshot(
+            AdminDraftSnapshot(name: 'newer B'),
+            activation: activation,
+          );
+          released.complete(const Result.success(null));
+          await blocking;
+          expect(await checkpoint, isA<Error<void>>());
+          expect(h.drafts.saves, isEmpty);
+          expect(h.session.state!.current.name, 'newer B');
+          expect(h.session.state!.effective.name, 'A');
+          expect(h.session.isExitCheckpointConfirmed(review), isFalse);
+          expect(h.session.isExitDiscardConfirmed(review), isFalse);
+        },
+      );
+    }
+
+    test('started reviewed A write never confirms newer B', () async {
+      h.seed();
+      await h.session.activate(h.owner);
+      final activation = h.session.captureActivation()!;
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'reviewed A'),
+        activation: activation,
+      );
+      final review = h.session.captureExitReview(activation)!;
+      final entered = Completer<void>();
+      final released = Completer<Result<void>>();
+      h.drafts.onSave = (_) {
+        entered.complete();
+        return released.future;
+      };
+      final checkpoint = h.session.checkpointReviewed(review);
+      await entered.future;
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'newer B'),
+        activation: activation,
+      );
+      released.complete(const Result.success(null));
+      expect(await checkpoint, isA<Success<void>>());
+      expect(h.drafts.saves.single.snapshot, review.snapshot);
+      expect(h.session.state!.physicalCheckpoint!.snapshot, review.snapshot);
+      expect(h.session.state!.effective, review.snapshot);
+      expect(h.session.state!.current.name, 'newer B');
+      expect(h.session.state!.hasUncheckpointedChanges, isTrue);
+      expect(h.session.isExitCheckpointConfirmed(review), isFalse);
+    });
+
+    test('equal C with newer E or edit-and-revert revision refuses', () async {
+      h.seed();
+      await h.session.activate(h.owner);
+      final activation = h.session.captureActivation()!;
+      final snapshot = AdminDraftSnapshot(name: 'reviewed');
+      h.session.setSnapshot(snapshot, activation: activation);
+      var review = h.session.captureExitReview(activation)!;
+      await h.session.checkpoint();
+      expect(await h.session.checkpointReviewed(review), isA<Error<void>>());
+      expect(h.drafts.saves, hasLength(1));
+      review = h.session.captureExitReview(activation)!;
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'temporary'),
+        activation: activation,
+      );
+      h.session.setSnapshot(snapshot, activation: activation);
+      expect(await h.session.checkpointReviewed(review), isA<Error<void>>());
+      expect(await h.session.discardReviewed(review), isA<Error<void>>());
+      expect(h.drafts.saves, hasLength(1));
+    });
+
+    test(
+      'unchanged C and revision cannot borrow a newer remote baseline',
+      () async {
+        h.seed(name: 'local', remoteName: 'remote');
+        await h.session.activate(h.owner);
+        final activation = h.session.captureActivation()!;
+        final review = h.session.captureExitReview(activation)!;
+        final before = h.session.state!;
+        final refreshed = AdminRemoteBaseline(
+          snapshot: before.remoteBaseline!.snapshot,
+          status: AdminSubmissionStatus.pending,
+          modifiedAt: DateTime.utc(2026, 10, 29),
+          modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+        );
+        await h.session.acceptHydration(
+          h.session.admitHydration()!,
+          refreshed,
+          associatedCount: 0,
+        );
+        expect(h.session.state!.current, before.current);
+        expect(h.session.state!.fieldRevision, before.fieldRevision);
+        expect(await h.session.checkpointReviewed(review), isA<Error<void>>());
+        expect(await h.session.discardReviewed(review), isA<Error<void>>());
+        expect(h.drafts.saves, isEmpty);
+        expect(h.session.state!.remoteBaseline, refreshed);
+      },
+    );
+
+    test('A1 review cannot act after revocation and same-session A2', () async {
+      h.seed();
+      await h.session.activate(h.owner);
+      final review = h.session.captureExitReview(
+        h.session.captureActivation()!,
+      )!;
+      h.session.revoke();
+      await h.session.activate(h.owner);
+      final before = h.session.state;
+      expect(await h.session.checkpointReviewed(review), isA<Error<void>>());
+      expect(await h.session.discardReviewed(review), isA<Error<void>>());
+      expect(h.session.state, same(before));
+      expect(h.drafts.saves, isEmpty);
+    });
+
+    test('discard uses hydrated E while preserving physical A', () async {
+      h.seed();
+      await h.session.activate(h.owner);
+      await h.session.acceptHydration(
+        h.session.admitHydration()!,
+        h.remote('hydrated B'),
+        associatedCount: 0,
+      );
+      final activation = h.session.captureActivation()!;
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'incomplete C', latitudeText: 'invalid, raw'),
+        activation: activation,
+      );
+      final review = h.session.captureExitReview(activation)!;
+      final before = h.session.state!;
+      expect(await h.session.discardReviewed(review), isA<Success<void>>());
+      expect(h.session.state!.current.name, 'hydrated B');
+      expect(h.session.state!.effective, before.effective);
+      expect(
+        h.session.state!.physicalCheckpoint,
+        same(before.physicalCheckpoint),
+      );
+      expect(h.session.state!.remoteBaseline, same(before.remoteBaseline));
+      expect(h.drafts.saves, isEmpty);
+      expect(h.session.isExitDiscardConfirmed(review), isTrue);
+    });
+
+    test(
+      'discard retains intents navigation staging and confirmed receipts',
+      () async {
+        h.seed(name: 'local', remoteName: 'remote');
+        final old = h.drafts.drafts[h.owner.lookupKey]!;
+        final intent = AdminFieldWriteIntent(
+          kind: AdminFieldWriteKind.update,
+          attemptId: '22222222-2222-4222-8222-222222222222',
+          snapshot: old.snapshot,
+          expectedModifiedAt: 'exact-version',
+        );
+        h.drafts.drafts[h.owner.lookupKey] = AdminSubmissionDraft(
+          owner: h.owner,
+          snapshot: old.snapshot,
+          remoteBaseline: old.remoteBaseline,
+          fieldWriteIntent: intent,
+          navigationIntent: AdminNavigationIntent(
+            requestNonce: '33333333-3333-4333-8333-333333333333',
+          ),
+        );
+        final digest = 'b' * 40;
+        final asset = AdminSubmissionStagedAsset(
+          owner: h.owner,
+          digest: digest,
+          relativePath: '${h.owner.accountId}/${h.owner.sessionId}/$digest',
+          progress: AdminStagedAssetProgress(
+            upload: const SubmissionAsset(
+              secureUrl: 'https://example.com/photo',
+              width: 100,
+              height: 100,
+            ),
+            associationId: 9,
+          ),
+        );
+        h.staged.assets[h.owner] = [asset];
+        await h.session.activate(h.owner);
+        final activation = h.session.captureActivation()!;
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'new C'),
+          activation: activation,
+        );
+        final before = h.session.state!;
+        final review = h.session.captureExitReview(activation)!;
+        expect(await h.session.discardReviewed(review), isA<Success<void>>());
+        final after = h.session.state!;
+        expect(after.current, before.effective);
+        expect(after.physicalCheckpoint, same(before.physicalCheckpoint));
+        expect(after.remoteBaseline, same(before.remoteBaseline));
+        expect(after.assets, before.assets);
+        expect(after.assets.single.progress, same(asset.progress));
+        expect(after.owner, before.owner);
+        expect(h.staged.removals, isEmpty);
+        expect(h.staged.progressSaves, isEmpty);
+        expect(h.drafts.saves, isEmpty);
+      },
+    );
+
+    test(
+      'discard preserves accepted recovery obligation; checkpoint proves it',
+      () async {
+        h.seed(name: 'local');
+        await h.session.activate(h.owner);
+        final read = h.session.admitHydration()!;
+        final remote = AdminRemoteBaseline(
+          snapshot: AdminDraftSnapshot(name: 'accepted B'),
+          status: AdminSubmissionStatus.pending,
+          modifiedAt: DateTime.utc(2026, 10, 29),
+          modifiedAtToken: '2026-10-29T00:00:00.123456Z',
+        );
+        await h.session.acceptHydration(read, remote, associatedCount: 0);
+        final observation = h.session.captureRecoveryObservation(
+          read,
+          remote,
+          associatedCount: 0,
+        )!;
+        await h.session.reconcile(observation, acceptRemote: true);
+        final activation = h.session.captureActivation()!;
+        h.session.setSnapshot(
+          AdminDraftSnapshot(name: 'new C'),
+          activation: activation,
+        );
+        final before = h.session.state!;
+        var review = h.session.captureExitReview(activation)!;
+        await h.session.discardReviewed(review);
+        expect(h.session.state!.current.name, 'accepted B');
+        expect(
+          h.session.state!.recoveryCheckpointRevision,
+          before.recoveryCheckpointRevision,
+        );
+        expect(
+          h.session.state!.physicalCheckpoint,
+          same(before.physicalCheckpoint),
+        );
+        expect(h.session.isExitDiscardConfirmed(review), isTrue);
+        review = h.session.captureExitReview(activation)!;
+        expect(
+          await h.session.checkpointReviewed(review),
+          isA<Success<void>>(),
+        );
+        expect(h.session.state!.pendingRecoveryCheckpoint, isFalse);
+        expect(h.session.isExitCheckpointConfirmed(review), isTrue);
+      },
+    );
+
+    test('failed reviewed checkpoint preserves all local baselines', () async {
+      h.seed();
+      await h.session.activate(h.owner);
+      final activation = h.session.captureActivation()!;
+      h.session.setSnapshot(
+        AdminDraftSnapshot(name: 'incomplete A'),
+        activation: activation,
+      );
+      final review = h.session.captureExitReview(activation)!;
+      final before = h.session.state;
+      h.drafts.onSave = (_) async => Result.error(Exception('disk failure'));
+      expect(await h.session.checkpointReviewed(review), isA<Error<void>>());
+      expect(h.session.state, same(before));
+      expect(h.session.isExitCheckpointConfirmed(review), isFalse);
+    });
+  });
 
   group('explicit recovery', () {
     final remoteB = AdminRemoteBaseline(

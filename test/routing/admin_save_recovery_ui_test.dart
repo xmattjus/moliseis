@@ -77,12 +77,14 @@ void main() {
     harness.router.go('/admin/submissions/2?session=${otherOwner.sessionId}');
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('prima di aprire un altro contributo.'),
+      find.text(
+        'Salva nella bozza locale i campi remoti accettati '
+        'prima di aprire un altro contributo.',
+      ),
       findsOneWidget,
     );
     expect(harness.owner.submissionId, 1);
-    await tester.tap(find.byKey(const ValueKey('admin_return_active_editor')));
-    await tester.pumpAndSettle();
+    expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
     expect(harness.owner.sessionId, session);
     expect(harness.owner.name, 'Remote fields');
     harness.local.drafts.onSave = (_) async =>
@@ -95,8 +97,7 @@ void main() {
     harness.router.go('/admin/submissions/2');
     await tester.pumpAndSettle();
     expect(harness.owner.submissionId, 1);
-    await tester.tap(find.byKey(const ValueKey('admin_return_active_editor')));
-    await tester.pumpAndSettle();
+    expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
     harness.local.drafts.onSave = null;
     await tester.ensureVisible(find.text('Salva bozza locale'));
     await tester.tap(find.text('Salva bozza locale'));

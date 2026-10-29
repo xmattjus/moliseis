@@ -2,7 +2,7 @@
 
 ## Context
 
-See [proposal.md](proposal.md) for motivation. Planning baseline is `origin/main` at `c7250f5db274c8b00af53cdd83846076918fd226`, after archived Admin Plans 1–3. The dedicated branch contains planning artifacts only.
+See [proposal.md](proposal.md) for motivation. Planning baseline is `origin/main` at `c7250f5db274c8b00af53cdd83846076918fd226`, after archived Admin Plans 1–3. The change was originally planning-only; implementation and verification status are tracked in [tasks.md](tasks.md) and [verification.md](verification.md).
 
 ### Inspected contracts and source
 
@@ -132,4 +132,4 @@ No unresolved material contradiction remains in the intended behavior. Native in
 
 ## Migration Plan
 
-This is a planning-only PR. Later apply should implement local state operations first, shared presentation next, then route integration and focused regression tests. Run focused tests before broader Flutter analysis/testing. Review all source changes against Plans 1–3; do not synchronize or archive this change until the separate workflow is requested. No data migration or backend deployment is involved. A later rollback reverts route/dialog integration while retaining the existing durable sessions and files; it must not erase checkpoints or reinterpret unresolved writes.
+The original planning PR also carries the separately authorized implementation. Apply should implement local state operations first, shared presentation next, then route integration and focused regression tests. Run focused tests before broader Flutter analysis/testing. Review all source changes against Plans 1–3; do not synchronize or archive this change until the separate workflow is requested. No data migration or backend deployment is involved. A later rollback reverts route/dialog integration while retaining the existing durable sessions and files; it must not erase checkpoints or reinterpret unresolved writes.

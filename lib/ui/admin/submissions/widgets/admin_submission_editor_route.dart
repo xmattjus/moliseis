@@ -1,8 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
+import 'package:moliseis/routing/admin_submission_exit_policy.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
@@ -21,6 +25,8 @@ class AdminSubmissionEditorRoute extends StatefulWidget {
     this.submissionId,
     this.sessionId,
     this.child,
+    this.exitPolicy,
+    this.exitLocation,
     super.key,
   });
 
@@ -31,6 +37,12 @@ class AdminSubmissionEditorRoute extends StatefulWidget {
 
   /// Optional observer route sharing the same activation binding.
   final Widget? child;
+
+  /// Router-owned exit arbitration; absent for isolated presentations.
+  final AdminSubmissionExitPolicy? exitPolicy;
+
+  /// Concrete source supplied by the router builder before async restoration.
+  final String? exitLocation;
 
   @override
   State<AdminSubmissionEditorRoute> createState() =>
@@ -55,20 +67,33 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
   Exception? _error;
   AdminDraftActivation? _activation;
   var _rebindQueued = false;
+  AdminEditorExitVisit? _exitVisit;
+  AdminSubmissionExitPolicy? _exitPolicy;
+  ModalRoute<dynamic>? _editorRoute;
+  var _allowExplicitPop = false;
+  ModalRoute<dynamic>? _registeredProgress;
 
   @override
   void initState() {
     super.initState();
+    _exitPolicy = widget.exitPolicy;
     widget.auth.addListener(_authChanged);
     widget.viewModel.addListener(_ownerChanged);
   }
 
   @override
   void didUpdateWidget(covariant AdminSubmissionEditorRoute oldWidget) {
+    if (!identical(oldWidget.exitPolicy, widget.exitPolicy)) {
+      final visit = _exitVisit;
+      if (visit != null) _exitPolicy?.unregister(visit);
+      _exitVisit = null;
+      _exitPolicy = widget.exitPolicy;
+    }
     if (oldWidget.submissionId != widget.submissionId ||
         oldWidget.sessionId != widget.sessionId ||
         !identical(oldWidget.viewModel, widget.viewModel)) {
       // Reused route State must not carry A's resume hint into target B.
+      _allowExplicitPop = false;
       _restoredSession.value = null;
       _activation = null;
       _ready = false;
@@ -88,11 +113,14 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
         !identical(oldWidget.auth, widget.auth)) {
       unawaited(_activate());
     }
+    _syncExitVisit();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _editorRoute = ModalRoute.of(context);
+    _syncExitVisit();
     if (!_ready &&
         _activation != null &&
         ModalRoute.of(context)?.isCurrent == true) {
@@ -115,6 +143,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
     final owner = widget.viewModel;
     if (owner.isActivationCurrent(_activation)) {
       if (owner.hasDurableDraft) _restoredSession.value = owner.sessionId;
+      _syncExitVisit();
       return;
     }
     final next = owner.activation;
@@ -127,9 +156,11 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
         old.owner.sessionId == next.owner.sessionId) {
       _activation = next;
       if (owner.hasDurableDraft) _restoredSession.value = owner.sessionId;
+      _syncExitVisit();
       return;
     }
     setState(() => _ready = false);
+    _syncExitVisit();
     if (ModalRoute.of(context)?.isCurrent == true) _queueRebind();
   }
 
@@ -140,6 +171,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
 
   Future<void> _activate() async {
     if (!mounted) return;
+    _allowExplicitPop = false;
     final owner = widget.viewModel;
     final auth = widget.auth;
     final account = auth.isAdmin ? auth.currentUser?.id : null;
@@ -148,6 +180,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
     final binding = ++_binding;
     _ready = false;
     _error = null;
+    _syncExitVisit();
     if (account == null) {
       setState(() {});
       return;
@@ -170,6 +203,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
       if (_ready) _activation = owner.activation;
       _error = result is Error<void> ? result.error : null;
     });
+    _syncExitVisit();
     if (_ready && owner.isEditMode && !owner.hasLoadedDetail) {
       owner.requestLoad(activation: owner.activation);
     }
@@ -181,10 +215,105 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
   @override
   void dispose() {
     _binding++;
+    final visit = _exitVisit;
+    if (visit != null) _exitPolicy?.unregister(visit);
+    final progress = _registeredProgress;
+    if (progress != null) _exitPolicy?.unregisterProgress(progress);
     widget.auth.removeListener(_authChanged);
     widget.viewModel.removeListener(_ownerChanged);
     _restoredSession.dispose();
     super.dispose();
+  }
+
+  /// Binds actual page handles, independently from the root router context.
+  void _syncExitVisit() {
+    if (!mounted) return;
+    final policy = _exitPolicy;
+    final route = _editorRoute;
+    final activation = _activation;
+    final location = widget.exitLocation;
+    if (policy == null) return;
+    if (widget.child != null) {
+      if (_ready &&
+          route != null &&
+          activation != null &&
+          widget.viewModel.isActivationCurrent(activation)) {
+        _registeredProgress = route;
+        policy.registerProgress(route, widget.viewModel);
+      }
+      return;
+    }
+    if (!_ready ||
+        widget.child != null ||
+        route == null ||
+        activation == null ||
+        location == null ||
+        !widget.viewModel.isActivationCurrent(activation)) {
+      final old = _exitVisit;
+      if (old != null) policy.unregister(old);
+      _exitVisit = null;
+      return;
+    }
+    _exitVisit = policy.register(
+      context,
+      route,
+      widget.viewModel,
+      activation,
+      location,
+    );
+  }
+
+  /// Explicit iOS Back initiates router policy without enabling native swipe.
+  void _requestBack(
+    AdminSubmissionEditorViewModel owner,
+    AdminDraftActivation? activation,
+    ModalRoute<dynamic>? route,
+  ) {
+    if (!mounted) return;
+    if (!identical(widget.viewModel, owner) ||
+        !identical(_editorRoute, route)) {
+      return;
+    }
+    final router = GoRouter.of(context);
+    if (route?.isCurrent != true ||
+        !owner.isActivationCurrent(activation) ||
+        owner.exitDecisionPending) {
+      return;
+    }
+    if (defaultTargetPlatform != TargetPlatform.iOS ||
+        !owner.hasUncheckpointedChanges) {
+      if (router.canPop()) {
+        router.pop();
+      } else {
+        router.goNamed(RouteNames.adminDashboard);
+      }
+      return;
+    }
+    setState(() => _allowExplicitPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!identical(widget.viewModel, owner) ||
+          !identical(_editorRoute, route) ||
+          !owner.isActivationCurrent(activation)) {
+        return;
+      }
+      if (route?.isCurrent == true && owner.isActivationCurrent(activation)) {
+        if (router.canPop()) {
+          router.pop();
+        } else {
+          router.goNamed(RouteNames.adminDashboard);
+        }
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (!identical(widget.viewModel, owner) ||
+            !identical(_editorRoute, route) ||
+            !owner.isActivationCurrent(activation)) {
+          return;
+        }
+        setState(() => _allowExplicitPop = false);
+      });
+    });
   }
 
   @override
@@ -248,7 +377,39 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
               ),
       );
     }
-    return widget.child ??
-        AdminSubmissionEditorScreen(viewModel: widget.viewModel);
+    if (widget.child case final child?) return child;
+    final backActivation = _activation;
+    final backRoute = _editorRoute;
+    void requestBack() => _requestBack(owner, backActivation, backRoute);
+    return ListenableBuilder(
+      listenable: owner,
+      builder: (context, _) => CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.escape): requestBack,
+        },
+        child: PopScope<Object?>(
+          canPop:
+              defaultTargetPlatform != TargetPlatform.iOS ||
+              !(owner.hasUncheckpointedChanges || owner.exitDecisionPending) ||
+              _allowExplicitPop,
+          child: AdminSubmissionEditorScreen(
+            viewModel: owner,
+            onBack: requestBack,
+            onModerationClose: (activation, lane, execution) {
+              if (!mounted) return false;
+              final visit = _exitVisit;
+              return visit != null &&
+                  (_exitPolicy?.closeAfterModeration(
+                        visit,
+                        activation,
+                        lane,
+                        execution,
+                      ) ??
+                      false);
+            },
+          ),
+        ),
+      ),
+    );
   }
 }

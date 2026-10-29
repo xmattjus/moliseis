@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
+import 'package:moliseis/routing/admin_submission_exit_policy.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_parameters.dart';
@@ -23,6 +24,7 @@ import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/logging_screen.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
+import 'package:moliseis/ui/core/ui/unsaved_changes_dialog.dart';
 import 'package:moliseis/ui/event/view_models/event_view_model.dart';
 import 'package:moliseis/ui/event/widgets/events_screen.dart';
 import 'package:moliseis/ui/explore/view_models/explore_view_model.dart';
@@ -54,12 +56,11 @@ final _favouritesShellNavigatorKey = GlobalKey<NavigatorState>();
 final _mapShellNavigatorKey = GlobalKey<NavigatorState>();
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-enum _ContentSubmissionExitChoice { save, discard, cancel }
-
 GoRouter buildAppRouter({
   required SyncViewModel syncViewModel,
   required AdminAuthViewModel adminAuthViewModel,
 }) {
+  final adminExit = AdminSubmissionExitPolicy(adminAuthViewModel);
   Object? contentSubmissionTransitionOwner;
 
   Object? acquireContentSubmissionTransition() {
@@ -90,6 +91,7 @@ GoRouter buildAppRouter({
       syncViewModel.sync.isRunning,
       adminAuthViewModel,
     ]),
+    onEnter: adminExit.onEnter,
     redirect: (context, state) =>
         _redirectForSync(context, syncViewModel, state) ??
         _redirectForAdminAuth(adminAuthViewModel, state),
@@ -139,34 +141,9 @@ GoRouter buildAppRouter({
               exiting = true;
               return true;
             }
-            final choice = await showDialog<_ContentSubmissionExitChoice>(
+            final choice = await showDialog<UnsavedChangesDecision>(
               context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Salvare le modifiche?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(
-                      context,
-                      _ContentSubmissionExitChoice.cancel,
-                    ),
-                    child: const Text('Annulla'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(
-                      context,
-                      _ContentSubmissionExitChoice.discard,
-                    ),
-                    child: const Text('Esci senza salvare'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(
-                      context,
-                      _ContentSubmissionExitChoice.save,
-                    ),
-                    child: const Text('Salva ed esci'),
-                  ),
-                ],
-              ),
+              builder: (_) => const UnsavedChangesDialog(),
             );
             if (!context.mounted) return false;
             if (!current() ||
@@ -175,11 +152,11 @@ GoRouter buildAppRouter({
               return false;
             }
             final result = switch (choice) {
-              _ContentSubmissionExitChoice.save =>
+              UnsavedChangesDecision.saveAndExit =>
                 await viewModel.checkpointDraft(),
-              _ContentSubmissionExitChoice.discard =>
+              UnsavedChangesDecision.discardAndExit =>
                 await viewModel.restoreCheckpointDraft(),
-              _ContentSubmissionExitChoice.cancel || null => null,
+              UnsavedChangesDecision.cancel || null => null,
             };
             if (!context.mounted) return false;
             if (!current() ||
@@ -272,11 +249,14 @@ GoRouter buildAppRouter({
           GoRoute(
             path: RoutePaths.adminSubmissionsNew,
             name: RouteNames.adminSubmissionNew,
+            onExit: adminExit.exit,
             builder: (context, state) {
               final auth = context.read<AdminAuthViewModel>();
               return AdminSubmissionEditorRoute(
                 viewModel: context.read<AdminSubmissionEditorViewModel>(),
                 auth: auth,
+                exitPolicy: adminExit,
+                exitLocation: state.matchedLocation,
                 sessionId: state.uri.queryParameters['session'],
               );
             },
@@ -312,6 +292,7 @@ GoRouter buildAppRouter({
                 viewModel: owner,
                 auth: context.read<AdminAuthViewModel>(),
                 sessionId: session,
+                exitPolicy: adminExit,
                 child: progress,
               );
             },
@@ -319,6 +300,7 @@ GoRouter buildAppRouter({
           GoRoute(
             path: RoutePaths.adminSubmission,
             name: RouteNames.adminSubmissionEditor,
+            onExit: adminExit.exit,
             builder: (context, state) {
               final id = RouteParameters.submissionId(
                 state.pathParameters['id'],
@@ -336,6 +318,8 @@ GoRouter buildAppRouter({
                 viewModel: context.read<AdminSubmissionEditorViewModel>(),
                 auth: context.read<AdminAuthViewModel>(),
                 submissionId: id,
+                exitPolicy: adminExit,
+                exitLocation: state.matchedLocation,
                 sessionId: state.uri.queryParameters['session'],
               );
             },

@@ -58,6 +58,199 @@ void main() {
     }
   });
 
+  group('local exit review', () {
+    test('local field dirtiness is separate from moderation work', () async {
+      await vm.activate(accountId: account);
+      expect(vm.hasUncheckpointedChanges, isFalse);
+      expect(vm.isDirty, isTrue);
+      final activation = vm.activation;
+      vm.setName('incomplete', activation: activation);
+      expect(vm.hasUncheckpointedChanges, isTrue);
+      await vm.checkpointLocal();
+      expect(vm.hasUncheckpointedChanges, isFalse);
+      expect(vm.isDirty, isTrue);
+    });
+
+    for (final stagedOnly in [true, false]) {
+      test('${stagedOnly ? 'staged receipt' : 'unresolved write'} '
+          'alone is locally clean', () async {
+        local.seed();
+        final old = local.drafts.drafts[local.owner.lookupKey]!;
+        if (stagedOnly) {
+          final digest = 'a' * 40;
+          local.staged.assets[local.owner] = [
+            AdminSubmissionStagedAsset(
+              owner: local.owner,
+              digest: digest,
+              relativePath:
+                  '${local.owner.accountId}/${local.owner.sessionId}/$digest',
+              progress: AdminStagedAssetProgress(
+                upload: const SubmissionAsset(
+                  secureUrl: 'https://example.com/photo',
+                  width: 10,
+                  height: 10,
+                ),
+              ),
+            ),
+          ];
+        } else {
+          local.drafts.drafts[local.owner.lookupKey] = AdminSubmissionDraft(
+            owner: local.owner,
+            snapshot: old.snapshot,
+            remoteBaseline: old.remoteBaseline,
+            fieldWriteIntent: AdminFieldWriteIntent(
+              kind: AdminFieldWriteKind.update,
+              attemptId: '22222222-2222-4222-8222-222222222222',
+              snapshot: old.snapshot,
+              expectedModifiedAt: token,
+            ),
+          );
+        }
+        await vm.activate(accountId: account, submissionId: 7);
+        expect(vm.hasUncheckpointedChanges, isFalse);
+        expect(vm.isDirty, isTrue);
+        expect(vm.canRequestExit, isTrue);
+        expect(remote.updateInputs, isEmpty);
+        expect(content.uploadedImages, isEmpty);
+      });
+    }
+
+    test(
+      'review reserves mutations and only its own release can clear it',
+      () async {
+        await vm.activate(accountId: account);
+        final activation = vm.activation;
+        vm.setName('A', activation: activation);
+        final review = vm.beginExitDecision(activation)!;
+        expect(vm.beginExitDecision(activation), isNull);
+        expect(vm.canRequestExit, isFalse);
+        expect(vm.requestSave(activation: activation), isFalse);
+        expect(vm.requestLoad(activation: activation), isFalse);
+        expect(vm.requestAddAsset(activation: activation), isFalse);
+        expect(await vm.checkpointLocal(), isA<Error<void>>());
+        vm.endExitDecision(review);
+        final next = vm.beginExitDecision(activation)!;
+        vm.endExitDecision(review);
+        expect(vm.exitDecisionPending, isTrue);
+        vm.endExitDecision(next);
+        expect(vm.canRequestExit, isTrue);
+        expect(local.drafts.saves, isEmpty);
+        expect(remote.createInputs, isEmpty);
+        expect(content.uploadedImages, isEmpty);
+      },
+    );
+
+    test('queued checkpoint refuses unreviewed B before writing', () async {
+      local.seed();
+      final digest = 'b' * 40;
+      final asset = AdminSubmissionStagedAsset(
+        owner: local.owner,
+        digest: digest,
+        relativePath:
+            '${local.owner.accountId}/${local.owner.sessionId}/$digest',
+      );
+      local.staged.assets[local.owner] = [asset];
+      await vm.activate(accountId: account, submissionId: 7);
+      final activation = vm.activation;
+      vm.setName('reviewed A', activation: activation);
+      final review = vm.beginExitDecision(activation)!;
+      final entered = Completer<void>();
+      final released = Completer<Result<void>>();
+      local.staged.onRemove = (_, _) {
+        entered.complete();
+        return released.future;
+      };
+      final blocker = local.session.remove(asset);
+      await entered.future;
+      final checkpoint = vm.checkpointForExit(review);
+      vm.setName('newer B', activation: activation);
+      released.complete(const Result.success(null));
+      await blocker;
+      expect(await checkpoint, isA<Error<void>>());
+      expect(local.drafts.saves, isEmpty);
+      expect(vm.name, 'newer B');
+      expect(vm.hasUncheckpointedChanges, isTrue);
+      expect(vm.isExitCheckpointConfirmed(review), isFalse);
+      vm.endExitDecision(review);
+    });
+
+    test(
+      'checkpoint preserves review A while typing B remains dirty',
+      () async {
+        await vm.activate(accountId: account);
+        final activation = vm.activation;
+        vm.setName('A', activation: activation);
+        final review = vm.beginExitDecision(activation)!;
+        final entered = Completer<void>();
+        final released = Completer<Result<void>>();
+        local.drafts.onSave = (_) {
+          entered.complete();
+          return released.future;
+        };
+        final checkpoint = vm.checkpointForExit(review);
+        await entered.future;
+        vm.setName('B', activation: activation);
+        released.complete(const Result.success(null));
+        expect(await checkpoint, isA<Success<void>>());
+        expect(local.drafts.saves.single.snapshot.name, 'A');
+        expect(vm.name, 'B');
+        expect(vm.hasUncheckpointedChanges, isTrue);
+        expect(vm.isExitCheckpointConfirmed(review), isFalse);
+        vm.endExitDecision(review);
+      },
+    );
+
+    test(
+      'discard invalidates old review and keeps effective local fields',
+      () async {
+        local.seed();
+        await vm.activate(accountId: account, submissionId: 7);
+        final activation = vm.activation;
+        vm.setName('B', activation: activation);
+        final review = vm.beginExitDecision(activation)!;
+        expect(await vm.discardForExit(review), isA<Success<void>>());
+        expect(vm.name, 'A');
+        expect(vm.hasUncheckpointedChanges, isFalse);
+        expect(vm.isExitDiscardConfirmed(review), isTrue);
+        expect(vm.isExitReviewCurrent(review), isFalse);
+        expect(local.drafts.saves, isEmpty);
+        expect(remote.updateInputs, isEmpty);
+        vm.endExitDecision(review);
+      },
+    );
+
+    test(
+      'revocation during write retains original owner but no A2 permission',
+      () async {
+        await vm.activate(accountId: account);
+        final activation = vm.activation;
+        final owner = local.session.state!.owner;
+        vm.setName('A', activation: activation);
+        final review = vm.beginExitDecision(activation)!;
+        final entered = Completer<void>();
+        final released = Completer<Result<void>>();
+        local.drafts.onSave = (_) {
+          entered.complete();
+          return released.future;
+        };
+        final checkpoint = vm.checkpointForExit(review);
+        await entered.future;
+        vm.revoke();
+        expect(vm.exitDecisionPending, isFalse);
+        released.complete(const Result.success(null));
+        expect(await checkpoint, isA<Error<void>>());
+        local.drafts.onSave = null;
+        await vm.activate(accountId: account, sessionId: owner.sessionId);
+        expect(vm.name, 'A');
+        expect(vm.isExitCheckpointConfirmed(review), isFalse);
+        final next = vm.beginExitDecision(vm.activation)!;
+        vm.endExitDecision(review);
+        expect(vm.exitDecisionPending, isTrue);
+        vm.endExitDecision(next);
+      },
+    );
+  });
+
   test(
     'same-target activation retains C and rejects unowned setters',
     () async {
