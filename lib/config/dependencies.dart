@@ -42,6 +42,7 @@ import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
+import 'package:moliseis/domain/use_cases/set_crash_reporting_use_case.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
@@ -50,7 +51,6 @@ import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/logging/logging.dart';
-import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -89,7 +89,7 @@ List<SingleChildWidget> providers(
   http.Client httpClient,
   SettingsRepository settingsRepository,
   CacheManager cacheManager,
-  SentryLoggingFlag sentryLoggingFlag,
+  SetCrashReportingUseCase crashReporting,
 ) => <SingleChildWidget>[
   //#region Shared
   Provider<CacheManager>.value(value: cacheManager),
@@ -260,10 +260,7 @@ List<SingleChildWidget> providers(
   ),
   ChangeNotifierProvider<SettingsViewModel>(
     create: (context) {
-      return SettingsViewModel(
-        settingsRepository: context.read(),
-        sentryLoggingFlag: sentryLoggingFlag,
-      );
+      return SettingsViewModel(crashReporting: crashReporting);
     },
   ),
   ChangeNotifierProvider<FavouriteViewModel>(

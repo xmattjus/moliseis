@@ -63,6 +63,7 @@ import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 
 import '../support/command_test_support.dart';
+import '../support/crash_reporting_support.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
@@ -1602,8 +1603,10 @@ List<SingleChildWidget> _buildProviders(
     ),
     ChangeNotifierProvider<SettingsViewModel>(
       create: (_) => SettingsViewModel(
-        settingsRepository: settingsRepository,
-        sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
+        crashReporting: testCrashReporting(
+          repository: settingsRepository,
+          flag: SentryLoggingFlag(initialValue: false),
+        ),
       ),
     ),
     ChangeNotifierProvider<SyncViewModel>.value(value: harness.viewModel),

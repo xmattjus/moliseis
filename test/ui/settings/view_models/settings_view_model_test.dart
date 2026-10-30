@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/app_settings.dart';
 import 'package:moliseis/data/repositories/settings_repository_impl.dart';
+import 'package:moliseis/domain/use_cases/set_crash_reporting_use_case.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 
 import '../../../support/command_test_support.dart';
+import '../../../support/crash_reporting_support.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
 import '../../../support/ordinary_view_model_lifecycle_support.dart';
@@ -40,8 +42,10 @@ void main() {
         await repository.initialize();
         final flag = SentryLoggingFlag(initialValue: initial);
         final vm = SettingsViewModel(
-          settingsRepository: repository,
-          sentryLoggingFlag: flag,
+          crashReporting: testCrashReporting(
+            repository: repository,
+            flag: flag,
+          ),
         );
         var notifications = 0;
         vm.addListener(() => notifications++);
@@ -57,10 +61,10 @@ void main() {
         const success = Result<void>.success(null);
         gate.complete(success);
         await pumpPhysicalCommandDisposal(tester);
-        expect(await execution, same(success));
+        expect(await execution, isA<Success<CrashReportingUpdate>>());
         expect(repository.crashReporting, !initial);
         expect(persisted, !initial);
-        expect(flag.enabled, persisted);
+        expect(flag.enabled, initial && persisted);
         expect(vm.crashReporting, local);
         expect(notifications, count);
         expect(tester.takeException(), isNull);
@@ -78,8 +82,10 @@ void main() {
         await repository.initialize();
         final flag = SentryLoggingFlag(initialValue: true);
         final vm = SettingsViewModel(
-          settingsRepository: repository,
-          sentryLoggingFlag: flag,
+          crashReporting: testCrashReporting(
+            repository: repository,
+            flag: flag,
+          ),
         );
         var notifications = 0;
         vm.addListener(() => notifications++);
@@ -89,7 +95,10 @@ void main() {
         final failure = Result<void>.error(TestException('not persisted'));
         gate.complete(failure);
         await pumpPhysicalCommandDisposal(tester);
-        expect(await execution, same(failure));
+        expect(
+          (await execution)!.fold((_) => null, (error) => error),
+          same(failure.fold((_) => null, (error) => error)),
+        );
         expect(repository.crashReporting, isTrue);
         expect(flag.enabled, isTrue);
         expect(vm.crashReporting, isFalse);
@@ -129,19 +138,14 @@ void main() {
           };
         await repository.initialize();
         final flag = SentryLoggingFlag(initialValue: true);
-        final a = SettingsViewModel(
-          settingsRepository: repository,
-          sentryLoggingFlag: flag,
-        );
+        final consent = testCrashReporting(repository: repository, flag: flag);
+        final a = SettingsViewModel(crashReporting: consent);
         var aNotifications = 0;
         a.addListener(() => aNotifications++);
         final aResult = a.setCrashReporting.runAsync(false);
         await pumpCommandTurns(tester);
         a.dispose();
-        final b = SettingsViewModel(
-          settingsRepository: repository,
-          sentryLoggingFlag: flag,
-        );
+        final b = SettingsViewModel(crashReporting: consent);
         final bResult = b.setCrashReporting.runAsync(true);
         await pumpCommandTurns(tester);
         expect(source.savedSettings, hasLength(2));
@@ -159,8 +163,8 @@ void main() {
         expect(deliveries, [!firstValue]);
         firstDelivery.complete();
         await pumpCommandTurns(tester);
-        expect(await aResult, isA<Success<void>>());
-        expect(await bResult, isA<Success<void>>());
+        expect(await aResult, isA<Success<CrashReportingUpdate>>());
+        expect(await bResult, isA<Success<CrashReportingUpdate>>());
         expect(deliveries, [!firstValue, firstValue]);
         expect(repository.crashReporting, persisted);
         expect(flag.enabled, persisted);
@@ -185,8 +189,10 @@ void main() {
         await repository.initialize();
         final flag = SentryLoggingFlag(initialValue: true);
         final vm = SettingsViewModel(
-          settingsRepository: repository,
-          sentryLoggingFlag: flag,
+          crashReporting: testCrashReporting(
+            repository: repository,
+            flag: flag,
+          ),
         );
         var notifications = 0;
         vm.addListener(() => notifications++);
@@ -216,8 +222,10 @@ void main() {
         final pending = Completer<Result<void>>();
         final events = <String>[];
         final vm = SettingsViewModel(
-          settingsRepository: repository,
-          sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
+          crashReporting: testCrashReporting(
+            repository: repository,
+            flag: SentryLoggingFlag(initialValue: false),
+          ),
         );
         addTearDown(vm.dispose);
         vm.addListener(() => events.add('notify:${vm.crashReporting}'));
@@ -246,8 +254,7 @@ void main() {
       };
       final flag = SentryLoggingFlag(initialValue: false);
       final vm = SettingsViewModel(
-        settingsRepository: repository,
-        sentryLoggingFlag: flag,
+        crashReporting: testCrashReporting(repository: repository, flag: flag),
       );
       addTearDown(vm.dispose);
       vm.addListener(() => vm.setCrashReporting.run(false));
@@ -260,23 +267,25 @@ void main() {
       expect(flag.enabled, isFalse);
       const result = Result<void>.success(null);
       pending.complete(result);
-      expect(await execution, same(result));
-      expect(flag.enabled, isTrue);
+      expect(await execution, isA<Success<CrashReportingUpdate>>());
+      expect(flag.enabled, isFalse);
     });
 
-    test('updates SentryLoggingFlag on successful toggle', () async {
+    test('saved opt-in leaves forwarding deferred until restart', () async {
       final repository = FakeSettingsRepository();
       final sentryLoggingFlag = SentryLoggingFlag(initialValue: false);
       final viewModel = SettingsViewModel(
-        settingsRepository: repository,
-        sentryLoggingFlag: sentryLoggingFlag,
+        crashReporting: testCrashReporting(
+          repository: repository,
+          flag: sentryLoggingFlag,
+        ),
       );
 
       addTearDown(viewModel.dispose);
       await viewModel.setCrashReporting.runAsync(true);
 
       expect(viewModel.crashReporting, isTrue);
-      expect(sentryLoggingFlag.enabled, isTrue);
+      expect(sentryLoggingFlag.enabled, isFalse);
       expect(viewModel.setCrashReporting.results.value.completed, isTrue);
     });
 
@@ -287,8 +296,10 @@ void main() {
       );
       final sentryLoggingFlag = SentryLoggingFlag(initialValue: true);
       final viewModel = SettingsViewModel(
-        settingsRepository: repository,
-        sentryLoggingFlag: sentryLoggingFlag,
+        crashReporting: testCrashReporting(
+          repository: repository,
+          flag: sentryLoggingFlag,
+        ),
       );
 
       addTearDown(viewModel.dispose);

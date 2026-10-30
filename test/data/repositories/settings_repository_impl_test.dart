@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/app_settings.dart';
+import 'package:moliseis/data/data-sources/settings_local_data_source.dart';
 import 'package:moliseis/data/repositories/settings_repository_impl.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
@@ -7,9 +10,80 @@ import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/utils/result.dart';
 
 import '../../support/fake_repositories.dart' show TestException;
+import '../../support/objectbox_test_store.dart';
 import '../../support/settings_local_data_source.dart';
 
 void main() {
+  group('SettingsRepositoryImpl overlapping independent settings', () {
+    test('a delayed theme save cannot overwrite a confirmed opt-out', () async {
+      final themeWrite = Completer<void>();
+      final source = FakeSettingsLocalDataSource()
+        ..onSave = (settings) async {
+          if (settings.type == ThemeType.app) await themeWrite.future;
+          return const Result.success(null);
+        };
+      final repository = SettingsRepositoryImpl(source);
+      await repository.initialize();
+
+      final theme = repository.setThemeType(ThemeType.app);
+      final consent = await repository.setCrashReporting(enable: false);
+      expect(consent, isA<Success<void>>());
+      expect(repository.crashReporting, isFalse);
+      themeWrite.complete();
+      expect(await theme, isA<Success<void>>());
+
+      expect(
+        [
+          repository.crashReporting,
+          (await source.load()).getOrNull()!.crashReporting,
+        ],
+        [false, false],
+      );
+      expect(repository.themeType, ThemeType.app);
+    });
+
+    test('failed unrelated write preserves confirmed opt-out', () async {
+      final themeWrite = Completer<Result<void>>();
+      final source = FakeSettingsLocalDataSource()
+        ..onSave = (settings) => settings.type == ThemeType.app
+            ? themeWrite.future
+            : Future.value(const Result.success(null));
+      final repository = SettingsRepositoryImpl(source);
+      await repository.initialize();
+      final theme = repository.setThemeType(ThemeType.app);
+      expect(
+        await repository.setCrashReporting(enable: false),
+        isA<Success<void>>(),
+      );
+      themeWrite.complete(Result.error(TestException('write failed')));
+      expect(await theme, isA<Error<void>>());
+      expect(repository.crashReporting, isFalse);
+      expect(repository.themeType, ThemeType.system);
+      expect((await source.load()).getOrNull()!.crashReporting, isFalse);
+    });
+
+    test('real ObjectBox same-turn writes preserve opt-out', () async {
+      final environment = await TestObjectBoxEnvironment.create();
+      addTearDown(environment.dispose);
+      final source = SettingsLocalDataSource(environment.store);
+      final repository = SettingsRepositoryImpl(source);
+      await repository.initialize();
+
+      final consent = repository.setCrashReporting(enable: false);
+      final theme = repository.setThemeType(ThemeType.app);
+      expect(await consent, isA<Success<void>>());
+      expect(await theme, isA<Success<void>>());
+      final reloaded = SettingsRepositoryImpl(source);
+      await reloaded.initialize();
+
+      expect(
+        [repository.crashReporting, reloaded.crashReporting],
+        [false, false],
+      );
+      expect(reloaded.themeType, ThemeType.app);
+    });
+  });
+
   group('SettingsRepositoryImpl sync state', () {
     test('persists both dates once and retains unrelated settings', () async {
       final source = FakeSettingsLocalDataSource(

@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/utils/extensions/date_time_extensions.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// A tappable dashboard row describing one moderation submission.
 class AdminSubmissionListItem extends StatelessWidget {
@@ -32,8 +33,11 @@ class AdminSubmissionListItem extends StatelessWidget {
           children: <Widget>[
             Text(summary.city),
             Text('$type · ${summary.status.label}'),
-            Text(
-              '${summary.userName} · ${summary.createdAt.formatDate(locale)}',
+            Wrap(
+              children: <Widget>[
+                SentryMask(Text(summary.userName)),
+                Text(' · ${summary.createdAt.formatDate(locale)}'),
+              ],
             ),
           ],
         ),
