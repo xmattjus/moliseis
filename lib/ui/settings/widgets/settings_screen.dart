@@ -176,6 +176,7 @@ class SettingsScreen extends StatelessWidget {
                               : SnackBarType.info,
                         );
                       } else if (result == null &&
+                          !value &&
                           !viewModel.committedCrashReporting &&
                           viewModel.reportingState ==
                               CrashReportingState.unconfirmed) {

@@ -7,10 +7,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
+import 'package:moliseis/domain/use_cases/set_crash_reporting_use_case.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
@@ -248,6 +250,69 @@ void main() {
       await tester.pumpAndSettle();
       await tester.pump(const Duration(milliseconds: 50));
     });
+
+    testWidgets(
+      'failed opt-in after unconfirmed shutdown does not claim a save',
+      (tester) async {
+        repository.crashReporting = true;
+        closeSentry = () async {
+          throw Exception('synthetic close failure');
+        };
+        final error = StateError('synthetic opt-in persistence failure');
+        final reports = <Object>[];
+        final previousHandler = command_it.Command.globalExceptionHandler;
+        command_it.Command.globalExceptionHandler = (report, _) =>
+            reports.add(report.error);
+        addTearDown(
+          () => command_it.Command.globalExceptionHandler = previousHandler,
+        );
+        await tester.pumpWidget(app);
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+          false,
+        );
+        await tester.pumpAndSettle();
+        final viewModel = tester
+            .element(find.byType(SettingsScreen))
+            .read<SettingsViewModel>();
+        expect(repository.crashReporting, isFalse);
+        expect(viewModel.reportingState, CrashReportingState.unconfirmed);
+        expect(
+          find.text(
+            'Preferenza salvata; arresto non confermato. '
+            'Vale dal prossimo avvio.',
+          ),
+          findsOneWidget,
+        );
+        clearAppSnackBars();
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar), findsNothing);
+        final attemptedDirections = <bool>[];
+        repository.onSetCrashReporting = (enable) async {
+          attemptedDirections.add(enable);
+          throw error;
+        };
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+          true,
+        );
+        await tester.pumpAndSettle();
+        expect(repository.crashReporting, isFalse);
+        expect(viewModel.crashReporting, isFalse);
+        expect(viewModel.reportingState, CrashReportingState.unconfirmed);
+        expect(attemptedDirections, [true]);
+        expect(reports, [same(error)]);
+        expect(
+          find.text(
+            'Preferenza salvata; arresto non confermato. '
+            'Vale dal prossimo avvio.',
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 50));
+      },
+    );
 
     testWidgets('raw shutdown error reports once and retains saved opt-out', (
       tester,
@@ -501,8 +566,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          'Gli errori verranno inviati al prossimo avvio '
-          "dell'app",
+          'La segnalazione degli errori sarà attivata '
+          "al prossimo avvio dell'app.",
         ),
         findsNothing,
       );

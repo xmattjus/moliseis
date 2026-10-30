@@ -31,4 +31,4 @@ Verified planning baseline: `main` and fetched `origin/main` at `80223649dc09d94
 
 Affected implementation surfaces are `lib/main.dart`, HTTP factory, Provider composition, Settings ViewModel/screen, existing logging flag, a bounded application-owned consent operation, and two moderation widgets plus focused tests. No database/API/schema changes, dependency upgrades, general logging/networking refactor, new persistent storage, privacy framework, restart controls or global masking are intended. Historical command-migration artifacts remain unchanged; only delta specifications change the current contract.
 
-This definition is planning only. Implementation tasks remain unchecked; no application changes, apply, implementation PR, merge, deployment, spec sync or archive are performed.
+Implementation is applied in [Draft PR #26](https://github.com/xmattjus/moliseis/pull/26) and automatically verified. [tasks.md](tasks.md) is authoritative for completion and remaining acceptance: native gates 7.1–7.5 remain unchecked. No merge, deployment, release, canonical specification synchronization or archive has occurred.

@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md for motivation and the three delta specifications for observable contracts. This document defines intended work, not delivered behavior.
+See proposal.md for motivation and the three delta specifications for observable contracts. This document records the design intent implemented in [Draft PR #26](https://github.com/xmattjus/moliseis/pull/26). [tasks.md](tasks.md) records completed automated acceptance and the pending native gates 7.1–7.5; implementation does not imply native acceptance or release.
 
 ### Verified baseline and boundaries
 
