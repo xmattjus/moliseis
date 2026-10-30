@@ -71,6 +71,17 @@ void main() {
       expect(loadedSettings.crashReporting, isTrue);
     });
 
+    test('failed atomic update preserves the stored singleton', () async {
+      await dataSource.save(AppSettings(crashReporting: false));
+      final result = await dataSource.update(
+        (_) => throw const FormatException('Rejected change'),
+      );
+      expect(result, isA<Error<void>>());
+      final loaded = (await dataSource.load()).getOrNull()!;
+      expect(loaded.crashReporting, isFalse);
+      expect(loaded.type, ThemeType.system);
+    });
+
     test('save persists settings in the singleton slot', () async {
       final updatedSettings = AppSettings(
         type: ThemeType.app,
