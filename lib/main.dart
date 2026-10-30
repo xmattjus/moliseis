@@ -8,12 +8,14 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/config/bootstrap.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/config/env/env.dart';
 import 'package:moliseis/data/data-sources/settings_local_data_source.dart';
 import 'package:moliseis/data/repositories/settings_repository_impl.dart';
 import 'package:moliseis/data/services/objectbox.dart';
 import 'package:moliseis/data/services/supabase_anonymous_session.dart';
+import 'package:moliseis/domain/use_cases/set_crash_reporting_use_case.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/app_scroll_behavior.dart';
@@ -52,73 +54,70 @@ Future<void> _main() async {
   // Ensures the disk can be accessed before continuing app start-up.
   WidgetsFlutterBinding.ensureInitialized();
 
-  SentryWidgetsFlutterBinding.ensureInitialized();
-
   configureCommandReporting(_logger);
-
-  // Retrieves an HTTP client instance initialized with the `runWithClient`
-  // method.
   final httpClient = http.Client();
+  late final ObjectBox objectBox;
 
-  await SentryFlutter.init(
-    (options) => options
-      ..dsn = Env.sentryUrl
-      ..environment = kDebugMode ? 'debug' : 'production'
-      ..tracesSampleRate = kDebugMode ? 0 : 0.4
-      ..replay.sessionSampleRate = kDebugMode ? 0 : 0.4
-      ..replay.onErrorSampleRate = kDebugMode ? 0 : 1.0
-      ..sendDefaultPii = false
-      ..httpClient = httpClient
-      ..privacy.maskAllText = false
-      ..privacy.maskAllImages = false
-      ..beforeBreadcrumb = (breadcrumb, hint) {
-        final message = breadcrumb?.message;
+  await bootstrapApplication(
+    createSettings: () async {
+      objectBox = await ObjectBox.create();
+      return SettingsRepositoryImpl(SettingsLocalDataSource(objectBox.store));
+    },
+    onLocalFailure: (error, stackTrace) {
+      _logger.log(
+        const LocalPersistenceInitFailed(),
+        error: error,
+        stackTrace: stackTrace,
+      );
+      runApp(const SetupErrorApp());
+    },
+    onSettingsInitialized: handleSettingsRepositoryInitialization,
+    initializeTelemetry: (runner) async {
+      SentryWidgetsFlutterBinding.ensureInitialized();
+      await SentryFlutter.init(
+        (options) => options
+          ..dsn = Env.sentryUrl
+          ..environment = kDebugMode ? 'debug' : 'production'
+          ..tracesSampleRate = kDebugMode ? 0 : 0.4
+          ..replay.sessionSampleRate = kDebugMode ? 0 : 0.4
+          ..replay.onErrorSampleRate = kDebugMode ? 0 : 1.0
+          ..sendDefaultPii = false
+          ..httpClient = httpClientFactory()
+          ..privacy.maskAllText = false
+          ..privacy.maskAllImages = false
+          ..beforeBreadcrumb = (breadcrumb, hint) {
+            final message = breadcrumb?.message;
 
-        // Drops Talker console breadcrumbs.
-        if (message != null &&
-            (message.contains('┌') ||
-                message.contains('│ [') ||
-                message.contains('└') ||
-                message.contains('─['))) {
-          return null;
-        }
+            // Drops Talker console breadcrumbs.
+            if (message != null &&
+                (message.contains('┌') ||
+                    message.contains('│ [') ||
+                    message.contains('└') ||
+                    message.contains('─['))) {
+              return null;
+            }
 
-        return breadcrumb;
-      },
-    appRunner: () async {
+            return breadcrumb;
+          },
+        appRunner: runner,
+      );
+    },
+    runApplication: (settingsRepository, {required reportingEnabled}) async {
+      final consent = SetCrashReportingUseCase(
+        settingsRepository: settingsRepository,
+        sentryLoggingFlag: _sentryLoggingFlag,
+        initiallyEnabled: reportingEnabled,
+        closeSentry: Sentry.close,
+      );
       final supabase = await Supabase.initialize(
         url: Env.supabaseProdUrl,
         publishableKey: Env.supabaseProdApiKey,
         httpClient: SentrySupabaseClient(client: httpClient),
       );
-
       await ensureAnonymousSupabaseSession(
         authClient: supabase.client.auth,
         logger: _logger,
       );
-
-      late final ObjectBox objectBox;
-
-      try {
-        objectBox = await ObjectBox.create();
-      } on Object catch (error, stackTrace) {
-        _logger.log(
-          const LocalPersistenceInitFailed(),
-          error: error,
-          stackTrace: stackTrace,
-        );
-        runApp(const SetupErrorApp());
-        return;
-      }
-
-      final settingsRepository = SettingsRepositoryImpl(
-        SettingsLocalDataSource(objectBox.store),
-      );
-      final initializeResult = await settingsRepository.initialize();
-      handleSettingsRepositoryInitialization(initializeResult);
-
-      _sentryLoggingFlag.enabled = settingsRepository.crashReporting;
-
       final cacheManager = DefaultCacheManager(
         connectionParameters: ConnectionParameters(
           connectionTimeout: const Duration(
@@ -129,7 +128,6 @@ Future<void> _main() async {
           ),
         ),
       );
-
       final app = MultiProvider(
         providers: providers(
           _logger,
@@ -138,24 +136,19 @@ Future<void> _main() async {
           httpClient,
           settingsRepository,
           cacheManager,
-          _sentryLoggingFlag,
+          consent,
         ),
         child: const MoliseIsApp(),
       );
-
-      if (settingsRepository.crashReporting) {
+      if (reportingEnabled) {
         _logger.log(
           const SentryLoggingEnabled(
             environment: kDebugMode ? 'debug' : 'production',
           ),
         );
-
         runApp(SentryWidget(child: app));
       } else {
-        await Sentry.close();
-
         _logger.log(const SentryLoggingDisabled());
-
         runApp(app);
       }
     },

@@ -120,6 +120,10 @@ Keep both global mask flags false and public form masks intact. In the dashboard
 
 Search for the same contributor fields found these display sites, not another direct UI identity path. Draft diagnostic `toString` records identity lengths (`lib/domain/models/content_submission_draft.dart:107-114`); no explicit raw contributor logging/URL interpolation was established. UI masking is not payload scrubbing; report any concrete additional leak rather than claiming universal privacy.
 
+### D7. Verified unrelated-settings concurrency repair
+
+The implementation request additionally authorized reproducing and fixing stale full-entity settings writes. Both a controllable data source and a real temporary ObjectBox store reproduced opt-out false being overwritten by an overlapping theme update. `SettingsLocalDataSource.update` now applies a synchronous field-only transform to the latest singleton in an ObjectBox write transaction; repository completion merges that same field change into current cache. Domain repository signatures and direct data-source save remain unchanged. This fixes the responsible persistence boundary without a write queue or request-order serialization. Focused real-store failure tests retain the previous committed opt-out.
+
 ## Risks / Trade-offs
 
 - **Native errors can be swallowed** → distinguish SDK completion from native proof; require isolated Android/iOS gates, retain documented runtime observability limits. Never equate a flag with all-signal shutdown.
@@ -133,7 +137,7 @@ Search for the same contributor fields found these display sites, not another di
 
 ## Verification strategy
 
-No implementation acceptance is claimed during definition. Reuse `test/support/settings_consent_support.dart`, `fake_repositories.dart`, `recording_sentry_transport.dart` and existing lifecycle harnesses. Before test edits, load repository unit/widget/test-support and mounted-context skills as applicable; ObjectBox tests use the real temporary-store harness. Add only the smallest bootstrap/lifecycle/transport seams needed for discriminating tests.
+Definition-time baseline evidence is distinct from the executed implementation verification recorded in tasks.md. Reuse `test/support/settings_consent_support.dart`, `fake_repositories.dart`, `recording_sentry_transport.dart` and existing lifecycle harnesses. Before test edits, load repository unit/widget/test-support and mounted-context skills as applicable; ObjectBox tests use the real temporary-store harness. Add only the smallest bootstrap/lifecycle/transport seams needed for discriminating tests.
 
 | Gate | Automated evidence to add or preserve |
 | --- | --- |
@@ -159,7 +163,7 @@ Keep summaries and remaining limits in tasks.md when future execution is authori
 
 ## Migration Plan
 
-No schema/data migration or backend deployment. After independent review and explicit apply authorization, implement independent transport first; prove ownership before wiring runtime close. Then add the bounded lifecycle operation, consent-first bootstrap and Settings outcome wiring, and selective masks. Run automated and native gates separately; unchecked native gates cannot be called complete. Normal release uses the existing app delivery path. Rollback is a cohesive code revert preserving saved settings; reverting the privacy fix reintroduces the original limitations and must not be described as retaining its guarantees. This definition does not authorize apply, release, PR merge, sync or archive.
+No schema/data migration or backend deployment. After independent review and explicit apply authorization, implement independent transport first; prove ownership before wiring runtime close. Then add the bounded lifecycle operation, consent-first bootstrap and Settings outcome wiring, and selective masks. Run automated and native gates separately; unchecked native gates cannot be called complete. Normal release uses the existing app delivery path. Rollback is a cohesive code revert preserving saved settings; reverting the privacy fix reintroduces the original limitations and must not be described as retaining its guarantees. The subsequent implementation request authorizes apply, commits and a Draft PR, but not release, PR merge, spec sync or archive.
 
 ## Open Questions
 

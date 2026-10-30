@@ -27,6 +27,18 @@ The application SHALL resolve existing local consent before initializing telemet
 - **WHEN** local database initialization fails before consent can be resolved
 - **THEN** the existing setup-error fallback remains usable and no telemetry initializes to report that failure
 
+### Requirement: Unrelated settings writes preserve committed consent
+
+An update to another setting SHALL NOT restore an older consent value through a stale full-settings snapshot. Expected persistence failure SHALL retain the previously committed consent, without imposing a global preference write queue or changing independent command admission.
+
+#### Scenario: Theme write overlaps confirmed opt-out
+- **WHEN** a theme update overlaps a successful opt-out
+- **THEN** the updated theme and disabled consent both remain in persistent storage and committed repository state
+
+#### Scenario: Unrelated update fails
+- **WHEN** an unrelated settings update fails after opt-out was committed
+- **THEN** disabled consent remains committed and durable
+
 ### Requirement: Telemetry shutdown preserves application networking
 
 Telemetry SHALL own transport resources independently of application networking, including underlying fallback socket resources. Shutting down telemetry SHALL NOT close application-owned clients, cancel their requests or prevent subsequent Supabase, authentication, weather, image or other application HTTP operations.
