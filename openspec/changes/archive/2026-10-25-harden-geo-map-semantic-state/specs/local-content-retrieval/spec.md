@@ -2,9 +2,7 @@
 
 ### Requirement: GeoMap Nearby publication belongs to its current semantic target
 
-GeoMap Nearby SHALL have one active requested target: committed Explore anchor, or materialized Post identity and coordinates. The Explore anchor SHALL remain independently owned while Post is active. Search and unresolved Post SHALL have no Nearby target. Target changes SHALL immediately revoke obsolete publication and clear/hide prior target collections. Only authoritative live terminal retrieval SHALL synchronously commit one target-bound terminal snapshot and its replacement collection/error projection; awaited actions SHALL not mutate ViewModel data.
-
-Existing repository distance/filter contracts SHALL remain unchanged. Foundation Home/Search retrieval and concurrency requirements are inherited without modification or duplication.
+GeoMap Nearby SHALL have one active requested target: committed Explore anchor, or materialized Post identity and coordinates. The Explore anchor SHALL remain independently owned while Post is active. Search and unresolved Post SHALL have no Nearby target. Target changes SHALL immediately revoke obsolete publication and clear/hide prior target collections.
 
 #### Scenario: Explore anchor changes while loading
 - **WHEN** Nearby target A is pending and Explore commits B
@@ -12,7 +10,7 @@ Existing repository distance/filter contracts SHALL remain unchanged. Foundation
 
 #### Scenario: Explore switches to Post
 - **WHEN** a materialized Post with its own identity/coordinates becomes active
-- **THEN** Nearby targets that Post and Explore anchor remains remembered; pending Explore results cannot appear beneath Post
+- **THEN** Nearby uses the materialized Post as its target, while the Explore anchor remains remembered; pending Explore results cannot appear beneath Post
 
 #### Scenario: Post switches to another Post or Explore
 - **WHEN** Post A becomes Post B, or explicit close enters Explore at live center
@@ -22,9 +20,13 @@ Existing repository distance/filter contracts SHALL remain unchanged. Foundation
 - **WHEN** a deferred load/retry refers to a no-longer-current target or disposed owner
 - **THEN** it cannot retarget the active lane, publish content or notify the ViewModel late
 
+#### Scenario: Nearby commits only authoritative terminal data
+- **WHEN** Nearby retrieval settles or its semantic target changes
+- **THEN** Only authoritative live terminal retrieval SHALL synchronously commit one target-bound terminal snapshot and its replacement collection/error projection; awaited actions SHALL not mutate ViewModel data. Existing repository distance/filter contracts SHALL remain unchanged. Foundation Home/Search retrieval and concurrency requirements are inherited without modification or duplication.
+
 ### Requirement: GeoMap Nearby preserves partial data and first error together
 
-A completed GeoMap Nearby retrieval SHALL retain successful Places first and successful Events second, and the original first expected repository error, with Places error taking precedence over Events error. Its operation-specific aggregate SHALL carry both collection and nullable first error. A completed aggregate with a first error SHALL NOT be presented as fully successful discovery. Unexpected runtime failures SHALL retain foundation error routing rather than fabricated expected Results; partial publication after such a throw is not required.
+A completed GeoMap Nearby retrieval SHALL retain successful Places first and successful Events second, and the original first expected repository error, with Places error taking precedence over Events error. Its operation-specific aggregate SHALL carry both collection and nullable first error. A completed aggregate with a first error SHALL NOT be presented as fully successful discovery.
 
 #### Scenario: Both repositories succeed
 - **WHEN** Places and then Events succeed
@@ -64,4 +66,8 @@ A completed GeoMap Nearby retrieval SHALL retain successful Places first and suc
 
 #### Scenario: Shared normal Post consumer
 - **WHEN** normal Post uses the adapted shared Nearby widget inputs
-- **THEN** its existing retrieval ordering, error display, Post owner isolation and Nearby URI/Search-parent navigation behavior remain unchanged without migrating PostViewModel commands
+- **THEN** its existing retrieval ordering, error display, Post owner isolation and Nearby URI/Search-parent navigation behavior remain unchanged
+
+#### Scenario: Aggregate completion distinguishes expected and runtime failures
+- **WHEN** Nearby aggregation returns expected errors or throws unexpectedly
+- **THEN** Unexpected runtime failures SHALL retain foundation error routing rather than fabricated expected Results; partial publication after such a throw is not required.

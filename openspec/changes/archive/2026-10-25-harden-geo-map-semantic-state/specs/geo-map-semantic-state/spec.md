@@ -6,7 +6,7 @@ Keep Map semantic presentation and target-bound content coherent across route in
 
 ### Requirement: GeoMap exposes one authoritative semantic mode
 
-GeoMap SHALL represent presentation with exactly one immutable ViewModel-owned mode: Explore, SearchResults with one committed valid query, or PostDetail with a complete positive ID and content type identity. Async neutral/running/success/error SHALL remain in execution snapshots rather than additional modes. Selection requests SHALL be transient inputs, not competing stored modes. Coupled mode, resolved content and active discovery target changes SHALL be coherent before a single semantic notification.
+GeoMap SHALL represent presentation with exactly one immutable ViewModel-owned mode: Explore, SearchResults with one committed valid query, or PostDetail with a complete positive ID and content type identity. Async neutral/running/success/error SHALL remain in execution snapshots rather than additional modes. Selection requests SHALL be transient inputs, not competing stored modes.
 
 #### Scenario: Default Map opens
 - **WHEN** Map is entered without a valid complete routed identity
@@ -19,6 +19,10 @@ GeoMap SHALL represent presentation with exactly one immutable ViewModel-owned m
 #### Scenario: Post identity begins resolving
 - **WHEN** a complete routed identity is accepted without materialized content
 - **THEN** GeoMap immediately enters PostDetail for that identity with absent resolved content and current loading presentation
+
+#### Scenario: Semantic state publishes coherently
+- **WHEN** a semantic intent changes Map presentation
+- **THEN** Coupled mode, resolved content and active discovery target changes SHALL be coherent before a single semantic notification.
 
 ### Requirement: Materialized Post content matches the active Post identity
 
@@ -134,7 +138,7 @@ Routing SHALL supply one nullable complete identity, preserving validation/defau
 
 ### Requirement: GeoMap Search integrates existing query ownership
 
-Search SHALL retain its foundation independent result/suggestion, short-query and atomic publication guarantees. Only valid committed queries SHALL enter GeoMap SearchResults. Visible results and loading/error presentation SHALL belong to the latest Map admission for the exact current Search mode and Search owner, including repeated equal queries. Query equality or synchronous non-running state alone SHALL NOT authorize an older terminal snapshot. Each Map submit/retry SHALL synchronously fence out the pre-admission public snapshot; neutral/loading and unpublished terminal intervals SHALL not expose retained collections. The newest authoritative publicly published terminal SHALL eventually render success or failure for that admission. Shared SearchViewModel and SearchResultSliverList behavior SHALL remain unchanged.
+Search SHALL retain the independent results and suggestions, short-query, and atomic-publication guarantees defined by the existing `local-content-retrieval` Search contract. Only valid committed queries SHALL enter GeoMap SearchResults. Visible results and loading/error presentation SHALL belong to the latest Map admission for the exact current Search mode and Search owner, including repeated equal queries.
 
 #### Scenario: Invalid query submitted
 - **WHEN** a short query is submitted while a different semantic mode is active
@@ -168,9 +172,13 @@ Search SHALL retain its foundation independent result/suggestion, short-query an
 - **WHEN** Search/GeoMap owner changes or the Screen unmounts
 - **THEN** its old fence and callbacks lose authority; retained Search on a new Search owner initializes the current query once through fresh guarded admission, while equal owner/mode rebuilds do not refetch
 
+#### Scenario: Map admission fences retained Search snapshots
+- **WHEN** a Map Search admission has not yet published its own terminal snapshot
+- **THEN** Query equality or synchronous non-running state alone SHALL NOT authorize an older terminal snapshot. Each Map submit/retry SHALL synchronously fence out the pre-admission public snapshot; neutral/loading and unpublished terminal intervals SHALL not expose retained collections. The newest authoritative publicly published terminal SHALL eventually render success or failure for that admission. Shared SearchViewModel and SearchResultSliverList behavior SHALL remain unchanged.
+
 ### Requirement: Weather streams share one authoritative target
 
-Weather SHALL bind all current/hourly/daily data and publication to one value target containing content identity and coordinates. Target change or clearing SHALL revoke all three lanes and reset old projections before another Post can render them. Each lane SHALL use existing latest-intent execution with fetch/commit separation. Owner/init/update guarantees and API/cache contracts SHALL follow the complete modified Weather requirement in command-execution-concurrency; GeoMap binds the target from authoritative materialized mode and never initializes forecast I/O.
+Weather SHALL bind all current/hourly/daily data and publication to one value target containing content identity and coordinates. Target change or clearing SHALL revoke all three lanes and reset old projections before another Post can render them. Each lane SHALL use existing latest-intent execution with fetch/commit separation.
 
 #### Scenario: Local Post changes within one Weather owner
 - **WHEN** Post A changes to B while any A forecast is pending or stored
@@ -199,6 +207,10 @@ Weather SHALL bind all current/hourly/daily data and publication to one value ta
 #### Scenario: Open modal loses target or owner
 - **WHEN** the modal's captured target/owner is invalidated
 - **THEN** all forecast/title projections are gated and the owning Button releases only its captured modal route, without popping a newer or parent route or requiring disposal-time ViewModel notification
+
+#### Scenario: Weather delegates forecast ownership
+- **WHEN** GeoMap binds Weather from its authoritative materialized Post mode
+- **THEN** Owner/init/update guarantees and API/cache contracts SHALL follow the complete modified Weather requirement in command-execution-concurrency; GeoMap binds the target from authoritative materialized mode and never initializes forecast I/O.
 
 ### Requirement: GeoMap preserves established local navigation behavior
 
