@@ -313,7 +313,7 @@ Large changes and refactors are not automatically breaking.
 | internal rename/refactor only | NO |
 | implementation replaced behind same contract | NO |
 | bug fix restoring documented behavior | NO |
-| tests/docs/CI/AI harness only | NO |
+| tests/docs/CI/AI harness only | usually NO |
 
 Look for aliases, fallbacks, adapters, deprecated APIs that still work, and
 transparent migrations. If existing consumers still work unchanged, it is not

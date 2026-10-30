@@ -129,8 +129,8 @@ def posix_quote(value: str) -> str:
 
 
 def powershell_quote(value: str) -> str:
-    # PowerShell single-quoted strings escape an apostrophe by doubling it.
-    return "'" + value.replace("'", "''") + "'"
+    # PowerShell treats these five characters as interchangeable quote delimiters.
+    return "'" + re.sub(r"['‘’‚‛]", lambda match: match[0] * 2, value) + "'"
 
 
 def error(code: str, detail: str = "") -> str:
@@ -201,6 +201,12 @@ def format_commit(
         wrapped_footer = wrap(f"BREAKING CHANGE: {sentence(breaking)}") if breaking else ""
     except ValueError as exc:
         return error("unwrappable_word", str(exc))
+
+    if wrapped_footer and wrapped_footer.splitlines()[0] == "BREAKING CHANGE:":
+        return error(
+            "breaking_first_word_too_long",
+            "reword breaking text so its first word fits after BREAKING CHANGE:",
+        )
 
     quote = posix_quote if shell == "posix" else powershell_quote
     parts = [
