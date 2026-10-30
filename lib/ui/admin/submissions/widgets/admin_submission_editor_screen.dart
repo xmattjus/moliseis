@@ -26,6 +26,7 @@ import 'package:moliseis/ui/core/utils/content_submission_asset_size.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Form screen for creating and editing a moderation submission.
 class AdminSubmissionEditorScreen extends StatefulWidget {
@@ -1192,9 +1193,9 @@ class _AdminSubmissionEditorScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           if (viewModel.contributorName case final name?)
-                            Text(name),
+                            SentryMask(Text(name)),
                           if (viewModel.contributorEmail case final email?)
-                            Text(email),
+                            SentryMask(Text(email)),
                         ],
                       ),
                     ),

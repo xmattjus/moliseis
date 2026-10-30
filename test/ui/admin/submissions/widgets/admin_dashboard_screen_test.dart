@@ -10,9 +10,12 @@ import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submissions_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_list_item.dart';
 import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
+import 'package:moliseis/utils/extensions/date_time_extensions.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../support/command_test_support.dart';
@@ -21,6 +24,47 @@ import '../../../../support/mock_gotrue_client.dart';
 import '../../../../support/ordinary_view_model_lifecycle_support.dart';
 
 void main() {
+  testWidgets('contributor-only row mask wraps at narrow large text size', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final submission = sampleAdminSubmission(
+      userName: 'Synthetic contributor with a long display name',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: const TextScaler.linear(2)),
+          child: child!,
+        ),
+        home: Scaffold(
+          body: AdminSubmissionListItem(summary: submission, onTap: () {}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(
+      find.ancestor(
+        of: find.text(submission.userName),
+        matching: find.byType(SentryMask),
+      ),
+      findsOneWidget,
+    );
+    final locale = Localizations.localeOf(
+      tester.element(find.byType(AdminSubmissionListItem)),
+    );
+    final date = find.text(' · ${submission.createdAt.formatDate(locale)}');
+    expect(date, findsOneWidget);
+    expect(
+      find.ancestor(of: date, matching: find.byType(SentryMask)),
+      findsNothing,
+    );
+  });
+
   group('AdminDashboardScreen', () {
     late ControllableAdminAuth auth;
     late FakeAdminContentSubmissionRepository repository;
@@ -248,7 +292,32 @@ void main() {
         expect(find.text(submission.name), findsOneWidget);
         expect(find.text(submission.city), findsOneWidget);
         expect(find.text('Luogo · Da revisionare'), findsOneWidget);
-        expect(find.textContaining('${submission.userName} ·'), findsOneWidget);
+        expect(find.text(submission.userName), findsOneWidget);
+        expect(
+          find.ancestor(
+            of: find.text(submission.userName),
+            matching: find.byType(SentryMask),
+          ),
+          findsOneWidget,
+        );
+        final locale = Localizations.localeOf(
+          tester.element(find.byType(AdminSubmissionListItem)),
+        );
+        for (final publicText in [
+          submission.name,
+          submission.city,
+          'Luogo · Da revisionare',
+          ' · ${submission.createdAt.formatDate(locale)}',
+        ]) {
+          expect(find.text(publicText), findsOneWidget);
+          expect(
+            find.ancestor(
+              of: find.text(publicText),
+              matching: find.byType(SentryMask),
+            ),
+            findsNothing,
+          );
+        }
       },
       disposeOwners: () {
         viewModel.dispose();
