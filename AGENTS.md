@@ -1,303 +1,137 @@
 # moliseis — AGENTS.md
 
-Repository-wide engineering instructions for AI agents working on Molise Is.
+Repository-wide operational rules for Molise Is. More specific nested
+`AGENTS.md` files also apply.
 
-This file contains **project-specific rules only**. It does not replace an
-effective implementation plan/specification or a more specific nested `AGENTS.md`.
+## Sources of truth and repository-first work
 
-## Sources of Truth
+- The user's request defines the outcome; an approved plan/specification defines
+  executable intent when present; applicable `AGENTS.md` files define repository
+  rules. Current code, tests, migrations, configuration, and authoritative
+  dependency sources establish implementation reality.
+- Stop affected execution on material contradictions. Report them for resolution
+  by the planner/reviewer before continuing; do not silently override a source or
+  redesign the task. Plan compliance alone does not establish correctness.
+- Before proposing or modifying code, inspect the relevant implementations,
+  callers, tests, and backend contracts. Identify existing patterns, abstractions,
+  ownership, and conventions; reuse or extend them before introducing alternatives.
+  Do not reproduce demonstrated defects merely for consistency.
+- A new architectural pattern, shared abstraction strategy, framework,
+  or cross-cutting convention requires explicit user authorization,
+  unless already authorized by the user's request or an approved plan.
+  Before proposing one, establish why existing approaches are
+  insufficient and identify the simplest viable alternative.
+  Stop only for architectural decisions outside the authorized scope.
+  Ordinary local implementation details do not require approval.
+- New packages require material justification.
+- Preserve unrelated working-tree changes and stay within authorized scope.
+  Do not prioritize delivery time or implementation cost unless requested.
 
-For repository-changing work, keep these responsibilities distinct:
+## Delegation
 
-- the user's explicit request defines the desired outcome;
-- an approved implementation plan or specification defines current executable
-  intent when one exists;
-- applicable `AGENTS.md` files define repository-specific engineering rules;
-- current code, tests, migrations, configuration, and authoritative dependency
-  sources provide repository reality and implementation evidence.
+Use `.codex/agents/` role instructions when supported; keep model, sandbox, and
+prompt configuration there. Delegate selectively, not for trivial work or extra
+opinions after sufficient evidence exists. Prefer parallel independent reads;
+avoid concurrent writers on the same production surface.
 
-Do not resolve a material conflict by silently overriding one source with another.
-A planner/reviewer must resolve material conflicts between requested intent,
-planning artifacts, and repository reality before affected execution starts or
-resumes. An executor must stop and report a material contradiction rather than
-silently redesigning the task.
+Give each task explicit scope, expected results, constraints, and evidence
+requirements, with one owner per bounded implementation. The main agent retains
+request interpretation, scope, evidence reconciliation, integration, and final
+architecture/readiness judgments. Verify material delegated conclusions rather
+than treating reports as authority. Subagents must not broaden scope; confirmed
+contradictions that make the task unsafe or impossible require escalation.
 
-## Delegation and Subagents
+## Architecture and persistence boundaries
 
-When the active harness supports the project-scoped agents configured under
-`.codex/agents/`, use delegation selectively to keep exploration, verification,
-and noisy intermediate work out of the main reasoning context.
+- Keep `lib/domain/` independent of `data` and `ui`. Domain repository contracts
+  live in `lib/domain/repositories/`; implementations in `lib/data/repositories/`.
+  The data layer implements domain contracts and owns infrastructure details.
+- UI/ViewModels use domain-facing contracts. Keep presentation, ViewModel
+  orchestration, domain rules, persistence, and backend enforcement in their
+  owning layers; do not expose privileged backend details in UI.
+- Keep Provider/`ChangeNotifier` for state and dependency injection, with
+  `lib/config/dependencies.dart` as the primary composition root. Do not introduce
+  parallel state management.
+- ObjectBox entities/local data sources belong in `lib/data/data-sources/`, wire
+  DTOs in `lib/data/dtos/`, and mappings in `lib/data/mappers/`. Reuse repository
+  and write boundaries before adding direct data-source access.
+- Preserve deliberate local exceptions rather than performing unrelated
+  architectural cleanup.
 
-The main agent always owns:
-- interpretation of the user's request;
-- scope and requirement decisions;
-- reconciliation of conflicting evidence;
-- integration across delegated results;
-- final architectural and readiness judgments.
-
-Use the configured roles as follows:
-- `explorer`: read-only repository mapping, execution-path tracing, dependency
-  discovery, and evidence gathering for non-trivial work.
-- `implementer`: bounded implementation after the intended behavior and scope are
-  sufficiently defined.
-- `test_debugger`: focused test execution, regression analysis, and failure
-  diagnosis.
-- `reviewer`: independent adversarial review of meaningful implementation changes.
-- `architect`: escalation only for genuine architectural, ownership, concurrency,
-  security, persistence, or cross-boundary ambiguity that cannot be resolved from
-  existing repository conventions.
-
-Delegation rules:
-- Do not delegate trivial work whose delegation overhead exceeds the work itself.
-- Prefer parallel delegation for independent read-heavy work such as exploration,
-  testing, evidence gathering, and review.
-- Avoid concurrent code-writing agents over the same production surface.
-- Normally give one agent clear ownership of a bounded implementation.
-- Every delegated task must have an explicit scope, expected result, and relevant
-  constraints or evidence requirements.
-- Do not use additional agents merely to obtain more opinions after sufficient
-  evidence already exists.
-- Treat delegated output as evidence, not authority. The main agent must verify and
-  reconcile material conclusions before acting on them.
-- A subagent must not broaden the current OpenSpec change or implementation scope
-  unless a confirmed contradiction makes the requested work unsafe or impossible.
-
-Harness-specific implementation details, model selection, sandbox configuration,
-and agent prompts belong in the relevant agent/workflow configuration rather than
-this repository-wide policy. Repository-level delegation boundaries and ownership
-rules may be defined here when they are durable across tasks.
-
-## Engineering Principles
-
-Apply these principles together rather than mechanically optimizing for any one of
-them:
-
-- **KISS (Keep It Simple):** choose the simplest design that satisfies the
-  verified requirement and fits the current architecture. Avoid speculative
-  indirection, generalized infrastructure, and complexity without a concrete need.
-- **YAGNI (You Aren't Gonna Need It):** implement requirements and edge cases that
-  are actually required now. Defer speculative extensibility, future hooks, and
-  hypothetical scenarios until there is evidence they are needed.
-- **DRY (Don't Repeat Yourself):** reuse existing behavior and keep important
-  rules/invariants in a single authoritative place when practical. Do not use DRY
-  as a reason to introduce a premature abstraction for small or incidental
-  duplication.
-- **Rule of Three:** prefer tolerating limited duplication over inventing a generic
-  abstraction too early. Extract a reusable abstraction when there are at least
-  three concrete use cases, unless an existing shared contract or invariant already
-  requires one authoritative implementation.
-- **SRP (Single Responsibility Principle):** keep functions, classes, widgets,
-  services, RPCs, and Edge Functions focused on one coherent responsibility. Do
-  not split code into artificial micro-abstractions merely to satisfy the principle
-  mechanically.
-- **Separation of Concerns:** keep UI/presentation, application orchestration,
-  domain rules, persistence/infrastructure, and database enforcement in their
-  appropriate layers. In particular, do not move Supabase/database invariants into
-  Flutter merely for convenience, or leak privileged backend details into the UI.
-- **Composition over inheritance:** in Dart/Flutter, prefer composing existing
-  widgets, helpers, services, and behaviors over creating new inheritance
-  hierarchies, unless an established project hierarchy clearly fits the problem.
-- **Clean Architecture is guidance, not a goal by itself:** preserve useful layer
-  boundaries, but do not add abstractions, boilerplate, or files when doing so
-  would conflict with KISS or YAGNI.
-
-Operationally:
-
-- Inspect the current implementation, relevant tests, and backend definitions
-  before proposing or making changes.
-- In technical reviews, implementation plans, and architectural decisions, 
-  prioritize identifying failure modes, regressions, unverified assumptions, 
-  unjustified complexity, and violations of KISS, YAGNI, SRP, and 
-  Separation of Concerns over confirming the proposed solution.
-- Do not declare an implementation ready merely because it conforms to the plan or 
-  specification; verify that the plan or specification itself is sound against 
-  repository reality, requirements, and applicable engineering principles.
-- Prefer existing project patterns and reusable components over theoretically
-  superior replacements.
-- Prefer incremental, maintainable changes that fit naturally into the codebase.
-- Do not introduce new packages, frameworks, state-management solutions, or
-  architectural patterns unless materially justified.
-- Do not broaden a task into opportunistic cleanup or a large refactor.
-- Do not optimize for delivery time or implementation cost unless explicitly
-  requested.
-- Preserve unrelated working-tree changes. Never discard user work to simplify a
-  change.
-- Do not invent files, symbols, APIs, schemas, behavior, or verification results.
-
-## GitHub Contribution Workflow
-
-- `main` is an integration branch. Agents must not push
-  commits directly to `main`.
-- All agent-authored changes intended for `main` must be
-  integrated through a GitHub pull request.
-- Use one pull request per cohesive, independently
-  reviewable change, not per commit, file, or agent task.
-- An OpenSpec change should normally correspond to one
-  pull request.
-- Keep related implementation, tests, documentation,
-  generated artifacts, and review fixes in the same PR.
-- Address review findings with additional commits to the
-  existing PR while it remains open.
-- Do not bundle unrelated changes merely to reduce the
-  number of pull requests.
-- Local experiments, read-only analysis, and uncommitted
-  work do not require a pull request.
-- Agents may create and update pull requests as part of
-  authorized repository-changing work.
-- Agents must not merge a pull request unless the user
-  explicitly authorizes the merge.
-- Direct pushes to `main` require an explicit user
-  exception and must not be inferred from task scope,
-  change size, or urgency.
-- Never bypass GitHub branch protections or required
-  checks without explicit authorization.
-
-## Architecture
-
-The current high-level structure is:
-
-```text
-lib/
-├── domain/          # Models, repository contracts, use cases
-├── data/
-│   ├── data-sources/ # ObjectBox/local persistence
-│   ├── dtos/         # Remote/wire DTOs
-│   ├── mappers/      # DTO/entity ↔ domain mapping
-│   ├── repositories/ # Repository implementations
-│   └── services/     # Infrastructure/external services
-├── ui/              # Feature-based UI, ViewModels, widgets
-├── routing/         # go_router
-├── config/          # Environment + Provider composition root
-├── utils/           # Result, Command, logging, shared utilities
-└── generated/       # Generated ObjectBox output
-
-supabase/
-├── functions/       # Edge Functions + shared Deno/TypeScript
-├── migrations/      # Schema, RPCs, triggers, RLS, DB invariants
-└── tests/           # Backend/database tests
-```
-
-The directory summary is orientation only. Verify specific paths and symbols in
-the current checkout before relying on them.
-
-### Layer boundaries
-
-- `domain` must remain independent of `data` and `ui`.
-- `data` implements domain contracts and owns infrastructure details.
-- UI/ViewModels should use domain-facing contracts rather than direct persistence
-  or privileged backend implementation details.
-- `config/dependencies.dart` is the primary Provider composition root.
-- Prefer a deliberate existing local exception over an unrelated architectural
-  cleanup.
-
-## Project Patterns
-
-### `Result<T>`
+## Result and command contracts
 
 Use `Result.success(T)` / `Result.error(Exception)` for expected recoverable
-failures across repository, use-case, and ViewModel boundaries.
+failures across repository, use-case, and ViewModel boundaries. Translate expected
+infrastructure failures at the boundary owning the error contract, preserving
+logging/reporting. Internal code and Result transformations may throw; there is
+no blanket prohibition on exceptions.
 
-Do **not** apply a blanket "nothing may ever throw" rule. Internal code and
-`Result` transformations can propagate exceptions. Translate expected
-infrastructure failures at the architectural boundary that owns the error
-contract, and preserve existing logging/error-reporting behavior.
+For new ViewModel async actions:
 
-### Command execution
-
-For new ViewModel async actions, use the `command_it`-based infrastructure:
-
-- Use `createResultCommand` / `createResultCommandNoParam` from
-  `lib/utils/result_command.dart` as the default for ordinary single-flight
-  actions. These wrap `command_it.Command<P, Result<T>?>`; concurrent invocations
-  are rejected while the current execution is running. Any coalescing required
-  by a consumer belongs in its orchestration.
+- Default to `createResultCommand` / `createResultCommandNoParam` from
+  `lib/utils/result_command.dart`. They wrap `command_it.Command<P, Result<T>?>`
+  and reject concurrent invocations while running; consumer-required coalescing
+  belongs in orchestration.
 - Use `RestartableCommand<P, T>` from `lib/utils/restartable_command.dart` only
-  when newer intent must supersede older async work, such as search or
-  identity/selection reads. It composes child `command_it` commands with
-  `switchMap`; obsolete work loses publication authority even if it continues
-  physically. It is not the default for ordinary actions.
-- Expected recoverable failures remain `Result.error`. Raw throws remain
-  unexpected runtime/programming failures and must not be converted to
-  `Result.error` merely to satisfy command lifecycle behavior. Do not catch
-  generic `Object` and convert it to `Result.error` to bypass lifecycle or
-  error-routing behavior. While a command remains live, handled unexpected
-  failures use the configured `command_it` global reporting path.
-- Views should trigger commands rather than duplicate ViewModel orchestration.
+  when newer intent must supersede older work, such as search or identity/selection
+  reads. Its child commands and `switchMap` revoke obsolete work's publication
+  authority even when physical work continues. It is not the default for actions.
+- Keep expected failures as `Result.error`; raw throws are unexpected runtime or
+  programming failures. Do not catch generic `Object` and convert it to
+  `Result.error` to bypass lifecycle or error routing. While commands remain live,
+  handled unexpected failures use the configured `command_it` global reporter.
+- Views trigger commands rather than duplicating ViewModel orchestration.
 
-`command_it 9.5.2` has a known late-throw-after-dispose limitation: after a
-disposed command's deferred internal notifier teardown, a raw async throw can
-fail on disposed internal state before reaching the configured global exception
-handler. Do not rely on global reporting to make post-dispose raw throws safe.
-Preserve appropriate ViewModel lifecycle guards and re-audit this constraint
-when `command_it` is upgraded.
+`command_it 9.5.2` has a late-throw-after-dispose limitation: after deferred
+internal notifier teardown, raw async throws can fail on disposed state before
+reaching the global handler. Preserve ViewModel lifecycle guards; global reporting
+cannot make post-dispose throws safe. Re-audit this when upgrading `command_it`.
 
-### Provider / `ChangeNotifier`
+## Supabase and database contracts
 
-Keep the existing Provider/`ChangeNotifier` state-management and dependency
-injection model. Do not introduce a parallel state-management solution.
+Current migrations and SQL definitions are authoritative for schema, constraints,
+RLS, transactional invariants, and RPC behavior.
 
-### Data boundaries
-
-- Domain repository contracts: `lib/domain/repositories/`.
-- Concrete repositories: `lib/data/repositories/`.
-- ObjectBox entities/data sources: `lib/data/data-sources/`.
-- Remote/wire DTOs: `lib/data/dtos/`.
-- Mapping: `lib/data/mappers/`.
-
-Reuse existing repository/write boundaries before adding direct data-source
-access.
-
-## Supabase / Database
-
-Treat current migrations and SQL definitions as authoritative for schema,
-constraints, RLS, transactional invariants, and RPC behavior.
-
-- Do not make Flutter the sole enforcement point for database invariants.
-- Do not bypass an existing RPC/transaction boundary with direct table writes.
+- Keep database invariants server-side; Flutter must not be their sole enforcer.
+- Preserve existing RPC/transaction boundaries instead of direct table writes.
 - Do not weaken RLS, authentication, authorization, service-role, or secret
-  boundaries to simplify client code.
-- Keep privileged operations behind the project's existing Edge Function/RPC
+  boundaries. Keep privileged operations behind existing Edge Function/RPC
   boundaries.
-- When changing a database contract, inspect affected SQL, Edge Functions,
-  callers, generated/shared types where applicable, and regression tests.
+- For database contract changes, inspect affected SQL, Edge Functions, callers,
+  generated/shared types where applicable, and regression tests.
+- Never expose secret values, full authorization headers, or secret-bearing
+  environment contents in source, plans, logs, tests, or chat output.
 
-Never write secret values, full authorization headers, or secret-bearing
-environment contents into source, planning artifacts, logs, tests, or chat output.
+## Generated code and verification
 
-## Generated Code
+- Change generator inputs rather than hand-editing generated output. For
+  ObjectBox, `dart_mappable`, and Envied, use the established `build_runner`
+  workflow, typically `dart run build_runner build --delete-conflicting-outputs`.
+  Inspect generated diffs and retain only intentionally caused changes.
+- Start with the smallest relevant checks; broaden for shared contracts and risk.
+  Follow explicit plan/specification acceptance requirements. Common Flutter
+  checks are `flutter analyze` and `flutter test`; follow affected Deno code/tests
+  for Edge Function formatting, type checks, and test commands.
+- Never invent repository facts or claim a command, test, migration, build,
+  deployment, or smoke check passed without executing it and observing success.
+- For version-sensitive behavior, inspect the checkout's actual versions and use
+  authoritative local source or current official documentation. Use available
+  documentation tools within permissions; no particular search tool is required.
 
-Do not hand-edit generated output when its generator input is the proper write
-boundary.
+## GitHub contributions and pull requests
 
-The current project uses `build_runner` with ObjectBox, `dart_mappable`, and
-Envied. After changing generator inputs, use the established generation workflow,
-typically:
-
-```bash
-dart run build_runner build --delete-conflicting-outputs
-```
-
-Inspect generated diffs and keep only changes caused by intentional source
-changes.
-
-## Testing and Verification
-
-- Run the smallest relevant tests first; broaden when shared contracts or the
-  current task scope require it.
-- Common Flutter checks are `flutter analyze` and `flutter test`.
-- For Edge Functions, follow the affected Deno code/tests for formatting, type
-  checks, and test commands.
-- When work is governed by an implementation plan or specification, its explicit
-  verification and acceptance requirements are authoritative.
-- Never claim a command, test, migration, build, deployment, or smoke check passed
-  unless it actually ran and produced that result.
-
-## Version-Specific Behavior
-
-When library, SDK, CLI, Flutter, Dart, Deno, or Supabase behavior is
-version-sensitive, inspect the version actually used by the checkout and prefer
-authoritative local source or current official documentation.
-
-Do not hard-code a particular documentation/search tool into this repository
-policy. Use the authoritative source and documentation capabilities available to
-the active agent, while respecting its permissions.
+- `main` is an integration branch. Agent-authored changes intended for it go
+  through PRs; direct pushes require an explicit user exception, regardless of
+  urgency or change size. Local experiments and uncommitted work need no PR.
+- Use one PR per cohesive, independently reviewable change, normally one per
+  OpenSpec change. Keep related implementation, tests, docs, generated artifacts,
+  and review fixes together; add review-fix commits to the same open PR.
+- Agents may create/update PRs within authorized work. Merging requires explicit
+  user authorization, as does bypassing branch protections or required checks.
+- Generate PR titles with the repository-local
+  `.agents/skills/strict-conventional-commit/SKILL.md` and its `--pr-title` mode.
+  Consider the entire PR against its base; staging alone does not represent it.
+- Follow `.github/PULL_REQUEST_TEMPLATE.md` for descriptions, including via CLI
+  or API. Only `Why` is mandatory. Keep descriptions concise; do not duplicate CI
+  outcomes, file summaries, logs, or execution histories. Retain materially
+  necessary optional information as required by the template.

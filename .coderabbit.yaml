@@ -1,0 +1,4 @@
+# Keep the pull request description authored by the contributor or agent.
+# CodeRabbit's code reviews and comments remain enabled.
+reviews:
+  high_level_summary: false
