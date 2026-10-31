@@ -19,6 +19,7 @@ import '../support/loopback_http_client.dart';
 import '../support/mock_logger.dart';
 import '../support/recording_sentry_transport.dart';
 import '../support/test_image_files.dart';
+import '../support/weather_http_fixture.dart';
 
 void main() {
   late HttpServer server;
@@ -201,38 +202,7 @@ void main() {
             ..add(png);
         } else {
           request.response.headers.contentType = ContentType.json;
-          request.response.write(
-            jsonEncode({
-              'latitude': 41.5,
-              'longitude': 14.5,
-              'generationtime_ms': 0.1,
-              'utc_offset_seconds': 0,
-              'timezone': 'Europe/Rome',
-              'timezone_abbreviation': 'CET',
-              'elevation': 100,
-              'current': {
-                'time': '2026-10-30T12:00',
-                'interval': 900,
-                'temperature_2m': 18.0,
-                'is_day': 1,
-                'weather_code': 0,
-              },
-              'hourly': {
-                'time': <String>[],
-                'temperature_2m': <double>[],
-                'precipitation_probability': <int>[],
-                'weather_code': <int>[],
-                'is_day': <int>[],
-              },
-              'daily': {
-                'time': <String>[],
-                'weather_code': <int>[],
-                'temperature_2m_max': <double>[],
-                'temperature_2m_min': <double>[],
-                'precipitation_probability_max': <int>[],
-              },
-            }),
-          );
+          request.response.write(jsonEncode(weatherHttpResponse));
         }
         await request.response.close();
       };
