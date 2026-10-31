@@ -131,7 +131,17 @@ void main() {
     final originalHandler = FlutterError.onError;
     try {
       // Exercise the installed handler without failing the test runner.
-      FlutterError.onError = (_) {};
+      FlutterError.onError = (details) {
+        final error = details.exception;
+        if (error is StateError &&
+            const {
+              'synthetic-pre-revocation',
+              'synthetic-post-revocation',
+            }.contains(error.message)) {
+          return;
+        }
+        originalHandler?.call(details);
+      };
       var starts = 0;
       late SetCrashReportingUseCase consent;
       var taps = 0;
