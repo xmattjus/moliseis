@@ -127,11 +127,30 @@ Enable and disable success SHALL use the existing Snackbar component with identi
 
 ### Requirement: Native acceptance is separate from presentation acceptance
 
-Android and iOS acceptance SHALL verify actual shutdown and Replay behavior using synthetic identities and an isolated telemetry destination. Widget/flag assertions and a Dart facade enabled flag SHALL NOT establish native success. Buffered pre-revocation delivery SHALL be distinguished from new post-shutdown capture, including queued data observed after a later launch.
+Android and iOS acceptance SHALL require controlled framework-error and representative native-crash evidence with positive controls, synthetic data and an isolated destination. Facade/widget flags SHALL NOT prove native success. Previously acquired buffers MAY drain; new acquisition after effective shutdown SHALL remain prohibited for every source. Acceptance SHALL document native observability limits; Replay follows `session-replay-privacy`.
 
-#### Scenario: Automatic capture after effective shutdown
-- **WHEN** controlled framework, unhandled-Dart and native-error probes occur after successful shutdown on each native platform
-- **THEN** no new report from those probes is acquired or delivered under the agreed shutdown contract and unrelated application networking remains functional
+#### Scenario: Native consent and networking acceptance
+- **WHEN** representative native acceptance is evaluated on each platform
+- **THEN** persisted-consent startup, actual SDK shutdown, mounted-root usability, application networking continuity and deferred opt-in with fresh-process activation are demonstrated
+- **AND** buffered pre-revocation delivery, including data queued until a later launch, is distinguished from new acquisition
+- **AND** internally swallowed native shutdown failures and observation limits are documented rather than inferred from facade state
+
+#### Scenario: Representative automatic capture after effective shutdown
+- **WHEN** controlled framework-error and representative native-error probes occur before and after successful shutdown on each native platform
+- **THEN** working positive controls and crash-cache recovery establish that the destination and tested mechanisms are operational
+- **AND** no new post-shutdown report from those probes is acquired or delivered during valid recovery observation, and unrelated application networking remains functional
+- **AND** Android Java RuntimeException and iOS SIGSEGV results are not generalized to every crash mechanism
+
+#### Scenario: Additional probe has no reliable positive control
+- **WHEN** the integration-test binding prevents a reliable unhandled-Dart automatic-capture positive control and no specific regression is demonstrated
+- **THEN** the probe remains inconclusive and its residual coverage limitation is recorded, without blocking merge/release acceptance supported by the mandatory representative evidence
+- **AND** independent unhandled-Dart, Android NDK and exhaustive device/crash-family probes are not merge/release prerequisites absent a specific regression; concrete evidence of new capture requires investigation regardless of source
+- **AND** the requirement to stop new acquisition after effective shutdown remains unchanged
+
+#### Scenario: Retained-process activation evidence
+- **WHEN** process-level integration tests establish runtime opt-in deferral and activation only in a fresh process, with no concrete alternate initialization path identified
+- **THEN** separate native navigation, resume and hot-reload probes are not mandatory for acceptance
+- **AND** those transitions remain prohibited from reinitializing telemetry in the existing process
 
 #### Scenario: Native shutdown cannot meet acceptance
 - **WHEN** controlled native verification shows continued new capture or an unobservable failure invalidates the required claim

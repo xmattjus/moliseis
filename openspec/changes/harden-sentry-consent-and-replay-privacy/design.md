@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md for motivation and the three delta specifications for observable contracts. This document records the design intent implemented in [Draft PR #26](https://github.com/xmattjus/moliseis/pull/26). [tasks.md](tasks.md) records completed automated acceptance and the remaining native acceptance gates; implementation does not imply native acceptance or release.
+See proposal.md for motivation and the three delta specifications for observable contracts. This document records the design intent implemented in [Draft PR #26](https://github.com/xmattjus/moliseis/pull/26). [tasks.md](tasks.md) records completed automated and revised representative native acceptance, with historical results and residual coverage limits preserved. Acceptance completion does not authorize merge or release.
 
 ### Verified baseline and boundaries
 
@@ -151,15 +151,15 @@ Definition-time baseline evidence is distinct from the executed implementation v
 | Replay widgets | Extend dashboard/editor tests for name-only/date-visible masks, both optional edit identities, finalized display and unchanged create account context; preserve title/city/status/images and existing public form masks |
 | Static/full regression | Run focused tests first, scoped format/analyze, then full `flutter test` for shared factory/bootstrap/composition impact. Record pre-existing diagnostics distinctly; no global lint fixes |
 
-### Separate native release gates (not satisfied by automated rows)
+### Representative native acceptance (separate from automated rows)
 
-1. Build the actually resolved Android/iOS app against an isolated telemetry project and synthetic submissions. Record package/native versions, platform/build mode and identifiers outside source; do not use production identities. Force deterministic Replay sampling only in the test configuration.
-2. Before opt-out, prove the isolated destination receives controlled automatic errors and a Replay. Inspect public form, dashboard contributor/date and edit `Proposto da`; contributor identity must be unreadable while title, date, city, status and tourism image remain visible. Confirm approved `Creato come` visibility.
-3. Persist opt-out during an active recorded session. Observe shutdown timing, app input/rendering with mounted SentryWidget, and Supabase/auth/weather/image requests. Trigger uniquely tagged framework, unhandled-Dart and native crash probes only after effective shutdown. Inspect received/cached envelopes, later relaunch and Replay timeline for new acquisition, separately identifying data captured before effective revocation. Native crash tests use separate controlled launches and recovery, not a production crash.
-4. Enable again: no current-process reinitialization or forwarding when closed; terminate and launch a fresh process to verify activation. Resume/navigation/hot reload are negative controls.
-5. Verify startup false/unreadable-consent policy on native builds and observable failure handling where platform fault injection is feasible. Public APIs do not expose every internally swallowed native failure; explicitly record that limit. Any observed continued new capture blocks immediate-disable acceptance and triggers a bounded reviewed correction, not a passing status or blanket mask/restart workaround.
+1. Use actually resolved Android/iOS builds, synthetic data, an isolated telemetry destination and test-only deterministic Replay sampling. Record native versions and build mode; never use production identities or infer native success from SDK facade flags.
+2. Establish controlled framework-error and representative native-crash positive controls before shutdown. Verify committed opt-out precedes actual close, mounted-root usability, Cronet/Cupertino and application/Supabase/auth/weather/image transport continuity, stored-false startup, retained-process opt-in deferral and fresh-process activation. Compare Android Java RuntimeException and iOS SIGSEGV before/after close, including native cache recovery with a working collector; distinguish old buffered delivery from new acquisition. Results are bounded to the tested mechanisms and observation windows.
+3. Combine actual native dashboard Replay pixels on both platforms with widget regressions across public form/dashboard/editor, preserved editorial/image and `Creato come` visibility boundaries, and product-owner visual inspection of actual Sentry Replay for public-form/editor contributor masking. Record provenance; do not infer the platform of owner-inspected recordings or claim independent recordings of every variant.
+4. Preserve unit/widget verification of missing/unreadable consent, setup fallback, owner races and observable shutdown error/timeout handling. Public APIs cannot expose every internally swallowed native failure; this remains accepted uncertainty, not a native failure-injection pass. Any observed new post-shutdown acquisition or contributor disclosure remains unacceptable and requires a bounded correction.
+5. Separate unhandled-Dart automatic-capture probes, Android NDK/additional crash families, per-variant native Replay recordings, and dedicated navigation/resume/hot-reload probes are no longer mandatory merge/release checks without a concrete regression signal. Runtime reinitialization remains forbidden. Process-level tests and the inspected one-time initialization path suffice for this acceptance decision; an inconclusive probe is never a passing result.
 
-Keep summaries and remaining limits in tasks.md when future execution is authorized. Temporary logs, analyzer dumps, test-generated recordings and synthetic telemetry identifiers stay outside the repository; do not create append-only investigation artifacts. No production credentials or secret-bearing SDK/network payloads belong in planning files.
+Keep concise evidence and limitations in tasks.md. Temporary logs, analyzer dumps, recordings and raw telemetry stay outside the repository; no secret-bearing payloads belong in planning files.
 
 ## Migration Plan
 
@@ -167,4 +167,16 @@ No schema/data migration or backend deployment. After independent review and exp
 
 ## Open Questions
 
-No product decision is deferred: buffer draining is accepted, unknown consent fails closed for telemetry, first-install default stays true and create-mode administrator context remains visible. Remaining evidence gates are native shutdown/recording behavior and fresh build resolution, not permission to choose deferred-only opt-out, private SDK APIs or an upgrade. A failed gate requires a focused design update with concrete evidence before release; it does not justify speculative infrastructure now.
+No product decision is deferred: buffer draining is accepted, unknown consent fails closed for telemetry, first-install default stays true and create-mode administrator context remains visible. The revised representative acceptance gates are satisfied as recorded in tasks.md. Residual uncertainty is not permission to choose deferred-only opt-out, private SDK APIs or an upgrade. A demonstrated functional failure still requires a focused correction before release; optional coverage gaps alone do not justify speculative infrastructure.
+
+## Final risk-based acceptance decision (2026-11-01)
+
+The product owner explicitly authorized revising the verification contract while retaining every functional consent, networking and privacy guarantee. Tasks 7.2–7.4 are complete under the revised delta requirements, not assertions that every originally planned test ran. No unresolved material defect is documented.
+
+- **Verified:** executed automated tests, Android 8.56.0 / iOS Cocoa 9.27.0 framework and representative native crash/cache recovery controls, consent/networking/process tests, and inspected native dashboard Replay pixels on both platforms.
+- **Owner-verified:** the product owner reports visually inspecting actual Sentry Replay recordings and confirms contributor masking in the public contribution form and administrative editor. Codex did not independently reproduce this inspection; recording identifiers and platforms were not supplied and are not inferred.
+- **Inconclusive:** independent unhandled-Dart automatic capture under the integration-test binding lacked a reliable positive control. No production defect or successful shutdown test is inferred from that attempt.
+- **Not executed:** independent native pixel checks for every other screen/create variant and dedicated navigation/resume/hot-reload controls. Widget coverage supports the remaining visibility boundaries; it is not native pixel proof.
+- **No longer mandatory:** those additional probes and exhaustive crash/device matrices are optional or risk-triggered, not deferred release blockers. Representative native controls, automated contracts and direct native/owner Replay observations are sufficient; no material regression has been demonstrated in the excluded scenarios.
+
+Accepted residual uncertainty includes untested event/crash families, native internally swallowed failures, unspecified platforms for owner observations and simulator/debug versus physical-device/release differences. A concrete new acquisition, reinitialization or masking defect reopens investigation; the revision does not waive product behavior. It authorizes neither merge, deployment, release, canonical specification synchronization nor archive.

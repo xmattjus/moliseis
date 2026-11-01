@@ -12,7 +12,7 @@ Disabling error reporting currently changes only custom logger forwarding, leavi
 - Coordinate committed consent and the single shutdown operation at application scope, independently of Settings presentation lifetime. Preserve ordinary command admission, optimistic rollback, committed-cache authority and existing write ordering.
 - Use the existing Snackbar for both directions with accurate success copy and distinct saved-preference/shutdown-failure feedback.
 - Preserve globally unmasked Replay text/images and existing public-form masks. Mask dashboard contributor name separately from its date, and the editor's `Proposto da` name/email. Preserve `Creato come` administrator account context.
-- Require deterministic automated acceptance and separate Android/iOS native shutdown and synthetic Replay gates. Allow SDK draining of telemetry acquired before effective revocation; make no zero-network-after-tap claim.
+- Require deterministic automated acceptance and separate representative Android/iOS native shutdown and combined Replay evidence under the authorized risk-based acceptance contract. Allow SDK draining of telemetry acquired before effective revocation; make no zero-network-after-tap claim.
 
 ## Capabilities
 
@@ -31,4 +31,4 @@ Verified planning baseline: `main` and fetched `origin/main` at `80223649dc09d94
 
 Affected implementation surfaces are `lib/main.dart`, HTTP factory, Provider composition, Settings ViewModel/screen, existing logging flag, a bounded application-owned consent operation, and two moderation widgets plus focused tests. No database/API/schema changes, dependency upgrades, general logging/networking refactor, new persistent storage, privacy framework, restart controls or global masking are intended. Historical command-migration artifacts remain unchanged; only delta specifications change the current contract.
 
-Implementation is applied in [Draft PR #26](https://github.com/xmattjus/moliseis/pull/26) and automatically verified. [tasks.md](tasks.md) is authoritative for completion and remaining acceptance: native release acceptance remains pending. No merge, deployment, release, canonical specification synchronization or archive has occurred.
+Implementation is applied in [Draft PR #26](https://github.com/xmattjus/moliseis/pull/26) and automatically verified. [tasks.md](tasks.md) is authoritative: all 24 tasks are complete under the product-owner-authorized risk-based acceptance revision of 2026-11-01. Representative native tests and widget regressions are supplemented by owner-verified public-form/editor Replay inspection; inconclusive unhandled-Dart and unexecuted variant/navigation probes remain documented coverage limits, not passing tests or merge/release prerequisites absent a concrete regression. No merge, deployment, release, canonical specification synchronization or archive has occurred.

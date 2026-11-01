@@ -37,12 +37,13 @@ Replay SHALL retain globally unmasked text and images and useful public tourism 
 
 ### Requirement: Native recording proves selective redaction
 
-Selective redaction acceptance SHALL include Android and iOS Replay inspection with synthetic contributor identities and visible non-sensitive controls. Widget-tree assertions SHALL establish placement only, not successful native pixel redaction or protection of separate telemetry payloads.
+Selective redaction acceptance SHALL combine representative native dashboard recordings on Android/iOS, affected widget-boundary regressions and actual Sentry Replay inspection of public-form/editor masking. Owner inspection MAY supply the latter with accurate provenance. Widget assertions SHALL NOT prove native pixels or separate payload protection. All contributor masking and editorial/account visibility guarantees remain mandatory.
 
-#### Scenario: Synthetic native moderation recording
-- **WHEN** an isolated test recording includes the public form, dashboard and edit-mode identity section
-- **THEN** synthetic contributor names/emails are unreadable while event/place titles, date, city, status and tourism images remain readable or visible
-- **AND** the account-context branch remains distinguishable and preserves its approved visibility
+#### Scenario: Combined selective-redaction evidence
+- **WHEN** native dashboard recordings on both platforms show synthetic contributor-name redaction with adjacent date/title/city/category/status visible, widget regressions preserve public-form/editor identity masks and editorial/image/create-account boundaries, and actual Sentry Replay inspection confirms public-form and editor contributor masking
+- **THEN** the combined evidence satisfies selective Replay acceptance without claiming every screen was independently recorded on each platform
+- **AND** product-owner inspection is distinguished from independently reproduced test output, with no invented recording identifier or platform attribution
+- **AND** separate native recordings of every screen/create-mode variant are not mandatory absent evidence of a masking defect
 
 #### Scenario: Separate payload exposure discovered
 - **WHEN** verification discovers contributor values in a distinct error, breadcrumb, URL or metadata payload
