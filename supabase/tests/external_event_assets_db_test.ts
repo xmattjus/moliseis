@@ -490,6 +490,16 @@ const uploadedFixture = {
   mimeType: "image/png",
   publicId: "fixture/source",
 };
+function assetClient(
+  fetchImpl: typeof fetch = fetch,
+): SupabaseClient<Database> {
+  const url = Deno.env.get("API_URL")!;
+  assert(["localhost", "127.0.0.1"].includes(new URL(url).hostname));
+  return createClient<Database>(url, Deno.env.get("SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetchImpl },
+  });
+}
 async function committedAssetFixture(
   run: (
     sql: Sql,
@@ -497,11 +507,13 @@ async function committedAssetFixture(
     userId: string,
     source: Record<string, unknown>,
     eventIds: string[],
+    cityIds: string[],
   ) => Promise<void>,
 ) {
   const sql = postgres(databaseUrl, { max: 1, onnotice: () => {} }),
     userId = crypto.randomUUID(),
-    eventIds: string[] = [];
+    eventIds: string[] = [],
+    cityIds: string[] = [];
   let source: Record<string, unknown> | undefined;
   try {
     await sql`insert into auth.users(id,email,raw_user_meta_data) values (${userId},'image@example.test','{"display_name":"Image"}')`;
@@ -510,14 +522,7 @@ async function committedAssetFixture(
         sql.json(normalized)
       },1,${await hashNormalizedExternalEvent(normalized)},'{}',1,${userId})`;
     assert(source);
-    const url = Deno.env.get("API_URL")!;
-    assert(["localhost", "127.0.0.1"].includes(new URL(url).hostname));
-    const client = createClient<Database>(
-      url,
-      Deno.env.get("SERVICE_ROLE_KEY")!,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    );
-    await run(sql, client, userId, source, eventIds);
+    await run(sql, assetClient(), userId, source, eventIds, cityIds);
   } finally {
     if (source) {
       await sql`delete from public.submissions_assets where content_submission_id in (select id from public.content_submissions where external_event_record_id=${
@@ -532,6 +537,9 @@ async function committedAssetFixture(
     }
     for (const id of eventIds) {
       await sql`delete from public.events where id=${id}`;
+    }
+    for (const id of cityIds) {
+      await sql`delete from public.cities where id=${id}`;
     }
     await sql`delete from auth.users where id=${userId}`;
     await sql.end();
@@ -551,22 +559,248 @@ function assetParams(source: Record<string, unknown>) {
     cloudinary: cloudinaryFixture,
   };
 }
-Deno.test("M7 failed automatic upload consumes real committed claim and later observation never retries", () =>
+for (const promote of [false, true]) {
+  Deno.test(
+    `committed association survives lost response${
+      promote ? " after real Event promotion" : ""
+    }`,
+    () =>
+      committedAssetFixture(
+        async (sql, _client, userId, source, eventIds, cityIds) => {
+          const destroyed: string[] = [];
+          let associationRequests = 0, committedBeforeFailure = false;
+          let associatedId: string | undefined, promotedId: string | undefined;
+          if (promote) {
+            const cityName = `asset-response-loss-${crypto.randomUUID()}`;
+            const [city] =
+              await sql`insert into public.cities(name) values (${cityName}) returning id`;
+            cityIds.push(String(city.id));
+            await sql`update public.content_submissions set city=${cityName} where id=${
+              String(source.pending_submission_id)
+            }`;
+          }
+          const transport = assetClient(async (input, init) => {
+            const url = new URL(
+              input instanceof Request ? input.url : String(input),
+            );
+            assert(["localhost", "127.0.0.1"].includes(url.hostname));
+            const response = await fetch(input, init);
+            if (url.pathname !== "/rest/v1/rpc/add_submission_assets") {
+              return response;
+            }
+            associationRequests++;
+            assertEquals(response.status, 200);
+            const reply = await response.json();
+            assertEquals(reply.length, 1);
+            assertEquals(reply[0].outcome, "created");
+            // This SQL connection is separate from PostgREST's transaction.
+            const [asset] =
+              await sql`select id,url,width,height from public.submissions_assets where content_submission_id=${
+                String(source.pending_submission_id)
+              }`;
+            assert(asset);
+            associatedId = String(asset.id);
+            assertEquals(Number(asset.id), reply[0].id);
+            assertEquals(asset.url, uploadedFixture.url);
+            assertEquals(asset.width, uploadedFixture.width);
+            assertEquals(asset.height, uploadedFixture.height);
+            if (promote) {
+              const [promotion] =
+                await sql`select * from public.promote_content_submission(${
+                  String(source.pending_submission_id)
+                },'event',${userId})`;
+              assertEquals(promotion.outcome, "created");
+              assertEquals(promotion.target_type, "event");
+              assert(promotion.entity_id !== null);
+              promotedId = String(promotion.entity_id);
+              eventIds.push(promotedId);
+              const [media] =
+                await sql`select url,width,height from public.media where event_id=${promotedId}`;
+              assertEquals(media, {
+                url: uploadedFixture.url,
+                width: uploadedFixture.width,
+                height: uploadedFixture.height,
+              });
+            }
+            committedBeforeFailure = true;
+            throw new TypeError(
+              "Injected response loss after committed association",
+            );
+          });
+          const error = await assertRejects(() =>
+            importSourceAssetIfEligible(transport, assetParams(source), {
+              uploadRemoteImage: () => Promise.resolve(uploadedFixture),
+              destroyCloudinaryImage: ({ publicId }) => {
+                destroyed.push(publicId);
+                return Promise.resolve();
+              },
+            })
+          );
+          assertEquals(
+            (error as Error & { phase: string }).phase,
+            "association",
+          );
+          assertEquals(
+            (error as Error & { outcome: string }).outcome,
+            "unknown",
+          );
+          assertEquals(committedBeforeFailure, true);
+          assertEquals(associationRequests, 1);
+          assertEquals(destroyed, []);
+          const [asset] =
+            await sql`select id,url from public.submissions_assets where content_submission_id=${
+              String(source.pending_submission_id)
+            }`;
+          assertEquals(asset, { id: associatedId, url: uploadedFixture.url });
+          const [submission] =
+            await sql`select source_asset_import_claimed_at,status,promoted_event_id from public.content_submissions where id=${
+              String(source.pending_submission_id)
+            }`;
+          assert(submission.source_asset_import_claimed_at !== null);
+          assertEquals(submission.status, promote ? "accepted" : "pending");
+          assertEquals(submission.promoted_event_id, promotedId ?? null);
+          if (promotedId) {
+            const [media] =
+              await sql`select url from public.media where event_id=${promotedId}`;
+            assertEquals(media, { url: uploadedFixture.url });
+          }
+        },
+      ),
+  );
+}
+Deno.test("lost real finalization rejection remains unknown and retains uploaded object", () =>
+  committedAssetFixture(async (sql, _client, userId, source, eventIds) => {
+    const destroyed: string[] = [];
+    let associationRequests = 0, rejectionVerified = false;
+    const transport = assetClient(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      assert(["localhost", "127.0.0.1"].includes(url.hostname));
+      const response = await fetch(input, init);
+      if (url.pathname !== "/rest/v1/rpc/add_submission_assets") {
+        return response;
+      }
+      associationRequests++;
+      assertEquals(response.status, 200);
+      assertEquals(await response.json(), [{
+        outcome: "not_pending",
+        id: null,
+        url: null,
+        width: null,
+        height: null,
+      }]);
+      assertEquals(
+        (await sql`select count(*)::int as count from public.submissions_assets where content_submission_id=${
+          String(source.pending_submission_id)
+        }`)[0].count,
+        0,
+      );
+      rejectionVerified = true;
+      throw new TypeError(
+        "Injected response loss after confirmed database rejection",
+      );
+    });
+    const error = await assertRejects(() =>
+      importSourceAssetIfEligible(transport, assetParams(source), {
+        uploadRemoteImage: async () => {
+          const [event] =
+            await sql`insert into public.events(name,start_date,latitude,longitude) values ('Finalize before lost rejection','2026-10-02',41,14) returning id`;
+          eventIds.push(String(event.id));
+          const [linked] =
+            await sql`select * from public.link_content_submission_to_event(${
+              String(source.pending_submission_id)
+            },${event.id},${userId})`;
+          assertEquals(linked.outcome, "linked");
+          return uploadedFixture;
+        },
+        destroyCloudinaryImage: ({ publicId }) => {
+          destroyed.push(publicId);
+          return Promise.resolve();
+        },
+      })
+    );
+    assertEquals((error as Error & { phase: string }).phase, "association");
+    assertEquals((error as Error & { outcome: string }).outcome, "unknown");
+    assertEquals(rejectionVerified, true);
+    assertEquals(associationRequests, 1);
+    assertEquals(destroyed, []);
+    const [submission] =
+      await sql`select source_asset_import_claimed_at,status from public.content_submissions where id=${
+        String(source.pending_submission_id)
+      }`;
+    assert(submission.source_asset_import_claimed_at !== null);
+    assertEquals(submission.status, "accepted");
+  }));
+Deno.test("existing unclaimed pending can import its first image after an earlier image-free observation", () =>
   committedAssetFixture(async (sql, client, userId, source) => {
-    let uploads = 0;
+    let uploads = 0, destroyed = 0;
     const dependencies = {
       uploadRemoteImage: () => {
         uploads++;
-        return Promise.reject(new Error("Source permanently unavailable"));
+        return Promise.resolve(uploadedFixture);
+      },
+      destroyCloudinaryImage: () => {
+        destroyed++;
+        return Promise.resolve();
+      },
+    };
+    assertEquals(
+      await importSourceAssetIfEligible(client, {
+        ...assetParams(source),
+        event: { imageUrl: null },
+      }, dependencies),
+      "skipped",
+    );
+    assertEquals(
+      (await sql`select source_asset_import_claimed_at from public.content_submissions where id=${
+        String(source.pending_submission_id)
+      }`)[0].source_asset_import_claimed_at,
+      null,
+    );
+    const repeated = await reobserveAssetSource(sql, userId, source);
+    assertEquals(repeated.pending_created, false);
+    assertEquals(
+      Number(repeated.pending_submission_id),
+      Number(source.pending_submission_id),
+    );
+    assertEquals(
+      await importSourceAssetIfEligible(
+        client,
+        assetParams(repeated),
+        dependencies,
+      ),
+      "uploaded",
+    );
+    assertEquals(uploads, 1);
+    assertEquals(destroyed, 0);
+    const [asset] =
+      await sql`select url from public.submissions_assets where content_submission_id=${
+        String(source.pending_submission_id)
+      }`;
+    assertEquals(asset, { url: uploadedFixture.url });
+    assert(
+      (await sql`select source_asset_import_claimed_at from public.content_submissions where id=${
+        String(source.pending_submission_id)
+      }`)[0].source_asset_import_claimed_at !== null,
+    );
+  }));
+Deno.test("M7 failed automatic upload consumes real committed claim and later observation never retries", () =>
+  committedAssetFixture(async (sql, client, userId, source) => {
+    let uploads = 0;
+    const uploadError = new Error("Source permanently unavailable");
+    const dependencies = {
+      uploadRemoteImage: () => {
+        uploads++;
+        return Promise.reject(uploadError);
       },
       destroyCloudinaryImage: () => Promise.resolve(),
     };
-    await assertRejects(
+    const error = await assertRejects(
       () =>
         importSourceAssetIfEligible(client, assetParams(source), dependencies),
       Error,
-      "Source permanently unavailable",
+      "Cloudinary upload failed",
     );
+    assertEquals(error.cause, uploadError);
     const [claim] =
       await sql`select source_asset_import_claimed_at::text as value from public.content_submissions where id=${
         String(source.pending_submission_id)

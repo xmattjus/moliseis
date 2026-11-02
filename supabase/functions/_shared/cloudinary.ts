@@ -367,16 +367,24 @@ export async function destroyCloudinaryImage(params: {
     form.set(key, value);
   }
 
-  await withCloudinaryTimeout(async (signal) => {
-    const response = await fetchImpl(
-      `https://api.cloudinary.com/v1_1/${
-        encodeURIComponent(params.config.cloudName)
-      }/image/destroy`,
-      { method: "POST", body: form, signal },
-    );
-    if (!response.ok) {
-      throw new Error(`Cloudinary destroy failed with HTTP ${response.status}`);
-    }
-    await response.body?.cancel();
-  });
+  try {
+    await withCloudinaryTimeout(async (signal) => {
+      const response = await fetchImpl(
+        `https://api.cloudinary.com/v1_1/${
+          encodeURIComponent(params.config.cloudName)
+        }/image/destroy`,
+        { method: "POST", body: form, signal },
+      );
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new Error("Cloudinary destroy was not confirmed");
+      }
+      const body: unknown = await response.json();
+      if (!isRecord(body) || body.result !== "ok") {
+        throw new Error("Cloudinary destroy was not confirmed");
+      }
+    });
+  } catch {
+    throw new Error("Cloudinary destroy was not confirmed");
+  }
 }
