@@ -159,6 +159,12 @@ type ImportError = {
   sourceId?: number;
   sourceUrl?: string;
   date?: string;
+  submissionId?: number;
+  publicId?: string;
+  phase?: "claim" | "upload" | "association";
+  outcome?: "failed" | "rejected" | "unknown";
+  cleanup?: "confirmed" | "unconfirmed";
+  note?: "confirmed" | "unconfirmed";
 };
 
 type ImportedAssetDependencies = {
@@ -270,24 +276,56 @@ function addError(errors: ImportError[], error: ImportError): void {
   if (errors.length < MAX_ERRORS_IN_RESPONSE) errors.push(error);
 }
 
+export class ImportedAssetError extends Error {
+  readonly publicId?: string;
+  readonly cleanup?: "confirmed" | "unconfirmed";
+
+  constructor(
+    readonly phase: "claim" | "upload" | "association",
+    readonly outcome: "failed" | "rejected" | "unknown",
+    message: string,
+    options: {
+      cause?: unknown;
+      publicId?: string;
+      cleanup?: "confirmed" | "unconfirmed";
+    } = {},
+  ) {
+    super(message, { cause: options.cause });
+    this.name = "ImportedAssetError";
+    this.publicId = options.publicId;
+    this.cleanup = options.cleanup;
+  }
+}
+
 async function appendAssetFailureNote(
   admin: SupabaseClient<Database>,
   submissionId: number,
-  originalNotes: string,
-): Promise<void> {
-  const { error } = await admin
-    .from("content_submissions")
-    .update({
-      internal_notes:
-        `${originalNotes}\nWarning: image import failed; reviewer may need to add it manually`,
-    })
-    .eq("id", submissionId);
-
-  if (error) {
-    console.error("Could not append image failure note", {
-      submissionId,
-      error: error.message,
-    });
+): Promise<"confirmed" | "unconfirmed"> {
+  try {
+    const { data, error } = await admin.from("content_submissions")
+      .select("internal_notes").eq("id", submissionId).single().retry(false);
+    if (
+      error || !data ||
+      (data.internal_notes !== null && typeof data.internal_notes !== "string")
+    ) {
+      return "unconfirmed";
+    }
+    const previous = data.internal_notes;
+    const warning =
+      "Warning: image import failed; inspect current assets before adding an image manually";
+    let update = admin.from("content_submissions").update({
+      internal_notes: previous ? `${previous}\n${warning}` : warning,
+    }).eq("id", submissionId);
+    update = previous === null
+      ? update.is("internal_notes", null)
+      : update.eq("internal_notes", previous);
+    const result = await update.select("id");
+    return !result.error && result.data?.length === 1 &&
+        result.data[0].id === submissionId
+      ? "confirmed"
+      : "unconfirmed";
+  } catch {
+    return "unconfirmed";
   }
 }
 
@@ -311,24 +349,37 @@ export async function importSourceAssetIfEligible(
     !event.imageUrl || !isAllowedEventImageUrl(event.imageUrl) ||
     observation.event_id !== null || observation.pending_submission_id === null
   ) return "skipped";
-  const { data, error } = await admin.rpc("claim_external_event_source_asset", {
-    p_submission_id: observation.pending_submission_id,
-  });
-  if (error) throw new Error(`Source asset claim failed: ${error.message}`);
-  const outcome = data?.length === 1 ? data[0].outcome : null;
-  if (
-    [
-      "not_found",
-      "not_imported",
-      "not_pending",
-      "source_already_linked",
-      "already_claimed",
-      "assets_present",
-    ].includes(outcome ?? "")
-  ) return "skipped";
-  if (outcome !== "claimed") {
-    throw new Error("Source asset claim returned an invalid outcome");
+  try {
+    const { data, error } = await admin.rpc(
+      "claim_external_event_source_asset",
+      {
+        p_submission_id: observation.pending_submission_id,
+      },
+    );
+    if (error) throw error;
+    const outcome = data?.length === 1 ? data[0]?.outcome : null;
+    if (
+      [
+        "not_found",
+        "not_imported",
+        "not_pending",
+        "source_already_linked",
+        "already_claimed",
+        "assets_present",
+      ].includes(outcome ?? "")
+    ) return "skipped";
+    if (outcome !== "claimed") throw new Error("Invalid claim outcome");
+  } catch (cause) {
+    throw new ImportedAssetError(
+      "claim",
+      "failed",
+      "Source asset claim failed",
+      {
+        cause,
+      },
+    );
   }
+
   await uploadAndPersistImportedAsset(admin, {
     submissionId: observation.pending_submission_id,
     sourceUrl: event.imageUrl,
@@ -346,54 +397,137 @@ export async function uploadAndPersistImportedAsset(
   },
   dependencies: ImportedAssetDependencies = defaultImportedAssetDependencies,
 ): Promise<void> {
-  const uploaded = await dependencies.uploadRemoteImage({
-    sourceUrl: params.sourceUrl,
-    config: params.cloudinary,
-  });
-
+  let uploaded;
   try {
-    const { data: assetInsertResults, error: assetError } = await admin
-      .rpc("add_submission_assets", {
-        p_submission_id: params.submissionId,
-        p_assets: [{
-          url: uploaded.url,
-          width: uploaded.width,
-          height: uploaded.height,
-          mime_type: uploaded.mimeType,
-          duration_seconds: null,
-        }] as Json,
-      });
-    const assetInsertResult = assetInsertResults?.[0];
-    if (
-      assetError ||
-      assetInsertResults?.length !== 1 ||
-      assetInsertResult?.outcome !== "created"
-    ) {
-      throw new Error(
-        `Asset insert failed: ${
-          assetError?.message ??
-            `Asset insertion returned ${
-              assetInsertResult?.outcome ?? "no outcome"
-            }`
-        }`,
-      );
-    }
-  } catch (error) {
-    try {
-      await dependencies.destroyCloudinaryImage({
-        publicId: uploaded.publicId,
-        config: params.cloudinary,
-      });
-    } catch (cleanupError) {
-      console.error("Could not clean up orphaned Cloudinary image", {
-        publicId: uploaded.publicId,
-        error: cleanupError instanceof Error
-          ? cleanupError.message
-          : String(cleanupError),
-      });
-    }
-    throw error;
+    uploaded = await dependencies.uploadRemoteImage({
+      sourceUrl: params.sourceUrl,
+      config: params.cloudinary,
+    });
+  } catch (cause) {
+    throw new ImportedAssetError(
+      "upload",
+      "failed",
+      "Cloudinary upload failed",
+      {
+        cause,
+      },
+    );
   }
+
+  const unknownAssociation = (cause?: unknown) =>
+    new ImportedAssetError(
+      "association",
+      "unknown",
+      "Asset association outcome unknown; inspect current submission assets before manual addition",
+      { publicId: uploaded.publicId, cause },
+    );
+  let response: unknown;
+  try {
+    response = await admin.rpc("add_submission_assets", {
+      p_submission_id: params.submissionId,
+      p_assets: [{
+        url: uploaded.url,
+        width: uploaded.width,
+        height: uploaded.height,
+        mime_type: uploaded.mimeType,
+        duration_seconds: null,
+      }] as Json,
+    });
+  } catch (cause) {
+    throw unknownAssociation(cause);
+  }
+  if (!response || typeof response !== "object" || Array.isArray(response)) {
+    throw unknownAssociation();
+  }
+  const { data, error } = response as { data?: unknown; error?: unknown };
+  const row = Array.isArray(data) && data.length === 1 ? data[0] : null;
+  if (error !== null || !row || typeof row !== "object" || Array.isArray(row)) {
+    throw unknownAssociation(error);
+  }
+  if (
+    row.outcome === "created" && Number.isSafeInteger(row.id) && row.id > 0 &&
+    row.url === uploaded.url && row.width === uploaded.width &&
+    row.height === uploaded.height
+  ) return;
+  if (
+    !["not_found", "not_pending", "limit_reached"].includes(row.outcome) ||
+    row.id !== null || row.url !== null || row.width !== null ||
+    row.height !== null
+  ) throw unknownAssociation();
+
+  let cleanup: "confirmed" | "unconfirmed" = "confirmed";
+  let cleanupCause: unknown;
+  try {
+    await dependencies.destroyCloudinaryImage({
+      publicId: uploaded.publicId,
+      config: params.cloudinary,
+    });
+  } catch (cause) {
+    cleanup = "unconfirmed";
+    cleanupCause = cause;
+  }
+  throw new ImportedAssetError(
+    "association",
+    "rejected",
+    `Asset association rejected: ${row.outcome}`,
+    { publicId: uploaded.publicId, cleanup, cause: cleanupCause },
+  );
+}
+
+/** Processes the observed batch; diagnostic persistence never owns its outcome. */
+export async function importObservedAssets(
+  admin: SupabaseClient<Database>,
+  observations: Array<
+    { event: PreparedExternalEvent; observation: ExternalEventIngestResult }
+  >,
+  cloudinary: CloudinaryConfig,
+  dependencies: ImportedAssetDependencies = defaultImportedAssetDependencies,
+) {
+  const report = {
+    assets_uploaded: 0,
+    assets_failed: 0,
+    assets_unknown: 0,
+    without_asset: 0,
+    errors: [] as ImportError[],
+  };
+  for (const { event, observation } of observations) {
+    try {
+      const asset = await importSourceAssetIfEligible(admin, {
+        event,
+        observation,
+        cloudinary,
+      }, dependencies);
+      if (asset === "skipped") report.without_asset++;
+      else report.assets_uploaded++;
+    } catch (error) {
+      const failure = error instanceof ImportedAssetError
+        ? error
+        : new ImportedAssetError(
+          "claim",
+          "failed",
+          "Source asset processing failed",
+        );
+      if (failure.outcome === "unknown") report.assets_unknown++;
+      else report.assets_failed++;
+      const note = failure.outcome !== "unknown" &&
+          observation.pending_submission_id !== null
+        ? await appendAssetFailureNote(admin, observation.pending_submission_id)
+        : undefined;
+      addError(report.errors, {
+        stage: "import_asset",
+        sourceId: event.sourceId,
+        sourceUrl: event.sourceUrl,
+        submissionId: observation.pending_submission_id ?? undefined,
+        publicId: failure.publicId,
+        phase: failure.phase,
+        outcome: failure.outcome,
+        cleanup: failure.cleanup,
+        note,
+        message: failure.message,
+      });
+    }
+  }
+  return report;
 }
 
 export async function handleRequest(request: Request): Promise<Response> {
@@ -520,50 +654,19 @@ export async function handleRequest(request: Request): Promise<Response> {
     parsed.limit,
   );
   for (const error of batch.errors) addError(errors, error);
-  const cloudinary = cloudinaryConfig();
-  const inserted = batch.created;
-  let assetsUploaded = 0;
-  let assetsFailed = 0;
-  let withoutAsset = 0;
-
-  for (const { event, observation } of batch.results) {
-    try {
-      const asset = await importSourceAssetIfEligible(admin, {
-        event,
-        observation,
-        cloudinary,
-      });
-      if (asset === "skipped") {
-        withoutAsset += 1;
-        continue;
-      }
-      assetsUploaded += 1;
-    } catch (error) {
-      assetsFailed += 1;
-      if (observation.pending_submission_id !== null) {
-        await appendAssetFailureNote(
-          admin,
-          observation.pending_submission_id,
-          event.internalNotes,
-        );
-      }
-      addError(errors, {
-        stage: "import_asset",
-        sourceId: event.sourceId,
-        sourceUrl: event.sourceUrl,
-        message: error instanceof Error ? error.message : "Asset import failed",
-      });
-    }
-  }
+  const assets = await importObservedAssets(
+    admin,
+    batch.results,
+    cloudinaryConfig(),
+  );
+  for (const error of assets.errors) addError(errors, error);
 
   return jsonResponse({
     ...baseReport,
-    inserted,
+    inserted: batch.created,
     observations_processed: batch.results.length + batch.errors.length,
     limit_reached: batch.limitReached,
-    assets_uploaded: assetsUploaded,
-    assets_failed: assetsFailed,
-    without_asset: withoutAsset,
+    ...assets,
     errors,
   });
 }

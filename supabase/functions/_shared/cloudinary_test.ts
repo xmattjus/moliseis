@@ -3,6 +3,7 @@ import {
   CloudinaryLookupAuthenticationError,
   CloudinaryLookupError,
   cloudinarySignature,
+  destroyCloudinaryImage,
   lookupCloudinaryImage,
   parseCloudinaryDeliveryUrl,
   prepareCloudinaryUploadFields,
@@ -354,4 +355,99 @@ Deno.test("remote upload timeout includes response body consumption", async () =
       },
     })
   );
+});
+
+Deno.test("destroy confirms only a successful HTTP response with result ok", async () => {
+  let requests = 0;
+  await destroyCloudinaryImage({
+    publicId,
+    config,
+    fetchImpl: (input, init) => {
+      requests++;
+      assertEquals(
+        input,
+        "https://api.cloudinary.com/v1_1/test-cloud/image/destroy",
+      );
+      assertEquals(init?.method, "POST");
+      assertEquals((init?.body as FormData).get("public_id"), publicId);
+      return Promise.resolve(new Response(JSON.stringify({ result: "ok" })));
+    },
+  });
+  assertEquals(requests, 1);
+});
+
+Deno.test("destroy leaves rejected, absent and malformed results unconfirmed without retry", async (t) => {
+  for (
+    const [name, body, status] of [
+      ["HTTP failure", '{"result":"ok"}', 500],
+      ["not found", '{"result":"not found"}', 200],
+      ["unexpected result", '{"result":"unexpected"}', 200],
+      ["missing result", "{}", 200],
+      ["null", "null", 200],
+      ["array", '[{"result":"ok"}]', 200],
+      ["non-string result", '{"result":true}', 200],
+      ["malformed JSON", '{"result":', 200],
+      ["empty body", "", 200],
+      ["secret-bearing error body", '{"error":"test-secret test-key"}', 200],
+    ] as const
+  ) {
+    await t.step(name, async () => {
+      let requests = 0;
+      const error = await assertRejects(() =>
+        destroyCloudinaryImage({
+          publicId,
+          config,
+          fetchImpl: () => {
+            requests++;
+            return Promise.resolve(new Response(body, { status }));
+          },
+        }), Error);
+      assertEquals(error.message, "Cloudinary destroy was not confirmed");
+      assertEquals(requests, 1);
+    });
+  }
+});
+
+Deno.test("destroy sanitizes a lost transport response without retry", async () => {
+  let requests = 0;
+  const error = await assertRejects(() =>
+    destroyCloudinaryImage({
+      publicId,
+      config,
+      fetchImpl: () => {
+        requests++;
+        return Promise.reject(
+          new Error("test-secret test-key upstream payload"),
+        );
+      },
+    }), Error);
+  assertEquals(error.message, "Cloudinary destroy was not confirmed");
+  assertEquals(requests, 1);
+});
+
+Deno.test("destroy timeout includes response body consumption", async () => {
+  let requests = 0;
+  const error = await assertRejects(() =>
+    destroyCloudinaryImage({
+      publicId,
+      config,
+      fetchImpl: (_input, init) => {
+        requests++;
+        const signal = init?.signal;
+        return Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start(controller) {
+                signal?.addEventListener("abort", () =>
+                  controller.error(signal.reason), {
+                  once: true,
+                });
+              },
+            }),
+          ),
+        );
+      },
+    }), Error);
+  assertEquals(error.message, "Cloudinary destroy was not confirmed");
+  assertEquals(requests, 1);
 });
