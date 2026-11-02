@@ -89,8 +89,13 @@ Runtime opt-in SHALL persist the preference without initializing or reinitializi
 Shutdown observation SHALL be bounded. A detected failure, timeout or unconfirmed shutdown SHALL retain saved opt-out and disabled custom forwarding, without claiming disable success or reverting persistence. Repeated callers SHALL share the original physical shutdown rather than interpret a later no-op close as proof of completion. Late settlement SHALL NOT replay UI feedback.
 
 #### Scenario: Shutdown rejects or times out
-- **WHEN** opt-out saved successfully but shutdown throws or exceeds its observation deadline
+- **WHEN** opt-out saved successfully but shutdown rejects with an `Exception` or exceeds its observation deadline
 - **THEN** the operation reports saved preference with shutdown unconfirmed, the switch remains off and the user can continue using the application
+
+#### Scenario: Shutdown rejects with an unexpected raw Error
+- **WHEN** opt-out saved successfully but shutdown rejects with an unexpected raw `Error`
+- **THEN** the error SHALL retain unexpected command-error reporting rather than being normalized into `shutdownUnconfirmed`
+- **AND** when committed opt-out and unconfirmed shutdown remain current, eligible Settings feedback SHALL still distinguish the saved preference from the unconfirmed effective shutdown through its existing fallback
 
 #### Scenario: Repeated close while the first is pending
 - **WHEN** another reconciliation observes opt-out during pending shutdown
