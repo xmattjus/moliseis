@@ -42,6 +42,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
 import 'admin_draft_repositories.dart';
+import 'crash_reporting_support.dart';
 import 'fake_cache_manager.dart';
 import 'fake_repositories.dart';
 import 'mock_gotrue_client.dart';
@@ -250,8 +251,10 @@ List<SingleChildWidget> buildSyncProviders(
     ),
     ChangeNotifierProvider<SettingsViewModel>(
       create: (_) => SettingsViewModel(
-        settingsRepository: settingsRepository,
-        sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
+        crashReporting: testCrashReporting(
+          repository: settingsRepository,
+          flag: SentryLoggingFlag(initialValue: false),
+        ),
       ),
     ),
     ChangeNotifierProvider<SyncViewModel>.value(value: harness.viewModel),

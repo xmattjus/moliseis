@@ -108,6 +108,8 @@ dev_dependencies:
   # G
   # H
   # I
+  integration_test:
+    sdk: flutter
   # J
   # K
   # L

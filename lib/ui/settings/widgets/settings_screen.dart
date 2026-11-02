@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
+import 'package:moliseis/domain/use_cases/set_crash_reporting_use_case.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
@@ -121,46 +122,113 @@ class SettingsScreen extends StatelessWidget {
               builder: (_, viewModel, _) {
                 final sentryLoggingEnabled = viewModel.crashReporting;
 
-                return SwitchListTile(
-                  value: sentryLoggingEnabled,
-                  onChanged: (value) async {
-                    final command = viewModel.setCrashReporting;
-                    if (viewModel.isDisposed ||
-                        command.isRunningSync.value ||
-                        !command.canRun.value) {
-                      return;
-                    }
-                    // The global handler reports unexpected failures.
-                    // This continuation only observes its own admitted run.
-                    final result = await command
-                        .runAsync(value)
-                        .then(
-                          (result) => result,
-                          onError: (Object _, StackTrace _) => null,
+                return ListenableBuilder(
+                  listenable: viewModel.setCrashReporting.isRunningSync,
+                  builder: (context, _) => SwitchListTile(
+                    value: sentryLoggingEnabled,
+                    onChanged: (value) async {
+                      final command = viewModel.setCrashReporting;
+                      if (viewModel.isDisposed ||
+                          command.isRunningSync.value ||
+                          !command.canRun.value) {
+                        return;
+                      }
+                      // The global handler reports unexpected failures.
+                      // This continuation only observes its own admitted run.
+                      final result = await command
+                          .runAsync(value)
+                          .then(
+                            (result) => result,
+                            onError: (Object _, StackTrace _) => null,
+                          );
+                      if (!context.mounted) return;
+                      if (viewModel.isDisposed ||
+                          !identical(
+                            context.read<SettingsViewModel>(),
+                            viewModel,
+                          )) {
+                        return;
+                      }
+                      if (result case Success<CrashReportingUpdate>(
+                        :final value,
+                      )) {
+                        if (!viewModel.isCurrent(value)) return;
+                        final text = switch (value.outcome) {
+                          CrashReportingOutcome.enabledForNextStart =>
+                            'La segnalazione degli errori sarà attivata '
+                                "al prossimo avvio dell'app.",
+                          CrashReportingOutcome.disabled =>
+                            'La segnalazione di nuovi errori '
+                                'è stata disattivata.',
+                          CrashReportingOutcome.shutdownUnconfirmed =>
+                            'Preferenza salvata; arresto non confermato. '
+                                'Vale dal prossimo avvio.',
+                          CrashReportingOutcome.superseded => null,
+                        };
+                        if (text == null) return;
+                        showSnackBar(
+                          context: context,
+                          textContent: text,
+                          type:
+                              value.outcome ==
+                                  CrashReportingOutcome.shutdownUnconfirmed
+                              ? SnackBarType.error
+                              : SnackBarType.info,
                         );
-                    if (!context.mounted) return;
-                    if (!viewModel.isDisposed &&
-                        value &&
-                        result is Success<void> &&
-                        identical(
-                          context.read<SettingsViewModel>(),
-                          viewModel,
-                        )) {
-                      showSnackBar(
-                        context: context,
-                        textContent:
-                            'Gli errori verranno inviati al prossimo avvio '
-                            "dell'app",
-                      );
-                    }
-                  },
-                  title: const Text('Segnalazione errori'),
-                  subtitle: Text(
-                    sentryLoggingEnabled
-                        ? "Gli errori dell'app verranno inviati "
-                              'automaticamente agli sviluppatori'
-                        : "Gli errori dell'app non verranno inviati agli "
-                              'sviluppatori',
+                      } else if (result == null &&
+                          !value &&
+                          !viewModel.committedCrashReporting &&
+                          viewModel.reportingState ==
+                              CrashReportingState.unconfirmed) {
+                        // The command already reported the original raw error.
+                        showSnackBar(
+                          context: context,
+                          textContent:
+                              'Preferenza salvata; arresto non confermato. '
+                              'Vale dal prossimo avvio.',
+                          type: SnackBarType.error,
+                        );
+                      } else if (result is Error<CrashReportingUpdate>) {
+                        showSnackBar(
+                          context: context,
+                          textContent:
+                              'Non è stato possibile salvare la preferenza. '
+                              'Riprova.',
+                          type: SnackBarType.error,
+                        );
+                      }
+                    },
+                    title: const Text('Segnalazione errori'),
+                    subtitle: Text(
+                      viewModel.setCrashReporting.isRunningSync.value
+                          ? 'Salvataggio della preferenza e '
+                                'aggiornamento della segnalazione…'
+                          : switch (viewModel.reportingState) {
+                              CrashReportingState.closing =>
+                                sentryLoggingEnabled
+                                    ? 'Arresto in corso. '
+                                          'Attivazione al prossimo avvio.'
+                                    : 'Arresto della segnalazione in corso…',
+                              CrashReportingState.unconfirmed =>
+                                sentryLoggingEnabled
+                                    ? 'Arresto non confermato. '
+                                          'La segnalazione sarà '
+                                          'attivata al prossimo avvio.'
+                                    : 'Preferenza salvata. '
+                                          'Arresto non confermato; '
+                                          'la segnalazione sarà disattivata '
+                                          'al prossimo avvio.',
+                              CrashReportingState.active =>
+                                "Gli errori dell'app verranno inviati "
+                                    'automaticamente agli sviluppatori',
+                              CrashReportingState.inactive =>
+                                sentryLoggingEnabled
+                                    ? 'La segnalazione sarà attivata '
+                                          'al prossimo avvio.'
+                                    : 'La segnalazione di nuovi errori '
+                                          'è disattivata.',
+                            },
+                    ),
                   ),
                 );
               },

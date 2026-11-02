@@ -22,6 +22,7 @@ import 'package:moliseis/ui/content_submission/widgets/content_submission_screen
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../../support/command_test_support.dart';
 import '../../../support/content_submission_command_harness.dart';
@@ -1957,6 +1958,23 @@ void main() {
               )
               .initialValue,
           'Mario',
+        );
+
+        for (final label in ['E-mail', 'Autore']) {
+          expect(
+            find.ancestor(
+              of: find.widgetWithText(TextFormField, label),
+              matching: find.byType(SentryMask),
+            ),
+            findsOneWidget,
+          );
+        }
+        expect(
+          find.ancestor(
+            of: find.byType(ContentSubmissionDescriptionFormField),
+            matching: find.byType(SentryMask),
+          ),
+          findsNothing,
         );
 
         // The terms checkbox is checked from the persisted draft.

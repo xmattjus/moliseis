@@ -40,6 +40,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../support/admin_draft_repositories.dart';
 import '../support/command_test_support.dart';
+import '../support/crash_reporting_support.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/mock_gotrue_client.dart';
@@ -1372,8 +1373,10 @@ final class _AdminRouteHarness {
           ),
           ChangeNotifierProvider<SettingsViewModel>(
             create: (_) => SettingsViewModel(
-              settingsRepository: settingsRepository,
-              sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
+              crashReporting: testCrashReporting(
+                repository: settingsRepository,
+                flag: SentryLoggingFlag(initialValue: false),
+              ),
             ),
           ),
         ],

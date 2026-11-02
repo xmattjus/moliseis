@@ -7,20 +7,23 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
+import 'package:moliseis/domain/use_cases/set_crash_reporting_use_case.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
+import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../support/crash_reporting_support.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/mock_gotrue_client.dart';
 import '../../../support/mock_logger.dart';
@@ -31,10 +34,12 @@ void main() {
     late GoRouter router;
     late Widget app;
     late FakeSettingsRepository repository;
+    late Future<void> Function() closeSentry;
 
     setUp(() {
       auth = ControllableAdminAuth();
       repository = FakeSettingsRepository();
+      closeSentry = () async {};
       final logger = MockLogger();
       router = GoRouter(
         initialLocation: RoutePaths.settings,
@@ -70,8 +75,11 @@ void main() {
           ),
           ChangeNotifierProvider<SettingsViewModel>(
             create: (_) => SettingsViewModel(
-              settingsRepository: repository,
-              sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
+              crashReporting: testCrashReporting(
+                repository: repository,
+                initiallyEnabled: repository.crashReporting,
+                closeSentry: () => closeSentry(),
+              ),
             ),
           ),
           ChangeNotifierProvider<AdminAuthViewModel>.value(
@@ -88,6 +96,306 @@ void main() {
       );
       addTearDown(auth.dispose);
       addTearDown(router.dispose);
+    });
+
+    for (final enable in [true, false]) {
+      testWidgets('symmetric success feedback for enable=$enable', (
+        tester,
+      ) async {
+        repository.crashReporting = !enable;
+        await tester.pumpWidget(app);
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+          enable,
+        );
+        await tester.pumpAndSettle();
+        final expected = enable
+            ? 'La segnalazione degli errori sarà attivata '
+                  "al prossimo avvio dell'app."
+            : 'La segnalazione di nuovi errori '
+                  'è stata disattivata.';
+        expect(find.text(expected), findsOneWidget);
+        final context = tester.element(find.byType(SettingsScreen));
+        final snack = tester.widget<SnackBar>(find.byType(SnackBar));
+        expect(
+          snack.backgroundColor,
+          context.appColors.infoSnackBar.background,
+        );
+        expect(repository.crashReporting, enable);
+        expect(
+          find.text(
+            'Salvataggio della preferenza e '
+            'aggiornamento della segnalazione…',
+          ),
+          findsNothing,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 50));
+      });
+    }
+
+    for (final outcome in ['success', 'failure', 'timeout']) {
+      testWidgets('saved opt-out owns shutdown $outcome feedback', (
+        tester,
+      ) async {
+        repository.crashReporting = true;
+        final pending = Completer<void>();
+        var closes = 0;
+        closeSentry = () {
+          closes++;
+          return pending.future;
+        };
+        await tester.pumpWidget(app);
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+          false,
+        );
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(closes, 1);
+        expect(repository.crashReporting, isFalse);
+        expect(
+          find.text(
+            'La segnalazione di nuovi errori '
+            'è stata disattivata.',
+          ),
+          findsNothing,
+        );
+        if (outcome == 'timeout') {
+          await tester.pump(const Duration(seconds: 10));
+        } else if (outcome == 'failure') {
+          pending.completeError(Exception('synthetic shutdown failure'));
+        } else {
+          pending.complete();
+        }
+        await tester.pumpAndSettle();
+        expect(repository.crashReporting, isFalse);
+        expect(
+          tester.widget<SwitchListTile>(find.byType(SwitchListTile)).value,
+          isFalse,
+        );
+        expect(
+          find.text(
+            'La segnalazione di nuovi errori '
+            'è stata disattivata.',
+          ),
+          outcome == 'success' ? findsOneWidget : findsNothing,
+        );
+        if (outcome != 'success') {
+          expect(
+            find.text(
+              'Preferenza salvata; arresto non confermato. '
+              'Vale dal prossimo avvio.',
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.text(
+              'Preferenza salvata. '
+              'Arresto non confermato; '
+              'la segnalazione sarà disattivata al prossimo avvio.',
+            ),
+            findsOneWidget,
+          );
+        }
+        if (outcome == 'timeout') {
+          pending.complete();
+          await tester.pumpAndSettle();
+          expect(
+            find.text(
+              'La segnalazione di nuovi errori '
+              'è stata disattivata.',
+            ),
+            findsNothing,
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 50));
+      });
+    }
+
+    testWidgets('unconfirmed shutdown then enable describes saved opt-in', (
+      tester,
+    ) async {
+      repository.crashReporting = true;
+      closeSentry = () async {
+        throw Exception('synthetic close failure');
+      };
+      await tester.pumpWidget(app);
+      tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+        false,
+      );
+      await tester.pumpAndSettle();
+      tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+        true,
+      );
+      await tester.pumpAndSettle();
+      expect(repository.crashReporting, isTrue);
+      expect(
+        find.text(
+          'Arresto non confermato. '
+          'La segnalazione sarà '
+          'attivata al prossimo avvio.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Preferenza salvata. '
+          'Arresto non confermato; '
+          'la segnalazione sarà disattivata al prossimo avvio.',
+        ),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 50));
+    });
+
+    testWidgets(
+      'failed opt-in after unconfirmed shutdown does not claim a save',
+      (tester) async {
+        repository.crashReporting = true;
+        closeSentry = () async {
+          throw Exception('synthetic close failure');
+        };
+        final error = StateError('synthetic opt-in persistence failure');
+        final reports = <Object>[];
+        final previousHandler = command_it.Command.globalExceptionHandler;
+        command_it.Command.globalExceptionHandler = (report, _) =>
+            reports.add(report.error);
+        addTearDown(
+          () => command_it.Command.globalExceptionHandler = previousHandler,
+        );
+        await tester.pumpWidget(app);
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+          false,
+        );
+        await tester.pumpAndSettle();
+        final viewModel = tester
+            .element(find.byType(SettingsScreen))
+            .read<SettingsViewModel>();
+        expect(repository.crashReporting, isFalse);
+        expect(viewModel.reportingState, CrashReportingState.unconfirmed);
+        expect(
+          find.text(
+            'Preferenza salvata; arresto non confermato. '
+            'Vale dal prossimo avvio.',
+          ),
+          findsOneWidget,
+        );
+        clearAppSnackBars();
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar), findsNothing);
+        final attemptedDirections = <bool>[];
+        repository.onSetCrashReporting = (enable) async {
+          attemptedDirections.add(enable);
+          throw error;
+        };
+        tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+          true,
+        );
+        await tester.pumpAndSettle();
+        expect(repository.crashReporting, isFalse);
+        expect(viewModel.crashReporting, isFalse);
+        expect(viewModel.reportingState, CrashReportingState.unconfirmed);
+        expect(attemptedDirections, [true]);
+        expect(reports, [same(error)]);
+        expect(
+          find.text(
+            'Preferenza salvata; arresto non confermato. '
+            'Vale dal prossimo avvio.',
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 50));
+      },
+    );
+
+    testWidgets('raw shutdown error reports once and retains saved opt-out', (
+      tester,
+    ) async {
+      repository.crashReporting = true;
+      final error = StateError('synthetic raw close error');
+      final reports = <Object>[];
+      final previousHandler = command_it.Command.globalExceptionHandler;
+      command_it.Command.globalExceptionHandler = (report, _) =>
+          reports.add(report.error);
+      addTearDown(
+        () => command_it.Command.globalExceptionHandler = previousHandler,
+      );
+      closeSentry = () async {
+        throw error;
+      };
+      await tester.pumpWidget(app);
+      tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+        false,
+      );
+      await tester.pumpAndSettle();
+      expect(reports, [same(error)]);
+      expect(repository.crashReporting, isFalse);
+      expect(
+        find.text(
+          'Preferenza salvata; arresto non confermato. '
+          'Vale dal prossimo avvio.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'La segnalazione di nuovi errori '
+          'è stata disattivata.',
+        ),
+        findsNothing,
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 50));
+    });
+
+    testWidgets('saved-state subtitle fits narrow increased text scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      repository.crashReporting = true;
+      closeSentry = () async {
+        throw Exception('synthetic close failure');
+      };
+      await tester.pumpWidget(app);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byType(SwitchListTile),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byType(SettingsScreen),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      tester.widget<SwitchListTile>(find.byType(SwitchListTile)).onChanged!(
+        false,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Preferenza salvata. '
+          'Arresto non confermato; '
+          'la segnalazione sarà disattivata al prossimo avvio.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 50));
     });
 
     for (final outcome in [
@@ -137,8 +445,11 @@ void main() {
         ThemeViewModel? replacementTheme;
         if (outcome == 'replacement') {
           replacement = SettingsViewModel(
-            settingsRepository: repository,
-            sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
+            crashReporting: testCrashReporting(
+              repository: repository,
+              initiallyEnabled: repository.crashReporting,
+              closeSentry: () => closeSentry(),
+            ),
           );
           replacementTheme = ThemeViewModel(settingsRepository: repository);
           await tester.pumpWidget(
@@ -168,8 +479,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(
           find.text(
-            'Gli errori verranno inviati al prossimo avvio '
-            "dell'app",
+            'La segnalazione degli errori sarà attivata '
+            "al prossimo avvio dell'app.",
           ),
           outcome == 'success' ? findsOneWidget : findsNothing,
         );
@@ -194,12 +505,18 @@ void main() {
       final pending = Completer<Result<void>>();
       repository.onSetCrashReporting = (_) => pending.future;
       final previous = SettingsViewModel(
-        settingsRepository: repository,
-        sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
+        crashReporting: testCrashReporting(
+          repository: repository,
+          initiallyEnabled: repository.crashReporting,
+          closeSentry: () => closeSentry(),
+        ),
       );
       final replacement = SettingsViewModel(
-        settingsRepository: repository,
-        sentryLoggingFlag: SentryLoggingFlag(initialValue: false),
+        crashReporting: testCrashReporting(
+          repository: repository,
+          initiallyEnabled: repository.crashReporting,
+          closeSentry: () => closeSentry(),
+        ),
       );
       final owner = ValueNotifier(previous);
       final theme = ThemeViewModel(settingsRepository: repository);
@@ -249,8 +566,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          'Gli errori verranno inviati al prossimo avvio '
-          "dell'app",
+          'La segnalazione degli errori sarà attivata '
+          "al prossimo avvio dell'app.",
         ),
         findsNothing,
       );

@@ -31,6 +31,7 @@ import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:provider/provider.dart';
 
 import '../support/command_test_support.dart';
+import '../support/crash_reporting_support.dart';
 import '../support/fake_cache_manager.dart';
 import '../support/fake_repositories.dart';
 import '../support/mock_logger.dart';
@@ -102,7 +103,10 @@ void main() {
             httpClient,
             settingsRepository,
             cacheManager,
-            sentryLoggingFlag,
+            testCrashReporting(
+              repository: settingsRepository,
+              flag: sentryLoggingFlag,
+            ),
           ),
           child: Directionality(
             textDirection: TextDirection.ltr,

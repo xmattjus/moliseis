@@ -1,29 +1,23 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/domain/repositories/settings_repository.dart';
+import 'package:moliseis/domain/use_cases/set_crash_reporting_use_case.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
-import 'package:moliseis/utils/sentry_logging_flag.dart';
 
 class SettingsViewModel extends ChangeNotifier {
-  SettingsViewModel({
-    required SettingsRepository settingsRepository,
-    required SentryLoggingFlag sentryLoggingFlag,
-  }) : _settingsRepository = settingsRepository,
-       _sentryLoggingFlag = sentryLoggingFlag {
+  SettingsViewModel({required SetCrashReportingUseCase crashReporting})
+    : _consent = crashReporting {
     setCrashReporting = createResultCommand(
       _setCrashReporting,
       debugName: 'SettingsViewModel.setCrashReporting',
     );
-    _crashReporting = _settingsRepository.crashReporting;
+    _crashReporting = _consent.preference;
   }
 
-  final SettingsRepository _settingsRepository;
+  final SetCrashReportingUseCase _consent;
 
-  final SentryLoggingFlag _sentryLoggingFlag;
-
-  late final ResultCommand<bool, void> setCrashReporting;
+  late final ResultCommand<bool, CrashReportingUpdate> setCrashReporting;
 
   bool _disposed = false;
 
@@ -34,27 +28,28 @@ class SettingsViewModel extends ChangeNotifier {
 
   bool get crashReporting => _crashReporting;
 
-  Future<Result<void>> _setCrashReporting(bool enable) async {
+  /// Saved consent, independent of the switch's pending optimistic value.
+  bool get committedCrashReporting => _consent.preference;
+
+  /// Effective process state, independent of the optimistic switch.
+  CrashReportingState get reportingState => _consent.state;
+
+  /// Feedback must still describe this application's current committed intent.
+  bool isCurrent(CrashReportingUpdate update) => _consent.isCurrent(update);
+
+  Future<Result<CrashReportingUpdate>> _setCrashReporting(bool enable) async {
     if (_disposed) return Result.error(Exception('Settings unavailable'));
     _crashReporting = enable;
-
     notifyListeners();
-
     if (_disposed) return Result.error(Exception('Settings unavailable'));
-    final result = await _settingsRepository.setCrashReporting(enable: enable);
-
-    // Shared consent follows the repository's committed cache, even after this
-    // presentation owner is revoked or another owner's write has completed.
-    _sentryLoggingFlag.enabled = _settingsRepository.crashReporting;
-    if (_disposed) return result;
-
-    if (result.isError) {
-      _crashReporting = !_crashReporting; // Revert the change on error.
-
-      notifyListeners();
+    try {
+      return await _consent(enable: enable);
+    } finally {
+      if (!_disposed) {
+        _crashReporting = _consent.preference;
+        notifyListeners();
+      }
     }
-
-    return result;
   }
 
   @override

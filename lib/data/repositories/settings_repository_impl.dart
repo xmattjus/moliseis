@@ -14,14 +14,17 @@ class SettingsRepositoryImpl implements SettingsRepository {
   final ISettingsLocalDataSource _dataSource;
   AppSettings? _settings;
 
-  AppSettings get _cache {
+  void _requireInitialized() {
     if (_settings == null) {
       throw StateError(
         'SettingsRepositoryImpl has not been initialized. '
         'Call initialize() and await completion before accessing app settings.',
       );
     }
+  }
 
+  AppSettings get _cache {
+    _requireInitialized();
     return _settings!;
   }
 
@@ -40,11 +43,15 @@ class SettingsRepositoryImpl implements SettingsRepository {
     return result;
   }
 
-  Future<Result<void>> _persistNewSettings(AppSettings newSettings) async {
-    final result = await _dataSource.save(newSettings);
+  Future<Result<void>> _persistNewSettings(
+    AppSettings Function(AppSettings) transform,
+  ) async {
+    _requireInitialized();
+    final result = await _dataSource.update(transform);
 
     if (result is Success<void>) {
-      _settings = newSettings;
+      // Other setting lanes may have committed while this write was pending.
+      _settings = transform(_cache);
     }
 
     return result;
@@ -70,14 +77,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   @override
   Future<Result<void>> setContentSort(ContentSort sort) {
-    final newSettings = _cache.copyWith(contentSort: sort);
-    return _persistNewSettings(newSettings);
+    return _persistNewSettings(
+      (settings) => settings.copyWith(contentSort: sort),
+    );
   }
 
   @override
   Future<Result<void>> setCrashReporting({required bool enable}) {
-    final newSettings = _cache.copyWith(crashReporting: enable);
-    return _persistNewSettings(newSettings);
+    return _persistNewSettings(
+      (settings) => settings.copyWith(crashReporting: enable),
+    );
   }
 
   @override
@@ -85,22 +94,23 @@ class SettingsRepositoryImpl implements SettingsRepository {
     required DateTime lastSyncedAt,
     required DateTime contentSyncCursorAt,
   }) {
-    final newSettings = _cache.copyWith(
-      lastSyncedAt: lastSyncedAt,
-      contentSyncCursorAt: contentSyncCursorAt,
+    return _persistNewSettings(
+      (settings) => settings.copyWith(
+        lastSyncedAt: lastSyncedAt,
+        contentSyncCursorAt: contentSyncCursorAt,
+      ),
     );
-    return _persistNewSettings(newSettings);
   }
 
   @override
   Future<Result<void>> setThemeBrightness(ThemeBrightness brightness) {
-    final newSettings = _cache.copyWith(brightness: brightness);
-    return _persistNewSettings(newSettings);
+    return _persistNewSettings(
+      (settings) => settings.copyWith(brightness: brightness),
+    );
   }
 
   @override
   Future<Result<void>> setThemeType(ThemeType type) {
-    final newSettings = _cache.copyWith(type: type);
-    return _persistNewSettings(newSettings);
+    return _persistNewSettings((settings) => settings.copyWith(type: type));
   }
 }

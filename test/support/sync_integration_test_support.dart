@@ -43,6 +43,16 @@ final class FailNextSettingsSave implements ISettingsLocalDataSource {
   Future<Result<AppSettings>> load() => delegate.load();
 
   @override
+  Future<Result<void>> update(AppSettings Function(AppSettings) transform) {
+    saves++;
+    if (failNextSave) {
+      failNextSave = false;
+      return Future.value(Result.error(Exception('Settings save failure')));
+    }
+    return delegate.update(transform);
+  }
+
+  @override
   Future<Result<void>> save(AppSettings settings) {
     saves++;
     if (failNextSave) {

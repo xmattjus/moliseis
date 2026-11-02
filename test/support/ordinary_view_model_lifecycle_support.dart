@@ -32,6 +32,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 
 import 'command_test_support.dart';
+import 'crash_reporting_support.dart';
 import 'fake_image_picker.dart';
 import 'fake_repositories.dart';
 import 'fixtures.dart';
@@ -235,8 +236,10 @@ class OrdinaryOwnerHarness {
       case OrdinaryOwnerLane.settings:
         final sentryFlag = SentryLoggingFlag(initialValue: false);
         final vm = SettingsViewModel(
-          settingsRepository: preferences,
-          sentryLoggingFlag: sentryFlag,
+          crashReporting: testCrashReporting(
+            repository: preferences,
+            flag: sentryFlag,
+          ),
         );
         owner = vm;
         command = vm.setCrashReporting;

@@ -32,6 +32,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../../../support/admin_moderation_error_cases.dart';
 import '../../../../support/command_test_support.dart';
@@ -958,6 +959,13 @@ void main() {
         find.text('Creato come Redattore · redattore@example.com'),
         findsOneWidget,
       );
+      expect(
+        find.ancestor(
+          of: find.text('Creato come Redattore · redattore@example.com'),
+          matching: find.byType(SentryMask),
+        ),
+        findsNothing,
+      );
       expect(find.widgetWithText(TextFormField, 'E-mail'), findsNothing);
       expect(find.widgetWithText(TextFormField, 'Autore'), findsNothing);
       expect(find.byType(CheckboxFormField), findsNothing);
@@ -1031,7 +1039,79 @@ void main() {
       expect(find.text('Proposto da'), findsOneWidget);
       expect(find.text('Anna Bianchi'), findsOneWidget);
       expect(find.text('anna@example.com'), findsOneWidget);
+      for (final value in ['Anna Bianchi', 'anna@example.com']) {
+        expect(
+          find.ancestor(
+            of: find.text(value),
+            matching: find.byType(SentryMask),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(
+        find.ancestor(
+          of: find.byType(AppNetworkImage),
+          matching: find.byType(SentryMask),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.ancestor(
+          of: find.text('Proposto da'),
+          matching: find.byType(SentryMask),
+        ),
+        findsNothing,
+      );
     }, disposeOwners: () => viewModel.dispose());
+
+    for (final status in [
+      AdminSubmissionStatus.accepted,
+      AdminSubmissionStatus.rejected,
+    ]) {
+      testOwnerUI('finalized $status keeps contributor identities masked', (
+        tester,
+      ) async {
+        await tester.binding.setSurfaceSize(const Size(800, 1600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(status: status),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        final scrollable = find
+            .descendant(
+              of: find.byKey(
+                const ValueKey<String>('admin_submission_editor_scroll'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(
+          find.text('mario@example.com'),
+          200,
+          scrollable: scrollable,
+        );
+        for (final identity in ['Mario Rossi', 'mario@example.com']) {
+          expect(
+            find.ancestor(
+              of: find.text(identity),
+              matching: find.byType(SentryMask),
+            ),
+            findsOneWidget,
+          );
+        }
+        expect(find.text('Proposto da'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }, disposeOwners: () => viewModel.dispose());
+    }
 
     testOwnerUI('unfocuses the editor before opening the asset picker', (
       tester,

@@ -26,6 +26,20 @@ final class FakeSettingsLocalDataSource implements ISettingsLocalDataSource {
   Future<Result<AppSettings>> load() async => loadResult;
 
   @override
+  Future<Result<void>> update(
+    AppSettings Function(AppSettings) transform,
+  ) async {
+    final current = loadResult.getOrElse(AppSettings.new);
+    final result = await save(transform(current));
+    if (result is Success<void>) {
+      loadResult = Result.success(
+        transform(loadResult.getOrElse(AppSettings.new)),
+      );
+    }
+    return result;
+  }
+
+  @override
   Future<Result<void>> save(AppSettings settings) async {
     savedSettings.add(settings);
     final handler = onSave;
