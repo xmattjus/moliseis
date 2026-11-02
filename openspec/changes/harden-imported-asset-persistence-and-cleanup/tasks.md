@@ -28,4 +28,4 @@
 ## 5. Review and handoff
 
 - [x] 5.1 Review focused diff for unrelated changes, RPC/schema/grant drift, accidental extra writes, report compatibility and unnecessary abstractions; run strict OpenSpec validation and `git diff --check`; inspect untracked artifact whitespace and paths explicitly, since no dedicated documentation/hygiene gate is defined in this checkout.
-- [ ] 5.2 Publish the change via the repository's PR workflow only after required verification and authorization. Do not commit temporary probe scripts, test dumps, or generated operational evidence.
+- [x] 5.2 Publish the change via the repository's PR workflow only after required verification and authorization. Do not commit temporary probe scripts, test dumps, or generated operational evidence.
