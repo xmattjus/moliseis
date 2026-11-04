@@ -6,7 +6,7 @@ Make Molise Is diagnostic events and manual traces useful, truthful, and safe ac
 
 ### Requirement: Sync runs produce one locally identifiable terminal outcome
 
-Every admitted canonical sync invocation SHALL generate typed local diagnostic events identifying its start and exactly one terminal result (success or failure), including early `Result.error` returns and unexpected throws. The terminal result SHALL identify the last relevant phase (cursor acquisition, per-repository preparation, atomic commit, or sync-state persistence) and bootstrap/delta mode, with bounded elapsed time and safe aggregate counts when known. Counts of remotely fetched DTOs SHALL NOT be mislabeled as persisted insert/update/delete operations. The telemetry opt-out SHALL NOT suppress these local diagnostics.
+Every admitted canonical sync invocation SHALL generate typed local diagnostic events identifying its start and exactly one terminal result (success or failure), including early `Result.error` returns and unexpected throws. The terminal result SHALL identify the last relevant phase (cursor acquisition, per-repository preparation, atomic commit, or sync-state persistence) and bootstrap/delta mode determined from the **local persisted `contentSyncCursorAt` read at sync entry**, not the fetched server cursor. It SHALL carry bounded elapsed time and safe aggregate counts when known. Fetched DTO counts SHALL NOT be mislabeled as persisted changes. Telemetry opt-out SHALL NOT suppress local diagnostics.
 
 #### Scenario: Cursor acquisition fails before preparation
 
@@ -32,7 +32,9 @@ Every admitted canonical sync invocation SHALL generate typed local diagnostic e
 
 ### Requirement: Error reporting is owned and preserves available causes
 
-An exception caught for conversion into `Result.error` SHALL retain its original exception object wherever the contract permits, and the first responsible reporter SHALL log the original stack trace before that context is lost. For non-`Exception` errors handled by an existing compatibility boundary, reporting SHALL retain the original `Object` and stack before conversion. An already reported failure SHALL NOT be captured a second time by the sync terminal event. No new diagnostic or span metadata SHALL expose tokens, credentials, private contributor data, arbitrary HTTP request/response bodies, or secret-bearing URLs.
+A caught `Exception` SHALL retain its original identity wherever `Result.error` permits, and the first owning reporting boundary SHALL preserve the original throwable and `StackTrace` for **local** diagnosis. A non-`Exception` `dart:core.Error` SHALL be distinguished from `Result.Error<T>` and retained locally before any contract-required `Exception` wrapper. For runtime `setSyncState` failures, `SettingsLocalDataSource.update` owns the original cause/stack report; `SyncUseCase` emits only the terminal `settings` outcome, distinct from startup `load` reporting. Callback `Result.error` failures already logged by repositories SHALL NOT be recaptured as transaction-native faults.
+
+Remote reporting SHALL distinguish expected/transient failures (**zero** application-initiated exception captures) from reportable unexpected contract/storage failures (**exactly one** sanitized capture when consent is enabled). The original throwable, untrusted message/stack and arbitrary HTTP/URL/credential/contributor fields SHALL NOT be forwarded verbatim. Only allowlisted safe categories/context and reviewed-safe stack fields may reach Sentry exception payloads, breadcrumbs or spans. Because `AppLogger.log(error: ...)` forwards the original error automatically today, the new sync reporting paths SHALL explicitly separate local cause retention from safe remote reporting; safe `LogEvent.data` alone SHALL NOT be considered sufficient. Consent off SHALL suppress these remote captures, without hiding local diagnostics. This policy applies to app-initiated reporting of handled failures, not unrelated automatic SDK crashes.
 
 #### Scenario: Original exception caught at the cursor or settings boundary
 
@@ -40,17 +42,31 @@ An exception caught for conversion into `Result.error` SHALL retain its original
 - **THEN** the reporting owner receives the original throwable and stack, not only their interpolated textual representation
 - **AND** a subsequent terminal sync failure does not capture it again
 
-#### Scenario: Transaction wrapper handles an Error
+#### Scenario: Transaction wrapper handles a runtime Error
 
-- **WHEN** ObjectBox raises a non-`Exception` error that existing Result handling must translate
-- **THEN** the original error and stack are available at the reporting boundary, with any necessary downstream `Exception` wrapper clearly distinct
-- **AND** ordinary `Result.error` rollback from an already-logged repository callback does not cause duplicate capture
+- **WHEN** an ObjectBox transaction or callback raises a `dart:core.Error` that the existing Result contract must translate
+- **THEN** the original runtime error and stack remain available locally before a necessary `Exception` wrapper, distinct from `Result.Error<T>`
+- **AND** an already-logged callback `Result.error` used to roll back the transaction causes no additional capture
+
+#### Scenario: Expected connectivity failure stays local
+
+- **GIVEN** telemetry consent is enabled
+- **WHEN** an expected timeout/connectivity failure is returned during sync
+- **THEN** its original cause is diagnosable locally while the application initiates zero Sentry exception captures
+- **AND** terminal reporting does not capture it again
+
+#### Scenario: Reportable exception uses safe remote fields
+
+- **GIVEN** a reportable failure's throwable message, stack or context contains synthetic private URLs, credentials, contributor data or HTTP bodies
+- **WHEN** the owner reports it with consent enabled
+- **THEN** exactly one application-initiated Sentry exception capture uses only allowlisted, sanitized fields and omits those synthetic values
+- **AND** Sentry breadcrumbs and span attributes omit them too, while the original error/stack remain locally available
 
 #### Scenario: Unexpected raw throw
 
 - **WHEN** business work unexpectedly throws rather than returning `Result.error`
 - **THEN** the original thrown object and stack remain propagatable without silent conversion to a normal result
-- **AND** its terminal failure remains identifiable without duplicate exception capture
+- **AND** its terminal failure remains identifiable without duplicate application-initiated exception capture
 
 ### Requirement: Manual traces use Sentry streaming lifecycle
 

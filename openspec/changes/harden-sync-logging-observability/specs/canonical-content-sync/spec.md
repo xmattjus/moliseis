@@ -20,4 +20,4 @@ Operational success diagnostics for canonical synchronization SHALL follow the a
 
 - **WHEN** the four repositories commit atomically and the cursor/completion pair is saved successfully
 - **THEN** any content-commit success describes an already completed transaction
-- **AND** exactly one overall sync-success diagnostic may be emitted after the durable state update
+- **AND** exactly one overall sync-success diagnostic SHALL be emitted after the durable state update
