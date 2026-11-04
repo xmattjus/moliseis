@@ -1,6 +1,5 @@
 import 'package:command_it/command_it.dart';
-import 'package:moliseis/utils/logging/log_event.dart';
-import 'package:moliseis/utils/logging/logger.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 
 /// Routes handled command failures through the existing application logger.
 ///
@@ -10,6 +9,17 @@ void configureCommandReporting(Logger logger) {
   Command.reportAllExceptions = false;
   Command.globalExceptionHandler = (commandError, stackTrace) {
     final name = commandError.commandName;
+    if (name == 'sync_view_model.sync') {
+      logger.log(
+        SyncFailure(
+          owner: SyncFailureOwner.command,
+          category: syncFailureCategory(commandError.error),
+        ),
+        error: commandError.error,
+        stackTrace: stackTrace,
+      );
+      return;
+    }
     final safeName = switch (name) {
       'search_results' || 'search_suggestions' || 'geo_map_selection' => name!,
       _ => 'command',

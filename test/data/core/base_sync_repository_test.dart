@@ -33,17 +33,52 @@ void main() {
       expect(repository.receivedLowerBound, lowerBound);
     });
 
+    for (final error in <Object>[
+      StateError('sensitive runtime error'),
+      'sensitive thrown string',
+      Object(),
+    ]) {
+      test(
+        'retains non-Exception ${error.runtimeType} locally and rethrows',
+        () async {
+          final stack = StackTrace.fromString('synthetic source boundary');
+          repository
+            ..fetchError = error
+            ..fetchStackTrace = stack;
+          Object? caught;
+          StackTrace? caughtStack;
+          try {
+            await repository.prepareSync();
+          } on Object catch (e, st) {
+            caught = e;
+            caughtStack = st;
+          }
+          expect(caught, same(error));
+          expect(caughtStack.toString(), stack.toString());
+          final call = mockLogger.firstCallOfType<SyncFailure>()!;
+          expect(call.error, same(error));
+          expect(call.stackTrace.toString(), stack.toString());
+          expect((call.event as SyncFailure).report, isFalse);
+        },
+      );
+    }
+
     test('returns Result.error when fetchRemote throws', () async {
+      final error = Exception('Supabase unavailable');
+      final stack = StackTrace.fromString('source fetch boundary');
       final throwingRepository = StubSyncRepository(mockLogger)
-        ..fetchError = Exception('Supabase unavailable');
+        ..fetchError = error
+        ..fetchStackTrace = stack;
 
       final result = await throwingRepository.prepareSync();
 
       expect(result, isA<Error<List<FakeSyncDto>>>());
-      expect(mockLogger.eventsOfType<RepositorySyncFailed>(), hasLength(1));
-      final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+      expect((result as Error<List<FakeSyncDto>>).error, same(error));
+      expect(mockLogger.eventsOfType<SyncFailure>(), hasLength(1));
+      final failedCall = mockLogger.firstCallOfType<SyncFailure>();
       expect(failedCall, isNotNull);
-      expect(failedCall!.error, isNotNull);
+      expect(failedCall!.error, same(error));
+      expect(failedCall.stackTrace.toString(), stack.toString());
       expect(failedCall.stackTrace, isNotNull);
     });
   });
@@ -62,7 +97,8 @@ void main() {
 
       expect(repository.createdEntities, hasLength(1));
       expect(repository.storedEntities[1]?.remoteId, equals(1));
-      expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
+      expect(mockLogger.eventsOfType<EntityInsertSuccess>(), isEmpty);
+      expect(mockLogger.eventsOfType<RepositorySyncFinished>(), isEmpty);
     });
 
     test('does not call putMany when remote returns empty', () {
@@ -81,7 +117,7 @@ void main() {
 
       expect(repository.mergedEntities, hasLength(1));
       expect(repository.storedEntities[1]?.modifiedAt, equals(DateTime(2026)));
-      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), isEmpty);
     });
 
     test('skips an existing entity when remote modifiedAt is not newer', () {
@@ -116,7 +152,7 @@ void main() {
 
         expect(repository.mergedEntities, hasLength(1));
         expect(repository.storedEntities[1]?.isDeleted, isTrue);
-        expect(mockLogger.eventsOfType<EntityDeleteSuccess>(), hasLength(1));
+        expect(mockLogger.eventsOfType<EntityDeleteSuccess>(), isEmpty);
       },
     );
 
@@ -162,9 +198,9 @@ void main() {
 
         expect(repository.putManyCallCount, equals(1));
         expect(repository.putManyCalls[0], hasLength(3));
-        expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
-        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
-        expect(mockLogger.eventsOfType<EntityDeleteSuccess>(), hasLength(1));
+        expect(mockLogger.eventsOfType<EntityInsertSuccess>(), isEmpty);
+        expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), isEmpty);
+        expect(mockLogger.eventsOfType<EntityDeleteSuccess>(), isEmpty);
       },
     );
 
@@ -193,7 +229,7 @@ void main() {
 
       expect(repository.mergedEntities, hasLength(1));
       expect(repository.storedEntities[1]?.isDeleted, isFalse);
-      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), isEmpty);
     });
 
     test('handles duplicate remote IDs — second DTO updates the entity '
@@ -210,8 +246,8 @@ void main() {
         repository.storedEntities[1]?.modifiedAt,
         equals(DateTime(2026, 6)),
       );
-      expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
-      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
+      expect(mockLogger.eventsOfType<EntityInsertSuccess>(), isEmpty);
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), isEmpty);
     });
 
     for (final deleted in [false, true]) {
@@ -276,23 +312,20 @@ void main() {
       },
     );
 
-    test(
-      'returns Result.error and logs RepositorySyncFailed when putMany throws',
-      () {
-        final throwingRepo = StubSyncRepository(mockLogger)
-          ..commitError = Exception('Local write failed');
+    test('returns Result.error and logs SyncFailure when putMany throws', () {
+      final throwingRepo = StubSyncRepository(mockLogger)
+        ..commitError = Exception('Local write failed');
 
-        final result = throwingRepo.commitSync([
-          FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
-        ]);
+      final result = throwingRepo.commitSync([
+        FakeSyncDto(id: 1, modifiedAt: DateTime(2026)),
+      ]);
 
-        expect(result.isError, isTrue);
-        expect(mockLogger.eventsOfType<RepositorySyncFailed>(), hasLength(1));
-        final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
-        expect(failedCall, isNotNull);
-        expect(failedCall!.error, isNotNull);
-        expect(failedCall.stackTrace, isNotNull);
-      },
-    );
+      expect(result.isError, isTrue);
+      expect(mockLogger.eventsOfType<SyncFailure>(), hasLength(1));
+      final failedCall = mockLogger.firstCallOfType<SyncFailure>();
+      expect(failedCall, isNotNull);
+      expect(failedCall!.error, isNotNull);
+      expect(failedCall.stackTrace, isNotNull);
+    });
   });
 }

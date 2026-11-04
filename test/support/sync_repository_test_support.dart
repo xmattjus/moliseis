@@ -1,3 +1,6 @@
+import 'dart:core' as core;
+import 'dart:core';
+
 import 'package:moliseis/data/core/base_sync_repository.dart';
 import 'package:moliseis/domain/core/sync_dto.dart';
 import 'package:moliseis/domain/core/sync_entity.dart';
@@ -44,7 +47,8 @@ class StubSyncRepository
   final createdEntities = <FakeSyncEntity>[];
   final mergedEntities = <FakeSyncEntity>[];
   DateTime? receivedLowerBound;
-  Exception? fetchError;
+  Object? fetchError;
+  StackTrace? fetchStackTrace;
   Exception? commitError;
 
   @override
@@ -56,7 +60,12 @@ class StubSyncRepository
   @override
   Future<List<FakeSyncDto>> fetchRemote({DateTime? modifiedAtOrAfter}) async {
     receivedLowerBound = modifiedAtOrAfter;
-    if (fetchError != null) throw fetchError!;
+    if (fetchError case final error?) {
+      core.Error.throwWithStackTrace(
+        error,
+        fetchStackTrace ?? StackTrace.current,
+      );
+    }
     return remoteDtos;
   }
 

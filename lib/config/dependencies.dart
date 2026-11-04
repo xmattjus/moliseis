@@ -244,14 +244,16 @@ List<SingleChildWidget> providers(
   ChangeNotifierProvider<SyncViewModel>(
     create: (context) {
       final syncUseCase = SyncUseCase(
+        logger: logger,
         cityRepository: context.read(),
         eventRepository: context.read(),
         mediaRepository: context.read(),
         placeRepository: context.read(),
         settingsRepository: context.read(),
-        cursorSource: SupabaseSyncCursorSource(supabase.client),
+        cursorSource: SupabaseSyncCursorSource(supabase.client, logger: logger),
         transactionCoordinator: ObjectBoxSyncTransactionCoordinator(
           objectBox.store,
+          logger: logger,
         ),
       );
 

@@ -1321,6 +1321,7 @@ final class _AdminRouteHarness {
     );
     syncViewModel = SyncViewModel(
       syncUseCase: SyncUseCase(
+        logger: MockLogger(),
         cityRepository: FakeCityRepository(),
         eventRepository: FakeEventRepository(),
         mediaRepository: FakeMediaRepository(),

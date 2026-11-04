@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:core' as core;
+import 'dart:core';
+
 import 'package:moliseis/data/dtos/city_dto.dart';
 import 'package:moliseis/data/dtos/event_dto.dart';
 import 'package:moliseis/data/dtos/media_dto.dart';
@@ -9,8 +13,9 @@ import 'package:moliseis/domain/repositories/event_repository.dart';
 import 'package:moliseis/domain/repositories/media_repository.dart';
 import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
+import 'package:moliseis/utils/logging/logging.dart';
+import 'package:moliseis/utils/logging/run_traced_result.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Safety window for request-scoped canonical writes becoming visible late.
 ///
@@ -28,6 +33,7 @@ const syncOverlap = Duration(hours: 24);
 /// none are.
 class SyncUseCase {
   SyncUseCase({
+    required Logger logger,
     required CityRepository cityRepository,
     required EventRepository eventRepository,
     required MediaRepository mediaRepository,
@@ -36,7 +42,8 @@ class SyncUseCase {
     required SyncTransactionCoordinator transactionCoordinator,
     required SyncCursorSource cursorSource,
     DateTime Function()? now,
-  }) : _cityRepository = cityRepository,
+  }) : _logger = logger,
+       _cityRepository = cityRepository,
        _eventRepository = eventRepository,
        _mediaRepository = mediaRepository,
        _placeRepository = placeRepository,
@@ -45,6 +52,7 @@ class SyncUseCase {
        _cursorSource = cursorSource,
        _now = now ?? DateTime.now;
 
+  final Logger _logger;
   final CityRepository _cityRepository;
   final EventRepository _eventRepository;
   final MediaRepository _mediaRepository;
@@ -63,104 +71,143 @@ class SyncUseCase {
   /// Saves the pre-fetch server cursor only after content commit, together with
   /// the completion time. A settings failure leaves committed content available
   /// for harmless replay from the previous cursor and returns [Result.error].
-  Future<Result<void>> sync() async {
-    final transaction = Sentry.startTransaction(
-      'sync',
-      'task',
-      bindToScope: true,
-    );
+  Future<Result<void>> sync() => runTracedResult('sync', _sync);
 
-    var spanStatus = const SpanStatus.internalError();
-
+  Future<Result<void>> _sync() async {
+    final clock = Stopwatch()..start();
+    final cursor = _settingsRepository.contentSyncCursorAt;
+    final mode = cursor == null ? SyncMode.bootstrap : SyncMode.delta;
+    var phase = SyncPhase.cursor;
+    var succeeded = false;
+    SyncFailureCategory? category;
+    int? cityFetched;
+    int? placeFetched;
+    int? eventFetched;
+    int? mediaFetched;
+    _logger.log(SyncStarted(mode));
     try {
       // Observe U before any fetch; it is not a transactional snapshot.
-      final cursor = _settingsRepository.contentSyncCursorAt;
       final cursorResult = await _cursorSource.getCurrentCursor();
       final DateTime serverCursor;
       switch (cursorResult) {
         case Success(:final value):
           serverCursor = value.toUtc();
         case Error(:final error):
+          category = syncFailureCategory(error);
           return Result.error(error);
       }
       final lowerBound = cursor?.toUtc().subtract(syncOverlap);
-
-      // Phase 1: fetch all remote data concurrently, even when U equals C.
-      final (cityResult, placeResult, eventResult, mediaResult) = await (
-        _cityRepository.prepareSync(modifiedAtOrAfter: lowerBound),
-        _placeRepository.prepareSync(modifiedAtOrAfter: lowerBound),
-        _eventRepository.prepareSync(modifiedAtOrAfter: lowerBound),
-        _mediaRepository.prepareSync(modifiedAtOrAfter: lowerBound),
-      ).wait;
-
-      final List<CityDto> cityDtos;
-      switch (cityResult) {
-        case Success(:final value):
-          cityDtos = value;
-        case Error(:final error):
-          spanStatus = const SpanStatus.internalError();
-          return Result.error(error);
+      phase = SyncPhase.prepare_city;
+      final (
+        Result<List<CityDto>>,
+        Result<List<PlaceDto>>,
+        Result<List<EventDto>>,
+        Result<List<MediaDto>>,
+      )
+      prepared;
+      try {
+        prepared = await (
+          _cityRepository.prepareSync(modifiedAtOrAfter: lowerBound),
+          _placeRepository.prepareSync(modifiedAtOrAfter: lowerBound),
+          _eventRepository.prepareSync(modifiedAtOrAfter: lowerBound),
+          _mediaRepository.prepareSync(modifiedAtOrAfter: lowerBound),
+        ).wait;
+        // Positional join errors must retain each original throwable and stack.
+        // ignore: avoid_catching_errors
+      } on ParallelWaitError<
+        (
+          Result<List<CityDto>>?,
+          Result<List<PlaceDto>>?,
+          Result<List<EventDto>>?,
+          Result<List<MediaDto>>?,
+        ),
+        (AsyncError?, AsyncError?, AsyncError?, AsyncError?)
+      > catch (error) {
+        final values = error.values;
+        cityFetched = values.$1?.getOrNull()?.length;
+        placeFetched = values.$2?.getOrNull()?.length;
+        eventFetched = values.$3?.getOrNull()?.length;
+        mediaFetched = values.$4?.getOrNull()?.length;
+        final errors = error.errors;
+        // Record.wait preserves positional provenance and the original stacks.
+        for (final (failedPhase, failure) in [
+          (SyncPhase.prepare_city, errors.$1),
+          (SyncPhase.prepare_place, errors.$2),
+          (SyncPhase.prepare_event, errors.$3),
+          (SyncPhase.prepare_media, errors.$4),
+        ]) {
+          if (failure != null) {
+            phase = failedPhase;
+            core.Error.throwWithStackTrace(failure.error, failure.stackTrace);
+          }
+        }
+        rethrow;
       }
-
-      final List<PlaceDto> placeDtos;
-      switch (placeResult) {
-        case Success(:final value):
-          placeDtos = value;
-        case Error(:final error):
-          spanStatus = const SpanStatus.internalError();
+      final (cityResult, placeResult, eventResult, mediaResult) = prepared;
+      cityFetched = cityResult.getOrNull()?.length;
+      placeFetched = placeResult.getOrNull()?.length;
+      eventFetched = eventResult.getOrNull()?.length;
+      mediaFetched = mediaResult.getOrNull()?.length;
+      for (final (failedPhase, result) in [
+        (SyncPhase.prepare_city, cityResult),
+        (SyncPhase.prepare_place, placeResult),
+        (SyncPhase.prepare_event, eventResult),
+        (SyncPhase.prepare_media, mediaResult),
+      ]) {
+        if (result case Error(:final error)) {
+          phase = failedPhase;
+          category = syncFailureCategory(error);
           return Result.error(error);
+        }
       }
-
-      final List<EventDto> eventDtos;
-      switch (eventResult) {
-        case Success(:final value):
-          eventDtos = value;
-        case Error(:final error):
-          spanStatus = const SpanStatus.internalError();
-          return Result.error(error);
-      }
-
-      final List<MediaDto> mediaDtos;
-      switch (mediaResult) {
-        case Success(:final value):
-          mediaDtos = value;
-        case Error(:final error):
-          spanStatus = const SpanStatus.internalError();
-          return Result.error(error);
-      }
-
-      // Phase 2: commit all repos in a single write transaction,
-      // short-circuiting on the first commit error
+      final cityDtos = (cityResult as Success<List<CityDto>>).value;
+      final placeDtos = (placeResult as Success<List<PlaceDto>>).value;
+      final eventDtos = (eventResult as Success<List<EventDto>>).value;
+      final mediaDtos = (mediaResult as Success<List<MediaDto>>).value;
+      phase = SyncPhase.commit;
       final commitResult = _transactionCoordinator.runInWriteTransaction(() {
         final cityCommit = _cityRepository.commitSync(cityDtos);
         if (cityCommit.isError) return cityCommit;
-
         final placeCommit = _placeRepository.commitSync(placeDtos);
         if (placeCommit.isError) return placeCommit;
-
         final eventCommit = _eventRepository.commitSync(eventDtos);
         if (eventCommit.isError) return eventCommit;
-
-        final mediaCommit = _mediaRepository.commitSync(mediaDtos);
-        if (mediaCommit.isError) return mediaCommit;
-
-        return const Result.success(null);
+        return _mediaRepository.commitSync(mediaDtos);
       });
-
-      if (commitResult.isError) {
-        spanStatus = const SpanStatus.internalError();
+      if (commitResult case Error(:final error)) {
+        category = syncFailureCategory(error);
         return commitResult;
       }
-
+      _logger.log(const SyncContentCommitSucceeded());
+      phase = SyncPhase.settings;
       final settingsResult = await _settingsRepository.setSyncState(
         lastSyncedAt: _now(),
         contentSyncCursorAt: serverCursor,
       );
-      if (settingsResult.isError) return settingsResult;
-      spanStatus = const SpanStatus.ok();
+      if (settingsResult case Error(:final error)) {
+        category = syncFailureCategory(error);
+        return settingsResult;
+      }
+      succeeded = true;
       return const Result.success(null);
+    } catch (error) {
+      category = syncFailureCategory(error);
+      rethrow;
     } finally {
-      await transaction.finish(status: spanStatus);
+      clock.stop();
+      _logger.log(
+        SyncFinished(
+          mode: mode,
+          phase: phase,
+          succeeded: succeeded,
+          elapsedMs: clock.elapsedMilliseconds,
+          cityFetched: cityFetched,
+          placeFetched: placeFetched,
+          eventFetched: eventFetched,
+          mediaFetched: mediaFetched,
+          category: category,
+        ),
+      );
     }
   }
 

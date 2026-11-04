@@ -1,6 +1,9 @@
 // Test readability benefits from redundant argument values.
 // ignore_for_file: avoid_redundant_argument_values
 
+import 'dart:core' as core;
+import 'dart:core';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/data/data-sources/app_settings.dart';
 import 'package:moliseis/data/data-sources/settings_local_data_source.dart';
@@ -8,8 +11,10 @@ import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 
+import '../../support/mock_logger.dart';
 import '../../support/objectbox_test_store.dart';
 
 void main() {
@@ -17,11 +22,16 @@ void main() {
     late TestObjectBoxEnvironment objectBoxEnvironment;
     late SettingsLocalDataSource dataSource;
     late Box<AppSettings> settingsBox;
+    late MockLogger logger;
 
     setUp(() async {
       objectBoxEnvironment = await TestObjectBoxEnvironment.create();
       settingsBox = objectBoxEnvironment.store.box<AppSettings>();
-      dataSource = SettingsLocalDataSource(objectBoxEnvironment.store);
+      logger = MockLogger();
+      dataSource = SettingsLocalDataSource(
+        objectBoxEnvironment.store,
+        logger: logger,
+      );
     });
 
     tearDown(() async {
@@ -81,6 +91,29 @@ void main() {
       expect(loaded.crashReporting, isFalse);
       expect(loaded.type, ThemeType.system);
     });
+
+    test(
+      'update catch retains original exception and stack, cursor and consent',
+      () async {
+        final cursor = DateTime.utc(2026, 10, 1);
+        await dataSource.save(
+          AppSettings(crashReporting: false, contentSyncCursorAt: cursor),
+        );
+        const error = FormatException('private settings payload');
+        final stack = StackTrace.fromString('original settings stack');
+        final result = await dataSource.update((_) {
+          core.Error.throwWithStackTrace(error, stack);
+        });
+        expect((result as Error<void>).error, same(error));
+        final stored = (await dataSource.load()).getOrNull()!;
+        expect(stored.contentSyncCursorAt?.toUtc(), cursor);
+        expect(stored.crashReporting, isFalse);
+        final call = logger.firstCallOfType<SyncFailure>()!;
+        expect(call.error, same(error));
+        expect(call.stackTrace.toString(), stack.toString());
+        expect(logger.eventsOfType<SyncFailure>(), hasLength(1));
+      },
+    );
 
     test('save persists settings in the singleton slot', () async {
       final updatedSettings = AppSettings(

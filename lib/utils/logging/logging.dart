@@ -12,3 +12,5 @@ export 'app_log_level_mapper.dart';
 export 'app_logger.dart';
 export 'log_event.dart';
 export 'logger.dart';
+
+export 'sync_failure_category.dart';

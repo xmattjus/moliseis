@@ -1,3 +1,6 @@
+// SDK test configuration and scope processors verify actual streaming spans.
+// ignore_for_file: invalid_use_of_internal_member
+
 import 'dart:async' show TimeoutException;
 import 'dart:io' show SocketException;
 
@@ -9,10 +12,12 @@ import 'package:moliseis/domain/models/content_submission.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:sentry/sentry.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../support/fake_cloudinary_upload_client.dart';
 import '../../support/mock_logger.dart';
+import '../../support/recording_sentry_transport.dart';
 import '../../support/recording_supabase_functions_http_client.dart';
 
 void main() {
@@ -439,4 +444,71 @@ void main() {
       expect(body['end_calendar_date'], '2026-10-14');
     },
   );
+
+  group('streaming traces', () {
+    late RecordingSentryTransport transport;
+
+    setUp(() async {
+      transport = RecordingSentryTransport();
+      await Sentry.init((options) {
+        options
+          ..dsn = 'https://abc@example.test/1'
+          ..automatedTestMode = true
+          ..traceLifecycle = SentryTraceLifecycle.stream
+          ..tracesSampleRate = 1.0
+          ..transport = transport
+          ..beforeSendSpan = transport.recordSpan;
+      });
+      Sentry.currentHub.scope.addEventProcessor(transport);
+    });
+
+    tearDown(Sentry.close);
+
+    for (final outcome in ['success', 'normalized', 'transport', 'format']) {
+      test(
+        'records real $outcome span without extra exception capture',
+        () async {
+          switch (outcome) {
+            case 'success':
+              httpClient.queueJson({'submission_id': 1});
+            case 'normalized':
+              httpClient.queueJson({
+                'code': 'INVALID',
+                'message': 'Invalid',
+              }, status: 400);
+            case 'transport':
+              httpClient.error = const SocketException('network unavailable');
+            case 'format':
+              httpClient.queueJson({'submission_id': 0});
+          }
+
+          final result = await submit();
+          await transport.settleSpans(1);
+          final span = transport.spans.single;
+          expect(span.name, 'content-submission');
+          expect(span.isEnded, isTrue);
+          expect(
+            span.status,
+            outcome == 'success'
+                ? SentrySpanStatusV2.ok
+                : SentrySpanStatusV2.error,
+          );
+          expect(result.isSuccess, outcome == 'success');
+          expect(httpClient.requests, hasLength(1));
+          expect(
+            logger.eventsOfType<ContentSubmissionUploadStarted>(),
+            hasLength(1),
+          );
+          expect(
+            logger.eventsOfType<ContentSubmissionUploadFailed>(),
+            hasLength(outcome == 'success' ? 0 : 1),
+          );
+          await transport.settleCaptures();
+          expect(transport.events, isEmpty);
+          await Sentry.close();
+          expect(transport.envelopes, isNotEmpty);
+        },
+      );
+    }
+  });
 }

@@ -25,6 +25,7 @@ void main() {
     Result<List<PlaceDto>> placeResult = const Result.success([]),
   }) {
     return SyncUseCase(
+      logger: MockLogger(),
       cityRepository: FakeCityRepository(prepareResult: cityResult),
       eventRepository: FakeEventRepository(prepareResult: eventResult),
       mediaRepository: FakeMediaRepository(prepareResult: mediaResult),
@@ -367,7 +368,7 @@ void main() {
   );
 
   testWidgets(
-    'S3 existing prepare wait wrapper remains unexpected and reports once',
+    'S3 original prepare throwable remains unexpected and reports once',
     (tester) async {
       final deps = buildSyncUseCase(settings: FakeSettingsRepository());
       final pending = Completer<Result<List<CityDto>>>();
@@ -379,20 +380,10 @@ void main() {
       final original = StateError('prepare failure');
       pending.completeError(original, StackTrace.current);
       await pumpCommandTurns(tester);
-      final wrapper = vm.sync.results.value.unexpectedError;
-      expect(wrapper, isA<ParallelWaitError<Object?, Object?>>());
-      if (wrapper
-          is ParallelWaitError<
-            Object?,
-            (AsyncError?, AsyncError?, AsyncError?, AsyncError?)
-          >) {
-        expect(wrapper.errors.$1?.error, same(original));
-      } else {
-        fail('Expected the existing four-prepare error record');
-      }
+      expect(vm.sync.results.value.unexpectedError, same(original));
       expect(vm.sync.results.value.domainError, isNull);
       expect(logger.calls, hasLength(1));
-      expect(logger.calls.single.error, same(wrapper));
+      expect(logger.calls.single.error, same(original));
       vm.dispose();
       await pumpCommandTurns(tester);
       await tester.pump(const Duration(milliseconds: 50));

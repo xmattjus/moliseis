@@ -1,5 +1,6 @@
 import 'package:moliseis/data/data-sources/app_settings.dart';
 import 'package:moliseis/generated/objectbox.g.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 
 /// Local persistence contract for app settings.
@@ -18,11 +19,13 @@ abstract interface class ISettingsLocalDataSource {
 
 /// ObjectBox-backed implementation for app settings persistence.
 class SettingsLocalDataSource implements ISettingsLocalDataSource {
-  SettingsLocalDataSource(Store store)
+  SettingsLocalDataSource(Store store, {Logger? logger})
     : _store = store,
-      _box = store.box<AppSettings>();
+      _box = store.box<AppSettings>(),
+      _logger = logger;
 
   final Store _store;
+  final Logger? _logger;
 
   final Box<AppSettings> _box;
 
@@ -50,9 +53,18 @@ class SettingsLocalDataSource implements ISettingsLocalDataSource {
       });
       return const Result.success(null);
     } on Exception catch (exception, stackTrace) {
-      return Result.error(
-        Exception('Failed to update app settings, $exception, $stackTrace'),
+      _logger?.log(
+        SyncFailure(
+          owner: SyncFailureOwner.settings,
+          category:
+              syncFailureCategory(exception) == SyncFailureCategory.connectivity
+              ? SyncFailureCategory.connectivity
+              : SyncFailureCategory.storage,
+        ),
+        error: exception,
+        stackTrace: stackTrace,
       );
+      return Result.error(exception);
     }
   }
 

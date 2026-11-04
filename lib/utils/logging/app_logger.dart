@@ -57,7 +57,34 @@ class AppLogger implements Logger {
     // Do not send logs to Sentry if it is not necessary.
     if (!_sentryFlag.enabled || level.index < AppLogLevel.info.index) return;
 
-    unawaited(_addBreadcrumb(event.name, mergedData, level));
+    // Sync remote data comes only from typed allowlisted fields.
+    final remoteData = event is SyncFailure ? event.data : mergedData;
+    unawaited(_addBreadcrumb(event.name, remoteData, level));
+
+    if (event is SyncFailure) {
+      if (event.report && event.category != SyncFailureCategory.connectivity) {
+        unawaited(
+          Sentry.captureEvent(
+            SentryEvent(
+              exceptions: [
+                SentryException(
+                  type: 'CanonicalSyncFailure',
+                  value: '${event.owner.name}:${event.category.name}',
+                ),
+              ],
+            ),
+            withScope: (scope) async {
+              // Ambient context may contain unrelated raw console or HTTP data.
+              await scope.clear();
+              for (final key in scope.contexts.keys.toList()) {
+                await scope.removeContexts(key);
+              }
+            },
+          ),
+        );
+      }
+      return;
+    }
 
     if (error != null && level.index >= AppLogLevel.error.index) {
       unawaited(Sentry.captureException(error, stackTrace: stackTrace));

@@ -45,12 +45,26 @@ abstract class BaseSyncRepository<
       return Result.success(dtos);
     } on Exception catch (e, stackTrace) {
       logger.log(
-        RepositorySyncFailed(entityName),
+        SyncFailure(
+          owner: SyncFailureOwner.prepare,
+          category: syncFailureCategory(e),
+        ),
         error: e,
         stackTrace: stackTrace,
       );
 
       return Result.error(e);
+    } catch (error, stackTrace) {
+      logger.log(
+        SyncFailure(
+          owner: SyncFailureOwner.prepare,
+          category: syncFailureCategory(error),
+          report: false,
+        ),
+        error: error,
+        stackTrace: stackTrace,
+      );
+      rethrow;
     }
   }
 
@@ -73,7 +87,6 @@ abstract class BaseSyncRepository<
           pendingPuts.add(created);
           pendingById[dto.id] = created;
 
-          logger.log(EntityInsertSuccess(entityName, dto.id));
           continue;
         }
 
@@ -81,12 +94,6 @@ abstract class BaseSyncRepository<
           final merged = mergeEntity(dto, existing);
           pendingPuts.add(merged);
           pendingById[dto.id] = merged;
-
-          logger.log(
-            dto.deletedAt != null
-                ? EntityDeleteSuccess(entityName, dto.id)
-                : EntityUpdateSuccess(entityName, dto.id),
-          );
         }
       }
 
@@ -94,12 +101,15 @@ abstract class BaseSyncRepository<
         putMany(pendingPuts);
       }
 
-      logger.log(RepositorySyncFinished(entityName));
-
       return const Result.success(null);
     } on Exception catch (e, stackTrace) {
       logger.log(
-        RepositorySyncFailed(entityName),
+        SyncFailure(
+          owner: SyncFailureOwner.commit,
+          category: syncFailureCategory(e) == SyncFailureCategory.connectivity
+              ? SyncFailureCategory.connectivity
+              : SyncFailureCategory.storage,
+        ),
         error: e,
         stackTrace: stackTrace,
       );

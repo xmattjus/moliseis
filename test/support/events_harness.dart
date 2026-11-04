@@ -19,6 +19,7 @@ import 'package:provider/single_child_widget.dart';
 
 import 'fake_repositories.dart';
 import 'mock_gotrue_client.dart';
+import 'mock_logger.dart';
 
 /// Reproduces the production Provider ownership of [EventsScreen].
 final class EventsProviderHarness {
@@ -72,6 +73,7 @@ final class EventsRouteHarness {
     );
     syncViewModel = SyncViewModel(
       syncUseCase: SyncUseCase(
+        logger: MockLogger(),
         cityRepository: FakeCityRepository(),
         eventRepository: FakeEventRepository(),
         mediaRepository: FakeMediaRepository(),

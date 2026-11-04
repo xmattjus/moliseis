@@ -1,3 +1,6 @@
+import 'dart:core' as core;
+import 'dart:core';
+
 import 'package:moliseis/data/data-sources/app_settings.dart';
 import 'package:moliseis/data/data-sources/media_entity.dart';
 import 'package:moliseis/data/data-sources/settings_local_data_source.dart';
@@ -36,6 +39,12 @@ final class FailNextSettingsSave implements ISettingsLocalDataSource {
   /// The next attempted save returns an error without changing disk state.
   bool failNextSave = false;
 
+  /// Original recoverable failure injected inside production update's catch.
+  final Exception failure = Exception('Settings save failure');
+  final StackTrace failureStack = StackTrace.fromString(
+    'settings-update-source',
+  );
+
   /// Number of settings save attempts, including failures.
   int saves = 0;
 
@@ -47,7 +56,9 @@ final class FailNextSettingsSave implements ISettingsLocalDataSource {
     saves++;
     if (failNextSave) {
       failNextSave = false;
-      return Future.value(Result.error(Exception('Settings save failure')));
+      return delegate.update((current) {
+        core.Error.throwWithStackTrace(failure, failureStack);
+      });
     }
     return delegate.update(transform);
   }
