@@ -60,3 +60,12 @@ class RecordingSentryTransport implements Transport, EventProcessor {
     }
   }
 }
+
+/// Selects SDK non-debug branches without changing the host Flutter build.
+class NonDebugRuntimeChecker extends RuntimeChecker {
+  @override
+  bool isDebugMode() => false;
+
+  @override
+  bool isReleaseMode() => true;
+}
