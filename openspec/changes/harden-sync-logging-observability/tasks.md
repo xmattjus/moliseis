@@ -39,4 +39,4 @@ All verification work in this change is performed **automatically by Codex durin
 ## 6. Review and handoff
 
 - [x] 6.1 Independently inspect the whole diff against the agreed constraints: correct sync outcome and error ownership, no duplicate captures, accurate aggregate counts and rollback semantics, Sentry stream compatibility, no consent/HTTP regression, no new packages, no unrelated SQL/Cloudinary/UI edits. Keep only durable OpenSpec artifacts and genuine test fixtures in Git; never commit raw test logs, temporary analyzer dumps, recordings or generated operational evidence.
-- [ ] 6.2 Once verification is complete, publish/review implementation on the same cohesive PR according to `AGENTS.md`. Do not merge, deploy, synchronize canonical specs or archive OpenSpec without separate explicit authorization.
+- [x] 6.2 Once verification is complete, publish/review implementation on the same cohesive PR according to `AGENTS.md`. Do not merge, deploy, synchronize canonical specs or archive OpenSpec without separate explicit authorization.
