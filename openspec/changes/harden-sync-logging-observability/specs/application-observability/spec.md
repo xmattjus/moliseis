@@ -6,13 +6,20 @@ Make Molise Is diagnostic events and manual traces useful, truthful, and safe ac
 
 ### Requirement: Sync runs produce one locally identifiable terminal outcome
 
-Every canonical sync invocation SHALL emit a typed start and exactly one terminal result, including early `Result.error` and unexpected throws. Terminal diagnostics SHALL identify the phase and bootstrap/delta mode from the persisted `contentSyncCursorAt` read at entry, not the server cursor. Elapsed time and fetched DTO counts SHALL be bounded, safe and accurately labeled. Telemetry consent SHALL NOT suppress local diagnostics.
+Every canonical sync invocation SHALL emit a typed start and exactly one terminal result, including early `Result.error` and unexpected throws. Terminal diagnostics SHALL identify the phase and bootstrap/delta mode from the persisted `contentSyncCursorAt` read at entry, not the server cursor. Elapsed time and per-repository fetched DTO counts SHALL follow the numeric-field scenario below and be accurately labeled. Telemetry consent SHALL NOT suppress local diagnostics.
 
 #### Scenario: Safe terminal data with telemetry disabled
 
 - **WHEN** a bootstrap/delta sync yields any fetched DTO count or failure with consent off
-- **THEN** local events remain available, bootstrap/delta derives from the locally persisted cursor at entry, and elapsed time/counts use safe bounded fields
+- **THEN** local events remain available, bootstrap/delta derives from the locally persisted cursor at entry, and elapsed time/counts follow the numeric-field contract below
 - **AND** fetched counts are not mislabeled as durable insert/update/delete totals
+
+#### Scenario: Numeric diagnostic fields have portable bounds
+
+- **WHEN** sync emits elapsed time or available fetched DTO counts
+- **THEN** `elapsed_ms` comes from a `Stopwatch` started at sync entry and stopped at terminal publication; each repository count comes from its successfully prepared list's `length`, with unavailable counts omitted and no cross-repository total
+- **AND** each numeric field SHALL be an integer clamped before emission to `0..9007199254740991` (`2^53 - 1`), the portable contiguous safe-integer range for native/JavaScript numeric metadata: negative input becomes zero, input above the maximum saturates at the maximum, and in-range input remains unchanged
+- **AND** the maximum denotes a saturated diagnostic; these bounds are neither a sync timeout nor a retrieval/storage limit, and clamping does not change business outcomes
 
 #### Scenario: Cursor acquisition fails before preparation
 
@@ -26,11 +33,17 @@ Every canonical sync invocation SHALL emit a typed start and exactly one termina
 
 #### Scenario: Concurrent preparation unexpectedly throws
 
-- **WHEN** city, place, event, or media `prepareSync` throws an unexpected `Exception` or `dart:core.Error` while other preparations are running
-- **THEN** the orchestrator uses positional `ParallelWaitError.errors` and `.values` from the existing record `.wait` to identify `prepare_city`, `prepare_place`, `prepare_event` or `prepare_media`, without new per-future wrappers
+- **WHEN** city, place, event, or media `prepareSync` throws any non-null `Object` (including an `Exception`, `dart:core.Error`, custom object or string) while other preparations are running
+- **THEN** the orchestrator uses positional `AsyncError` entries in `ParallelWaitError.errors` from the existing record `.wait` to identify `prepare_city`, `prepare_place`, `prepare_event` or `prepare_media`, without new per-future wrappers
 - **AND** exactly one terminal failure describes that phase without a second capture or a false commit
 - **AND** the selected throwable identity and the stack from its `AsyncError` propagate unchanged; all four preparations remain concurrent
-- **AND** when multiple preparations fail, the primary failure SHALL be selected regardless of completion order: thrown `Exception`/`dart:core.Error` failures take precedence over returned `Result.error`; within either category, precedence is `prepare_city` → `prepare_place` → `prepare_event` → `prepare_media`, and exactly one terminal failure identifies that selected phase/cause
+- **AND** when multiple preparations fail, the primary failure SHALL be selected regardless of completion order: all thrown non-null `Object` failures take precedence over returned `Result.error`; within either category, precedence is `prepare_city` → `prepare_place` → `prepare_event` → `prepare_media`, and exactly one terminal failure identifies that selected phase/cause
+
+#### Scenario: Returned preparation failure has no Result stack
+
+- **WHEN** a preparation normally completes with `Result.error`, including a value in `ParallelWaitError.values` during a mixed returned/thrown failure
+- **THEN** its original returned exception identity remains available, but no stack is expected from the Result; available catch-site stacks are verified separately at the reporting source
+- **AND** thrown-object identity and stack come from the corresponding `AsyncError` in `.errors`, and thrown-over-returned precedence and city/place/event/media order remain unchanged
 
 #### Scenario: Settings persistence fails after content committed
 
@@ -65,10 +78,10 @@ Canonical sync reporting SHALL preserve original throwable/stack locally. For un
 - **THEN** the reporting owner receives the original throwable and stack, not only their interpolated textual representation
 - **AND** a subsequent terminal sync failure does not capture it again
 
-#### Scenario: Repository preparation raises a runtime Error
+#### Scenario: Repository preparation raises a non-Exception object
 
-- **WHEN** `fetchRemote` throws a `dart:core.Error` inside `BaseSyncRepository.prepareSync`
-- **THEN** that repository's original error and stack are recorded locally before the same error and stack are rethrown
+- **WHEN** `fetchRemote` throws a non-Exception `Object`, including `dart:core.Error`, a custom object or a string, inside `BaseSyncRepository.prepareSync`
+- **THEN** after the separate caught-`Exception` to `Result.error` path, that repository records the original object and stack locally and rethrows them unchanged without repository remote capture or conversion to `Result.error`
 - **AND** `SyncUseCase` attributes the corresponding `prepare_*` phase and emits one terminal failure without capturing the cause again
 
 #### Scenario: Transaction wrapper handles a runtime Error
@@ -79,7 +92,7 @@ Canonical sync reporting SHALL preserve original throwable/stack locally. For un
 
 #### Scenario: Unexpected sync throw reaches the configured global handler
 
-- **WHEN** `SyncViewModel.sync` propagates a thrown `Exception` or `dart:core.Error` through `createResultCommand` with `ErrorReaction.globalHandler`
+- **WHEN** `SyncViewModel.sync` propagates any thrown non-null `Object` through `createResultCommand` with `ErrorReaction.globalHandler`, including an object that is neither `Exception` nor `dart:core.Error`
 - **THEN** `configureCommandReporting` recognizes `sync_view_model.sync` and alone owns any app-initiated remote capture for that throw
 - **AND** the original error/stack remain available locally; a reportable failure yields one consent-gated sanitized capture without repository or terminal recapture
 - **AND** unrelated commands, their error handling and direct sync use-case calls retain existing behavior
