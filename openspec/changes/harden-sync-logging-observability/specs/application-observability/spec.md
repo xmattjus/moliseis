@@ -15,8 +15,15 @@ Every admitted canonical sync invocation SHALL generate typed local diagnostic e
 
 #### Scenario: Preparation fails after other fetches started
 
-- **WHEN** any one of four concurrently started preparations returns an error
+- **WHEN** any one of four concurrently started preparations returns a `Result.error`
 - **THEN** sync emits one terminal failure identifying the failing repository/prepare phase and does not claim that any content committed
+
+#### Scenario: Concurrent preparation unexpectedly throws
+
+- **WHEN** city, place, event, or media `prepareSync` throws an unexpected `Exception` or `dart:core.Error` while other preparations are running
+- **THEN** the orchestrator identifies the originating `prepare_city`, `prepare_place`, `prepare_event`, or `prepare_media` phase from a per-future boundary established before the combined await
+- **AND** exactly one terminal failure describes that phase without a second capture or a false commit
+- **AND** the original throwable identity and stack propagate unchanged; multiple failures have a deterministic primary phase/cause and do not serialize the preparations
 
 #### Scenario: Settings persistence fails after content committed
 
@@ -32,15 +39,21 @@ Every admitted canonical sync invocation SHALL generate typed local diagnostic e
 
 ### Requirement: Error reporting is owned and preserves available causes
 
-A caught `Exception` SHALL retain its original identity wherever `Result.error` permits, and the first owning reporting boundary SHALL preserve the original throwable and `StackTrace` for **local** diagnosis. A non-`Exception` `dart:core.Error` SHALL be distinguished from `Result.Error<T>` and retained locally before any contract-required `Exception` wrapper. For runtime `setSyncState` failures, `SettingsLocalDataSource.update` owns the original cause/stack report; `SyncUseCase` emits only the terminal `settings` outcome, distinct from startup `load` reporting. Callback `Result.error` failures already logged by repositories SHALL NOT be recaptured as transaction-native faults.
+An `Exception` caught for conversion to `Result.error` SHALL retain its original identity wherever that contract permits, and the first owning reporting boundary SHALL preserve the original throwable and `StackTrace` for **local** diagnosis. `BaseSyncRepository.prepareSync` SHALL additionally record an unexpected `dart:core.Error` and original stack from `fetchRemote` locally at its existing owner boundary and **rethrow that same Error with the original stack**, not wrap it as `Result.error(Exception)`; the orchestrator SHALL attribute its concurrent preparation phase without duplicate reporting. A non-`Exception` `dart:core.Error` SHALL be distinguished from `Result.Error<T>` and retained locally before any contract-required `Exception` wrapper. For runtime `setSyncState` failures, `SettingsLocalDataSource.update` owns the original cause/stack report; `SyncUseCase` emits only the terminal `settings` outcome, distinct from startup `load` reporting. Callback `Result.error` failures already logged by repositories SHALL NOT be recaptured as transaction-native faults.
 
-Remote reporting SHALL distinguish expected/transient failures (**zero** application-initiated exception captures) from reportable unexpected contract/storage failures (**exactly one** sanitized capture when consent is enabled). The original throwable, untrusted message/stack and arbitrary HTTP/URL/credential/contributor fields SHALL NOT be forwarded verbatim. Only allowlisted safe categories/context and reviewed-safe stack fields may reach Sentry exception payloads, breadcrumbs or spans. Because `AppLogger.log(error: ...)` forwards the original error automatically today, the new sync reporting paths SHALL explicitly separate local cause retention from safe remote reporting; safe `LogEvent.data` alone SHALL NOT be considered sufficient. Consent off SHALL suppress these remote captures, without hiding local diagnostics. This policy applies to app-initiated reporting of handled failures, not unrelated automatic SDK crashes.
+For **canonical sync reporting paths only**, remote reporting SHALL distinguish expected/transient failures (**zero** application-initiated Sentry exception captures) from reportable unexpected contract/storage failures (**exactly one** sanitized application-initiated capture when consent is enabled). This zero-or-one capture policy SHALL NOT be imposed on content-submission failures: that workflow retains its existing reporting behavior while the stream migration SHALL introduce no additional capture. The original throwable, untrusted message/stack and arbitrary HTTP/URL/credential/contributor fields SHALL NOT be forwarded verbatim. Only allowlisted safe categories/context and reviewed-safe stack fields may reach Sentry exception payloads, breadcrumbs or spans. Because `AppLogger.log(error: ...)` forwards the original error automatically today, the new sync reporting paths SHALL explicitly separate local cause retention from safe remote reporting; safe `LogEvent.data` alone SHALL NOT be considered sufficient. Consent off SHALL suppress these remote captures, without hiding local diagnostics. This policy applies to app-initiated reporting of handled failures, not unrelated automatic SDK crashes.
 
 #### Scenario: Original exception caught at the cursor or settings boundary
 
 - **WHEN** an infrastructure `Exception` with a stack is caught and returned as a `Result.error`
 - **THEN** the reporting owner receives the original throwable and stack, not only their interpolated textual representation
 - **AND** a subsequent terminal sync failure does not capture it again
+
+#### Scenario: Repository preparation raises a runtime Error
+
+- **WHEN** `fetchRemote` throws a `dart:core.Error` inside `BaseSyncRepository.prepareSync`
+- **THEN** that repository's original error and stack are recorded locally before the same error and stack are rethrown
+- **AND** `SyncUseCase` attributes the corresponding `prepare_*` phase and emits one terminal failure without capturing the cause again
 
 #### Scenario: Transaction wrapper handles a runtime Error
 
