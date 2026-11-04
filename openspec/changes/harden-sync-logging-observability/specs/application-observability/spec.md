@@ -23,7 +23,8 @@ Every admitted canonical sync invocation SHALL generate typed local diagnostic e
 - **WHEN** city, place, event, or media `prepareSync` throws an unexpected `Exception` or `dart:core.Error` while other preparations are running
 - **THEN** the orchestrator identifies the originating `prepare_city`, `prepare_place`, `prepare_event`, or `prepare_media` phase from a per-future boundary established before the combined await
 - **AND** exactly one terminal failure describes that phase without a second capture or a false commit
-- **AND** the original throwable identity and stack propagate unchanged; multiple failures have a deterministic primary phase/cause and do not serialize the preparations
+- **AND** the original throwable identity and stack propagate unchanged; concurrent preparations remain concurrent
+- **AND** when multiple preparations fail, the primary failure SHALL be selected regardless of completion order: thrown `Exception`/`dart:core.Error` failures take precedence over returned `Result.error`; within either category, precedence is `prepare_city` → `prepare_place` → `prepare_event` → `prepare_media`, and exactly one terminal failure identifies that selected phase/cause
 
 #### Scenario: Settings persistence fails after content committed
 
