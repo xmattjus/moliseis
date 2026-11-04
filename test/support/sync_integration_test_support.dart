@@ -52,15 +52,18 @@ final class FailNextSettingsSave implements ISettingsLocalDataSource {
   Future<Result<AppSettings>> load() => delegate.load();
 
   @override
-  Future<Result<void>> update(AppSettings Function(AppSettings) transform) {
+  Future<Result<void>> update(
+    AppSettings Function(AppSettings) transform, {
+    bool reportSyncFailure = false,
+  }) {
     saves++;
     if (failNextSave) {
       failNextSave = false;
       return delegate.update((current) {
         core.Error.throwWithStackTrace(failure, failureStack);
-      });
+      }, reportSyncFailure: reportSyncFailure);
     }
-    return delegate.update(transform);
+    return delegate.update(transform, reportSyncFailure: reportSyncFailure);
   }
 
   @override

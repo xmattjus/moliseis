@@ -64,7 +64,7 @@ void main() {
             console.add(line);
             unawaited(
               Sentry.addBreadcrumb(
-                Breadcrumb(message: line, category: 'console', type: 'debug'),
+                Breadcrumb.console(message: line, level: SentryLevel.debug),
               ),
             );
           }
@@ -124,10 +124,14 @@ void main() {
             case SyncFailureOwner.settings:
               final env = await TestObjectBoxEnvironment.create();
               addTearDown(env.dispose);
-              final result = await SettingsLocalDataSource(
-                env.store,
-                logger: logger,
-              ).update((_) => core.Error.throwWithStackTrace(failure, stack));
+              final result =
+                  await SettingsLocalDataSource(
+                    env.store,
+                    logger: logger,
+                  ).update(
+                    (_) => core.Error.throwWithStackTrace(failure, stack),
+                    reportSyncFailure: true,
+                  );
               expect((result as Error<void>).error, same(failure));
             case SyncFailureOwner.command:
               fail('Command covered through real ViewModel below');
@@ -239,10 +243,40 @@ void main() {
     }
   }
 
+  for (final category in <String?>[null, 'app', 'http', 'navigation']) {
+    test(
+      'preserves non-console decorated breadcrumb category=$category',
+      () async {
+        final breadcrumb = Breadcrumb(
+          message: 'Explore │ Map ┌ └',
+          category: category,
+        );
+        await Sentry.addBreadcrumb(breadcrumb);
+        expect(Sentry.currentHub.scope.breadcrumbs.single, same(breadcrumb));
+      },
+    );
+  }
+
+  test('rejects console exception, stack and multiline Talker fragments', () {
+    for (final message in [
+      '│ Exception: $secret',
+      '│ StackTrace: $secret',
+      '┌ Header\n│ Exception: $secret\n│ StackTrace: $secret\n└',
+    ]) {
+      expect(
+        filterBreadcrumb(Breadcrumb.console(message: message), Hint()),
+        isNull,
+      );
+    }
+  });
+
   test(
     'real Talker preserves original stack; safe console breadcrumb survives',
     () async {
-      expect(filterBreadcrumb(Breadcrumb(message: '─\u001b['), Hint()), isNull);
+      expect(
+        filterBreadcrumb(Breadcrumb.console(message: '─\u001b['), Hint()),
+        isNull,
+      );
       final error = Exception(secret);
       final stack = StackTrace.fromString(secret);
       logger.log(
@@ -253,9 +287,7 @@ void main() {
         error: error,
         stackTrace: stack,
       );
-      await Sentry.addBreadcrumb(
-        Breadcrumb(message: 'safe console', category: 'console'),
-      );
+      await Sentry.addBreadcrumb(Breadcrumb.console(message: 'safe console'));
       await transport.settleCaptures();
       expect(talker.history.single.exception, same(error));
       expect(talker.history.single.stackTrace, same(stack));

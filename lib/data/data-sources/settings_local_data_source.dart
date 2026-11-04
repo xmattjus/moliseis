@@ -14,7 +14,11 @@ abstract interface class ISettingsLocalDataSource {
   /// Applies a field-only change to the latest singleton in one transaction.
   ///
   /// The transform must be synchronous and must not mutate its argument.
-  Future<Result<void>> update(AppSettings Function(AppSettings) transform);
+  /// Only canonical sync-state writes enable [reportSyncFailure].
+  Future<Result<void>> update(
+    AppSettings Function(AppSettings) transform, {
+    bool reportSyncFailure = false,
+  });
 }
 
 /// ObjectBox-backed implementation for app settings persistence.
@@ -44,8 +48,9 @@ class SettingsLocalDataSource implements ISettingsLocalDataSource {
 
   @override
   Future<Result<void>> update(
-    AppSettings Function(AppSettings) transform,
-  ) async {
+    AppSettings Function(AppSettings) transform, {
+    bool reportSyncFailure = false,
+  }) async {
     try {
       _store.runInTransaction(TxMode.write, () {
         final current = _box.get(AppSettings.singletonId) ?? AppSettings();
@@ -53,17 +58,20 @@ class SettingsLocalDataSource implements ISettingsLocalDataSource {
       });
       return const Result.success(null);
     } on Exception catch (exception, stackTrace) {
-      _logger?.log(
-        SyncFailure(
-          owner: SyncFailureOwner.settings,
-          category:
-              syncFailureCategory(exception) == SyncFailureCategory.connectivity
-              ? SyncFailureCategory.connectivity
-              : SyncFailureCategory.storage,
-        ),
-        error: exception,
-        stackTrace: stackTrace,
-      );
+      if (reportSyncFailure) {
+        _logger?.log(
+          SyncFailure(
+            owner: SyncFailureOwner.settings,
+            category:
+                syncFailureCategory(exception) ==
+                    SyncFailureCategory.connectivity
+                ? SyncFailureCategory.connectivity
+                : SyncFailureCategory.storage,
+          ),
+          error: exception,
+          stackTrace: stackTrace,
+        );
+      }
       return Result.error(exception);
     }
   }

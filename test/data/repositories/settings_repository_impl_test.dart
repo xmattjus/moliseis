@@ -7,11 +7,14 @@ import 'package:moliseis/data/repositories/settings_repository_impl.dart';
 import 'package:moliseis/domain/models/content_sort.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/models/theme_type.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 
 import '../../support/fake_repositories.dart' show TestException;
+import '../../support/mock_logger.dart';
 import '../../support/objectbox_test_store.dart';
 import '../../support/settings_local_data_source.dart';
+import '../../support/sync_integration_test_support.dart';
 
 void main() {
   group('SettingsRepositoryImpl overlapping independent settings', () {
@@ -141,6 +144,125 @@ void main() {
       expect(repository.contentSyncCursorAt, cursor);
     });
   });
+
+  for (final operation in ['sync', 'consent', 'sort', 'brightness', 'theme']) {
+    test(
+      'real update failure and retry retain $operation ownership and cache',
+      () async {
+        final env = await TestObjectBoxEnvironment.create();
+        addTearDown(env.dispose);
+        final logger = MockLogger();
+        final source = SettingsLocalDataSource(env.store, logger: logger);
+        final previous = DateTime.utc(2026, 10);
+        final next = DateTime.utc(2026, 10, 2);
+        final initial = AppSettings(
+          lastSyncedAt: previous,
+          contentSyncCursorAt: previous,
+        );
+        await source.save(initial);
+        final failures = FailNextSettingsSave(source)..failNextSave = true;
+        final repository = SettingsRepositoryImpl(failures);
+        await repository.initialize();
+        final write = switch (operation) {
+          'sync' => () => repository.setSyncState(
+            lastSyncedAt: next,
+            contentSyncCursorAt: next,
+          ),
+          'consent' => () => repository.setCrashReporting(enable: false),
+          'sort' => () => repository.setContentSort(ContentSort.byDate),
+          'brightness' => () => repository.setThemeBrightness(
+            ThemeBrightness.dark,
+          ),
+          _ => () => repository.setThemeType(ThemeType.app),
+        };
+        final result = await write();
+        expect((result as Error<void>).error, same(failures.failure));
+        final causes = logger.eventsOfType<SyncFailure>();
+        expect(causes, hasLength(operation == 'sync' ? 1 : 0));
+        if (operation == 'sync') {
+          expect(causes.single.owner, SyncFailureOwner.settings);
+          final call = logger.firstCallOfType<SyncFailure>()!;
+          expect(call.error, same(failures.failure));
+          expect(call.stackTrace, same(failures.failureStack));
+        }
+        final storedBeforeRetry = (await source.load()).getOrNull()!;
+        expect(
+          [
+            repository.lastSyncedAt?.toUtc(),
+            repository.contentSyncCursorAt?.toUtc(),
+            repository.crashReporting,
+            repository.contentSort,
+            repository.themeBrightness,
+            repository.themeType,
+          ],
+          [
+            previous,
+            previous,
+            true,
+            ContentSort.byName,
+            ThemeBrightness.system,
+            ThemeType.system,
+          ],
+        );
+        expect(
+          [
+            storedBeforeRetry.lastSyncedAt?.toUtc(),
+            storedBeforeRetry.contentSyncCursorAt?.toUtc(),
+            storedBeforeRetry.crashReporting,
+            storedBeforeRetry.contentSort,
+            storedBeforeRetry.brightness,
+            storedBeforeRetry.type,
+          ],
+          [
+            previous,
+            previous,
+            true,
+            ContentSort.byName,
+            ThemeBrightness.system,
+            ThemeType.system,
+          ],
+        );
+        logger.reset();
+        expect(await write(), isA<Success<void>>());
+        expect(logger.eventsOfType<SyncFailure>(), isEmpty);
+        final expected = switch (operation) {
+          'sync' => initial.copyWith(
+            lastSyncedAt: next,
+            contentSyncCursorAt: next,
+          ),
+          'consent' => initial.copyWith(crashReporting: false),
+          'sort' => initial.copyWith(contentSort: ContentSort.byDate),
+          'brightness' => initial.copyWith(brightness: ThemeBrightness.dark),
+          _ => initial.copyWith(type: ThemeType.app),
+        };
+        final expectedValues = <Object?>[
+          expected.lastSyncedAt,
+          expected.contentSyncCursorAt,
+          expected.crashReporting,
+          expected.contentSort,
+          expected.brightness,
+          expected.type,
+        ];
+        final stored = (await source.load()).getOrNull()!;
+        expect([
+          repository.lastSyncedAt?.toUtc(),
+          repository.contentSyncCursorAt?.toUtc(),
+          repository.crashReporting,
+          repository.contentSort,
+          repository.themeBrightness,
+          repository.themeType,
+        ], expectedValues);
+        expect([
+          stored.lastSyncedAt?.toUtc(),
+          stored.contentSyncCursorAt?.toUtc(),
+          stored.crashReporting,
+          stored.contentSort,
+          stored.brightness,
+          stored.type,
+        ], expectedValues);
+      },
+    );
+  }
 
   group('SettingsRepositoryImpl initialization contract', () {
     test('throws clear error when getter is used before initialize', () {

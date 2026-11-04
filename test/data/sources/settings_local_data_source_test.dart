@@ -90,6 +90,7 @@ void main() {
       final loaded = (await dataSource.load()).getOrNull()!;
       expect(loaded.crashReporting, isFalse);
       expect(loaded.type, ThemeType.system);
+      expect(logger.eventsOfType<SyncFailure>(), isEmpty);
     });
 
     test(
@@ -103,7 +104,7 @@ void main() {
         final stack = StackTrace.fromString('original settings stack');
         final result = await dataSource.update((_) {
           core.Error.throwWithStackTrace(error, stack);
-        });
+        }, reportSyncFailure: true);
         expect((result as Error<void>).error, same(error));
         final stored = (await dataSource.load()).getOrNull()!;
         expect(stored.contentSyncCursorAt?.toUtc(), cursor);
