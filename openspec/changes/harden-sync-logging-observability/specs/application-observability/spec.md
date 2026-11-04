@@ -6,7 +6,13 @@ Make Molise Is diagnostic events and manual traces useful, truthful, and safe ac
 
 ### Requirement: Sync runs produce one locally identifiable terminal outcome
 
-Every admitted canonical sync invocation SHALL generate typed local diagnostic events identifying its start and exactly one terminal result (success or failure), including early `Result.error` returns and unexpected throws. The terminal result SHALL identify the last relevant phase (cursor acquisition, per-repository preparation, atomic commit, or sync-state persistence) and bootstrap/delta mode determined from the **local persisted `contentSyncCursorAt` read at sync entry**, not the fetched server cursor. It SHALL carry bounded elapsed time and safe aggregate counts when known. Fetched DTO counts SHALL NOT be mislabeled as persisted changes. Telemetry opt-out SHALL NOT suppress local diagnostics.
+Every canonical sync invocation SHALL emit a typed start and exactly one terminal result, including early `Result.error` and unexpected throws. Terminal diagnostics SHALL identify the phase and bootstrap/delta mode from the persisted `contentSyncCursorAt` read at entry, not the server cursor. Elapsed time and fetched DTO counts SHALL be bounded, safe and accurately labeled. Telemetry consent SHALL NOT suppress local diagnostics.
+
+#### Scenario: Safe terminal data with telemetry disabled
+
+- **WHEN** a bootstrap/delta sync yields any fetched DTO count or failure with consent off
+- **THEN** local events remain available, bootstrap/delta derives from the locally persisted cursor at entry, and elapsed time/counts use safe bounded fields
+- **AND** fetched counts are not mislabeled as durable insert/update/delete totals
 
 #### Scenario: Cursor acquisition fails before preparation
 
@@ -21,9 +27,9 @@ Every admitted canonical sync invocation SHALL generate typed local diagnostic e
 #### Scenario: Concurrent preparation unexpectedly throws
 
 - **WHEN** city, place, event, or media `prepareSync` throws an unexpected `Exception` or `dart:core.Error` while other preparations are running
-- **THEN** the orchestrator identifies the originating `prepare_city`, `prepare_place`, `prepare_event`, or `prepare_media` phase from a per-future boundary established before the combined await
+- **THEN** the orchestrator uses positional `ParallelWaitError.errors` and `.values` from the existing record `.wait` to identify `prepare_city`, `prepare_place`, `prepare_event` or `prepare_media`, without new per-future wrappers
 - **AND** exactly one terminal failure describes that phase without a second capture or a false commit
-- **AND** the original throwable identity and stack propagate unchanged; concurrent preparations remain concurrent
+- **AND** the selected throwable identity and the stack from its `AsyncError` propagate unchanged; all four preparations remain concurrent
 - **AND** when multiple preparations fail, the primary failure SHALL be selected regardless of completion order: thrown `Exception`/`dart:core.Error` failures take precedence over returned `Result.error`; within either category, precedence is `prepare_city` → `prepare_place` → `prepare_event` → `prepare_media`, and exactly one terminal failure identifies that selected phase/cause
 
 #### Scenario: Settings persistence fails after content committed
@@ -40,9 +46,18 @@ Every admitted canonical sync invocation SHALL generate typed local diagnostic e
 
 ### Requirement: Error reporting is owned and preserves available causes
 
-An `Exception` caught for conversion to `Result.error` SHALL retain its original identity wherever that contract permits, and the first owning reporting boundary SHALL preserve the original throwable and `StackTrace` for **local** diagnosis. `BaseSyncRepository.prepareSync` SHALL additionally record an unexpected `dart:core.Error` and original stack from `fetchRemote` locally at its existing owner boundary and **rethrow that same Error with the original stack**, not wrap it as `Result.error(Exception)`; the orchestrator SHALL attribute its concurrent preparation phase without duplicate reporting. A non-`Exception` `dart:core.Error` SHALL be distinguished from `Result.Error<T>` and retained locally before any contract-required `Exception` wrapper. For runtime `setSyncState` failures, `SettingsLocalDataSource.update` owns the original cause/stack report; `SyncUseCase` emits only the terminal `settings` outcome, distinct from startup `load` reporting. Callback `Result.error` failures already logged by repositories SHALL NOT be recaptured as transaction-native faults.
+Canonical sync reporting SHALL preserve original throwable/stack locally. For unexpected throws through `SyncViewModel.sync`, the global command handler SHALL own remote exception reporting. Expected sync failures SHALL initiate zero app captures; reportable handled failures SHALL initiate exactly one sanitized, consent-gated capture. Sentry console breadcrumbs SHALL NOT leak Talker error text or stack. Content-submission reporting SHALL remain unchanged.
 
-For **canonical sync reporting paths only**, remote reporting SHALL distinguish expected/transient failures (**zero** application-initiated Sentry exception captures) from reportable unexpected contract/storage failures (**exactly one** sanitized application-initiated capture when consent is enabled). This zero-or-one capture policy SHALL NOT be imposed on content-submission failures: that workflow retains its existing reporting behavior while the stream migration SHALL introduce no additional capture. The original throwable, untrusted message/stack and arbitrary HTTP/URL/credential/contributor fields SHALL NOT be forwarded verbatim. Only allowlisted safe categories/context and reviewed-safe stack fields may reach Sentry exception payloads, breadcrumbs or spans. Because `AppLogger.log(error: ...)` forwards the original error automatically today, the new sync reporting paths SHALL explicitly separate local cause retention from safe remote reporting; safe `LogEvent.data` alone SHALL NOT be considered sufficient. Consent off SHALL suppress these remote captures, without hiding local diagnostics. This policy applies to app-initiated reporting of handled failures, not unrelated automatic SDK crashes.
+#### Scenario: Runtime settings failure has a distinct reporting owner
+
+- **WHEN** `SettingsLocalDataSource.update` catches an exception from `setSyncState`
+- **THEN** it retains the original throwable/stack locally and `SyncUseCase` emits only terminal phase `settings`
+- **AND** `SettingsRepositoryImpl` passes the failure through and startup `handleSettingsRepositoryInitialization` for `load` does not recapture it
+
+#### Scenario: Deliberate rollback does not become a new transaction exception
+
+- **WHEN** `BaseSyncRepository` has already reported a returned `Result.error` and the ObjectBox coordinator rolls back the transaction
+- **THEN** the coordinator preserves that result without a second exception capture or treating it as a new transaction-native error
 
 #### Scenario: Original exception caught at the cursor or settings boundary
 
@@ -62,6 +77,19 @@ For **canonical sync reporting paths only**, remote reporting SHALL distinguish 
 - **THEN** the original runtime error and stack remain available locally before a necessary `Exception` wrapper, distinct from `Result.Error<T>`
 - **AND** an already-logged callback `Result.error` used to roll back the transaction causes no additional capture
 
+#### Scenario: Unexpected sync throw reaches the configured global handler
+
+- **WHEN** `SyncViewModel.sync` propagates a thrown `Exception` or `dart:core.Error` through `createResultCommand` with `ErrorReaction.globalHandler`
+- **THEN** `configureCommandReporting` recognizes `sync_view_model.sync` and alone owns any app-initiated remote capture for that throw
+- **AND** the original error/stack remain available locally; a reportable failure yields one consent-gated sanitized capture without repository or terminal recapture
+- **AND** unrelated commands, their error handling and direct sync use-case calls retain existing behavior
+
+#### Scenario: Talker console fragments cannot bypass remote sanitization
+
+- **WHEN** real Talker outputs a locally preserved error/stack as separate `debugPrint`/`print` lines, including `│ Exception:` and `│ StackTrace:` fragments
+- **THEN** the production `beforeBreadcrumb` path prevents those sensitive lines from reaching Sentry console breadcrumbs while original local in-memory diagnostics remain
+- **AND** unrelated safe breadcrumbs remain available, and exception payloads/typed breadcrumbs/spans contain only safe allowed fields
+
 #### Scenario: Expected connectivity failure stays local
 
 - **GIVEN** telemetry consent is enabled
@@ -76,6 +104,12 @@ For **canonical sync reporting paths only**, remote reporting SHALL distinguish 
 - **THEN** exactly one application-initiated Sentry exception capture uses only allowlisted, sanitized fields and omits those synthetic values
 - **AND** Sentry breadcrumbs and span attributes omit them too, while the original error/stack remain locally available
 
+#### Scenario: Content-submission reporting remains independent
+
+- **WHEN** content submission moves from legacy Sentry transactions to stream spans
+- **THEN** the canonical-sync zero-or-one application capture policy is not imposed on submission failures
+- **AND** the migration introduces no new exception capture or change to consent and sampling
+
 #### Scenario: Unexpected raw throw
 
 - **WHEN** business work unexpectedly throws rather than returning `Result.error`
@@ -84,7 +118,13 @@ For **canonical sync reporting paths only**, remote reporting SHALL distinguish 
 
 ### Requirement: Manual traces use Sentry streaming lifecycle
 
-The application SHALL explicitly select `SentryTraceLifecycle.stream` for Sentry 10 and use the streaming `startSpan` family for manual sync and content-submission tracing, not legacy `startTransaction`. A small adapter under `lib/utils/logging` SHALL execute each `Result`-returning action exactly once, preserve its result, mark returned `Result.error` as `SentrySpanStatusV2.error`, and allow unexpected throws to propagate while the SDK marks those spans failed. The adapter SHALL NOT call `captureException`. Existing sampling rates, SDK shutdown/consent semantics, and business workflows SHALL remain unchanged.
+The application SHALL use `SentryTraceLifecycle.stream` and streaming `startSpan` for manual sync and content-submission tracing. One minimal adapter under `lib/utils/logging` SHALL execute the `Result` callback once, preserve original values and throws, mark returned `Result.error` with `SentrySpanStatusV2.error`, and SHALL NOT capture exceptions. Existing sampling, consent and business workflow behavior SHALL remain unchanged.
+
+#### Scenario: Streaming adapter preserves execution semantics
+
+- **WHEN** a traced `Result` action runs with Sentry enabled, sampled out or inactive
+- **THEN** its callback executes once, its original result/throw propagates and no exception capture is initiated by the tracing adapter
+- **AND** existing sampling, consent and business behavior are preserved
 
 #### Scenario: Sync succeeds or returns an error
 

@@ -2,7 +2,12 @@
 
 ### Requirement: Sync diagnostic success follows atomic commit and cursor persistence
 
-Operational success diagnostics for canonical synchronization SHALL follow the actual durability boundaries already defined by this capability. A repository or entity write that is merely staged inside the cross-repository ObjectBox transaction SHALL NOT be reported as successfully committed. Content commit success MAY be logged after the outer transaction returns successfully; overall sync success SHALL be logged only after both the content transaction and durable synchronization-state save succeed. Any reported counts SHALL distinguish fetched DTOs from committed changes and shall not assert unsupported per-entity persistence totals.
+Sync diagnostics SHALL reflect durability: staged ObjectBox writes SHALL NOT be called committed; optional content-commit success MAY follow the completed outer transaction. Exactly one overall sync success SHALL follow durable sync-state persistence. Fetched DTO counts SHALL be distinguished from committed changes, and unsupported per-entity write totals SHALL NOT be asserted.
+
+#### Scenario: Fetched counts are not write counts
+
+- **WHEN** sync diagnostics show fetched DTO counts
+- **THEN** those counts describe retrieval, not persisted per-entity insert/update/delete totals, unless independently measured committed-write counts exist
 
 #### Scenario: Later repository fails after earlier writes
 
