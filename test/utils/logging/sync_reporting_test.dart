@@ -19,10 +19,11 @@ import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
+// Select Linux enrichment without replacing the SDK's real process I/O.
+import 'package:sentry/src/platform/mock_platform.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
-import '../../support/command_test_support.dart';
 import '../../support/fake_repositories.dart';
 import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
@@ -47,6 +48,7 @@ void main() {
       options
         ..dsn = 'https://abc@def.ingest.sentry.io/1234'
         ..automatedTestMode = true
+        ..platform = MockPlatform.linux()
         ..transport = transport
         ..addEventProcessor(transport)
         ..traceLifecycle = SentryTraceLifecycle.stream
@@ -166,74 +168,74 @@ void main() {
       }
     }
     for (final failure in <Object>[StateError(secret), secret]) {
-      testWidgets('real sync command ${failure.runtimeType} consent=$enabled', (
-        tester,
-      ) async {
-        consent.enabled = enabled;
-        final previous = Command.globalExceptionHandler;
-        final previousAll = Command.reportAllExceptions;
-        addTearDown(() {
-          Command.globalExceptionHandler = previous;
-          Command.reportAllExceptions = previousAll;
-        });
-        configureCommandReporting(logger);
-        final deps = buildSyncUseCase(
-          settings: FakeSettingsRepository(),
-          logger: logger,
-        );
-        deps.cityRepo.pendingPrepare = Completer();
-        final vm = SyncViewModel(syncUseCase: deps.useCase);
-        await pumpCommandTurns(tester);
-        final stack = StackTrace.fromString(secret);
-        deps.cityRepo.pendingPrepare!.completeError(failure, stack);
-        await pumpCommandTurns(tester);
-        expect(vm.sync.results.value.unexpectedError, same(failure));
-        final cause = talker.history.singleWhere(
-          (e) => identical(e.exception, failure),
-        );
-        expect(cause.stackTrace.toString(), contains('PRIVATE_CANARY'));
-        expect(cause.stackTrace.toString(), contains('private-body'));
-        expect(
-          talker.history.where(
-            (e) => e.message?.contains('content_sync_failed') ?? false,
-          ),
-          hasLength(1),
-        );
-        await tester.runAsync(() async {
+      // Sentry's Linux enrichment starts real I/O before transport delivery.
+      test(
+        'real sync command ${failure.runtimeType} consent=$enabled',
+        () async {
+          consent.enabled = enabled;
+          final previous = Command.globalExceptionHandler;
+          final previousAll = Command.reportAllExceptions;
+          addTearDown(() {
+            Command.globalExceptionHandler = previous;
+            Command.reportAllExceptions = previousAll;
+          });
+          configureCommandReporting(logger);
+          final deps = buildSyncUseCase(
+            settings: FakeSettingsRepository(),
+            logger: logger,
+          );
+          deps.cityRepo.pendingPrepare = Completer();
+          final vm = SyncViewModel(syncUseCase: deps.useCase);
+          await pumpEventQueue(times: 4);
+          final stack = StackTrace.fromString(secret);
+          deps.cityRepo.pendingPrepare!.completeError(failure, stack);
+          await pumpEventQueue(times: 4);
+          expect(vm.sync.results.value.unexpectedError, same(failure));
+          final cause = talker.history.singleWhere(
+            (e) => identical(e.exception, failure),
+          );
+          expect(cause.stackTrace.toString(), contains('PRIVATE_CANARY'));
+          expect(cause.stackTrace.toString(), contains('private-body'));
+          expect(
+            talker.history.where(
+              (e) => e.message?.contains('content_sync_failed') ?? false,
+            ),
+            hasLength(1),
+          );
           await transport.settleCaptures();
           await transport.settleSpans(1);
           await Sentry.close();
-        });
-        expect(transport.events, hasLength(enabled ? 1 : 0));
-        if (enabled) {
+          expect(transport.events, hasLength(enabled ? 1 : 0));
+          if (enabled) {
+            expect(
+              transport.events.single.exceptions!.single.type,
+              'CanonicalSyncFailure',
+            );
+          }
           expect(
-            transport.events.single.exceptions!.single.type,
-            'CanonicalSyncFailure',
+            jsonEncode(transport.events.map((e) => e.toJson()).toList()),
+            isNot(contains('PRIVATE_CANARY')),
           );
-        }
-        expect(
-          jsonEncode(transport.events.map((e) => e.toJson()).toList()),
-          isNot(contains('PRIVATE_CANARY')),
-        );
-        expect(
-          jsonEncode(
-            transport.spans
-                .map(
-                  (e) => {
-                    'name': e.name,
-                    'attributes': e.attributes.map(
-                      (key, value) => MapEntry(key, value.value),
-                    ),
-                  },
-                )
-                .toList(),
-          ),
-          isNot(contains('PRIVATE_CANARY')),
-        );
-        vm.dispose();
-        await pumpCommandTurns(tester);
-        await tester.pump(const Duration(milliseconds: 50));
-      });
+          expect(
+            jsonEncode(
+              transport.spans
+                  .map(
+                    (e) => {
+                      'name': e.name,
+                      'attributes': e.attributes.map(
+                        (key, value) => MapEntry(key, value.value),
+                      ),
+                    },
+                  )
+                  .toList(),
+            ),
+            isNot(contains('PRIVATE_CANARY')),
+          );
+          vm.dispose();
+          await pumpEventQueue(times: 4);
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        },
+      );
     }
   }
 
