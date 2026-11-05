@@ -36,8 +36,43 @@ Implementation and regression verification use the isolated PR #31 branch and ex
 
 ## Verification evidence
 
-Implementation commit `08900c789bb5737bfcd6bbc1ec09023df9197d39`, reviewed against PR planning HEAD `a061d49`, was published by normal fast-forward push to the existing PR #31 branch; the complete Flutter suite passed with 3,989 tests and six unchanged pre-existing skips. Cloudinary/events focused tests passed (117), as did the scoped logger/privacy tests (51). `flutter analyze --no-pub`, changed-Dart format verification, `git diff --check` and strict OpenSpec validation passed. An initial full run exposed the preparation-stage regression; its new assertion failed before the correction and passed afterwards. Initial ObjectBox loading failures were resolved by the normal ignored native test dependency; no tests were disabled. Independent source review rechecked both the stage correction and scoped command privacy before publication.
+Local checks ran on working trees while preparing the commits below; the commit column identifies the delivered change, not a claim that every local command ran after checking out that immutable commit. Intermediate failed trees had no recorded Git tree hash and are labeled WIP. CI runs identify the exact tested commit. Log redirections are omitted; no transient logs are committed.
 
-No repository OpenSpec documentation-audit skill is installed; proposal, design, delta/canonical contracts and task coherence were audited directly. Native tests were not added because SDK/native lifecycle is unchanged. Logs and transient outputs remain outside Git.
+| Change / snapshot | Exact command | Exit | Observed result |
+| --- | --- | --- | --- |
+| WIP from `a061d49`, before `08900c7` | `flutter test --no-pub test/data/services/api/cloudinary/cloudinary_upload_client_impl_test.dart --plain-name 'request.done has one owner'` | 1 | Initial attempts failed compilation while the event/logger API was incomplete; these were not runtime reproductions. |
+| WIP before `08900c7` | `flutter test --no-pub` | 1 | 3,982 passed, six skipped, one failed: malformed preparation was incorrectly labeled as an upload response. The stage guard was corrected. |
+| WIP before `08900c7` | `flutter analyze --no-pub` | 1 | 12 introduced analyzer diagnostics; corrected before the successful rerun. |
+| Implementation `08900c7` | `flutter test --no-pub test/data/services/api/cloudinary test/utils/logging/log_event_test.dart` | 0 | 117 passed, including corrected preparation/preflight stage assertions. |
+| Implementation `08900c7` | `flutter test --no-pub test/utils/logging/app_logger_test.dart test/utils/logging/talker_console_privacy_test.dart` | 0 | 51 passed locally; the later Linux run exposed a capture-delivery race missed by this run. |
+| Implementation `08900c7` | `flutter test --no-pub` | 0 | 3,989 passed, six unchanged pre-existing skips. |
+| Implementation `08900c7` | `flutter analyze --no-pub` | 0 | No issues found. |
+| Implementation `08900c7` | `git diff --check` | 0 | No whitespace errors. |
+| Implementation `08900c7` | `openspec validate reduce-cloudinary-logging-noise --strict` | 0 | `Change 'reduce-cloudinary-logging-noise' is valid`. |
+| Handoff `2dd1cfb`, Linux CI [42033207699](https://github.com/xmattjus/moliseis/actions/runs/42033207699) | Autonomous test command below | 1 | 3,984 passed, four skipped, five new privacy tests failed: envelope assertions ran before delivery because scope clearing removed scope-local capture observation. |
+| Handoff `2dd1cfb`, same CI run | `flutter analyze --no-pub` | 0 | Analyzer check succeeded. |
+| Capture-delivery correction `dff5d35` | `flutter test --no-pub test/data/services/api/cloudinary test/utils/logging` | 0 | 230 passed after registering the recording processor globally. |
+| Capture-delivery correction `dff5d35` | `flutter test --no-pub` | 0 | 3,989 passed, the same six skips; capture-count and privacy assertions retained and strengthened. |
+| Capture-delivery correction `dff5d35` | `flutter analyze --no-pub` | 0 | No issues found. |
+| Published `dff5d35` | `git diff --name-only -z a061d49 HEAD -- '*.dart' \| xargs -0 dart format --output=none --set-exit-if-changed` | 0 | 19 Dart files checked, zero changes. |
+| Published `dff5d35` | `git diff --check origin/main...HEAD` | 0 | No whitespace errors. |
+| Published `dff5d35` | `openspec validate reduce-cloudinary-logging-noise --strict` | 0 | Change valid. |
+| Published `dff5d35` | `openspec instructions apply --change reduce-cloudinary-logging-noise --json` | 0 | `all_done`, 17/17 tasks complete. |
+| Exact `dff5d35`, Linux CI [42034910312](https://github.com/xmattjus/moliseis/actions/runs/42034910312) | Autonomous test command below | 0 | 3,989 passed, four existing skips; the five previously failing privacy tests passed. |
+| Exact `dff5d35`, same CI run | `flutter analyze --no-pub` | 0 | Analyzer check succeeded. |
 
-The first Linux CI run on `2dd1cfb` exposed five new privacy-test synchronization failures: scope-local capture observation was removed by the deliberately cleared privacy scope, allowing envelope assertions to run early. The test setup now registers its existing recording processor globally so `settleCaptures` waits for actual delivery, including Linux enrichment. No production behavior or assertion was weakened. After correction, `flutter test --no-pub test/data/services/api/cloudinary test/utils/logging` passed 230 tests; the complete `flutter test --no-pub` suite again passed 3,989 tests with the same six skips. Analyzer, format, diff and strict OpenSpec checks passed again.
+The autonomous-test command in both CI runs, from `.github/workflows/pull-request.yml`, was:
+
+```bash
+mapfile -d '' test_files < <(
+  find test -type f -name '*_test.dart' \
+    -not -path 'test/integration/*' -print0 | sort -z
+)
+flutter test --no-pub --reporter expanded "${test_files[@]}"
+```
+
+Local full-suite runs included the two environment-gated local-service tests as skips; CI explicitly excluded `test/integration/`, accounting for six local skips versus four CI skips. No test was disabled for this change.
+
+The earlier 19-file formatter check before `08900c7` returned zero through a Python-expanded argument vector; its literal expanded command text was not retained and is not reconstructed here. The exact published-head formatter command and observed result are recorded above. Initial four-file repository/ViewModel runs also encountered ten missing-ObjectBox-runtime failures; their exact command text was not retained. Installing the normal ignored native test dependency resolved those setup failures, and the full local and Linux CI gates above supersede them.
+
+Independent review rechecked stage classification, passive request-fault ownership and scoped command privacy. The Linux test-only correction preserved capture observation across privacy scope clearing; no production behavior or privacy assertion was weakened. No repository OpenSpec documentation-audit skill is installed, so artifact coherence was audited directly. Native tests were not added because SDK/native lifecycle is unchanged. Canonical sync, archive, merge and deployment remain separately authorized.
