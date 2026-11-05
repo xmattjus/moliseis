@@ -1,21 +1,70 @@
-import 'dart:async' show Completer, unawaited;
+import 'dart:async' show AsyncError, Completer, unawaited;
 import 'dart:io' show HttpClientRequest;
 
 import 'package:moliseis/utils/logging/logging.dart';
 
 /// Coordinates cancellation of an in-flight Cloudinary upload.
 class CloudinaryUploadCancellationToken {
-  /// Creates a token.
-  ///
-  /// [logger] is used to surface genuine errors emitted by `request.done`
-  /// (i.e. failures that are NOT caused by an `abort` from this token).
-  /// Errors that follow a [cancel] are silently ignored: they are expected
-  /// and are already handled by the upload pipeline's `request.close()`
-  /// await path.
+  /// The token consumes early/late request faults; the client owns reporting.
   CloudinaryUploadCancellationToken({required Logger logger})
     : _logger = logger;
 
   final Logger _logger;
+  AsyncError? _requestFailure;
+  bool _finished = false;
+  bool _reported = false;
+
+  /// Publishes at most one terminal error with its classified cause.
+  void reportFailure(
+    CloudinaryRequestFailed event,
+    Object error,
+    StackTrace? stackTrace,
+  ) {
+    if (_cancelled || _reported) return;
+    _reported = true;
+    _logger.log(
+      event,
+      error: error,
+      stackTrace:
+          stackTrace ??
+          (identical(_requestFailure?.error, error)
+              ? _requestFailure?.stackTrace
+              : null),
+    );
+  }
+
+  /// Retains a recoverable cause locally without a terminal alert.
+  void reportRetry(CloudinaryUploadRetry event, Exception error) {
+    _logger.log(
+      event,
+      error: error,
+      stackTrace: identical(_requestFailure?.error, error)
+          ? _requestFailure?.stackTrace
+          : null,
+    );
+    _requestFailure = null;
+    _attachment?.superseded = true;
+  }
+
+  /// Settles reporting even when the main path never awaited request.close().
+  void finish() {
+    _finished = true;
+    _reportPendingFailure();
+  }
+
+  void _reportPendingFailure() {
+    final failure = _requestFailure;
+    if (_finished && failure != null) {
+      reportFailure(
+        const CloudinaryRequestFailed(
+          stage: CloudinaryFailureStage.upload,
+          category: CloudinaryFailureCategory.transport,
+        ),
+        failure.error,
+        failure.stackTrace,
+      );
+    }
+  }
 
   _RequestAttachment? _attachment;
   final _cancelledCompleter = Completer<void>();
@@ -33,22 +82,15 @@ class CloudinaryUploadCancellationToken {
   void attach(HttpClientRequest request) {
     final attachment = _RequestAttachment(request);
     _attachment = attachment;
-    // `request.done` is the same future returned by `request.close()`. The
-    // upload pipeline awaits `request.close()` and routes its errors through
-    // the surrounding try/catch, but `request.done` still needs a passive
-    // listener so that an abort-induced error never becomes an unhandled
-    // asynchronous error. Genuine (non-abort) errors are logged here instead
-    // of being silently swallowed.
+    // Consume the future immediately; it may fail before close() is awaited.
+    // Client settlement gives both observers one reporting owner.
     unawaited(
       request.done.then(
         (_) {},
         onError: (Object error, StackTrace stackTrace) {
-          if (!_cancelled && !attachment.abortedForRetry) {
-            _logger.log(
-              const CloudinaryRequestFailed(detail: 'request_done_error'),
-              error: error,
-              stackTrace: stackTrace,
-            );
+          if (!_cancelled && !attachment.superseded) {
+            _requestFailure ??= AsyncError(error, stackTrace);
+            _reportPendingFailure();
           }
         },
       ),
@@ -79,7 +121,7 @@ class CloudinaryUploadCancellationToken {
     final attachment = _attachment;
     if (attachment == null) return;
     attachment
-      ..abortedForRetry = true
+      ..superseded = true
       ..request.abort();
   }
 }
@@ -88,5 +130,5 @@ final class _RequestAttachment {
   _RequestAttachment(this.request);
 
   final HttpClientRequest request;
-  bool abortedForRetry = false;
+  bool superseded = false;
 }

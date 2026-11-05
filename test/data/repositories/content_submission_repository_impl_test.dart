@@ -63,6 +63,31 @@ void main() {
 
   tearDown(() => client.dispose());
 
+  for (final replayed in [false, true]) {
+    for (final failure in [
+      Exception('logger failed'),
+      StateError('logger failed'),
+    ]) {
+      test(
+        'confirmed replay=$replayed survives logger ${failure.runtimeType}',
+        () async {
+          httpClient.queueJson({'submission_id': 9, 'replayed': replayed});
+          logger.onLogRecorded = (event) {
+            if (event is ContentSubmissionConfirmed ||
+                event is ContentSubmissionReplayAcknowledged) {
+              if (failure is Exception) throw failure;
+              if (failure is StateError) throw failure;
+            }
+          };
+          expect(await submit(), isA<Success<void>>());
+          expect(httpClient.requests, hasLength(1));
+          expect(logger.eventsOfType<ContentSubmissionUploadFailed>(), isEmpty);
+          expect(logger.calls, hasLength(2));
+        },
+      );
+    }
+  }
+
   test(
     'sends one exact request and accepts a positive acknowledgement',
     () async {
@@ -74,6 +99,14 @@ void main() {
       final result = await submit();
 
       expect(result, isA<Success<void>>());
+      expect(logger.calls.map((call) => call.event.runtimeType), [
+        ContentSubmissionUploadStarted,
+        ContentSubmissionConfirmed,
+      ]);
+      expect(
+        logger.eventsOfType<ContentSubmissionConfirmed>().single.data,
+        isEmpty,
+      );
       expect(httpClient.requests, hasLength(1));
       final request = httpClient.requests.single;
       expect(request.method, 'POST');
@@ -125,6 +158,11 @@ void main() {
     expect(replayEvents.single.name, 'content_submission_replay_acknowledged');
     expect(replayEvents.single.level, AppLogLevel.info);
     expect(replayEvents.single.data, isEmpty);
+    expect(logger.eventsOfType<ContentSubmissionConfirmed>(), isEmpty);
+    expect(logger.calls.map((call) => call.event.runtimeType), [
+      ContentSubmissionUploadStarted,
+      ContentSubmissionReplayAcknowledged,
+    ]);
     expect(
       httpClient.requests.single.body,
       containsPair(
@@ -191,6 +229,15 @@ void main() {
       expect(result, isA<Error<void>>());
       expect((result as Error<void>).error, isA<FormatException>());
       expect(httpClient.requests, hasLength(1));
+      expect(logger.eventsOfType<ContentSubmissionConfirmed>(), isEmpty);
+      expect(
+        logger.eventsOfType<ContentSubmissionReplayAcknowledged>(),
+        isEmpty,
+      );
+      expect(
+        logger.eventsOfType<ContentSubmissionUploadFailed>().single.outcome,
+        AssociationOutcome.unconfirmed,
+      );
     });
   }
 
@@ -300,6 +347,22 @@ void main() {
       expect(error.code, failure.code);
       expect(error.message, failure.message);
       expect(httpClient.requests, hasLength(1));
+      final event = logger.eventsOfType<ContentSubmissionUploadFailed>().single;
+      expect(
+        event.outcome,
+        failure.status < 500
+            ? AssociationOutcome.rejected
+            : AssociationOutcome.unconfirmed,
+      );
+      expect(event.data, {
+        'outcome': event.outcome.name,
+        'status_code': failure.status,
+      });
+      expect(
+        logger.firstCallOfType<ContentSubmissionUploadFailed>()!.error,
+        same(error),
+      );
+      expect(logger.eventsOfType<ContentSubmissionConfirmed>(), isEmpty);
     });
   }
 
@@ -336,6 +399,10 @@ void main() {
       expect(error.statusCode, failure.status);
       expect(error.code, failure.code);
       expect(httpClient.requests, hasLength(1));
+      expect(
+        logger.eventsOfType<ContentSubmissionUploadFailed>().single.outcome,
+        AssociationOutcome.unconfirmed,
+      );
     });
   }
 
@@ -354,6 +421,47 @@ void main() {
         expect(result, isA<Error<void>>());
         expect((result as Error<void>).error, same(failure.error));
         expect(httpClient.requests, hasLength(1));
+        expect(
+          logger.eventsOfType<ContentSubmissionUploadFailed>().single.data,
+          {'outcome': 'unconfirmed'},
+        );
+        expect(
+          logger.firstCallOfType<ContentSubmissionUploadFailed>()!.error,
+          same(failure.error),
+        );
+        expect(logger.eventsOfType<ContentSubmissionConfirmed>(), isEmpty);
+      },
+    );
+  }
+
+  for (final assetCount in [0, 2]) {
+    test(
+      'one whole-submission acknowledgement covers $assetCount assets',
+      () async {
+        httpClient.queueJson({'submission_id': 9});
+        final assets = List<SubmissionAsset>.generate(
+          assetCount,
+          (index) => SubmissionAsset(
+            secureUrl: 'https://example.com/$index.jpg',
+            width: 10,
+            height: 20,
+          ),
+        );
+        final result = await repository.submit(
+          clientSubmissionId: '00000000-0000-4000-8000-000000000001',
+          contentSubmission: submission,
+          submissionAssets: assets,
+        );
+        expect(result, isA<Success<void>>());
+        expect(logger.eventsOfType<ContentSubmissionConfirmed>(), hasLength(1));
+        expect(logger.eventsOfType<ContentSubmissionUploadFailed>(), isEmpty);
+        expect(httpClient.requests, hasLength(1));
+        final body = httpClient.requests.single.body! as Map;
+        expect(
+          body['client_submission_id'],
+          '00000000-0000-4000-8000-000000000001',
+        );
+        expect(body['assets'], hasLength(assetCount));
       },
     );
   }

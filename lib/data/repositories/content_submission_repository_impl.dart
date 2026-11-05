@@ -51,8 +51,14 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
       if ((data['submission_id'] as int) <= 0) {
         throw const FormatException('submit-content response is invalid.');
       }
-      if (data['replayed'] == true) {
-        _logger.log(const ContentSubmissionReplayAcknowledged());
+      try {
+        if (data['replayed'] == true) {
+          _logger.log(const ContentSubmissionReplayAcknowledged());
+        } else {
+          _logger.log(const ContentSubmissionConfirmed());
+        }
+      } on Object catch (_) {
+        // Diagnostic failure cannot revoke a validated backend acknowledgement.
       }
       return const Result.success(null);
     } on FunctionsFetchException catch (exception, stackTrace) {
@@ -66,7 +72,18 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
     } on FunctionException catch (exception, stackTrace) {
       final normalized = _normalizeFunctionException(exception);
       _logger.log(
-        const ContentSubmissionUploadFailed(),
+        ContentSubmissionUploadFailed(
+          outcome:
+              const {
+                (400, 'VALIDATION_ERROR'),
+                (401, 'UNAUTHORIZED'),
+                (405, 'METHOD_NOT_ALLOWED'),
+                (429, 'RATE_LIMIT_EXCEEDED'),
+              }.contains((normalized.statusCode, normalized.code))
+              ? AssociationOutcome.rejected
+              : AssociationOutcome.unconfirmed,
+          statusCode: normalized.statusCode,
+        ),
         error: normalized,
         stackTrace: stackTrace,
       );

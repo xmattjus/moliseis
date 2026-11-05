@@ -1,4 +1,5 @@
 import 'dart:async' show unawaited;
+import 'dart:io' show FileSystemException;
 
 import 'package:moliseis/utils/logging/app_log_level.dart';
 import 'package:moliseis/utils/logging/app_log_level_mapper.dart';
@@ -57,19 +58,62 @@ class AppLogger implements Logger {
     // Do not send logs to Sentry if it is not necessary.
     if (!_sentryFlag.enabled || level.index < AppLogLevel.info.index) return;
 
-    // Sync remote data comes only from typed allowlisted fields.
-    final remoteData = event is SyncFailure ? event.data : mergedData;
+    final uploadDiagnostic = switch (event) {
+      CloudinaryRequestStarted() ||
+      CloudinaryRequestFailed() ||
+      CloudinaryUploadCompleted() ||
+      CloudinaryUploadCancelled() ||
+      CloudinaryDuplicateDetected() ||
+      ContentSubmissionUploadStarted() ||
+      ContentSubmissionUploadFailed() ||
+      ContentSubmissionConfirmed() ||
+      ContentSubmissionReplayAcknowledged() ||
+      AdminStagedAssetAssociated() => true,
+      CommandExecutionFailed(:final debugName) => const {
+        'content_submission_submit',
+        'admin_submission_editor_save',
+        'admin_submission_editor_add_asset',
+      }.contains(debugName),
+      AdminBackendRequestFailed(:final operation) =>
+        operation == 'associateStagedAsset',
+      _ => false,
+    };
+    // Only typed, bounded fields cross these diagnostic boundaries.
+    final remoteData = event is SyncFailure || uploadDiagnostic
+        ? event.data
+        : mergedData;
     unawaited(_addBreadcrumb(event.name, remoteData, level));
 
-    if (event is SyncFailure) {
-      if (event.report && event.category != SyncFailureCategory.connectivity) {
+    if (event is SyncFailure || uploadDiagnostic) {
+      final report = switch (event) {
+        SyncFailure() =>
+          event.report && event.category != SyncFailureCategory.connectivity,
+        CloudinaryRequestFailed() => error != null && event.report,
+        CommandExecutionFailed() when error is FileSystemException => false,
+        _ => error != null && level.index >= AppLogLevel.error.index,
+      };
+      if (report) {
         unawaited(
           Sentry.captureEvent(
             SentryEvent(
+              contexts: uploadDiagnostic
+                  ? (Contexts()..['upload_diagnostic'] = event.data)
+                  : null,
               exceptions: [
                 SentryException(
-                  type: 'CanonicalSyncFailure',
-                  value: '${event.owner.name}:${event.category.name}',
+                  type: event is SyncFailure
+                      ? 'CanonicalSyncFailure'
+                      : 'UploadDiagnosticFailure',
+                  value: switch (event) {
+                    SyncFailure() =>
+                      '${event.owner.name}:${event.category.name}',
+                    CloudinaryRequestFailed() =>
+                      '${event.stage.name}:${event.category.name}',
+                    ContentSubmissionUploadFailed() => event.outcome.name,
+                    AdminBackendRequestFailed() =>
+                      (event.outcome ?? AssociationOutcome.unconfirmed).name,
+                    _ => event.name,
+                  },
                 ),
               ],
             ),

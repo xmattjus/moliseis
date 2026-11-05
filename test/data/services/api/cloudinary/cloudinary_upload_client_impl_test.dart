@@ -1,8 +1,11 @@
 // Separate response and delay setup keeps each timeout scenario clear.
-// ignore_for_file: cascade_invocations
+// Sentry internals inspect delivered envelopes without a production SDK.
+// ignore_for_file: cascade_invocations, invalid_use_of_internal_member
 
-import 'dart:async' show Completer, TimeoutException, unawaited;
-import 'dart:io' show Directory, File;
+import 'dart:async'
+    show Completer, TimeoutException, runZonedGuarded, unawaited;
+import 'dart:convert' show utf8;
+import 'dart:io' show Directory, File, FileSystemException, HttpOverrides;
 
 import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter_test/flutter_test.dart';
@@ -14,12 +17,18 @@ import 'package:moliseis/data/services/api/cloudinary/exceptions/file_too_large_
 import 'package:moliseis/data/services/api/cloudinary/exceptions/upload_cancelled_exception.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/constants.dart';
+import 'package:moliseis/utils/logging/filter_breadcrumb.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/sentry_logging_flag.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../../../support/fake_cloudinary_http_request.dart';
 import '../../../../support/fake_cloudinary_server.dart';
 import '../../../../support/fake_cloudinary_upload_preparation_client.dart';
 import '../../../../support/mock_logger.dart';
+import '../../../../support/recording_sentry_transport.dart';
 
 void main() {
   group('CloudinaryUploadClientImpl', () {
@@ -45,6 +54,269 @@ void main() {
       client.dispose();
       await server.stop();
     });
+
+    for (final retried in [false, true]) {
+      test('POST reuse is truthful, after retry=$retried', () async {
+        final directory = await Directory.systemTemp.createTemp('reuse_');
+        addTearDown(() => directory.delete(recursive: true));
+        final file = File('${directory.path}/image.jpg')..writeAsBytesSync([1]);
+        server.queueUploadResponses([
+          if (retried)
+            (status: 503, body: <String, dynamic>{'error': 'temporary'}),
+          (
+            status: 200,
+            body: <String, dynamic>{
+              'secure_url': 'https://res.cloudinary.com/test/reused.jpg',
+              'width': 10,
+              'height': 20,
+              'existing': true,
+            },
+          ),
+        ]);
+        final result = await client.uploadImageTask(file).result;
+        expect(result.isSuccess, isTrue);
+        expect(
+          server.requests.where((r) => r.method == 'POST'),
+          hasLength(retried ? 2 : 1),
+        );
+        expect(
+          logger.eventsOfType<CloudinaryDuplicateDetected>().single.source,
+          CloudinaryReuseSource.response,
+        );
+        expect(logger.eventsOfType<CloudinaryUploadCompleted>(), isEmpty);
+        expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
+        expect(
+          logger.eventsOfType<CloudinaryUploadRetry>(),
+          hasLength(retried ? 1 : 0),
+        );
+        expect(logger.calls.last.event, isA<CloudinaryDuplicateDetected>());
+      });
+    }
+
+    for (final failure in [
+      'preparation',
+      'overwrite',
+      'invalid_json',
+      'http_400',
+      'http_503',
+    ]) {
+      test('one bounded terminal diagnostic for $failure', () async {
+        final directory = await Directory.systemTemp.createTemp('failure_');
+        addTearDown(() => directory.delete(recursive: true));
+        final file = File('${directory.path}/image.jpg')..writeAsBytesSync([1]);
+        if (failure == 'preparation') {
+          preparationClient.enqueue(
+            Result.error(Exception('private preparation body')),
+          );
+        } else if (failure == 'invalid_json') {
+          server.setUploadResponse(
+            status: 200,
+            body: {'secure_url': 'invalid'},
+          );
+        } else {
+          server.setUploadResponse(
+            status: failure == 'http_503' ? 503 : 400,
+            body: {'error': 'private response body'},
+          );
+        }
+        final result = await client
+            .uploadImageTask(
+              file,
+              options: CloudinaryUploadOptions(
+                overwrite: failure == 'overwrite',
+              ),
+            )
+            .result;
+        expect(result.isError, isTrue);
+        final terminal = logger.eventsOfType<CloudinaryRequestFailed>().single;
+        expect(terminal.level, AppLogLevel.error);
+        expect(terminal.category, switch (failure) {
+          'preparation' => CloudinaryFailureCategory.preparation,
+          'overwrite' => CloudinaryFailureCategory.validation,
+          'invalid_json' => CloudinaryFailureCategory.invalidResponse,
+          _ => CloudinaryFailureCategory.http,
+        });
+        expect(terminal.stage, switch (failure) {
+          'preparation' => CloudinaryFailureStage.preparation,
+          'overwrite' => CloudinaryFailureStage.preflight,
+          'invalid_json' => CloudinaryFailureStage.response,
+          _ => CloudinaryFailureStage.upload,
+        });
+        expect(logger.eventsOfType<CloudinaryUploadCompleted>(), isEmpty);
+        expect(
+          server.requests.length,
+          failure == 'http_503'
+              ? 3
+              : (failure == 'preparation' || failure == 'overwrite' ? 0 : 1),
+        );
+        expect(logger.calls.last.event, same(terminal));
+      });
+    }
+
+    test(
+      'missing file keeps its original thrown contract and safe classification',
+      () async {
+        final directory = await Directory.systemTemp.createTemp('missing_');
+        addTearDown(() => directory.delete(recursive: true));
+        await expectLater(
+          client.uploadImageTask(File('${directory.path}/missing.jpg')).result,
+          throwsA(isA<FileSystemException>()),
+        );
+        final terminal = logger.eventsOfType<CloudinaryRequestFailed>().single;
+        expect(terminal.stage, CloudinaryFailureStage.preflight);
+        expect(terminal.category, CloudinaryFailureCategory.fileRead);
+        expect(terminal.report, isFalse);
+        expect(server.requests, isEmpty);
+      },
+    );
+
+    test('file lost after preparation is preflight, without a POST', () async {
+      final directory = await Directory.systemTemp.createTemp('lost_file_');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = File('${directory.path}/image.jpg')..writeAsBytesSync([1]);
+      final pending = preparationClient.makeNextPreparationPending();
+      final task = client.uploadImageTask(file);
+      await preparationClient.whenPreparationStarted;
+      await file.delete();
+      pending.complete(
+        Result.success(
+          CloudinaryAuthorizedUploadPreparation({
+            'public_id': preparationClient.calls.single.publicId,
+          }),
+        ),
+      );
+      final result = await task.result;
+      expect(result, isA<Error<SubmissionAsset>>());
+      final terminal = logger.eventsOfType<CloudinaryRequestFailed>().single;
+      expect(terminal.stage, CloudinaryFailureStage.preflight);
+      expect(terminal.category, CloudinaryFailureCategory.fileRead);
+      expect(server.requests, isEmpty);
+    });
+
+    test(
+      'cancelled missing file preserves the raw preflight contract',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'cancel_missing_',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final task = client.uploadImageTask(
+          File('${directory.path}/missing.jpg'),
+        );
+        task.cancel();
+        await expectLater(task.result, throwsA(isA<FileSystemException>()));
+        expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
+        expect(logger.eventsOfType<CloudinaryUploadCompleted>(), isEmpty);
+        expect(preparationClient.calls, isEmpty);
+        expect(server.requests, isEmpty);
+      },
+    );
+
+    for (final consent in [false, true]) {
+      test(
+        'real HTTP error body stays out of Sentry, consent=$consent',
+        () async {
+          const canary = 'PRIVATE_HTTP_BODY_AUTH_ROW_ID_CONTRIBUTOR';
+          final transport = RecordingSentryTransport();
+          await Sentry.init(
+            (options) => options
+              ..dsn = 'https://abc@example.test/1'
+              ..automatedTestMode = true
+              ..transport = transport
+              ..addEventProcessor(transport)
+              ..beforeBreadcrumb = filterBreadcrumb,
+          );
+          addTearDown(Sentry.close);
+          final talker = TalkerFlutter.init();
+          final safeClient = CloudinaryUploadClientImpl(
+            logger: AppLogger(
+              talker,
+              sentryFlag: SentryLoggingFlag(initialValue: consent),
+            ),
+            cloudName: server.cloudName,
+            preparationClient: preparationClient,
+            baseUrl: server.baseUri.toString(),
+          );
+          addTearDown(safeClient.dispose);
+          server.setUploadResponse(status: 400, body: {'error': canary});
+          final directory = await Directory.systemTemp.createTemp(
+            'http_privacy_',
+          );
+          addTearDown(() => directory.delete(recursive: true));
+          final file = File('${directory.path}/image.jpg')
+            ..writeAsBytesSync([1]);
+          final result = await safeClient.uploadImageTask(file).result;
+          expect(result.isError, isTrue);
+          expect((result as Error).error.toString(), isNot(contains(canary)));
+          await transport.settleCaptures();
+          expect(transport.events, hasLength(consent ? 1 : 0));
+          expect(transport.envelopes, hasLength(consent ? 1 : 0));
+          for (final envelope in transport.envelopes) {
+            final serialized = await utf8.decoder
+                .bind(envelope.envelopeStream(Sentry.currentHub.options))
+                .join();
+            expect(serialized, isNot(contains(canary)));
+            expect(serialized, contains('UploadDiagnosticFailure'));
+          }
+          expect(
+            talker.history.where(
+              (e) => e.message?.contains('cloudinary_request_failed') ?? false,
+            ),
+            hasLength(1),
+          );
+        },
+      );
+    }
+
+    for (final beforeClose in [false, true]) {
+      test('request.done has one owner, before close=$beforeClose', () async {
+        final directory = await Directory.systemTemp.createTemp('done_fault_');
+        addTearDown(() => directory.delete(recursive: true));
+        final file = File('${directory.path}/image.jpg')..writeAsBytesSync([1]);
+
+        final escaped = <Object>[];
+        final settled = Completer<void>();
+        unawaited(
+          runZonedGuarded(
+            () async {
+              final http = FaultingCloudinaryHttpClient(
+                beforeClose: beforeClose,
+              );
+              await HttpOverrides.runZoned(() async {
+                final faultClient = CloudinaryUploadClientImpl(
+                  logger: logger,
+                  cloudName: 'test',
+                  preparationClient: preparationClient,
+                );
+                try {
+                  final result = await faultClient.uploadImageTask(file).result;
+                  expect(result, isA<Error<SubmissionAsset>>());
+                  await Future<void>.delayed(Duration.zero);
+                  expect(
+                    logger.eventsOfType<CloudinaryRequestFailed>(),
+                    hasLength(1),
+                  );
+                  expect(
+                    logger.firstCallOfType<CloudinaryRequestFailed>()!.error,
+                    same(http.failure),
+                  );
+                  expect(http.closeCalled, !beforeClose);
+                } finally {
+                  faultClient.dispose();
+                }
+              }, createHttpClient: (_) => http);
+              settled.complete();
+            },
+            (error, stack) {
+              escaped.add(error);
+              if (!settled.isCompleted) settled.complete();
+            },
+          ),
+        );
+        await settled.future;
+        expect(escaped, isEmpty);
+      });
+    }
 
     test(
       'successful jpg upload returns MIME metadata and reaches progress 1.0',
@@ -77,6 +349,7 @@ void main() {
         expect(result.getOrNull()?.secureUrl, secureUrl);
         expect(result.getOrNull()?.mimeType, 'image/jpeg');
         expect(progressValues, contains(1));
+        expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
         expect(server.requests.where((r) => r.method == 'POST'), hasLength(1));
 
         final uploadRequest = server.requests.firstWhere(
@@ -220,6 +493,11 @@ void main() {
           matches(RegExp(r'^content_submissions/[0-9a-f]{64}$')),
         );
         expect(server.requests.where((r) => r.method == 'POST'), isEmpty);
+        expect(
+          logger.eventsOfType<CloudinaryDuplicateDetected>().single.source,
+          CloudinaryReuseSource.preparation,
+        );
+        expect(logger.eventsOfType<CloudinaryUploadCompleted>(), isEmpty);
       },
     );
 
@@ -351,6 +629,9 @@ void main() {
         final result = await client.uploadImageTask(file).result;
 
         expect(result.isError, isTrue);
+        final terminal = logger.eventsOfType<CloudinaryRequestFailed>().single;
+        expect(terminal.stage, CloudinaryFailureStage.preparation);
+        expect(terminal.category, CloudinaryFailureCategory.invalidResponse);
         expect(
           server.requests.where((request) => request.method == 'POST'),
           isEmpty,
@@ -444,12 +725,13 @@ void main() {
       expect(server.requests.where((r) => r.method == 'POST'), hasLength(2));
       expect(preparationClient.calls, hasLength(1));
 
-      // Per-attempt 5xx breadcrumb is logged before the retry.
-      final details = logger
-          .eventsOfType<CloudinaryRequestFailed>()
-          .map((e) => e.detail)
-          .toList();
-      expect(details, contains('http_500_attempt_1'));
+      final retry = logger.eventsOfType<CloudinaryUploadRetry>().single;
+      expect(retry.level, AppLogLevel.debug);
+      expect(retry.category, CloudinaryFailureCategory.http);
+      expect(retry.statusCode, 500);
+      expect(retry.attempt, 1);
+      expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
+      expect(logger.eventsOfType<CloudinaryUploadCompleted>(), hasLength(1));
     });
 
     test('per-attempt timeout aborts the in-flight request and retries until '
@@ -503,12 +785,12 @@ void main() {
       // assertion is the regression guard against that zombie bug.
       expect(server.requests.where((r) => r.method == 'POST'), hasLength(2));
 
-      // Per-attempt timeout breadcrumb.
-      final details = logger
-          .eventsOfType<CloudinaryRequestFailed>()
-          .map((e) => e.detail)
-          .toList();
-      expect(details, contains('timeout_attempt_1'));
+      expect(
+        logger.eventsOfType<CloudinaryUploadRetry>().single.category,
+        CloudinaryFailureCategory.timeout,
+      );
+      expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
+      expect(logger.eventsOfType<CloudinaryUploadCompleted>(), hasLength(1));
 
       // Progress must stay monotonically non-decreasing across the
       // timeout and the retry (the bug's symptom #3 was a StateError when
@@ -569,18 +851,15 @@ void main() {
         // Exactly three POSTs: one per attempt; no zombie dupes.
         expect(server.requests.where((r) => r.method == 'POST'), hasLength(3));
 
-        // Per-attempt timeout breadcrumbs for the retryable attempts
-        // (the third attempt is the terminal one and is logged by
-        // [_finalizeUploadResult] as `upload_exception`).
-        final details = logger
-            .eventsOfType<CloudinaryRequestFailed>()
-            .map((e) => e.detail)
-            .toList();
         expect(
-          details,
-          containsAll(['timeout_attempt_1', 'timeout_attempt_2']),
+          logger.eventsOfType<CloudinaryUploadRetry>().map((e) => e.attempt),
+          [1, 2],
         );
-        expect(details, contains('upload_exception'));
+        expect(
+          logger.eventsOfType<CloudinaryRequestFailed>().single.category,
+          CloudinaryFailureCategory.timeout,
+        );
+        expect(logger.eventsOfType<CloudinaryUploadCompleted>(), isEmpty);
       },
     );
 
@@ -637,6 +916,8 @@ void main() {
         expect(result.isError, isTrue);
         expect(preparationClient.calls, isEmpty);
         expect(server.requests, isEmpty);
+        expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
+        expect(logger.eventsOfType<CloudinaryUploadCancelled>(), hasLength(1));
       },
     );
 
@@ -666,6 +947,8 @@ void main() {
       final result = await task.result;
       expect(result.isError, isTrue);
       expect(server.requests, isEmpty);
+      expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
+      expect(logger.eventsOfType<CloudinaryUploadCancelled>(), hasLength(1));
     });
 
     test(
@@ -715,6 +998,9 @@ void main() {
           server.requests.where((request) => request.method == 'POST'),
           hasLength(1),
         );
+        expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
+        expect(logger.eventsOfType<CloudinaryUploadCompleted>(), isEmpty);
+        expect(logger.eventsOfType<CloudinaryUploadCancelled>(), hasLength(1));
         releaseBackoff.complete();
       },
     );

@@ -7,7 +7,14 @@ import 'dart:async'
         Timer,
         unawaited;
 import 'dart:convert' show jsonDecode, utf8;
-import 'dart:io' show File, HttpClient, HttpException, HttpHeaders;
+import 'dart:io'
+    show
+        File,
+        FileSystemException,
+        HttpClient,
+        HttpException,
+        HttpHeaders,
+        SocketException;
 
 import 'package:meta/meta.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_asset_mime_type.dart';
@@ -96,6 +103,7 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
           token: token,
           progressController: progressController,
         ).whenComplete(() {
+          token.finish();
           if (!progressController.isClosed) {
             unawaited(progressController.close());
           }
@@ -124,7 +132,20 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
     // this guard protects any future call site and avoids a wasteful multipart
     // stream that Cloudinary would reject with HTTP 400 "File size too large"
     // after the upload had already started.
-    final length = await image.length();
+    late final int length;
+    try {
+      length = await image.length();
+    } on Exception catch (error, stack) {
+      token.reportFailure(
+        const CloudinaryRequestFailed(
+          stage: CloudinaryFailureStage.preflight,
+          category: CloudinaryFailureCategory.fileRead,
+        ),
+        error,
+        stack,
+      );
+      rethrow;
+    }
     if (length > kCloudinaryMaxUploadBytes) {
       return _finalizeUploadResult(
         Result.error(
@@ -134,6 +155,7 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
           ),
         ),
         token,
+        stage: CloudinaryFailureStage.preflight,
       );
     }
     if (options.overwrite) {
@@ -142,28 +164,35 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
           FormatException('Cloudinary overwrite is not supported'),
         ),
         token,
+        stage: CloudinaryFailureStage.preflight,
       );
     }
 
     _logger.log(const CloudinaryRequestStarted());
     progressController.add(0);
 
+    var stage = CloudinaryFailureStage.preflight;
     try {
       if (token.isCancelled) throw const UploadCancelledException();
       final publicId = await _publicIdGenerator.generate(image);
       if (token.isCancelled) throw const UploadCancelledException();
+      stage = CloudinaryFailureStage.preparation;
       final preparation = await _preparationClient.prepare(
         publicId: publicId,
         options: options,
       );
       if (token.isCancelled) throw const UploadCancelledException();
       if (preparation case Error<CloudinaryUploadPreparation>(:final error)) {
-        return _finalizeUploadResult(Result.error(error), token);
+        return _finalizeUploadResult(Result.error(error), token, stage: stage);
       }
       final prepared =
           (preparation as Success<CloudinaryUploadPreparation>).value;
       if (prepared case CloudinaryDuplicateUploadPreparation(:final asset)) {
-        _logger.log(CloudinaryDuplicateDetected(publicId: publicId));
+        _logger.log(
+          const CloudinaryDuplicateDetected(
+            source: CloudinaryReuseSource.preparation,
+          ),
+        );
         progressController.add(1);
         return Result.success(asset);
       }
@@ -176,23 +205,24 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
       final baseUri = Uri.parse(_baseUrl ?? 'https://api.cloudinary.com');
       final uri = baseUri.replace(path: '/v1_1/$_cloudName/image/upload');
 
+      stage = CloudinaryFailureStage.preflight;
+      final totalLength = await multipartWriter.computeTotalLength();
+      stage = CloudinaryFailureStage.upload;
       return await _uploadWithRetries(
+        totalLength: totalLength,
         uri: uri,
         multipartWriter: multipartWriter,
-        publicId: publicId,
         token: token,
         progressController: progressController,
       );
     } on Exception catch (exception, stackTrace) {
-      if (_handlePotentialCancellation(exception, token, stackTrace)) {
-        return const Result.error(UploadCancelledException());
-      }
       return _finalizeUploadResult(
         Result.error(
           token.isCancelled ? const UploadCancelledException() : exception,
         ),
         token,
         stackTrace: stackTrace,
+        stage: stage,
       );
     } finally {
       // Guard against the controller already being closed by the timeout
@@ -205,13 +235,12 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
   }
 
   Future<Result<SubmissionAsset>> _uploadWithRetries({
+    required int totalLength,
     required Uri uri,
     required CloudinaryMultipartWriter multipartWriter,
-    required String publicId,
     required CloudinaryUploadCancellationToken token,
     required StreamController<double> progressController,
   }) async {
-    final totalLength = await multipartWriter.computeTotalLength();
     Result<SubmissionAsset>? result;
     StackTrace? lastErrorStackTrace;
     // Single-cell list used as mutable state captured by _executeUploadAttempt:
@@ -232,7 +261,6 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
           uri: uri,
           multipartWriter: multipartWriter,
           totalLength: totalLength,
-          publicId: publicId,
           token: token,
           progressController: progressController,
           progressFloor: progressFloor,
@@ -273,12 +301,15 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
         if (!isRetryable || attempt == _kMaxUploadAttempts) {
           break;
         }
-        final exception = error is TimeoutException
-            ? 'timeout'
-            : 'http_${(error as _UploadHttpException).statusCode}';
-
-        _logger.log(
-          CloudinaryRequestFailed(detail: '${exception}_attempt_$attempt'),
+        token.reportRetry(
+          CloudinaryUploadRetry(
+            category: error is TimeoutException
+                ? CloudinaryFailureCategory.timeout
+                : CloudinaryFailureCategory.http,
+            attempt: attempt,
+            statusCode: error is _UploadHttpException ? error.statusCode : null,
+          ),
+          error,
         );
       }
 
@@ -309,7 +340,6 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
     required Uri uri,
     required CloudinaryMultipartWriter multipartWriter,
     required int totalLength,
-    required String publicId,
     required CloudinaryUploadCancellationToken token,
     required StreamController<double> progressController,
     required List<double> progressFloor,
@@ -371,10 +401,7 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
       final responseBytes = await _readResponseBytes(response, token, attempt);
       if (token.isCancelled) throw const UploadCancelledException();
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        final errorBody = utf8.decode(responseBytes, allowMalformed: true);
-        return Result.error(
-          _UploadHttpException(response.statusCode, errorBody),
-        );
+        return Result.error(_UploadHttpException(response.statusCode));
       }
 
       final responseJson = _responseObject(
@@ -400,7 +427,13 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
       );
 
       if (token.isCancelled) throw const UploadCancelledException();
-      _logger.log(CloudinaryUploadCompleted(publicId: publicId));
+      _logger.log(
+        responseJson['existing'] == true
+            ? const CloudinaryDuplicateDetected(
+                source: CloudinaryReuseSource.response,
+              )
+            : const CloudinaryUploadCompleted(),
+      );
       progressController.add(1);
       return Result.success(submissionAsset);
     } on Exception catch (exception) {
@@ -501,74 +534,47 @@ class CloudinaryUploadClientImpl implements CloudinaryUploadClient {
     Result<SubmissionAsset>? result,
     CloudinaryUploadCancellationToken token, {
     StackTrace? stackTrace,
+    CloudinaryFailureStage stage = CloudinaryFailureStage.upload,
   }) {
     final resolved =
         result ??
         Result.error(Exception('Cloudinary upload failed after retrying'));
-
     if (resolved case Error<SubmissionAsset>(:final error)) {
-      if (!token.isCancelled) {
-        if (error is _UploadHttpException) {
-          _logger.log(
-            CloudinaryRequestFailed(detail: 'http_${error.statusCode}'),
-            error: error,
-            stackTrace: stackTrace,
-          );
-        } else if (error is EmptyUrlException) {
-          _logger.log(
-            const CloudinaryRequestFailed(detail: 'empty_url'),
-            error: error,
-            stackTrace: stackTrace,
-          );
-        } else if (error is InvalidAssetDimensions) {
-          _logger.log(
-            const CloudinaryRequestFailed(detail: 'invalid_dimensions'),
-            error: error,
-            stackTrace: stackTrace,
-          );
-        } else if (error is FileTooLargeException) {
-          _logger.log(
-            const CloudinaryRequestFailed(detail: 'file_too_large'),
-            error: error,
-            stackTrace: stackTrace,
-          );
-        } else {
-          // Catch-all for terminal errors that don't have a dedicated branch
-          // above (e.g. a final [TimeoutException] after all retry attempts
-          // are exhausted, or an unexpected [SocketException]/`HttpException`
-          // from the connect phase). A terminal timeout is logged here as the
-          // generic `upload_exception` rather than a dedicated `timeout`
-          // detail because the per-attempt breadcrumbs already emitted
-          // `timeout_attempt_<N>` for each failed attempt in
-          // [_uploadWithRetries], so the timeout detail is preserved in the
-          // log trail — nothing is lost.
-          _logger.log(
-            const CloudinaryRequestFailed(detail: 'upload_exception'),
-            error: error,
-            stackTrace: stackTrace,
-          );
-        }
+      if (token.isCancelled) {
+        _logger.log(const CloudinaryUploadCancelled());
+      } else {
+        final category = switch (error) {
+          _UploadHttpException() => CloudinaryFailureCategory.http,
+          TimeoutException() => CloudinaryFailureCategory.timeout,
+          FileTooLargeException() => CloudinaryFailureCategory.validation,
+          FileSystemException() => CloudinaryFailureCategory.fileRead,
+          FormatException() when stage == CloudinaryFailureStage.preflight =>
+            CloudinaryFailureCategory.validation,
+          EmptyUrlException() ||
+          InvalidAssetDimensions() ||
+          FormatException() => CloudinaryFailureCategory.invalidResponse,
+          SocketException() ||
+          HttpException() => CloudinaryFailureCategory.transport,
+          _ when stage == CloudinaryFailureStage.preparation =>
+            CloudinaryFailureCategory.preparation,
+          _ => CloudinaryFailureCategory.unexpected,
+        };
+        token.reportFailure(
+          CloudinaryRequestFailed(
+            stage:
+                category == CloudinaryFailureCategory.invalidResponse &&
+                    stage == CloudinaryFailureStage.upload
+                ? CloudinaryFailureStage.response
+                : stage,
+            category: category,
+            statusCode: error is _UploadHttpException ? error.statusCode : null,
+          ),
+          error,
+          stackTrace,
+        );
       }
     }
-
     return resolved;
-  }
-
-  bool _handlePotentialCancellation(
-    Exception exception,
-    CloudinaryUploadCancellationToken token,
-    StackTrace stackTrace,
-  ) {
-    if (!token.isCancelled) return false;
-
-    _logger
-      ..log(const CloudinaryUploadCancelled())
-      ..log(
-        const CloudinaryRequestFailed(detail: 'cancelled'),
-        error: exception,
-        stackTrace: stackTrace,
-      );
-    return true;
   }
 
   String _fileName(File file) => p.basename(file.path);
@@ -599,19 +605,10 @@ class _CloudinaryUploadTask implements ImageUploadTask {
   }
 }
 
-// TODO(xmattjus): Cloudinary error bodies can be arbitrarily long and may
-//  contain multi-line JSON or user-supplied content. Truncate [body] in
-//  [_UploadHttpException.toString] (or extract the `error.message` field)
-//  before logging once we start sampling real-world payloads, so that log
-//  lines stay single-line and bounded in size.
+/// HTTP status is sufficient; arbitrary response bodies never enter exceptions.
 class _UploadHttpException implements Exception {
-  const _UploadHttpException(this.statusCode, this.body);
-
+  const _UploadHttpException(this.statusCode);
   final int statusCode;
-
-  /// Raw response body from Cloudinary, captured for diagnostics.
-  final String body;
-
   @override
-  String toString() => 'UploadHttpException($statusCode): $body';
+  String toString() => 'UploadHttpException($statusCode)';
 }
