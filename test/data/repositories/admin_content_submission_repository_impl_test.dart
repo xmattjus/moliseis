@@ -544,6 +544,160 @@ void main() {
       );
     });
 
+    for (final replayed in [false, true]) {
+      test(
+        'staged association reports validated replay=$replayed once',
+        () async {
+          const asset = SubmissionAsset(
+            secureUrl: 'https://example.com/a.jpg',
+            width: 100,
+            height: 90,
+          );
+          httpClient.queueJson({
+            'outcome': replayed ? 'replayed' : 'created',
+            'asset': {
+              'id': 9,
+              'url': asset.secureUrl,
+              'width': 100,
+              'height': 90,
+            },
+          });
+          final result = await repository.associateStagedAsset(7, asset);
+          expect(result.getOrNull()!.id, 9);
+          expect(httpClient.requests, hasLength(1));
+          expect(logger.calls, hasLength(1));
+          final event = logger
+              .eventsOfType<AdminStagedAssetAssociated>()
+              .single;
+          expect(event.replayed, replayed);
+          expect(event.level, AppLogLevel.info);
+          expect(event.data, {'outcome': replayed ? 'replayed' : 'confirmed'});
+          expect(logger.eventsOfType<AdminBackendRequestFailed>(), isEmpty);
+        },
+      );
+    }
+
+    for (final failure in [
+      (400, 'VALIDATION_ERROR', AssociationOutcome.rejected),
+      (401, 'UNAUTHORIZED', AssociationOutcome.rejected),
+      (403, 'ADMIN_REQUIRED', AssociationOutcome.rejected),
+      (404, 'NOT_FOUND', AssociationOutcome.rejected),
+      (409, 'INVALID_STATUS_TRANSITION', AssociationOutcome.rejected),
+      (409, 'ASSET_LIMIT_REACHED', AssociationOutcome.rejected),
+      (409, 'ASSET_METADATA_CONFLICT', AssociationOutcome.rejected),
+      (409, 'UNKNOWN_FAILURE', AssociationOutcome.unconfirmed),
+      (500, 'ASSET_LIMIT_REACHED', AssociationOutcome.unconfirmed),
+      (500, 'INTERNAL_ERROR', AssociationOutcome.unconfirmed),
+    ]) {
+      test(
+        'staged association classifies ${failure.$1}/${failure.$2}',
+        () async {
+          httpClient.queueJson({
+            'code': failure.$2,
+            'message': 'private backend message',
+          }, status: failure.$1);
+          final result = await repository.associateStagedAsset(
+            7,
+            const SubmissionAsset(
+              secureUrl: 'https://example.com/a.jpg',
+              width: 100,
+              height: 90,
+            ),
+          );
+          final error =
+              (result as Error).error as AdminContentSubmissionApiException;
+          expect(
+            (error.statusCode, error.code, error.message),
+            (failure.$1, failure.$2, 'private backend message'),
+          );
+          expect(httpClient.requests, hasLength(1));
+          expect(logger.calls, hasLength(1));
+          final event = logger.eventsOfType<AdminBackendRequestFailed>().single;
+          expect(event.outcome, failure.$3);
+          expect(event.data, {
+            'operation': 'associateStagedAsset',
+            'outcome': failure.$3.name,
+            'status_code': failure.$1,
+          });
+          expect(
+            logger.firstCallOfType<AdminBackendRequestFailed>()!.error,
+            same(error),
+          );
+          expect(logger.eventsOfType<AdminStagedAssetAssociated>(), isEmpty);
+        },
+      );
+    }
+
+    for (final malformed in [
+      null,
+      {'outcome': 'created'},
+      {
+        'outcome': 'unknown',
+        'asset': {
+          'id': 9,
+          'url': 'https://example.com/a.jpg',
+          'width': 100,
+          'height': 90,
+        },
+      },
+      {
+        'outcome': 'created',
+        'asset': {
+          'id': 9,
+          'url': 'https://example.com/a.jpg',
+          'width': 101,
+          'height': 90,
+        },
+      },
+    ]) {
+      test(
+        'staged malformed acknowledgement remains unconfirmed: $malformed',
+        () async {
+          httpClient.queueJson(malformed);
+          final result = await repository.associateStagedAsset(
+            7,
+            const SubmissionAsset(
+              secureUrl: 'https://example.com/a.jpg',
+              width: 100,
+              height: 90,
+            ),
+          );
+          expect(result, isA<Error<AdminSubmissionAsset>>());
+          expect(httpClient.requests, hasLength(1));
+          expect(logger.calls, hasLength(1));
+          expect(
+            logger.eventsOfType<AdminBackendRequestFailed>().single.outcome,
+            AssociationOutcome.unconfirmed,
+          );
+          expect(logger.eventsOfType<AdminStagedAssetAssociated>(), isEmpty);
+        },
+      );
+    }
+
+    test(
+      'staged transport loss preserves the cause and unconfirmed outcome',
+      () async {
+        final cause = http.ClientException('private transport message');
+        httpClient.error = cause;
+        final result = await repository.associateStagedAsset(
+          7,
+          const SubmissionAsset(
+            secureUrl: 'https://example.com/a.jpg',
+            width: 100,
+            height: 90,
+          ),
+        );
+        expect((result as Error).error, same(cause));
+        expect(httpClient.requests, hasLength(1));
+        expect(logger.calls, hasLength(1));
+        expect(logger.eventsOfType<AdminBackendRequestFailed>().single.data, {
+          'operation': 'associateStagedAsset',
+          'outcome': 'unconfirmed',
+        });
+        expect(logger.eventsOfType<AdminStagedAssetAssociated>(), isEmpty);
+      },
+    );
+
     test('create sends only the twelve editor-owned fields', () async {
       httpClient.queueJson(<String, dynamic>{
         'outcome': 'created',

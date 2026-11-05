@@ -274,6 +274,9 @@ final class AdminContentSubmissionRepositoryImpl
           confirmed.height != asset.height) {
         throw const FormatException('association receipt does not match');
       }
+      _logger.log(
+        AdminStagedAssetAssociated(replayed: envelope['outcome'] == 'replayed'),
+      );
       return confirmed;
     },
   );
@@ -318,7 +321,29 @@ final class AdminContentSubmissionRepositoryImpl
 
   void _logFailure(String operation, Exception error, StackTrace stackTrace) {
     _logger.log(
-      AdminBackendRequestFailed(operation: operation),
+      AdminBackendRequestFailed(
+        operation: operation,
+        outcome:
+            operation == 'associateStagedAsset' &&
+                error is AdminContentSubmissionApiException &&
+                const {
+                  (400, 'INVALID_JSON'),
+                  (400, 'VALIDATION_ERROR'),
+                  (401, 'UNAUTHORIZED'),
+                  (403, 'ADMIN_REQUIRED'),
+                  (404, 'NOT_FOUND'),
+                  (405, 'METHOD_NOT_ALLOWED'),
+                  (409, 'INVALID_STATUS_TRANSITION'),
+                  (409, 'ASSET_LIMIT_REACHED'),
+                  (409, 'ASSET_METADATA_CONFLICT'),
+                  (413, 'REQUEST_TOO_LARGE'),
+                }.contains((error.statusCode, error.code))
+            ? AssociationOutcome.rejected
+            : AssociationOutcome.unconfirmed,
+        statusCode: error is AdminContentSubmissionApiException
+            ? error.statusCode
+            : null,
+      ),
       error: error,
       stackTrace: stackTrace,
     );

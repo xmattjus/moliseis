@@ -180,11 +180,14 @@ void main() {
 
     group('Service events', () {
       test('CloudinaryRequestFailed has correct contract', () {
-        const event = CloudinaryRequestFailed(detail: 'timeout');
+        const event = CloudinaryRequestFailed(
+          stage: CloudinaryFailureStage.upload,
+          category: CloudinaryFailureCategory.timeout,
+        );
 
         expect(event.name, 'cloudinary_request_failed');
         expect(event.level, AppLogLevel.error);
-        expect(event.data, {'detail': 'timeout'});
+        expect(event.data, {'stage': 'upload', 'category': 'timeout'});
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
@@ -192,19 +195,17 @@ void main() {
         const event = CloudinaryRequestStarted();
 
         expect(event.name, 'cloudinary_request_started');
-        expect(event.level, AppLogLevel.info);
+        expect(event.level, AppLogLevel.debug);
         expect(event.data, isEmpty);
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
       test('CloudinaryUploadCompleted has correct contract', () {
-        const event = CloudinaryUploadCompleted(
-          publicId: 'content_submissions/abc',
-        );
+        const event = CloudinaryUploadCompleted();
 
         expect(event.name, 'cloudinary_upload_completed');
         expect(event.level, AppLogLevel.info);
-        expect(event.data, {'publicId': 'content_submissions/abc'});
+        expect(event.data, isEmpty);
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
@@ -219,12 +220,12 @@ void main() {
 
       test('CloudinaryDuplicateDetected has correct contract', () {
         const event = CloudinaryDuplicateDetected(
-          publicId: 'content_submissions/abc',
+          source: CloudinaryReuseSource.preparation,
         );
 
         expect(event.name, 'cloudinary_duplicate_detected');
         expect(event.level, AppLogLevel.info);
-        expect(event.data, {'publicId': 'content_submissions/abc'});
+        expect(event.data, {'source': 'preparation'});
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 
@@ -334,7 +335,7 @@ void main() {
 
         expect(event.name, 'content_submission_upload_failed');
         expect(event.level, AppLogLevel.error);
-        expect(event.data, isEmpty);
+        expect(event.data, {'outcome': 'unconfirmed'});
         expect(eventNamePattern.hasMatch(event.name), isTrue);
       });
 

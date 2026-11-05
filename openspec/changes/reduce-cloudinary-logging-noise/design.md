@@ -16,7 +16,7 @@ Keep each event attached to the boundary that knows the fact. Do **not** add a s
 | Public `submit-content` response boundary | Positive valid submission acknowledgement / replay; explicit API rejection; request outcome not confirmed | Cloudinary upload success from only a submitted URL; an orphan's existence |
 | Admin `associateStagedAsset` response boundary | Valid associated asset returned (including replay); explicit server rejection; confirmation unavailable | Whether Cloudinary created the asset this attempt; cross-service atomicity |
 
-Proposed event policy (names are illustrative where new; prefer existing event classes when their meaning remains truthful):
+Implemented event policy (existing event classes are reused where their meaning remains truthful):
 
 - `CloudinaryRequestStarted`: demote routine start to `debug` or remove if redundant. Do not remove the existing progress signal.
 - Retryable 5xx/timeout attempts: one `debug` event with only controlled reason and attempt ordinal, never `CloudinaryRequestFailed`/remote exception capture for a retry that remains in progress.
@@ -57,4 +57,10 @@ Extend the existing Cloudinary client, logging event, public final-submission re
 
 Implementation must execute focused tests, appropriate full Flutter regression, format and analysis checks, and `openspec validate reduce-cloudinary-logging-noise --strict`. Record actual commands/results/commit and compare any pre-existing failures. Review the diff against unchanged contracts, consent, idempotency and all out-of-scope backend/importer work. Keep logs, test output and transient validation artifacts out of Git.
 
-This planning PR contains no implementation. OpenSpec canonical sync/archive and production deployment are later, separately authorized steps.
+## Implementation notes
+
+The cancellation token consumes request faults immediately and defers their terminal report until client settlement. Main-path and passive-only faults share one reporting gate; a recoverable attempt retains its cause locally at debug and cannot publish a stale terminal error after a later success. Retry eligibility and physical request cancellation are unchanged.
+
+Scoped `AppLogger` forwarding uses typed metadata and sanitized exception envelopes with cleared ambient scope, preserving original causes locally. This also covers the existing global reporter for the three upload-capable commands: raw preflight file failures retain their original throw contract and stay local, including cancellation concurrent with a missing file. Other commands and Admin operations retain their reporting behavior. Malformed preparation and file inspection before POST retain their own diagnostic stage.
+
+OpenSpec canonical sync/archive, merge and production deployment remain separately authorized steps.

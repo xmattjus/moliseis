@@ -58,18 +58,49 @@ class AdminAuthStateError extends LogEvent {
 
 /// Fired when an admin backend request fails.
 final class AdminBackendRequestFailed extends LogEvent {
-  const AdminBackendRequestFailed({required this.operation});
+  const AdminBackendRequestFailed({
+    required this.operation,
+    this.outcome,
+    this.statusCode,
+  });
 
   final String operation;
+  final AssociationOutcome? outcome;
+  final int? statusCode;
 
   @override
-  Map<String, Object?> get data => <String, Object?>{'operation': operation};
+  Map<String, Object?> get data => {
+    'operation': operation,
+    if (operation == 'associateStagedAsset') ...{
+      'outcome': (outcome ?? AssociationOutcome.unconfirmed).name,
+      if (statusCode case final int status when status >= 100 && status <= 599)
+        'status_code': status,
+    },
+  };
 
   @override
   AppLogLevel get level => AppLogLevel.error;
 
   @override
   String get name => 'admin_backend_request_failed';
+}
+
+/// Fired only after the server confirms an exact staged-asset receipt.
+final class AdminStagedAssetAssociated extends LogEvent {
+  const AdminStagedAssetAssociated({required this.replayed});
+
+  final bool replayed;
+
+  @override
+  Map<String, Object?> get data => {
+    'outcome': replayed ? 'replayed' : 'confirmed',
+  };
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'admin_staged_asset_associated';
 }
 
 /// A local Admin persistence stage failed without disclosing private paths.

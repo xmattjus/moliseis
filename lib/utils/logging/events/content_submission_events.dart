@@ -77,12 +77,25 @@ class ContentSubmissionAssetRetrievalStarted extends LogEvent {
   String get name => 'content_submission_asset_retrieval_started';
 }
 
-/// Fired when a content submission upload fails.
+/// Evidence available after a failed association request.
+enum AssociationOutcome { rejected, unconfirmed }
+
+/// Fired when the final whole-submission request fails.
 class ContentSubmissionUploadFailed extends LogEvent {
-  const ContentSubmissionUploadFailed();
+  const ContentSubmissionUploadFailed({
+    this.outcome = AssociationOutcome.unconfirmed,
+    this.statusCode,
+  });
+
+  final AssociationOutcome outcome;
+  final int? statusCode;
 
   @override
-  Map<String, Object?> get data => const {};
+  Map<String, Object?> get data => {
+    'outcome': outcome.name,
+    if (statusCode case final int status when status >= 100 && status <= 599)
+      'status_code': status,
+  };
 
   @override
   AppLogLevel get level => AppLogLevel.error;
@@ -103,6 +116,21 @@ class ContentSubmissionUploadStarted extends LogEvent {
 
   @override
   String get name => 'content_submission_upload_started';
+}
+
+/// Fired after a valid whole-submission acknowledgement.
+/// Replay acknowledgements use their existing separate event.
+class ContentSubmissionConfirmed extends LogEvent {
+  const ContentSubmissionConfirmed();
+
+  @override
+  Map<String, Object?> get data => const {};
+
+  @override
+  AppLogLevel get level => AppLogLevel.info;
+
+  @override
+  String get name => 'content_submission_request_confirmed';
 }
 
 /// Fired when the backend acknowledges an already submitted session.

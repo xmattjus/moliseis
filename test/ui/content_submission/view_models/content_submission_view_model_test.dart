@@ -12,6 +12,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/data/data-sources/content_submission_draft_entry.dart';
 import 'package:moliseis/data/data-sources/content_submission_staged_asset_entity.dart';
 import 'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart';
+import 'package:moliseis/data/repositories/content_submission_repository_impl.dart';
 import 'package:moliseis/data/repositories/content_submission_staged_asset_repository_impl.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -26,15 +27,18 @@ import 'package:moliseis/utils/logging/app_log_level.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../support/command_test_support.dart';
 import '../../../support/content_submission_command_harness.dart';
+import '../../../support/fake_cloudinary_upload_client.dart';
 import '../../../support/fake_image_picker.dart';
 import '../../../support/fake_repositories.dart';
 import '../../../support/mock_logger.dart';
 import '../../../support/mock_objectbox.dart';
 import '../../../support/objectbox_test_store.dart';
 import '../../../support/ordinary_view_model_lifecycle_support.dart';
+import '../../../support/recording_supabase_functions_http_client.dart';
 
 void main() {
   late MockLogger commandLogger;
@@ -5152,6 +5156,93 @@ void main() {
     });
 
     group('submit', () {
+      for (final failure in [
+        'rejection',
+        'malformed acknowledgement',
+        'transport',
+      ]) {
+        test(
+          'zero-asset $failure preserves identity until backend replay',
+          () async {
+            final httpClient = RecordingSupabaseFunctionsHttpClient();
+            if (failure == 'transport') {
+              httpClient.error = const SocketException('response lost');
+            } else {
+              httpClient.queueJson(
+                failure == 'rejection'
+                    ? {'code': 'RATE_LIMIT_EXCEEDED', 'message': 'Rejected'}
+                    : {'submission_id': 0},
+                status: failure == 'rejection' ? 429 : 200,
+              );
+            }
+            final client = SupabaseClient(
+              'https://test-project.supabase.co',
+              'test-key',
+              httpClient: httpClient,
+              accessToken: () async => 'test-access-token',
+            );
+            addTearDown(client.dispose);
+            final log = MockLogger();
+            final repository = ContentSubmissionRepositoryImpl(
+              logger: log,
+              supabaseClient: client,
+              cloudinaryUploadClient: FakeCloudinaryUploadClient(),
+            );
+            final vm =
+                buildViewModel(
+                    contentSubmissionRepository: repository,
+                    logger: log,
+                  )
+                  ..setCity('Rome')
+                  ..setName('Colosseum')
+                  ..setUserEmail('jane@example.com')
+                  ..setUserName('Jane');
+            addTearDown(vm.dispose);
+            final identity = vm.state.clientSubmissionId;
+            await requestAndWait(vm.requestSubmit, () => vm.isSubmitting);
+            expect(vm.submitSnapshot.hasFailure, isTrue);
+            expect(vm.state.clientSubmissionId, identity);
+            expect(vm.submissionFinalizationPending, isFalse);
+            expect(
+              log.eventsOfType<ContentSubmissionUploadFailed>().single.outcome,
+              failure == 'rejection'
+                  ? AssociationOutcome.rejected
+                  : AssociationOutcome.unconfirmed,
+            );
+            expect(log.eventsOfType<ContentSubmissionConfirmed>(), isEmpty);
+            expect(
+              log.eventsOfType<ContentSubmissionReplayAcknowledged>(),
+              isEmpty,
+            );
+            expect(commandLogger.calls, isEmpty);
+
+            httpClient
+              ..error = null
+              ..queueJson({'submission_id': 9, 'replayed': true});
+            await requestAndWait(vm.requestSubmit, () => vm.isSubmitting);
+            expect(vm.submitSnapshot.completed, isTrue);
+            expect(vm.state.clientSubmissionId, isNot(identity));
+            expect(vm.submissionFinalizationPending, isFalse);
+            expect(httpClient.requests, hasLength(2));
+            for (final request in httpClient.requests) {
+              final body = request.body! as Map;
+              expect(body['client_submission_id'], identity);
+              expect(body['assets'], isEmpty);
+            }
+            expect(
+              log.eventsOfType<ContentSubmissionUploadFailed>(),
+              hasLength(1),
+            );
+            expect(
+              log.eventsOfType<ContentSubmissionReplayAcknowledged>(),
+              hasLength(1),
+            );
+            expect(log.eventsOfType<ContentSubmissionConfirmed>(), isEmpty);
+            expect(commandLogger.calls, isEmpty);
+          },
+        );
+      }
+
       test(
         'derives immediate retry as false for idle, running, and success',
         () async {

@@ -33,4 +33,4 @@ Flutter logging events and affected Cloudinary upload, public submission, and Ad
 
 No orphan count or automatic cleanup (tracked by [TASK-9](https://app.notion.com/p/40d1b5e75aa78096a2baf2ae2765abbd)); no cross-service atomicity; no new correlation-ID infrastructure, logging framework, tracing redesign, or generalized audit of unrelated request failures.
 
-Planning only: this PR does not implement, deploy, sync canonical specs, archive the change, or authorize a merge.
+PR #31 includes the scoped Flutter implementation and regressions. It does not deploy, sync canonical specs, archive the change, or authorize a merge.

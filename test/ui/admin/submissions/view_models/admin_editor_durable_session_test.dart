@@ -1210,6 +1210,14 @@ void main() {
           terminal ? AdminSavePhase.conflict : AdminSavePhase.partialFailure,
         );
         expect(content.uploadedImages, hasLength(1));
+        if (failure != 'upload receipt') {
+          final retained = local.staged.assets[owner]!.single;
+          expect(retained.owner, owner);
+          expect(retained.progress!.upload, receipt);
+          if (failure == 'association response' || terminal) {
+            expect(retained.progress!.associationId, isNull);
+          }
+        }
         if (terminal) {
           expect(vm.canRequestSave, isFalse);
           expect(vm.stagedAssets, hasLength(1));
@@ -1247,6 +1255,12 @@ void main() {
           hasLength(failure == 'association response' ? 2 : 1),
         );
         expect(remote.updateIds, isEmpty);
+        expect(
+          remote.addAssetCalls.every(
+            (call) => call.$1 == 1 && call.$2 == receipt,
+          ),
+          isTrue,
+        );
         expect(vm.stagedAssets, isEmpty);
         expect(vm.assets.single.id, 3);
       },

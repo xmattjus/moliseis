@@ -75,86 +75,118 @@ class CacheEntryEvicted extends LogEvent {
   String get name => 'cache_entry_evicted';
 }
 
-/// Fired when a Cloudinary upload request fails.
-class CloudinaryRequestFailed extends LogEvent {
-  /// Creates an event with a [detail] describing the Cloudinary error.
-  const CloudinaryRequestFailed({required this.detail});
+/// The client boundary at which confirmation became unavailable.
+enum CloudinaryFailureStage { preflight, preparation, upload, response }
 
-  /// Error message or description returned by the Cloudinary API.
-  final String detail;
+/// Controlled diagnostic causes, never arbitrary exception text.
+enum CloudinaryFailureCategory {
+  http,
+  timeout,
+  transport,
+  invalidResponse,
+  fileRead,
+  validation,
+  preparation,
+  unexpected,
+}
+
+/// A terminal client non-success, without asserting remote asset absence.
+class CloudinaryRequestFailed extends LogEvent {
+  const CloudinaryRequestFailed({
+    required this.stage,
+    required this.category,
+    this.statusCode,
+  });
+
+  final CloudinaryFailureStage stage;
+  final CloudinaryFailureCategory category;
+  final int? statusCode;
+
+  /// Expected local input failures do not create remote exception alerts.
+  bool get report =>
+      category != CloudinaryFailureCategory.validation &&
+      category != CloudinaryFailureCategory.fileRead;
 
   @override
-  Map<String, Object?> get data => {'detail': detail};
-
+  Map<String, Object?> get data => {
+    'stage': stage.name,
+    'category': category.name,
+    if (statusCode != null && statusCode! >= 100 && statusCode! <= 599)
+      'status_code': statusCode,
+  };
   @override
   AppLogLevel get level => AppLogLevel.error;
-
   @override
   String get name => 'cloudinary_request_failed';
 }
 
-/// Fired when a Cloudinary upload request started.
-class CloudinaryRequestStarted extends LogEvent {
-  /// Creates an event for a Cloudinary request start.
-  const CloudinaryRequestStarted();
+/// An intermediate recoverable attempt, owned by the existing retry loop.
+class CloudinaryUploadRetry extends LogEvent {
+  const CloudinaryUploadRetry({
+    required this.category,
+    required this.attempt,
+    this.statusCode,
+  });
+  final CloudinaryFailureCategory category;
+  final int attempt;
+  final int? statusCode;
+  @override
+  Map<String, Object?> get data => {
+    'category': category.name,
+    'attempt': attempt.clamp(1, 3),
+    if (statusCode != null && statusCode! >= 100 && statusCode! <= 599)
+      'status_code': statusCode,
+  };
+  @override
+  AppLogLevel get level => AppLogLevel.debug;
+  @override
+  String get name => 'cloudinary_upload_retry';
+}
 
+/// Routine operation admission, independent of whether a POST is needed.
+class CloudinaryRequestStarted extends LogEvent {
+  const CloudinaryRequestStarted();
   @override
   Map<String, Object?> get data => const {};
-
   @override
-  AppLogLevel get level => AppLogLevel.info;
-
+  AppLogLevel get level => AppLogLevel.debug;
   @override
   String get name => 'cloudinary_request_started';
 }
 
-/// Fired when a Cloudinary upload completes successfully.
+/// A validated POST response that does not indicate asset reuse.
 class CloudinaryUploadCompleted extends LogEvent {
-  /// Creates an event for a completed Cloudinary upload of [publicId].
-  const CloudinaryUploadCompleted({required this.publicId});
-
-  /// Public ID of the uploaded asset.
-  final String publicId;
-
+  const CloudinaryUploadCompleted();
   @override
-  Map<String, Object?> get data => {'publicId': publicId};
-
+  Map<String, Object?> get data => const {};
   @override
   AppLogLevel get level => AppLogLevel.info;
-
   @override
   String get name => 'cloudinary_upload_completed';
 }
 
-/// Fired when a Cloudinary upload is cancelled by the caller.
+/// Deliberate cancellation is a normal client outcome.
 class CloudinaryUploadCancelled extends LogEvent {
-  /// Creates an event for a cancelled Cloudinary upload.
   const CloudinaryUploadCancelled();
-
   @override
   Map<String, Object?> get data => const {};
-
   @override
   AppLogLevel get level => AppLogLevel.info;
-
   @override
   String get name => 'cloudinary_upload_cancelled';
 }
 
-/// Fired when a duplicate Cloudinary upload is detected and skipped.
+/// Only preparation reuse establishes that no binary POST occurred.
+enum CloudinaryReuseSource { preparation, response }
+
+/// A validated existing asset, preserving how it was discovered.
 class CloudinaryDuplicateDetected extends LogEvent {
-  /// Creates an event for a duplicate Cloudinary upload of [publicId].
-  const CloudinaryDuplicateDetected({required this.publicId});
-
-  /// Public ID of the existing asset.
-  final String publicId;
-
+  const CloudinaryDuplicateDetected({required this.source});
+  final CloudinaryReuseSource source;
   @override
-  Map<String, Object?> get data => {'publicId': publicId};
-
+  Map<String, Object?> get data => {'source': source.name};
   @override
   AppLogLevel get level => AppLogLevel.info;
-
   @override
   String get name => 'cloudinary_duplicate_detected';
 }

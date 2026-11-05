@@ -8,11 +8,18 @@
 // Test readability benefits from separate statements over cascades.
 // ignore_for_file: cascade_invocations
 
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:command_it/command_it.dart' as commands;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:moliseis/utils/command_configuration.dart';
 import 'package:moliseis/utils/logging/app_log_level.dart';
 import 'package:moliseis/utils/logging/app_logger.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
+import 'package:moliseis/utils/result.dart' show Result;
+import 'package:moliseis/utils/result_command.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -466,6 +473,155 @@ void main() {
           );
         },
       );
+    }
+
+    for (final event in <LogEvent>[
+      const CloudinaryUploadCompleted(),
+      const CloudinaryDuplicateDetected(
+        source: CloudinaryReuseSource.preparation,
+      ),
+      const CloudinaryDuplicateDetected(source: CloudinaryReuseSource.response),
+      const CloudinaryUploadCancelled(),
+      const ContentSubmissionConfirmed(),
+      const ContentSubmissionReplayAcknowledged(),
+      const AdminStagedAssetAssociated(replayed: false),
+      const AdminStagedAssetAssociated(replayed: true),
+    ]) {
+      test('${event.name} forwards only typed safe fields', () async {
+        sentryFlag.enabled = true;
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
+        logger.log(event, extra: {'authorization': 'PRIVATE_AUTH_CANARY'});
+        await fakeTransport.settleCaptures();
+        expect(fakeTransport.events, isEmpty);
+        final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
+        expect(breadcrumbs, hasLength(1));
+        expect(breadcrumbs.single.data, event.data);
+        expect(
+          jsonEncode(breadcrumbs.single.toJson()),
+          isNot(contains('PRIVATE_AUTH_CANARY')),
+        );
+      });
+    }
+
+    test(
+      'expected Cloudinary causes remain local with consent enabled',
+      () async {
+        sentryFlag.enabled = true;
+        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
+        for (final event in <LogEvent>[
+          const CloudinaryRequestFailed(
+            stage: CloudinaryFailureStage.preflight,
+            category: CloudinaryFailureCategory.validation,
+          ),
+          const CloudinaryRequestFailed(
+            stage: CloudinaryFailureStage.preflight,
+            category: CloudinaryFailureCategory.fileRead,
+          ),
+          const CloudinaryUploadCancelled(),
+          const CloudinaryUploadRetry(
+            category: CloudinaryFailureCategory.timeout,
+            attempt: 1,
+          ),
+        ]) {
+          logger.log(event, error: Exception('PRIVATE_EXPECTED_CAUSE'));
+        }
+        await fakeTransport.settleCaptures();
+        expect(fakeTransport.events, isEmpty);
+        expect(fakeTransport.envelopes, isEmpty);
+        expect(
+          jsonEncode(
+            Sentry.currentHub.scope.breadcrumbs
+                .map((entry) => entry.toJson())
+                .toList(),
+          ),
+          isNot(contains('PRIVATE_EXPECTED_CAUSE')),
+        );
+      },
+    );
+
+    test('scoped capture drops inherited private context', () async {
+      sentryFlag.enabled = true;
+      await Sentry.configureScope((scope) async {
+        await scope.setContexts('private', {
+          'payload': 'PRIVATE_CONTEXT_CANARY',
+        });
+        await scope.setUser(SentryUser(id: 'PRIVATE_ACCOUNT_CANARY'));
+      });
+      final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
+      logger.log(
+        const ContentSubmissionUploadFailed(),
+        error: Exception('PRIVATE_EXCEPTION_CANARY'),
+        stackTrace: StackTrace.fromString('PRIVATE_STACK_CANARY'),
+      );
+      await fakeTransport.settleCaptures();
+      expect(fakeTransport.envelopes, hasLength(1));
+      final serialized = await utf8.decoder
+          .bind(fakeTransport.envelopes.single.envelopeStream(SentryOptions()))
+          .join();
+      expect(serialized, contains('unconfirmed'));
+      expect(serialized, isNot(contains('PRIVATE_')));
+    });
+
+    for (final name in [
+      'content_submission_submit',
+      'admin_submission_editor_save',
+      'admin_submission_editor_add_asset',
+      'search_results',
+    ]) {
+      for (final error in [
+        StateError('PRIVATE_FILE_ERROR'),
+        const FileSystemException(
+          'PRIVATE_FILE_ERROR',
+          '/private/PRIVATE_FILE_PATH',
+        ),
+      ]) {
+        test('global $name ${error.runtimeType} retains ownership '
+            'and scopes causes', () async {
+          final previousHandler = commands.Command.globalExceptionHandler;
+          final previousReportAll = commands.Command.reportAllExceptions;
+          addTearDown(() {
+            commands.Command.globalExceptionHandler = previousHandler;
+            commands.Command.reportAllExceptions = previousReportAll;
+          });
+          final command = createResultCommandNoParam<void>(
+            () async => const Result.success(null),
+            debugName: name,
+          );
+          addTearDown(command.dispose);
+          sentryFlag.enabled = true;
+          final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
+          configureCommandReporting(logger);
+          final stack = StackTrace.fromString('PRIVATE_FILE_STACK');
+          commands.Command.globalExceptionHandler!(
+            commands.CommandError<void>(command: command, error: error),
+            stack,
+          );
+          await fakeTransport.settleCaptures();
+          final capture =
+              error is! FileSystemException || name == 'search_results';
+          expect(fakeTransport.envelopes, hasLength(capture ? 1 : 0));
+          if (capture) {
+            final payload = await utf8.decoder
+                .bind(
+                  fakeTransport.envelopes.single.envelopeStream(
+                    SentryOptions(),
+                  ),
+                )
+                .join();
+            expect(payload.contains('PRIVATE_FILE_'), name == 'search_results');
+          } else {
+            expect(fakeTransport.events, isEmpty);
+          }
+          verify(
+            () => mockTalker.log(
+              any(),
+              logLevel: LogLevel.error,
+              exception: error,
+              stackTrace: stack,
+            ),
+          ).called(1);
+        });
+      }
     }
 
     group('event name assertion', () {
