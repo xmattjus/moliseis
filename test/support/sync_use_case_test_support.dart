@@ -5,8 +5,11 @@ import 'package:moliseis/data/dtos/place_dto.dart';
 import 'package:moliseis/domain/core/sync_transaction_coordinator.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
+import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
+
 import 'fake_repositories.dart';
+import 'mock_logger.dart';
 
 SyncUseCaseDeps buildSyncUseCase({
   required FakeSettingsRepository settings,
@@ -17,6 +20,7 @@ SyncUseCaseDeps buildSyncUseCase({
   SyncTransactionCoordinator? transactionCoordinator,
   FakeSyncCursorSource? cursorSource,
   DateTime Function()? now,
+  Logger? logger,
 }) {
   final cityRepo = FakeCityRepository(prepareResult: cityResult);
   final eventRepo = FakeEventRepository(prepareResult: eventResult);
@@ -24,6 +28,7 @@ SyncUseCaseDeps buildSyncUseCase({
   final placeRepo = FakePlaceRepository(prepareResult: placeResult);
 
   final useCase = SyncUseCase(
+    logger: logger ?? MockLogger(),
     cityRepository: cityRepo,
     eventRepository: eventRepo,
     mediaRepository: mediaRepo,

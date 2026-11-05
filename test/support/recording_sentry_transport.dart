@@ -10,7 +10,25 @@ class RecordingSentryTransport implements Transport, EventProcessor {
   /// Envelopes delivered after all Sentry processors have completed.
   final List<SentryEnvelope> envelopes = [];
 
+  /// Real recording spans observed by the streaming SDK pipeline.
+  final List<SentrySpanV2> spans = [];
+
+  Completer<void> _spanDelivery = Completer<void>();
   Completer<void> _delivery = Completer<void>();
+
+  /// Attach to SentryOptions.beforeSendSpan to observe ended recording spans.
+  void recordSpan(SentrySpanV2 span, Hint hint) {
+    spans.add(span);
+    _spanDelivery.complete();
+    _spanDelivery = Completer<void>();
+  }
+
+  /// Waits for the expected number of real streaming pipeline callbacks.
+  Future<void> settleSpans(int count) async {
+    while (spans.length < count) {
+      await _spanDelivery.future.timeout(const Duration(seconds: 5));
+    }
+  }
 
   @override
   SentryEvent apply(SentryEvent event, Hint hint) {
@@ -29,12 +47,25 @@ class RecordingSentryTransport implements Transport, EventProcessor {
   /// Waits for captures started by the preceding synchronous logger call.
   Future<void> settleCaptures() async {
     // In sentry 10.0.0-rc.2, Hub.captureException awaits scope cloning before
-    // applying scope processors. Its continuation is queued before this one.
+    // applying processors; async sanitized scopes also require microtasks.
     // Observe attempts here, before Linux enrichment starts /proc/meminfo IO,
     // so a forbidden capture cannot pass an empty-envelope assertion.
-    await Future<void>.value();
-    while (envelopes.length < events.length) {
+    await Future<void>(() {});
+    while (events.any(
+      (event) => !envelopes.any(
+        (envelope) => envelope.header.eventId == event.eventId,
+      ),
+    )) {
       await _delivery.future.timeout(const Duration(seconds: 5));
     }
   }
+}
+
+/// Selects SDK non-debug branches without changing the host Flutter build.
+class NonDebugRuntimeChecker extends RuntimeChecker {
+  @override
+  bool isDebugMode() => false;
+
+  @override
+  bool isReleaseMode() => true;
 }

@@ -1065,6 +1065,9 @@ final class FakeSettingsRepository implements SettingsRepository {
   // Call tracking
   bool setSyncStateCalled = false;
 
+  /// Optional gate for checking publication before durable sync-state save.
+  Future<Result<void>> Function()? onSetSyncState;
+
   @override
   Future<Result<void>> initialize() async => initializeResult;
 
@@ -1093,11 +1096,13 @@ final class FakeSettingsRepository implements SettingsRepository {
     required DateTime contentSyncCursorAt,
   }) async {
     setSyncStateCalled = true;
-    if (setSyncStateResult is Success<void>) {
+    final result =
+        await (onSetSyncState?.call() ?? Future.value(setSyncStateResult));
+    if (result is Success<void>) {
       this.lastSyncedAt = lastSyncedAt;
       this.contentSyncCursorAt = contentSyncCursorAt;
     }
-    return setSyncStateResult;
+    return result;
   }
 
   @override

@@ -1498,6 +1498,7 @@ final class _MapHarness {
       contentSyncCursorAt: DateTime.utc(2026, 10, 12),
     );
     final useCase = SyncUseCase(
+      logger: MockLogger(),
       cityRepository: FakeCityRepository(),
       eventRepository: FakeEventRepository(),
       mediaRepository: FakeMediaRepository(),

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:moliseis/data/mappers/mappers.dart';
@@ -10,8 +9,8 @@ import 'package:moliseis/domain/models/image_upload_task.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
 import 'package:moliseis/utils/logging/logging.dart';
+import 'package:moliseis/utils/logging/run_traced_result.dart';
 import 'package:moliseis/utils/result.dart';
-import 'package:sentry/sentry.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
@@ -33,15 +32,7 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
     required String clientSubmissionId,
     required ContentSubmission contentSubmission,
     required List<SubmissionAsset> submissionAssets,
-  }) async {
-    final transaction = Sentry.startTransaction(
-      'content-submission',
-      'upload',
-      bindToScope: true,
-    );
-
-    var spanStatus = const SpanStatus.internalError();
-
+  }) => runTracedResult('content-submission', () async {
     _logger.log(const ContentSubmissionUploadStarted());
 
     try {
@@ -63,7 +54,6 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
       if (data['replayed'] == true) {
         _logger.log(const ContentSubmissionReplayAcknowledged());
       }
-      spanStatus = const SpanStatus.ok();
       return const Result.success(null);
     } on FunctionsFetchException catch (exception, stackTrace) {
       final transportError = recoverSupabaseFunctionsFetchError(exception);
@@ -72,7 +62,6 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
         error: transportError,
         stackTrace: stackTrace,
       );
-      spanStatus = const SpanStatus.internalError();
       return Result.error(transportError);
     } on FunctionException catch (exception, stackTrace) {
       final normalized = _normalizeFunctionException(exception);
@@ -81,7 +70,6 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
         error: normalized,
         stackTrace: stackTrace,
       );
-      spanStatus = const SpanStatus.internalError();
       return Result.error(normalized);
     } on Exception catch (exception, stackTrace) {
       _logger.log(
@@ -89,12 +77,9 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
         error: exception,
         stackTrace: stackTrace,
       );
-      spanStatus = const SpanStatus.internalError();
       return Result.error(exception);
-    } finally {
-      unawaited(transaction.finish(status: spanStatus));
     }
-  }
+  });
 
   ContentSubmissionApiException _normalizeFunctionException(
     FunctionException exception,

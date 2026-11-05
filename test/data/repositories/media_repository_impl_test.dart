@@ -344,11 +344,11 @@ void main() {
       final result = await repository.prepareSync();
 
       expect(result, isA<Error<List<MediaDto>>>());
-      final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+      final failedCall = mockLogger.firstCallOfType<SyncFailure>();
       expect(failedCall, isNotNull);
-      final event = failedCall!.event as RepositorySyncFailed;
-      expect(event.repositoryName, 'media');
-      expect(failedCall.error, isNotNull);
+      final event = failedCall!.event as SyncFailure;
+      expect(event.owner, SyncFailureOwner.prepare);
+      expect(failedCall.error, same((result as Error<List<MediaDto>>).error));
       expect(failedCall.stackTrace, isNotNull);
     });
   });
@@ -409,7 +409,7 @@ void main() {
         expect(entity.placeToOneId, isNull);
         expect(entity.event.targetId, 7);
         expect(entity.place.targetId, 0);
-        expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
+        expect(mockLogger.eventsOfType<EntityInsertSuccess>(), isEmpty);
       },
     );
 
@@ -537,7 +537,7 @@ void main() {
       expect(entity.placeToOneId, isNull);
       expect(entity.event.targetId, 1);
       expect(entity.place.targetId, 0);
-      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), hasLength(1));
+      expect(mockLogger.eventsOfType<EntityUpdateSuccess>(), isEmpty);
     });
 
     test('prepareSync returns Error when Supabase query fails', () async {
@@ -548,11 +548,11 @@ void main() {
       final result = await repository.prepareSync();
 
       expect(result, isA<Error<List<MediaDto>>>());
-      final failedCall = mockLogger.firstCallOfType<RepositorySyncFailed>();
+      final failedCall = mockLogger.firstCallOfType<SyncFailure>();
       expect(failedCall, isNotNull);
-      final event = failedCall!.event as RepositorySyncFailed;
-      expect(event.repositoryName, 'media');
-      expect(failedCall.error, isNotNull);
+      final event = failedCall!.event as SyncFailure;
+      expect(event.owner, SyncFailureOwner.prepare);
+      expect(failedCall.error, same((result as Error<List<MediaDto>>).error));
       expect(failedCall.stackTrace, isNotNull);
     });
   });

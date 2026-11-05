@@ -25,6 +25,7 @@ import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/command_configuration.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/http_client.dart';
+import 'package:moliseis/utils/logging/filter_breadcrumb.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
@@ -61,7 +62,9 @@ Future<void> _main() async {
   await bootstrapApplication(
     createSettings: () async {
       objectBox = await ObjectBox.create();
-      return SettingsRepositoryImpl(SettingsLocalDataSource(objectBox.store));
+      return SettingsRepositoryImpl(
+        SettingsLocalDataSource(objectBox.store, logger: _logger),
+      );
     },
     onLocalFailure: (error, stackTrace) {
       _logger.log(
@@ -78,6 +81,7 @@ Future<void> _main() async {
         (options) => options
           ..dsn = Env.sentryUrl
           ..environment = kDebugMode ? 'debug' : 'production'
+          ..traceLifecycle = SentryTraceLifecycle.stream
           ..tracesSampleRate = kDebugMode ? 0 : 0.4
           ..replay.sessionSampleRate = kDebugMode ? 0 : 0.4
           ..replay.onErrorSampleRate = kDebugMode ? 0 : 1.0
@@ -85,20 +89,7 @@ Future<void> _main() async {
           ..httpClient = httpClientFactory()
           ..privacy.maskAllText = false
           ..privacy.maskAllImages = false
-          ..beforeBreadcrumb = (breadcrumb, hint) {
-            final message = breadcrumb?.message;
-
-            // Drops Talker console breadcrumbs.
-            if (message != null &&
-                (message.contains('┌') ||
-                    message.contains('│ [') ||
-                    message.contains('└') ||
-                    message.contains('─['))) {
-              return null;
-            }
-
-            return breadcrumb;
-          },
+          ..beforeBreadcrumb = filterBreadcrumb,
         appRunner: runner,
       );
     },

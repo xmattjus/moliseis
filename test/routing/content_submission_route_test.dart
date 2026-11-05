@@ -1676,6 +1676,7 @@ final class _ContentSubmissionRouteHarness {
     required this.externalUrlService,
   }) {
     final syncUseCase = SyncUseCase(
+      logger: MockLogger(),
       cityRepository: FakeCityRepository(),
       eventRepository: FakeEventRepository(),
       mediaRepository: FakeMediaRepository(),

@@ -63,10 +63,12 @@ void main() {
     env.store.box<MediaEntity>().put(
       makeMediaEntity(title: 'Old media', eventId: 1, modifiedAt: oldMarker),
     );
-    source = FailNextSettingsSave(SettingsLocalDataSource(env.store));
+    logger = MockLogger();
+    source = FailNextSettingsSave(
+      SettingsLocalDataSource(env.store, logger: logger),
+    );
     settings = SettingsRepositoryImpl(source);
     await settings.initialize();
-    logger = MockLogger();
     final common = <String, dynamic>{
       'created_at': DateTime.utc(2026).toIso8601String(),
       'modified_at': remoteMarker.toIso8601String(),
@@ -126,6 +128,7 @@ void main() {
       objectBoxI: objectBox,
     );
     useCase = SyncUseCase(
+      logger: logger,
       cityRepository: CityRepositoryImpl(
         logger: logger,
         supabaseI: cities.mockSupabase,
@@ -143,7 +146,10 @@ void main() {
       ),
       mediaRepository: mediaRepository,
       settingsRepository: settings,
-      transactionCoordinator: ObjectBoxSyncTransactionCoordinator(env.store),
+      transactionCoordinator: ObjectBoxSyncTransactionCoordinator(
+        env.store,
+        logger: logger,
+      ),
       cursorSource: FakeSyncCursorSource(result: Result.success(serverCursor)),
       now: () => completion,
     );
@@ -171,6 +177,15 @@ void main() {
       final result = await useCase.sync();
       expect(result, isA<Error<void>>());
       expect(observedStaging, isTrue);
+      expect(logger.eventsOfType<EntityInsertSuccess>(), isEmpty);
+      expect(logger.eventsOfType<EntityUpdateSuccess>(), isEmpty);
+      expect(logger.eventsOfType<EntityDeleteSuccess>(), isEmpty);
+      expect(logger.eventsOfType<RepositorySyncFinished>(), isEmpty);
+      expect(logger.eventsOfType<SyncContentCommitSucceeded>(), isEmpty);
+      final terminal = logger.eventsOfType<SyncFinished>();
+      expect(terminal, hasLength(1));
+      expect(terminal.single.data['phase'], 'commit');
+      expect(terminal.single.succeeded, isFalse);
       expect(env.store.box<CityEntity>().get(1)!.name, 'Old city');
       expect(env.store.box<PlaceEntity>().get(1)!.name, 'Old place');
       expect(env.store.box<EventEntity>().get(1)!.name, 'Old event');
@@ -196,6 +211,19 @@ void main() {
       source.failNextSave = true;
       expect(await useCase.sync(), isA<Error<void>>());
       expect(source.saves, 1);
+      final cause = logger.firstCallOfType<SyncFailure>();
+      expect(cause, isNotNull);
+      expect(cause!.error, same(source.failure));
+      expect(cause.stackTrace.toString(), contains('settings-update-source'));
+      expect(
+        logger.eventsOfType<LocalPersistenceSettingsInitFailed>(),
+        isEmpty,
+      );
+      expect(logger.eventsOfType<SyncContentCommitSucceeded>(), hasLength(1));
+      final terminal = logger.eventsOfType<SyncFinished>();
+      expect(terminal, hasLength(1));
+      expect(terminal.single.data['phase'], 'settings');
+      expect(terminal.single.succeeded, isFalse);
       expect(settings.contentSyncCursorAt?.toUtc(), oldMarker);
       expect(settings.lastSyncedAt?.toUtc(), oldCompletion);
       final oldDisk = env.store.box<AppSettings>().get(1)!;

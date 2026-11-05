@@ -75,6 +75,7 @@ final class SyncHarness {
           contentSyncCursorAt: autoSync ? null : DateTime.utc(2026, 10, 12),
         );
     final useCase = SyncUseCase(
+      logger: MockLogger(),
       cityRepository: _GatedCityRepository(
         gate: gate,
         prepareResult: cityResult,

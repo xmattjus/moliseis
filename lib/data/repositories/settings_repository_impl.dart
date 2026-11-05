@@ -44,10 +44,14 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   Future<Result<void>> _persistNewSettings(
-    AppSettings Function(AppSettings) transform,
-  ) async {
+    AppSettings Function(AppSettings) transform, {
+    bool reportSyncFailure = false,
+  }) async {
     _requireInitialized();
-    final result = await _dataSource.update(transform);
+    final result = await _dataSource.update(
+      transform,
+      reportSyncFailure: reportSyncFailure,
+    );
 
     if (result is Success<void>) {
       // Other setting lanes may have committed while this write was pending.
@@ -99,6 +103,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
         lastSyncedAt: lastSyncedAt,
         contentSyncCursorAt: contentSyncCursorAt,
       ),
+      reportSyncFailure: true,
     );
   }
 
