@@ -223,6 +223,7 @@ void main() {
               ..dsn = 'https://abc@example.test/1'
               ..automatedTestMode = true
               ..transport = transport
+              ..addEventProcessor(transport)
               ..beforeBreadcrumb = filterBreadcrumb,
           );
           addTearDown(Sentry.close);
@@ -248,6 +249,7 @@ void main() {
           expect(result.isError, isTrue);
           expect((result as Error).error.toString(), isNot(contains(canary)));
           await transport.settleCaptures();
+          expect(transport.events, hasLength(consent ? 1 : 0));
           expect(transport.envelopes, hasLength(consent ? 1 : 0));
           for (final envelope in transport.envelopes) {
             final serialized = await utf8.decoder

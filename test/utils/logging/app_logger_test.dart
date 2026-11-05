@@ -47,9 +47,10 @@ void main() {
       options
         ..dsn = 'https://abc@def.ingest.sentry.io/1234'
         ..automatedTestMode = true
-        ..transport = fakeTransport;
+        ..transport = fakeTransport
+        ..addEventProcessor(fakeTransport);
     });
-    Sentry.currentHub.scope.addEventProcessor(fakeTransport);
+    // Capture observation must survive the per-event privacy scope clear.
   });
 
   tearDown(() async {
@@ -554,6 +555,7 @@ void main() {
         stackTrace: StackTrace.fromString('PRIVATE_STACK_CANARY'),
       );
       await fakeTransport.settleCaptures();
+      expect(fakeTransport.events, hasLength(1));
       expect(fakeTransport.envelopes, hasLength(1));
       final serialized = await utf8.decoder
           .bind(fakeTransport.envelopes.single.envelopeStream(SentryOptions()))
@@ -599,6 +601,7 @@ void main() {
           await fakeTransport.settleCaptures();
           final capture =
               error is! FileSystemException || name == 'search_results';
+          expect(fakeTransport.events, hasLength(capture ? 1 : 0));
           expect(fakeTransport.envelopes, hasLength(capture ? 1 : 0));
           if (capture) {
             final payload = await utf8.decoder
