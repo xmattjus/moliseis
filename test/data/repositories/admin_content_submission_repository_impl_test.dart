@@ -59,6 +59,51 @@ void main() {
 
   tearDown(() => client.dispose());
 
+  for (final replayed in [false, true]) {
+    for (final failure in [
+      Exception('logger failed'),
+      StateError('logger failed'),
+    ]) {
+      test(
+        'association replay=$replayed survives logger ${failure.runtimeType}',
+        () async {
+          const asset = SubmissionAsset(
+            secureUrl: 'https://example.com/a.jpg',
+            width: 100,
+            height: 90,
+          );
+          httpClient.queueJson({
+            'outcome': replayed ? 'replayed' : 'created',
+            'asset': {
+              'id': 9,
+              'url': asset.secureUrl,
+              'width': 100,
+              'height': 90,
+            },
+          });
+          logger.onLogRecorded = (event) {
+            if (event is AdminStagedAssetAssociated) {
+              if (failure is Exception) throw failure;
+              if (failure is StateError) throw failure;
+            }
+          };
+          final result = await repository.associateStagedAsset(7, asset);
+          final receipt = (result as Success<AdminSubmissionAsset>).value;
+          expect(
+            (receipt.id, receipt.url, receipt.width, receipt.height),
+            (9, asset.secureUrl, 100, 90),
+          );
+          expect(httpClient.requests, hasLength(1));
+          expect(logger.eventsOfType<AdminBackendRequestFailed>(), isEmpty);
+          expect(
+            logger.eventsOfType<AdminStagedAssetAssociated>(),
+            hasLength(1),
+          );
+        },
+      );
+    }
+  }
+
   for (final rejection in [
     (400, 'VALIDATION_ERROR', true),
     (422, 'ADMIN_PROFILE_INCOMPLETE', true),

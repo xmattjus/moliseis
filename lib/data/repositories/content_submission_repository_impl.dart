@@ -51,10 +51,14 @@ class ContentSubmissionRepositoryImpl implements ContentSubmissionRepository {
       if ((data['submission_id'] as int) <= 0) {
         throw const FormatException('submit-content response is invalid.');
       }
-      if (data['replayed'] == true) {
-        _logger.log(const ContentSubmissionReplayAcknowledged());
-      } else {
-        _logger.log(const ContentSubmissionConfirmed());
+      try {
+        if (data['replayed'] == true) {
+          _logger.log(const ContentSubmissionReplayAcknowledged());
+        } else {
+          _logger.log(const ContentSubmissionConfirmed());
+        }
+      } on Object catch (_) {
+        // Diagnostic failure cannot revoke a validated backend acknowledgement.
       }
       return const Result.success(null);
     } on FunctionsFetchException catch (exception, stackTrace) {

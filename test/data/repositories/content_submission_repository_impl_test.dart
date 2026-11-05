@@ -63,6 +63,31 @@ void main() {
 
   tearDown(() => client.dispose());
 
+  for (final replayed in [false, true]) {
+    for (final failure in [
+      Exception('logger failed'),
+      StateError('logger failed'),
+    ]) {
+      test(
+        'confirmed replay=$replayed survives logger ${failure.runtimeType}',
+        () async {
+          httpClient.queueJson({'submission_id': 9, 'replayed': replayed});
+          logger.onLogRecorded = (event) {
+            if (event is ContentSubmissionConfirmed ||
+                event is ContentSubmissionReplayAcknowledged) {
+              if (failure is Exception) throw failure;
+              if (failure is StateError) throw failure;
+            }
+          };
+          expect(await submit(), isA<Success<void>>());
+          expect(httpClient.requests, hasLength(1));
+          expect(logger.eventsOfType<ContentSubmissionUploadFailed>(), isEmpty);
+          expect(logger.calls, hasLength(2));
+        },
+      );
+    }
+  }
+
   test(
     'sends one exact request and accepts a positive acknowledgement',
     () async {

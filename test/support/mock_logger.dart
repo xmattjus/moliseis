@@ -12,6 +12,9 @@ import 'package:moliseis/utils/logging/logging.dart';
 /// expect(mockLogger.eventsOfType<EntityInsertSuccess>(), hasLength(1));
 /// ```
 class MockLogger implements Logger {
+  /// Optional failure injection after recording, preserving default behavior.
+  void Function(LogEvent event)? onLogRecorded;
+
   final List<
     ({
       LogEvent event,
@@ -35,6 +38,7 @@ class MockLogger implements Logger {
       stackTrace: stackTrace,
       extra: extra,
     ));
+    onLogRecorded?.call(event);
   }
 
   /// Returns every [LogEvent] of type [T] that was logged, in call order.

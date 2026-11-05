@@ -96,6 +96,9 @@ class AppLogger implements Logger {
         unawaited(
           Sentry.captureEvent(
             SentryEvent(
+              contexts: uploadDiagnostic
+                  ? (Contexts()..['upload_diagnostic'] = event.data)
+                  : null,
               exceptions: [
                 SentryException(
                   type: event is SyncFailure

@@ -14,7 +14,7 @@ class CloudinaryUploadCancellationToken {
   bool _finished = false;
   bool _reported = false;
 
-  /// Publishes at most one terminal error, retaining a passive request cause.
+  /// Publishes at most one terminal error with its classified cause.
   void reportFailure(
     CloudinaryRequestFailed event,
     Object error,
@@ -24,8 +24,12 @@ class CloudinaryUploadCancellationToken {
     _reported = true;
     _logger.log(
       event,
-      error: _requestFailure?.error ?? error,
-      stackTrace: _requestFailure?.stackTrace ?? stackTrace,
+      error: error,
+      stackTrace:
+          stackTrace ??
+          (identical(_requestFailure?.error, error)
+              ? _requestFailure?.stackTrace
+              : null),
     );
   }
 
@@ -33,8 +37,10 @@ class CloudinaryUploadCancellationToken {
   void reportRetry(CloudinaryUploadRetry event, Exception error) {
     _logger.log(
       event,
-      error: _requestFailure?.error ?? error,
-      stackTrace: _requestFailure?.stackTrace,
+      error: error,
+      stackTrace: identical(_requestFailure?.error, error)
+          ? _requestFailure?.stackTrace
+          : null,
     );
     _requestFailure = null;
     _attachment?.superseded = true;

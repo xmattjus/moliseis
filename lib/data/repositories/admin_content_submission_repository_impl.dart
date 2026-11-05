@@ -274,9 +274,15 @@ final class AdminContentSubmissionRepositoryImpl
           confirmed.height != asset.height) {
         throw const FormatException('association receipt does not match');
       }
-      _logger.log(
-        AdminStagedAssetAssociated(replayed: envelope['outcome'] == 'replayed'),
-      );
+      try {
+        _logger.log(
+          AdminStagedAssetAssociated(
+            replayed: envelope['outcome'] == 'replayed',
+          ),
+        );
+      } on Object catch (_) {
+        // Diagnostic failure cannot revoke a validated association receipt.
+      }
       return confirmed;
     },
   );

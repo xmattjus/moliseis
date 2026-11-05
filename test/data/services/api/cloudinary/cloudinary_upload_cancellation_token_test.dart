@@ -170,21 +170,203 @@ void main() {
         final token = CloudinaryUploadCancellationToken(logger: logger);
         final done = Completer<HttpClientResponse>();
         token.attach(FakeCloudinaryHttpRequest(doneFuture: done.future));
-        done.completeError(TimeoutException('early timeout'));
-        await Future<void>.delayed(Duration.zero);
+        done.completeError(Exception('passive transport failure'));
+        await done.future.then<void>(
+          (_) {},
+          onError: (Object _, StackTrace _) {},
+        );
+        final mainCause = TimeoutException('main timeout');
         token
           ..reportRetry(
             const CloudinaryUploadRetry(
               category: CloudinaryFailureCategory.timeout,
               attempt: 1,
             ),
-            TimeoutException('main timeout'),
+            mainCause,
           )
           ..finish();
         expect(logger.eventsOfType<CloudinaryUploadRetry>(), hasLength(1));
+        expect(
+          logger.firstCallOfType<CloudinaryUploadRetry>()!.error,
+          same(mainCause),
+        );
+        expect(
+          logger.firstCallOfType<CloudinaryUploadRetry>()!.stackTrace,
+          isNull,
+        );
         expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
       },
     );
+
+    for (final passiveFirst in [true, false]) {
+      test(
+        'main cause matches classification, passiveFirst=$passiveFirst',
+        () async {
+          final logger = MockLogger();
+          final token = CloudinaryUploadCancellationToken(logger: logger);
+          final done = Completer<HttpClientResponse>();
+          final passive = Exception('passive transport failure');
+          final main = TimeoutException('main timeout');
+          final stack = StackTrace.fromString('main timeout stack');
+          token.attach(FakeCloudinaryHttpRequest(doneFuture: done.future));
+          if (passiveFirst) {
+            done.completeError(passive);
+            await done.future.then<void>(
+              (_) {},
+              onError: (Object _, StackTrace _) {},
+            );
+          }
+          token
+            ..reportFailure(
+              const CloudinaryRequestFailed(
+                stage: CloudinaryFailureStage.upload,
+                category: CloudinaryFailureCategory.timeout,
+              ),
+              main,
+              stack,
+            )
+            ..finish();
+          if (!passiveFirst) {
+            done.completeError(passive);
+            await done.future.then<void>(
+              (_) {},
+              onError: (Object _, StackTrace _) {},
+            );
+          }
+          token.finish();
+          expect(logger.eventsOfType<CloudinaryRequestFailed>(), hasLength(1));
+          final call = logger.firstCallOfType<CloudinaryRequestFailed>()!;
+          expect(call.error, same(main));
+          expect(call.stackTrace, same(stack));
+          expect(
+            (call.event as CloudinaryRequestFailed).category,
+            CloudinaryFailureCategory.timeout,
+          );
+        },
+      );
+    }
+
+    for (final retry in [false, true]) {
+      test('same passive cause retains its stack, retry=$retry', () async {
+        final logger = MockLogger();
+        final token = CloudinaryUploadCancellationToken(logger: logger);
+        final done = Completer<HttpClientResponse>();
+        final cause = TimeoutException('same observed failure');
+        final stack = StackTrace.fromString('original passive stack');
+        token.attach(FakeCloudinaryHttpRequest(doneFuture: done.future));
+        done.completeError(cause, stack);
+        await done.future.then<void>(
+          (_) {},
+          onError: (Object _, StackTrace _) {},
+        );
+        if (retry) {
+          token.reportRetry(
+            const CloudinaryUploadRetry(
+              category: CloudinaryFailureCategory.timeout,
+              attempt: 1,
+            ),
+            cause,
+          );
+        } else {
+          token.reportFailure(
+            const CloudinaryRequestFailed(
+              stage: CloudinaryFailureStage.upload,
+              category: CloudinaryFailureCategory.timeout,
+            ),
+            cause,
+            null,
+          );
+        }
+        token.finish();
+        expect(logger.calls, hasLength(1));
+        expect(logger.calls.single.error, same(cause));
+        expect(logger.calls.single.stackTrace, same(stack));
+      });
+    }
+
+    for (final succeeds in [true, false]) {
+      test(
+        'late previous attempt cannot contaminate retry success=$succeeds',
+        () async {
+          final logger = MockLogger();
+          final token = CloudinaryUploadCancellationToken(logger: logger);
+          final first = Completer<HttpClientResponse>();
+          final second = Completer<HttpClientResponse>();
+          token.attach(FakeCloudinaryHttpRequest(doneFuture: first.future));
+          final retryCause = TimeoutException('retry timeout');
+          token
+            ..reportRetry(
+              const CloudinaryUploadRetry(
+                category: CloudinaryFailureCategory.timeout,
+                attempt: 1,
+              ),
+              retryCause,
+            )
+            ..attach(FakeCloudinaryHttpRequest(doneFuture: second.future));
+          first.completeError(Exception('obsolete transport failure'));
+          await first.future.then<void>(
+            (_) {},
+            onError: (Object _, StackTrace _) {},
+          );
+          if (succeeds) {
+            second.complete(FakeCloudinaryHttpResponse());
+            await second.future;
+          } else {
+            final cause = TimeoutException('second timeout');
+            token.reportFailure(
+              const CloudinaryRequestFailed(
+                stage: CloudinaryFailureStage.upload,
+                category: CloudinaryFailureCategory.timeout,
+              ),
+              cause,
+              null,
+            );
+            second.completeError(cause);
+            await second.future.then<void>(
+              (_) {},
+              onError: (Object _, StackTrace _) {},
+            );
+            expect(
+              logger.firstCallOfType<CloudinaryRequestFailed>()!.error,
+              same(cause),
+            );
+          }
+          token.finish();
+          expect(
+            logger.eventsOfType<CloudinaryRequestFailed>(),
+            hasLength(succeeds ? 0 : 1),
+          );
+          expect(
+            logger.firstCallOfType<CloudinaryUploadRetry>()!.error,
+            same(retryCause),
+          );
+        },
+      );
+    }
+
+    test('cancel after passive fault suppresses terminal reporting', () async {
+      final logger = MockLogger();
+      final token = CloudinaryUploadCancellationToken(logger: logger);
+      final done = Completer<HttpClientResponse>();
+      token.attach(FakeCloudinaryHttpRequest(doneFuture: done.future));
+      done.completeError(Exception('transport failure'));
+      await done.future.then<void>(
+        (_) {},
+        onError: (Object _, StackTrace _) {},
+      );
+      token
+        ..cancel()
+        ..reportFailure(
+          const CloudinaryRequestFailed(
+            stage: CloudinaryFailureStage.upload,
+            category: CloudinaryFailureCategory.transport,
+          ),
+          Exception('main failure'),
+          null,
+        )
+        ..finish();
+      expect(logger.eventsOfType<CloudinaryRequestFailed>(), isEmpty);
+    });
 
     group('abortCurrentRequest', () {
       test(

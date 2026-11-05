@@ -540,6 +540,102 @@ void main() {
       },
     );
 
+    for (final enabled in [false, true]) {
+      for (final status in [400, 503]) {
+        for (final event in <LogEvent>[
+          CloudinaryRequestFailed(
+            stage: CloudinaryFailureStage.response,
+            category: CloudinaryFailureCategory.http,
+            statusCode: status,
+          ),
+          const CloudinaryRequestFailed(
+            stage: CloudinaryFailureStage.upload,
+            category: CloudinaryFailureCategory.timeout,
+          ),
+          const CloudinaryRequestFailed(
+            stage: CloudinaryFailureStage.response,
+            category: CloudinaryFailureCategory.invalidResponse,
+          ),
+          ContentSubmissionUploadFailed(
+            outcome: status == 400
+                ? AssociationOutcome.rejected
+                : AssociationOutcome.unconfirmed,
+            statusCode: status,
+          ),
+          AdminBackendRequestFailed(
+            operation: 'associateStagedAsset',
+            outcome: status == 400
+                ? AssociationOutcome.rejected
+                : AssociationOutcome.unconfirmed,
+            statusCode: status,
+          ),
+        ]) {
+          test(
+            '${event.name} HTTP $status structured capture consent=$enabled',
+            () async {
+              sentryFlag.enabled = enabled;
+              await Sentry.configureScope((scope) async {
+                await scope.setContexts('private', {
+                  'payload': 'PRIVATE_CONTEXT_CANARY',
+                });
+                await scope.setUser(SentryUser(id: 'PRIVATE_USER_CANARY'));
+                await scope.setTag('private', 'PRIVATE_TAG_CANARY');
+                await scope.addBreadcrumb(
+                  Breadcrumb(message: 'PRIVATE_BREADCRUMB_CANARY'),
+                );
+              });
+              final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
+              logger.log(
+                event,
+                error: Exception('PRIVATE_EXCEPTION_CANARY'),
+                stackTrace: StackTrace.fromString('PRIVATE_STACK_CANARY'),
+                extra: {
+                  'authorization': 'PRIVATE_EXTRA_CANARY',
+                  'status_code': 201,
+                },
+              );
+              await fakeTransport.settleCaptures();
+              expect(fakeTransport.events, hasLength(enabled ? 1 : 0));
+              expect(fakeTransport.envelopes, hasLength(enabled ? 1 : 0));
+              if (enabled) {
+                expect(
+                  fakeTransport.events.single.contexts['upload_diagnostic'],
+                  event.data,
+                );
+                final serialized = await utf8.decoder
+                    .bind(
+                      fakeTransport.envelopes.single.envelopeStream(
+                        SentryOptions(),
+                      ),
+                    )
+                    .join();
+                // Check the serialized event, independent of breadcrumbs.
+                final payload =
+                    (jsonDecode(serialized.trim().split('\n').last)
+                            as Map)['contexts']
+                        as Map;
+                expect(payload['upload_diagnostic'], event.data);
+                expect(serialized, isNot(contains('PRIVATE_')));
+              }
+              expect(Sentry.currentHub.scope.contexts['private'], {
+                'payload': 'PRIVATE_CONTEXT_CANARY',
+              });
+              expect(Sentry.currentHub.scope.user!.id, 'PRIVATE_USER_CANARY');
+              // Later ordinary captures retain the global scope.
+              await Sentry.captureMessage('subsequent ordinary capture');
+              await fakeTransport.settleCaptures();
+              final later = fakeTransport.events.last;
+              expect(later.contexts['private'], {
+                'payload': 'PRIVATE_CONTEXT_CANARY',
+              });
+              expect(later.user!.id, 'PRIVATE_USER_CANARY');
+              expect(later.contexts['upload_diagnostic'], isNull);
+            },
+          );
+        }
+      }
+    }
+
     test('scoped capture drops inherited private context', () async {
       sentryFlag.enabled = true;
       await Sentry.configureScope((scope) async {
