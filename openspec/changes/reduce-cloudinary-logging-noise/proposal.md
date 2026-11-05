@@ -21,7 +21,7 @@ None.
 
 ### Modified Capabilities
 
-- `application-observability`: Add Cloudinary upload and subsequent public/Admin association diagnostic contracts that produce truthful, non-duplicative, privacy-safe signals.
+- `application-observability`: Add Cloudinary upload and subsequent public/Admin association diagnostic contracts that produce truthful, non-duplicative, privacy-safe signals. Narrow the earlier blanket "content-submission reporting unchanged" clause solely for these diagnostics; preserve exception-capture ownership, consent and existing submission behavior.
 
 Existing `content-submission-submit-orchestration`, `admin-submission-save-idempotency`, and `admin-local-asset-staging` contracts remain authoritative and functionally unchanged; their upload/association distinctions are inputs to the observability requirements.
 
