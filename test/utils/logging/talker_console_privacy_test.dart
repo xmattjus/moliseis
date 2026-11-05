@@ -34,6 +34,7 @@ void main() {
         // Select the Dart debugPrint path; this is not a native release build.
         debugDefaultTargetPlatformOverride = TargetPlatform.android;
         final transport = RecordingSentryTransport();
+        final observedConsole = <String>[];
         final options = SentryFlutterOptions(checker: NonDebugRuntimeChecker())
           ..addIntegration(DebugPrintIntegration());
         await Sentry.init((options) {
@@ -42,7 +43,12 @@ void main() {
             ..automatedTestMode = true
             ..transport = transport
             ..addEventProcessor(transport)
-            ..beforeBreadcrumb = filterBreadcrumb;
+            ..beforeBreadcrumb = (breadcrumb, hint) {
+              if (breadcrumb?.category == 'console') {
+                observedConsole.add(breadcrumb?.message ?? '');
+              }
+              return filterBreadcrumb(breadcrumb, hint);
+            };
         }, options: options);
         expect(options.runtimeChecker.isDebugMode(), isFalse);
         expect(options.enablePrintBreadcrumbs, isTrue);
@@ -83,6 +89,13 @@ void main() {
               .map((breadcrumb) => breadcrumb.message),
           contains(safeConsole),
         );
+        for (final framing in ['Exception:', 'StackTrace:']) {
+          expect(
+            observedConsole,
+            contains(contains(framing)),
+            reason: 'Talker $framing must reach the pre-filter console hook',
+          );
+        }
         final scopeJson = jsonEncode(
           accepted.map((breadcrumb) => breadcrumb.toJson()).toList(),
         );
