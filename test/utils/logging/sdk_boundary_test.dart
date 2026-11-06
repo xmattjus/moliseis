@@ -11,6 +11,116 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
+  test('apostrophe in a comment cannot hide executable SDK calls', () {
+    final violations = findSdkBoundaryViolations({
+      'lib/ui/example.dart': """
+// It doesn't matter here
+Sentry.captureException(error);
+final value = 'example';
+""",
+    });
+
+    const expected =
+        'lib/ui/example.dart: direct Sentry captureException '
+        'requires an approved adapter';
+    expect(violations, [expected]);
+  });
+
+  test('quotes and comment markers cannot hide following SDK calls', () {
+    final fixtures = {
+      'block_comment': """
+/* It doesn't matter: ' or " */
+Sentry.captureException(error);
+final value = 'example';
+""",
+      'comment_markers': """
+final line = '// not a comment';
+final block = "/* not a comment */";
+Sentry.captureException(error);
+""",
+      'raw_single': r"""
+final value = r'// raw trailing backslash\';
+Sentry.captureException(error);
+final other = 'example';
+""",
+      'raw_double': r'''
+final value = r"/* raw trailing backslash\";
+Sentry.captureException(error);
+final other = "example";
+''',
+      'escaped_quotes': r"""
+final value = 'it\'s // still a string';
+Sentry.captureException(error);
+""",
+    };
+    for (final entry in fixtures.entries) {
+      final path = 'lib/ui/${entry.key}.dart';
+      expect(findSdkBoundaryViolations({path: entry.value}), [
+        '$path: direct Sentry captureException requires an approved adapter',
+      ], reason: entry.key);
+    }
+  });
+
+  test('SDK-looking strings and comments are ignored', () {
+    final violations = findSdkBoundaryViolations({
+      'lib/domain/example.dart': r"""
+// It doesn't call Sentry.captureException(error);
+/* 'Sentry.captureEvent(event)' and "Sentry.configureScope(callback)" */
+final single = 'Sentry.captureException(error)';
+final double = "Sentry.startSpan('operation', callback)";
+final raw = r'/* Sentry.captureException(error) */';
+final escaped = 'it\'s Sentry.captureException(error)';
+final importText = "import 'package:sentry/sentry.dart';";
+""",
+    });
+    expect(violations, isEmpty);
+  });
+
+  for (final quote in ["'", '"']) {
+    for (final raw in [false, true]) {
+      test('triple $quote strings mask only their contents, raw=$raw', () {
+        final delimiter = '$quote$quote$quote';
+        final source = [
+          'final value = ${raw ? 'r' : ''}$delimiter',
+          'Sentry.captureException(fake);',
+          "import 'package:sentry/sentry.dart';",
+          "import 'package:talker/talker.dart';",
+          '// comment markers inside a string',
+          '/* also string contents */',
+          if (!raw) '\\$delimiter',
+          if (!raw) 'Sentry.configureScope(fake);',
+          if (raw) r'\',
+          '$delimiter;',
+          'Sentry.captureEvent(event);',
+        ].join('\n');
+        const expected =
+            'lib/domain/example.dart: direct Sentry captureEvent '
+            'requires an approved adapter';
+        expect(findSdkBoundaryViolations({'lib/domain/example.dart': source}), [
+          expected,
+        ]);
+      });
+    }
+  }
+
+  test('masking retains line boundaries for imports after comments', () {
+    final violations = findSdkBoundaryViolations({
+      'lib/ui/example.dart':
+          """
+// comment marker text: /*
+library example; /* comment with a line break
+ending on the import line */ import
+  'package:sentry/sentry.dart' as telemetry;
+void report() => telemetry.Sentry.captureException(error);
+"""
+              .replaceAll('\n', '\r\n'),
+    });
+    const expected =
+        'lib/ui/example.dart: direct Sentry captureException '
+        'requires an approved adapter';
+    expect(violations, [expected]);
+  });
+
   test('source fixtures reject aliased Sentry and direct Talker bypasses', () {
     final violations = findSdkBoundaryViolations({
       'lib/data/repositories/repository.dart': '''

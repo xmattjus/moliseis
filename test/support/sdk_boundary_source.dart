@@ -21,10 +21,18 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
   final hubAdapterConstruction = RegExp(
     r'\b(?:(\w+)\s*\.\s*)?Hub(?:Adapter)?\s*\(',
   );
-  final stringLiteral = RegExp(
-    r'''(?:r)?(?:'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")''',
+  final stringOrComment = RegExp(
+    r'//[^\r\n]*|/\*[\s\S]*?\*/'
+    r"|r'''[\s\S]*?'''"
+    r'|r"""[\s\S]*?"""'
+    r"|'''(?:\\[\s\S]|(?!''')[^\\])*'''"
+    r'|"""(?:\\[\s\S]|(?!""")[^\\])*"""'
+    r"|r'[^'\r\n]*'"
+    r'|r"[^"\r\n]*"'
+    r"|'(?:\\[^\r\n]|[^'\\\r\n])*'"
+    r'|"(?:\\[^\r\n]|[^"\\\r\n])*"',
   );
-  final comment = RegExp(r'//[^\n]*|/\*[\s\S]*?\*/');
+  final nonLineBreak = RegExp(r'[^\r\n]');
   final talkerImport = RegExp(
     r'''^\s*import\s+['"]package:talker(?:_flutter)?/[^'"]+['"]''',
     multiLine: true,
@@ -46,12 +54,25 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
   for (final entry in sources.entries) {
     final path = entry.key.replaceAll(r'\', '/');
     final source = entry.value;
-    // Mask ordinary string literals and comments to avoid matching examples
-    // or prose. This intentionally remains a lightweight source check, not a
-    // Dart lexer; SDK calls inside interpolated strings are outside its scope.
-    final code = source.replaceAll(stringLiteral, ' ').replaceAll(comment, ' ');
-    final importSource = source.replaceAll(comment, ' ');
-    final sentryImports = sentryImport.allMatches(importSource).toList();
+    // First token wins: quotes in comments and comment markers in strings
+    // cannot consume code. Keep offsets and line breaks for import matching.
+    // shortcut: interpolation code is masked, use an analyzer if needed.
+    final code = source.replaceAllMapped(
+      stringOrComment,
+      (match) => match[0]!.replaceAll(nonLineBreak, ' '),
+    );
+    final importSource = source.replaceAllMapped(stringOrComment, (match) {
+      final token = match[0]!;
+      return token.startsWith('//') || token.startsWith('/*')
+          ? token.replaceAll(nonLineBreak, ' ')
+          : token;
+    });
+    bool isCodeImport(RegExpMatch match) =>
+        code.substring(match.start, match.end).trimLeft().startsWith('import');
+    final sentryImports = sentryImport
+        .allMatches(importSource)
+        .where(isCodeImport)
+        .toList();
     final importedAliases = sentryImports
         .map((match) => match.group(1))
         .whereType<String>()
@@ -63,7 +84,7 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
         path.startsWith('lib/domain/') ||
         path.startsWith('lib/data/repositories/');
     final importsSentryFromBusinessLayer =
-        isBusinessLayer && sentryImport.hasMatch(importSource);
+        isBusinessLayer && sentryImports.isNotEmpty;
     final apiOperations = <String>{
       ...directSentryApi.allMatches(code).map((match) => match.group(2)!),
       ...aliasedSentryApi
@@ -97,8 +118,8 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
       }
     }
 
-    if (talkerImport.hasMatch(importSource) &&
-        !allowedTalkerFiles.contains(path)) {
+    if (!allowedTalkerFiles.contains(path) &&
+        talkerImport.allMatches(importSource).any(isCodeImport)) {
       violations.add(
         '$path: direct Talker use requires an approved logging boundary',
       );
