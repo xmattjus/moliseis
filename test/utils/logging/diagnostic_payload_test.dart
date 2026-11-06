@@ -250,9 +250,10 @@ void main() {
     },
   );
 
-  testWidgets(
+  // SDK Linux enrichment starts a process; captures need real async execution.
+  test(
     'command reports preserve approved identity without private input',
-    (tester) async {
+    () async {
       final previousHandler = command_it.Command.globalExceptionHandler;
       final previousReportAll = command_it.Command.reportAllExceptions;
       final previousDetailed = command_it.Command.detailedStackTraces;
@@ -293,11 +294,10 @@ void main() {
               (_) => fail('Unexpected command success'),
               onError: (Object error, StackTrace _) => observedError = error,
             );
-        await tester.pump(Duration.zero);
         await observed;
         expect(observedError, same(errors[i]));
       }
-      await tester.runAsync(transport.settleCaptures);
+      await transport.settleCaptures();
 
       expect(transport.envelopes, hasLength(4));
       final events = <Map<String, dynamic>>[];
