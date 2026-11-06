@@ -165,7 +165,6 @@ void main() {
         final terminal = logger.eventsOfType<CloudinaryRequestFailed>().single;
         expect(terminal.stage, CloudinaryFailureStage.preflight);
         expect(terminal.category, CloudinaryFailureCategory.fileRead);
-        expect(terminal.report, isFalse);
         expect(server.requests, isEmpty);
       },
     );

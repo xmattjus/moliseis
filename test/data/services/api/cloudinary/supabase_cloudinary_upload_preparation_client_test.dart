@@ -147,6 +147,27 @@ void main() {
     expect(third, isA<Error<CloudinaryUploadPreparation>>());
   });
 
+  test(
+    'preserves FunctionException status for preparation diagnostics',
+    () async {
+      httpClient.queueJson(
+        const {'code': 'UPSTREAM_FAILURE', 'message': 'private response body'},
+        status: 502,
+        reasonPhrase: 'Bad Gateway',
+      );
+
+      final result = await client.prepare(
+        publicId: publicId,
+        options: const CloudinaryUploadOptions(),
+      );
+
+      expect(result, isA<Error<CloudinaryUploadPreparation>>());
+      final error = (result as Error<CloudinaryUploadPreparation>).error;
+      expect(error, isA<FunctionException>());
+      expect((error as FunctionException).status, 502);
+    },
+  );
+
   for (final failure
       in <
         ({

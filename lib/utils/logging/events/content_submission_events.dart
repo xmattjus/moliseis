@@ -233,12 +233,10 @@ class ContentSubmissionDraftClearSuccess extends LogEvent {
 
 /// Fired when a content submission draft save starts.
 class ContentSubmissionDraftSaveStarted extends LogEvent {
-  const ContentSubmissionDraftSaveStarted({required this.draft});
-
-  final String draft;
+  const ContentSubmissionDraftSaveStarted();
 
   @override
-  Map<String, Object?> get data => {'draft': draft};
+  Map<String, Object?> get data => const {};
 
   @override
   AppLogLevel get level => AppLogLevel.info;
@@ -263,12 +261,10 @@ class ContentSubmissionDraftSaveFailed extends LogEvent {
 
 /// Fired when a content submission draft save finishes successfully.
 class ContentSubmissionDraftSaveSuccess extends LogEvent {
-  const ContentSubmissionDraftSaveSuccess({required this.draft});
-
-  final String draft;
+  const ContentSubmissionDraftSaveSuccess();
 
   @override
-  Map<String, Object?> get data => {'draft': draft};
+  Map<String, Object?> get data => const {};
 
   @override
   AppLogLevel get level => AppLogLevel.info;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -59,6 +60,20 @@ class RecordingSentryTransport implements Transport, EventProcessor {
       await _delivery.future.timeout(const Duration(seconds: 5));
     }
   }
+
+  /// Reads the final event JSON from a delivered serialized envelope.
+  Future<Map<String, dynamic>> serializedEvent(int index) async {
+    final serialized = await utf8.decoder
+        .bind(envelopes[index].envelopeStream(SentryOptions()))
+        .join();
+    return jsonDecode(serialized.trim().split('\n').last)
+        as Map<String, dynamic>;
+  }
+
+  /// Returns exception values in the serialized Sentry event shape.
+  List<Map<String, dynamic>> exceptionValues(Map<String, dynamic> event) =>
+      ((event['exception'] as Map<String, dynamic>)['values'] as List)
+          .cast<Map<String, dynamic>>();
 }
 
 /// Selects SDK non-debug branches without changing the host Flutter build.

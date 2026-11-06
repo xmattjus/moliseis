@@ -55,6 +55,7 @@ void main() {
             options
               ..dsn = 'https://abc@example.test/1'
               ..automatedTestMode = true
+              ..enablePrintBreadcrumbs = false
               ..transport = transport
               ..addEventProcessor(transport)
               ..beforeBreadcrumb = (breadcrumb, hint) {
@@ -65,8 +66,8 @@ void main() {
               };
           }, options: options);
           expect(options.runtimeChecker.isDebugMode(), isFalse);
-          expect(options.enablePrintBreadcrumbs, isTrue);
-          expect(debugPrint, isNot(same(originalDebugPrint)));
+          expect(options.enablePrintBreadcrumbs, isFalse);
+          expect(debugPrint, same(originalDebugPrint));
 
           const safeConsole = 'TASK41_SAFE_CONSOLE';
           const followupMessage = 'TASK41_INNOCUOUS_FOLLOWUP';
@@ -117,15 +118,9 @@ void main() {
             accepted
                 .where((breadcrumb) => breadcrumb.category == 'console')
                 .map((breadcrumb) => breadcrumb.message),
-            contains(safeConsole),
+            isEmpty,
           );
-          for (final framing in ['Exception:', 'StackTrace:']) {
-            expect(
-              observedConsole,
-              contains(contains(framing)),
-              reason: 'Talker $framing must reach the pre-filter console hook',
-            );
-          }
+          expect(observedConsole, isEmpty);
           final scopeJson = jsonEncode(
             accepted.map((breadcrumb) => breadcrumb.toJson()).toList(),
           );
@@ -141,7 +136,7 @@ void main() {
               .bind(envelope.envelopeStream(options))
               .join();
           expect(serialized, contains(followupMessage));
-          expect(serialized, contains(safeConsole));
+          expect(serialized, isNot(contains(safeConsole)));
           expect(serialized, isNot(contains('TASK7_PRIVATE_')));
           expect(
             {

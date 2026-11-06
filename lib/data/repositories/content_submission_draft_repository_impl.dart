@@ -62,12 +62,12 @@ class ContentSubmissionDraftRepositoryImpl
 
   @override
   Future<Result<void>> saveDraft(ContentSubmissionDraft state) async {
-    _logger.log(ContentSubmissionDraftSaveStarted(draft: state.toString()));
+    _logger.log(const ContentSubmissionDraftSaveStarted());
 
     try {
       final draft = state.toEntity();
       await _box.putAsync(draft);
-      _logger.log(ContentSubmissionDraftSaveSuccess(draft: state.toString()));
+      _logger.log(const ContentSubmissionDraftSaveSuccess());
       return const Result.success(null);
     } on Exception catch (exception, stackTrace) {
       _logger.log(

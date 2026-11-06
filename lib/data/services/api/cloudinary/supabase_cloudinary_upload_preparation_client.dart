@@ -47,9 +47,7 @@ final class SupabaseCloudinaryUploadPreparationClient
     } on FunctionsFetchException catch (error) {
       return Result.error(recoverSupabaseFunctionsFetchError(error));
     } on FunctionException catch (error) {
-      return Result.error(
-        Exception(error.reasonPhrase ?? 'Upload preparation failed'),
-      );
+      return Result.error(error);
     } on Exception catch (error) {
       return Result.error(error);
     }

@@ -86,6 +86,7 @@ Future<void> _main() async {
           ..replay.sessionSampleRate = kDebugMode ? 0 : 0.4
           ..replay.onErrorSampleRate = kDebugMode ? 0 : 1.0
           ..sendDefaultPii = false
+          ..enablePrintBreadcrumbs = false
           ..httpClient = httpClientFactory()
           ..privacy.maskAllText = false
           ..privacy.maskAllImages = false
@@ -103,7 +104,10 @@ Future<void> _main() async {
       final supabase = await Supabase.initialize(
         url: Env.supabaseProdUrl,
         publishableKey: Env.supabaseProdApiKey,
-        httpClient: SentrySupabaseClient(client: httpClient),
+        httpClient: SentrySupabaseClient(
+          client: httpClient,
+          enableErrors: false,
+        ),
       );
       await ensureAnonymousSupabaseSession(
         authClient: supabase.client.auth,
