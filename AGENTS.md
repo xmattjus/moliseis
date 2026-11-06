@@ -87,6 +87,26 @@ internal notifier teardown, raw async throws can fail on disposed state before
 reaching the global handler. Preserve ViewModel lifecycle guards; global reporting
 cannot make post-dispose throws safe. Re-audit this when upgrading `command_it`.
 
+## Application logging
+
+- Use typed events through `Logger.log(event, error: error, stackTrace: stack)`.
+  Pass original causes/stacks for local diagnostics; `extra` is local only.
+- Ordinary callers do not choose remote policy. Severity alone never authorizes
+  a report. Add new remote event families only through AppLogger's reviewed,
+  bounded projection; never forward raw input, URLs, messages or stack text.
+- Respect the existing terminal reporting owner. A returned `Result.error` may
+  already be reported; logging/rethrowing it elsewhere must not add a capture.
+- Diagnostics must not change results, persistence, retries or exception
+  propagation. Avoid fallible pre-rendering of logging arguments.
+- Business code must not call Sentry capture, breadcrumbs, structured logging,
+  scope mutation or manual tracing directly. Bootstrap/network, consent,
+  Replay masks and the local Talker viewer/observer retain their approved roles.
+- Use `runTracedResult` for existing manual Result traces; it never reports
+  exceptions. Review automatic SDK integration ownership before enabling capture.
+- These project rules take precedence over generic bundled Sentry skill examples.
+  `test/utils/logging/sdk_boundary_test.dart` guards representative bypasses;
+  it does not prove semantic correctness or payload privacy.
+
 ## Supabase and database contracts
 
 Current migrations and SQL definitions are authoritative for schema, constraints,

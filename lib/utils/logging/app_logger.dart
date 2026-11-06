@@ -22,6 +22,55 @@ class AppLogger implements Logger {
     this.minLevel = AppLogLevel.debug,
   }) : _sentryFlag = sentryFlag;
 
+  static const _approvedReportKey = 'moliseis.approved_report';
+  static const _uploadCommands = {
+    'content_submission_submit',
+    'admin_submission_editor_save',
+    'admin_submission_editor_add_asset',
+  };
+
+  /// Restores app payloads after native enrichment; leaves SDK-owned errors.
+  ///
+  /// Wire this only at Sentry bootstrap. The private hint is never transmitted.
+  static SentryEvent? beforeSend(SentryEvent event, Hint hint) {
+    final approved = hint.get(_approvedReportKey);
+    if (approved is! SentryEvent) return event;
+    try {
+      final trace = event.contexts.trace;
+      if (trace != null) {
+        approved.contexts.trace = SentryTraceContext(
+          traceId: trace.traceId,
+          spanId: trace.spanId,
+          parentSpanId: trace.parentSpanId,
+          replayId: trace.replayId,
+          sampled: trace.sampled,
+          status: trace.status,
+          operation: 'app.report',
+        );
+      }
+      hint
+        ..attachments.clear()
+        ..screenshot = null
+        ..viewHierarchy = null;
+      return SentryEvent(
+        eventId: event.eventId,
+        timestamp: event.timestamp,
+        sdk: event.sdk,
+        platform: event.platform,
+        release: event.release,
+        dist: event.dist,
+        environment: event.environment,
+        level: approved.level,
+        exceptions: approved.exceptions,
+        contexts: approved.contexts,
+        breadcrumbs: approved.breadcrumbs,
+      );
+    } on Object catch (_) {
+      // Never let SDK fallback forward an unisolated app report.
+      return null;
+    }
+  }
+
   final Talker _talker;
   final SentryLoggingFlag _sentryFlag;
 
@@ -179,16 +228,10 @@ class AppLogger implements Logger {
           'search_results',
           'search_suggestions',
           'geo_map_selection',
-          'content_submission_submit',
-          'admin_submission_editor_save',
-          'admin_submission_editor_add_asset',
+          ..._uploadCommands,
           'command',
         });
-        final uploadCommand = const {
-          'content_submission_submit',
-          'admin_submission_editor_save',
-          'admin_submission_editor_add_asset',
-        }.contains(command);
+        final uploadCommand = _uploadCommands.contains(command);
         return (
           report: report && !(uploadCommand && error is FileSystemException),
           data: {'debugName': command},
@@ -230,35 +273,19 @@ class AppLogger implements Logger {
             }),
           },
         );
-      case EntityInsertFailed() || EntityRemoveFailed():
-        final entity = switch (event) {
-          EntityInsertFailed() => event.entityType,
-          EntityRemoveFailed() => event.entityType,
-          _ => null,
-        };
-        return (report: report, data: {'entityType': _repository(entity)});
-      case EntityInsertSuccess() ||
-          EntityDeleteSuccess() ||
-          EntityUpdateSuccess():
-        final entity = switch (event) {
-          EntityInsertSuccess() => event.entityType,
-          EntityDeleteSuccess() => event.entityType,
-          EntityUpdateSuccess() => event.entityType,
-          _ => null,
-        };
-        return (report: false, data: {'entityType': _repository(entity)});
-      case RepositorySyncStarted() ||
-          RepositorySyncFinished() ||
-          RepositorySyncFailed():
-        final repository = switch (event) {
-          RepositorySyncStarted() => event.repositoryName,
-          RepositorySyncFinished() => event.repositoryName,
-          RepositorySyncFailed() => event.repositoryName,
-          _ => null,
-        };
+      case EntityInsertFailed(:final entityType) ||
+          EntityRemoveFailed(:final entityType):
+        return (report: report, data: {'entityType': _repository(entityType)});
+      case EntityInsertSuccess(:final entityType) ||
+          EntityDeleteSuccess(:final entityType) ||
+          EntityUpdateSuccess(:final entityType):
+        return (report: false, data: {'entityType': _repository(entityType)});
+      case RepositorySyncStarted(:final repositoryName) ||
+          RepositorySyncFinished(:final repositoryName) ||
+          RepositorySyncFailed(:final repositoryName):
         return (
           report: event is RepositorySyncFailed && report,
-          data: {'repositoryName': _repository(repository)},
+          data: {'repositoryName': _repository(repositoryName)},
         );
       case ImageLoadFailed():
         return (
@@ -322,11 +349,7 @@ class AppLogger implements Logger {
         (event is AdminBackendRequestFailed &&
             event.operation == 'associateStagedAsset') ||
         (event is CommandExecutionFailed &&
-            const {
-              'content_submission_submit',
-              'admin_submission_editor_save',
-              'admin_submission_editor_add_asset',
-            }.contains(event.debugName));
+            _uploadCommands.contains(event.debugName));
     final diagnostic = {
       'event': name,
       ...data,
@@ -360,8 +383,19 @@ class AppLogger implements Logger {
         ),
       ],
     );
+    // Separate containers keep native enrichment out of the approved copy.
+    final approvedReport = SentryEvent(
+      level: reportEvent.level,
+      exceptions: reportEvent.exceptions,
+      breadcrumbs: reportEvent.breadcrumbs,
+      contexts: Contexts()
+        ..['app_diagnostic'] = diagnostic
+        ..[upload ? 'upload_diagnostic' : 'failure_diagnostic'] = data,
+    );
+    final hint = Hint.withMap({_approvedReportKey: approvedReport});
     await Sentry.captureEvent(
       reportEvent,
+      hint: hint,
       withScope: (scope) async {
         final previous = scope.breadcrumbs;
         await scope.clear();
@@ -375,6 +409,7 @@ class AppLogger implements Logger {
             ),
           currentBreadcrumb,
         ];
+        approvedReport.breadcrumbs = reportEvent.breadcrumbs;
       },
     );
   }

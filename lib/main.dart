@@ -25,7 +25,6 @@ import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/command_configuration.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/http_client.dart';
-import 'package:moliseis/utils/logging/filter_breadcrumb.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
@@ -87,10 +86,10 @@ Future<void> _main() async {
           ..replay.onErrorSampleRate = kDebugMode ? 0 : 1.0
           ..sendDefaultPii = false
           ..enablePrintBreadcrumbs = false
+          ..beforeSend = AppLogger.beforeSend
           ..httpClient = httpClientFactory()
           ..privacy.maskAllText = false
-          ..privacy.maskAllImages = false
-          ..beforeBreadcrumb = filterBreadcrumb,
+          ..privacy.maskAllImages = false,
         appRunner: runner,
       );
     },

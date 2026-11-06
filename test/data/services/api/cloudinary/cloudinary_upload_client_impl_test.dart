@@ -17,7 +17,6 @@ import 'package:moliseis/data/services/api/cloudinary/exceptions/file_too_large_
 import 'package:moliseis/data/services/api/cloudinary/exceptions/upload_cancelled_exception.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/utils/constants.dart';
-import 'package:moliseis/utils/logging/filter_breadcrumb.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
@@ -223,7 +222,7 @@ void main() {
               ..automatedTestMode = true
               ..transport = transport
               ..addEventProcessor(transport)
-              ..beforeBreadcrumb = filterBreadcrumb,
+              ..enablePrintBreadcrumbs = false,
           );
           addTearDown(Sentry.close);
           final talker = TalkerFlutter.init();

@@ -14,7 +14,6 @@ import 'package:moliseis/data/core/supabase_sync_cursor_source.dart';
 import 'package:moliseis/data/data-sources/settings_local_data_source.dart';
 import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/command_configuration.dart';
-import 'package:moliseis/utils/logging/filter_breadcrumb.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
@@ -54,20 +53,12 @@ void main() {
         ..traceLifecycle = SentryTraceLifecycle.stream
         ..tracesSampleRate = 1.0
         ..beforeSendSpan = transport.recordSpan
-        ..beforeBreadcrumb = filterBreadcrumb;
+        ..enablePrintBreadcrumbs = false;
     });
     talker = Talker(
       logger: TalkerLogger(
         output: (message) {
-          // The locked IO logger sends exactly these newline-split print calls.
-          for (final line in message.split('\n')) {
-            console.add(line);
-            unawaited(
-              Sentry.addBreadcrumb(
-                Breadcrumb.console(message: line, level: SentryLevel.debug),
-              ),
-            );
-          }
+          console.addAll(message.split('\n'));
         },
       ),
     );
@@ -242,74 +233,4 @@ void main() {
       );
     }
   }
-
-  for (final category in <String?>[null, 'app', 'http', 'navigation']) {
-    test(
-      'preserves non-console decorated breadcrumb category=$category',
-      () async {
-        final breadcrumb = Breadcrumb(
-          message: 'Explore │ Map ┌ └',
-          category: category,
-        );
-        await Sentry.addBreadcrumb(breadcrumb);
-        expect(Sentry.currentHub.scope.breadcrumbs.single, same(breadcrumb));
-      },
-    );
-  }
-
-  test('rejects console exception, stack and multiline Talker fragments', () {
-    for (final message in [
-      '│ Exception: $secret',
-      '│ StackTrace: $secret',
-      '┌ Header\n│ Exception: $secret\n│ StackTrace: $secret\n└',
-    ]) {
-      expect(
-        filterBreadcrumb(Breadcrumb.console(message: message), Hint()),
-        isNull,
-      );
-    }
-  });
-
-  test(
-    'real Talker preserves original stack; safe console breadcrumb survives',
-    () async {
-      expect(
-        filterBreadcrumb(Breadcrumb.console(message: '─\u001b['), Hint()),
-        isNull,
-      );
-      final error = Exception(secret);
-      final stack = StackTrace.fromString(secret);
-      logger.log(
-        SyncFailure(
-          owner: SyncFailureOwner.command,
-          category: syncFailureCategory(error),
-        ),
-        error: error,
-        stackTrace: stack,
-      );
-      await Sentry.addBreadcrumb(Breadcrumb.console(message: 'safe console'));
-      await transport.settleCaptures();
-      expect(talker.history.single.exception, same(error));
-      expect(talker.history.single.stackTrace, same(stack));
-      expect(
-        console.any((line) => line.contains('Exception:')),
-        isTrue,
-        reason: console.join('\n'),
-      );
-      expect(
-        console.any((line) => line.contains('StackTrace:')),
-        isTrue,
-        reason: console.join('\n'),
-      );
-      final accepted = Sentry.currentHub.scope.breadcrumbs;
-      expect(
-        accepted.where((b) => b.category == 'console').single.message,
-        'safe console',
-      );
-      expect(
-        jsonEncode(accepted.map((b) => b.toJson()).toList()),
-        isNot(contains('PRIVATE_CANARY')),
-      );
-    },
-  );
 }

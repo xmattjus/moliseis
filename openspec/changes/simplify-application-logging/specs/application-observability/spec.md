@@ -88,6 +88,7 @@ When an application-generated remote report depends on specific approved applica
 - **WHEN** a report path isolates the Sentry scope to prevent ambient untrusted console, HTTP or other data
 - **THEN** unrelated or prohibited context remains excluded
 - **AND** the report's specifically required approved application context is preserved by the smallest verified method, without disabling isolation solely to retain all ambient breadcrumbs
+- **AND** subsequent native SDK enrichment cannot restore unapproved ambient fields or replace the required breadcrumbs in the final serialized application report; SDK-owned automatic captures retain their existing contract
 
 ### Requirement: Console interception is disabled without suppressing legitimate telemetry
 

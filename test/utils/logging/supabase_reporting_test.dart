@@ -54,6 +54,7 @@ void main() {
         ..traceLifecycle = SentryTraceLifecycle.stream
         ..tracesSampleRate = 1
         ..beforeSendSpan = transport.recordSpan
+        ..sendDefaultPii = false
         ..transport = transport
         ..addEventProcessor(transport);
     });
@@ -81,6 +82,7 @@ void main() {
     client = SupabaseClient(
       'https://example.invalid',
       'public-test-key',
+      headers: const {'X-Private-Test': 'PRIVATE_HEADER_CANARY'},
       httpClient: SentrySupabaseClient(
         client: innerClient,
         enableErrors: false,
@@ -267,4 +269,48 @@ void main() {
       isTrue,
     );
   });
+
+  test(
+    'SDK breadcrumb and span keep request values out of remote telemetry',
+    () async {
+      const queryCanary = 'PRIVATE_QUERY_CANARY';
+      const headerCanary = 'PRIVATE_HEADER_CANARY';
+
+      await Sentry.startSpan('private-query-test', (_) async {
+        await client.from('cities').select().eq('name', queryCanary);
+      });
+      await transport.settleSpans(2);
+      await Sentry.captureMessage('safe Supabase telemetry control');
+      await transport.settleCaptures();
+
+      final eventPayload = await utf8.decoder
+          .bind(transport.envelopes.single.envelopeStream(SentryOptions()))
+          .join();
+      final spanPayload = jsonEncode(
+        transport.spans
+            .map(
+              (span) => span.attributes.map(
+                (key, attribute) => MapEntry(key, attribute.toJson()),
+              ),
+            )
+            .toList(),
+      );
+      final breadcrumbPayload = jsonEncode(
+        Sentry.currentHub.scope.breadcrumbs
+            .map((breadcrumb) => breadcrumb.toJson())
+            .toList(),
+      );
+
+      expect(transport.events, hasLength(1));
+      expect(transport.events.single.exceptions, isNull);
+      expect(eventPayload, contains('db.select'));
+      expect(eventPayload, contains('cities'));
+      expect(eventPayload, contains('select'));
+      expect(breadcrumbPayload, contains('db.select'));
+      for (final payload in [eventPayload, spanPayload, breadcrumbPayload]) {
+        expect(payload, isNot(contains(queryCanary)));
+        expect(payload, isNot(contains(headerCanary)));
+      }
+    },
+  );
 }
