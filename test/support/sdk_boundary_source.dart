@@ -1,5 +1,44 @@
 import 'dart:io';
 
+final _stringOrComment = RegExp(
+  r'//[^\r\n]*|/\*[\s\S]*?\*/'
+  r"|r'''[\s\S]*?'''"
+  r'|r"""[\s\S]*?"""'
+  r"|'''(?:\\[\s\S]|(?!''')[^\\])*'''"
+  r'|"""(?:\\[\s\S]|(?!""")[^\\])*"""'
+  r"|r'[^'\r\n]*'"
+  r'|r"[^"\r\n]*"'
+  r"|'(?:\\[^\r\n]|[^'\\\r\n])*'"
+  r'|"(?:\\[^\r\n]|[^"\\\r\n])*"',
+);
+final _nonLineBreak = RegExp(r'[^\r\n]');
+
+/// Masks Dart strings and comments while preserving source offsets and lines.
+String maskDartCode(String source) => source.replaceAllMapped(
+  _stringOrComment,
+  (match) => match[0]!.replaceAll(_nonLineBreak, ' '),
+);
+
+/// Checks that production wires both Sentry privacy options in its init call.
+bool productionSentryPrivacyConfigured(String source) {
+  final code = maskDartCode(source);
+  final initCalls = RegExp(
+    r'SentryFlutter\s*\.\s*init\s*\(\s*\(options\)\s*=>\s*options([\s\S]*?),\s*appRunner\s*:',
+  ).allMatches(code).toList();
+  if (initCalls.length != 1) return false;
+  final options = initCalls.single.group(1)!;
+  final printSettings = RegExp(
+    r'\.\.enablePrintBreadcrumbs\s*=\s*([^,\r\n]+)',
+  ).allMatches(options).map((match) => match.group(1)!.trim());
+  final sendSettings = RegExp(
+    r'\.\.beforeSend\s*=\s*([^,\r\n]+)',
+  ).allMatches(options).map((match) => match.group(1)!.trim());
+  return printSettings.length == 1 &&
+      printSettings.single == 'false' &&
+      sendSettings.length == 1 &&
+      sendSettings.single == 'AppLogger.beforeSend';
+}
+
 /// Finds direct Sentry and Talker SDK use outside the approved boundaries.
 ///
 /// This is a source-level regression gate, not a Dart parser. It deliberately
@@ -21,18 +60,6 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
   final hubAdapterConstruction = RegExp(
     r'\b(?:(\w+)\s*\.\s*)?Hub(?:Adapter)?\s*\(',
   );
-  final stringOrComment = RegExp(
-    r'//[^\r\n]*|/\*[\s\S]*?\*/'
-    r"|r'''[\s\S]*?'''"
-    r'|r"""[\s\S]*?"""'
-    r"|'''(?:\\[\s\S]|(?!''')[^\\])*'''"
-    r'|"""(?:\\[\s\S]|(?!""")[^\\])*"""'
-    r"|r'[^'\r\n]*'"
-    r'|r"[^"\r\n]*"'
-    r"|'(?:\\[^\r\n]|[^'\\\r\n])*'"
-    r'|"(?:\\[^\r\n]|[^"\\\r\n])*"',
-  );
-  final nonLineBreak = RegExp(r'[^\r\n]');
   final talkerImport = RegExp(
     r'''^\s*import\s+['"]package:talker(?:_flutter)?/[^'"]+['"]''',
     multiLine: true,
@@ -54,17 +81,13 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
   for (final entry in sources.entries) {
     final path = entry.key.replaceAll(r'\', '/');
     final source = entry.value;
-    // First token wins: quotes in comments and comment markers in strings
-    // cannot consume code. Keep offsets and line breaks for import matching.
+    // Keep lines and offsets for import matching.
     // shortcut: interpolation code is masked, use an analyzer if needed.
-    final code = source.replaceAllMapped(
-      stringOrComment,
-      (match) => match[0]!.replaceAll(nonLineBreak, ' '),
-    );
-    final importSource = source.replaceAllMapped(stringOrComment, (match) {
+    final code = maskDartCode(source);
+    final importSource = source.replaceAllMapped(_stringOrComment, (match) {
       final token = match[0]!;
       return token.startsWith('//') || token.startsWith('/*')
-          ? token.replaceAll(nonLineBreak, ' ')
+          ? token.replaceAll(_nonLineBreak, ' ')
           : token;
     });
     bool isCodeImport(RegExpMatch match) =>

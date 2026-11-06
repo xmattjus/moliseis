@@ -4,6 +4,101 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/sdk_boundary_source.dart';
 
 void main() {
+  test(
+    'production Sentry privacy guard rejects missing or changed options',
+    () {
+      const source = '''
+await SentryFlutter.init(
+  (options) => options
+    ..enablePrintBreadcrumbs = false
+    ..beforeSend = AppLogger.beforeSend,
+  appRunner: runner,
+);
+''';
+      expect(productionSentryPrivacyConfigured(source), isTrue);
+      expect(
+        productionSentryPrivacyConfigured(
+          source.replaceAll('..enablePrintBreadcrumbs = false', ''),
+        ),
+        isFalse,
+      );
+      expect(
+        productionSentryPrivacyConfigured(
+          source.replaceAll(
+            '..enablePrintBreadcrumbs = false',
+            '..enablePrintBreadcrumbs = true',
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        productionSentryPrivacyConfigured(
+          source.replaceFirst(
+            '..enablePrintBreadcrumbs = false',
+            '..enablePrintBreadcrumbs = false\n'
+                '    ..enablePrintBreadcrumbs = true',
+          ),
+        ),
+        isFalse,
+      );
+      for (final replacement in ['null', 'customBeforeSend']) {
+        expect(
+          productionSentryPrivacyConfigured(
+            source.replaceAll('AppLogger.beforeSend', replacement),
+          ),
+          isFalse,
+        );
+      }
+      expect(
+        productionSentryPrivacyConfigured(
+          source.replaceAll('..beforeSend = AppLogger.beforeSend', ''),
+        ),
+        isFalse,
+      );
+      expect(
+        productionSentryPrivacyConfigured(
+          source.replaceFirst(
+            '..beforeSend = AppLogger.beforeSend',
+            '..beforeSend = AppLogger.beforeSend,\n'
+                '    ..beforeSend = null',
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        productionSentryPrivacyConfigured('''
+// ..enablePrintBreadcrumbs = false
+// ..beforeSend = AppLogger.beforeSend
+'''),
+        isFalse,
+      );
+      expect(
+        productionSentryPrivacyConfigured('''
+await SentryFlutter.init(
+  (options) => options..enablePrintBreadcrumbs = true,
+  appRunner: runner,
+);
+await SentryFlutter.init(
+  (options) => options
+    ..enablePrintBreadcrumbs = false
+    ..beforeSend = AppLogger.beforeSend,
+  appRunner: runner,
+);
+'''),
+        isFalse,
+      );
+      expect(
+        productionSentryPrivacyConfigured(
+          source.replaceAll(
+            '..beforeSend = AppLogger.beforeSend',
+            '// ..beforeSend = AppLogger.beforeSend',
+          ),
+        ),
+        isFalse,
+      );
+    },
+  );
+
   test('production SDK use stays within approved boundaries', () {
     final violations = findSdkBoundaryViolations(
       readProductionDartSources(Directory('lib')),

@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moliseis/utils/command_configuration.dart';
 import 'package:moliseis/utils/logging/app_logger.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
-import 'package:moliseis/utils/result.dart';
+import 'package:moliseis/utils/result.dart' hide Error;
 import 'package:moliseis/utils/result_command.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -247,6 +247,86 @@ void main() {
         (entry) => identical(entry.exception, unexpected),
       );
       expect(local.stackTrace, same(unexpectedStack));
+    },
+  );
+
+  testWidgets(
+    'command reports preserve approved identity without private input',
+    (tester) async {
+      final previousHandler = command_it.Command.globalExceptionHandler;
+      final previousReportAll = command_it.Command.reportAllExceptions;
+      final previousDetailed = command_it.Command.detailedStackTraces;
+      addTearDown(() {
+        command_it.Command.globalExceptionHandler = previousHandler;
+        command_it.Command.reportAllExceptions = previousReportAll;
+        command_it.Command.detailedStackTraces = previousDetailed;
+      });
+      command_it.Command.detailedStackTraces = false;
+      configureCommandReporting(logger);
+
+      const commandNames = [
+        'post_view_model.loadPlace',
+        'favourite_view_model.load',
+        'post_view_model.loadPlace',
+        privateCanary,
+      ];
+      final errors = <Object>[
+        StateError(privateCanary),
+        StateError(privateCanary),
+        TypeError(),
+        FormatException(privateCanary),
+      ];
+      final stacks = List.generate(
+        errors.length,
+        (index) => StackTrace.fromString('$privateCanary local stack $index'),
+      );
+
+      for (var i = 0; i < commandNames.length; i++) {
+        final command = createResultCommand<String, void>((_) async {
+          Error.throwWithStackTrace(errors[i], stacks[i]);
+        }, debugName: commandNames[i]);
+        addTearDown(command.dispose);
+        Object? observedError;
+        final observed = command
+            .runAsync(privateCanary)
+            .then<void>(
+              (_) => fail('Unexpected command success'),
+              onError: (Object error, StackTrace _) => observedError = error,
+            );
+        await tester.pump(Duration.zero);
+        await observed;
+        expect(observedError, same(errors[i]));
+      }
+      await tester.runAsync(transport.settleCaptures);
+
+      expect(transport.envelopes, hasLength(4));
+      final events = <Map<String, dynamic>>[];
+      for (var i = 0; i < transport.envelopes.length; i++) {
+        events.add(await transport.serializedEvent(i));
+      }
+      final diagnostics = events
+          .map((event) => event['contexts']['app_diagnostic'])
+          .toList();
+      expect(diagnostics[0]['debugName'], 'post_view_model.loadPlace');
+      expect(diagnostics[1]['debugName'], 'favourite_view_model.load');
+      expect(diagnostics[2]['debugName'], 'post_view_model.loadPlace');
+      expect(diagnostics[3]['debugName'], 'command');
+      expect(diagnostics[0]['cause_type'], 'StateError');
+      expect(diagnostics[1]['cause_type'], 'StateError');
+      expect(diagnostics[2]['cause_type'], 'TypeError');
+
+      final values = events.map(transport.exceptionValues).toList();
+      expect(values[0].single['value'], isNot(values[1].single['value']));
+      expect(values[0].single['value'], isNot(values[2].single['value']));
+      for (final event in events) {
+        expect(jsonEncode(event), isNot(contains(privateCanary)));
+      }
+
+      expect(talker.history, hasLength(errors.length));
+      for (var i = 0; i < errors.length; i++) {
+        expect(talker.history[i].exception, same(errors[i]));
+        expect(talker.history[i].stackTrace, same(stacks[i]));
+      }
     },
   );
 

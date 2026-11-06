@@ -21,11 +21,31 @@ void main() {
   late RecordingSentryTransport transport;
   late Talker talker;
   late AppLogger logger;
+  String? malformedTechnicalContextMode;
 
   setUp(() async {
+    malformedTechnicalContextMode = null;
     native = NativeContextBinding({
       'contexts': {
-        'device': {'name': nativeCanary},
+        'os': {
+          'name': 'Android',
+          'version': '16',
+          'raw_description': nativeCanary,
+          'unapproved_os_field': nativeCanary,
+        },
+        'app': {
+          'app_version': '2.3.1',
+          'app_build': '105',
+          'device_app_hash': nativeCanary,
+          'view_names': [nativeCanary],
+          'unapproved_app_field': nativeCanary,
+        },
+        'device': {
+          'name': nativeCanary,
+          'id': nativeCanary,
+          'family': nativeCanary,
+          'model': nativeCanary,
+        },
       },
       'tags': {'native_private': nativeCanary},
       'extra': {'native_private': nativeCanary},
@@ -60,6 +80,24 @@ void main() {
           ..replayId = SentryId.fromId('33333333333333333333333333333333')
           ..description = nativeCanary
           ..data = {'request': queryCanary};
+        switch (malformedTechnicalContextMode) {
+          case 'shape':
+            // Inject after the installed native processor has parsed its JSON
+            // fixture, so malformed shapes exercise AppLogger's own boundary.
+            event.contexts['os'] = nativeCanary;
+            event.contexts['app'] = [nativeCanary];
+          case 'values':
+            event.contexts.operatingSystem = SentryOperatingSystem(
+              name: 'Android',
+              version: '16\n$nativeCanary',
+            );
+            event.contexts.app = SentryApp(
+              version: '2.3.1',
+              build: List.filled(65, '1').join(),
+            );
+          case null:
+            break;
+        }
         return AppLogger.beforeSend(event, hint);
       }
       ..addEventProcessor(transport);
@@ -99,6 +137,12 @@ void main() {
       expect(appJson, isNot(contains(nativeCanary)));
       expect(appJson, isNot(contains(queryCanary)));
       expect(appEvent, isNot(contains('user')));
+      expect(appEvent['contexts']['os'], {'name': 'Android', 'version': '16'});
+      expect(appEvent['contexts']['app'], {
+        'app_version': '2.3.1',
+        'app_build': '105',
+      });
+      expect(appEvent['contexts'], isNot(contains('device')));
       expect(appEvent['contexts']['app_diagnostic']['owner'], 'settings');
       expect(appEvent['contexts']['app_diagnostic']['category'], 'storage');
       expect(appEvent['breadcrumbs'].map((dynamic b) => b['message']), [
@@ -120,6 +164,73 @@ void main() {
       expect(talker.history.last.stackTrace, same(stack));
     },
   );
+
+  test(
+    'malformed technical contexts are omitted without dropping reports',
+    () async {
+      malformedTechnicalContextMode = 'shape';
+      logger.log(
+        const SyncFailure(
+          owner: SyncFailureOwner.settings,
+          category: SyncFailureCategory.storage,
+        ),
+      );
+      await transport.settleCaptures();
+
+      expect(transport.events, hasLength(1));
+      final malformedShapeEvent = await transport.serializedEvent(0);
+      expect(malformedShapeEvent['contexts'], isNot(contains('os')));
+      expect(malformedShapeEvent['contexts'], isNot(contains('app')));
+      expect(
+        malformedShapeEvent['contexts']['app_diagnostic']['category'],
+        'storage',
+      );
+      expect(jsonEncode(malformedShapeEvent), isNot(contains(nativeCanary)));
+
+      malformedTechnicalContextMode = 'values';
+      logger.log(
+        const CloudinaryRequestFailed(
+          stage: CloudinaryFailureStage.upload,
+          category: CloudinaryFailureCategory.http,
+          statusCode: 502,
+        ),
+        error: Exception('LOCAL_ONLY_ORIGINAL_CAUSE'),
+      );
+      await transport.settleCaptures();
+
+      expect(transport.events, hasLength(2));
+      final invalidValueEvent = await transport.serializedEvent(1);
+      expect(invalidValueEvent['contexts']['os'], {'name': 'Android'});
+      expect(invalidValueEvent['contexts']['app'], {'app_version': '2.3.1'});
+      expect(
+        invalidValueEvent['contexts']['app_diagnostic']['status_code'],
+        502,
+      );
+      expect(
+        invalidValueEvent['contexts']['app_diagnostic']['stage'],
+        'upload',
+      );
+      expect(jsonEncode(invalidValueEvent), isNot(contains(nativeCanary)));
+    },
+  );
+
+  test('missing native technical contexts do not block app reports', () async {
+    native.contexts['contexts'] = <String, dynamic>{};
+
+    logger.log(
+      const SyncFailure(
+        owner: SyncFailureOwner.settings,
+        category: SyncFailureCategory.storage,
+      ),
+    );
+    await transport.settleCaptures();
+
+    expect(transport.events, hasLength(1));
+    final event = await transport.serializedEvent(0);
+    expect(event['contexts'], isNot(contains('app')));
+    expect(event['contexts']['app_diagnostic']['category'], 'storage');
+    expect(jsonEncode(event), isNot(contains(nativeCanary)));
+  });
 
   test(
     'SDK-owned capture remains untouched by the app-report sanitizer',

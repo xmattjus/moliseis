@@ -36,6 +36,30 @@ class AppLogger implements Logger {
     final approved = hint.get(_approvedReportKey);
     if (approved is! SentryEvent) return event;
     try {
+      final os = event.contexts['os'];
+      if (os is SentryOperatingSystem) {
+        approved.contexts.operatingSystem = SentryOperatingSystem(
+          name:
+              const {
+                'Android',
+                'iOS',
+                'Mac OS X',
+                'macOS',
+                'Windows',
+                'Linux',
+              }.contains(os.name)
+              ? os.name
+              : null,
+          version: _technicalVersion(os.version),
+        );
+      }
+      final app = event.contexts['app'];
+      if (app is SentryApp) {
+        approved.contexts.app = SentryApp(
+          version: _technicalVersion(app.version),
+          build: _technicalVersion(app.build),
+        );
+      }
       final trace = event.contexts.trace;
       if (trace != null) {
         approved.contexts.trace = SentryTraceContext(
@@ -70,6 +94,14 @@ class AppLogger implements Logger {
       return null;
     }
   }
+
+  /// Accepts bounded version tokens, never arbitrary native descriptions.
+  static String? _technicalVersion(String? value) =>
+      value != null &&
+          value.length <= 64 &&
+          RegExp(r'^[0-9][0-9A-Za-z.+_-]*$').stringMatch(value) == value
+      ? value
+      : null;
 
   final Talker _talker;
   final SentryLoggingFlag _sentryFlag;
@@ -224,13 +256,7 @@ class AppLogger implements Logger {
           },
         );
       case CommandExecutionFailed():
-        final command = _known(event.debugName, const {
-          'search_results',
-          'search_suggestions',
-          'geo_map_selection',
-          ..._uploadCommands,
-          'command',
-        });
+        final command = safeCommandDebugName(event.debugName);
         final uploadCommand = _uploadCommands.contains(command);
         return (
           report: report && !(uploadCommand && error is FileSystemException),

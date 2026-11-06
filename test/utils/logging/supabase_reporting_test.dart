@@ -26,6 +26,7 @@ import 'package:talker_flutter/talker_flutter.dart';
 import '../../support/mock_supabase.dart';
 import '../../support/objectbox_test_store.dart';
 import '../../support/recording_sentry_transport.dart';
+import '../../support/sdk_boundary_source.dart';
 
 void main() {
   const canary = 'PRIVATE_SUPABASE_FAILURE_CANARY';
@@ -114,6 +115,7 @@ void main() {
         ),
       ),
     );
+    expect(productionSentryPrivacyConfigured(source), isTrue);
   });
 
   test(
