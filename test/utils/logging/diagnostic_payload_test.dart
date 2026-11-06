@@ -35,6 +35,7 @@ void main() {
       options
         ..dsn = 'https://abc@def.ingest.sentry.io/1234'
         ..automatedTestMode = true
+        ..beforeSend = AppLogger.beforeSend
         ..transport = transport
         ..addEventProcessor(transport);
     });
@@ -307,17 +308,20 @@ void main() {
       final diagnostics = events
           .map((event) => event['contexts']['app_diagnostic'])
           .toList();
-      expect(diagnostics[0]['debugName'], 'post_view_model.loadPlace');
-      expect(diagnostics[1]['debugName'], 'favourite_view_model.load');
-      expect(diagnostics[2]['debugName'], 'post_view_model.loadPlace');
-      expect(diagnostics[3]['debugName'], 'command');
-      expect(diagnostics[0]['cause_type'], 'StateError');
-      expect(diagnostics[1]['cause_type'], 'StateError');
-      expect(diagnostics[2]['cause_type'], 'TypeError');
-
-      final values = events.map(transport.exceptionValues).toList();
-      expect(values[0].single['value'], isNot(values[1].single['value']));
-      expect(values[0].single['value'], isNot(values[2].single['value']));
+      // Independent SDK enrichment can finish in any order.
+      expect(
+        diagnostics.map((data) => (data['debugName'], data['cause_type'])),
+        unorderedEquals([
+          ('post_view_model.loadPlace', 'StateError'),
+          ('favourite_view_model.load', 'StateError'),
+          ('post_view_model.loadPlace', 'TypeError'),
+          ('command', 'FormatException'),
+        ]),
+      );
+      final values = events
+          .map((event) => transport.exceptionValues(event).single['value'])
+          .toSet();
+      expect(values, hasLength(4));
       for (final event in events) {
         expect(jsonEncode(event), isNot(contains(privateCanary)));
       }
