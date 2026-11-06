@@ -39,7 +39,7 @@ A concrete call-site hazard exists: `saveDraft` evaluates `state.toString()` *be
 
 ## Proposed boundary and policy matrix
 
-`RemotePolicy` with values `localOnly`, `breadcrumb` and `report` is the preferred smallest candidate. The final declaration site (event getter, typed descriptor, or equivalent), and any category-dependent policy, must be resolved from the migration inventory. This is a **candidate design**, not authority to introduce a new abstraction before the gate is closed.
+Gate A selects a centralized typed switch in `AppLogger`. Its private nullable record combines approved fields with report authorization: absent means local-only; present means breadcrumb, with a boolean authorizing a report. There is no public enum, descriptor, per-call policy argument or catalog-wide getter migration. The existing `SyncFailure.report` remains solely as propagation-owner deferral; the redundant Cloudinary report getter is folded into this switch.
 
 Baseline-compatible policy behavior to evaluate and lock:
 
@@ -129,3 +129,53 @@ Implement only the approved, smallest contract: refine event types as needed, se
 Run focused tests and the full applicable Flutter test suite, analyzer and formatter, and strict OpenSpec validation in the actual development checkout. Inspect the branch diff, no unintended files, and compare against mainline. Record concise verified evidence in the PR review process (not transient files in Git). Native tests and real Sentry Issue/Replay inspection are separate, provenance-tagged acceptance where required; do not claim they ran in ordinary CI.
 
 The initial commit of PR #33 contains only the five planning artifacts. Phase A characterization tests/spikes, Phase B source and test changes, and any justified AGENTS changes SHALL be added to **the same branch and PR**, in reviewable commits, after their stated gates. Do not merge before implementation acceptance. Once the implementation PR is merged, synchronize the canonical spec and archive this change in a **separate documentation PR**. Deployment and merging remain expressly authorized steps.
+
+
+## Gate A closure — F1–F4 remediation (2026-11-06)
+
+Execution starts at PR HEAD `3c12e6b`, two documentation commits ahead of remote main `3246b04`; the application implementation is unchanged. Installed Flutter/Dart are 3.47.5/3.13.4, Sentry packages 10.0.0-rc.2, Talker 5.1.20 and command_it 9.5.2. Baseline analyzer passes. Nine isolated review probes were rerun successfully before production edits: real Supabase cursor connectivity emits one integration envelope containing the original message; HTTP 500 emits two envelopes; Talker throws escape and suppress capture; draft diagnostic failures prevent a write or misrepresent durable success; generic immediate breadcrumbs survive while isolated synthetic captures clear them; distinct prepare causes share identical synthetic exception fields. These are recording-transport observations, not production ingestion or server Issue counts.
+
+### Final policy and legacy classification
+
+The centralized switch is selected over event getters because the 64-class catalog already has local fields and severity, while approved remote projection and cause-dependent ownership must be reviewed together. Adding a getter to each event would duplicate these decisions. New unknown types default local-only. Existing types are deliberately classified below; fields not listed are local only. All eligible local logs retain original error/stack and existing extra-merge precedence.
+
+| Existing family | Previous remote behavior | Approved target and fields |
+| --- | --- | --- |
+| SyncStarted/Finished/ContentCommitSucceeded | Breadcrumbs | Retained with existing bounded mode/phase/counts/category; content commit remains distinct from settings success |
+| SyncFailure | Breadcrumb; report unless connectivity or deferred, including no attached cause | Retained owner/category plus bounded repository origin, controlled cause type; cause-less reports remain explicit; prepare/commit repository origin added at source |
+| RepositorySyncStarted/Finished/Failed | Breadcrumbs; failed with cause reports | Retained using only known repository name; failed reports remain owned by boundary |
+| Entity insert/load/remove/update failures | Breadcrumb plus raw capture with cause | Retained owned capture with known entity/method and controlled error type; IDs and embedded extra removed |
+| Entity insert/delete/update success | Breadcrumb | Retained event and known entity only; IDs removed |
+| Cloudinary request start/retry | Debug, no remote | Unchanged local-only under remote level gate |
+| Cloudinary completed/reuse/cancel | Breadcrumb | Retained typed reuse source; cancellation never reports |
+| Cloudinary terminal failure | Conditional synthetic report | Retained stage/category/status; validation/fileRead only breadcrumb; original FunctionException retained locally so preparation status is available without exporting details |
+| Public submission start/confirmed/replay/failure | Breadcrumb; failure with cause reports | Retained event/outcome/status and controlled cause; repository owns failure, never tracing adapter |
+| Admin backend/association | Breadcrumb; failure with cause reports | Retained known operation and association outcome/status; repository owns; receipt/replay behavior unchanged |
+| CommandExecutionFailed | Cause-dependent report | Retained allowlisted command and controlled type; selected upload FileSystemException remains breadcrumb-only; sync command owns unexpected sync throws |
+| Core route/image errors | Raw URL/reason plus cause-dependent capture | Route retains owned capture. Handled image errors become breadcrumb-only with controlled cause type/status: Flutter rebuilds can repeat one errorBuilder failure, and synthetic capture bypasses throwable dedup. No widget state/global dedup is added; URI/query/reason/image URL stay local |
+| URL launch, weather, reverse geocoding | Raw URL/coordinates; failure capture by severity | Retain event, controlled cause/status; remove URL and coordinate precision; expected connectivity breadcrumb-only |
+| Network timeout, snackbar, image sharing, contributor asset warnings/retrieval | Breadcrumb; warnings do not capture | Retain event identity only; remove rejected filenames and textual reason |
+| Draft save/load/clear, local init/settings failures, asset add/removal | Breadcrumb; error with attached cause captures | Retain event and controlled cause type; remove draft rendering entirely; handled cause-less failures stay breadcrumbs |
+| AdminLocalStorageFailed | Breadcrumb with operation | Retain event; local operation/extra remain local until a concrete remote need exists |
+| Auth login/logout/state/anonymous/user-id failure | Cause-dependent capture | Retain event and controlled cause/status; expected connectivity breadcrumb-only |
+| Cache and Sentry enabled/disabled debug events | No remote | Unchanged local-only |
+
+`minLevel` still filters the entire operation; debug remains local-only; inactive remote flag starts no logger remote work. An approved report with a cause emits one bounded synthetic event; all ordinary error severity alone authorizes nothing. Only SyncFailure permits a cause-less report. Non-report policies never capture even with an attached cause. Existing handled connectivity is deliberately breadcrumb-only, including GoTrue AuthRetryableFetchException without status (the network wrapper); Auth server failures retaining HTTP status remain reportable. Unknown events never inherit remote eligibility from severity.
+
+An independent source review additionally verified that Flutter may repeat Image.errorBuilder for the same failed load during rebuilds; SDK throwable dedup no longer applies to synthetic events. The affected image decision is therefore deliberately revised to breadcrumb-only before its production policy change. Other independently owned failures remain reportable.
+
+### Capture ownership including integrations
+
+Disable only `SentrySupabaseClient.enableErrors`; retain its independent breadcrumb/tracing defaults and the existing client/resource ownership. Installed integration captures handled REST transport errors and HTTP 500–599. Every application `/rest/v1` operation is either cursor RPC or City/Place/Event/Media pagination through BaseSyncRepository, already owning returned failures; no exclusive valuable REST reporter was found. Functions endpoints (public/Admin/preparation) and Auth are outside that integration's REST matcher and retain their existing owners. Unexpected sync non-Exception objects retain original rethrow and command ownership; SDK uncaught/framework/native capture remains enabled. No object-identity registry is added. SDK deduplication can still drop raw automatic captures; application synthetic captures have no throwable and are counted separately from Issues.
+
+### Diagnostic minimum, context and privacy decisions
+
+Sync report minimum is owner/category, repository when known, controlled cause type and approved current-run sync breadcrumbs (start, repository preparation evidence, content commit, terminal selected phase). Distinct city/media preparation contract failures must differ by repository; unexpected commands also retain safe preceding source diagnostics. Settings reports must preserve preceding durable-content evidence when present, without inventing a commit for standalone settings writes. Upload minimum is stage/category/status and controlled cause; preserve original FunctionException rather than discard preparation status. Association minimum is event/operation, rejected versus unconfirmed, status and controlled cause. Generic repository minimum is known entity/method and cause type; UI minimum is event/cause type and status where available. Known PostgREST backend codes are allowlisted; numeric fallback codes supply HTTP status only when actually preserved by the SDK, never inferred from SQLSTATE. No original exception value or stack/frame is exported; this deliberately sacrifices exact remote source lines in favor of controlled technical origin. Full originals remain local. No historical grouping equivalence or improvement is claimed.
+
+Every application report uses isolated scope and an explicit diagnostic context. Preserve only narrowly reprojected current-run sync breadcrumbs, in original causal order; no arbitrary ambient app/HTTP/console/context is restored. Other report families carry sufficient explicit current diagnostic context and their own approved breadcrumb; they do not require ambient history. Installed scope insertion is synchronous before native observers, so retain unawaited best-effort breadcrumb submission; no global queue or blanket awaiting. Disabling print/debugPrint interception closes the local-console path; existing frame filter may remain as redundant defense until the separate removal task is verified. Independent SDK unhandled payloads and Replay remain under their canonical contracts, not a claim of universal sanitization.
+
+### Best effort and bounded scope
+
+Guard event metadata, local rendering/Talker and remote work independently. Consume both synchronous start failures and asynchronous diagnostic rejection without recursive reporting. Missing local data must not block a remote projection that can use typed fields independently. Remove saveDraft pre-rendering, rather than catching business work. The route fallback keeps its existing deduplication semantics but narrowly guards optional error-reason rendering, another pre-call diagnostic expression. A bad diagnostic cannot replace a real Result/throw or cause extra writes/retries. Representative tests use real ObjectBox and installed SDK, with production-mode versus automated-test-mode distinctions recorded.
+
+Gate A is closed for the authorized F1–F4 remediation: the above choices resolve its policy, migration, ownership, payload, context and isolation decisions. Remaining broad enforcement/native/agent-guidance tasks are not silently declared implemented. No new Unicode-specific diagnostic is justified by a reproducer; exact-input capture is deferred. Native, actual Sentry ingestion/Replay and grouping, required branch checks and deployed options remain unverified. Existing canonical consent/Replay/tracing behavior must be preserved; no database, schema, RPC or Edge Function change is needed.

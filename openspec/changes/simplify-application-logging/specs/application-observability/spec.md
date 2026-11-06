@@ -2,7 +2,7 @@
 
 ### Requirement: Typed logging declares remote intent separately from severity
 
-The application SHALL retain a single application-facing `Logger.log` entry point and SHALL make local-only diagnostics, safe remote breadcrumbs, and application-initiated error reports explicit outcomes independent of `AppLogLevel`. The concrete typed policy SHALL define behavior for missing/present errors, `minLevel`, consent, remote level thresholds, and whether a report includes an approved breadcrumb. A conservative default for new events SHALL NOT retroactively reclassify existing remotely visible events without a reviewed inventory. `localOnly` SHALL refer only to forwarding initiated by this application logger, not independent SDK automatic integrations.
+The application SHALL retain `Logger.log` and explicitly classify local diagnostics, safe breadcrumbs and owned reports independently of severity. Reviewed policy SHALL cover causes, filtering, consent and legacy migration.
 
 #### Scenario: Error severity alone does not open a report
 
@@ -10,6 +10,8 @@ The application SHALL retain a single application-facing `Logger.log` entry poin
 - **WHEN** an error-level or critical-level event is explicitly classified local-only or breadcrumb-only and has an attached exception
 - **THEN** the logger initiates no exception/report capture for that event, while maintaining its appropriate local diagnostics
 - **AND** a breadcrumb-only event includes only its reviewed remote fields
+- **AND** new unclassified events default to local-only; existing remote events require a reviewed migration inventory
+- **AND** local-only describes this logger, not independent SDK integrations
 
 #### Scenario: Report policy with and without a cause
 
@@ -47,13 +49,14 @@ Application logging SHALL be best effort and SHALL NOT change business return va
 
 ### Requirement: Remote diagnostic payloads are reviewed and useful
 
-Remote application-originated telemetry SHALL use approved, bounded, purpose-specific fields. `Logger.log(extra: ...)` SHALL NOT be forwarded remotely, and original arbitrary throwable messages, stack text, URLs, request/response bodies, credentials, contributor identities, or untrusted event fields SHALL NOT be sent merely because they are present locally. For each reportable family, the approved fields SHALL provide the minimum safe context required to distinguish and localize representative failures; local original throwable/stack retention SHALL remain. This requirement SHALL NOT assert that SDK-generated HTTP, Replay, navigation or unhandled-error payloads are controlled by the application logger.
+Remote application telemetry SHALL use approved bounded fields that distinguish and localize representative failures. Arbitrary local metadata, throwable text and stack text SHALL NOT be copied remotely. Original causes and stacks SHALL remain available locally.
 
 #### Scenario: Arbitrary extra and raw URL are not transmitted
 
 - **GIVEN** an event contains a signed URL or URI query with a synthetic sensitive canary and `extra` includes a second canary
 - **WHEN** the logger emits an approved remote breadcrumb or report
-- **THEN** the final transmitted payload omits both prohibited values
+- **THEN** the final transmitted payload omits both prohibited values and all arbitrary `Logger.log(extra: ...)` data
+- **AND** request/response bodies, credentials, contributor identities and untrusted event fields are not sent merely because they are available locally
 - **AND** retains only reviewed, useful route/image/operation classifications or appropriately bounded fields
 
 #### Scenario: Exception value and frames are evaluated separately
@@ -67,6 +70,7 @@ Remote application-originated telemetry SHALL use approved, bounded, purpose-spe
 
 - **WHEN** Sentry HTTP, Supabase, navigation, unhandled-error, tracing or Replay integrations can emit telemetry independently of application event forwarding
 - **THEN** their relevant active payload paths are characterized with synthetic canaries and addressed only through evidence-backed, narrowly scoped changes
+- **AND** handled Supabase integration capture is disabled where application REST boundaries already own reporting; breadcrumbs and tracing remain enabled
 - **AND** existing consent and Replay privacy requirements remain authoritative
 
 ### Requirement: Required application breadcrumb context survives report capture
@@ -143,11 +147,12 @@ Canonical sync reporting SHALL preserve original throwable/stack locally. For un
 - **AND** the original error/stack remain available locally; a reportable failure yields one consent-gated sanitized capture without repository or terminal recapture
 - **AND** unrelated commands, their error handling and direct sync use-case calls retain existing behavior
 
-#### Scenario: Talker console output is not automatically collected remotely
+#### Scenario: Talker console fragments cannot bypass remote sanitization
 
 - **WHEN** real Talker emits local errors and stacks through `debugPrint` or `print`, including multiline output
 - **THEN** the production Sentry SDK does not automatically acquire those console outputs as breadcrumbs, without relying on string matching of Talker's rendered frame characters
-- **AND** original local in-memory throwable/stack evidence remains available and approved explicit application/SDK breadcrumbs remain observable where required
+- **AND** original local in-memory throwable/stack evidence remains available and approved explicit application breadcrumbs remain observable where required
+- **AND** automatic error capture, tracing and Replay retain their existing contracts; sanitization does not depend on recognizing Talker console formatting
 - **AND** exception payloads, approved application breadcrumbs and spans continue to enforce safe remote fields
 
 #### Scenario: Expected connectivity failure stays local
