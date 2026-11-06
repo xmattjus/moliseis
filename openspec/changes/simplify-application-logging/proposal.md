@@ -27,7 +27,7 @@ None.
 
 ## Impact
 
-Flutter only, primarily `lib/utils/logging/`, focused event definitions/call sites, `lib/main.dart` Sentry options, `lib/utils/command_configuration.dart`, associated unit/integration tests, and a concise `AGENTS.md` logging rule. All changes to code and agent guidance are **future implementation tasks**, not part of this planning-only PR.
+Flutter only, primarily `lib/utils/logging/`, focused event definitions/call sites, `lib/main.dart` Sentry options, `lib/utils/command_configuration.dart`, associated unit/integration tests, and a concise `AGENTS.md` logging rule. The initial planning commit contains OpenSpec artifacts only; Phase A tests and subsequent approved production implementation will be added to this same branch and PR.
 
 Existing `sentry-consent-lifecycle` and `session-replay-privacy` remain authoritative and unchanged. Do not alter Supabase SQL/RPC/Edge Functions, Cloudinary persistence or retry semantics, content-submission idempotency, ObjectBox schemas, app networking ownership, Sentry sampling/tracing, or release/deployment configuration.
 
@@ -37,4 +37,4 @@ No new logging service, three-method replacement API, global deduplication queue
 
 ## Planning and delivery boundary
 
-This PR contains OpenSpec artifacts only. It authorizes characterization and design review, **not application code migration, merging, canonical spec synchronization, archival, or deployment**. The implementation owner must revalidate mainline and close the explicit design gate before changing production logging. Use a separate implementation authorization and reviewable PR when that stage begins.
+This PR starts with OpenSpec artifacts, then remains the single review surface for Phase A characterization and the subsequent Phase B application implementation. Production logging migration SHALL NOT start until the implementation owner revalidates the baseline, closes Gate A and reconciles its findings in these artifacts. Merging, canonical-spec synchronization, archival and deployment remain separate, expressly authorized steps. After the implementation PR is merged, open a **new, documentation-only PR** for canonical OpenSpec synchronization and archival.

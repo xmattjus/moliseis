@@ -1,6 +1,6 @@
 # Tasks: simplify-application-logging
 
-> Planning-only PR. All tasks are intentionally unchecked. Phase A may create **tests or isolated spikes** to decide the contract; it must not modify production logging behavior. Phase B is blocked until Gate A is resolved, the design/specs are reconciled with the observed evidence, and application implementation is separately authorized. Do not merge, archive, sync main specs or deploy as a side effect of completing these tasks.
+> Single implementation PR (#33). All tasks are initially unchecked. Phase A may create **tests or isolated spikes** to decide the contract on this same branch; it must not modify production logging behavior. Phase B remains blocked until Gate A is closed and the design/specs are reconciled with observed evidence. Keep Phase B implementation on this same PR. Do not merge, archive, sync main specs or deploy as a side effect of completing these tasks.
 
 ## 0. Revalidate the implementation baseline
 
@@ -30,7 +30,7 @@
 - [ ] 2.7 Resolve only substantiated automatic integration/privacy risks, record sampled evidence limitations and any owner/privacy decision required. Keep consent, Replay and stream tracing under their existing canonical specifications.
 - [ ] 2.8 Reconcile `proposal.md`, `design.md`, this task list and the `application-observability` delta with Gate A findings. **Stop affected Phase B work** if an architecture/payload decision that changes behavior remains unapproved or contradictory. Do not mark this gate done merely because all characterization tests pass.
 
-## 3. Minimal logging implementation (Phase B; requires Gate A and separate implementation authorization)
+## 3. Minimal logging implementation (Phase B; requires approved Gate A on the same PR)
 
 - [ ] 3.1 Preserve the public `Logger.log` method and existing Talker/Sentry stack. Implement the smallest reviewed explicit remote-intent policy, with severity independent of capture decision and without a generic three-method API or new dependency. Preserve current `minLevel` unless Gate A justifies changing it.
 - [ ] 3.2 Migrate legacy event classes and call sites per Gate A inventory; remove redundant special-case switches/flags where the reviewed typed policy subsumes them. Preserve cause-less reports only where deliberately authorized; do not introduce new implicit captures on event severity.
@@ -56,6 +56,6 @@
 
 ## 5. Delivery hygiene and later lifecycle (Phase C)
 
-- [ ] 5.1 Review the entire implementation PR diff against current mainline, applicable `AGENTS.md` and canonical/delta specs. Include only implementation, required tests and justified agent guidance; exclude temporary diagnostics, printed dumps, test logs, local paths and unrelated code.
+- [ ] 5.1 Review the entire PR #33 diff (planning plus implementation) against current mainline, applicable `AGENTS.md` and canonical/delta specs. Include only implementation, required tests and justified agent guidance; exclude temporary diagnostics, printed dumps, test logs, local paths and unrelated code.
 - [ ] 5.2 Obtain a separate review of observable correctness, reporting ownership, privacy boundaries, failure isolation, and deletion of unnecessary logging complexity. Do not equate a passing test suite with absence of defects.
-- [ ] 5.3 With explicit user authorization, merge the implementation PR. Only **after** implementation is accepted and integrated, synchronize the approved delta with `application-observability`, archive the change and merge those documentation updates via the repository workflow. Do not automatically perform these steps now.
+- [ ] 5.3 With explicit user authorization, merge PR #33 after accepted implementation. Only **after** implementation is accepted and integrated, synchronize the approved delta with `application-observability`, archive the change and publish those documentation-only changes in a **separate PR**, requiring its own explicit merge authorization. Do not automatically perform these steps now.
