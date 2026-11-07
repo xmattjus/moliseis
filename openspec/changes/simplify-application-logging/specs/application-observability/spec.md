@@ -88,7 +88,7 @@ When an application-generated remote report depends on specific approved applica
 - **WHEN** a report path isolates the Sentry scope to prevent ambient untrusted console, HTTP or other data
 - **THEN** unrelated or prohibited context remains excluded
 - **AND** the report's specifically required approved application context is preserved by the smallest verified method, without disabling isolation solely to retain all ambient breadcrumbs
-- **AND** subsequent native SDK enrichment cannot restore unapproved ambient fields or replace the required breadcrumbs in the final serialized application report; SDK-owned automatic captures retain their existing contract
+- **AND** subsequent native SDK enrichment cannot restore unapproved ambient fields or replace the required breadcrumbs in the final serialized application report; SDK-owned automatic captures follow the separate automatic-event privacy contract
 
 ### Requirement: Console interception is disabled without suppressing legitimate telemetry
 
@@ -103,8 +103,105 @@ Automatic capture of Talker `print` and `debugPrint` output as Sentry console br
 #### Scenario: Existing platform telemetry remains active when eligible
 
 - **WHEN** console interception is disabled under valid telemetry consent
-- **THEN** approved explicit application breadcrumbs and the existing automatic error, trace and Replay contracts continue to operate
+- **THEN** approved explicit application breadcrumbs and the existing automatic error, trace and Replay contracts, including the expanded channel-specific privacy requirements, continue to operate
 - **AND** sampling, transport resource ownership and consent lifecycle are unchanged
+
+### Requirement: Privacy-safe exception discrimination
+
+Remote errors SHALL retain reviewed technical information sufficient to distinguish and localize materially different representative failures where feasible, without arbitrary exception messages, unsafe frames or private content. Original causes and stacks SHALL remain local. Missing stacks SHALL NOT suppress an otherwise reportable failure.
+
+#### Scenario: Same category has different safe source evidence
+
+- **GIVEN** two failures share event/category/type but originate at different reviewed technical locations
+- **WHEN** their reports are serialized through the installed SDK
+- **THEN** useful safe source or cause discrimination is retained where available and prohibited message/path/filename canaries are absent
+- **AND** the comparison records retained fields, diagnostic limitations and possible grouping-input changes without asserting actual server Issue grouping
+
+#### Scenario: Stack cannot be used safely
+
+- **GIVEN** a missing, unparsable, generated, platform-specific or user-controlled stack representation
+- **WHEN** a report is otherwise eligible
+- **THEN** a useful bounded category/origin report remains visible without fallback to raw stack or private message
+- **AND** release/source-map differences and deliberately omitted diagnostics are stated in verification evidence
+
+### Requirement: Complete application report envelopes are isolated
+
+Application reports SHALL exclude unapproved ambient fields and attachment content through final envelope serialization, including post-scope enrichment. Isolation SHALL preserve approved breadcrumbs, safe technical context and correlation without corrupting shared scope or another capture.
+
+#### Scenario: Enrichment and attachment controls
+
+- **GIVEN** synthetic private scope/native-processor fields, scope/hint attachments and approved causal breadcrumbs
+- **WHEN** an application report passes installed SDK processing to transport
+- **THEN** its complete envelope omits prohibited values and attachment bytes while preserving required approved chronology and safe correlation
+- **AND** event-only beforeSend assertions are not treated as attachment protection or proof of real native acquisition
+
+#### Scenario: Captures overlap
+
+- **WHEN** two app reports and one SDK-owned error overlap under controlled processing delays
+- **THEN** each event keeps its own approved representation and required breadcrumb order without hint/data crossover or destructive shared-scope changes
+- **AND** transport arrival order need not equal invocation order
+
+### Requirement: Automatic Dart errors retain safe visibility
+
+SDK-owned automatic Dart errors SHALL have a separately reviewed privacy contract that preserves unexpected-error visibility, safe technical diagnostics and SDK ownership while excluding arbitrary private message, frame and enriched content. Application logging SHALL NOT duplicate that capture.
+
+#### Scenario: Genuinely unhandled private-content error
+
+- **GIVEN** active consent and an operational automatic capture positive control
+- **WHEN** a genuine unhandled Dart error includes private synthetic content
+- **THEN** the final serialized SDK report retains identifiable safe error/mechanism/source diagnostics and excludes the prohibited content
+- **AND** no extra application report is created; PII-off or an app-report-only hook is not accepted as proof
+
+#### Scenario: Automatic policy encounters malformed diagnostics
+
+- **WHEN** automatic-event privacy processing encounters unsupported or malformed error/frame/context data
+- **THEN** a bounded safe representation retains unexpected-error visibility without forwarding unsafe originals or silently dropping the error
+- **AND** framework/platform/zone entry-specific behavior is verified independently of owned app-report substitution
+
+### Requirement: Native error telemetry has an independent privacy boundary
+
+Native-origin Android/iOS errors SHALL exclude private descriptions, user-info and equivalent arbitrary content while retaining safe technical crash diagnostics and capture visibility. Acceptance SHALL use platform-appropriate processing and final native transport evidence, separately from Dart callbacks.
+
+#### Scenario: Native error contains private descriptions
+
+- **GIVEN** an operational native-origin capture control and active consent on each supported native platform
+- **WHEN** native error descriptions, mechanisms or user-info contain synthetic private values
+- **THEN** final native envelopes omit those values and retain reviewed useful type, thread and stack diagnostics
+- **AND** an uninvoked Dart callback is not claimed to sanitize the native event
+
+#### Scenario: Autonomous native crash and recovery
+
+- **WHEN** representative automatic native crash capture and recovery are verified on Android and iOS
+- **THEN** working positive controls, cache/relaunch evidence, private-content exclusion and safe diagnostic retention are recorded with platform/build limitations
+- **AND** nonfatal iOS NSError evidence is not generalized to Android, autonomous crashes or every native mechanism
+
+### Requirement: Local diagnostics and voluntary export have explicit boundaries
+
+Local original diagnostics SHALL remain independent of Sentry consent. Voluntary log sharing SHALL require user action and SHALL NOT authorize automatic Sentry acquisition of Talker history. Local-only SHALL NOT imply that console/system output is absent.
+
+#### Scenario: Consent and user-directed export are independent
+
+- **WHEN** a user views or chooses to export local logs with telemetry enabled or disabled
+- **THEN** local history remains available and sharing is user-directed independently of automatic telemetry consent
+- **AND** neither Sentry opt-in nor background capture automatically exports or reconstructs private history
+- **AND** privacy-sensitive diagnostic displays follow the separate Replay contract
+
+### Requirement: Independent telemetry channels retain bounded acquisition
+
+Active SDK breadcrumbs and spans SHALL retain reviewed useful diagnostics under their own acquisition/privacy contracts. Event projection SHALL NOT be claimed to sanitize streaming spans, Replay recordings or independently transmitted native events.
+
+#### Scenario: Supabase SDK controls remain effective
+
+- **GIVEN** the configured Supabase client with independent error capture disabled and PII/body gates active
+- **WHEN** synthetic private query/body/header data traverse representative requests and a sampled stream span
+- **THEN** final event and span payloads omit prohibited values while positive controls retain operation/table/status and parameterized-query diagnostics
+- **AND** application-owned error reporting remains nonduplicative
+
+#### Scenario: HTTP capability differs from active acquisition
+
+- **WHEN** request telemetry is evaluated
+- **THEN** evidence identifies the actual app client, Supabase wrapper, SDK transport and native instrumentation separately
+- **AND** an unused general HTTP wrapper's private query capability is not represented as demonstrated application exposure
 
 ## MODIFIED Requirements
 
