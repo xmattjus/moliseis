@@ -256,6 +256,49 @@ void report() => telemetry.Sentry.captureException(error);
     expect(violations, [expected]);
   });
 
+  test('global Talker calls reject nullable operators and spacing', () {
+    const expected =
+        'lib/ui/example.dart: direct global Talker use bypasses Logger.log';
+    for (final call in [
+      r'$talker.warning(value);',
+      r'$talker!.warning(value);',
+      r'$talker?.warning(value);',
+      r'$talker . warning (value);',
+      r'$talker ! . warning (value);',
+      r'$talker ?. warning (value);',
+      r'''
+$talker!
+ . warning(value);
+''',
+    ]) {
+      expect(
+        findSdkBoundaryViolations({
+          'lib/ui/example.dart': 'void write() => $call',
+        }),
+        [expected],
+        reason: call,
+      );
+    }
+  });
+
+  test('Talker routing references and inert text stay permitted', () {
+    expect(
+      findSdkBoundaryViolations({
+        'lib/routing/router.dart': r'''
+final observer = TalkerRouteObserver($talker!);
+final viewer = LoggingScreen(talker: $talker!);
+''',
+        'lib/ui/example.dart': r"""
+const examples = ['$talker.warning(value)', '$talker!.warning(value)',
+  '$talker?.warning(value)', '$talker ! . warning (value)'];
+// $talker!.warning(value);
+/* $talker?.warning(value); $talker.warning(value); */
+""",
+      }),
+      isEmpty,
+    );
+  });
+
   test('source fixtures reject aliased Sentry and direct Talker bypasses', () {
     final violations = findSdkBoundaryViolations({
       'lib/data/repositories/repository.dart': '''

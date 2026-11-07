@@ -64,7 +64,7 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
     r'''^\s*import\s+['"]package:talker(?:_flutter)?/[^'"]+['"]''',
     multiLine: true,
   );
-  final directGlobalTalkerUse = RegExp(r'\$talker\.\w+\s*\(');
+  final directGlobalTalkerUse = RegExp(r'\$talker\s*[!?]?\s*\.\s*\w+\s*\(');
   const allowedSentryOperations = <String, Set<String>>{
     'lib/main.dart': {'close'},
     'lib/utils/logging/app_logger.dart': {'captureEvent', 'addBreadcrumb'},
