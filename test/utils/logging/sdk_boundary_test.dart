@@ -303,11 +303,13 @@ void bypass() => TalkerFlutter.init().warning('message');
 
     const constructionViolation =
         'direct Talker construction bypasses Debug composition';
+    const initializationViolation =
+        'Talker initialization requires Debug composition';
     expect(violations, [
       'lib/main.dart: $constructionViolation',
       'lib/ui/core/ui/logging_screen.dart: $constructionViolation',
       'lib/config/dependencies.dart: $constructionViolation',
-      'lib/routing/router.dart: Talker initialization requires Debug composition',
+      'lib/routing/router.dart: $initializationViolation',
     ]);
   });
 
