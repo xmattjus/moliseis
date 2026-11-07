@@ -233,7 +233,7 @@ void main() {
   });
 
   test(
-    'SDK-owned capture remains untouched by the app-report sanitizer',
+    'SDK-owned capture has its own bounded post-enrichment policy',
     () async {
       await Sentry.captureEvent(
         SentryEvent(
@@ -247,15 +247,15 @@ void main() {
       expect(transport.events, hasLength(1));
       final event = await transport.serializedEvent(0);
       final json = jsonEncode(event);
-      expect(json, contains(nativeCanary));
-      expect(json, contains(queryCanary));
+      expect(json, isNot(contains(nativeCanary)));
+      expect(json, isNot(contains(queryCanary)));
+      expect(transport.exceptionValues(event).single['type'], 'DartError');
+      expect(event['contexts'], isNot(contains('app_diagnostic')));
       expect(
         event['contexts']['trace']['replay_id'],
         '33333333333333333333333333333333',
       );
-      expect(event['breadcrumbs'].map((dynamic b) => b['message']), [
-        'native_http_request',
-      ]);
+      expect(event['breadcrumbs'], anyOf(isNull, isEmpty));
     },
   );
 }

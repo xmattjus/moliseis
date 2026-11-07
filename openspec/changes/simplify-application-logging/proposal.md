@@ -47,3 +47,14 @@ No universal recursive sanitizer, regex blacklist, global generic-crash replacem
 ## Delivery boundary
 
 New implementation tasks remain open. Characterization precedes uncertain mechanisms, and verified boundaries remain until alternatives pass their privacy and diagnostic controls. Exactly one documentation commit publishes this revision to PR #33. Merge, deployment, canonical synchronization and archival require later authorization; synchronization/archival remain a separate documentation PR after implementation merge.
+
+## Implementation status — November 7 expansion
+
+The expansion now includes bounded application source locations, a separate
+automatic Dart exception policy, targeted private proposal/diagnostic Replay
+masks, and maintained transport/concurrency controls. See the design's new
+implementation evidence and task state. Native reporting remains unchanged by
+explicit owner instruction after the pre-start customization limitation was
+established. Mandatory native, actual Replay, production export-overlay and
+complete automatic attachment acceptance remain unresolved; this is not a
+readiness or merge claim. Canonical specs and archived research remain unchanged.

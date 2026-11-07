@@ -1974,7 +1974,7 @@ void main() {
             of: find.byType(ContentSubmissionDescriptionFormField),
             matching: find.byType(SentryMask),
           ),
-          findsNothing,
+          findsOneWidget,
         );
 
         // The terms checkbox is checked from the persisted draft.

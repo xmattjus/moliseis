@@ -31,6 +31,13 @@ class RecordingSentryTransport implements Transport, EventProcessor {
     }
   }
 
+  /// Waits for delivery when another observed capture intentionally fails.
+  Future<void> settleEnvelopes(int count) async {
+    while (envelopes.length < count) {
+      await _delivery.future.timeout(const Duration(seconds: 5));
+    }
+  }
+
   @override
   SentryEvent apply(SentryEvent event, Hint hint) {
     events.add(event);
@@ -63,12 +70,17 @@ class RecordingSentryTransport implements Transport, EventProcessor {
 
   /// Reads the final event JSON from a delivered serialized envelope.
   Future<Map<String, dynamic>> serializedEvent(int index) async {
-    final serialized = await utf8.decoder
-        .bind(envelopes[index].envelopeStream(SentryOptions()))
-        .join();
-    return jsonDecode(serialized.trim().split('\n').last)
+    final item = envelopes[index].items.singleWhere(
+      (item) => item.header.type == 'event',
+    );
+    return jsonDecode(utf8.decode(await item.dataFactory()))
         as Map<String, dynamic>;
   }
+
+  /// Serializes every item, including attachment bytes and stream spans.
+  Future<String> serializedEnvelope(int index) => utf8.decoder
+      .bind(envelopes[index].envelopeStream(SentryOptions()))
+      .join();
 
   /// Returns exception values in the serialized Sentry event shape.
   List<Map<String, dynamic>> exceptionValues(Map<String, dynamic> event) =>

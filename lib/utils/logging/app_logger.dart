@@ -8,6 +8,7 @@ import 'package:moliseis/utils/logging/app_log_level.dart';
 import 'package:moliseis/utils/logging/app_log_level_mapper.dart';
 import 'package:moliseis/utils/logging/log_event.dart';
 import 'package:moliseis/utils/logging/logger.dart';
+import 'package:moliseis/utils/logging/safe_error_diagnostics.dart';
 import 'package:moliseis/utils/logging/sync_failure_category.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -29,12 +30,21 @@ class AppLogger implements Logger {
     'admin_submission_editor_add_asset',
   };
 
-  /// Restores app payloads after native enrichment; leaves SDK-owned errors.
+  /// Restores approved app payloads and filters SDK-owned Dart errors.
   ///
   /// Wire this only at Sentry bootstrap. The private hint is never transmitted.
   static SentryEvent? beforeSend(SentryEvent event, Hint hint) {
     final approved = hint.get(_approvedReportKey);
-    if (approved is! SentryEvent) return event;
+    if (approved is! SentryEvent) return _automaticEvent(event, hint);
+    return _restoreEvent(event, hint, approved);
+  }
+
+  static SentryEvent? _restoreEvent(
+    SentryEvent event,
+    Hint hint,
+    SentryEvent approved, {
+    String operation = 'app.report',
+  }) {
     try {
       final os = event.contexts['os'];
       if (os is SentryOperatingSystem) {
@@ -69,7 +79,7 @@ class AppLogger implements Logger {
           replayId: trace.replayId,
           sampled: trace.sampled,
           status: trace.status,
-          operation: 'app.report',
+          operation: operation,
         );
       }
       hint
@@ -86,6 +96,8 @@ class AppLogger implements Logger {
         environment: event.environment,
         level: approved.level,
         exceptions: approved.exceptions,
+        threads: approved.threads,
+        debugMeta: approved.debugMeta,
         contexts: approved.contexts,
         breadcrumbs: approved.breadcrumbs,
       );
@@ -94,6 +106,65 @@ class AppLogger implements Logger {
       return null;
     }
   }
+
+  /// Keeps automatic errors under SDK ownership with their own field policy.
+  static SentryEvent _automaticEvent(SentryEvent event, Hint hint) {
+    // shortcut: SDK scope bytes bypass this hook, review before adding any.
+    hint
+      ..attachments.clear()
+      ..screenshot = null
+      ..viewHierarchy = null;
+    try {
+      final exceptions = event.exceptions;
+      final safe = SentryEvent(
+        eventId: event.eventId,
+        timestamp: event.timestamp,
+        level: event.level,
+        exceptions: exceptions == null || exceptions.isEmpty
+            ? [SentryException(type: 'DartError', value: 'SDK error')]
+            : exceptions.reversed
+                  .take(16)
+                  .toList()
+                  .reversed
+                  .map(safeAutomaticException)
+                  .toList(),
+        breadcrumbs: _syncBreadcrumbs(
+          event.breadcrumbs ?? [],
+          includeDatabase: true,
+        ),
+        debugMeta: safeAutomaticImages(event.debugMeta),
+        threads: event.threads
+            ?.take(32)
+            .map(
+              (thread) => SentryThread(
+                id: thread.id,
+                crashed: thread.crashed,
+                current: thread.current,
+                stacktrace: thread.stacktrace == null
+                    ? null
+                    : safeDiagnosticFrames(
+                        thread.stacktrace!.frames,
+                        allowNative: true,
+                      ),
+              ),
+            )
+            .toList(),
+      );
+      return _restoreEvent(event, hint, safe, operation: 'sdk.error') ?? safe;
+    } on Object catch (_) {
+      return _automaticFallback(event);
+    }
+  }
+
+  /// A broken optional field must neither leak the input nor erase the error.
+  static SentryEvent _automaticFallback(SentryEvent event) => SentryEvent(
+    eventId: event.eventId,
+    timestamp: event.timestamp,
+    level: SentryLevel.error,
+    exceptions: [
+      SentryException(type: 'DartError', value: 'Diagnostic filtering failed'),
+    ],
+  );
 
   /// Accepts bounded version tokens, never arbitrary native descriptions.
   static String? _technicalVersion(String? value) =>
@@ -158,7 +229,15 @@ class AppLogger implements Logger {
       );
       Sentry.addBreadcrumb(breadcrumb).ignore();
       if (diagnostic.report) {
-        _capture(event, name, data, level, error, breadcrumb).ignore();
+        _capture(
+          event,
+          name,
+          data,
+          level,
+          error,
+          stackTrace,
+          breadcrumb,
+        ).ignore();
       }
     } on Object catch (_) {
       // Logging failures never replace business results or trigger reporting.
@@ -366,6 +445,7 @@ class AppLogger implements Logger {
     Map<String, Object?> data,
     AppLogLevel level,
     Object? error,
+    StackTrace? stackTrace,
     Breadcrumb currentBreadcrumb,
   ) async {
     final causeType = _causeType(error);
@@ -406,6 +486,7 @@ class AppLogger implements Logger {
               ? 'UploadDiagnosticFailure'
               : 'ApplicationFailure',
           value: '$name:${data.values.join(':')}:$causeType',
+          stackTrace: safeApplicationStack(stackTrace),
         ),
       ],
     );
@@ -441,13 +522,51 @@ class AppLogger implements Logger {
   }
 
   /// Reprojects only current-run sync context, never ambient raw breadcrumbs.
-  List<Breadcrumb> _syncBreadcrumbs(List<Breadcrumb> breadcrumbs) {
+  static List<Breadcrumb> _syncBreadcrumbs(
+    List<Breadcrumb> breadcrumbs, {
+    bool includeDatabase = false,
+  }) {
     final start = breadcrumbs.lastIndexWhere(
       (b) => b.category == 'app' && b.message == 'content_sync_started',
     );
-    if (start < 0) return [];
+    if (start < 0 && !includeDatabase) return [];
     final approved = <Breadcrumb>[];
-    for (final b in breadcrumbs.skip(start)) {
+    for (
+      var index = includeDatabase ? 0 : start;
+      index < breadcrumbs.length;
+      index++
+    ) {
+      final b = breadcrumbs[index];
+      if (includeDatabase &&
+          b.type == 'supabase' &&
+          const {
+            'cities',
+            'places',
+            'events',
+            'media',
+          }.contains(b.data?['table']) &&
+          const {
+            'select',
+            'insert',
+            'update',
+            'upsert',
+            'delete',
+          }.contains(b.data?['operation'])) {
+        approved.add(
+          Breadcrumb(
+            message: 'from(${b.data!['table']})',
+            category: 'db.${b.data!['operation']}',
+            type: 'supabase',
+            timestamp: b.timestamp,
+            data: {
+              'table': b.data!['table'],
+              'operation': b.data!['operation'],
+            },
+          ),
+        );
+        continue;
+      }
+      if (start < 0 || index < start) continue;
       if (b.category != 'app') continue;
       final data = b.data ?? {};
       final safe = switch (b.message) {
@@ -507,9 +626,9 @@ class AppLogger implements Logger {
     return approved;
   }
 
-  String _repository(Object? value) =>
+  static String _repository(Object? value) =>
       _known(value, const {'city', 'place', 'event', 'media', 'search'});
-  String _known(Object? value, Set<String> allowed) =>
+  static String _known(Object? value, Set<String> allowed) =>
       value is String && allowed.contains(value) ? value : 'other';
   int? _status(int? value) =>
       value != null && value >= 100 && value <= 599 ? value : null;

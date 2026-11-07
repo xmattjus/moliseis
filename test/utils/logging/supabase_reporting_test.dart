@@ -33,6 +33,7 @@ void main() {
   final previousHandler = Command.globalExceptionHandler;
   final previousReportAll = Command.reportAllExceptions;
   late RecordingSentryTransport transport;
+  late SentryOptions sdkOptions;
   late SupabaseClient client;
   late AppLogger logger;
   late MockSupabase mockSupabase;
@@ -49,6 +50,7 @@ void main() {
     requestError = null;
     transport = RecordingSentryTransport();
     await Sentry.init((options) {
+      sdkOptions = options;
       options
         ..dsn = 'https://abc@def.ingest.sentry.io/1234'
         ..automatedTestMode = true
@@ -313,6 +315,100 @@ void main() {
         expect(payload, isNot(contains(queryCanary)));
         expect(payload, isNot(contains(headerCanary)));
       }
+
+      // beforeSendSpan is not the wire boundary. Flush the installed batching
+      // processor and inspect its independently serialized span envelope.
+      await sdkOptions.telemetryProcessor.flush();
+      final spanEnvelopes = transport.envelopes.where(
+        (envelope) => envelope.items.any((item) => item.header.type == 'span'),
+      );
+      expect(spanEnvelopes, hasLength(1));
+      final serializedSpans = await transport.serializedEnvelope(
+        transport.envelopes.indexOf(spanEnvelopes.single),
+      );
+      expect(serializedSpans, contains('from(cities)'));
+      expect(serializedSpans, contains('SELECT'));
+      expect(serializedSpans, contains('?'));
+      expect(serializedSpans, isNot(contains(queryCanary)));
+      expect(serializedSpans, isNot(contains(headerCanary)));
+    },
+  );
+
+  for (final pii in [false, true]) {
+    test('Supabase body/query acquisition control PII=$pii', () async {
+      const privateValue = 'PRIVATE_BODY_QUERY_CONTROL';
+      sdkOptions
+        ..sendDefaultPii = pii
+        ..maxRequestBodySize = MaxRequestBodySize.always;
+      final bodyClient = SentrySupabaseClient(
+        client: MockClient((request) async => http.Response('{}', 200)),
+        enableErrors: false,
+      );
+      addTearDown(bodyClient.close);
+      await Sentry.startSpan('body-query-control', (_) async {
+        await client.from('cities').select().eq('name', privateValue);
+        // The installed body reader accepts http.Request, whereas Postgrest
+        // can supply a streamed request. Use a real acquired body control.
+        await bodyClient.send(
+          http.Request(
+            'PATCH',
+            Uri.parse('https://example.invalid/rest/v1/cities'),
+          )..body = jsonEncode({'name': privateValue}),
+        );
+      });
+      await transport.settleSpans(3);
+      await Sentry.captureMessage('safe database control');
+      await transport.settleCaptures();
+      await sdkOptions.telemetryProcessor.flush();
+
+      final eventEnvelopes = transport.envelopes.where(
+        (envelope) => envelope.items.any((item) => item.header.type == 'event'),
+      );
+      final spanEnvelopes = transport.envelopes.where(
+        (envelope) => envelope.items.any((item) => item.header.type == 'span'),
+      );
+      expect(eventEnvelopes, hasLength(1));
+      expect(spanEnvelopes, hasLength(1));
+      for (final envelope in [eventEnvelopes.single, spanEnvelopes.single]) {
+        final payload = await transport.serializedEnvelope(
+          transport.envelopes.indexOf(envelope),
+        );
+        expect(payload, contains('cities'));
+        // StreamingInstrumentationSpan.setData rejects Map bodies even with
+        // PII enabled; breadcrumbs supply the acquired body/query control.
+        final isEvent = envelope.items.any(
+          (item) => item.header.type == 'event',
+        );
+        expect(payload.contains(privateValue), pii && isEvent);
+        if (!isEvent) {
+          expect(payload, contains('UPDATE'));
+          expect(payload, contains('SELECT'));
+          expect(payload, contains('?'));
+        }
+      }
+      expect(
+        transport.spans.map((span) => span.name),
+        containsAll(['from(cities)', 'body-query-control']),
+      );
+    });
+  }
+  test(
+    'automatic policy retains acquired Supabase operation breadcrumbs',
+    () async {
+      sdkOptions.beforeSend = AppLogger.beforeSend;
+      await client.from('cities').select().eq('name', canary);
+      await Sentry.captureException(StateError(canary));
+      expect(transport.envelopes, hasLength(1));
+      final event = await transport.serializedEvent(0);
+      expect(transport.exceptionValues(event).single['type'], 'StateError');
+      expect(event['breadcrumbs'], hasLength(1));
+      final breadcrumbs = (event['breadcrumbs'] as List)
+          .cast<Map<String, dynamic>>();
+      expect(breadcrumbs.single['data'], {
+        'table': 'cities',
+        'operation': 'select',
+      });
+      expect(await transport.serializedEnvelope(0), isNot(contains(canary)));
     },
   );
 }

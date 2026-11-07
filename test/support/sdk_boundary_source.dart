@@ -71,6 +71,7 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
     'lib/utils/logging/run_traced_result.dart': {'startSpan'},
   };
   const allowedTalkerFiles = <String>{
+    'lib/main.dart', // Typed Replay masking rules for diagnostic widgets.
     'lib/config/dependencies.dart',
     'lib/routing/router.dart',
     'lib/ui/core/ui/logging_screen.dart',

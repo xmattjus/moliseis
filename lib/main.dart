@@ -32,6 +32,7 @@ import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_supabase/sentry_supabase.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 final _sentryLoggingFlag = SentryLoggingFlag(initialValue: false);
 
@@ -89,7 +90,10 @@ Future<void> _main() async {
           ..beforeSend = AppLogger.beforeSend
           ..httpClient = httpClientFactory()
           ..privacy.maskAllText = false
-          ..privacy.maskAllImages = false,
+          ..privacy.maskAllImages = false
+          // Monitor detail routes are outside LoggingScreen’s widget subtree.
+          ..privacy.mask<TalkerView>()
+          ..privacy.mask<TalkerDataCard>(),
         appRunner: runner,
       );
     },

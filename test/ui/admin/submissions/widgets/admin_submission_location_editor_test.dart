@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:provider/provider.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../../../../support/recording_tile_http_client.dart';
 
@@ -92,6 +93,10 @@ void main() {
     await _pumpEditor(tester);
 
     expect(find.byType(GeoMap), findsOneWidget);
+    expect(
+      find.ancestor(of: find.byType(GeoMap), matching: find.byType(SentryMask)),
+      findsOneWidget,
+    );
     expect(find.text('Mappa'), findsOneWidget);
     expect(find.text('Coordinate'), findsOneWidget);
   });
@@ -111,6 +116,15 @@ void main() {
 
     expect(find.byType(GeoMap), findsNothing);
     expect(find.byType(TextFormField), findsNWidgets(2));
+    for (final field in find.byType(TextFormField).evaluate()) {
+      expect(
+        find.ancestor(
+          of: find.byWidget(field.widget),
+          matching: find.byType(SentryMask),
+        ),
+        findsOneWidget,
+      );
+    }
 
     formKey.currentState!.validate();
     await tester.pump();

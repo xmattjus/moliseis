@@ -193,3 +193,114 @@ A source guard beside the existing Supabase configuration assertion pins both pr
 Guard event metadata, local rendering/Talker and remote work independently. Consume both synchronous start failures and asynchronous diagnostic rejection without recursive reporting. Missing local data must not block a remote projection that can use typed fields independently. Remove saveDraft pre-rendering, rather than catching business work. The route fallback keeps its existing deduplication semantics but narrowly guards optional error-reason rendering, another pre-call diagnostic expression. A bad diagnostic cannot replace a real Result/throw or cause extra writes/retries. Representative tests use real ObjectBox and installed SDK, with production-mode versus automated-test-mode distinctions recorded.
 
 Gate A was closed for the original authorized remediation: the above choices resolve its policy, migration, ownership, payload, context and isolation decisions. The original completion record in tasks.md describes subsequent integration, enforcement and agent-guidance work. No new Unicode-specific diagnostic is justified by a reproducer; exact-input capture is deferred. Actual native recordings, Sentry ingestion/grouping and deployed options remain unverified; publication checks must be inspected for the actual final HEAD. Existing canonical consent/Replay/tracing behavior must be preserved; no database, schema, RPC or Edge Function change is needed.
+
+## November 7 implementation evidence — expansion at `5f044865`
+
+This section records new implementation after the planning baseline, rather
+than reclassifying the archived investigation as new execution. Native SDK
+reporting is unchanged: after inspecting the bridge limitation, the owner
+explicitly instructed: “Keep this evidence, do not make any changes to the SDK
+native reporting.” That disposition does not satisfy native privacy acceptance.
+The expansion is **not ready** while the mandatory channel guarantees remain
+unmet. Detailed execution and remaining acceptance are recorded in the
+[implementation evidence](research/2026-11-07-hardening-implementation.md).
+
+### Reviewed exception and source contract (6.1–6.2, 8.1–8.2)
+
+`safe_error_diagnostics.dart` retains exact reviewed source URI literals and
+bounded positive line/column numbers. Application reports keep their existing
+family/value/category/operation representation and add those locations from
+VM-format stacks. Original throwable and stack objects still go to Talker.
+Functions, arbitrary package/file names, absolute paths, query-bearing paths,
+source snippets, variables and unparsed lines are not forwarded. Only selected
+reporting-owner files and exact Dart runtime source identities are accepted;
+there is no basename, path-prefix, hash, dynamic source manifest, new parser
+package or fingerprint policy. The VM line parser accepts one anchored known
+shape; missing/malformed, generated, absolute-path and app AOT stacks retain the
+bounded failure without a location. These are explicit localization limits,
+not evidence that release builds were executed or symbolicated.
+
+Automatic Dart errors have a separate policy in the existing `beforeSend`
+boundary. They keep a finite known exception type (unknown/obfuscated types
+become `DartError`), SDK mechanism/handled state and exception-group linkage,
+reviewed source frames and numeric thread identity/state. Original values,
+thread names, arbitrary mechanism data, requests/users/tags/extras and unknown
+contexts are omitted. Exception chains retain the last sixteen entries,
+including the root. No new capture, automatic-error shutdown or object-identity
+deduplication is introduced. Supabase core-table operation breadcrumbs and
+current-run sync breadcrumbs are reprojected in acquisition order; other
+automatic/navigation/console crumbs are omitted until their fields are reviewed.
+This is a diagnostic tradeoff, not a universal breadcrumb compatibility claim.
+
+For automatic AOT errors, the installed SDK parser's numeric native instruction
+addresses survive, along with numeric image addresses/sizes, finite image types
+and architectures, UUID-shaped debug identifiers and hex code identifiers.
+Image names, paths, symbols and registers are omitted. These fields retain
+symbolication inputs, but actual release symbolication and Sentry server Issue
+grouping were not tested. No native SDK callback or reporting pipeline changes
+are involved: these are Dart-event protocol fields only.
+
+OS/app version and trace/span/Replay linkage retain the earlier field contract;
+automatic trace operation is `sdk.error`, while app reports keep `app.report`.
+If optional enrichment restoration fails, the already-sanitized automatic event
+retains its identity and diagnostics. If projection itself fails, a bounded
+`DartError` event survives without the unsafe input. This fallback begins after
+SDK throwable preparation: it cannot repair an SDK failure before `beforeSend`.
+Host tests exercise a genuinely unhandled zone and extracted chain, Flutter's
+actual framework reporting entry and the installed dispatcher handler. Direct
+handler invocation is explicitly not mobile engine-origin capture evidence.
+
+### Retained isolation layers and remaining attachment capability (7.1, 11.2)
+
+New C/D controls independently retain event reconstruction and cloned-scope
+clearing. Reconstruction removes tested polluted event fields; scope clearing
+independently removes attachments collected later by the SDK. Hint attachments,
+screenshot and hierarchy items are excluded by finalization. Scope cloning has
+native synchronization disabled in this SDK; the observer control confirms no
+shared native-user reset. The real installed native-context processor remains
+covered with controlled binding data, which is not native acquisition evidence.
+No deletion of either protection or new technical-context expansion is justified.
+
+A separate positive control proves that **SDK-owned automatic events can still
+inherit ambient scope attachments** after `beforeSend`. The installed API has no
+`beforeSendEnvelope`, and `maxAttachmentSize=0` is unsupported. There is no
+production attachment producer in the inspected application, and screenshot/
+hierarchy acquisition remains disabled by SDK defaults. Nevertheless the broad
+full-envelope attachment guarantee remains open. No destructive shared-scope
+clear or replacement transport was added to disguise this SDK boundary.
+
+### Rendered content classification and local export (7.2, 10)
+
+Editable submission proposals, restored drafts, their original asset previews,
+precise location editor/map, recovery comparison values, candidate-search input,
+proposed merge values and unbounded preview-error text are private/unpublished.
+They now have targeted masks. Original submission assets remain protected even
+after approval: approval does not prove every original field or asset is the
+same as promoted public content. Existing contributor masks remain. Dashboard
+summary title/city/date/category/status, public source/current editorial context,
+public tourism screens and `Creato come` retain their intentional visibility.
+The log viewer and monitor detail content are protected by typed `TalkerView`
+and `TalkerDataCard` rules because pushed monitor routes leave LoggingScreen's
+subtree. Global text/images remain unmasked; no navigation or form semantics
+changed. These are widget/source guarantees, not recording acceptance.
+
+The installed Replay integration triggers buffered error Replay through its
+`OnBeforeSendEvent` lifecycle callback, independently of event reconstruction.
+Mask rules operate on Flutter render bounds. Native keyboard/picker/share
+surfaces, platform views, native overlay pixels, actual image recordings and
+buffer/cache shutdown need separate runtime evidence. No Android/iOS Replay
+recording or attributed Sentry Replay inspection was performed here, and no
+production project received synthetic probes. Tasks 10.1/10.3 remain open.
+
+Talker originals and console output remain local and independent of consent.
+Isolated package tests exercise viewer copy plus its actual export controller,
+real temporary-file contents and mocked share dismissal, with consent on/off.
+Export contents remain private diagnostics requiring a separate explicit action;
+Sentry never reconstructs that history. This does not prove OS share-preview
+redaction. Production-style viewer characterization also exposed existing
+material_ui/Flutter overlay incompatibilities: missing legacy localizations and
+ScaffoldMessenger, plus a pinned-package debug decorated-ListTile assertion.
+The package control uses Flutter MaterialApp and a transparent test theme;
+it is not evidence that production overlays work. No app-wide compatibility or
+navigation redesign was introduced. Task 7.2 remains open for that flow and
+platform preview acceptance.

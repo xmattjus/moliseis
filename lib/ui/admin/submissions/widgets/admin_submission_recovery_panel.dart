@@ -5,6 +5,7 @@ import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/utils/extensions/content_category_extensions.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Reviews whole-field alternatives without owning their persistence.
 class AdminSubmissionRecoveryPanel extends StatelessWidget {
@@ -168,7 +169,7 @@ class _ComparisonValue extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(label, style: Theme.of(context).textTheme.labelLarge),
-      SelectableText(value),
+      SentryMask(SelectableText(value)),
     ],
   );
 }
