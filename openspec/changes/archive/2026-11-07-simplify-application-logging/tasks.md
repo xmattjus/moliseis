@@ -1,6 +1,6 @@
 # Tasks: simplify-application-logging
 
-> Existing PR #33 only. Sections 0–5 preserve executed historical work; the owner freeze below supersedes their former all-build local/native-recording assumptions. Sections 6–12 retain completed Dart work and explicitly dispose of withdrawn obligations. A disposition is not an executed mitigation or runtime test. Final applicable implementation verification is recorded below; external delivery/review status is reported separately. Do not merge, archive, synchronize canonical specs or deploy; 5.3 remains open.
+> Implementation evidence belongs to merged PR #33; task 5.3 records the separately authorized post-merge documentation lifecycle. Sections 0–5 preserve executed historical work; the owner freeze below supersedes their former all-build local/native-recording assumptions. Sections 6–12 retain completed Dart work and explicitly dispose of withdrawn obligations. A disposition is not an executed mitigation or runtime test. Final applicable implementation verification is recorded below; external delivery/review status is reported separately. The documentation PR requires separate explicit merge authorization; deployment remains outside scope.
 
 ## 0. Revalidate the implementation baseline
 
@@ -58,12 +58,12 @@
 
 - [x] 5.1 Review the entire PR #33 diff (planning plus implementation) against current mainline, applicable `AGENTS.md` and canonical/delta specs. Include only implementation, required tests and justified agent guidance; exclude temporary diagnostics, printed dumps, test logs, local paths and unrelated code.
 - [x] 5.2 Obtain a separate review of observable correctness, reporting ownership, privacy boundaries, failure isolation, and deletion of unnecessary logging complexity. Do not equate a passing test suite with absence of defects.
-- [ ] 5.3 With explicit user authorization, merge PR #33 after accepted implementation. Only **after** implementation is accepted and integrated, synchronize the approved deltas with `application-observability`, `sentry-consent-lifecycle` and `session-replay-privacy`, archive the change and publish those documentation-only changes in a **separate PR**, requiring its own explicit merge authorization. Do not automatically perform these steps now.
+- [x] 5.3 Verify PR #33 is merged and its merge commit `479250e213de46bd4bb6374e14d36873ee66476a` is contained in current `main`; with separate post-merge authorization, synchronize the approved deltas with `application-observability`, `sentry-consent-lifecycle` and `session-replay-privacy`, archive the change and prepare the documentation-only PR. Publication and live checks are recorded in that PR and the delivery report; its merge still requires explicit owner authorization.
 
 
 ## Historical evidence
 
-Original implementation and November 7 execution evidence is retained in [the implementation report](research/2026-11-07-hardening-implementation.md) and the unchanged archived investigation. Historical full-suite results distinguish the 4,101-pass/4-skip expansion run from the subsequent 4,104-pass/4-skip run after the dashboard masks at `ddcd646`; both excluded native integration tests and neither proves native/Replay privacy. These counts are historical, not the final freeze execution result. The final owner freeze revises those acceptance obligations; no historical or unexecuted native test is marked passed here. Task 5.3 remains separately authorized post-merge work.
+Original implementation and November 7 execution evidence is retained in [the implementation report](research/2026-11-07-hardening-implementation.md) and the unchanged archived investigation. Historical full-suite results distinguish the 4,101-pass/4-skip expansion run from the subsequent 4,104-pass/4-skip run after the dashboard masks at `ddcd646`; both excluded native integration tests and neither proves native/Replay privacy. These counts are historical, not the final freeze execution result. The final owner freeze revises those acceptance obligations; no historical or unexecuted native test is marked passed here. Task 5.3 was deferred at that implementation checkpoint and is reconciled above under separate post-merge authorization.
 
 ## 6. Safe exception discrimination (D2/D3)
 
@@ -101,13 +101,13 @@ Original implementation and November 7 execution evidence is retained in [the im
 ## 12. Final verification and delivery
 
 - [x] 12.1 Run focused and applicable complete Flutter tests, `flutter analyze --no-pub`, formatting verification, static logging-boundary checks, supported non-Debug build validation where possible and strict OpenSpec validation. Review the complete PR against current main; reconcile final code/deltas/task states and inspect hygiene before staging. Report genuine regressions, known failures and environment limits separately; exclude temporary outputs, secrets, machine paths, SDK copies and unrelated files.
-- [x] 12.2 Complete independent full-PR review under the frozen contract and finalize the implementation evidence and PR description. Confirm there are no planned implementation/documentation changes beyond recording these verified results. Distinguish accepted SDK limits from implementation defects without inferring server grouping/native pixels. Keep draft status and leave 5.3 open; readiness does not authorize merge.
+- [x] 12.2 Complete independent full-PR review under the frozen contract and finalize the implementation evidence and PR description. Confirm there are no planned implementation/documentation changes beyond recording these verified results. Distinguish accepted SDK limits from implementation defects without inferring server grouping/native pixels. At implementation readiness, keep PR #33 draft and leave 5.3 open until separate lifecycle authorization; readiness alone does not authorize merge.
 
 
 ## Final-scope disposition
 
-Tasks 9.1–9.3, 10.1 and 10.3 are completed dispositions of withdrawn obligations, not claims of native sanitizer implementation or native/Replay runtime passes. Accepted SDK limitations are recorded once in [design.md](design.md#accepted-sdk-limitations); the deltas formally supersede contradictory canonical acceptance. Tasks 7.2, 10.2, 11.1–11.2 and 12.1–12.2 passed the applicable final implementation verification recorded in design. Task 5.3 remains open and outside this PR's authorization.
+Tasks 9.1–9.3, 10.1 and 10.3 are completed dispositions of withdrawn obligations, not claims of native sanitizer implementation or native/Replay runtime passes. Accepted SDK limitations are recorded once in [design.md](design.md#accepted-sdk-limitations); the deltas formally supersede contradictory canonical acceptance. Tasks 7.2, 10.2, 11.1–11.2 and 12.1–12.2 passed the applicable final implementation verification recorded in design. Task 5.3 was outside the implementation PR's authorization and is completed above under the separate post-merge documentation scope.
 
-## Final external review sequence
+## Historical implementation external review sequence
 
 After the completed implementation/task evidence is committed and pushed, confirm final remote HEAD and required CI, finalize the PR description, then post exactly one top-level `@coderabbitai full review` comment. Observe/report review status and material findings without retries or further automatic commits/pushes. This external final action is reported in the PR conversation and final response rather than requiring a post-request task-file commit.

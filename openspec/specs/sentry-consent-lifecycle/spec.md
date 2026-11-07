@@ -57,12 +57,12 @@ Telemetry SHALL own transport resources independently of application networking,
 
 ### Requirement: Committed opt-out initiates one current-session shutdown
 
-Consent persistence SHALL precede its effective change. Committed opt-out SHALL stop custom forwarding and initiate one application-owned SDK shutdown. New telemetry acquisition SHALL stop after effective shutdown on verified supported platforms. SDK draining of previously acquired telemetry is permitted; zero traffic immediately after the tap SHALL NOT be promised.
+Consent persistence SHALL precede its effective change. Committed opt-out SHALL stop custom forwarding and initiate one application-owned SDK shutdown. The application SHALL use public `Sentry.close` without native customization and stop new application forwarding. Successful shutdown observation SHALL mean settlement of that supported SDK operation, not independent proof of inaccessible native internal state. No new native acquisition probe or custom shutdown guarantee is required for this change. SDK draining of previously acquired telemetry is permitted; zero traffic immediately after the tap SHALL NOT be promised.
 
 #### Scenario: Active SDK receives opt-out
 - **WHEN** opt-out persists and remains the currently committed preference at reconciliation
 - **THEN** custom forwarding stops, SDK shutdown starts, and disable success waits for shutdown settlement
-- **AND** the switch's optimistic value alone does not establish effective shutdown
+- **AND** the switch's optimistic value alone does not establish observed SDK shutdown
 
 #### Scenario: Already inactive process
 - **WHEN** opt-out persists while telemetry was never initialized or has already shut down successfully
@@ -86,7 +86,7 @@ Runtime opt-in SHALL persist the preference without initializing or reinitializi
 
 ### Requirement: Shutdown uncertainty does not undo persisted consent
 
-Shutdown observation SHALL be bounded. A detected failure, timeout or unconfirmed shutdown SHALL retain saved opt-out and disabled custom forwarding, without claiming disable success or reverting persistence. Repeated callers SHALL share the original physical shutdown rather than interpret a later no-op close as proof of completion. Late settlement SHALL NOT replay UI feedback.
+Shutdown observation SHALL be bounded. A detected failure, timeout or unconfirmed shutdown SHALL retain saved opt-out and disabled custom forwarding, without claiming disable success or reverting persistence. Repeated callers SHALL share the original SDK close Future rather than interpret a later no-op close as proof of completion. Late settlement SHALL NOT replay UI feedback.
 
 #### Scenario: Shutdown rejects or times out
 - **WHEN** opt-out saved successfully but shutdown rejects with an `Exception` or exceeds its observation deadline
@@ -95,7 +95,7 @@ Shutdown observation SHALL be bounded. A detected failure, timeout or unconfirme
 #### Scenario: Shutdown rejects with an unexpected raw Error
 - **WHEN** opt-out saved successfully but shutdown rejects with an unexpected raw `Error`
 - **THEN** the error SHALL retain unexpected command-error reporting rather than being normalized into `shutdownUnconfirmed`
-- **AND** when committed opt-out and unconfirmed shutdown remain current, eligible Settings feedback SHALL still distinguish the saved preference from the unconfirmed effective shutdown through its existing fallback
+- **AND** when committed opt-out and unconfirmed shutdown remain current, eligible Settings feedback SHALL still distinguish the saved preference from the unconfirmed observed SDK shutdown through its existing fallback
 
 #### Scenario: Repeated close while the first is pending
 - **WHEN** another reconciliation observes opt-out during pending shutdown
@@ -114,7 +114,7 @@ Enable and disable success SHALL use the existing Snackbar component with identi
 - **THEN** one success Snackbar says "La segnalazione degli errori sarà attivata al prossimo avvio dell'app."
 
 #### Scenario: Disable succeeds
-- **WHEN** the current admitted opt-out persists and required shutdown settles successfully under the validated platform behavior
+- **WHEN** the current admitted opt-out persists and required shutdown settles successfully through the supported SDK close observation
 - **THEN** one success Snackbar says "La segnalazione di nuovi errori è stata disattivata."
 
 #### Scenario: Persistence fails
@@ -130,34 +130,21 @@ Enable and disable success SHALL use the existing Snackbar component with identi
 - **WHEN** a caller is disposed, unmounted, replaced, refused admission or superseded before feedback authorization
 - **THEN** it displays no stale success or error Snackbar while application-owned consent reconciliation remains eligible
 
-### Requirement: Native acceptance is separate from presentation acceptance
+### Requirement: Consent acceptance follows supported SDK lifecycle boundaries
 
-Android and iOS acceptance SHALL require controlled framework-error and representative native-crash evidence with positive controls, synthetic data and an isolated destination. Facade/widget flags SHALL NOT prove native success. Previously acquired buffers MAY drain; new acquisition after effective shutdown SHALL remain prohibited for every source. Acceptance SHALL document native observability limits; Replay follows `session-replay-privacy`.
+Persisted consent, first-install defaults, unreadable-preference handling, deferred opt-in, bounded public SDK shutdown observation and independent application networking SHALL remain unchanged. Acceptance SHALL distinguish saved preference, application forwarding, observable close settlement and unverified native internal state.
 
-#### Scenario: Native consent and networking acceptance
-- **WHEN** representative native acceptance is evaluated on each platform
-- **THEN** persisted-consent startup, actual SDK shutdown, mounted-root usability, application networking continuity and deferred opt-in with fresh-process activation are demonstrated
-- **AND** buffered pre-revocation delivery, including data queued until a later launch, is distinguished from new acquisition
-- **AND** internally swallowed native shutdown failures and observation limits are documented rather than inferred from facade state
+#### Scenario: Startup consent controls initialization
 
-#### Scenario: Representative automatic capture after effective shutdown
-- **WHEN** controlled framework-error and representative native-error probes occur before and after successful shutdown on each native platform
-- **THEN** working positive controls and crash-cache recovery establish that the destination and tested mechanisms are operational
-- **AND** no new post-shutdown report from those probes is acquired or delivered during valid recovery observation, and unrelated application networking remains functional
-- **AND** Android Java RuntimeException and iOS SIGSEGV results are not generalized to every crash mechanism
+- **WHEN** a fresh process reads stored opt-out or unreadable consent
+- **THEN** telemetry is not initialized and application networking remains usable
+- **AND** first-install defaults and deferred opt-in retain their established semantics without a second consent store
+- **AND** Debug-only Talker diagnostics and explicit developer export remain consent-independent; Profile and Release provide no Talker capabilities
 
-#### Scenario: Additional probe has no reliable positive control
-- **WHEN** the integration-test binding prevents a reliable unhandled-Dart automatic-capture positive control and no specific regression is demonstrated
-- **THEN** the probe remains inconclusive and its residual coverage limitation is recorded, without blocking merge/release acceptance supported by the mandatory representative evidence
-- **AND** independent unhandled-Dart, Android NDK and exhaustive device/crash-family probes are not merge/release prerequisites absent a specific regression; concrete evidence of new capture requires investigation regardless of source
-- **AND** the requirement to stop new acquisition after effective shutdown remains unchanged
+#### Scenario: Runtime opt-out is observed
 
-#### Scenario: Retained-process activation evidence
-- **WHEN** process-level integration tests establish runtime opt-in deferral and activation only in a fresh process, with no concrete alternate initialization path identified
-- **THEN** separate native navigation, resume and hot-reload probes are not mandatory for acceptance
-- **AND** those transitions remain prohibited from reinitializing telemetry in the existing process
-
-#### Scenario: Native shutdown cannot meet acceptance
-- **WHEN** controlled native verification shows continued new capture or an unobservable failure invalidates the required claim
-- **THEN** immediate-disable release acceptance remains unmet, evidence identifies the failing path and a bounded design correction is reviewed before release
-- **AND** a restart message alone is not accepted as the privacy fix
+- **WHEN** opt-out persists while the SDK is active
+- **THEN** custom forwarding stops and callers share bounded observation of the public SDK close operation
+- **AND** previously acquired buffered delivery is distinguished from new work; immediate zero traffic and independently verified native shutdown are not promised
+- **AND** a rejection or timeout retains saved opt-out and unconfirmed-shutdown feedback
+- **AND** no private native hook, custom shutdown/recovery implementation or new native probe campaign is required
