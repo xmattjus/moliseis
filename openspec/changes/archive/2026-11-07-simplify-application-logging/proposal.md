@@ -21,8 +21,8 @@ Typed application logging must preserve business behavior and useful Sentry diag
 
 ## Impact and boundaries
 
-Implementation remains in PR #33 on `codex/simplify-application-logging`. No new dependency, logging abstraction, runtime diagnostics toggle, application log-file writer, native SDK customization, sampling change or business-flow change is authorized. Accepted SDK limitations are recorded once in [design.md](design.md#accepted-sdk-limitations).
+Implementation was merged through [PR #33](https://github.com/xmattjus/moliseis/pull/33) into `main` at `479250e213de46bd4bb6374e14d36873ee66476a`. No new dependency, logging abstraction, runtime diagnostics toggle, application log-file writer, native SDK customization, sampling change or business-flow change is authorized. Accepted SDK limitations are recorded once in [design.md](design.md#accepted-sdk-limitations).
 
 The [November 7 investigation](research/2026-11-07-sentry-sanitization-investigation.md), [native assessment](research/2026-11-07-native-integration-assessment.md) and [implementation evidence](research/2026-11-07-hardening-implementation.md) remain historical evidence; their superseded acceptance obligations do not govern the final freeze.
 
-Final applicable tests, non-Debug build validation where supported, strict OpenSpec validation, full-diff review and CI precede the single final CodeRabbit full-review request. Merge, canonical specification synchronization, archival, a separate post-merge documentation PR and deployment remain outside this implementation; task 5.3 stays open.
+Implementation verification and external review belong to PR #33. Separately authorized post-merge task 5.3 synchronizes the approved deltas and archives this change in a documentation-only PR. That documentation PR requires its own explicit merge authorization; deployment remains outside scope.

@@ -8,43 +8,72 @@ Protect contributor identity in diagnostic recordings while preserving useful pu
 
 ### Requirement: Contributor identity is selectively obscured in Replay
 
-Replay SHALL obscure contributor name and email in the public contribution form and administrative moderation displays. Approval or staff access SHALL NOT make contributor contact data public. Protection SHALL leave normal screen use and authorized staff access unchanged.
+Replay SHALL obscure contributor name and email in the public contribution form and administrative moderation displays. Approval or staff access SHALL NOT make contributor contact data public. Original dashboard title and city SHALL also be protected unless their publication is established independently; moderation status or a promotion link alone SHALL NOT prove the original values are public. Protection SHALL leave normal screen use and authorized staff access unchanged.
 
 #### Scenario: Public contribution form
 - **WHEN** a contributor enters or restores a name or email
-- **THEN** the existing identity-field masks remain in effect without masking unrelated editorial input
+- **THEN** the existing identity-field masks remain in effect
+- **AND** other private or unpublished input follows its separate selective-protection contract while deliberately public context retains visibility
 
 #### Scenario: Dashboard row
-- **WHEN** a moderation row shows contributor name with creation date
-- **THEN** Replay obscures the name while retaining the adjacent date, title, city, category and status
-- **AND** authorized staff can still read the identity in the application
+- **WHEN** a moderation row renders original contributor name, title and city without independent proof that the title and city are public
+- **THEN** Replay obscures those original values while retaining adjacent date, category and status
+- **AND** acceptance or promotion alone does not remove these masks
+- **AND** separately proven public title/city context remains visible and authorized staff can still read and select the original row normally
+
+#### Scenario: Pending contribution match warning
+
+- **WHEN** the editor renders `matches.pendingWarnings` containing an unpublished pending contribution title
+- **THEN** the private warning text is a descendant of `SentryMask`
+- **AND** its visible text, layout, interaction and backend behavior remain unchanged
 
 #### Scenario: Editor proposed-by section
 - **WHEN** edit mode renders contributor name or email in `Proposto da`, including finalized submissions
-- **THEN** Replay obscures each present contributor identity field without obscuring the editorial content
+- **THEN** Replay obscures each present contributor identity field
+- **AND** deliberately public editorial context remains visible while classified private/unpublished content follows its selective-protection contract
 
 ### Requirement: Public content and administrator context retain Replay visibility
 
-Replay SHALL retain globally unmasked text and images and useful public tourism content. The authenticated administrator context in `Creato come` SHALL NOT acquire a mask merely for containing a name or email. Intentionally public administrator identity information SHALL remain visible; it SHALL NOT be conflated with a submission contributor's private contact fields.
+Replay SHALL retain useful public tourism/editorial text and images under selective privacy protection. Classified private or unpublished material SHALL be protected even when displayed by editorial controls. The authenticated administrator context in `Creato come` SHALL NOT acquire a mask merely for containing a name or email. Intentionally public administrator identity information SHALL remain visible; it SHALL NOT be conflated with a submission contributor's private contact fields.
 
 #### Scenario: Tourism and editorial content
 - **WHEN** Replay records event/place titles, descriptions, cities, dates, categories, status, images or normal editorial controls
-- **THEN** those fields remain visible under the current global privacy configuration
+- **THEN** deliberately public fields remain visible; classified private/unpublished input in those controls follows selective protection
 
 #### Scenario: Create-mode account context
 - **WHEN** the editor renders `Creato come` from the current administrator account
 - **THEN** that display retains its existing visibility and is not treated as the original submission contributor
 
-### Requirement: Native recording proves selective redaction
+### Requirement: Private submission and diagnostic content is selectively protected
 
-Selective redaction acceptance SHALL combine representative native dashboard recordings on Android/iOS, affected widget-boundary regressions and actual Sentry Replay inspection of public-form/editor masking. Owner inspection MAY supply the latter with accurate provenance. Widget assertions SHALL NOT prove native pixels or separate payload protection. All contributor masking and editorial/account visibility guarantees remain mandatory.
+The application SHALL wrap private contributor identity/contact and reviewed private or unpublished submission, moderation and Debug diagnostic content in the appropriate official Replay masking components. Protection SHALL follow rendered content sensitivity, including user-authored text/assets where private, while preserving authorized UI access and useful public context. Error-triggered Replay SHALL obey the same contract.
 
-#### Scenario: Combined selective-redaction evidence
-- **WHEN** native dashboard recordings on both platforms show synthetic contributor-name redaction with adjacent date/title/city/category/status visible, widget regressions preserve public-form/editor identity masks and editorial/image/create-account boundaries, and actual Sentry Replay inspection confirms public-form and editor contributor masking
-- **THEN** the combined evidence satisfies selective Replay acceptance without claiming every screen was independently recorded on each platform
-- **AND** product-owner inspection is distinguished from independently reproduced test output, with no invented recording identifier or platform attribution
-- **AND** separate native recordings of every screen/create-mode variant are not mandatory absent evidence of a masking defect
+#### Scenario: Private content is entered or restored
 
-#### Scenario: Separate payload exposure discovered
-- **WHEN** verification discovers contributor values in a distinct error, breadcrumb, URL or metadata payload
-- **THEN** UI masking alone is not claimed to protect that payload and the concrete disclosure is reported for a bounded scope decision
+- **GIVEN** a reviewed classification of rendered public contribution, restored draft, confirmation/error, moderation list/editor and diagnostic-view surfaces
+- **WHEN** contributor contact or classified private user-authored text, location, asset or moderation details are rendered
+- **THEN** the application applies official masking boundaries to the private content while authorized users can still use/read it in the application
+- **AND** adjacent deliberately public titles, dates, city, category, status and images retain useful visibility
+
+#### Scenario: Error triggers a recording
+
+- **GIVEN** sensitive submission, moderation or local diagnostic content is visible
+- **WHEN** an error triggers Replay acquisition or flush
+- **THEN** the same application masking boundaries apply; buffered recording behavior remains SDK-owned and is not newly verified here
+- **AND** an event beforeSend filter is not claimed to sanitize recording pixels or payloads
+
+### Requirement: Application masking boundaries use official SDK mechanisms
+
+Replay SHALL retain official SDK selective masking with `maskAllText = false`, `maskAllImages = false`, existing sample rates and applicable `SentryMask` and typed masking rules. Application acceptance SHALL verify classified private widget boundaries and authorized UI behavior with focused regressions. It SHALL NOT reproduce SDK masking internals or require new native recordings, pixel comparisons or server-side Replay inspection for this change.
+
+#### Scenario: Widget boundary is verified
+
+- **WHEN** sensitive application content is rendered in a focused widget test
+- **THEN** the appropriate official masking component is its ancestor and adjacent deliberately public or approved account context remains available
+- **AND** this proves application wrapping rather than native pixels, all rendering paths or actual acquisition
+
+#### Scenario: Device acquisition has not been observed
+
+- **WHEN** native recordings or actual Replay inspection were not executed for this change
+- **THEN** that limitation is accurately disclosed under the owner-accepted scope
+- **AND** event filtering and widget assertions are not described as recording sanitization or native consent evidence

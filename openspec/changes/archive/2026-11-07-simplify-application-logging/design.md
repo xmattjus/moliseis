@@ -2,7 +2,7 @@
 
 ## Context and authority
 
-The original typed logging migration and November 7 Dart hardening are implemented in existing PR #33. The owner's final logging decision freeze supersedes contradictory planning assumptions, including mandatory native sanitization/probes, native Replay recording campaigns and production Talker diagnostics. This design records the current contract, not a new architecture.
+The original typed logging migration and November 7 Dart hardening were merged through [PR #33](https://github.com/xmattjus/moliseis/pull/33) into `main` at `479250e213de46bd4bb6374e14d36873ee66476a`. The owner's final logging decision freeze supersedes contradictory planning assumptions, including mandatory native sanitization/probes, native Replay recording campaigns and production Talker diagnostics. This design records the current contract, not a new architecture.
 
 Historical investigation and execution details remain in [the archived investigation](research/2026-11-07-sentry-sanitization-investigation.md), [native integration assessment](research/2026-11-07-native-integration-assessment.md) and [hardening implementation evidence](research/2026-11-07-hardening-implementation.md). Those reports retain their original observations and historical BLOCKED verdicts; the owner subsequently revised the acceptance contract. A historical pass is not new execution evidence.
 
@@ -40,7 +40,7 @@ This is a structural source-identity contract, not provenance authentication. A 
 
 The installed SDK and Dart runtime confirm `NoSuchMethodError`, `UnsupportedError`, `ConcurrentModificationError` and VM `LateError`; only those exact additional technical type strings are retained. Unknown types still become `DartError`, and original values still become `SDK error`. Real SDK transport tests cover UI, ViewModel, repository, Flutter and Dart locations, malformed/private source cases, location bounds, standard types and the existing native/AOT controls. The automatic positive control uses an actual unhandled guarded-zone entry with a supplied synthetic stack. Negative frame fixtures pass through SDK processing and final envelope serialization. Neither proves backend Issue grouping, device delivery or authenticity of forged frames. Breadcrumb filtering, reporting ownership and all frozen architecture remain unchanged.
 
-P2-1 diagnostic-source remediation verification at commit `2b88cb3782b460a94fdf53ac2a417e822a8b74a7`, subsequent to the logging freeze, on Flutter 3.47.5 / Dart 3.13.4 and Sentry 10.0.0-rc.2: 22 focused automatic/localization tests and 241 logging tests passed; the CI-equivalent 195-file autonomous suite passed 4,112 tests with four existing skips. Analysis, changed-file formatting, static logging boundaries, strict OpenSpec validation and diff hygiene passed. No native/Replay campaign or additional build was run for this platform-independent remediation. Task 5.3 remains open; final remote/CI/review evidence is reported in the PR rather than requiring a post-review documentation commit.
+P2-1 diagnostic-source remediation verification at commit `2b88cb3782b460a94fdf53ac2a417e822a8b74a7`, subsequent to the logging freeze, on Flutter 3.47.5 / Dart 3.13.4 and Sentry 10.0.0-rc.2: 22 focused automatic/localization tests and 241 logging tests passed; the CI-equivalent 195-file autonomous suite passed 4,112 tests with four existing skips. Analysis, changed-file formatting, static logging boundaries, strict OpenSpec validation and diff hygiene passed. No native/Replay campaign or additional build was run for this platform-independent remediation. At that implementation checkpoint, task 5.3 remained open; final implementation remote/CI/review evidence belongs to PR #33.
 
 ### D4 — Official native integration only
 
@@ -67,13 +67,13 @@ The owner accepts the following residual boundaries for this PR, without claimin
 
 See the historical investigation and native assessment linked above for provenance. These owner-accepted SDK limits are not implementation blockers under the revised deltas. They must not be converted into positive verification claims, privacy certification or proof of server grouping.
 
-## Verification and delivery
+## Implementation verification and delivery (historical)
 
 Reuse existing maintained policy, envelope, concurrency, consent/networking, functional sync/Cloudinary/submission/moderation and command tests. Add focused null-Talker independence, Debug sink/source-guard and pending-warning widget regressions. Ordinary `flutter test` runs in Debug and cannot prove Profile/Release behavior; combine compile-time structural checks with a supported non-Debug build when tooling permits and state any build limitation precisely.
 
 Run focused tests, the applicable complete Flutter suite, `flutter analyze --no-pub`, formatting, static logging boundaries, strict OpenSpec validation and repository hygiene checks. Review the complete PR diff against current main and distinguish existing failures from new regressions. Only actual executed checks may complete tasks 7.2, 10.2, 11.1–11.2 and 12.1–12.2.
 
-All implementation, documentation, fixes, commits, pushes, final remote-HEAD/CI verification and PR-description updates must precede exactly one top-level `@coderabbitai full review` request. Observe/report its status; do not automatically push after that request or retry an unavailable review. Keep the PR draft. Task 5.3 remains a separately authorized post-merge workflow; do not merge, synchronize canonical specifications, archive or deploy.
+The implementation delivery sequence required all fixes, commits, pushes, remote-HEAD/CI verification and PR-description updates before exactly one final top-level `@coderabbitai full review` request, with its status reported externally and no automatic push afterward. PR #33 was to remain draft at implementation readiness; task 5.3 required separate post-merge authorization. These historical instructions do not govern publication of the separately authorized documentation PR.
 
 
 ## Historical final logging freeze verification
@@ -85,4 +85,8 @@ All implementation, documentation, fixes, commits, pushes, final remote-HEAD/CI 
 - `flutter build apk --profile --no-pub`: passed. This validates a real non-Debug compilation alongside structural guard checks; the artifact was not deployed or executed. Existing toolchain/plugin deprecation warnings do not establish a runtime defect. No Release runtime, native privacy or actual Replay recording claim follows.
 - Independent read-only review covered the complete PR against current main, connected production paths and applicable tests/deltas. No material production defect was found; an automatic-event scope-attachment qualification was corrected without changing application-envelope protections. The reviewer inspected tests rather than independently executing them.
 
-The PR description is reconciled to the frozen contract. Final commit/remote HEAD, CI and the single CodeRabbit request/status are recorded externally in the PR and delivery response, preserving the required no-push-after-request sequence. Only separately authorized task 5.3 remains open.
+The implementation PR description was reconciled to the frozen contract. Final implementation commit/remote HEAD, CI and CodeRabbit request/status belong to PR #33 and its delivery response. Task 5.3 was deferred at that checkpoint.
+
+## Post-merge documentation lifecycle
+
+PR #33 is verified merged, and its merge commit `479250e213de46bd4bb6374e14d36873ee66476a` is contained in the fetched `main` baseline. Separately authorized task 5.3 synchronizes all three approved deltas and archives this change on November 7, 2026. Historical research and implementation verification remain attributed to their original checkpoints; this documentation work supplies no new native, Replay, runtime or server-grouping evidence. The separate documentation PR is prepared for publication and owner review, with live publication/check status recorded externally. Its merge requires explicit authorization; no deployment is authorized.
