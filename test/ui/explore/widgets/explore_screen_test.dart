@@ -3,15 +3,18 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/models/event.dart';
 import 'package:moliseis/domain/models/place.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/content/content_event_card_grid_item.dart';
 import 'package:moliseis/ui/core/ui/content/content_sliver_grid.dart';
+import 'package:moliseis/ui/core/ui/logging_screen.dart';
 import 'package:moliseis/ui/core/ui/skeletons/skeleton_content_sliver_grid.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 import '../../../support/command_test_support.dart';
 import '../../../support/events_harness.dart';
@@ -22,6 +25,28 @@ import '../../../support/sync_harness.dart';
 
 void main() {
   setUpAll(() => initializeDateFormatting('en'));
+  testOwnerUI('Debug menu opens registered Talker viewer with route observer', (
+    tester,
+  ) async {
+    final harness = EventsRouteHarness(eventRepository: FakeEventRepository());
+    addTearDown(harness.dispose);
+    await tester.pumpWidget(harness.app);
+    await tester.pumpAndSettle();
+    final navigator = tester.widget<Navigator>(find.byType(Navigator).first);
+    expect(navigator.observers.whereType<TalkerRouteObserver>(), hasLength(1));
+    expect($talker, isNotNull);
+    // The Debug action lives inside the overflow menu.
+    expect(find.byTooltip('Debug', skipOffstage: false), findsOneWidget);
+    unawaited(harness.router.pushNamed(RouteNames.logging));
+    await tester.pumpAndSettle();
+    expect(find.byType(LoggingScreen), findsOneWidget);
+    expect(
+      tester.widget<TalkerScreen>(find.byType(TalkerScreen)).talker,
+      same($talker),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testOwnerUI('latest runtime failure renders retry and recovers', (
     tester,
   ) async {

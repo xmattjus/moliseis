@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
@@ -213,13 +214,12 @@ GoRouter buildAppRouter({
           ),
         ],
       ),
-      GoRoute(
-        path: RoutePaths.logging,
-        name: RouteNames.logging,
-        builder: (_, _) {
-          return LoggingScreen(talker: $talker);
-        },
-      ),
+      if (kDebugMode)
+        GoRoute(
+          path: RoutePaths.logging,
+          name: RouteNames.logging,
+          builder: (_, _) => LoggingScreen(talker: $talker!),
+        ),
       GoRoute(
         path: RoutePaths.adminLoginLocation,
         name: RouteNames.adminLogin,
@@ -564,7 +564,7 @@ GoRouter buildAppRouter({
         },
       ),
     ],
-    observers: [TalkerRouteObserver($talker)],
+    observers: [if (kDebugMode) TalkerRouteObserver($talker!)],
   );
 }
 

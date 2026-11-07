@@ -47,6 +47,7 @@ abstract class BaseSyncRepository<
       logger.log(
         SyncFailure(
           owner: SyncFailureOwner.prepare,
+          repository: entityName,
           category: syncFailureCategory(e),
         ),
         error: e,
@@ -58,6 +59,7 @@ abstract class BaseSyncRepository<
       logger.log(
         SyncFailure(
           owner: SyncFailureOwner.prepare,
+          repository: entityName,
           category: syncFailureCategory(error),
           report: false,
         ),
@@ -106,6 +108,7 @@ abstract class BaseSyncRepository<
       logger.log(
         SyncFailure(
           owner: SyncFailureOwner.commit,
+          repository: entityName,
           category: syncFailureCategory(e) == SyncFailureCategory.connectivity
               ? SyncFailureCategory.connectivity
               : SyncFailureCategory.storage,

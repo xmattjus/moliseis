@@ -1,6 +1,7 @@
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// An item in a horizontal asset selection list with a remove button.
 ///
@@ -36,7 +37,7 @@ class ContentSubmissionAssetListItem extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: context.appShapes.circular.cornerMedium,
-          child: image,
+          child: SentryMask(image),
         ),
         if (showRemoveIcon)
           Positioned(

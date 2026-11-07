@@ -5,6 +5,7 @@ import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 
+import '../../../support/logging_faults.dart';
 import '../../../support/mock_logger.dart';
 
 void main() {
@@ -33,6 +34,35 @@ void main() {
       expect(call.error, same(error));
       expect(call.stackTrace, isNull);
       expect(logger.calls, hasLength(1));
+    });
+
+    testWidgets('diagnostic rendering failure preserves fallback UI', (
+      tester,
+    ) async {
+      final logger = MockLogger();
+      final error = DiagnosticRenderingFailure();
+      final screenKey = GlobalKey<State<RouteErrorScreen>>();
+      for (var rebuild = 0; rebuild < 2; rebuild++) {
+        await tester.pumpWidget(
+          _buildApp(
+            logger: logger,
+            screenKey: screenKey,
+            uri: Uri.parse('/bogus'),
+            error: error,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        expect(
+          find.text('La pagina richiesta non è stata trovata'),
+          findsOneWidget,
+        );
+      }
+      expect(logger.calls, hasLength(1));
+      expect(logger.calls.single.error, same(error));
+      expect(
+        (logger.calls.single.event as RouteErrorScreenShown).reason,
+        isNull,
+      );
     });
 
     testWidgets('does not log when no logger is available', (tester) async {

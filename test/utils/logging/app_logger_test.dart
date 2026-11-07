@@ -11,6 +11,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cached_network_image_ce/cached_network_image.dart'
+    show HttpExceptionWithStatus;
 import 'package:command_it/command_it.dart' as commands;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -24,6 +26,7 @@ import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../support/logging_faults.dart';
 import '../../support/recording_sentry_transport.dart';
 
 class MockTalker extends Mock implements Talker {}
@@ -56,6 +59,70 @@ void main() {
   tearDown(() async {
     await Sentry.close();
   });
+
+  test(
+    'absent Talker skips local metadata and preserves Sentry ownership',
+    () async {
+      await Sentry.close();
+      await Sentry.init((options) {
+        options
+          ..dsn = 'https://abc@example.test/1'
+          ..automatedTestMode = true
+          ..beforeSend = AppLogger.beforeSend
+          ..transport = fakeTransport
+          ..addEventProcessor(fakeTransport);
+      });
+      sentryFlag.enabled = true;
+      final logger = AppLogger(null, sentryFlag: sentryFlag);
+      var localReads = 0;
+      logger.log(
+        FaultyRepositoryEvent(onReadData: () => localReads++),
+        error: StateError('PRIVATE_NULL_TALKER_CANARY'),
+        stackTrace: StackTrace.fromString(
+          '#0 repository (package:moliseis/data/repositories/event_repository.dart:42:3)',
+        ),
+        extra: {'private': 'PRIVATE_NULL_TALKER_CANARY'},
+      );
+      await fakeTransport.settleCaptures();
+      expect(localReads, 0);
+      expect(fakeTransport.envelopes, hasLength(1));
+      final event = await fakeTransport.serializedEvent(0);
+      expect(jsonEncode(event), contains('entity_load_failed'));
+      expect(jsonEncode(event), contains('getById'));
+      expect(event['breadcrumbs'], isNotEmpty);
+      expect(
+        await fakeTransport.serializedEnvelope(0),
+        isNot(contains('PRIVATE_NULL_TALKER_CANARY')),
+      );
+
+      logger.log(const RepositorySyncStarted('event'));
+      logger.log(const ImageLoadFailed(url: 'PRIVATE_NULL_TALKER_CANARY'));
+      await fakeTransport.settleCaptures();
+      expect(fakeTransport.envelopes, hasLength(1));
+      expect(
+        Sentry.currentHub.scope.breadcrumbs.last.message,
+        'image_load_failed',
+      );
+
+      await Sentry.captureException(StateError('PRIVATE_NULL_TALKER_CANARY'));
+      expect(fakeTransport.envelopes, hasLength(2));
+      final automatic = await fakeTransport.serializedEvent(1);
+      expect(jsonEncode(automatic), contains('StateError'));
+      expect(jsonEncode(automatic), isNot(contains('entity_load_failed')));
+      expect(
+        await fakeTransport.serializedEnvelope(1),
+        isNot(contains('PRIVATE_NULL_TALKER_CANARY')),
+      );
+
+      AppLogger(
+        null,
+        sentryFlag: sentryFlag,
+        minLevel: AppLogLevel.critical,
+      ).log(const EntityLoadFailed('event', method: 'getById'));
+      await fakeTransport.settleCaptures();
+      expect(fakeTransport.envelopes, hasLength(2));
+    },
+  );
 
   group('AppLogger', () {
     // Real LogEvent subclasses used since LogEvent is sealed:
@@ -199,7 +266,7 @@ void main() {
       test('passes event name and merged data as message set', () {
         final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
-        logger.log(const RepositorySyncStarted('cities'));
+        logger.log(const RepositorySyncStarted('city'));
 
         final captured = verify(
           () => mockTalker.log(
@@ -214,7 +281,7 @@ void main() {
         expect(message, contains('repository_sync_started'));
 
         final data = message.whereType<Map<String, Object?>>().first;
-        expect(data, {'repositoryName': 'cities'});
+        expect(data, {'repositoryName': 'city'});
       });
     });
 
@@ -327,7 +394,7 @@ void main() {
         sentryFlag.enabled = true;
         final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
-        logger.log(const RepositorySyncStarted('cities'));
+        logger.log(const RepositorySyncStarted('city'));
 
         await fakeTransport.settleCaptures();
 
@@ -336,7 +403,7 @@ void main() {
 
         final breadcrumb = breadcrumbs.first;
         expect(breadcrumb.message, 'repository_sync_started');
-        expect(breadcrumb.data, {'repositoryName': 'cities'});
+        expect(breadcrumb.data, {'repositoryName': 'city'});
         expect(breadcrumb.level, SentryLevel.info);
         expect(breadcrumb.type, 'log');
         expect(breadcrumb.category, 'app');
@@ -355,19 +422,22 @@ void main() {
         expect(breadcrumbs.first.level, SentryLevel.warning);
       });
 
-      test('captures exception for error-level with non-null error', () async {
-        sentryFlag.enabled = true;
-        final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
+      test(
+        'captures explicitly reportable persistence failure with cause',
+        () async {
+          sentryFlag.enabled = true;
+          final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
-        logger.log(
-          const ImageLoadFailed(url: ''),
-          error: Exception('captured'),
-        );
+          logger.log(
+            const ContentSubmissionDraftLoadFailed(),
+            error: Exception('captured'),
+          );
 
-        await fakeTransport.settleCaptures();
+          await fakeTransport.settleCaptures();
 
-        expect(fakeTransport.envelopes, hasLength(1));
-      });
+          expect(fakeTransport.envelopes, hasLength(1));
+        },
+      );
 
       test(
         'captures exception for critical-level with non-null error',
@@ -419,7 +489,7 @@ void main() {
         },
       );
 
-      test('breadcrumb includes merged extra data', () async {
+      test('breadcrumb excludes local extra data', () async {
         sentryFlag.enabled = true;
         final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
 
@@ -432,10 +502,7 @@ void main() {
 
         final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
         expect(breadcrumbs, hasLength(1));
-        expect(breadcrumbs.first.data, {
-          'repositoryName': 'events',
-          'retries': 2,
-        });
+        expect(breadcrumbs.first.data, {'repositoryName': 'other'});
       });
     });
 
@@ -707,7 +774,7 @@ void main() {
                   ),
                 )
                 .join();
-            expect(payload.contains('PRIVATE_FILE_'), name == 'search_results');
+            expect(payload, isNot(contains('PRIVATE_FILE_')));
           } else {
             expect(fakeTransport.events, isEmpty);
           }
@@ -722,6 +789,36 @@ void main() {
         });
       }
     }
+
+    test('repeated handled image errors remain useful breadcrumbs '
+        'without captures', () async {
+      sentryFlag.enabled = true;
+      final logger = AppLogger(mockTalker, sentryFlag: sentryFlag);
+      final error = HttpExceptionWithStatus(
+        404,
+        'PRIVATE_IMAGE_MESSAGE',
+        uri: Uri.parse('https://private.invalid/PRIVATE_IMAGE_URL'),
+      );
+      for (var rebuild = 0; rebuild < 3; rebuild++) {
+        logger.log(
+          const ImageLoadFailed(url: 'PRIVATE_IMAGE_URL'),
+          error: error,
+        );
+      }
+      await fakeTransport.settleCaptures();
+      expect(fakeTransport.events, isEmpty);
+      expect(fakeTransport.envelopes, isEmpty);
+      final breadcrumbs = Sentry.currentHub.scope.breadcrumbs;
+      expect(breadcrumbs, hasLength(3));
+      expect(breadcrumbs.last.data, {
+        'cause_type': 'HttpExceptionWithStatus',
+        'status_code': 404,
+      });
+      expect(
+        jsonEncode(breadcrumbs.map((b) => b.toJson()).toList()),
+        isNot(contains('PRIVATE_IMAGE')),
+      );
+    });
 
     group('event name assertion', () {
       test('valid three-segment name passes assertion', () {

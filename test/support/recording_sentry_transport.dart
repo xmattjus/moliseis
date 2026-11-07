@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -27,6 +28,13 @@ class RecordingSentryTransport implements Transport, EventProcessor {
   Future<void> settleSpans(int count) async {
     while (spans.length < count) {
       await _spanDelivery.future.timeout(const Duration(seconds: 5));
+    }
+  }
+
+  /// Waits for delivery when another observed capture intentionally fails.
+  Future<void> settleEnvelopes(int count) async {
+    while (envelopes.length < count) {
+      await _delivery.future.timeout(const Duration(seconds: 5));
     }
   }
 
@@ -59,6 +67,25 @@ class RecordingSentryTransport implements Transport, EventProcessor {
       await _delivery.future.timeout(const Duration(seconds: 5));
     }
   }
+
+  /// Reads the final event JSON from a delivered serialized envelope.
+  Future<Map<String, dynamic>> serializedEvent(int index) async {
+    final item = envelopes[index].items.singleWhere(
+      (item) => item.header.type == 'event',
+    );
+    return jsonDecode(utf8.decode(await item.dataFactory()))
+        as Map<String, dynamic>;
+  }
+
+  /// Serializes every item, including attachment bytes and stream spans.
+  Future<String> serializedEnvelope(int index) => utf8.decoder
+      .bind(envelopes[index].envelopeStream(SentryOptions()))
+      .join();
+
+  /// Returns exception values in the serialized Sentry event shape.
+  List<Map<String, dynamic>> exceptionValues(Map<String, dynamic> event) =>
+      ((event['exception'] as Map<String, dynamic>)['values'] as List)
+          .cast<Map<String, dynamic>>();
 }
 
 /// Selects SDK non-debug branches without changing the host Flutter build.

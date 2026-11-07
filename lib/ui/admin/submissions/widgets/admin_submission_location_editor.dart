@@ -3,6 +3,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// The display representation selected inside the location editor.
 enum _LocationMode { mappa, coordinate }
@@ -219,105 +220,108 @@ class _AdminSubmissionLocationEditorState
       _longitudeController.text,
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: _mode == _LocationMode.mappa ? 8 : 16,
-      children: <Widget>[
-        SegmentedButton<_LocationMode>(
-          segments: const <ButtonSegment<_LocationMode>>[
-            ButtonSegment<_LocationMode>(
-              value: _LocationMode.mappa,
-              label: Text('Mappa'),
-              icon: Icon(Symbols.map),
-            ),
-            ButtonSegment<_LocationMode>(
-              value: _LocationMode.coordinate,
-              label: Text('Coordinate'),
-              icon: Icon(Symbols.pin_drop),
-            ),
-          ],
-          selected: <_LocationMode>{_mode},
-          onSelectionChanged: (selection) =>
-              _handleModeChanged(selection.first),
-        ),
-        // Compact visible hint so a blocked Save is never silent while Map
-        // mode hides the invalid fields.
-        if (_mode == _LocationMode.mappa && !_hasValidDraft)
-          Text(
-            'Coordinate non valide',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.error,
-            ),
+    // Both the map marker and coordinate drafts expose the selected location.
+    return SentryMask(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: _mode == _LocationMode.mappa ? 8 : 16,
+        children: <Widget>[
+          SegmentedButton<_LocationMode>(
+            segments: const <ButtonSegment<_LocationMode>>[
+              ButtonSegment<_LocationMode>(
+                value: _LocationMode.mappa,
+                label: Text('Mappa'),
+                icon: Icon(Symbols.map),
+              ),
+              ButtonSegment<_LocationMode>(
+                value: _LocationMode.coordinate,
+                label: Text('Coordinate'),
+                icon: Icon(Symbols.pin_drop),
+              ),
+            ],
+            selected: <_LocationMode>{_mode},
+            onSelectionChanged: (selection) =>
+                _handleModeChanged(selection.first),
           ),
-        // The Form stays mounted in every display mode so the screen-owned
-        // formKey can validate from Map mode too; only its visibility hides.
-        Form(
-          key: widget.formKey,
-          child: Offstage(
-            offstage: _mode == _LocationMode.mappa,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 12,
-              children: <Widget>[
-                TextFormField(
-                  key: _latitudeFieldKey,
-                  controller: _latitudeController,
-                  decoration: const InputDecoration(labelText: 'Latitudine'),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                    decimal: true,
-                  ),
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  validator: _validateLatitude,
-                  onChanged: _handleLatitudeChanged,
-                ),
-                TextFormField(
-                  key: _longitudeFieldKey,
-                  controller: _longitudeController,
-                  decoration: const InputDecoration(labelText: 'Longitudine'),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                    decimal: true,
-                  ),
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  validator: _validateLongitude,
-                  onChanged: _handleLongitudeChanged,
-                ),
-              ],
+          // Compact visible hint so a blocked Save is never silent while Map
+          // mode hides the invalid fields.
+          if (_mode == _LocationMode.mappa && !_hasValidDraft)
+            Text(
+              'Coordinate non valide',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.error,
+              ),
             ),
-          ),
-        ),
-        // Only the map branch is conditional: each entry into Map mode
-        // rebuilds GeoMap and re-centers via initialCenter.
-        if (_mode == _LocationMode.mappa) ...<Widget>[
-          SizedBox(
-            height: 280,
-            width: double.infinity,
-            child: GeoMap(
-              initialCenter: _mapCenter,
-              markers: selectionPair == null
-                  ? const <Marker>[]
-                  : <Marker>[
-                      Marker(
-                        point: LatLng(selectionPair.$1, selectionPair.$2),
-                        width: 40,
-                        height: 40,
-                        child: const Icon(
-                          Symbols.location_pin,
-                          size: 32,
-                          fill: 1,
-                        ),
-                      ),
-                    ],
-              onPressed: (_, point) => widget.onMapCoordinatesSelected(
-                point.latitude,
-                point.longitude,
+          // The Form stays mounted in every display mode so the screen-owned
+          // formKey can validate from Map mode too; only its visibility hides.
+          Form(
+            key: widget.formKey,
+            child: Offstage(
+              offstage: _mode == _LocationMode.mappa,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 12,
+                children: <Widget>[
+                  TextFormField(
+                    key: _latitudeFieldKey,
+                    controller: _latitudeController,
+                    decoration: const InputDecoration(labelText: 'Latitudine'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: true,
+                      decimal: true,
+                    ),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: _validateLatitude,
+                    onChanged: _handleLatitudeChanged,
+                  ),
+                  TextFormField(
+                    key: _longitudeFieldKey,
+                    controller: _longitudeController,
+                    decoration: const InputDecoration(labelText: 'Longitudine'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      signed: true,
+                      decimal: true,
+                    ),
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    validator: _validateLongitude,
+                    onChanged: _handleLongitudeChanged,
+                  ),
+                ],
               ),
             ),
           ),
-          const Text('Tocca la mappa per impostare la posizione.'),
+          // Only the map branch is conditional: each entry into Map mode
+          // rebuilds GeoMap and re-centers via initialCenter.
+          if (_mode == _LocationMode.mappa) ...<Widget>[
+            SizedBox(
+              height: 280,
+              width: double.infinity,
+              child: GeoMap(
+                initialCenter: _mapCenter,
+                markers: selectionPair == null
+                    ? const <Marker>[]
+                    : <Marker>[
+                        Marker(
+                          point: LatLng(selectionPair.$1, selectionPair.$2),
+                          width: 40,
+                          height: 40,
+                          child: const Icon(
+                            Symbols.location_pin,
+                            size: 32,
+                            fill: 1,
+                          ),
+                        ),
+                      ],
+                onPressed: (_, point) => widget.onMapCoordinatesSelected(
+                  point.latitude,
+                  point.longitude,
+                ),
+              ),
+            ),
+            const Text('Tocca la mappa per impostare la posizione.'),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

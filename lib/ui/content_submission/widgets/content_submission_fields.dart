@@ -6,6 +6,7 @@ import 'package:moliseis/ui/content_submission/widgets/content_submission_date_c
 import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Category, content, and controlled event-date fields shared by submission
 /// editors.
@@ -99,64 +100,67 @@ class ContentSubmissionFields extends StatelessWidget {
           'Dettagli',
           padding: EdgeInsets.only(top: 16, bottom: 12),
         ),
-        Form(
-          key: formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 12,
-            children: <Widget>[
-              TextFormField(
-                key: hydrationRevision == null
-                    ? null
-                    : ValueKey((hydrationRevision, 'city')),
-                initialValue: city,
-                decoration: const InputDecoration(
-                  labelText: 'Città',
-                  hintText: 'San Pietro Avellana',
+        // Editable proposals may contain unpublished or private free text.
+        SentryMask(
+          Form(
+            key: formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 12,
+              children: <Widget>[
+                TextFormField(
+                  key: hydrationRevision == null
+                      ? null
+                      : ValueKey((hydrationRevision, 'city')),
+                  initialValue: city,
+                  decoration: const InputDecoration(
+                    labelText: 'Città',
+                    hintText: 'San Pietro Avellana',
+                  ),
+                  onChanged: onCityChanged,
+                  validator: (value) {
+                    if (value?.isEmpty ?? false) {
+                      return 'Inserisci il nome di una città';
+                    }
+                    if ((value?.length ?? 0) > 100) {
+                      return 'Il nome della città inserito è troppo lungo';
+                    }
+                    return null;
+                  },
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                 ),
-                onChanged: onCityChanged,
-                validator: (value) {
-                  if (value?.isEmpty ?? false) {
-                    return 'Inserisci il nome di una città';
-                  }
-                  if ((value?.length ?? 0) > 100) {
-                    return 'Il nome della città inserito è troppo lungo';
-                  }
-                  return null;
-                },
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-              ),
-              TextFormField(
-                key: hydrationRevision == null
-                    ? null
-                    : ValueKey((hydrationRevision, 'name')),
-                initialValue: name,
-                decoration: const InputDecoration(
-                  labelText: 'Luogo o evento',
-                  hintText: 'Museo del Tartufo',
+                TextFormField(
+                  key: hydrationRevision == null
+                      ? null
+                      : ValueKey((hydrationRevision, 'name')),
+                  initialValue: name,
+                  decoration: const InputDecoration(
+                    labelText: 'Luogo o evento',
+                    hintText: 'Museo del Tartufo',
+                  ),
+                  onChanged: onNameChanged,
+                  validator: (value) {
+                    if (value?.isEmpty ?? false) {
+                      return 'Inserisci il nome di un luogo o di un evento';
+                    }
+                    if ((value?.length ?? 0) > 150) {
+                      return "Il nome del luogo o dell'evento inserito è "
+                          'troppo lungo';
+                    }
+                    return null;
+                  },
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                 ),
-                onChanged: onNameChanged,
-                validator: (value) {
-                  if (value?.isEmpty ?? false) {
-                    return 'Inserisci il nome di un luogo o di un evento';
-                  }
-                  if ((value?.length ?? 0) > 150) {
-                    return "Il nome del luogo o dell'evento inserito è "
-                        'troppo lungo';
-                  }
-                  return null;
-                },
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-              ),
-              ContentSubmissionDescriptionFormField(
-                key: hydrationRevision == null
-                    ? null
-                    : ValueKey((hydrationRevision, 'description')),
-                initialDescription: description,
-                initialDescriptionDelta: descriptionDelta,
-                onChanged: onDescriptionChanged,
-              ),
-            ],
+                ContentSubmissionDescriptionFormField(
+                  key: hydrationRevision == null
+                      ? null
+                      : ValueKey((hydrationRevision, 'description')),
+                  initialDescription: description,
+                  initialDescriptionDelta: descriptionDelta,
+                  onChanged: onDescriptionChanged,
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 8),

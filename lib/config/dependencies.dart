@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show CacheManager;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/env/env.dart';
@@ -56,14 +57,14 @@ import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
-/// The global [Talker] instance.
+/// The Debug-only global [Talker] instance; absent in Profile and Release.
 ///
 /// The Dependency Injection pattern is intentionally not used here because
 /// go_router route observers do not have access to the build context.
 ///
 /// The `$` character in the name is used to clearly indicate that this
 /// instance is intentionally global/static.
-final Talker $talker = TalkerFlutter.init();
+final Talker? $talker = kDebugMode ? TalkerFlutter.init() : null;
 
 /// The global [ScaffoldMessengerState] instance.
 ///

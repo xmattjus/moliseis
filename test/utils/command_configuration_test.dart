@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:command_it/command_it.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +42,35 @@ void main() {
     expect(call.error, same(error));
     expect(call.stackTrace, same(stack));
     expect(call.extra, isNull);
+  });
+
+  test('production command names stay in the reviewed finite catalog', () {
+    final productionSources = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.dart'))
+        .map((file) => file.readAsStringSync())
+        .join('\n');
+    final literalNames = RegExp(
+      r'''debugName\s*:\s*(['"])([^'"$]+)\1''',
+    ).allMatches(productionSources).map((match) => match.group(2)!);
+    final editorSuffixes = RegExp(
+      r'''_createCommand(?:<[^>]+>)?\(\s*(['"])([^'"]+)\1''',
+    ).allMatches(productionSources).map((match) => match.group(2)!);
+
+    for (final name in literalNames) {
+      expect(safeCommandDebugName(name), name, reason: name);
+    }
+    for (final suffix in editorSuffixes) {
+      final name = 'admin_submission_editor_$suffix';
+      expect(safeCommandDebugName(name), name, reason: name);
+    }
+    expect(literalNames, isNotEmpty);
+    expect(editorSuffixes, hasLength(12));
+    expect(
+      safeCommandDebugName('admin_submission_editor_unreviewed'),
+      'command',
+    );
   });
 
   testWidgets('arbitrary command names never enter the event payload', (
