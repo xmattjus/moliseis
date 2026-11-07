@@ -108,21 +108,35 @@ Automatic capture of Talker `print` and `debugPrint` output as Sentry console br
 
 ### Requirement: Privacy-safe exception discrimination
 
-Remote errors SHALL retain reviewed technical information sufficient to distinguish and localize materially different representative failures where feasible, without arbitrary exception messages, unsafe frames or private content. Original causes and stacks SHALL remain local in Debug only. Missing stacks SHALL NOT suppress an otherwise reportable failure.
+Remote errors SHALL retain reviewed technical information sufficient to distinguish and localize representative failures through the bounded source-identity contract, excluding raw exception messages and unapproved diagnostic fields. Original causes and stacks SHALL remain local in Debug only. Missing stacks SHALL NOT suppress an otherwise reportable failure.
 
 #### Scenario: Same category has different safe source evidence
 
 - **GIVEN** two failures share event/category/type but originate at different reviewed technical locations
 - **WHEN** their reports are serialized through the installed SDK
-- **THEN** useful safe source or cause discrimination is retained where available and prohibited message/path/filename canaries are absent
+- **THEN** useful safe source or cause discrimination is retained where available and private message and rejected path/filename canaries are absent
 - **AND** the comparison records retained fields, diagnostic limitations and possible grouping-input changes without asserting actual server Issue grouping
 
 #### Scenario: Stack cannot be used safely
 
-- **GIVEN** a missing, unparsable, generated, platform-specific or user-controlled stack representation
+- **GIVEN** a missing, unparsable, generated or otherwise unsupported stack representation
 - **WHEN** a report is otherwise eligible
 - **THEN** a useful bounded category/origin report remains visible without fallback to raw stack or private message
 - **AND** release/source-map differences and deliberately omitted diagnostics are stated in verification evidence
+
+#### Scenario: Canonical source namespaces restore ordinary application locations
+
+- **WHEN** automatic or application errors contain canonical `package:moliseis/`, `package:flutter/` or `dart:<library>/` source identities
+- **THEN** validation checks the original spelling, limits it to 512 characters, accepts lowercase ASCII identifier path segments with underscores/digits and directory hyphens, and requires a single-stem `.dart` filename
+- **AND** ordinary UI/ViewModel, repository, Flutter and Dart frames retain their validated URI and bounded line/column through final SDK transport, without restoring function names, context lines, variables or raw messages
+- **AND** other namespaces, absolute/file/network paths, empty/dot segments, encoded syntax, queries/fragments, backslashes, controls, unsupported characters and multi-dot generated filenames remain excluded
+- **AND** existing frame-count/location limits and native/AOT symbolication fields remain unchanged
+
+#### Scenario: Forged canonical source identity cannot be authenticated
+
+- **WHEN** a supplied frame uses a deliberately forged but lexically canonical URI in an approved namespace
+- **THEN** structural validation alone cannot establish provenance or exclude a private value spelled as a valid source component; this limitation is disclosed and demonstrated separately from privacy-negative controls
+- **AND** arbitrary user-provided filenames are not considered authenticated source evidence, unsupported representations retain conservative fallback, and no backend grouping guarantee follows from serialized transport tests
 
 ### Requirement: Complete application report envelopes are isolated
 

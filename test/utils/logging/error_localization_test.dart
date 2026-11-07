@@ -46,7 +46,7 @@ void main() {
           '#1 $private (file:///private/$private/$private.dart:1:1)',
         ),
         StackTrace.fromString(
-          '#0 $private (package:moliseis/data/repositories/media_repository_impl.dart:88:4)\n'
+          '#0 $private (package:moliseis/ui/explore/view_models/explore_view_model.dart:88:4)\n'
           '#1 $private (package:moliseis/$private.dart:1:1)',
         ),
       ];
@@ -69,6 +69,10 @@ void main() {
       expect(first['value'], second['value']);
       expect(first['stacktrace']['frames'].single['lineno'], 42);
       expect(second['stacktrace']['frames'].single['lineno'], 88);
+      expect(
+        second['stacktrace']['frames'].single['abs_path'],
+        'package:moliseis/ui/explore/view_models/explore_view_model.dart',
+      );
       expect(first['stacktrace'], isNot(second['stacktrace']));
       for (var i = 0; i < errors.length; i++) {
         expect(await transport.serializedEnvelope(i), isNot(contains(private)));

@@ -66,6 +66,314 @@ void main() {
     });
   }
 
+  for (final filtered in [false, true]) {
+    test(
+      'automatic UI and runtime source locations, filtered=$filtered',
+      () async {
+        const sources = {
+          'package:moliseis/ui/explore/widgets/explore_screen.dart',
+          'package:moliseis/ui/explore/view_models/explore_view_model.dart',
+          'package:moliseis/data/repositories/event_repository_impl.dart',
+          'package:flutter/src/widgets/framework.dart',
+          'dart:async/future_impl.dart',
+        };
+        final transport = RecordingSentryTransport();
+        final caught = Completer<Object>();
+        final error = StateError(private);
+        addTearDown(Sentry.close);
+        await Sentry.init(
+          (options) => options
+            ..dsn = 'https://abc@example.test/1'
+            ..automatedTestMode = true
+            ..transport = transport
+            ..beforeSend = filtered ? AppLogger.beforeSend : null
+            ..addEventProcessor(transport),
+          appRunner: () => scheduleMicrotask(
+            () => Error.throwWithStackTrace(
+              error,
+              StackTrace.fromString(
+                sources.indexed
+                    .map((entry) => '#${entry.$1} $private (${entry.$2}:42:7)')
+                    .join('\n'),
+              ),
+            ),
+          ),
+          runZonedGuardedOnError: (error, _) => caught.complete(error),
+        );
+        expect(
+          await caught.future.timeout(const Duration(seconds: 5)),
+          same(error),
+        );
+        await transport.settleCaptures();
+        expect(transport.envelopes, hasLength(1));
+        final event = await transport.serializedEvent(0);
+        final exception = transport.exceptionValues(event).single;
+        final frames = (exception['stacktrace']['frames'] as List)
+            .cast<Map<String, dynamic>>();
+        expect(frames.map((frame) => frame['abs_path']).toSet(), sources);
+        for (final frame in frames) {
+          expect(frame['lineno'], 42);
+          expect(frame['colno'], 7);
+          if (filtered) {
+            expect(frame['filename'], frame['abs_path']);
+            expect(
+              frame['in_app'],
+              (frame['abs_path'] as String).startsWith('package:moliseis/'),
+            );
+            expect(frame, isNot(contains('function')));
+          }
+        }
+        expect(exception['type'], 'StateError');
+        expect(exception['mechanism']['handled'], isFalse);
+        expect(event['contexts'], isNot(contains('app_diagnostic')));
+        expect(
+          await transport.serializedEnvelope(0),
+          filtered ? isNot(contains(private)) : contains(private),
+        );
+        if (filtered) expect(exception['value'], 'SDK error');
+      },
+    );
+  }
+
+  test(
+    'source validation rejects private and noncanonical frame data',
+    () async {
+      final transport = RecordingSentryTransport();
+      await Sentry.init(
+        (options) => options
+          ..dsn = 'https://abc@example.test/1'
+          ..automatedTestMode = true
+          ..beforeSend = AppLogger.beforeSend
+          ..transport = transport
+          ..addEventProcessor(transport),
+      );
+      addTearDown(Sentry.close);
+      const source = 'package:moliseis/ui/explore/widgets/explore_screen.dart';
+      final invalid = <String?>[
+        null,
+        '',
+        'file:///private/$private/source.dart',
+        '/home/$private/source.dart',
+        'https://example.test/$private/source.dart',
+        'package:unapproved/ui/$private.dart',
+        'package:moliseis/',
+        'package:moliseis//source.dart',
+        'package:moliseis/ui/./source.dart',
+        'package:moliseis/ui/../source.dart',
+        'package:moliseis/ui/%2e%2e/source.dart',
+        'package:moliseis/ui/%252e%252e/source.dart',
+        'package:moliseis/ui/%2fsource.dart',
+        'package:moliseis/ui/%73ource.dart',
+        'package:moliseis/ui/source.dart?$private',
+        'package:moliseis/ui/source.dart#$private',
+        'package:moliseis/ui/secret-$private.dart',
+        'package:moliseis/ui/secret_$private/source.dart',
+        'package:moliseis/ui/private@example.com.dart',
+        'package:moliseis/ui/source.g.dart',
+        'package:moliseis/ui/source.mapper.dart',
+        'package:moliseis/ui/source.freezed.dart',
+        'package:moliseis/ui/source.dart\n',
+        'package:moliseis/ui/so\turce.dart',
+        r'package:moliseis/ui\source.dart',
+        'package:moliseis/${'a' * 513}.dart',
+        'package:moliseis/ui/source',
+        'package:moliseis/ui/source.js',
+        'dart:async',
+        'dart:/async/future_impl.dart',
+        'dart:async/../$private.dart',
+      ];
+      for (final path in invalid) {
+        await Sentry.captureEvent(
+          SentryEvent(
+            exceptions: [
+              SentryException(
+                type: private,
+                value: private,
+                stackTrace: SentryStackTrace(
+                  frames: [
+                    SentryStackFrame(absPath: source, lineNo: 42, colNo: 7),
+                    SentryStackFrame(
+                      absPath: path,
+                      fileName: private,
+                      function: private,
+                      vars: {'private': private},
+                      lineNo: 1,
+                      colNo: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+        final index = transport.envelopes.length - 1;
+        final exception = transport
+            .exceptionValues(await transport.serializedEvent(index))
+            .single;
+        expect(exception['type'], 'DartError');
+        expect(exception['value'], 'SDK error');
+        expect(exception['stacktrace']['frames'], [
+          {
+            'filename': source,
+            'abs_path': source,
+            'lineno': 42,
+            'colno': 7,
+            'in_app': true,
+            'platform': 'dart',
+          },
+        ], reason: 'Rejected original source: $path');
+        expect(
+          await transport.serializedEnvelope(index),
+          isNot(contains(private)),
+        );
+      }
+      expect(transport.envelopes, hasLength(invalid.length));
+
+      for (final position in [-1, 0, 1000001]) {
+        await Sentry.captureEvent(
+          SentryEvent(
+            exceptions: [
+              SentryException(
+                type: 'StateError',
+                value: private,
+                stackTrace: SentryStackTrace(
+                  frames: [
+                    SentryStackFrame(
+                      absPath: source,
+                      lineNo: position,
+                      colNo: position,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+        final index = transport.envelopes.length - 1;
+        final frame =
+            transport
+                    .exceptionValues(await transport.serializedEvent(index))
+                    .single['stacktrace']['frames']
+                    .single
+                as Map;
+        expect(frame['abs_path'], source);
+        expect(frame, isNot(contains('lineno')));
+        expect(frame, isNot(contains('colno')));
+        expect(
+          await transport.serializedEnvelope(index),
+          isNot(contains(private)),
+        );
+      }
+      expect(transport.envelopes, hasLength(invalid.length + 3));
+    },
+  );
+
+  test('canonical forged source documents the URI provenance limit', () async {
+    const forged =
+        'package:moliseis/ui/explore/widgets/private_source_canary.dart';
+    final transport = RecordingSentryTransport();
+    await Sentry.init(
+      (options) => options
+        ..dsn = 'https://abc@example.test/1'
+        ..automatedTestMode = true
+        ..beforeSend = AppLogger.beforeSend
+        ..transport = transport
+        ..addEventProcessor(transport),
+    );
+    addTearDown(Sentry.close);
+    await Sentry.captureEvent(
+      SentryEvent(
+        exceptions: [
+          SentryException(
+            type: 'StateError',
+            value: private,
+            stackTrace: SentryStackTrace(
+              frames: [
+                SentryStackFrame(
+                  absPath: forged,
+                  lineNo: 1,
+                  colNo: 1,
+                  function: private,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    expect(transport.envelopes, hasLength(1));
+    final event = await transport.serializedEvent(0);
+    expect(
+      transport
+          .exceptionValues(event)
+          .single['stacktrace']['frames']
+          .single['abs_path'],
+      forged,
+    );
+    // A valid spelling cannot establish that a source really exists
+    // or is SDK-owned.
+    expect(
+      await transport.serializedEnvelope(0),
+      contains('private_source_canary'),
+    );
+    expect(await transport.serializedEnvelope(0), isNot(contains(private)));
+  });
+
+  test(
+    'installed SDK preserves confirmed standard technical error types',
+    () async {
+      final transport = RecordingSentryTransport();
+      final observed = <String>[];
+      await Sentry.init(
+        (options) => options
+          ..dsn = 'https://abc@example.test/1'
+          ..automatedTestMode = true
+          ..beforeSend = (event, hint) {
+            observed.add(event.exceptions!.single.type!);
+            return AppLogger.beforeSend(event, hint);
+          }
+          ..transport = transport
+          ..addEventProcessor(transport),
+      );
+      addTearDown(Sentry.close);
+      final errors = <Object>[
+        NoSuchMethodError.withInvocation(
+          private,
+          Invocation.method(#missing, []),
+        ),
+        UnsupportedError(private),
+        ConcurrentModificationError(private),
+      ];
+      late String value;
+      // A runtime branch makes this a VM late-read probe, not a compile error.
+      if (observed.isNotEmpty) value = private;
+      try {
+        errors.add(value);
+        fail('An uninitialized late read must throw');
+      } on Object catch (error) {
+        errors.add(error);
+      }
+      for (final error in errors) {
+        await Sentry.captureException(error, stackTrace: stack);
+      }
+      expect(observed, [
+        'NoSuchMethodError',
+        'UnsupportedError',
+        'ConcurrentModificationError',
+        'LateError',
+      ]);
+      expect(transport.envelopes, hasLength(errors.length));
+      for (var i = 0; i < errors.length; i++) {
+        final exception = transport
+            .exceptionValues(await transport.serializedEvent(i))
+            .single;
+        expect(exception['type'], observed[i]);
+        expect(exception['value'], 'SDK error');
+        expect(await transport.serializedEnvelope(i), isNot(contains(private)));
+      }
+    },
+  );
+
   for (final entry in ['framework', 'dispatcher']) {
     test('$entry filters scope and preserves SDK ownership', () async {
       final transport = RecordingSentryTransport();

@@ -1,35 +1,21 @@
 import 'package:sentry_flutter/sentry_flutter.dart';
 
-// Exact source identities, not a path-pattern or basename privacy assumption.
-const _sources = {
-  'package:moliseis/main.dart',
-  'package:moliseis/data/core/base_sync_repository.dart',
-  'package:moliseis/data/core/supabase_sync_cursor_source.dart',
-  'package:moliseis/data/core/objectbox_sync_transaction_coordinator.dart',
-  'package:moliseis/data/repositories/city_repository_impl.dart',
-  'package:moliseis/data/repositories/event_repository_impl.dart',
-  'package:moliseis/data/repositories/place_repository_impl.dart',
-  'package:moliseis/data/repositories/media_repository_impl.dart',
-  'package:moliseis/data/repositories/search_repository_impl.dart',
-  'package:moliseis/data/repositories/settings_repository_impl.dart',
-  'package:moliseis/data/repositories/content_submission_repository_impl.dart',
-  'package:moliseis/data/repositories/content_submission_draft_repository_impl.dart',
-  'package:moliseis/data/repositories/admin_content_submission_repository_impl.dart',
-  'package:moliseis/domain/use-cases/sync_use_case.dart',
-  'package:moliseis/data/data-sources/settings_local_data_source.dart',
-  'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client_impl.dart',
-  'package:moliseis/ui/sync/view_models/sync_view_model.dart',
-  'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart',
-  'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart',
-  'dart:async/future_impl.dart',
-  'dart:async/zone.dart',
-  'dart:async/schedule_microtask.dart',
-  'dart:core/errors.dart',
-};
+// Validate the original spelling: URI normalization could hide traversal.
+final _sourceUri = RegExp(
+  '^(?:package:(?:moliseis|flutter)/|dart:[a-z_][a-z0-9_-]*/)'
+  r'(?:[a-z_][a-z0-9_-]*/)*[a-z_][a-z0-9_]*\.dart$',
+);
 
-/// Keeps only explicitly reviewed source URIs and numeric locations.
+/// Recognizes bounded canonical source identities, without proving provenance.
+bool _isCanonicalSourceUri(String? value) {
+  if (value == null || value.length > 512) return false;
+  // Checking the match end also excludes a trailing newline at the anchor.
+  return _sourceUri.matchAsPrefix(value)?.end == value.length;
+}
+
+/// Keeps validated app, Flutter and Dart source URIs and numeric locations.
 ///
-/// Functions, absolute paths and unknown/generated sources are omitted.
+/// Functions, absolute paths and unsupported/generated sources are omitted.
 /// Automatic AOT errors may retain numeric addresses for symbolication.
 SentryStackTrace? safeDiagnosticFrames(
   Iterable<SentryStackFrame> frames, {
@@ -50,7 +36,7 @@ SentryStackTrace? safeDiagnosticFrames(
       continue;
     }
     final path = frame.absPath;
-    if (!_sources.contains(path)) continue;
+    if (!_isCanonicalSourceUri(path)) continue;
     safe.add(
       SentryStackFrame(
         fileName: path,
@@ -155,6 +141,10 @@ SentryException safeAutomaticException(SentryException exception) {
     type:
         const {
           'StateError',
+          'NoSuchMethodError',
+          'LateError',
+          'UnsupportedError',
+          'ConcurrentModificationError',
           'FormatException',
           'TypeError',
           '_TypeError',
