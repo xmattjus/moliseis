@@ -24,7 +24,7 @@ import '../../../../support/mock_gotrue_client.dart';
 import '../../../../support/ordinary_view_model_lifecycle_support.dart';
 
 void main() {
-  testWidgets('contributor-only row mask wraps at narrow large text size', (
+  testWidgets('private row masks wrap at narrow large text size', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 800));
@@ -64,6 +64,53 @@ void main() {
       findsNothing,
     );
   });
+
+  for (final status in AdminSubmissionStatus.values) {
+    testWidgets('original row title and city remain private for $status', (
+      tester,
+    ) async {
+      final submission = sampleAdminSubmission(
+        status: status,
+        name: 'PRIVATE_ORIGINAL_TITLE',
+        city: 'PRIVATE_ORIGINAL_CITY',
+      );
+      var taps = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AdminSubmissionListItem(
+              summary: submission,
+              onTap: () => taps++,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final value in [
+        submission.name,
+        submission.city,
+        submission.userName,
+      ]) {
+        expect(find.text(value), findsOneWidget);
+        expect(
+          find.ancestor(
+            of: find.text(value),
+            matching: find.byType(SentryMask),
+          ),
+          findsOneWidget,
+        );
+      }
+      expect(
+        find.ancestor(
+          of: find.text('Luogo · ${status.label}'),
+          matching: find.byType(SentryMask),
+        ),
+        findsNothing,
+      );
+      await tester.tap(find.text(submission.name));
+      expect(taps, 1);
+    });
+  }
 
   group('AdminDashboardScreen', () {
     late ControllableAdminAuth auth;
@@ -303,9 +350,16 @@ void main() {
         final locale = Localizations.localeOf(
           tester.element(find.byType(AdminSubmissionListItem)),
         );
+        for (final privateText in [submission.name, submission.city]) {
+          expect(
+            find.ancestor(
+              of: find.text(privateText),
+              matching: find.byType(SentryMask),
+            ),
+            findsOneWidget,
+          );
+        }
         for (final publicText in [
-          submission.name,
-          submission.city,
           'Luogo · Da revisionare',
           ' · ${submission.createdAt.formatDate(locale)}',
         ]) {

@@ -33,7 +33,8 @@ Flutter's Android build pins 8.56.0. No dependencies or toolchains changed.
   displays gain targeted masks. Masking affects recording bounds, not validation,
   persistence, callbacks, staff access, navigation or displayed values. Existing
   dashboard summaries, tourism context and intentionally public admin identity
-  remain visible; dashboard title/city classification is unresolved below.
+  remain visible; original dashboard title/city are now masked by the owner
+  decision recorded below.
 - Existing support is extended for complete envelope serialization, deterministic
   delivery observation, processor gates/faults, native observer counts and a real
   exception cause extractor. No new test infrastructure package is introduced.
@@ -119,7 +120,7 @@ cannot run those platforms. No production project received synthetic telemetry.
 | 9.2 | BLOCKED | Owner explicitly requires native reporting unchanged; later supported hook/design authorization required |
 | 9.3 | OPEN — VERIFICATION REQUIRED | After permitted mitigation: isolated Android/iOS nonfatal, representative crash/relaunch and shutdown envelopes |
 | 10.1 | OPEN — VERIFICATION REQUIRED | Source/rendered inventory complete; obtain synthetic actual recordings including overlays/platform views/on-error buffers |
-| 10.2 | OPEN — IMPLEMENTATION REQUIRED | Other targeted masks pass widget controls; resolve canonical dashboard title/city visibility versus unpublished-content privacy before completing this boundary |
+| 10.2 | COMPLETE | Targeted masks plus 44 dashboard cases; owner resolved original title/city privacy and only the delta was revised; actual recordings remain separate |
 | 10.3 | OPEN — VERIFICATION REQUIRED | Android/iOS dashboard plus actual attributed form/editor/private-category Replay inspection and shutdown/cache controls |
 | 11.1 | OPEN — VERIFICATION REQUIRED | Host consent/bootstrap/networking/local regressions run; mandatory native/Replay channel cessation unverified |
 | 11.2 | OPEN — IMPLEMENTATION REQUIRED | Core event/span/console controls implemented; unsupported automatic scope-attachment capability and actual native/Replay evidence remain |
@@ -145,7 +146,7 @@ Observed final commands/results:
 - `openspec list --json`, `openspec status --change simplify-application-logging --json`,
   `openspec instructions apply --change simplify-application-logging --json`:
   existing repo-local spec-driven change, executable state `ready`; after verified
-  task updates, 45/57 complete, 12 remaining (including later lifecycle 5.3).
+  task updates, 46/57 complete, 11 remaining (including later lifecycle 5.3).
   CLI `ready` means ready to continue implementation, not release readiness.
 - `flutter test --no-pub --reporter expanded test/utils/logging/error_localization_test.dart test/utils/logging/native_enrichment_test.dart`:
   initial focused control, 11 passes.
@@ -193,13 +194,13 @@ local acceptance result. No required-check or bot-review outcome is inferred
 from the local test suite.
 
 
-Final audit correction: task 10.2 is not complete. Dashboard title/city values
+Interim audit correction: task 10.2 was reopened pending owner resolution. Dashboard title/city values
 are raw contributor submission fields, and the summary model does not establish
 that they are public. Canonical dashboard acceptance requires visibility while
 the expanded privacy contract protects unpublished text. The owner was asked
 to choose conditional visibility with targeted masks and a delta correction, or
-explicitly retain this unresolved boundary. Dashboard production code remains
-unchanged pending that required decision. This correction supersedes the first
+explicitly retain this unresolved boundary. Dashboard production code initially remained
+unchanged pending that required decision, subsequently resolved below. This correction supersedes the first
 implementation commit's checkbox count; it does not invalidate the test counts
 or claim that existing widget assertions prove public-data classification.
 
@@ -237,3 +238,32 @@ passed, 1 failed). The temporary probe was removed automatically. The maintained
 real-zone fixture passes all 4 controls, and final analysis, formatting and
 strict OpenSpec validation pass. Thus the harness correction has a working
 failure control and is not an unexplained timeout increase.
+
+
+## Owner-resolved dashboard boundary
+
+The owner then explicitly selected: “Mask original dashboard title/city; revise
+only the delta to make visibility conditional on proven public content.”
+`AdminSubmissionListItem` now masks `summary.name` and `.city` while retaining
+normal text/layout/taps and adjacent date/type/status. Pending, accepted and
+rejected status tests prove that moderation status alone cannot expose original
+contributor text. All 44 dashboard widget tests pass. The Replay delta modifies
+both the contributor/dashboard and combined native-recording requirements to
+condition visibility on proven public data; canonical specs remain unchanged.
+Task 10.2 is complete again, with task 10.1/10.3 actual recordings still open.
+The final implemented task count is 46/57 including the unrelated future 5.3.
+
+The full autonomous suite was rerun after the fake-async fixture correction:
+4,101 passes and 4 skips. This is a new local result, not the earlier failed
+Linux CI run. CodeRabbit's full review request after `d5ba778` was rate-limited;
+no paid review setting or billing action was enabled. The completed full review
+at `da0212e` does not count as review of later changes. Final-head CI/review
+results must be reported independently.
+
+Final dashboard verification: the complete CI-selected autonomous suite passes
+**4,104 tests with 4 skips across 195 files** after the owner-authorized masks.
+Dashboard-focused tests pass 44 cases; analysis reports no issues, formatting
+has no changes and strict OpenSpec validation passes. GitHub run `42362007127`
+passed both jobs at `d5ba778`, independently confirming the Linux fixture fix;
+that result predates the final dashboard commit and is not misattributed to it.
+The final dashboard commit requires its own CI result and requested full review.

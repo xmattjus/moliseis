@@ -305,13 +305,19 @@ it is not evidence that production overlays work. No app-wide compatibility or
 navigation redesign was introduced. Task 7.2 remains open for that flow and
 platform preview acceptance.
 
-### Dashboard classification conflict discovered in final audit
+### Dashboard classification conflict resolved by the owner
 
 `AdminSubmissionListItem` renders `AdminSubmission.name` and `.city` directly.
 The model describes these as contributor-provided values; status/promotion does
 not prove that the original text equals current published content. The existing
 canonical dashboard scenario requires title/city visibility, whereas the new
-contract protects unpublished text. The current row behavior is retained while
-this material contract conflict is referred to the owner. Task 10.2 was reopened;
-source/widget checks for other masks do not discharge it. Resolving the delta
-without changing canonical specs requires an explicit visibility decision.
+contract protects unpublished text. The owner explicitly authorized masking
+original dashboard title/city and revising only the delta to make visibility
+conditional on proven public content. The row now masks those originals in
+pending, accepted and rejected states: its model has no independent public-value
+proof. Date/type/status and normal row taps remain visible/functional; public
+tourism content elsewhere remains visible. The delta updates both contributor
+masking and combined native-recording acceptance to remove the contradictory
+unconditional title/city guarantee. Canonical specs are unchanged. All 44
+dashboard widget cases pass, including status-specific private/public controls.
+Task 10.2 is complete; actual recording acceptance remains separate.
