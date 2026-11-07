@@ -65,6 +65,12 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
     multiLine: true,
   );
   final directGlobalTalkerUse = RegExp(r'\$talker\s*[!?]?\s*\.\s*\w+\s*\(');
+  final directTalkerConstruction = RegExp(
+    r'\b(?:\w+\s*\.\s*)?Talker\s*\(',
+  );
+  final talkerFlutterInitialization = RegExp(
+    r'\bTalkerFlutter\s*\.\s*init\s*\(',
+  );
   const allowedSentryOperations = <String, Set<String>>{
     'lib/main.dart': {'close'},
     'lib/utils/logging/app_logger.dart': {'captureEvent', 'addBreadcrumb'},
@@ -150,6 +156,14 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
     }
     if (directGlobalTalkerUse.hasMatch(code)) {
       violations.add('$path: direct global Talker use bypasses Logger.log');
+    }
+    if (allowedTalkerFiles.contains(path) &&
+        directTalkerConstruction.hasMatch(code)) {
+      violations.add('$path: direct Talker construction bypasses Debug composition');
+    }
+    if (path != 'lib/config/dependencies.dart' &&
+        talkerFlutterInitialization.hasMatch(code)) {
+      violations.add('$path: Talker initialization requires Debug composition');
     }
   }
   return violations;
