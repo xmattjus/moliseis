@@ -5,6 +5,46 @@ import '../../support/sdk_boundary_source.dart';
 
 void main() {
   test(
+    'Talker composition and all entry points use compile-time Debug guards',
+    () {
+      final dependencies = maskDartCode(
+        File('lib/config/dependencies.dart').readAsStringSync(),
+      );
+      expect(
+        dependencies,
+        contains(
+          r'final Talker? $talker = kDebugMode ? TalkerFlutter.init() : null;',
+        ),
+      );
+      final router = maskDartCode(
+        File('lib/routing/router.dart').readAsStringSync(),
+      );
+      expect(
+        router,
+        matches(
+          RegExp(r'if \(kDebugMode\)\s+GoRoute\(\s+path: RoutePaths.logging,'),
+        ),
+      );
+      expect(
+        router,
+        contains(r'observers: [if (kDebugMode) TalkerRouteObserver($talker!)]'),
+      );
+      final logger = maskDartCode(
+        File('lib/utils/logging/app_logger.dart').readAsStringSync(),
+      );
+      expect(logger, contains('if (kDebugMode && _talker != null) {'));
+      final explore = maskDartCode(
+        File('lib/ui/explore/widgets/explore_screen.dart').readAsStringSync(),
+      );
+      expect(explore, matches(RegExp(r'if \(kDebugMode\)\s+MenuItem\(')));
+      expect(explore, contains('context.pushNamed(RouteNames.logging)'));
+      for (final source in [dependencies, router, logger, explore]) {
+        expect(source, isNot(contains('kReleaseMode')));
+      }
+    },
+  );
+
+  test(
     'production Sentry privacy guard rejects missing or changed options',
     () {
       const source = '''

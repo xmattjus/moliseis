@@ -3,6 +3,7 @@ import 'dart:io' show FileSystemException, HttpException, SocketException;
 
 import 'package:cached_network_image_ce/cached_network_image.dart'
     show HttpExceptionWithStatus, UnsupportedImageFormatException;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/painting.dart' show NetworkImageLoadException;
 import 'package:moliseis/utils/logging/app_log_level.dart';
 import 'package:moliseis/utils/logging/app_log_level_mapper.dart';
@@ -174,7 +175,7 @@ class AppLogger implements Logger {
       ? value
       : null;
 
-  final Talker _talker;
+  final Talker? _talker;
   final SentryLoggingFlag _sentryFlag;
 
   /// Filters the complete logging operation, independently of consent.
@@ -198,21 +199,23 @@ class AppLogger implements Logger {
       return;
     }
 
-    var localData = <String, Object?>{};
-    try {
-      localData = {...event.data, ...?extra};
-    } on Object catch (_) {
-      // A broken metadata getter must not hide the original cause.
-    }
-    try {
-      _talker.log(
-        {name, localData},
-        logLevel: mapToTalkerLevel(level),
-        exception: error,
-        stackTrace: stackTrace,
-      );
-    } on Object catch (_) {
-      // Local output cannot revoke the independent remote attempt.
+    if (kDebugMode && _talker != null) {
+      var localData = <String, Object?>{};
+      try {
+        localData = {...event.data, ...?extra};
+      } on Object catch (_) {
+        // A broken metadata getter must not hide the original cause.
+      }
+      try {
+        _talker.log(
+          {name, localData},
+          logLevel: mapToTalkerLevel(level),
+          exception: error,
+          stackTrace: stackTrace,
+        );
+      } on Object catch (_) {
+        // Local output cannot revoke the independent remote attempt.
+      }
     }
 
     try {

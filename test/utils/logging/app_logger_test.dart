@@ -26,6 +26,7 @@ import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../support/logging_faults.dart';
 import '../../support/recording_sentry_transport.dart';
 
 class MockTalker extends Mock implements Talker {}
@@ -58,6 +59,70 @@ void main() {
   tearDown(() async {
     await Sentry.close();
   });
+
+  test(
+    'absent Talker skips local metadata and preserves Sentry ownership',
+    () async {
+      await Sentry.close();
+      await Sentry.init((options) {
+        options
+          ..dsn = 'https://abc@example.test/1'
+          ..automatedTestMode = true
+          ..beforeSend = AppLogger.beforeSend
+          ..transport = fakeTransport
+          ..addEventProcessor(fakeTransport);
+      });
+      sentryFlag.enabled = true;
+      final logger = AppLogger(null, sentryFlag: sentryFlag);
+      var localReads = 0;
+      logger.log(
+        FaultyRepositoryEvent(onReadData: () => localReads++),
+        error: StateError('PRIVATE_NULL_TALKER_CANARY'),
+        stackTrace: StackTrace.fromString(
+          '#0 repository (package:moliseis/data/repositories/event_repository.dart:42:3)',
+        ),
+        extra: {'private': 'PRIVATE_NULL_TALKER_CANARY'},
+      );
+      await fakeTransport.settleCaptures();
+      expect(localReads, 0);
+      expect(fakeTransport.envelopes, hasLength(1));
+      final event = await fakeTransport.serializedEvent(0);
+      expect(jsonEncode(event), contains('entity_load_failed'));
+      expect(jsonEncode(event), contains('getById'));
+      expect(event['breadcrumbs'], isNotEmpty);
+      expect(
+        await fakeTransport.serializedEnvelope(0),
+        isNot(contains('PRIVATE_NULL_TALKER_CANARY')),
+      );
+
+      logger.log(const RepositorySyncStarted('event'));
+      logger.log(const ImageLoadFailed(url: 'PRIVATE_NULL_TALKER_CANARY'));
+      await fakeTransport.settleCaptures();
+      expect(fakeTransport.envelopes, hasLength(1));
+      expect(
+        Sentry.currentHub.scope.breadcrumbs.last.message,
+        'image_load_failed',
+      );
+
+      await Sentry.captureException(StateError('PRIVATE_NULL_TALKER_CANARY'));
+      expect(fakeTransport.envelopes, hasLength(2));
+      final automatic = await fakeTransport.serializedEvent(1);
+      expect(jsonEncode(automatic), contains('StateError'));
+      expect(jsonEncode(automatic), isNot(contains('entity_load_failed')));
+      expect(
+        await fakeTransport.serializedEnvelope(1),
+        isNot(contains('PRIVATE_NULL_TALKER_CANARY')),
+      );
+
+      AppLogger(
+        null,
+        sentryFlag: sentryFlag,
+        minLevel: AppLogLevel.critical,
+      ).log(const EntityLoadFailed('event', method: 'getById'));
+      await fakeTransport.settleCaptures();
+      expect(fakeTransport.envelopes, hasLength(2));
+    },
+  );
 
   group('AppLogger', () {
     // Real LogEvent subclasses used since LogEvent is sealed:

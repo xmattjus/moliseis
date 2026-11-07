@@ -90,7 +90,10 @@ cannot make post-dispose throws safe. Re-audit this when upgrading `command_it`.
 ## Application logging
 
 - Use typed events through `Logger.log(event, error: error, stackTrace: stack)`.
-  Pass original causes/stacks for local diagnostics; `extra` is local only.
+  Pass original causes/stacks; Debug Talker retains them and `extra` locally.
+- Talker creation, sink, console/history, observer and viewer/export are guarded
+  by `kDebugMode`, excluding both Profile and Release. Sentry reporting remains
+  independent of the optional Talker instance; do not gate `Logger.log` itself.
 - Ordinary callers do not choose remote policy. Severity alone never authorizes
   a report. Add new remote event families only through AppLogger's reviewed,
   bounded projection; never forward raw input, URLs, messages or stack text.

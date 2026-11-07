@@ -2,39 +2,37 @@
 
 ### Requirement: Private submission and diagnostic content is selectively protected
 
-Replay SHALL protect private contributor identity/contact and reviewed private or unpublished submission, moderation and diagnostic content. Protection SHALL follow rendered content sensitivity, including user-authored text/assets where private, while preserving authorized UI access and useful public context. Error-triggered Replay SHALL obey the same contract.
+The application SHALL wrap private contributor identity/contact and reviewed private or unpublished submission, moderation and Debug diagnostic content in the appropriate official Replay masking components. Protection SHALL follow rendered content sensitivity, including user-authored text/assets where private, while preserving authorized UI access and useful public context. Error-triggered Replay SHALL obey the same contract.
 
 #### Scenario: Private content is entered or restored
 
 - **GIVEN** a reviewed classification of rendered public contribution, restored draft, confirmation/error, moderation list/editor and diagnostic-view surfaces
 - **WHEN** contributor contact or classified private user-authored text, location, asset or moderation details are rendered
-- **THEN** Replay obscures the private content while authorized users can still use/read it in the application
+- **THEN** the application applies official masking boundaries to the private content while authorized users can still use/read it in the application
 - **AND** adjacent deliberately public titles, dates, city, category, status and images retain useful visibility
 
 #### Scenario: Error triggers a recording
 
 - **GIVEN** sensitive submission, moderation or local diagnostic content is visible
 - **WHEN** an error triggers Replay acquisition or flush
-- **THEN** the recording applies the same selective privacy protections, including protected buffered frames
+- **THEN** the same application masking boundaries apply; buffered recording behavior remains SDK-owned and is not newly verified here
 - **AND** an event beforeSend filter is not claimed to sanitize recording pixels or payloads
 
-### Requirement: Recording acceptance covers classified private surfaces
+### Requirement: Application masking boundaries use official SDK mechanisms
 
-Replay acceptance SHALL characterize actual Flutter/native rendering and verify affected private categories with bounded native recordings and attributed actual Replay inspection. Consent and opt-out SHALL govern recording acquisition. Missing runtime evidence SHALL remain explicit rather than being inferred from widget masks.
+Replay SHALL retain official SDK selective masking with `maskAllText = false`, `maskAllImages = false`, existing sample rates and applicable `SentryMask` and typed masking rules. Application acceptance SHALL verify classified private widget boundaries and authorized UI behavior with focused regressions. It SHALL NOT reproduce SDK masking internals or require new native recordings, pixel comparisons or server-side Replay inspection for this change.
 
-#### Scenario: Selective protection is evaluated
+#### Scenario: Widget boundary is verified
 
-- **WHEN** classified private fields/assets and adjacent public controls are exercised in Android/iOS recordings and affected widget regressions
-- **THEN** actual redaction, useful public visibility, authorized UI usability and error-triggered behavior are demonstrated
-- **AND** keyboard/native overlays, images and platform-view limitations are identified and necessary safeguards verified
-- **AND** existing combined dashboard/public-form/editor acceptance remains required, with owner-provided inspection distinguished from independently reproduced evidence
+- **WHEN** sensitive application content is rendered in a focused widget test
+- **THEN** the appropriate official masking component is its ancestor and adjacent deliberately public or approved account context remains available
+- **AND** this proves application wrapping rather than native pixels, all rendering paths or actual acquisition
 
-#### Scenario: Opt-out or rendering evidence is uncertain
+#### Scenario: Device acquisition has not been observed
 
-- **WHEN** recording behavior after effective shutdown or a private rendering boundary cannot be verified
-- **THEN** the missing criterion and environment/rendering limitation are recorded with explicit owner disposition before a readiness claim
-- **AND** no new recording acquisition after verified shutdown is permitted; pre-revocation buffers are distinguished from new acquisition
-- **AND** selective masking is retained only where it satisfies the reviewed privacy contract; an inadequate boundary requires a reviewed safeguard before acceptance
+- **WHEN** native recordings or actual Replay inspection were not executed for this change
+- **THEN** that limitation is accurately disclosed under the owner-accepted scope
+- **AND** event filtering and widget assertions are not described as recording sanitization or native consent evidence
 
 ## MODIFIED Requirements
 
@@ -65,21 +63,21 @@ Replay SHALL obscure contributor name and email in the public contribution form 
 - **AND** acceptance or promotion alone does not remove these masks
 - **AND** separately proven public title/city context remains visible and authorized staff can still read and select the original row normally
 
+#### Scenario: Pending contribution match warning
+
+- **WHEN** the editor renders `matches.pendingWarnings` containing an unpublished pending contribution title
+- **THEN** the private warning text is a descendant of `SentryMask`
+- **AND** its visible text, layout, interaction and backend behavior remain unchanged
+
 #### Scenario: Editor proposed-by section
 - **WHEN** edit mode renders contributor name or email in `Proposto da`, including finalized submissions
 - **THEN** Replay obscures each present contributor identity field
 - **AND** deliberately public editorial context remains visible while classified private/unpublished content follows its selective-protection contract
 
+## REMOVED Requirements
+
 ### Requirement: Native recording proves selective redaction
 
-Selective redaction acceptance SHALL combine representative native dashboard recordings on Android/iOS, affected widget-boundary regressions and actual Sentry Replay inspection of public-form/editor masking. Owner inspection MAY supply the latter with accurate provenance. Widget assertions SHALL NOT prove native pixels or separate payload protection. Contributor and original unpublished dashboard title/city protection and deliberately public editorial/account visibility guarantees remain mandatory.
+**Reason**: The owner explicitly withdraws the mandatory Android/iOS recording and server Replay inspection campaign for this PR while retaining application responsibility for private content classification and official selective masks.
 
-#### Scenario: Combined selective-redaction evidence
-- **WHEN** native dashboard recordings on both platforms show synthetic contributor-name and original unpublished title/city redaction with adjacent date/category/status and separately proven public tourism title/city context visible, widget regressions preserve public-form/editor private-content masks and public editorial/image/create-account boundaries, and actual Sentry Replay inspection confirms public-form/editor protection
-- **THEN** the combined evidence satisfies selective Replay acceptance without claiming every screen was independently recorded on each platform
-- **AND** product-owner inspection is distinguished from independently reproduced test output, with no invented recording identifier or platform attribution
-- **AND** separate native recordings of every screen/create-mode variant are not mandatory absent evidence of a masking defect
-
-#### Scenario: Separate payload exposure discovered
-- **WHEN** verification discovers protected contributor or unpublished values in a distinct error, breadcrumb, URL or metadata payload
-- **THEN** UI masking alone is not claimed to protect that payload and the concrete disclosure is reported for a bounded scope decision
+**Migration**: Use focused application widget-boundary regressions and retain existing official SDK configuration. Preserve historical provenance and disclose unverified actual-device acquisition; do not infer native pixels, buffered frames or universal rendering safety from widget tests.

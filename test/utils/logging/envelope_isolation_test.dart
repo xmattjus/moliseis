@@ -341,7 +341,8 @@ void main() {
         isNot(contains(canary)),
       );
       // This positive capability control is not a privacy pass: scope bytes are
-      // read after beforeSend. No app producer exists; acceptance remains open.
+      // read after beforeSend. No app producer exists; the owner accepts this
+      // SDK boundary.
       expect(await transport.serializedEnvelope(0), contains(canary));
       expect(transport.envelopes.single.items.map((item) => item.header.type), [
         'event',

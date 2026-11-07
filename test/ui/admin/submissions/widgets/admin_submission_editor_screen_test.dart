@@ -245,6 +245,13 @@ void main() {
           find.textContaining('Altro contributo in attesa: Pending'),
           findsOneWidget,
         );
+        expect(
+          find.ancestor(
+            of: find.textContaining('Altro contributo in attesa: Pending'),
+            matching: find.byType(SentryMask),
+          ),
+          findsOneWidget,
+        );
         await tester.ensureVisible(
           find.byKey(const ValueKey('admin_event_candidate_43')),
         );

@@ -20,15 +20,22 @@ class FaultyRepositoryEvent extends EntityLoadFailed {
     this.failData = false,
     this.failLevel = false,
     this.failName = false,
+    this.onReadData,
   }) : super('event', method: 'getById');
 
   final bool failData;
   final bool failLevel;
   final bool failName;
 
+  /// Observes local-only metadata acquisition independently of remote policy.
+  final void Function()? onReadData;
+
   @override
-  Map<String, Object?> get data =>
-      failData ? throw StateError('metadata') : super.data;
+  Map<String, Object?> get data {
+    onReadData?.call();
+    return failData ? throw StateError('metadata') : super.data;
+  }
+
   @override
   AppLogLevel get level => failLevel ? throw StateError('level') : super.level;
   @override

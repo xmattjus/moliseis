@@ -1317,11 +1317,13 @@ class _AdminSubmissionEditorScreenState
                                 ),
                               if (viewModel.candidates case final matches?) ...[
                                 for (final warning in matches.pendingWarnings)
-                                  Text(
-                                    'Altro contributo in attesa: '
-                                    '${warning.name} (#${warning.id}). '
-                                    'Questo avviso non blocca '
-                                    'la moderazione.',
+                                  SentryMask(
+                                    Text(
+                                      'Altro contributo in attesa: '
+                                      '${warning.name} (#${warning.id}). '
+                                      'Questo avviso non blocca '
+                                      'la moderazione.',
+                                    ),
                                   ),
                                 for (final candidate in matches.events)
                                   ListTile(

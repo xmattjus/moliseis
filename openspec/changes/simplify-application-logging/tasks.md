@@ -1,6 +1,6 @@
 # Tasks: simplify-application-logging
 
-> Single implementation PR (#33). Sections 0–5 preserve the original migration and its historical completion state (39 checked tasks, 5.3 still open). Gate A was closed for that scope. Sections 6–12 are the November 7 expansion and are initially unchecked; historical investigation passes do not complete them. Characterize uncertain mechanisms before the affected implementation. No new production work is performed by this documentation revision. Do not merge, archive, sync main specs or deploy as a side effect.
+> Existing PR #33 only. Sections 0–5 preserve executed historical work; the owner freeze below supersedes their former all-build local/native-recording assumptions. Sections 6–12 retain completed Dart work and explicitly dispose of withdrawn obligations. A disposition is not an executed mitigation or runtime test. Final applicable implementation verification is recorded below; external delivery/review status is reported separately. Do not merge, archive, synchronize canonical specs or deploy; 5.3 remains open.
 
 ## 0. Revalidate the implementation baseline
 
@@ -61,78 +61,53 @@
 - [ ] 5.3 With explicit user authorization, merge PR #33 after accepted implementation. Only **after** implementation is accepted and integrated, synchronize the approved deltas with `application-observability`, `sentry-consent-lifecycle` and `session-replay-privacy`, archive the change and publish those documentation-only changes in a **separate PR**, requiring its own explicit merge authorization. Do not automatically perform these steps now.
 
 
-## Historical completion evidence and remaining lifecycle
+## Historical evidence
 
-Tasks 1.5, 3.6, 3.8, 4.8 and 4.9 were completed for the original scope. The November 7 expansion does not imply their tests already cover the new automatic/native/Replay contracts. The console heuristic is removed; actual print/debugPrint integrations and automatic unhandled capture are tested. Final app-report isolation is verified after the installed native-context processor, including approved causal breadcrumbs and synthetic privacy canaries. SDK-owned controls retain native enrichment. The source gate covers aliases, static operations, Hub/HubAdapter construction and direct Talker use with narrow exceptions; it deliberately remains a source check, not semantic analysis.
-
-CI discovers the gate and autonomous regression tests. The active main ruleset requires both Flutter jobs. Native integration tests and OpenSpec validation are not run by that workflow. Historical consent/Replay native acceptance is not presented as fresh execution; the original scope retained those contracts with processor-level regression evidence and device/production limitations. Sections 9–12 now require separate runtime acceptance for the expanded native/Replay/privacy scope; historical completion does not waive it.
-
-Historical original-implementation local verification (not rerun by the November 7 documentation revision): `openspec validate simplify-application-logging --strict` exited 0 without warnings; `flutter test --no-pub test/utils/logging` passed 192 tests; `flutter test --no-pub test/utils/command_configuration_test.dart` passed 6 tests; `flutter analyze` exited 0 with no issues. The CI-equivalent `find test` selection (excluding `test/integration/**`), run with `TZ=Europe/Rome` and `flutter test --no-pub --reporter expanded`, passed 4,053 tests with 4 skips across 191 files. Formatting checks and `git diff --check` exited 0. This includes the affected Supabase, sync, Cloudinary, draft, public/Admin submission and consent regressions, but excludes native integration tests.
-
-Task 5.3 remains unchecked: merging, canonical synchronization and archival require later authorization and a separate documentation PR. No canonical specs are modified here.
-
+Original implementation and November 7 execution evidence is retained in [the implementation report](research/2026-11-07-hardening-implementation.md) and the unchanged archived investigation. Historical full-suite results distinguish the 4,101-pass/4-skip expansion run from the subsequent 4,104-pass/4-skip run after the dashboard masks at `ddcd646`; both excluded native integration tests and neither proves native/Replay privacy. These counts are historical, not the final freeze execution result. The final owner freeze revises those acceptance obligations; no historical or unexecuted native test is marked passed here. Task 5.3 remains separately authorized post-merge work.
 
 ## 6. Safe exception discrimination (D2/D3)
 
 - [x] 6.1 Inspect installed SDK exception/frame/grouping-relevant representations and compare bounded category/type/origin versus reviewed source-location alternatives. Include filename/function/line/column, app/package/framework/generated frames, source maps/obfuscation, platforms and missing/unparsable stacks. Complete when a reviewed field contract and privacy/utility comparison identify the smallest viable representation without raw-message fallback or an unjustified dependency.
 - [x] 6.2 Implement that bounded diagnostic improvement with maintained real-transport paired tests: distinct same-category causes, unsafe messages/filenames, generated/release representations and absent/malformed stacks. Complete when private canaries are absent, useful distinction/localization is demonstrated where feasible, remaining limits and possible grouping changes are recorded, original local causes and capture ownership remain unchanged. Do not claim server grouping from payloads.
 
-## 7. Isolation assessment and local/export boundaries (D1/D4)
+## 7. Isolation assessment and Debug diagnostics
 
 - [x] 7.1 Reproduce C/D single-factor and combined controls through installed processors and full serialized envelopes, including scope/hint attachments, screenshot/hierarchy, malformed contexts, safe technical fields and native scope observer effects. Complete when each retained layer has a distinct justified responsibility and evidence either supports a narrow simplification/allowlist improvement or explicitly retains current protection; any selected change must preserve causal breadcrumbs, correlation and attachment exclusion in regression tests.
-- [ ] 7.2 Exercise Talker history/console, viewer copy/export/share/cancel and relevant preview behavior with Sentry consent on/off. Complete when tests confirm original local objects/stacks, no automatic history reconstruction/upload and user-directed sharing independence; implement only observed necessary safeguards, with their focused tests and accurate sharing/privacy explanation. OS-log visibility must not be represented as voluntary sharing.
+- [x] 7.2 Make Talker strictly Debug-only at composition, local sink, route, observer and viewer/export boundaries using `kDebugMode`; skip disabled local metadata work. Verify injected Debug original error/stack retention, viewer/router/Explore availability, compile-time guards and Sentry forwarding with a null sink. Preserve console-acquisition protection and consent independence. Ordinary Debug tests are not non-Debug execution; perform a supported non-Debug build where available and record limits. The former OS-level sharing/preview campaign is withdrawn for this developer-only facility.
 
 ## 8. SDK-owned automatic Dart policy (D5)
 
 - [x] 8.1 Characterize genuinely unhandled zone, framework and platform-dispatcher routes with synthetic content, installed SDK processing and final envelopes. Complete when a separately reviewed automatic-event field/fallback contract covers mechanisms, chained errors, safe frames/origin, enriched scope/breadcrumbs, privacy and no duplicate app capture; distinguish host controls from mobile runtime evidence.
 - [x] 8.2 Implement the reviewed automatic policy and entry-specific transport regressions, deliberately updating the historical hint-less pass-through expectation. Complete when working positive controls deliver identifiable unexpected errors with safe useful diagnostics, private message/frame/context canaries are absent, filter failures retain bounded error visibility, and app-owned reporting/SDK ownership remain intact. Mobile entry limitations require explicit evidence disposition in 12.2.
 
-## 9. Native Android/iOS boundary (D6)
+## 9. Official native SDK boundary — owner-approved disposition
 
-- [ ] 9.1 Inspect authoritative installed/pinned Cocoa and Android sources and Flutter bridges for native event/error/crash entry points, privacy configuration, native callbacks, NSError description/user-info/mechanism fields, Java/NDK differences, frame/thread/image data and consent/cache behavior. Complete when a per-platform field/entry/callback matrix selects the smallest necessary mitigation and distinguishes native sends from Dart-event enrichment; no Dart callback coverage assumption.
-- [ ] 9.2 Apply only the necessary platform mitigation selected in 9.1 with focused tests. Complete when native private descriptions/user-info and equivalent Android content are excluded while reviewed technical stacks/threads and capture visibility survive, configuration follows consent, and no replacement native pipeline or diagnostic shutdown is introduced without evidence.
-- [ ] 9.3 Execute Android and iOS isolated-destination controls for native-origin nonfatal events and representative automatic native crashes, plus framework errors, before/after effective opt-out and crash-cache/relaunch recovery. Complete when final native envelopes prove private-content exclusion, safe technical utility and working positive controls; separate simulator/device/debug/release evidence, new acquisition and old draining. The historical iOS NSError pass cannot satisfy Android or autonomous-crash acceptance. Unavailable mechanisms/platforms remain unresolved and go to 12.2.
+- [x] 9.1 Retain the installed native SDK/bridge source assessment and its historical evidence. Owner disposition: keep official native reporting unchanged because the pinned bridge does not provide a supported pre-start customization mechanism satisfying the former guarantee. No new SDK investigation or customization is required; this completes the disposition, not native runtime acceptance.
+- [x] 9.2 Withdraw the former native sanitizer implementation obligation by explicit owner decision. Preserve the official SDK integration and existing effective Dart/application protections; no fork, private hook, replacement reporting pipeline or custom native shutdown/recovery is authorized. No native mitigation is claimed implemented.
+- [x] 9.3 Withdraw the new Android/iOS nonfatal/crash/relaunch/privacy/shutdown campaign as a PR acceptance gate. Record accepted native limitations in design and formally revise consent/observability deltas. Existing historical controls remain accurately attributed; no unexecuted runtime test, native-envelope sanitization or internal shutdown guarantee is claimed.
 
-## 10. Replay characterization and necessary safeguards (D7)
+## 10. Official selective Replay safeguards
 
-- [ ] 10.1 Inventory rendered content and actual Replay capture for public contribution/restored drafts, identity/contact, free text/location, assets/previews, submission errors/confirmation, moderation list/editor/rejection details and log-view/export previews. Complete when synthetic recordings plus source/rendering analysis classify private/unpublished versus deliberately public content, establish on-error behavior and identify Flutter/native overlay/image/platform-view limits. Record unsafe/unobservable surfaces before prescribing masks.
-- [x] 10.2 Apply targeted safeguards required by the reviewed classification and add widget-boundary regressions in the same work. Complete when private contributor/contact and classified private user-authored/submission/moderation/diagnostic content are protected while public tourism/editorial context and intentionally public administrator account context remain visible; document and review a fallback if selective protection cannot meet the contract.
-- [ ] 10.3 Obtain bounded native Android/iOS recordings and attributed actual Replay inspection for affected private categories, public adjacent controls and error-triggered Replay, plus opt-out/cache lifecycle controls. Complete when masks protect actual recordings without impairing authorized UI use and no new recording acquisition follows verified shutdown. Meet existing canonical combined acceptance; widget masks/beforeSend alone are insufficient. Missing runtime evidence remains unresolved for 12.2.
+- [x] 10.1 Retain source/rendered-content classification from the completed audit, including private/unpublished fields, drafts, moderation, diagnostics and conditionally public dashboard values. Owner disposition replaces the former actual-recording inventory obligation with application-owned classification and official masking boundaries. No native rendering/recording verification is claimed; the newly identified pending-warning omission is addressed in 10.2.
+- [x] 10.2 Preserve existing selective masks and add `SentryMask` around the pending-contribution warning containing its unpublished title. Verify the warning ancestor with a focused widget regression, retaining visible text/layout/interaction, public/editorial controls and intentionally visible administrator account context. Keep original dashboard title/city masks unless publication is independently established. Do not reproduce SDK masking internals.
+- [x] 10.3 Formally replace canonical native-recording/server-inspection acceptance with official SDK selective configuration and focused application widget-boundary verification. Owner explicitly withdraws new recording campaigns and pixel comparisons. This is acceptance-contract reconciliation, not evidence that actual device Replay, buffered frames or every rendering path were verified.
 
-## 11. Integrated consent, channel and concurrency regressions (D4/D8)
+## 11. Integrated consent, channel and concurrency regressions
 
-- [ ] 11.1 Reuse consent/bootstrap/networking harnesses and platform controls to cover fresh opt-out/unreadable consent, active consent, persistence-first opt-out, deferred opt-in, shutdown rejection/timeout and old buffered delivery. Complete when app/Dart/native/Supabase/Replay evidence identifies effective channel state, new acquisition stops after verified shutdown, ordinary networking/local diagnostics/export remain functional and UI feedback semantics stay unchanged.
-- [ ] 11.2 Add maintained transport-level canaries with acquisition controls for typed projection/raw exceptions, console on/off, SDK-owned events, actual native enrichment, full-envelope attachments and Supabase final event/stream-span payloads. Complete when privacy absence is paired with positive capture/span/approved-field counts, SDK-provided PII/body/SQL protection is retained without duplicate scrubbers, and active HTTP wiring is distinguished from optional wrapper/native capabilities.
+- [x] 11.1 Reuse consent/bootstrap/networking tests for stored opt-out, unreadable preference, first-install default, active consent, persistence-first runtime opt-out, deferred opt-in and shared bounded public-SDK shutdown rejection/timeout. Verify application networking and Debug diagnostics remain independent. Distinguish old buffered delivery, stopped application forwarding, observable close settlement and unverified native internal state; no new native probe or custom guarantee is required.
+- [x] 11.2 Run maintained real Dart transport/privacy positive controls for application projection, safe frames, SDK-owned errors, console exclusion, approved breadcrumbs, scope/hint isolation and Supabase streaming diagnostics. Add nullable-Talker capture/nonreportable/ownership regression coverage without weakening existing expectations. Retain actual-path versus mocked/native-capability distinctions and the documented SDK-owned automatic attachment boundary; no native envelope or Replay recording claim follows from host tests.
 - [x] 11.3 Extend deterministic concurrent capture tests beyond T09: delayed processors, app/app/SDK overlap, malformed data and consent transition. Complete when each report retains its own approved diagnostics/hint/causal breadcrumb order without cross-event private data, destructive shared-scope changes or duplication; no invocation-ordered transport assumption or arbitrary test sleeps.
 
-## 12. Readiness evidence and repository hygiene (D9)
+## 12. Final verification and delivery
 
-- [ ] 12.1 Run focused and repository-required tests/analysis plus strict OpenSpec validation on the implemented expansion; review the entire PR and field-contract/utility comparisons. Complete when production/tests/design/deltas agree, all privacy boundaries have positive controls, links and research provenance are intact and no raw operational evidence, temporary fixtures, SDK copies or unrelated changes are retained.
-- [ ] 12.2 Perform final adversarial review with an evidence matrix naming SHA/SDK/platform/build/channel, executed controls, observed results and diagnostic loss. Complete only when each mandatory Dart/native/Replay/consent criterion is met, or its exact environmental limitation, consequence and owner-approved disposition is recorded before any readiness claim. Do not silently waive a failed privacy guarantee, use unavailable platforms as passes, infer server grouping, or reuse historical tests as new acceptance. Retain canonical consent/Replay blockers where their guarantees cannot be met; no merge/deployment is implied.
+- [x] 12.1 Run focused and applicable complete Flutter tests, `flutter analyze --no-pub`, formatting verification, static logging-boundary checks, supported non-Debug build validation where possible and strict OpenSpec validation. Review the complete PR against current main; reconcile final code/deltas/task states and inspect hygiene before staging. Report genuine regressions, known failures and environment limits separately; exclude temporary outputs, secrets, machine paths, SDK copies and unrelated files.
+- [x] 12.2 Complete independent full-PR review under the frozen contract and finalize the implementation evidence and PR description. Confirm there are no planned implementation/documentation changes beyond recording these verified results. Distinguish accepted SDK limits from implementation defects without inferring server grouping/native pixels. Keep draft status and leave 5.3 open; readiness does not authorize merge.
 
 
-## November 7 expansion execution state
+## Final-scope disposition
 
-Seven expansion tasks are complete: 6.1, 6.2, 7.1, 8.1, 8.2, 10.2 and 11.3.
-See the [implementation evidence](research/2026-11-07-hardening-implementation.md)
-for field contracts, final-envelope controls, exact task dispositions and
-remaining acceptance. Checkbox completion does not establish whole-channel
-privacy: automatic scope attachments, native SDK reporting, actual Replay
-recordings and production export overlays remain explicitly open. The owner
-instructed native reporting to remain unchanged after source characterization.
-The expansion is BLOCKED, not READY. The archived investigation remains
-byte-for-byte unchanged and canonical specs are not synchronized.
+Tasks 9.1–9.3, 10.1 and 10.3 are completed dispositions of withdrawn obligations, not claims of native sanitizer implementation or native/Replay runtime passes. Accepted SDK limitations are recorded once in [design.md](design.md#accepted-sdk-limitations); the deltas formally supersede contradictory canonical acceptance. Tasks 7.2, 10.2, 11.1–11.2 and 12.1–12.2 passed the applicable final implementation verification recorded in design. Task 5.3 remains open and outside this PR's authorization.
 
-New full autonomous execution: 4,101 passing tests and 4 skips across the 195
-CI-selected files, with `TZ=Europe/Rome`; `test/integration/**` and native
-`integration_test/**` are excluded exactly as in CI. Native/runtime/Replay
-privacy is not inferred from this result. Task 5.3 remains outside authorization.
+## Final external review sequence
 
-A final source audit temporarily reopened 10.2: dashboard `summary.name` and `summary.city`
-are contributor-provided values without a proof-of-publication marker. Their
-canonical visibility scenario conflicts with the expanded unpublished-content
-contract. The owner then authorized masking original dashboard title/city and revising
-only the delta so visibility requires proven public content. The row now masks
-those values for every status; all 44 dashboard widget tests pass, including
-pending/accepted/rejected controls and preserved normal interaction. Task 10.2
-is complete again; actual recording acceptance remains in 10.1/10.3.
+After the completed implementation/task evidence is committed and pushed, confirm final remote HEAD and required CI, finalize the PR description, then post exactly one top-level `@coderabbitai full review` comment. Observe/report review status and material findings without retries or further automatic commits/pushes. This external final action is reported in the PR conversation and final response rather than requiring a post-request task-file commit.
