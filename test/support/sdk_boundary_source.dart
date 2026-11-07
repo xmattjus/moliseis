@@ -159,7 +159,9 @@ List<String> findSdkBoundaryViolations(Map<String, String> sources) {
     }
     if (allowedTalkerFiles.contains(path) &&
         directTalkerConstruction.hasMatch(code)) {
-      violations.add('$path: direct Talker construction bypasses Debug composition');
+      violations.add(
+        '$path: direct Talker construction bypasses Debug composition',
+      );
     }
     if (path != 'lib/config/dependencies.dart' &&
         talkerFlutterInitialization.hasMatch(code)) {
