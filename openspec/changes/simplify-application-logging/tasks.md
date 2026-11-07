@@ -96,7 +96,7 @@ Task 5.3 remains unchecked: merging, canonical synchronization and archival requ
 ## 10. Replay characterization and necessary safeguards (D7)
 
 - [ ] 10.1 Inventory rendered content and actual Replay capture for public contribution/restored drafts, identity/contact, free text/location, assets/previews, submission errors/confirmation, moderation list/editor/rejection details and log-view/export previews. Complete when synthetic recordings plus source/rendering analysis classify private/unpublished versus deliberately public content, establish on-error behavior and identify Flutter/native overlay/image/platform-view limits. Record unsafe/unobservable surfaces before prescribing masks.
-- [x] 10.2 Apply targeted safeguards required by the reviewed classification and add widget-boundary regressions in the same work. Complete when private contributor/contact and classified private user-authored/submission/moderation/diagnostic content are protected while public tourism/editorial context and intentionally public administrator account context remain visible; document and review a fallback if selective protection cannot meet the contract.
+- [ ] 10.2 Apply targeted safeguards required by the reviewed classification and add widget-boundary regressions in the same work. Complete when private contributor/contact and classified private user-authored/submission/moderation/diagnostic content are protected while public tourism/editorial context and intentionally public administrator account context remain visible; document and review a fallback if selective protection cannot meet the contract.
 - [ ] 10.3 Obtain bounded native Android/iOS recordings and attributed actual Replay inspection for affected private categories, public adjacent controls and error-triggered Replay, plus opt-out/cache lifecycle controls. Complete when masks protect actual recordings without impairing authorized UI use and no new recording acquisition follows verified shutdown. Meet existing canonical combined acceptance; widget masks/beforeSend alone are insufficient. Missing runtime evidence remains unresolved for 12.2.
 
 ## 11. Integrated consent, channel and concurrency regressions (D4/D8)
@@ -113,7 +113,7 @@ Task 5.3 remains unchecked: merging, canonical synchronization and archival requ
 
 ## November 7 expansion execution state
 
-Seven expansion tasks are complete: 6.1, 6.2, 7.1, 8.1, 8.2, 10.2 and 11.3.
+Six expansion tasks are complete: 6.1, 6.2, 7.1, 8.1, 8.2 and 11.3.
 See the [implementation evidence](research/2026-11-07-hardening-implementation.md)
 for field contracts, final-envelope controls, exact task dispositions and
 remaining acceptance. Checkbox completion does not establish whole-channel
@@ -127,3 +127,9 @@ New full autonomous execution: 4,101 passing tests and 4 skips across the 195
 CI-selected files, with `TZ=Europe/Rome`; `test/integration/**` and native
 `integration_test/**` are excluded exactly as in CI. Native/runtime/Replay
 privacy is not inferred from this result. Task 5.3 remains outside authorization.
+
+A final source audit reopened 10.2: dashboard `summary.name` and `summary.city`
+are contributor-provided values without a proof-of-publication marker. Their
+canonical visibility scenario conflicts with the expanded unpublished-content
+contract. Existing row behavior is preserved pending owner resolution; the
+other implemented masks and passing tests do not complete that boundary.

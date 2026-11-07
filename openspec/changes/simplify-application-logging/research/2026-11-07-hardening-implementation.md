@@ -31,8 +31,9 @@ Flutter's Android build pins 8.56.0. No dependencies or toolchains changed.
   remain unchanged. No native reporting change is made.
 - Shared proposal fields/assets, Admin location/recovery and sensitive merge
   displays gain targeted masks. Masking affects recording bounds, not validation,
-  persistence, callbacks, staff access, navigation or displayed values. Public
-  summaries, tourism context and intentionally public admin identity remain.
+  persistence, callbacks, staff access, navigation or displayed values. Existing
+  dashboard summaries, tourism context and intentionally public admin identity
+  remain visible; dashboard title/city classification is unresolved below.
 - Existing support is extended for complete envelope serialization, deterministic
   delivery observation, processor gates/faults, native observer counts and a real
   exception cause extractor. No new test infrastructure package is introduced.
@@ -118,7 +119,7 @@ cannot run those platforms. No production project received synthetic telemetry.
 | 9.2 | BLOCKED | Owner explicitly requires native reporting unchanged; later supported hook/design authorization required |
 | 9.3 | OPEN — VERIFICATION REQUIRED | After permitted mitigation: isolated Android/iOS nonfatal, representative crash/relaunch and shutdown envelopes |
 | 10.1 | OPEN — VERIFICATION REQUIRED | Source/rendered inventory complete; obtain synthetic actual recordings including overlays/platform views/on-error buffers |
-| 10.2 | COMPLETE | Targeted masks and affected widget regressions; recording acceptance separate |
+| 10.2 | OPEN — IMPLEMENTATION REQUIRED | Other targeted masks pass widget controls; resolve canonical dashboard title/city visibility versus unpublished-content privacy before completing this boundary |
 | 10.3 | OPEN — VERIFICATION REQUIRED | Android/iOS dashboard plus actual attributed form/editor/private-category Replay inspection and shutdown/cache controls |
 | 11.1 | OPEN — VERIFICATION REQUIRED | Host consent/bootstrap/networking/local regressions run; mandatory native/Replay channel cessation unverified |
 | 11.2 | OPEN — IMPLEMENTATION REQUIRED | Core event/span/console controls implemented; unsupported automatic scope-attachment capability and actual native/Replay evidence remain |
@@ -144,7 +145,7 @@ Observed final commands/results:
 - `openspec list --json`, `openspec status --change simplify-application-logging --json`,
   `openspec instructions apply --change simplify-application-logging --json`:
   existing repo-local spec-driven change, executable state `ready`; after verified
-  task updates, 46/57 complete, 11 remaining (including later lifecycle 5.3).
+  task updates, 45/57 complete, 12 remaining (including later lifecycle 5.3).
   CLI `ready` means ready to continue implementation, not release readiness.
 - `flutter test --no-pub --reporter expanded test/utils/logging/error_localization_test.dart test/utils/logging/native_enrichment_test.dart`:
   initial focused control, 11 passes.
@@ -190,3 +191,49 @@ Publication remains on draft PR #33. A full CodeRabbit review is requested after
 implementation publication; its live result belongs to the PR, not a fabricated
 local acceptance result. No required-check or bot-review outcome is inferred
 from the local test suite.
+
+
+Final audit correction: task 10.2 is not complete. Dashboard title/city values
+are raw contributor submission fields, and the summary model does not establish
+that they are public. Canonical dashboard acceptance requires visibility while
+the expanded privacy contract protects unpublished text. The owner was asked
+to choose conditional visibility with targeted masks and a delta correction, or
+explicitly retain this unresolved boundary. Dashboard production code remains
+unchanged pending that required decision. This correction supersedes the first
+implementation commit's checkbox count; it does not invalidate the test counts
+or claim that existing widget assertions prove public-data classification.
+
+## Publication follow-up and CI correction
+
+Implementation commit `da0212ef1d94ad7adb809b67f8bc2d13c742eef2` was pushed
+without rewriting history. PR #33 remains draft; its description identifies the
+unresolved acceptance. CodeRabbit acknowledged the explicit whole-PR request
+and reported “Full review finished” at 09:53 UTC. No new inline findings or new
+review submission were published for that command; historical resolved threads
+were not presented as new review results.
+
+GitHub run `42361199665` passed analysis but failed autonomous tests: 4,100 passed,
+4 skipped, 1 failed. The new consent-on Talker copy control timed out in
+`RecordingSentryTransport.settleCaptures` on Linux. Source analysis identified
+that the fixture created delivery completers in widget fake async; asynchronous
+SDK enrichment could finish transport work while observation remained stuck in
+that zone. Merely moving capture into runAsync was insufficient: a maintained
+processor performing real temporary-file IO reproduced the timeout on macOS.
+Constructing the recording transport/completers, initializing SDK, starting
+capture and observing delivery together in runAsync resolves the deterministic
+control. All four Talker controls pass with that IO control retained, without
+longer timeouts, extra sleeps, disabled enrichment or weaker privacy/count checks.
+The installed export pipeline control was already passing on Linux.
+
+This follow-up changes the test harness and corrects task 10.2's classification
+status; it changes no production behavior. Final CI and full-review status for
+the follow-up commit must be observed separately rather than copying the failed
+run's status or claiming the earlier local pass proves Linux success.
+
+A disposable single-factor ablation then moved **only** recording-transport
+construction back outside runAsync, leaving initialization/capture/observation
+unchanged. It reproduced the exact `settleCaptures` timeout on macOS (3 controls
+passed, 1 failed). The temporary probe was removed automatically. The maintained
+real-zone fixture passes all 4 controls, and final analysis, formatting and
+strict OpenSpec validation pass. Thus the harness correction has a working
+failure control and is not an unexplained timeout increase.

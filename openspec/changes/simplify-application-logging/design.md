@@ -277,7 +277,7 @@ proposed merge values and unbounded preview-error text are private/unpublished.
 They now have targeted masks. Original submission assets remain protected even
 after approval: approval does not prove every original field or asset is the
 same as promoted public content. Existing contributor masks remain. Dashboard
-summary title/city/date/category/status, public source/current editorial context,
+summary date/category/status, public source/current editorial context,
 public tourism screens and `Creato come` retain their intentional visibility.
 The log viewer and monitor detail content are protected by typed `TalkerView`
 and `TalkerDataCard` rules because pushed monitor routes leave LoggingScreen's
@@ -304,3 +304,14 @@ The package control uses Flutter MaterialApp and a transparent test theme;
 it is not evidence that production overlays work. No app-wide compatibility or
 navigation redesign was introduced. Task 7.2 remains open for that flow and
 platform preview acceptance.
+
+### Dashboard classification conflict discovered in final audit
+
+`AdminSubmissionListItem` renders `AdminSubmission.name` and `.city` directly.
+The model describes these as contributor-provided values; status/promotion does
+not prove that the original text equals current published content. The existing
+canonical dashboard scenario requires title/city visibility, whereas the new
+contract protects unpublished text. The current row behavior is retained while
+this material contract conflict is referred to the owner. Task 10.2 was reopened;
+source/widget checks for other masks do not discharge it. Resolving the delta
+without changing canonical specs requires an explicit visibility decision.

@@ -12,6 +12,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:talker_flutter/src/controller/talker_view_controller.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../../support/logging_faults.dart';
 import '../../../support/recording_sentry_transport.dart';
 
 void main() {
@@ -49,32 +50,44 @@ void main() {
         await Sentry.close();
         directory.deleteSync(recursive: true);
       });
-      final transport = RecordingSentryTransport();
-      if (reporting) {
-        await tester.runAsync(
-          () => Sentry.init((options) {
+      final enrichment = File('${directory.path}/enrichment.txt')
+        ..writeAsStringSync('PRIVATE_LOCAL_VIEWER_CANARY');
+      final talker = Talker(settings: TalkerSettings(useConsoleLogs: false));
+      final error = StateError('PRIVATE_LOCAL_VIEWER_CANARY');
+      final stack = StackTrace.fromString('PRIVATE_LOCAL_STACK_CANARY');
+      late RecordingSentryTransport transport;
+      await tester.runAsync(() async {
+        // Delivery completers must also originate outside widget fake async.
+        transport = RecordingSentryTransport();
+        if (reporting) {
+          await Sentry.init((options) {
             options
               ..dsn = 'https://abc@example.test/1'
               ..automatedTestMode = true
               ..enablePrintBreadcrumbs = false
               ..beforeSend = AppLogger.beforeSend
               ..transport = transport
-              ..addEventProcessor(transport);
-          }),
+              ..addEventProcessor(transport)
+              ..addEventProcessor(
+                CallbackEventProcessor((event, hint) async {
+                  // Exercise Linux-like asynchronous enrichment on every host.
+                  event.contexts['private_io'] = await enrichment
+                      .readAsString();
+                  return event;
+                }),
+              );
+          });
+        }
+        AppLogger(
+          talker,
+          sentryFlag: SentryLoggingFlag(initialValue: reporting),
+        ).log(
+          const RouteErrorScreenShown(uri: '/private'),
+          error: error,
+          stackTrace: stack,
         );
-      }
-      final talker = Talker(settings: TalkerSettings(useConsoleLogs: false));
-      final error = StateError('PRIVATE_LOCAL_VIEWER_CANARY');
-      final stack = StackTrace.fromString('PRIVATE_LOCAL_STACK_CANARY');
-      AppLogger(
-        talker,
-        sentryFlag: SentryLoggingFlag(initialValue: reporting),
-      ).log(
-        const RouteErrorScreenShown(uri: '/private'),
-        error: error,
-        stackTrace: stack,
-      );
-      if (reporting) await tester.runAsync(transport.settleCaptures);
+        if (reporting) await transport.settleCaptures();
+      });
       expect(talker.history.last.exception, same(error));
       expect(talker.history.last.stackTrace, same(stack));
       await tester.pumpWidget(
