@@ -50,7 +50,7 @@ class _RouteErrorScreenState extends State<RouteErrorScreen> {
     // double-log.
     if (oldWidget.uri.toString() != widget.uri.toString() ||
         oldWidget.error?.runtimeType != widget.error?.runtimeType ||
-        oldWidget.error?.toString() != widget.error?.toString()) {
+        _diagnosticReason(oldWidget.error) != _diagnosticReason(widget.error)) {
       _logRouteError();
     }
   }
@@ -60,7 +60,7 @@ class _RouteErrorScreenState extends State<RouteErrorScreen> {
     context.read<Logger?>()?.log(
       RouteErrorScreenShown(
         uri: widget.uri.toString(),
-        reason: widget.error?.toString(),
+        reason: _diagnosticReason(widget.error),
       ),
       error: widget.error,
     );
@@ -87,5 +87,14 @@ class _RouteErrorScreenState extends State<RouteErrorScreen> {
     } else {
       context.goNamed(RouteNames.home);
     }
+  }
+}
+
+// Rendering an optional diagnostic reason must not break the fallback screen.
+String? _diagnosticReason(Object? error) {
+  try {
+    return error?.toString();
+  } on Object catch (_) {
+    return null;
   }
 }

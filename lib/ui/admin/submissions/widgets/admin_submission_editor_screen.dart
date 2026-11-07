@@ -729,6 +729,16 @@ class _AdminSubmissionEditorScreenState
           final activation = viewModel.activation;
           final pickerRequest = viewModel.pickerRequestNonce;
           final status = viewModel.status;
+          final previewErrorMessage =
+              switch (viewModel.keepCurrentSnapshot.hasFailure
+              ? viewModel.keepCurrentSnapshot.data
+              : viewModel.previewSnapshot.data) {
+                Error(:final AdminContentSubmissionApiException error) =>
+                  _moderationErrorMessage(error.code) ?? error.message,
+                _ =>
+                  'Impossibile completare l’anteprima. '
+                      'Verifica i dati e ricarica.',
+              };
           final observation = viewModel.recoveryObservation;
 
           if (viewModel.isEditMode &&
@@ -1271,19 +1281,21 @@ class _AdminSubmissionEditorScreenState
                           ],
                           if (status == AdminSubmissionStatus.pending) ...[
                             if (viewModel.startDate != null) ...[
-                              KeyedSubtree(
-                                key: ObjectKey(viewModel),
-                                child: TextFormField(
-                                  key: const ValueKey('admin_event_search'),
-                                  decoration: const InputDecoration(
-                                    labelText: 'Cerca evento per nome',
-                                  ),
-                                  initialValue: viewModel.candidateSearch,
-                                  onChanged: (value) => _request(
-                                    viewModel,
-                                    () => viewModel.setCandidateSearch(
-                                      value,
-                                      activation: activation,
+                              SentryMask(
+                                KeyedSubtree(
+                                  key: ObjectKey(viewModel),
+                                  child: TextFormField(
+                                    key: const ValueKey('admin_event_search'),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Cerca evento per nome',
+                                    ),
+                                    initialValue: viewModel.candidateSearch,
+                                    onChanged: (value) => _request(
+                                      viewModel,
+                                      () => viewModel.setCandidateSearch(
+                                        value,
+                                        activation: activation,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1305,11 +1317,13 @@ class _AdminSubmissionEditorScreenState
                                 ),
                               if (viewModel.candidates case final matches?) ...[
                                 for (final warning in matches.pendingWarnings)
-                                  Text(
-                                    'Altro contributo in attesa: '
-                                    '${warning.name} (#${warning.id}). '
-                                    'Questo avviso non blocca '
-                                    'la moderazione.',
+                                  SentryMask(
+                                    Text(
+                                      'Altro contributo in attesa: '
+                                      '${warning.name} (#${warning.id}). '
+                                      'Questo avviso non blocca '
+                                      'la moderazione.',
+                                    ),
                                   ),
                                 for (final candidate in matches.events)
                                   ListTile(
@@ -1390,21 +1404,7 @@ class _AdminSubmissionEditorScreenState
                                 ),
                                 if (viewModel.previewSnapshot.hasFailure ||
                                     viewModel.keepCurrentSnapshot.hasFailure)
-                                  Text(switch (viewModel
-                                          .keepCurrentSnapshot
-                                          .hasFailure
-                                      ? viewModel.keepCurrentSnapshot.data
-                                      : viewModel.previewSnapshot.data) {
-                                    Error(
-                                      :final AdminContentSubmissionApiException
-                                      error,
-                                    ) =>
-                                      _moderationErrorMessage(error.code) ??
-                                          error.message,
-                                    _ =>
-                                      'Impossibile completare l’anteprima. '
-                                          'Verifica i dati e ricarica.',
-                                  }),
+                                  SentryMask(Text(previewErrorMessage)),
                                 if (viewModel.mergePreview case final merge?)
                                   for (final group in merge.groups)
                                     Card(
@@ -1428,8 +1428,10 @@ class _AdminSubmissionEditorScreenState
                                               ),
                                             Text('Base: ${group.base}'),
                                             Text('Fonte: ${group.source}'),
-                                            Text(
-                                              'Proposta: ${group.moderated}',
+                                            SentryMask(
+                                              Text(
+                                                'Proposta: ${group.moderated}',
+                                              ),
                                             ),
                                             Text('Attuale: ${group.current}'),
                                             TextButton(

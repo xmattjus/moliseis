@@ -20,17 +20,8 @@ void configureCommandReporting(Logger logger) {
       );
       return;
     }
-    final safeName = switch (name) {
-      'search_results' ||
-      'search_suggestions' ||
-      'geo_map_selection' ||
-      'content_submission_submit' ||
-      'admin_submission_editor_save' ||
-      'admin_submission_editor_add_asset' => name!,
-      _ => 'command',
-    };
     logger.log(
-      CommandExecutionFailed(debugName: safeName),
+      CommandExecutionFailed(debugName: safeCommandDebugName(name)),
       error: commandError.error,
       stackTrace: stackTrace,
     );

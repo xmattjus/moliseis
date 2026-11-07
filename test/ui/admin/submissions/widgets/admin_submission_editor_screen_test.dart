@@ -105,6 +105,25 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Full local description'), findsOneWidget);
         expect(find.text('Full remote description'), findsOneWidget);
+        for (final privateValue in [
+          'Full local description',
+          'Full remote description',
+        ]) {
+          expect(
+            find.ancestor(
+              of: find.text(privateValue),
+              matching: find.byType(SentryMask),
+            ),
+            findsOneWidget,
+          );
+        }
+        expect(
+          find.ancestor(
+            of: find.text('Stato remoto: Da revisionare'),
+            matching: find.byType(SentryMask),
+          ),
+          findsNothing,
+        );
         expect(
           find.text('Descrizione · formattazione differente'),
           findsOneWidget,
@@ -224,6 +243,13 @@ void main() {
         expect(repository.candidateCalls.single, (1, 'festa', null));
         expect(
           find.textContaining('Altro contributo in attesa: Pending'),
+          findsOneWidget,
+        );
+        expect(
+          find.ancestor(
+            of: find.textContaining('Altro contributo in attesa: Pending'),
+            matching: find.byType(SentryMask),
+          ),
           findsOneWidget,
         );
         await tester.ensureVisible(
@@ -1053,7 +1079,7 @@ void main() {
           of: find.byType(AppNetworkImage),
           matching: find.byType(SentryMask),
         ),
-        findsNothing,
+        findsOneWidget,
       );
       expect(
         find.ancestor(

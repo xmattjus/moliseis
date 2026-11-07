@@ -24,14 +24,15 @@ class AdminSubmissionListItem extends StatelessWidget {
     final locale = Localizations.localeOf(context);
     final type = summary.isEvent ? 'Evento' : 'Luogo';
 
+    // Approval does not prove these original values match published content.
     return CardBase(
       onPressed: onTap,
       child: ListTile(
-        title: Text(summary.name),
+        title: SentryMask(Text(summary.name)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(summary.city),
+            SentryMask(Text(summary.city)),
             Text('$type · ${summary.status.label}'),
             Wrap(
               children: <Widget>[

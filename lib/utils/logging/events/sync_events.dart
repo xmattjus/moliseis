@@ -96,10 +96,14 @@ final class SyncFailure extends LogEvent {
     required this.owner,
     required this.category,
     this.report = true,
+    this.repository,
   });
   final SyncFailureOwner owner;
   final SyncFailureCategory category;
   final bool report;
+
+  /// Technical repository origin; remote forwarding accepts known names only.
+  final String? repository;
   @override
   String get name => 'content_sync_cause_failed';
   @override
@@ -108,5 +112,6 @@ final class SyncFailure extends LogEvent {
   Map<String, Object?> get data => {
     'owner': owner.name,
     'category': category.name,
+    if (repository != null) 'repository': repository,
   };
 }

@@ -3,7 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_date_chip.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_description_form_field.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 void main() {
   Widget buildFields({
@@ -98,6 +100,37 @@ void main() {
         find.widgetWithText(TextFormField, 'Luogo o evento'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('masks editable proposals and preserves public controls', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildFields(isEvent: true));
+      for (final privateField in [
+        find.widgetWithText(TextFormField, 'Città'),
+        find.widgetWithText(TextFormField, 'Luogo o evento'),
+        find.byType(ContentSubmissionDescriptionFormField),
+      ]) {
+        expect(
+          find.ancestor(of: privateField, matching: find.byType(SentryMask)),
+          findsOneWidget,
+        );
+      }
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Luogo o evento'),
+        'PRIVATE_UNPUBLISHED_PROPOSAL',
+      );
+      expect(find.text('PRIVATE_UNPUBLISHED_PROPOSAL'), findsOneWidget);
+      for (final publicControl in [
+        find.text('Categoria'),
+        find.text('È un evento?'),
+        find.text('Seleziona data di inizio'),
+      ]) {
+        expect(
+          find.ancestor(of: publicControl, matching: find.byType(SentryMask)),
+          findsNothing,
+        );
+      }
     });
 
     testWidgets('is controlled by the supplied event state', (tester) async {

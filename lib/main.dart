@@ -25,7 +25,6 @@ import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/command_configuration.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/http_client.dart';
-import 'package:moliseis/utils/logging/filter_breadcrumb.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
@@ -33,6 +32,7 @@ import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:sentry_supabase/sentry_supabase.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 
 final _sentryLoggingFlag = SentryLoggingFlag(initialValue: false);
 
@@ -86,10 +86,14 @@ Future<void> _main() async {
           ..replay.sessionSampleRate = kDebugMode ? 0 : 0.4
           ..replay.onErrorSampleRate = kDebugMode ? 0 : 1.0
           ..sendDefaultPii = false
+          ..enablePrintBreadcrumbs = false
+          ..beforeSend = AppLogger.beforeSend
           ..httpClient = httpClientFactory()
           ..privacy.maskAllText = false
           ..privacy.maskAllImages = false
-          ..beforeBreadcrumb = filterBreadcrumb,
+          // Monitor detail routes are outside LoggingScreen’s widget subtree.
+          ..privacy.mask<TalkerView>()
+          ..privacy.mask<TalkerDataCard>(),
         appRunner: runner,
       );
     },
@@ -103,7 +107,10 @@ Future<void> _main() async {
       final supabase = await Supabase.initialize(
         url: Env.supabaseProdUrl,
         publishableKey: Env.supabaseProdApiKey,
-        httpClient: SentrySupabaseClient(client: httpClient),
+        httpClient: SentrySupabaseClient(
+          client: httpClient,
+          enableErrors: false,
+        ),
       );
       await ensureAnonymousSupabaseSession(
         authClient: supabase.client.auth,

@@ -102,11 +102,6 @@ class CloudinaryRequestFailed extends LogEvent {
   final CloudinaryFailureCategory category;
   final int? statusCode;
 
-  /// Expected local input failures do not create remote exception alerts.
-  bool get report =>
-      category != CloudinaryFailureCategory.validation &&
-      category != CloudinaryFailureCategory.fileRead;
-
   @override
   Map<String, Object?> get data => {
     'stage': stage.name,
