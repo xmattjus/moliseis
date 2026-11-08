@@ -58,6 +58,17 @@ contradictions that make the task unsafe or impossible require escalation.
 - Preserve deliberate local exceptions rather than performing unrelated
   architectural cleanup.
 
+## Flutter UI composition
+
+- Before creating or materially changing Screens, feature widgets or ViewModels
+  under `lib/ui/**`, read `.agents/skills/flutter-ui-engineering/SKILL.md`.
+  Apply its composition, ownership and review guidance together with this file.
+  It takes precedence over conflicting generic Flutter skills within its
+  specific UI scope but cannot override this file or approved specifications.
+- UI file/build lengths are review heuristics, not automatic failures. Do not
+  split code mechanically to meet a threshold or refactor unrelated legacy
+  Screens solely for size.
+
 ## Result and command contracts
 
 Use `Result.success(T)` / `Result.error(Exception)` for expected recoverable
