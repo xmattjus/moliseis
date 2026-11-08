@@ -1,16 +1,13 @@
 ---
-name: flutter-ui-engineering
+name: molise-is-flutter-ui-engineering
 description: >-
-  Molise Is-specific Flutter UI composition and review guidance. Use before
-  creating or materially changing Screens, feature widgets, or ViewModels under
-  lib/ui/, and when reviewing oversized or tightly coupled Flutter UI code.
+  Flutter UI composition and review guidance. Use before creating or changing
+  widgets, Screens, or ViewModels and when reviewing Flutter UI code.
 ---
 
-# Flutter UI engineering — Molise Is
+# Scope and precedence
 
-## Scope and precedence
-
-Apply to new or materially changed `lib/ui/**` code and its relevant tests.
+Apply to new or changed UI (widgets, Screens, ViewModels) code and its relevant tests.
 The goal is cohesive, testable Screens and ViewModels, not a target line count.
 Follow root `AGENTS.md` and any approved change specification first. Reuse
 existing feature patterns only when sound. This project-specific UI guidance
@@ -25,7 +22,7 @@ management approach, dependency, or architectural layer just to shorten files.
 Read `.agents/skills/molise-is-async-mounted-context-safety/SKILL.md` for
 changes involving async widget callbacks or post-unmount access.
 
-## Before implementing
+# Before implementing
 
 For a substantial Screen or ViewModel change (not a trivial visual edit):
 
@@ -40,14 +37,14 @@ For a substantial Screen or ViewModel change (not a trivial visual edit):
 4. Identify lifecycle/owner changes and relevant regression cases before
    altering orchestration or splitting a ViewModel.
 
-## DO / DON'T — rule catalog
+# DO / DON'T — rule catalog
 
 `MUST` rules apply when relevant to the change and need an explicit reason
 if a documented exception is necessary. `SHOULD` rules are strong defaults;
 deviations are acceptable when they make the code simpler or safer.
 An existing file is not defective merely because it predates a rule.
 
-### Composition
+## Composition
 
 | ID | Level | DO | DON'T |
 | --- | --- | --- | --- |
@@ -64,7 +61,7 @@ A small private rendering helper is not automatically wrong. A separate
 identity or a useful rebuild boundary. A View can contain many widgets; do
 not create a separate ViewModel for each widget.
 
-### State and boundaries
+## State and boundaries
 
 | ID | Level | DO | DON'T |
 | --- | --- | --- | --- |
@@ -80,7 +77,7 @@ existing command snapshots and presentation state when sufficient. When
 changing draft, save, navigation or recovery behavior, preserve single-flight,
 revision, identity and publication-authority invariants.
 
-### Lifecycle and performance
+## Lifecycle and performance
 
 | ID | Level | DO | DON'T |
 | --- | --- | --- | --- |
@@ -96,7 +93,7 @@ and the project's `command_it` edge cases in their owning instructions.
 Localizing rebuilds should not duplicate application state or break atomic UI
 snapshots.
 
-### Layout, design and accessibility
+## Layout, design and accessibility
 
 | ID | Level | DO | DON'T |
 | --- | --- | --- | --- |
@@ -106,7 +103,7 @@ snapshots.
 | UI-23 | MUST | Make new or altered interactive controls accessible, with meaningful labels, semantics, focus and reasonable target sizes. | Rely only on color, unlabeled icons or inaccessible custom gestures. |
 | UI-24 | SHOULD | Represent applicable loading, empty, failure and completion states with usable feedback. | Render unexplained blank states, duplicate submissions or silent terminal failures. |
 
-### Tests and review
+## Tests and review
 
 | ID | Level | DO | DON'T |
 | --- | --- | --- | --- |
@@ -119,9 +116,9 @@ snapshots.
 being changed: a trivial cosmetic edit does not require new ViewModel tests
 or broad end-to-end coverage.
 
-## Size-based review heuristics — not lints
+# Size-based review heuristics — not lints
 
-For new or materially edited UI code, use these **review triggers**:
+For new or changed UI code, use these **review triggers**:
 
 | Trigger | Review action |
 | --- | --- |
@@ -142,9 +139,9 @@ Calibration on `main` at `ff07477e` (2026-11-08): 5 of 18
 `*_view_model.dart` files exceeded 800. These counts justify review
 attention only; they do not establish defects.
 
-## Completion check
+# Completion check
 
-Before considering a material UI change done:
+Before considering a UI change done:
 
 - Confirm that the Screen describes UI rather than executing data workflows;
   named sections have clear input/interaction contracts, and local state has
@@ -158,7 +155,7 @@ Before considering a material UI change done:
 - If size heuristics trigger, report a reasoned assessment, not an automatic
   failure. Avoid refactoring unrelated legacy files.
 
-## Authoritative references
+# Authoritative references
 
 - Flutter architecture: https://docs.flutter.dev/app-architecture/recommendations
 - Flutter MVVM guide: https://docs.flutter.dev/app-architecture/guide
