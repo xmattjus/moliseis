@@ -100,7 +100,7 @@ snapshots.
 
 | ID | Level | DO | DON'T |
 | --- | --- | --- | --- |
-| UI-20 | SHOULD | Base responsive decisions on available constraints (`LayoutBuilder`) or window size (`MediaQuery.sizeOf`) as appropriate. | Assume device type or portrait orientation implies available width. |
+| UI-20 | SHOULD | Reuse `WindowSizeClass`, `ResponsiveScaffold` and existing responsive components where applicable; otherwise base layout decisions on available constraints (`LayoutBuilder`) or window size (`MediaQuery.sizeOf`). | Introduce duplicate responsive conventions or infer available width from device type or portrait orientation. |
 | UI-21 | SHOULD | Use the project's theme, typography and established design tokens/components. | Hardcode inconsistent colors, typography or spacing in new UI. |
 | UI-22 | SHOULD | Check narrow/expanded layouts and larger text scaling where affected. | Suppress text scaling or let essential controls overflow or disappear. |
 | UI-23 | MUST | Make new or altered interactive controls accessible, with meaningful labels, semantics, focus and reasonable target sizes. | Rely only on color, unlabeled icons or inaccessible custom gestures. |
