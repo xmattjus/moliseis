@@ -29,7 +29,7 @@
       "source": "dart-lang/skills",
       "sourceType": "github",
       "skillPath": "skills/dart-migrate-to-checks-package/SKILL.md",
-      "computedHash": "00b7fa026dcf004421650f20147d020244886321f715ff57ee38a96b3a9945bc"
+      "computedHash": "5ba75e33a683a75ade58f2077085be0d5654f2af987fd77e721a5058de08657b"
     },
     "dart-resolve-package-conflicts": {
       "source": "dart-lang/skills",
@@ -65,7 +65,7 @@
       "source": "flutter/agent-plugins",
       "sourceType": "github",
       "skillPath": "skills/flutter-add-widget-preview/SKILL.md",
-      "computedHash": "1b59c009558aab7a8e4b7b101fbe535b06054c0672780e9cea7e5c98a9c48dc4"
+      "computedHash": "5569e0b4a29ac21e1c663751a1d73364be2f63237a88d013733f655797a152bd"
     },
     "flutter-add-widget-test": {
       "source": "flutter/agent-plugins",
@@ -137,13 +137,13 @@
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-get-started/SKILL.md",
-      "computedHash": "c5727e02ec59cf31272d979e5d4b15cebef64dfa6269dec6aecf878511197a62"
+      "computedHash": "0a6d78eaffd8f738fd46bbe66a8e341cde430aa98fb6d968482fff73049b1b87"
     },
     "sentry-instrument": {
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-instrument/SKILL.md",
-      "computedHash": "1993e79cf7f22eff732d2c78e00271c333b528a82b2fb52dbcf8eefb7ea82765"
+      "computedHash": "d8e8170bb2be4043e5f1712fab26e0a3b3939a3759b4444e3e9f62989573b590"
     },
     "sentry-instrument-logging": {
       "source": "getsentry/sentry-for-ai",
