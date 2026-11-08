@@ -281,6 +281,58 @@ $talker!
     }
   });
 
+  test('approved Talker files reject direct instance construction', () {
+    final violations = findSdkBoundaryViolations({
+      'lib/main.dart': '''
+import 'package:talker_flutter/talker_flutter.dart';
+void bypass() => Talker().error('message');
+''',
+      'lib/ui/core/ui/logging_screen.dart': '''
+import 'package:talker_flutter/talker_flutter.dart' as diagnostics;
+final extra = diagnostics.Talker();
+''',
+      'lib/config/dependencies.dart': '''
+import 'package:talker_flutter/talker_flutter.dart';
+final extra = Talker();
+''',
+      'lib/routing/router.dart': '''
+import 'package:talker_flutter/talker_flutter.dart';
+void bypass() => TalkerFlutter.init().warning('message');
+''',
+    });
+
+    const constructionViolation =
+        'direct Talker construction bypasses Debug composition';
+    const initializationViolation =
+        'Talker initialization requires Debug composition';
+    expect(violations, [
+      'lib/main.dart: $constructionViolation',
+      'lib/ui/core/ui/logging_screen.dart: $constructionViolation',
+      'lib/config/dependencies.dart: $constructionViolation',
+      'lib/routing/router.dart: $initializationViolation',
+    ]);
+  });
+
+  test('approved Debug composition and Replay types remain permitted', () {
+    final violations = findSdkBoundaryViolations({
+      'lib/config/dependencies.dart': r'''
+import 'package:talker_flutter/talker_flutter.dart';
+final Talker? $talker = kDebugMode ? TalkerFlutter.init() : null;
+''',
+      'lib/main.dart': '''
+import 'package:talker_flutter/talker_flutter.dart';
+void masks(options) {
+  options.privacy.mask<TalkerView>();
+  options.privacy.mask<TalkerDataCard>();
+}
+''',
+      'lib/routing/router.dart': r'''
+final observer = TalkerRouteObserver($talker!);
+''',
+    });
+    expect(violations, isEmpty);
+  });
+
   test('Talker routing references and inert text stay permitted', () {
     expect(
       findSdkBoundaryViolations({
