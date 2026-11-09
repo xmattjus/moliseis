@@ -2,7 +2,7 @@
 name: molise-is-test-support-reuse
 description: >
   Test harnesses, fixtures, fakes, mocks, builders, matchers, pump helpers,
-  servers, stores, and setup/teardown reuse for Molise IS. Use BEFORE writing
+  servers, stores, and setup/teardown reuse for Molise Is. Use BEFORE writing
   or editing any Dart unit test, Flutter widget test, integration test,
   repository test, or other file under test/; requires first loading
   dart-add-unit-test plus flutter-add-widget-test or
@@ -29,9 +29,6 @@ Before writing or editing test code, load the applicable skills with the
    cross-screen user flow.
 4. Also load `molise-is-objectbox-test-store` for ObjectBox repository, local
    data-source, persistence, relation, or transaction tests.
-5. Load `dart-generate-test-mocks` only when generated Mockito mocks are
-   genuinely required and no existing fake or test-support implementation can
-   satisfy the test.
 
 **Do not start writing test code until the applicable skills are loaded.**
 

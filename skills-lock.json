@@ -13,18 +13,6 @@
       "skillPath": "skills/dart-collect-coverage/SKILL.md",
       "computedHash": "36d77c4ebc2edc7ade399ae8461776dd33a461899afda4b2b9d8e7f599d2ef6c"
     },
-    "dart-generate-test-mocks": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-generate-test-mocks/SKILL.md",
-      "computedHash": "7bf12a98d63e96ed51ba077a24426be1b11a9fc508f7dfca60fc6e118c3fc923"
-    },
-    "dart-migrate-to-checks-package": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-migrate-to-checks-package/SKILL.md",
-      "computedHash": "5ba75e33a683a75ade58f2077085be0d5654f2af987fd77e721a5058de08657b"
-    },
     "dart-resolve-package-conflicts": {
       "source": "dart-lang/skills",
       "sourceType": "github",
