@@ -26,6 +26,7 @@ class GeoMapMarkerIcon extends StatelessWidget {
     required this.size,
     this.onPressed,
     this.tooltip,
+    super.key,
   });
 
   final double size;

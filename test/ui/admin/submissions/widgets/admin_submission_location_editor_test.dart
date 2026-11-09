@@ -91,7 +91,9 @@ Future<(_HarnessState, GlobalKey<FormState>)> _pumpEditor(
 }
 
 void main() {
-  testWidgets('defaults to Map mode and offers the shared picker', (tester) async {
+  testWidgets(
+    'defaults to Map mode and offers the shared picker',
+    (tester) async {
     await _pumpEditor(tester);
 
     expect(find.byType(GeoMap), findsNothing);
@@ -138,7 +140,9 @@ void main() {
     expect(find.text('Inserisci anche la longitudine.'), findsOneWidget);
   });
 
-  testWidgets('blank coordinates open picker without a selection', (tester) async {
+  testWidgets(
+    'blank coordinates open picker without a selection',
+    (tester) async {
     await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
@@ -153,7 +157,9 @@ void main() {
     );
   });
 
-  testWidgets('existing location initializes picker marker and manual fields', (tester) async {
+  testWidgets(
+    'existing location initializes picker marker and manual fields',
+    (tester) async {
     await _pumpEditor(
       tester,
       latitude: '41.5575078',
@@ -266,7 +272,9 @@ void main() {
     expect(find.text('Inserisci anche la longitudine.'), findsNothing);
   });
 
-  testWidgets('map selection mutates draft only after confirmation', (tester) async {
+  testWidgets(
+    'map selection mutates draft only after confirmation',
+    (tester) async {
     final (state, _) = await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
@@ -296,7 +304,10 @@ void main() {
     expect(fields.last.controller!.text, '14.900000');
   });
 
-  testWidgets('successive taps replace the temporary marker without draft writes', (tester) async {
+  testWidgets(
+    'successive taps replace the temporary marker '
+    'without draft writes',
+    (tester) async {
     final (state, _) = await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
@@ -315,7 +326,9 @@ void main() {
     expect(tester.widget<GeoMap>(find.byType(GeoMap)).markers.single.point,
         const LatLng(41.1, 14.2));
 
-    await tester.tap(find.byKey(const ValueKey('geo_map_location_picker_confirm')));
+    await tester.tap(
+      find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+    );
     await tester.pumpAndSettle();
 
     expect(state.selectedPoints, const <LatLng>[LatLng(41.1, 14.2)]);
@@ -338,7 +351,9 @@ void main() {
     expect(outOfRangeFormKey.currentState!.validate(), isFalse);
   });
 
-  testWidgets('invalid coordinate drafts do not become a map selection', (tester) async {
+  testWidgets(
+    'invalid coordinate drafts do not become a map selection',
+    (tester) async {
     await _pumpEditor(tester, latitude: '95', longitude: '200');
     expect(find.byType(GeoMap), findsNothing);
     expect(find.byType(TextFormField), findsNWidgets(2));
@@ -407,7 +422,9 @@ void main() {
     expect(find.text('Seleziona sulla mappa'), findsOneWidget);
   });
 
-  testWidgets('explicit Back discards the selection without changing draft', (tester) async {
+  testWidgets(
+    'explicit Back discards the selection without changing draft',
+    (tester) async {
     final (state, _) = await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
@@ -417,7 +434,9 @@ void main() {
       const LatLng(41.9, 14.9),
     );
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('geo_map_location_picker_back')));
+    await tester.tap(
+      find.byKey(const ValueKey('geo_map_location_picker_back')),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(GeoMapLocationPicker), findsNothing);
@@ -427,7 +446,11 @@ void main() {
   });
 
   testWidgets('system Back pops only the picker route', (tester) async {
-    final (state, _) = await _pumpEditor(tester, latitude: '41.55', longitude: '14.64');
+    final (state, _) = await _pumpEditor(
+      tester,
+      latitude: '41.55',
+      longitude: '14.64',
+    );
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
 
