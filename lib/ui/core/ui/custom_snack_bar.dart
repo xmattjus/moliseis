@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
@@ -37,14 +39,79 @@ void showSnackBarGenericError({required BuildContext context}) => showSnackBar(
 /// Removes the current and queued snack bars from the app-wide messenger.
 ///
 /// This intentionally applies a global latest-feedback policy. Call it only
-/// when newer feedback must revoke a previously actionable message.
+/// when newer feedback must revoke a previously actionable message. It also
+/// invalidates any owned persistent presentation without changing its durable
+/// draft or navigation intent.
 void clearAppSnackBars() {
+  _appSnackBarClearToken = Object();
+  _persistentRequest?.cancel();
+  _persistentRequest = null;
+  ++_ordinarySnackBarGeneration;
+  _ordinarySnackBarTail = null;
+
   final globalMessenger = $scaffoldMessengerKey.currentState;
+  _ordinarySnackBarMessenger = globalMessenger;
+  if (globalMessenger == null ||
+      !identical(_persistentCloseTail?.messenger, globalMessenger)) {
+    _persistentCloseTail = null;
+  }
   if (globalMessenger == null) return;
 
   globalMessenger
     ..clearSnackBars()
     ..removeCurrentSnackBar();
+}
+
+Object _appSnackBarClearToken = Object();
+
+/// Identifies the latest explicit global clear boundary.
+///
+/// Capture before deferred eligibility work and compare before registering a
+/// persistent request, so clearing also revokes work not yet in the helper.
+Object get appSnackBarClearToken => _appSnackBarClearToken;
+
+_PersistentSnackBarRequest? _persistentRequest;
+Future<void>? _ordinarySnackBarTail;
+ScaffoldMessengerState? _ordinarySnackBarMessenger;
+int _ordinarySnackBarGeneration = 0;
+
+/// Shows an actionable recovery snack bar outside the native queue while
+/// ordinary feedback is active. The returned callback cancels this request;
+/// cancellation is safe to repeat and only closes its own visible entry.
+///
+/// After ordinary feedback settles, [revalidate] must still authorize the
+/// request before it can be shown again. Native close and swipe call
+/// [onDismissed]; temporary interruption does not.
+VoidCallback showPersistentSnackBar({
+  required BuildContext context,
+  required String textContent,
+  required String actionLabel,
+  required VoidCallback onActionPressed,
+  required Future<bool> Function() revalidate,
+  required VoidCallback onDismissed,
+}) {
+  _persistentRequest?.cancel();
+  final messenger = $scaffoldMessengerKey.currentState;
+  if (messenger == null) {
+    context.read<Logger?>()?.log(
+      const SnackBarShowFailed(reason: 'The global ScaffoldMessenger is null'),
+    );
+    return () {};
+  }
+  _bindMessenger(messenger);
+
+  late final _PersistentSnackBarRequest request;
+  request = _PersistentSnackBarRequest(
+    messenger: messenger,
+    textContent: textContent,
+    actionLabel: actionLabel,
+    onActionPressed: onActionPressed,
+    revalidate: revalidate,
+    onDismissed: onDismissed,
+  );
+  _persistentRequest = request;
+  _resumePersistentRequest(request);
+  return request.cancel;
 }
 
 /// Shows a floating Material 3 snack bar through the app-wide scaffold
@@ -53,10 +120,12 @@ void clearAppSnackBars() {
 ///
 /// The snack bar text is [textContent] and its severity is [type], which
 /// drives the background, foreground, and leading icon. When [replaceCurrent]
-/// is true, the global messenger removes all current and queued feedback
-/// before presenting this one. If the global messenger is unavailable, or an
-/// ordinary exception prevents display, the failure is logged through the
-/// injected [Logger]. Flutter contract errors and assertions remain visible.
+/// is true, the global messenger removes current and queued ordinary feedback
+/// before presenting this one. An owned persistent recovery request is
+/// suspended and remains eligible for later authoritative revalidation. If the
+/// global messenger is unavailable, or an ordinary exception prevents
+/// display, the failure is logged through the injected [Logger]. Flutter
+/// contract errors and assertions remain visible.
 void showSnackBar({
   required BuildContext context,
   required String textContent,
@@ -74,13 +143,17 @@ void showSnackBar({
 
     return;
   }
+  _bindMessenger(globalMessenger);
 
   try {
+    _suspendPersistentRequest();
     if (replaceCurrent) {
-      clearAppSnackBars();
+      // Replacement intentionally clears ordinary feedback but keeps the
+      // separately owned recovery request eligible for later revalidation.
+      _clearOrdinarySnackBars(globalMessenger);
     }
 
-    globalMessenger.showSnackBar(
+    final controller = globalMessenger.showSnackBar(
       _buildSnackBar(
         context,
         textContent,
@@ -88,6 +161,16 @@ void showSnackBar({
         action,
         _snackBarDurationEnumToDuration(duration),
       ),
+    );
+    final generation = ++_ordinarySnackBarGeneration;
+    _ordinarySnackBarTail = controller.closed;
+    unawaited(
+      controller.closed.then((_) {
+        if (_ordinarySnackBarGeneration == generation) {
+          final request = _persistentRequest;
+          if (request != null) _resumePersistentRequest(request);
+        }
+      }),
     );
   } on Exception catch (exception, stackTrace) {
     context.read<Logger?>()?.log(
@@ -97,6 +180,234 @@ void showSnackBar({
     );
   }
 }
+
+void _bindMessenger(ScaffoldMessengerState messenger) {
+  final request = _persistentRequest;
+  if (request != null && !identical(request.messenger, messenger)) {
+    request.cancel();
+  }
+  if (!identical(_ordinarySnackBarMessenger, messenger)) {
+    ++_ordinarySnackBarGeneration;
+    _ordinarySnackBarTail = null;
+    _ordinarySnackBarMessenger = messenger;
+  }
+  final closing = _persistentCloseTail;
+  if (closing != null && !identical(closing.messenger, messenger)) {
+    _persistentCloseTail = null;
+  }
+}
+
+void _clearOrdinarySnackBars(ScaffoldMessengerState messenger) {
+  ++_ordinarySnackBarGeneration;
+  _ordinarySnackBarTail = null;
+  messenger
+    ..clearSnackBars()
+    ..removeCurrentSnackBar();
+}
+
+void _suspendPersistentRequest() {
+  final request = _persistentRequest;
+  if (request == null) return;
+  request.suspend();
+}
+
+void _resumePersistentRequest(_PersistentSnackBarRequest request) {
+  if (request.canceled || !identical(_persistentRequest, request)) return;
+  final closing = _persistentCloseTail;
+  if (closing != null) {
+    if (!identical(closing.messenger, request.messenger)) {
+      _persistentCloseTail = null;
+      _resumePersistentRequest(request);
+      return;
+    }
+    unawaited(
+      closing.future.then((_) {
+        if (identical(_persistentCloseTail, closing)) {
+          _persistentCloseTail = null;
+          final current = _persistentRequest;
+          if (current != null) _resumePersistentRequest(current);
+        }
+      }),
+    );
+    return;
+  }
+  final messenger = $scaffoldMessengerKey.currentState;
+  if (messenger == null || !identical(messenger, request.messenger)) {
+    request.cancel();
+    return;
+  }
+  if (_ordinarySnackBarTail != null) {
+    final tail = _ordinarySnackBarTail!;
+    unawaited(
+      tail.then((_) {
+        if (identical(_ordinarySnackBarTail, tail)) {
+          _ordinarySnackBarTail = null;
+          final current = _persistentRequest;
+          if (current != null) _resumePersistentRequest(current);
+        }
+      }),
+    );
+    return;
+  }
+  if (request.validating || request.controller != null) return;
+  request.validating = true;
+  final validationGeneration = _ordinarySnackBarGeneration;
+  unawaited(
+    request.revalidate().then<void>(
+      (isValid) {
+        if (!isValid ||
+            request.canceled ||
+            !identical(_persistentRequest, request)) {
+          request.validating = false;
+          return;
+        }
+        if (validationGeneration != _ordinarySnackBarGeneration ||
+            _ordinarySnackBarTail != null) {
+          request.validating = false;
+          _resumePersistentRequest(request);
+          return;
+        }
+        if (!identical($scaffoldMessengerKey.currentState, request.messenger)) {
+          request
+            ..validating = false
+            ..cancel();
+          return;
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (request.canceled || !identical(_persistentRequest, request)) {
+            request.validating = false;
+            return;
+          }
+          if (validationGeneration != _ordinarySnackBarGeneration ||
+              _ordinarySnackBarTail != null) {
+            request.validating = false;
+            _resumePersistentRequest(request);
+            return;
+          }
+          if (!identical(
+            $scaffoldMessengerKey.currentState,
+            request.messenger,
+          )) {
+            request
+              ..validating = false
+              ..cancel();
+            return;
+          }
+          request
+            ..validating = false
+            ..present();
+        });
+        WidgetsBinding.instance.ensureVisualUpdate();
+      },
+      onError: (Object error, StackTrace stack) {
+        request.validating = false;
+        Error.throwWithStackTrace(error, stack);
+      },
+    ),
+  );
+}
+
+final class _PersistentSnackBarRequest {
+  _PersistentSnackBarRequest({
+    required this.messenger,
+    required this.textContent,
+    required this.actionLabel,
+    required this.onActionPressed,
+    required this.revalidate,
+    required this.onDismissed,
+  });
+
+  final ScaffoldMessengerState messenger;
+  final String textContent;
+  final String actionLabel;
+  final VoidCallback onActionPressed;
+  final Future<bool> Function() revalidate;
+  final VoidCallback onDismissed;
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? controller;
+  bool validating = false;
+  bool canceled = false;
+
+  void present() {
+    if (canceled || controller != null) return;
+    controller = messenger.showSnackBar(
+      _buildSnackBar(
+        messenger.context,
+        textContent,
+        SnackBarType.info,
+        SnackBarAction(
+          label: actionLabel,
+          onPressed: () {
+            if (canceled ||
+                !identical(_persistentRequest, this) ||
+                !identical($scaffoldMessengerKey.currentState, messenger)) {
+              return;
+            }
+            onActionPressed();
+          },
+        ),
+        const Duration(days: 1),
+        persist: true,
+        showCloseIcon: true,
+      ),
+    );
+    unawaited(
+      controller!.closed.then((reason) {
+        controller = null;
+        if (canceled || !identical(_persistentRequest, this)) return;
+        if (reason == SnackBarClosedReason.dismiss ||
+            reason == SnackBarClosedReason.swipe) {
+          cancel();
+          onDismissed();
+        }
+      }),
+    );
+  }
+
+  void suspend() {
+    final current = controller;
+    controller = null;
+    if (current != null &&
+        identical($scaffoldMessengerKey.currentState, messenger)) {
+      final closing = current.closed.then<void>((_) {});
+      _persistentCloseTail = _PersistentCloseTail(messenger, closing);
+      current.close();
+      unawaited(
+        closing.then((_) {
+          if (identical(_persistentCloseTail?.future, closing)) {
+            _persistentCloseTail = null;
+            final request = _persistentRequest;
+            if (request != null) _resumePersistentRequest(request);
+          }
+        }),
+      );
+    }
+  }
+
+  void cancel() {
+    if (canceled) return;
+    canceled = true;
+    final current = controller;
+    controller = null;
+    if (identical(_persistentRequest, this)) _persistentRequest = null;
+    if (current != null &&
+        identical($scaffoldMessengerKey.currentState, messenger)) {
+      _persistentCloseTail = _PersistentCloseTail(
+        messenger,
+        current.closed.then<void>((_) {}),
+      );
+      current.close();
+    }
+  }
+}
+
+final class _PersistentCloseTail {
+  const _PersistentCloseTail(this.messenger, this.future);
+
+  final ScaffoldMessengerState messenger;
+  final Future<void> future;
+}
+
+_PersistentCloseTail? _persistentCloseTail;
 
 Duration _snackBarDurationEnumToDuration(SnackBarDuration duration) =>
     switch (duration) {
@@ -111,8 +422,10 @@ SnackBar _buildSnackBar(
   String textContent,
   SnackBarType type,
   SnackBarAction? action,
-  Duration duration,
-) {
+  Duration duration, {
+  bool persist = false,
+  bool showCloseIcon = false,
+}) {
   const contentMaxLines = 2;
   const horizontalMargin = 24.0;
   const contentSpacing = 8.0;
@@ -193,7 +506,9 @@ SnackBar _buildSnackBar(
         final locale = Localizations.maybeLocaleOf(context);
         final width = MediaQuery.sizeOf(context).width;
         final textSpan = TextSpan(text: textContent, style: measuredStyle);
-        final snackBarContentWidth = width - (horizontalMargin * 2);
+        final availableWidth =
+            width - (horizontalMargin * 2) - (showCloseIcon ? 48 : 0);
+        final snackBarContentWidth = availableWidth > 1 ? availableWidth : 1.0;
 
         final textPainter = TextPainter(
           text: textSpan,
@@ -235,7 +550,7 @@ SnackBar _buildSnackBar(
           ],
         );
 
-        return contentLinesSpan == 1
+        return !usesFullWidthText
             ? row
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -262,6 +577,8 @@ SnackBar _buildSnackBar(
     ),
     behavior: SnackBarBehavior.floating,
     duration: duration,
-    persist: false,
+    persist: persist,
+    showCloseIcon: showCloseIcon,
+    closeIconColor: foreground,
   );
 }

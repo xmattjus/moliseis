@@ -301,4 +301,104 @@ void main() {
     );
     expect(environment.store.box<AdminSubmissionDraftEntity>().count(), 1);
   });
+
+  test(
+    'navigation replacement and compare-clear preserve exact account data',
+    () async {
+      final target = AdminDraftOwner(accountId: account, submissionId: 7);
+      final foreign = AdminDraftOwner(accountId: otherAccount);
+      const first = '22222222-2222-4222-8222-222222222222';
+      const next = '44444444-4444-4444-8444-444444444444';
+      for (final draftOwner in [owner, target, foreign]) {
+        expect(
+          await repository.saveDraft(
+            AdminSubmissionDraft(
+              owner: draftOwner,
+              snapshot: AdminDraftSnapshot(
+                name: draftOwner.sessionId,
+                latitudeText: '41,',
+              ),
+            ),
+          ),
+          isA<Success<void>>(),
+        );
+      }
+      expect(
+        await repository.saveNavigationIntent(
+          owner: owner,
+          requestNonce: first,
+        ),
+        isA<Success<AdminSubmissionDraft>>(),
+      );
+      expect(
+        await repository.saveNavigationIntent(
+          owner: foreign,
+          requestNonce: first,
+        ),
+        isA<Success<AdminSubmissionDraft>>(),
+      );
+      expect(
+        await repository.saveNavigationIntent(
+          owner: target,
+          requestNonce: next,
+        ),
+        isA<Success<AdminSubmissionDraft>>(),
+      );
+      final selected = (await repository.loadNavigationDraft(
+        accountId: account,
+      )).getOrNull()!;
+      expect(selected.owner, target);
+      expect(selected.navigationIntent!.requestNonce, next);
+      expect(selected.snapshot.latitudeText, '41,');
+      expect(
+        (await repository.loadDraft(
+          accountId: account,
+        )).getOrNull()!.navigationIntent,
+        isNull,
+      );
+      expect(
+        (await repository.loadNavigationDraft(
+          accountId: otherAccount,
+        )).getOrNull()!.owner,
+        foreign,
+      );
+      // A late cleanup for the prior request cannot clear the replacement.
+      expect(
+        (await repository.clearNavigationIntent(
+          owner: target,
+          requestNonce: first,
+        )).getOrNull(),
+        selected,
+      );
+      expect(
+        (await repository.loadNavigationDraft(accountId: account)).getOrNull(),
+        selected,
+      );
+      expect(
+        (await repository.clearNavigationIntent(
+          owner: target,
+          requestNonce: next,
+        )).getOrNull()!.navigationIntent,
+        isNull,
+      );
+      expect(
+        (await repository.loadNavigationDraft(accountId: account)).getOrNull(),
+        isNull,
+      );
+      expect(
+        (await repository.loadNavigationDraft(
+          accountId: otherAccount,
+        )).getOrNull()!.navigationIntent!.requestNonce,
+        first,
+      );
+      expect(
+        (await repository.loadDraft(
+          accountId: account,
+          submissionId: 7,
+        )).getOrNull()!.snapshot,
+        selected.snapshot,
+      );
+      expect(environment.store.box<AdminSubmissionDraftEntity>().count(), 3);
+    },
+  );
 }

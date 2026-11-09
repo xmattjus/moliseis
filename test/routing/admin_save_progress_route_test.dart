@@ -542,10 +542,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(harness.auth.viewModel.currentUser?.id, accountB.id);
       expect(harness.router.state.uri.path, RoutePaths.admin);
-      await tester.tap(find.byTooltip('Riprendi editor'));
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
       expect(harness.router.state.uri.path, RoutePaths.admin);
       expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+      expect(find.text('Riprendi'), findsNothing);
+      expect(
+        find.text('Hai una modifica interrotta da recuperare.'),
+        findsNothing,
+      );
       expect(find.text('Private unfinished A'), findsNothing);
       expect(owner.sessionId, isNull);
       final retainedA =
@@ -572,7 +576,8 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(harness.router.state.uri.path, RoutePaths.admin);
-      await tester.tap(find.byTooltip('Riprendi editor'));
+      expect(find.text('Riprendi'), findsOneWidget);
+      await tester.tap(find.text('Riprendi'));
       await tester.pumpAndSettle();
       expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
       expect(owner.accountId, accountA.id);

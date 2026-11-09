@@ -12,11 +12,16 @@ import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/data/services/url_launch_service.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_asset.dart';
+import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/repositories/content_submission_repository.dart';
+import 'package:moliseis/domain/repositories/event_repository.dart';
+import 'package:moliseis/domain/repositories/place_repository.dart';
+import 'package:moliseis/domain/repositories/search_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/sync_use_case.dart';
+import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/routing/router.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
@@ -164,6 +169,188 @@ void main() {
     );
 
     testOwnerUI(
+      'dashboard AppBar Back falls back to Home '
+      'and ignores a repeated callback',
+      (tester) async {
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
+        harness.router.go(RoutePaths.admin);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+
+        final back = tester.widget<IconButton>(
+          find.descendant(
+            of: find.byTooltip('Indietro'),
+            matching: find.byType(IconButton),
+          ),
+        );
+        final onPressed = back.onPressed!;
+        onPressed();
+        onPressed();
+        await tester.pumpAndSettle();
+
+        expect(harness.router.state.uri.path, RoutePaths.home);
+        expect(find.byType(AdminDashboardScreen), findsNothing);
+        expect(find.byType(AdminLoginScreen), findsNothing);
+        expect(harness.auth.viewModel.isAdmin, isTrue);
+      },
+      disposeOwners: () {
+        harness.editor.dispose();
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
+
+    for (final systemBack in [false, true]) {
+      testOwnerUI(
+        'authenticated Settings keeps its route and state '
+        'with system Back=$systemBack',
+        (tester) async {
+          harness = _AdminRouteHarness(
+            initialUser: makeAuthUser(
+              isAdmin: true,
+              id: AdminDraftSessionHarness.accountA,
+            ),
+          );
+          harness.router.go(RoutePaths.home);
+          await tester.pumpWidget(harness.app(withSettingsProviders: true));
+          await tester.pumpAndSettle();
+          unawaited(harness.router.push(RoutePaths.settings));
+          await tester.pumpAndSettle();
+
+          await tester.tap(find.byType(DropdownMenu<ThemeBrightness>));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Chiaro').last);
+          await tester.pumpAndSettle();
+          final settingsRoute = ModalRoute.of(
+            tester.element(find.byType(SettingsScreen)),
+          )!;
+          await tester.tap(find.text('Area redazione'));
+          await tester.pumpAndSettle();
+          expect(harness.router.state.uri.path, RoutePaths.admin);
+
+          expect(settingsRoute.isActive, isTrue);
+          expect(settingsRoute.isCurrent, isFalse);
+          if (systemBack) {
+            expect(await tester.binding.handlePopRoute(), isTrue);
+          } else {
+            final callback = tester
+                .widget<IconButton>(
+                  find.descendant(
+                    of: find.byTooltip('Indietro'),
+                    matching: find.byType(IconButton),
+                  ),
+                )
+                .onPressed!;
+            callback();
+            callback();
+          }
+          await tester.pumpAndSettle();
+          expect(harness.router.state.uri.path, RoutePaths.settings);
+          expect(find.byType(SettingsScreen), findsOneWidget);
+          expect(
+            ModalRoute.of(tester.element(find.byType(SettingsScreen))),
+            same(settingsRoute),
+          );
+          expect(
+            harness.settingsRepository.themeBrightness,
+            ThemeBrightness.light,
+          );
+          expect(
+            harness
+                .router
+                .routerDelegate
+                .navigatorKey
+                .currentState!
+                .widget
+                .pages
+                .map((page) => page.name),
+            contains(RouteNames.settings),
+          );
+
+          expect(await tester.binding.handlePopRoute(), isTrue);
+          await tester.pumpAndSettle();
+          expect(harness.router.state.uri.path, RoutePaths.home);
+        },
+        disposeOwners: () {
+          harness.editor.dispose();
+          harness.auth.dispose();
+          harness.syncViewModel.dispose();
+          harness.router.dispose();
+        },
+      );
+    }
+
+    for (final transition in ['sign out', 'auth owner']) {
+      testOwnerUI(
+        'saved dashboard Back loses authority after $transition',
+        (tester) async {
+          harness = _AdminRouteHarness(
+            initialUser: makeAuthUser(
+              isAdmin: true,
+              id: AdminDraftSessionHarness.accountA,
+            ),
+          );
+          harness.router.go(RoutePaths.admin);
+          await tester.pumpWidget(harness.app());
+          await tester.pumpAndSettle();
+          final callback = tester
+              .widget<IconButton>(
+                find.descendant(
+                  of: find.byTooltip('Indietro'),
+                  matching: find.byType(IconButton),
+                ),
+              )
+              .onPressed!;
+          if (transition == 'sign out') {
+            harness.auth.setUser(null);
+            harness.auth.emit(AuthChangeEvent.signedOut);
+            await tester.pumpAndSettle();
+            expect(find.byType(AdminLoginScreen), findsOneWidget);
+            callback();
+            await tester.pumpAndSettle();
+            expect(find.byType(AdminLoginScreen), findsOneWidget);
+            harness.auth.setUser(
+              makeAuthUser(
+                isAdmin: true,
+                id: AdminDraftSessionHarness.accountA,
+              ),
+            );
+            harness.auth.emit(AuthChangeEvent.signedIn);
+            await tester.pumpAndSettle();
+          } else {
+            final replacement = ControllableAdminAuth(
+              initialUser: makeAuthUser(
+                isAdmin: true,
+                id: AdminDraftSessionHarness.accountA,
+              ),
+            );
+            addTearDown(replacement.dispose);
+            await tester.pumpWidget(
+              harness.app(authOwner: replacement.viewModel),
+            );
+            await tester.pumpAndSettle();
+          }
+          callback();
+          await tester.pumpAndSettle();
+          expect(harness.router.state.uri.path, RoutePaths.admin);
+          expect(find.byType(AdminDashboardScreen), findsOneWidget);
+        },
+        disposeOwners: () {
+          harness.editor.dispose();
+          harness.auth.dispose();
+          harness.syncViewModel.dispose();
+          harness.router.dispose();
+        },
+      );
+    }
+
+    testOwnerUI(
       'redirects an admin user from the login to the dashboard',
       (tester) async {
         harness = _AdminRouteHarness(
@@ -295,7 +482,7 @@ void main() {
     );
 
     testOwnerUI(
-      'settings entry preserves back navigation after login',
+      'Settings to Login to Dashboard preserves Settings for AppBar Back',
       (tester) async {
         harness = _AdminRouteHarness();
         when(
@@ -318,10 +505,24 @@ void main() {
           );
         });
 
-        harness.router.go(RoutePaths.settings);
+        harness.router.go(RoutePaths.home);
         await tester.pumpWidget(harness.app(withSettingsProviders: true));
         await tester.pumpAndSettle();
+        unawaited(harness.router.push(RoutePaths.settings));
+        await tester.pumpAndSettle();
 
+        await tester.tap(find.byType(DropdownMenu<ThemeBrightness>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Chiaro').last);
+        await tester.pumpAndSettle();
+        expect(
+          harness.settingsRepository.themeBrightness,
+          ThemeBrightness.light,
+        );
+
+        final settingsRoute = ModalRoute.of(
+          tester.element(find.byType(SettingsScreen)),
+        )!;
         await tester.tap(find.text('Area redazione'));
         await tester.pumpAndSettle();
 
@@ -352,7 +553,9 @@ void main() {
         expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
         expect(harness.repository.listCallCount, 1);
 
-        await tester.binding.handlePopRoute();
+        expect(settingsRoute.isActive, isTrue);
+        expect(settingsRoute.isCurrent, isFalse);
+        await tester.tap(find.byTooltip('Indietro'));
         await tester.pumpAndSettle();
 
         expect(
@@ -360,6 +563,24 @@ void main() {
           RoutePaths.settings,
         );
         expect(find.byType(SettingsScreen), findsOneWidget);
+        expect(
+          ModalRoute.of(tester.element(find.byType(SettingsScreen))),
+          same(settingsRoute),
+        );
+        expect(
+          harness.settingsRepository.themeBrightness,
+          ThemeBrightness.light,
+        );
+        expect(
+          harness.router.routerDelegate.navigatorKey.currentState!.widget.pages
+              .map((page) => page.name),
+          contains(RouteNames.settings),
+        );
+
+        expect(await tester.binding.handlePopRoute(), isTrue);
+        await tester.pumpAndSettle();
+        expect(harness.router.state.uri.path, RoutePaths.home);
+        expect(find.byType(SettingsScreen), findsNothing);
       },
       disposeOwners: () {
         harness.editor.dispose();
@@ -1341,22 +1562,33 @@ final class _AdminRouteHarness {
   late final AdminSubmissionEditorViewModel editor;
   late final ControllableAdminAuth auth;
   late final FakeAdminContentSubmissionRepository repository;
+  final eventRepository = FakeEventRepository();
+  final placeRepository = FakePlaceRepository();
+  final searchRepository = FakeSearchRepository();
   late final FakeSettingsRepository settingsRepository;
   late final SyncViewModel syncViewModel;
   late final GoRouter router;
 
   /// Builds the minimal provider tree required by each tested route.
-  Widget app({bool withSettingsProviders = false}) {
+  Widget app({
+    bool withSettingsProviders = false,
+    AdminAuthViewModel? authOwner,
+  }) {
     final logger = MockLogger();
 
     return MultiProvider(
       providers: <SingleChildWidget>[
-        ChangeNotifierProvider<AdminAuthViewModel>.value(value: auth.viewModel),
+        ChangeNotifierProvider<AdminAuthViewModel>.value(
+          value: authOwner ?? auth.viewModel,
+        ),
         ChangeNotifierProvider<AdminSubmissionEditorViewModel>.value(
           value: editor,
         ),
         Provider<AdminSubmissionDraftRepository>.value(value: local.drafts),
         Provider<AdminContentSubmissionRepository>.value(value: repository),
+        Provider<EventRepository>.value(value: eventRepository),
+        Provider<PlaceRepository>.value(value: placeRepository),
+        Provider<SearchRepository>.value(value: searchRepository),
         Provider<ContentSubmissionRepository>.value(
           value: FakeContentSubmissionRepository(),
         ),

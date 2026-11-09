@@ -24,8 +24,82 @@ final class _AdminExecution<P, T> {
   int revision = 0;
 
   bool normalTerminal = false;
+  bool revoked = false;
 
   bool get normal => normalTerminal;
+
+  AdminDashboardRefreshResult get refreshResult {
+    final snapshot = terminal;
+    if (revoked) {
+      return const AdminDashboardRefreshResult(
+        AdminDashboardRefreshOutcome.revoked,
+      );
+    }
+    if (!normalTerminal || snapshot == null) {
+      return const AdminDashboardRefreshResult(
+        AdminDashboardRefreshOutcome.abnormal,
+      );
+    }
+    if (snapshot.domainError case final error?) {
+      return AdminDashboardRefreshResult(
+        AdminDashboardRefreshOutcome.expectedFailure,
+        error,
+      );
+    }
+    if (snapshot.unexpectedError case final error?) {
+      return AdminDashboardRefreshResult(
+        AdminDashboardRefreshOutcome.unexpectedFailure,
+        error,
+      );
+    }
+    return AdminDashboardRefreshResult(
+      snapshot.completed
+          ? AdminDashboardRefreshOutcome.success
+          : AdminDashboardRefreshOutcome.abnormal,
+    );
+  }
+}
+
+/// Terminal result of one admitted manual dashboard read.
+enum AdminDashboardRefreshOutcome {
+  /// The accepted read returned a successful Result.
+  success,
+
+  /// The accepted read returned an expected Result error.
+  expectedFailure,
+
+  /// The accepted read threw and the command reported the original failure.
+  unexpectedFailure,
+
+  /// The owner was revoked before this accepted read safely settled.
+  revoked,
+
+  /// The command settled without a normal terminal result, such as assertion.
+  abnormal,
+}
+
+/// Outcome captured from one dashboard read at safe settlement.
+final class AdminDashboardRefreshResult {
+  const AdminDashboardRefreshResult(this.outcome, [this.error]);
+
+  /// The terminal category for this accepted read.
+  final AdminDashboardRefreshOutcome outcome;
+
+  /// The original expected or handled unexpected error, when present.
+  final Object? error;
+
+  /// Whether the accepted execution ended with either failure channel.
+  bool get hasFailure =>
+      outcome == AdminDashboardRefreshOutcome.expectedFailure ||
+      outcome == AdminDashboardRefreshOutcome.unexpectedFailure;
+}
+
+/// A synchronously admitted dashboard refresh and its safe terminal outcome.
+final class AdminDashboardRefresh {
+  const AdminDashboardRefresh(this.settled);
+
+  /// Resolves with the result captured from this exact read execution.
+  final Future<AdminDashboardRefreshResult> settled;
 }
 
 /// Dashboard reads have independent single-flight lanes. Reactivation reserves
@@ -186,6 +260,23 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   Future<void> refreshIgnoredSources() =>
       _startIgnored()?.completion.future ?? Future<void>.value();
 
+  /// Whether manual refresh can currently enter the selected read lane.
+  bool get canRefreshSelectedLane =>
+      _canRead(null) &&
+      (_showIgnored ? _ignoredRead == null : _submissionRead == null);
+
+  /// Admits the selected read lane, or returns null when admission is refused.
+  ///
+  /// The returned receipt settles only after the exact execution's safe
+  /// settlement witness has completed.
+  AdminDashboardRefresh? startSelectedLaneRefresh() {
+    final execution = _showIgnored ? _startIgnored() : _startSubmissions();
+    if (execution == null) return null;
+    return AdminDashboardRefresh(
+      execution.completion.future.then((_) => execution.refreshResult),
+    );
+  }
+
   /// Requests a best-effort refresh after an editor has persisted a change.
   ///
   /// A busy lane may refuse the read; no freshness obligation is retained.
@@ -262,8 +353,9 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
       execution.revision++;
       final snapshot = command.results.value;
       if (captureResult && !snapshot.isRunning && !snapshot.idle) {
-        execution.normalTerminal = true;
-        if (!execution.read) execution.terminal = snapshot;
+        execution
+          ..normalTerminal = true
+          ..terminal = snapshot;
       }
       _scheduleSettlement(execution);
     }
@@ -351,7 +443,9 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
 
   void _settle<P, T>(_AdminExecution<P, T> execution) {
     if (execution.settled) return;
-    execution.settled = true;
+    execution
+      ..settled = true
+      ..revoked = _disposed;
     if (identical(_submissionRead, execution)) _submissionRead = null;
     if (identical(_ignoredRead, execution)) _ignoredRead = null;
     final mutation = identical(_mutation, execution);

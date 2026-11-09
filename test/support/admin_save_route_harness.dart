@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
+import 'package:moliseis/domain/models/admin_submission_staged_asset.dart';
 import 'package:moliseis/domain/models/content_category.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
@@ -89,29 +90,53 @@ final class AdminSaveRouteHarness {
   late final AdminSubmissionEditorViewModel owner;
   late final GoRouter router;
 
-  /// Retains one application owner across editor/progress page reconstruction.
-  Widget app({ThemeData? theme}) => MultiProvider(
-    providers: [
-      ...buildSyncProviders(sync, auth: auth),
-      Provider<AdminContentSubmissionRepository>.value(value: repository),
-      Provider<AdminSubmissionDraftRepository>.value(value: local.drafts),
-      Provider<ContentSubmissionRepository>.value(value: content),
-      ChangeNotifierProvider<AdminSubmissionEditorViewModel>.value(
-        value: owner,
+  /// Seeds an interrupted checkpoint and a private staged asset for its owner.
+  void seedNavigationRecovery({required String requestNonce}) {
+    final draftOwner = local.owner;
+    local.drafts.drafts[draftOwner.lookupKey] = AdminSubmissionDraft(
+      owner: draftOwner,
+      snapshot: AdminDraftSnapshot(
+        name: 'Private checkpoint',
+        latitudeText: '41,',
       ),
-    ],
-    child: MaterialApp.router(
-      scaffoldMessengerKey: $scaffoldMessengerKey,
-      restorationScopeId: 'admin-save-test',
-      routerConfig: router,
-      theme: theme,
-      localizationsDelegates: const [
-        FlutterQuillLocalizations.delegate,
-        ...GlobalMaterialLocalizations.delegates,
-      ],
-      supportedLocales: const [Locale('en'), Locale('it')],
-    ),
-  );
+      navigationIntent: AdminNavigationIntent(requestNonce: requestNonce),
+    );
+    local.staged.onResolve = (_) async =>
+        Result.error(Exception('Fixture preview unavailable.'));
+    final digest = 'a' * 40;
+    local.staged.assets[draftOwner] = [
+      AdminSubmissionStagedAsset(
+        owner: draftOwner,
+        digest: digest,
+        relativePath: '${draftOwner.accountId}/${draftOwner.sessionId}/$digest',
+      ),
+    ];
+  }
+
+  /// Retains one application owner across editor/progress page reconstruction.
+  Widget app({ThemeData? theme, AdminSubmissionEditorViewModel? editorOwner}) =>
+      MultiProvider(
+        providers: [
+          ...buildSyncProviders(sync, auth: auth),
+          Provider<AdminContentSubmissionRepository>.value(value: repository),
+          Provider<AdminSubmissionDraftRepository>.value(value: local.drafts),
+          Provider<ContentSubmissionRepository>.value(value: content),
+          ChangeNotifierProvider<AdminSubmissionEditorViewModel>.value(
+            value: editorOwner ?? owner,
+          ),
+        ],
+        child: MaterialApp.router(
+          scaffoldMessengerKey: $scaffoldMessengerKey,
+          restorationScopeId: 'admin-save-test',
+          routerConfig: router,
+          theme: theme,
+          localizationsDelegates: const [
+            FlutterQuillLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          supportedLocales: const [Locale('en'), Locale('it')],
+        ),
+      );
 
   /// Opens the real editor routes with their dashboard page underneath.
   Future<void> openEditor(

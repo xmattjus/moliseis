@@ -47,6 +47,29 @@ final class AdminEditorExitVisit {
       route.settings is Page ? (route.settings as Page<dynamic>).key : null;
 }
 
+/// One recovery push's admission acknowledgement, separate from editor return.
+///
+/// Pass as router `extra`. Only the existing policy resolves it, once for its
+/// exact destination; rejection never waits for GoRouter's pending pop Future.
+final class AdminEditorNavigationAdmission {
+  /// Binds rejection cleanup to one requested destination and caller attempt.
+  AdminEditorNavigationAdmission({
+    required this.location,
+    required VoidCallback onRejected,
+  }) : _onRejected = onRejected;
+
+  /// Exact destination, including the account-qualified session hint.
+  final Uri location;
+  final VoidCallback _onRejected;
+  bool _resolved = false;
+
+  void _resolve(Uri destination, OnEnterResult result) {
+    if (_resolved || destination != location) return;
+    _resolved = true;
+    if (result is Block) _onRejected();
+  }
+}
+
 /// Admin-only presentation arbitration for the existing router and draft owner.
 ///
 /// Results belong to individual router invocations. This object never owns a
@@ -170,6 +193,25 @@ final class AdminSubmissionExitPolicy {
 
   /// Guards only incoming Admin identity changes and occupied exit decisions.
   FutureOr<OnEnterResult> onEnter(
+    BuildContext context,
+    GoRouterState current,
+    GoRouterState next,
+    GoRouter router,
+  ) {
+    final result = _onEnter(context, current, next, router);
+    final admission = next.extra;
+    if (admission is! AdminEditorNavigationAdmission) return result;
+    if (result is Future<OnEnterResult>) {
+      return result.then((resolved) {
+        admission._resolve(next.uri, resolved);
+        return resolved;
+      });
+    }
+    admission._resolve(next.uri, result);
+    return result;
+  }
+
+  FutureOr<OnEnterResult> _onEnter(
     BuildContext context,
     GoRouterState current,
     GoRouterState next,
