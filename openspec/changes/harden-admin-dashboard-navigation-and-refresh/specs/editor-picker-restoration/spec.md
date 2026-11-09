@@ -65,10 +65,28 @@ Recovery SHALL use existing styling and persist except during ordinary feedback,
 - **WHEN** the user activates recovery
 - **THEN** the notification is retired immediately and a current account-qualified lookup must still match its session, target and navigation request before one editor navigation is allowed
 - **AND** duplicate presentation is blocked while revalidation runs; the existing editor receives its exact session hint and normal initialization and exit protections remain authoritative
-- **AND** successful editor presentation suppresses this candidate for the originating visit without consuming its durable nonce
+- **AND** action-in-progress and navigation admission block duplicates but do not prove editor activation succeeded or suppress the candidate for the remainder of the visit
+- **AND** success suppression requires verified initialized editor activation for the exact recovery attempt, account/session/target and validated nonce; neither admission nor push completion suffices and no durable nonce is consumed
+
+#### Scenario: DRAFT-05 Failed activation permits recovery after return
+- **GIVEN** recovery revalidation succeeds and its editor route is admitted
+- **WHEN** draft activation fails and the user returns from the existing error/retry presentation
+- **THEN** the attempt is released without success suppression and the same undismissed candidate can be offered after fresh authoritative validation
+- **AND** the durable draft, checkpoint, staged data and navigation intent remain intact without automatic Save, upload or cleanup
+
+#### Scenario: DRAFT-05 Existing editor retry establishes success
+- **GIVEN** an admitted recovery editor failed activation and offers its existing retry action
+- **WHEN** the user retries successfully and later returns to the same authorized dashboard
+- **THEN** verified initialized activation of the exact attempt prevents redundant recovery presentation even if its durable intent remains
+- **AND** direct successful activation has the same behavior without another navigation or notification while the editor is active
+
+#### Scenario: DRAFT-05 Activation authority is replaced
+- **GIVEN** a recovery editor activation is pending
+- **WHEN** logout, dashboard route replacement/departure, captured candidate account/session/target change, owner replacement or disposal revokes its attempt
+- **THEN** stale activation and return callbacks cannot suppress a new candidate or restore notifications or navigate on the old attempt's behalf
 
 #### Scenario: DRAFT-08 Equivalent candidates do not repeat
-- **GIVEN** a candidate was displayed and dismissed or recovered during this visit
+- **GIVEN** a candidate was explicitly dismissed or its recovery attempt verified successful editor activation during this visit
 - **WHEN** rebuilds, equivalent successful lookups or repository notifications occur
 - **THEN** no duplicate notification appears
 - **AND** a later genuinely different navigation request can be offered independently, even for the same session
@@ -91,7 +109,7 @@ Recovery SHALL use existing styling and persist except during ordinary feedback,
 - **AND** explicit dismissal suppression survives covering-route return within the same retained visit, an undismissed eligible candidate can be offered after authoritative validation, and a new dashboard visit or new auth authority can offer an eligible intent again
 
 ### Requirement: Contextual recovery yields to ordinary notification feedback
-Recovery SHALL NOT indefinitely block ordinary feedback or outlive its dashboard authority. Ordinary callers SHALL retain finite duration, queue ordering, semantic colors, responsive actions and explicit replacement behavior. Invalidation SHALL target only owned recovery. After ordinary feedback settles, recovery MAY return following authoritative validation. Interruption SHALL NOT record dismissal, alter durable drafts or consume navigation nonces.
+Recovery SHALL yield to ordinary feedback and remain dashboard-owned. Ordinary duration, queue order, styling, actions and replacement SHALL remain compatible. Recovery-specific cancellation SHALL target only its request; explicit global clearing SHALL remain global. After ordinary feedback settles, recovery MAY return following authoritative validation. Interruption SHALL NOT record dismissal, alter durable drafts or consume nonces.
 
 #### Scenario: DRAFT-11 Existing feedback precedes recovery
 - **GIVEN** ordinary feedback is visible or queued
@@ -122,7 +140,7 @@ Recovery SHALL NOT indefinitely block ordinary feedback or outlive its dashboard
 
 #### Scenario: DRAFT-11 Multiple ordinary notifications interrupt recovery
 - **GIVEN** recovery is visible or pending
-- **WHEN** several ordinary notifications arrive, including during deferred resumption validation
+- **WHEN** several non-replacing ordinary notifications arrive, including during deferred resumption validation
 - **THEN** each retains its normal duration and relative queue order, no unrelated Snackbar is cleared, and recovery waits outside the native queue until the latest ordinary tail settles and authoritative validation succeeds
 
 #### Scenario: DRAFT-11 Candidate or owner replaces pending or visible recovery
@@ -131,9 +149,27 @@ Recovery SHALL NOT indefinitely block ordinary feedback or outlive its dashboard
 - **THEN** A's presentation and callbacks lose authority without suppressing a new eligible candidate, closing a queued controller or clearing unrelated messages
 - **AND** the new candidate can appear only after its own successful validation and any outgoing recovery removal and ordinary feedback settlement
 
+#### Scenario: DRAFT-11 Replacement feedback preserves pending or visible recovery
+- **GIVEN** an owned recovery request is pending behind ordinary feedback or already visible
+- **WHEN** `showSnackBar(replaceCurrent: true)` replaces ordinary feedback and the replacement expires
+- **THEN** the recovery request survives without dismissal or durable changes and can appear after fresh candidate/owner validation under current dashboard authority
+- **AND** current/queued ordinary feedback selected by replacement is removed as before; discarded tail callbacks cannot revive old presentations
+
+#### Scenario: DRAFT-11 Replacement and ordinary feedback retain their policies
+- **WHEN** replacement and non-replacing ordinary notifications arrive in sequence during recovery suspension
+- **THEN** each replacement discards earlier ordinary entries, later ordinary calls queue normally with finite durations, and recovery waits for the latest surviving tail
+- **AND** route/account/owner revocation or a candidate change during resumption validation prevents any obsolete recovery from returning; no queued controller is closed
+
+#### Scenario: DRAFT-12 Explicit global clearing revokes presentation
+- **GIVEN** recovery is pending or visible and ordinary feedback may be queued
+- **WHEN** a caller intentionally invokes `clearAppSnackBars()` directly
+- **THEN** current/queued feedback and the owned recovery request are revoked under the existing global contract; canceled callbacks cannot restore them
+- **AND** durable drafts, checkpoints and navigation nonces are unchanged, no explicit user dismissal is recorded, and only a later established trigger may create a freshly validated recovery request
+
 #### Scenario: DRAFT-12 Existing callers retain default behavior
 - **WHEN** unrelated callers show ordinary notifications with or without an action
-- **THEN** their existing finite timeout, action callback, default queue ordering and opt-in global replacement remain supported
+- **THEN** their existing finite timeout, semantic colors, action callback, default queue ordering and opt-in ordinary replacement remain supported
+- **AND** FavouriteButton's direct global clear still immediately revokes the previous Undo; a later replacement message alone suspends recovery without invalidating its owned request
 
 #### Scenario: Recovery remains accessible at supported widths
 - **WHEN** recovery is shown at wide or narrow widths, in light or dark theme, or with enlarged text
