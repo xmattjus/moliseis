@@ -1,12 +1,6 @@
 {
   "version": 1,
   "skills": {
-    "dart-add-unit-test": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-add-unit-test/SKILL.md",
-      "computedHash": "55dabb37175bc8091a02b7d78d405f7e33173698c48a649ea29748f1186ac9c0"
-    },
     "dart-collect-coverage": {
       "source": "dart-lang/skills",
       "sourceType": "github",
