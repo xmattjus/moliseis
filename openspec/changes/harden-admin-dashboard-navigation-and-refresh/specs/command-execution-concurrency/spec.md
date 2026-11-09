@@ -33,13 +33,13 @@ Session-driven declarative redirects and pushed-login replacement SHALL preserve
 #### Scenario: NAV-01 Dashboard Back preserves the actual Settings entry
 - **GIVEN** an authenticated Admin opens the dashboard by pushing from Settings above an existing navigation ancestor
 - **WHEN** the explicit accessible dashboard Back control is activated
-- **THEN** the existing dashboard route is popped and the same Settings route, element and retained state are revealed
+- **THEN** the existing dashboard route is popped and the preserved underlying Settings Navigator route and meaningful user state required by its lifecycle are revealed
 - **AND** another Back reaches the original ancestor without reconstructing Settings or changing authentication
 
 #### Scenario: NAV-02 Pushed Login is replaced above Settings
 - **GIVEN** an unauthenticated user enters from an existing Settings route
 - **WHEN** authentication succeeds and dashboard Back is activated
-- **THEN** the same Settings route and ancestry are revealed, Login does not reopen, and authentication-event plus command completion causes no duplicate navigation
+- **THEN** the preserved underlying Settings Navigator route, meaningful retained state and ancestry are revealed, a second Back reaches the original ancestor without recreating Settings, Login does not reopen, and authentication-event plus command completion causes no duplicate navigation
 
 #### Scenario: NAV-03 Direct dashboard entry has a fallback
 - **GIVEN** authorized direct dashboard entry has no poppable previous route
