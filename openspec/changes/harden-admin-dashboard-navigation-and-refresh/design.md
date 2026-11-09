@@ -102,3 +102,13 @@ No database, generator or dependency migration. Implement helper compatibility a
 ## Open Questions
 
 No unresolved material product or architecture decision blocks implementation. Exact private field/type names and bounded loading-region spacing are implementation details subject to the observable contracts and accessibility checks above.
+
+
+## Implementation reconciliation
+
+- The dashboard captures route URI as well as Navigator route identity and generations, so a routing change revokes callbacks before a Navigator frame updates currentness. Explicit Back has a synchronous one-navigation latch; system Back retains platform behavior.
+- Recovery distinguishes pre-navigation revalidation from the admitted editor visit. Covering the dashboard cancels a pre-navigation attempt. An admitted attempt waits through the editor visit and one return frame before acquiring fresh dashboard authority and checking the existing editor's public initialized activation. This accommodates GoRouter push completion preceding route currentness; it introduces no cross-screen protocol.
+- Manual refresh admission returns one nullable execution receipt synchronously; the receipt's future settles through the existing private execution witness. Toolbar and pull presentations are mutually exclusive with initial empty-list loading for that manual execution. Revocation removes presentation authority without fabricating physical termination.
+- The helper retains one persistent request outside the native queue, plus native ordinary-tail and outgoing-removal barriers qualified by messenger identity. Ordinary replacement suspends that request; explicit global clearing revokes it while preserving any same-messenger outgoing-removal barrier. A helper-owned global-clear token also fences dashboard eligibility work before it registers a persistent request. No second notification queue or persistence state is introduced.
+
+The route visit owns ephemeral presentation state in the existing Dashboard State. Keeping that state with its route lifecycle avoids another state owner; the existing list and filter composition remains intact. No router/Login, editor activation policy, persistence implementation, dependency or backend change was necessary. Focused real-store tests extend navigation nonce replacement and compare-and-clear coverage.

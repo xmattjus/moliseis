@@ -919,6 +919,244 @@ void main() {
     },
   );
 
+  testWidgets('R1 selected-lane receipt captures its admitted success', (
+    tester,
+  ) async {
+    final h = AdminDashboardCommandHarness(
+      AdminDashboardLane.submissions,
+      probe: probe,
+    );
+    final refresh = h.owner.startSelectedLaneRefresh();
+    expect(refresh, isNotNull);
+    await pumpCommandTurns(tester);
+    expect(h.repository.listCallCount, 1);
+    expect(h.owner.loading, isTrue);
+    h.succeed();
+    await pumpCommandTurns(tester);
+    final result = await refresh!.settled;
+    expect(result.outcome, AdminDashboardRefreshOutcome.success);
+    expect(result.error, isNull);
+    expect(h.repository.listCallCount, 1);
+    h.owner.dispose();
+    await pumpPhysicalCommandDisposal(tester);
+  });
+
+  for (final runtimeKind in ['StateError', 'TypeError']) {
+    testWidgets(
+      'R1 receipt preserves expected and handled $runtimeKind failures',
+      (tester) async {
+        final expected = AdminDashboardCommandHarness(
+          AdminDashboardLane.submissions,
+          probe: probe,
+        );
+        final expectedRefresh = expected.owner.startSelectedLaneRefresh()!;
+        await pumpCommandTurns(tester);
+        expected.failDomain();
+        await pumpCommandTurns(tester);
+        final expectedResult = await expectedRefresh.settled;
+        expect(
+          expectedResult.outcome,
+          AdminDashboardRefreshOutcome.expectedFailure,
+        );
+        expect(expectedResult.error, isA<TestException>());
+        expected.owner.dispose();
+        await pumpPhysicalCommandDisposal(tester);
+
+        final runtime = AdminDashboardCommandHarness(
+          AdminDashboardLane.submissions,
+          probe: probe,
+        );
+        final runtimeRefresh = runtime.owner.startSelectedLaneRefresh()!;
+        await pumpCommandTurns(tester);
+        final failure = runtimeKind == 'StateError'
+            ? StateError('receipt original runtime failure')
+            : TypeError();
+        runtime.failRuntime(failure, StackTrace.current);
+        await pumpCommandTurns(tester);
+        final runtimeResult = await runtimeRefresh.settled;
+        expect(
+          runtimeResult.outcome,
+          AdminDashboardRefreshOutcome.unexpectedFailure,
+        );
+        expect(runtimeResult.error, same(failure));
+        expect(reports, [same(failure)]);
+        runtime.owner.dispose();
+        await pumpPhysicalCommandDisposal(tester);
+      },
+    );
+  }
+
+  testWidgets('R1 refused admission has no receipt or extra request', (
+    tester,
+  ) async {
+    final h = AdminDashboardCommandHarness(
+      AdminDashboardLane.submissions,
+      probe: probe,
+    );
+    final admitted = h.owner.startSelectedLaneRefresh()!;
+    await pumpCommandTurns(tester);
+    expect(h.owner.startSelectedLaneRefresh(), isNull);
+    expect(h.repository.listCallCount, 1);
+    h.succeed();
+    await pumpCommandTurns(tester);
+    expect(
+      (await admitted.settled).outcome,
+      AdminDashboardRefreshOutcome.success,
+    );
+    h.owner.dispose();
+    await pumpPhysicalCommandDisposal(tester);
+  });
+
+  testWidgets('R1 independent lane receipts remain execution-correlated', (
+    tester,
+  ) async {
+    final h = AdminDashboardCommandHarness(
+      AdminDashboardLane.submissions,
+      probe: probe,
+    );
+    final submissions = h.owner.startSelectedLaneRefresh()!;
+    await pumpCommandTurns(tester);
+    h.owner.setIgnoredFilter();
+    final ignoredPending = Completer<Result<List<AdminIgnoredSource>>>();
+    h.repository.pendingIgnoredList = ignoredPending;
+    final ignored = h.owner.startSelectedLaneRefresh()!;
+    await pumpCommandTurns(tester);
+    expect(h.repository.listCallCount, 1);
+    expect(h.repository.ignoredListCalls, 1);
+    h.failDomain();
+    ignoredPending.complete(const Result.success([]));
+    await pumpCommandTurns(tester);
+    expect(
+      (await submissions.settled).outcome,
+      AdminDashboardRefreshOutcome.expectedFailure,
+    );
+    expect(
+      (await ignored.settled).outcome,
+      AdminDashboardRefreshOutcome.success,
+    );
+    h.owner.dispose();
+    await pumpPhysicalCommandDisposal(tester);
+  });
+
+  testWidgets('R1 disposal before deferred entry settles as revoked', (
+    tester,
+  ) async {
+    final h = AdminDashboardCommandHarness(
+      AdminDashboardLane.submissions,
+      probe: probe,
+    );
+    final refresh = h.owner.startSelectedLaneRefresh()!;
+    h.owner.dispose();
+    await pumpPhysicalCommandDisposal(tester);
+    expect(
+      (await refresh.settled).outcome,
+      AdminDashboardRefreshOutcome.revoked,
+    );
+    expect(h.repository.listCallCount, 0);
+    expect(reports, isEmpty);
+  });
+
+  testWidgets('R1 revoked receipt stays pending until physical work settles', (
+    tester,
+  ) async {
+    final h = AdminDashboardCommandHarness(
+      AdminDashboardLane.submissions,
+      probe: probe,
+    );
+    final refresh = h.owner.startSelectedLaneRefresh()!;
+    await pumpCommandTurns(tester);
+    expect(h.repository.listCallCount, 1);
+
+    h.owner.dispose();
+    await pumpPhysicalCommandDisposal(tester);
+    var settled = false;
+    unawaited(refresh.settled.then((_) => settled = true));
+    await pumpCommandTurns(tester);
+    expect(settled, isFalse);
+
+    h.succeed();
+    await pumpPhysicalCommandDisposal(tester);
+    expect(
+      (await refresh.settled).outcome,
+      AdminDashboardRefreshOutcome.revoked,
+    );
+  });
+
+  testWidgets('R1 reentrant read cannot replace its earlier receipt outcome', (
+    tester,
+  ) async {
+    final h = AdminDashboardCommandHarness(
+      AdminDashboardLane.submissions,
+      probe: probe,
+    );
+    final firstGate = Completer<Result<List<AdminSubmission>>>();
+    final secondGate = Completer<Result<List<AdminSubmission>>>();
+    h.repository.pendingList = firstGate;
+    final first = h.owner.startSelectedLaneRefresh()!;
+    AdminDashboardRefresh? second;
+    var startingSecond = false;
+    void startNextAfterSafeSettlement() {
+      if (startingSecond || second != null || !h.owner.loadSnapshot.completed) {
+        return;
+      }
+      if (h.owner.loading) return;
+      startingSecond = true;
+      h.repository.pendingList = secondGate;
+      second = h.owner.startSelectedLaneRefresh();
+    }
+
+    h.owner.addListener(startNextAfterSafeSettlement);
+    await pumpCommandTurns(tester);
+    firstGate.complete(Result.success([sampleAdminSubmission(id: 81)]));
+    await pumpCommandTurns(tester);
+    expect(second, isNotNull);
+    await pumpCommandTurns(tester);
+    expect(h.repository.listCallCount, 2);
+    expect(h.owner.loading, isTrue);
+
+    secondGate.complete(Result.error(TestException('second read failed')));
+    await pumpCommandTurns(tester);
+    expect((await first.settled).outcome, AdminDashboardRefreshOutcome.success);
+    expect(
+      (await second!.settled).outcome,
+      AdminDashboardRefreshOutcome.expectedFailure,
+    );
+    expect(h.owner.loadSnapshot.domainError, isA<TestException>());
+
+    h.owner.removeListener(startNextAfterSafeSettlement);
+    h.owner.dispose();
+    await pumpPhysicalCommandDisposal(tester);
+  });
+
+  testWidgets(
+    'R1 assertion settlement reports abnormal without fabricating result',
+    (tester) async {
+      late AdminDashboardCommandHarness h;
+      late AdminDashboardRefresh refresh;
+      final uncaught = <Object>[];
+      runZonedGuarded(() {
+        h = AdminDashboardCommandHarness(
+          AdminDashboardLane.submissions,
+          probe: probe,
+        );
+        refresh = h.owner.startSelectedLaneRefresh()!;
+      }, (error, _) => uncaught.add(error));
+      await pumpCommandTurns(tester);
+      final failure = AssertionError('receipt abnormal execution');
+      h.failRuntime(failure, StackTrace.current);
+      await pumpCommandTurns(tester);
+      expect(
+        (await refresh.settled).outcome,
+        AdminDashboardRefreshOutcome.abnormal,
+      );
+      expect(uncaught, [same(failure)]);
+      expect(h.owner.loadSnapshot.completed, isFalse);
+      expect(reports, isEmpty);
+      h.owner.dispose();
+      await pumpPhysicalCommandDisposal(tester);
+    },
+  );
+
   for (final phase in ['running', 'terminal', 'safe']) {
     testWidgets('D5 reentrant editor request from $phase follows admission', (
       tester,

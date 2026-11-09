@@ -26,6 +26,12 @@ final class FakeAdminDraftRepository implements AdminSubmissionDraftRepository {
   Future<Result<AdminSubmissionDraft?>> Function(String, String)?
   onLoadBySession;
 
+  /// Controlled navigation-only eligibility lookup, independent of activation.
+  Future<Result<AdminSubmissionDraft?>> Function(String)? onLoadNavigation;
+
+  /// Number of automatic and explicit navigation eligibility reads.
+  int navigationLoadCalls = 0;
+
   /// Optional barrier before identity adoption commits in this domain fake.
   Future<void> Function()? onAdopt;
 
@@ -65,6 +71,8 @@ final class FakeAdminDraftRepository implements AdminSubmissionDraftRepository {
   Future<Result<AdminSubmissionDraft?>> loadNavigationDraft({
     required String accountId,
   }) async {
+    navigationLoadCalls++;
+    if (onLoadNavigation case final callback?) return await callback(accountId);
     final matches = drafts.values
         .where(
           (draft) =>

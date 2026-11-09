@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
@@ -12,6 +13,7 @@ import 'package:moliseis/ui/admin/submissions/view_models/admin_submissions_view
 import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_list_item.dart';
 import 'package:moliseis/ui/core/ui/custom_ink_well.dart';
+import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/utils/extensions/date_time_extensions.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
@@ -21,6 +23,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../support/command_test_support.dart';
 import '../../../../support/fake_repositories.dart';
 import '../../../../support/mock_gotrue_client.dart';
+import '../../../../support/mock_logger.dart';
 import '../../../../support/ordinary_view_model_lifecycle_support.dart';
 
 void main() {
@@ -122,7 +125,7 @@ void main() {
 
     setUp(() {
       editorChanged = true;
-      auth = ControllableAdminAuth();
+      auth = ControllableAdminAuth(initialUser: makeAuthUser(isAdmin: true));
       repository = FakeAdminContentSubmissionRepository();
       viewModel = AdminSubmissionsViewModel(repository: repository);
       owner = ValueNotifier(viewModel);
@@ -170,6 +173,7 @@ void main() {
     });
 
     tearDown(() {
+      clearAppSnackBars();
       owner.dispose();
       router.dispose();
       viewModel.dispose();
@@ -196,7 +200,12 @@ void main() {
         final initialRead = viewModel.refreshSubmissions();
         await pumpCommandTurns(tester);
         await initialRead;
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('Fonti ignorate'));
         await tester.pumpAndSettle();
@@ -241,7 +250,12 @@ void main() {
         final initialRead = viewModel.refreshSubmissions();
         await pumpCommandTurns(tester);
         await initialRead;
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.ensureVisible(find.text('Fonti ignorate'));
         await tester.pumpAndSettle();
@@ -269,7 +283,12 @@ void main() {
         repository.pendingList = pending;
         unawaited(viewModel.refreshSubmissions());
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pump();
 
         expect(find.text('Caricamento in corso...'), findsOneWidget);
@@ -291,7 +310,12 @@ void main() {
         repository.listResult = Result.error(TestException('list failed'));
         unawaited(viewModel.refreshSubmissions());
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
 
         expect(find.text('Impossibile caricare i contributi'), findsOneWidget);
@@ -315,7 +339,12 @@ void main() {
       (tester) async {
         unawaited(viewModel.refreshSubmissions());
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
 
         expect(find.text('Nessun contributo da mostrare'), findsOneWidget);
@@ -333,7 +362,12 @@ void main() {
         repository.listResult = Result.success(<AdminSubmission>[submission]);
         unawaited(viewModel.refreshSubmissions());
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
 
         expect(find.text(submission.name), findsOneWidget);
@@ -396,7 +430,12 @@ void main() {
         ]);
         unawaited(viewModel.refreshSubmissions());
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
 
         expect(find.text(pending.name), findsOneWidget);
@@ -419,7 +458,12 @@ void main() {
       (tester) async {
         viewModel.setFilter(AdminSubmissionStatus.accepted);
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
 
         expect(
           tester.widget<ToggleButtons>(find.byType(ToggleButtons)).isSelected,
@@ -439,7 +483,12 @@ void main() {
         repository.listResult = Result.success(<AdminSubmission>[pending]);
         unawaited(viewModel.refreshSubmissions());
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
 
         await tester.tap(find.text('Accettati'));
@@ -464,7 +513,12 @@ void main() {
         repository.listResult = Result.success(<AdminSubmission>[submission]);
         unawaited(viewModel.refreshSubmissions());
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.byType(CustomInkWell));
         await tester.pumpAndSettle();
@@ -481,7 +535,12 @@ void main() {
     testOwnerUI(
       'opens the create editor from the header action',
       (tester) async {
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.tap(find.text('Nuovo contributo'));
         await tester.pumpAndSettle();
 
@@ -502,7 +561,12 @@ void main() {
           ..devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
 
         await tester.tap(find.byIcon(Symbols.more_vert));
@@ -527,7 +591,12 @@ void main() {
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
 
         expect(find.text('Tutti'), findsOneWidget);
@@ -549,7 +618,12 @@ void main() {
         final initialRead = viewModel.refreshSubmissions();
         await pumpCommandTurns(tester);
         await initialRead;
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
 
         await tester.drag(find.byType(CustomScrollView), const Offset(0, 300));
@@ -566,7 +640,12 @@ void main() {
     testOwnerUI(
       'navigates home before executing logout',
       (tester) async {
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         expect(find.widgetWithIcon(IconButton, Symbols.logout), findsOneWidget);
 
         await tester.tap(find.byIcon(Symbols.logout));
@@ -593,7 +672,12 @@ void main() {
         repository.listResult = Result.success(<AdminSubmission>[submission]);
         unawaited(viewModel.refreshSubmissions());
 
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.byType(CustomInkWell));
         await tester.pumpAndSettle();
@@ -637,7 +721,12 @@ void main() {
           await pumpCommandTurns(tester);
           await initial;
           viewModel.setIgnoredFilter();
-          await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
           await tester.pumpAndSettle();
           final mutation = Completer<Result<AdminEventResolution>>();
           final ignored = Completer<Result<List<AdminIgnoredSource>>>();
@@ -715,7 +804,12 @@ void main() {
             ..setUser(makeAuthUser(isAdmin: true))
             ..emit(AuthChangeEvent.signedIn);
           await pumpCommandTurns(tester);
-          await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
           await tester.pumpAndSettle();
           expect(auth.viewModel.canLogout, isFalse);
           if (compact) {
@@ -775,7 +869,12 @@ void main() {
     testOwnerUI(
       'F4 stale enabled Logout callback is rejected without navigation',
       (tester) async {
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         final callback = tester
             .widget<IconButton>(find.widgetWithIcon(IconButton, Symbols.logout))
@@ -799,7 +898,12 @@ void main() {
     testOwnerUI(
       'R4 admitted Logout reentrant navigation causes no local Home go',
       (tester) async {
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         var moved = false;
         final locations = <String>[];
@@ -833,7 +937,12 @@ void main() {
         final initial = viewModel.refreshSubmissions();
         await pumpCommandTurns(tester);
         await initial;
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.byType(CustomInkWell));
         await tester.pumpAndSettle();
@@ -868,7 +977,12 @@ void main() {
           await pumpCommandTurns(tester);
         }
         viewModel.setIgnoredFilter();
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         final callback = tester
             .widget<TextButton>(
@@ -907,7 +1021,12 @@ void main() {
             await pumpCommandTurns(tester);
             await read;
           }
-          await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
           await tester.pumpAndSettle();
           final VoidCallback callback;
           if (ignored) {
@@ -946,7 +1065,12 @@ void main() {
     testOwnerUI(
       'R4 unmounted Dashboard rejects captured editor callback',
       (tester) async {
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         final callback = tester
             .widget<FloatingActionButton>(find.byType(FloatingActionButton))
@@ -974,7 +1098,12 @@ void main() {
           final initial = viewModel.refreshSubmissions();
           await pumpCommandTurns(tester);
           await initial;
-          await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
           await tester.pumpAndSettle();
           await tester.tap(find.byType(CustomInkWell));
           await tester.pumpAndSettle();
@@ -1022,7 +1151,12 @@ void main() {
         final initial = viewModel.refreshSubmissions();
         await pumpCommandTurns(tester);
         await initial;
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.byType(CustomInkWell));
         await tester.pumpAndSettle();
@@ -1053,7 +1187,12 @@ void main() {
         final initial = viewModel.refreshSubmissions();
         await pumpCommandTurns(tester);
         await initial;
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.byType(CustomInkWell));
         await tester.pumpAndSettle();
@@ -1087,7 +1226,12 @@ void main() {
           final initial = viewModel.refreshSubmissions();
           await pumpCommandTurns(tester);
           await initial;
-          await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
           await tester.pumpAndSettle();
           await tester.tap(find.byType(CustomInkWell));
           await tester.pumpAndSettle();
@@ -1108,7 +1252,12 @@ void main() {
       'D3 menu and pull refresh the selected ignored list',
       (tester) async {
         viewModel.setIgnoredFilter();
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.byIcon(Symbols.sync));
         await tester.pumpAndSettle();
@@ -1134,7 +1283,12 @@ void main() {
         final initial = viewModel.refreshSubmissions();
         await pumpCommandTurns(tester);
         await initial;
-        await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
         await tester.pumpAndSettle();
         repository.listResult = Result.error(TestException('refresh failure'));
         await tester.tap(find.byIcon(Symbols.sync));
@@ -1148,5 +1302,365 @@ void main() {
         auth.dispose();
       },
     );
+    for (final compact in [false, true]) {
+      for (final ignored in [false, true]) {
+        testOwnerUI(
+          'REF toolbar retains scroll subtree and admits only selected lane '
+          'compact=$compact ignored=$ignored',
+          (tester) async {
+            tester.view
+              ..physicalSize = Size(compact ? 400 : 1000, 900)
+              ..devicePixelRatio = 1;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            repository
+              ..listResult = Result.success([
+                sampleAdminSubmission(name: 'Retained row'),
+              ])
+              ..ignoredSourcesResult = const Result.success([
+                AdminIgnoredSource(
+                  id: 12,
+                  provider: 'p',
+                  externalId: 'e',
+                  name: 'Retained ignored',
+                  ignoredAt: 'today',
+                ),
+              ]);
+            final initial = ignored
+                ? viewModel.refreshIgnoredSources()
+                : viewModel.refreshSubmissions();
+            await pumpCommandTurns(tester);
+            await initial;
+            if (ignored) viewModel.setIgnoredFilter();
+            await tester.pumpWidget(
+              MaterialApp.router(
+                scaffoldMessengerKey: $scaffoldMessengerKey,
+                routerConfig: router,
+              ),
+            );
+            await tester.pumpAndSettle();
+            final scroll = tester.element(find.byType(NestedScrollView));
+            final row = tester.element(
+              find.text(ignored ? 'Retained ignored' : 'Retained row'),
+            );
+            final main = Completer<Result<List<AdminSubmission>>>();
+            final sources = Completer<Result<List<AdminIgnoredSource>>>();
+            repository
+              ..pendingList = main
+              ..pendingIgnoredList = sources;
+            if (compact) {
+              await tester.tap(find.byTooltip('Altro'));
+              await tester.pumpAndSettle();
+              await tester.tap(find.text('Aggiorna'));
+            } else {
+              await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+            }
+            await pumpCommandTurns(tester);
+            expect(find.text('Aggiornamento in corso...'), findsOneWidget);
+            expect(tester.element(find.byType(NestedScrollView)), same(scroll));
+            expect(
+              tester.element(
+                find.text(ignored ? 'Retained ignored' : 'Retained row'),
+              ),
+              same(row),
+            );
+            final pull = tester.widget<RefreshIndicator>(
+              find.byType(RefreshIndicator),
+            );
+            await pull
+                .onRefresh(); // Busy refusal must not join the physical read.
+            expect(repository.listCallCount, ignored ? 0 : 2);
+            expect(repository.ignoredListCalls, ignored ? 2 : 0);
+            if (ignored) {
+              sources.complete(repository.ignoredSourcesResult);
+            } else {
+              main.complete(repository.listResult);
+            }
+            await pumpCommandTurns(tester);
+            await tester.pumpAndSettle();
+            expect(find.text('Aggiornamento in corso...'), findsNothing);
+            expect(find.byType(SnackBar), findsNothing);
+            expect(router.state.uri.path, '/dashboard');
+          },
+          disposeOwners: () {
+            viewModel.dispose();
+            auth.dispose();
+          },
+        );
+      }
+    }
+
+    for (final revoke in ['none', 'selection', 'cover', 'owner', 'auth']) {
+      testOwnerUI(
+        'REF delayed failure feedback authority=$revoke',
+        (tester) async {
+          repository.listResult = Result.success([
+            sampleAdminSubmission(name: 'Retained row'),
+          ]);
+          final initial = viewModel.refreshSubmissions();
+          await pumpCommandTurns(tester);
+          await initial;
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final pending = Completer<Result<List<AdminSubmission>>>();
+          repository.pendingList = pending;
+          await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+          await pumpCommandTurns(tester);
+          expect(find.text('Aggiornamento in corso...'), findsOneWidget);
+          if (revoke == 'selection') {
+            viewModel
+              ..setFilter(AdminSubmissionStatus.accepted)
+              ..setFilter(null);
+          } else if (revoke == 'cover') {
+            unawaited(router.pushNamed<Object?>(RouteNames.adminSubmissionNew));
+            await tester.pumpAndSettle();
+            router.pop();
+          } else if (revoke == 'owner') {
+            final replacement = AdminSubmissionsViewModel(
+              repository: repository,
+            );
+            addTearDown(replacement.dispose);
+            owner.value = replacement;
+          } else if (revoke == 'auth') {
+            final old = auth.viewModel.currentUser!;
+            auth
+              ..setUser(
+                makeAuthUser(
+                  isAdmin: true,
+                  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                ),
+              )
+              ..emit(AuthChangeEvent.userUpdated);
+            await pumpCommandTurns(tester);
+            auth
+              ..setUser(old)
+              ..emit(AuthChangeEvent.userUpdated);
+          }
+          await pumpCommandTurns(tester);
+          pending.complete(Result.error(TestException('manual failure')));
+          await pumpCommandTurns(tester);
+          await tester.pumpAndSettle();
+          expect(find.text('Aggiornamento in corso...'), findsNothing);
+          expect(
+            find.byType(SnackBar),
+            revoke == 'none' ? findsOneWidget : findsNothing,
+          );
+          if (revoke == 'none') {
+            expect(
+              find.text(
+                'Si è verificato un errore durante '
+                "l'aggiornamento dei contenuti",
+              ),
+              findsOneWidget,
+            );
+            expect(find.text('Retained row'), findsOneWidget);
+          }
+        },
+        disposeOwners: () {
+          viewModel.dispose();
+          auth.dispose();
+        },
+      );
+    }
+
+    testOwnerUI(
+      'REF pull owns native progress and awaits only its admitted execution',
+      (tester) async {
+        repository.listResult = Result.success([
+          sampleAdminSubmission(name: 'Retained row'),
+        ]);
+        final initial = viewModel.refreshSubmissions();
+        await pumpCommandTurns(tester);
+        await initial;
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final pending = Completer<Result<List<AdminSubmission>>>();
+        repository.pendingList = pending;
+        await tester.drag(find.byType(CustomScrollView), const Offset(0, 300));
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pump(const Duration(milliseconds: 300));
+        await pumpCommandTurns(tester);
+        expect(repository.listCallCount, 2);
+        expect(find.byType(RefreshProgressIndicator), findsOneWidget);
+        expect(find.text('Aggiornamento in corso...'), findsNothing);
+        expect(find.text('Retained row'), findsOneWidget);
+        pending.complete(repository.listResult);
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        expect(find.byType(RefreshProgressIndicator), findsNothing);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+      disposeOwners: () {
+        viewModel.dispose();
+        auth.dispose();
+      },
+    );
+    testOwnerUI(
+      'REF old lane completion cannot remove newer toolbar progress',
+      (tester) async {
+        final main = Completer<Result<List<AdminSubmission>>>();
+        final ignored = Completer<Result<List<AdminIgnoredSource>>>();
+        repository
+          ..pendingList = main
+          ..pendingIgnoredList = ignored;
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+        await pumpCommandTurns(tester);
+        expect(find.text('Aggiornamento in corso...'), findsOneWidget);
+        viewModel.setIgnoredFilter();
+        await tester.pump();
+        await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+        await pumpCommandTurns(tester);
+        expect(repository.listCallCount, 1);
+        expect(repository.ignoredListCalls, 1);
+        main.complete(Result.error(TestException('obsolete lane')));
+        await pumpCommandTurns(tester);
+        expect(find.text('Aggiornamento in corso...'), findsOneWidget);
+        expect(find.byType(SnackBar), findsNothing);
+        ignored.complete(const Result.success([]));
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        expect(find.text('Aggiornamento in corso...'), findsNothing);
+        expect(find.byType(SnackBar), findsNothing);
+      },
+      disposeOwners: () {
+        viewModel.dispose();
+        auth.dispose();
+      },
+    );
+
+    testOwnerUI(
+      'REF handled unexpected failure shows one message and reports once',
+      (tester) async {
+        final logger = MockLogger();
+        addTearDown(installCommandTestReporting(logger));
+        final gate = Completer<Result<List<AdminSubmission>>>();
+        repository.pendingList = gate;
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+        await pumpCommandTurns(tester);
+        final failure = StateError('manual unexpected');
+        gate.completeError(failure, StackTrace.current);
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar), findsOneWidget);
+        expect(
+          logger.calls.where((call) => identical(call.error, failure)),
+          hasLength(1),
+        );
+        expect(find.text('Aggiornamento in corso...'), findsNothing);
+      },
+      disposeOwners: () {
+        viewModel.dispose();
+        auth.dispose();
+      },
+    );
+    testOwnerUI(
+      'editor-return refresh cannot borrow restored A authority',
+      (tester) async {
+        repository.listResult = Result.success([sampleAdminSubmission()]);
+        final initial = viewModel.refreshSubmissions();
+        await pumpCommandTurns(tester);
+        await initial;
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byType(CustomInkWell));
+        await tester.pumpAndSettle();
+        final accountA = auth.viewModel.currentUser!;
+        auth
+          ..setUser(
+            makeAuthUser(
+              isAdmin: true,
+              id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            ),
+          )
+          ..emit(AuthChangeEvent.userUpdated);
+        await pumpCommandTurns(tester);
+        auth
+          ..setUser(accountA)
+          ..emit(AuthChangeEvent.userUpdated);
+        await pumpCommandTurns(tester);
+        await tester.tap(find.text('EDIT_EDITOR_MARKER'));
+        await tester.pumpAndSettle();
+        expect(repository.listCallCount, 1);
+      },
+      disposeOwners: () {
+        viewModel.dispose();
+        auth.dispose();
+      },
+    );
+    for (final ignored in [false, true]) {
+      testOwnerUI(
+        'REF empty lane pull has only native progress ignored=$ignored',
+        (tester) async {
+          if (ignored) viewModel.setIgnoredFilter();
+          final main = Completer<Result<List<AdminSubmission>>>();
+          final sources = Completer<Result<List<AdminIgnoredSource>>>();
+          repository
+            ..pendingList = main
+            ..pendingIgnoredList = sources;
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.drag(
+            find.byType(CustomScrollView),
+            const Offset(0, 300),
+          );
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.pump(const Duration(milliseconds: 300));
+          await pumpCommandTurns(tester);
+          expect(find.byType(RefreshProgressIndicator), findsOneWidget);
+          expect(find.text('Caricamento in corso...'), findsNothing);
+          expect(find.text('Caricamento fonti ignorate...'), findsNothing);
+          expect(find.text('Aggiornamento in corso...'), findsNothing);
+          expect(repository.listCallCount, ignored ? 0 : 1);
+          expect(repository.ignoredListCalls, ignored ? 1 : 0);
+          if (ignored) {
+            sources.complete(const Result.success([]));
+          } else {
+            main.complete(const Result.success([]));
+          }
+          await pumpCommandTurns(tester);
+          await tester.pumpAndSettle();
+          expect(find.byType(RefreshProgressIndicator), findsNothing);
+          expect(find.byType(SnackBar), findsNothing);
+        },
+        disposeOwners: () {
+          viewModel.dispose();
+          auth.dispose();
+        },
+      );
+    }
   });
 }
