@@ -76,9 +76,11 @@ When a mock is necessary:
   `verify(() => mock.method(...)).called(n)`. Mocktail requires closures.
 - Stub required non-nullable-return methods before invoking the subject:
   unconfigured Mocktail calls return `null` and can fail at runtime.
-- Register fallback values with `registerFallbackValue` (usually in
-  `setUpAll`) only if an `any()` / `captureAny()` matcher needs a custom
-  non-nullable argument type. Primitive fallback values are already provided.
+- Register a fallback with `registerFallbackValue` (usually in
+  `setUpAll`) when `any()` / `captureAny()` matches a non-nullable argument
+  type without a compatible pre-registered value. This includes standard
+  library types such as `Uri` and custom types; common primitive fallback
+  values are already provided.
 - Prefer behavior assertions to brittle invocation counts. Avoid broad
   matcher configuration that accepts impossible calls.
 
