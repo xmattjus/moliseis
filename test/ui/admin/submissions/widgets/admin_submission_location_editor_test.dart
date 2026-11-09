@@ -403,7 +403,8 @@ void main() {
     await tester.tap(find.text('Mappa'));
     await tester.pumpAndSettle();
     expect(find.text('Coordinate non valide'), findsOneWidget);
-    expect(find.byType(GeoMap), findsOneWidget);
+    expect(find.byType(GeoMap), findsNothing);
+    expect(find.text('Seleziona sulla mappa'), findsOneWidget);
   });
 
   testWidgets('explicit Back discards the selection without changing draft', (tester) async {
