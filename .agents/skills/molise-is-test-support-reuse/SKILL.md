@@ -2,10 +2,10 @@
 name: molise-is-test-support-reuse
 description: >
   Test harnesses, fixtures, fakes, mocks, builders, matchers, pump helpers,
-  servers, stores, and setup/teardown reuse for Molise IS. Use BEFORE writing
+  servers, stores, and setup/teardown reuse for Molise Is. Use BEFORE writing
   or editing any Dart unit test, Flutter widget test, integration test,
   repository test, or other file under test/; requires first loading
-  dart-add-unit-test plus flutter-add-widget-test or
+  molise-is-dart-unit-testing plus flutter-add-widget-test or
   flutter-add-integration-test when applicable, then searching, reusing, or
   carefully extending test/support/ instead of creating duplicate local test
   helpers.
@@ -22,16 +22,13 @@ home for reusable test infrastructure.
 Before writing or editing test code, load the applicable skills with the
 `skill` tool:
 
-1. Load `dart-add-unit-test` for every Dart or Flutter test change.
+1. Load `molise-is-dart-unit-testing` for every Dart or Flutter test change.
 2. Also load `flutter-add-widget-test` when the test uses `testWidgets`,
    `WidgetTester`, finders, pumping, gestures, or widget rendering.
 3. Also load `flutter-add-integration-test` for an integration test or a
    cross-screen user flow.
 4. Also load `molise-is-objectbox-test-store` for ObjectBox repository, local
    data-source, persistence, relation, or transaction tests.
-5. Load `dart-generate-test-mocks` only when generated Mockito mocks are
-   genuinely required and no existing fake or test-support implementation can
-   satisfy the test.
 
 **Do not start writing test code until the applicable skills are loaded.**
 
@@ -212,7 +209,7 @@ Before changing an existing shared helper:
 
 ## DO
 
-- **DO** load `dart-add-unit-test` and every applicable Flutter test skill
+- **DO** load `molise-is-dart-unit-testing` and every applicable Flutter test skill
   before writing test code.
 - **DO** search and read `test/support/` before adding any helper.
 - **DO** import and configure existing fakes and fixtures instead of

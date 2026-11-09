@@ -1,47 +1,17 @@
 {
   "version": 1,
   "skills": {
-    "dart-add-unit-test": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-add-unit-test/SKILL.md",
-      "computedHash": "55dabb37175bc8091a02b7d78d405f7e33173698c48a649ea29748f1186ac9c0"
-    },
     "dart-collect-coverage": {
       "source": "dart-lang/skills",
       "sourceType": "github",
       "skillPath": "skills/dart-collect-coverage/SKILL.md",
       "computedHash": "36d77c4ebc2edc7ade399ae8461776dd33a461899afda4b2b9d8e7f599d2ef6c"
     },
-    "dart-fix-runtime-errors": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-fix-runtime-errors/SKILL.md",
-      "computedHash": "7b13cb0df76693d8c798432a1f86325b093a35e9687f231a012763fcad54fb2c"
-    },
-    "dart-generate-test-mocks": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-generate-test-mocks/SKILL.md",
-      "computedHash": "7bf12a98d63e96ed51ba077a24426be1b11a9fc508f7dfca60fc6e118c3fc923"
-    },
-    "dart-migrate-to-checks-package": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-migrate-to-checks-package/SKILL.md",
-      "computedHash": "00b7fa026dcf004421650f20147d020244886321f715ff57ee38a96b3a9945bc"
-    },
     "dart-resolve-package-conflicts": {
       "source": "dart-lang/skills",
       "sourceType": "github",
       "skillPath": "skills/dart-resolve-package-conflicts/SKILL.md",
       "computedHash": "e25c789387152d9d0c437610caa5746e337a789bcb8e9c9887b0425b94b734ef"
-    },
-    "dart-run-static-analysis": {
-      "source": "dart-lang/skills",
-      "sourceType": "github",
-      "skillPath": "skills/dart-run-static-analysis/SKILL.md",
-      "computedHash": "e64ea092e216ecdc9b4a8b49b06d0b9a0b49f680c1116ada1d247b2de3fa6fe1"
     },
     "dart-use-pattern-matching": {
       "source": "dart-lang/skills",
@@ -65,31 +35,13 @@
       "source": "flutter/agent-plugins",
       "sourceType": "github",
       "skillPath": "skills/flutter-add-widget-preview/SKILL.md",
-      "computedHash": "1b59c009558aab7a8e4b7b101fbe535b06054c0672780e9cea7e5c98a9c48dc4"
+      "computedHash": "5569e0b4a29ac21e1c663751a1d73364be2f63237a88d013733f655797a152bd"
     },
     "flutter-add-widget-test": {
       "source": "flutter/agent-plugins",
       "sourceType": "github",
       "skillPath": "skills/flutter-add-widget-test/SKILL.md",
       "computedHash": "c4f263c59cfe331ef42dba2aa81e25142aa4f7284518907c6b847e04502676b0"
-    },
-    "flutter-apply-architecture-best-practices": {
-      "source": "flutter/agent-plugins",
-      "sourceType": "github",
-      "skillPath": "skills/flutter-apply-architecture-best-practices/SKILL.md",
-      "computedHash": "2b1b63214d6b153c50aacd4bbcb76ce91dece449de9e06f477f8aad3163d667f"
-    },
-    "flutter-build-responsive-layout": {
-      "source": "flutter/agent-plugins",
-      "sourceType": "github",
-      "skillPath": "skills/flutter-build-responsive-layout/SKILL.md",
-      "computedHash": "f762ea2ee83d4f1f35d9093b41d2520dd024ab80c9539d4860b9ae7f2a4dc6a0"
-    },
-    "flutter-dart-code-review": {
-      "source": "affaan-m/everything-claude-code",
-      "sourceType": "github",
-      "skillPath": "skills/flutter-dart-code-review/SKILL.md",
-      "computedHash": "a5bbf2fda0e54df51e75e9316e8f341a64a1be9473137408f60244b6d0d777b7"
     },
     "flutter-fix-layout-issues": {
       "source": "flutter/agent-plugins",
@@ -137,13 +89,13 @@
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-get-started/SKILL.md",
-      "computedHash": "c5727e02ec59cf31272d979e5d4b15cebef64dfa6269dec6aecf878511197a62"
+      "computedHash": "0a6d78eaffd8f738fd46bbe66a8e341cde430aa98fb6d968482fff73049b1b87"
     },
     "sentry-instrument": {
       "source": "getsentry/sentry-for-ai",
       "sourceType": "github",
       "skillPath": "src/skills/sentry-instrument/SKILL.md",
-      "computedHash": "1993e79cf7f22eff732d2c78e00271c333b528a82b2fb52dbcf8eefb7ea82765"
+      "computedHash": "d8e8170bb2be4043e5f1712fab26e0a3b3939a3759b4444e3e9f62989573b590"
     },
     "sentry-instrument-logging": {
       "source": "getsentry/sentry-for-ai",
