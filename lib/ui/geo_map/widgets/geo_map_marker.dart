@@ -10,7 +10,7 @@ Marker generateMapMarker(ContentBase content, {void Function()? onPressed}) {
     point: content.coordinates,
     width: 60,
     height: 60,
-    child: _GeoMapMarkerIcon(
+    child: GeoMapMarkerIcon(
       content.category.icon,
       size: 60,
       onPressed: onPressed,
@@ -19,8 +19,9 @@ Marker generateMapMarker(ContentBase content, {void Function()? onPressed}) {
   );
 }
 
-class _GeoMapMarkerIcon extends StatelessWidget {
-  const _GeoMapMarkerIcon(
+/// Shared marker artwork for published content and tentative locations.
+class GeoMapMarkerIcon extends StatelessWidget {
+  const GeoMapMarkerIcon(
     this.icon, {
     required this.size,
     this.onPressed,

@@ -1,17 +1,11 @@
-import 'package:flutter_map/flutter_map.dart' show Marker;
 import 'package:latlong2/latlong.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_location_picker.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// The display representation selected inside the location editor.
 enum _LocationMode { mappa, coordinate }
-
-/// Fallback center used when the current drafts hold no valid point.
-///
-/// Kept local on purpose; there is no shared fallback-center constant.
-const LatLng _fallbackCenter = LatLng(41.5575078, 14.6485406);
 
 /// Parses one trimmed coordinate draft with narrow decimal-comma support.
 ///
@@ -28,9 +22,9 @@ double? _tryParseCoordinate(String raw) {
 
 /// Admin-only editor for a submission's optional geographical coordinates.
 ///
-/// The interactive map and the manual latitude/longitude fields are two
-/// representations of the same draft owned by the view model. Values and
-/// callbacks only, mirroring the shared `ContentSubmissionFields` convention.
+/// The map picker and the manual latitude/longitude fields edit the same
+/// view-model-owned draft. Map changes are emitted only after confirmation.
+/// Values and callbacks mirror the shared `ContentSubmissionFields` convention.
 class AdminSubmissionLocationEditor extends StatefulWidget {
   /// Creates a location editor bound to the screen-owned [formKey].
   const AdminSubmissionLocationEditor({
@@ -177,14 +171,21 @@ class _AdminSubmissionLocationEditorState
       _classifyDrafts(_latitudeController.text, _longitudeController.text) ==
       _LocationMode.mappa;
 
-  /// Map center from a range-valid draft pair, else [_fallbackCenter].
-  LatLng get _mapCenter {
+  Future<void> _openMap() async {
+    if (!mounted) return;
     final pair = _parseRangedPair(
       _latitudeController.text,
       _longitudeController.text,
     );
-    if (pair == null) return _fallbackCenter;
-    return LatLng(pair.$1, pair.$2);
+    // Capture the owner's activation-bound callback before opening a route.
+    // An obsolete selection must never mutate a newly active submission.
+    final onSelected = widget.onMapCoordinatesSelected;
+    final point = await showGeoMapLocationPicker(
+      context,
+      initialLocation: pair == null ? null : LatLng(pair.$1, pair.$2),
+    );
+    if (!mounted || point == null) return;
+    onSelected(point.latitude, point.longitude);
   }
 
   String? _validateLatitude(String? value) {
@@ -290,35 +291,29 @@ class _AdminSubmissionLocationEditorState
               ),
             ),
           ),
-          // Only the map branch is conditional: each entry into Map mode
-          // rebuilds GeoMap and re-centers via initialCenter.
           if (_mode == _LocationMode.mappa) ...<Widget>[
-            SizedBox(
-              height: 280,
-              width: double.infinity,
-              child: GeoMap(
-                initialCenter: _mapCenter,
-                markers: selectionPair == null
-                    ? const <Marker>[]
-                    : <Marker>[
-                        Marker(
-                          point: LatLng(selectionPair.$1, selectionPair.$2),
-                          width: 40,
-                          height: 40,
-                          child: const Icon(
-                            Symbols.location_pin,
-                            size: 32,
-                            fill: 1,
-                          ),
-                        ),
-                      ],
-                onPressed: (_, point) => widget.onMapCoordinatesSelected(
-                  point.latitude,
-                  point.longitude,
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 12,
+                  children: [
+                    Text(
+                      selectionPair == null
+                          ? 'Nessuna posizione selezionata.'
+                          : 'Lat. ${selectionPair.$1.toStringAsFixed(6)} · '
+                                'Lon. ${selectionPair.$2.toStringAsFixed(6)}',
+                    ),
+                    FilledButton.tonal(
+                      onPressed: _openMap,
+                      child: const Text('Seleziona sulla mappa'),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const Text('Tocca la mappa per impostare la posizione.'),
           ],
         ],
       ),
