@@ -353,8 +353,9 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
       execution.revision++;
       final snapshot = command.results.value;
       if (captureResult && !snapshot.isRunning && !snapshot.idle) {
-        execution.normalTerminal = true;
-        execution.terminal = snapshot;
+        execution
+          ..normalTerminal = true
+          ..terminal = snapshot;
       }
       _scheduleSettlement(execution);
     }
@@ -442,8 +443,9 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
 
   void _settle<P, T>(_AdminExecution<P, T> execution) {
     if (execution.settled) return;
-    execution.settled = true;
-    execution.revoked = _disposed;
+    execution
+      ..settled = true
+      ..revoked = _disposed;
     if (identical(_submissionRead, execution)) _submissionRead = null;
     if (identical(_ignoredRead, execution)) _ignoredRead = null;
     final mutation = identical(_mutation, execution);

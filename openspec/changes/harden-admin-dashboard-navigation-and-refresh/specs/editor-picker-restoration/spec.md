@@ -68,6 +68,14 @@ Recovery SHALL use existing styling and persist except during ordinary feedback,
 - **AND** action-in-progress and navigation admission block duplicates but do not prove editor activation succeeded or suppress the candidate for the remainder of the visit
 - **AND** success suppression requires verified initialized editor activation for the exact recovery attempt, account/session/target and validated nonce; neither admission nor push completion suffices and no durable nonce is consumed
 
+#### Scenario: DRAFT-05 Rejected navigation releases the exact attempt
+- **GIVEN** a valid interrupted session B and a retained editor A whose accepted remote fields still require a local checkpoint
+- **WHEN** the user activates `Riprendi` for B and the existing route policy refuses the transition
+- **THEN** the exact recovery reservation and matching editor-attempt state are released independently of the imperative push Future, while A's checkpoint obligation and both sessions' durable data, staged assets, write intents and navigation nonce remain protected
+- **AND** denial records neither successful activation nor explicit dismissal, performs no automatic Save, upload, deletion or repeated navigation, and permits a later established trigger to revalidate the same candidate
+- **AND** after A is explicitly checkpointed, B can be recovered from the same retained dashboard route
+- **AND** the admission acknowledgement belongs only to its exact destination and attempt, resolves once for admission or rejection, and a stale result cannot release a newer attempt or publish obsolete effects after route, account or owner revocation
+
 #### Scenario: DRAFT-05 Failed activation permits recovery after return
 - **GIVEN** recovery revalidation succeeds and its editor route is admitted
 - **WHEN** draft activation fails and the user returns from the existing error/retry presentation

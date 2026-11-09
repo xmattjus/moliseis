@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
+import 'package:moliseis/routing/admin_submission_exit_policy.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
@@ -403,13 +404,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return;
     }
     final target = identity.owner.submissionId;
+    final routeName = target == null
+        ? RouteNames.adminSubmissionNew
+        : RouteNames.adminSubmissionEditor;
+    final pathParameters = target == null
+        ? const <String, String>{}
+        : {'id': '$target'};
+    final queryParameters = {'session': identity.owner.sessionId};
+    final admission = AdminEditorNavigationAdmission(
+      location: Uri.parse(
+        authority.router.namedLocation(
+          routeName,
+          pathParameters: pathParameters,
+          queryParameters: queryParameters,
+        ),
+      ),
+      onRejected: () {
+        if (!mounted) return;
+        if (!identical(_recoveryAttempt, attempt)) return;
+        _recoveryAttempt = null;
+        if (identical(_editorAttempt, attempt)) _editorAttempt = null;
+      },
+    );
     _editorAttempt = attempt;
     await authority.router.pushNamed<Object?>(
-      target == null
-          ? RouteNames.adminSubmissionNew
-          : RouteNames.adminSubmissionEditor,
-      pathParameters: target == null ? const {} : {'id': '$target'},
-      queryParameters: {'session': identity.owner.sessionId},
+      routeName,
+      pathParameters: pathParameters,
+      queryParameters: queryParameters,
+      extra: admission,
     );
     // Push completion precedes the dashboard route becoming current.
     await WidgetsBinding.instance.endOfFrame;

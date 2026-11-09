@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
+import 'package:moliseis/routing/admin_submission_exit_policy.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
@@ -24,6 +26,180 @@ void main() {
   const message = 'Hai una modifica interrotta da recuperare.';
   const nonce = '22222222-2222-4222-8222-222222222222';
   const nextNonce = '33333333-3333-4333-8333-333333333333';
+
+  testOwnerUI(
+    'rejected recovery releases admission and retries after local checkpoint',
+    (tester) async {
+      harness = AdminSaveRouteHarness(persistedTargets: [1])
+        ..seedNavigationRecovery(requestNonce: nonce);
+      final persisted = harness.local.drafts.drafts.values.firstWhere(
+        (draft) => draft.owner.submissionId == 1,
+      );
+      final original = AdminSubmissionDraft(
+        owner: persisted.owner,
+        snapshot: persisted.snapshot.copyWith(name: 'Local fields'),
+        remoteBaseline: persisted.remoteBaseline,
+      );
+      harness.local.drafts.drafts[original.owner.lookupKey] = original;
+      final interrupted =
+          harness.local.drafts.drafts[harness.local.owner.lookupKey]!;
+      final candidate = AdminSubmissionDraft(
+        owner: interrupted.owner,
+        snapshot: interrupted.snapshot,
+        navigationIntent: interrupted.navigationIntent,
+        fieldWriteIntent: AdminFieldWriteIntent(
+          kind: AdminFieldWriteKind.update,
+          attemptId: nextNonce,
+          snapshot: original.snapshot,
+          expectedModifiedAt: original.remoteBaseline!.modifiedAtToken,
+        ),
+      );
+      harness.local.drafts.drafts[candidate.owner.lookupKey] = candidate;
+      final assets = List.of(harness.local.staged.assets[candidate.owner]!);
+      harness.repository.getByIdResults[7] = Result.success(
+        sampleAdminSubmission(id: 7, description: null),
+      );
+      harness.repository.getByIdResults[1] = Result.success(
+        sampleAdminSubmission(
+          name: 'Accepted remote fields',
+          description: null,
+          modifiedAtToken: '2026-08-21T00:00:00.654321Z',
+        ),
+      );
+      await harness.openEditor(tester, target: 1);
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('admin_accept_remote')),
+      );
+      await tester.tap(find.byKey(const ValueKey('admin_accept_remote')));
+      await tester.pumpAndSettle();
+      expect(harness.owner.pendingRecoveryCheckpoint, isTrue);
+      expect(harness.owner.name, 'Accepted remote fields');
+      harness.router.pop();
+      await tester.pumpAndSettle();
+      final dashboardRoute = ModalRoute.of(
+        tester.element(find.byType(AdminDashboardScreen)),
+      );
+      expect(find.text(message), findsOneWidget);
+
+      AdminEditorNavigationAdmission? rejectedRequest;
+      void captureRequest() {
+        final state = harness.router.routeInformationProvider.value.state;
+        if (state is RouteInformationState &&
+            state.extra is AdminEditorNavigationAdmission) {
+          rejectedRequest = state.extra! as AdminEditorNavigationAdmission;
+        }
+      }
+
+      harness.router.routeInformationProvider.addListener(captureRequest);
+      await tester.tap(find.text('Riprendi'));
+      await tester.pumpAndSettle();
+      harness.router.routeInformationProvider.removeListener(captureRequest);
+      expect(rejectedRequest, isNotNull);
+      expect(harness.router.state.uri.path, RoutePaths.admin);
+      expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+      expect(
+        find.text(
+          'Salva nella bozza locale i campi remoti accettati '
+          'prima di aprire un altro contributo.',
+        ),
+        findsOneWidget,
+      );
+      expect(harness.owner.pendingRecoveryCheckpoint, isTrue);
+      expect(harness.owner.submissionId, 1);
+      expect(harness.local.session.state!.physicalCheckpoint, original);
+      expect(
+        harness.local.drafts.drafts[candidate.owner.lookupKey],
+        same(candidate),
+      );
+      expect(harness.local.staged.assets[candidate.owner], assets);
+      expect(harness.local.drafts.saves, isEmpty);
+      expect(harness.local.staged.removals, isEmpty);
+      final deniedReads = harness.local.drafts.navigationLoadCalls;
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(harness.local.drafts.navigationLoadCalls, deniedReads);
+      expect(find.text(message), findsNothing);
+
+      await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(message),
+        findsOneWidget,
+        reason: 'Denied Riprendi must release its attempt for a later trigger',
+      );
+      expect(harness.owner.pendingRecoveryCheckpoint, isTrue);
+
+      final gate = Completer<Result<AdminSubmissionDraft?>>();
+      harness.local.drafts.onLoadNavigation = (_) => gate.future;
+      await tester.tap(find.text('Riprendi'));
+      await tester.pumpAndSettle();
+      final pendingReads = harness.local.drafts.navigationLoadCalls;
+      // Replaying an old rejected request must not release the newer lookup.
+      unawaited(
+        harness.router.pushNamed<Object?>(
+          RouteNames.adminSubmissionEditor,
+          pathParameters: {'id': '7'},
+          queryParameters: {'session': candidate.owner.sessionId},
+          extra: rejectedRequest,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+      await tester.pumpAndSettle();
+      expect(harness.local.drafts.navigationLoadCalls, pendingReads);
+      expect(find.text(message), findsNothing);
+      harness.local.drafts.onLoadNavigation = null;
+      gate.complete(Result.success(candidate));
+      await tester.pumpAndSettle();
+      expect(harness.router.state.uri.path, RoutePaths.admin);
+      expect(harness.owner.pendingRecoveryCheckpoint, isTrue);
+
+      final repair = harness.router.pushNamed<Object?>(
+        RouteNames.adminSubmissionEditor,
+        pathParameters: {'id': '1'},
+        queryParameters: {'session': original.owner.sessionId},
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Salva bozza locale'));
+      await tester.tap(find.text('Salva bozza locale'));
+      await tester.pumpAndSettle();
+      expect(harness.owner.pendingRecoveryCheckpoint, isFalse);
+      harness.router.pop();
+      await tester.pumpAndSettle();
+      await repair;
+      // Both deliberate denied pushes retain their ordinary feedback lifetime.
+      for (var message = 0; message < 2; message++) {
+        await tester.pump(const Duration(seconds: 6));
+        await tester.pumpAndSettle();
+      }
+      expect(
+        ModalRoute.of(tester.element(find.byType(AdminDashboardScreen))),
+        same(dashboardRoute),
+      );
+      expect(find.text(message), findsOneWidget);
+      await tester.tap(find.text('Riprendi'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+      expect(harness.owner.activation!.owner, candidate.owner);
+      expect(
+        harness.owner.isActivationCurrent(harness.owner.activation),
+        isTrue,
+      );
+      expect(
+        harness.local.drafts.drafts[candidate.owner.lookupKey],
+        same(candidate),
+      );
+      expect(harness.local.staged.assets[candidate.owner], assets);
+      expect(harness.local.drafts.saves, hasLength(1));
+      expect(harness.local.drafts.saves.single.owner, original.owner);
+      expect(harness.local.staged.removals, isEmpty);
+      expect(harness.repository.createInputs, isEmpty);
+      expect(harness.repository.updateInputs, isEmpty);
+      expect(harness.repository.addAssetCalls, isEmpty);
+      expect(harness.content.uploadedImages, isEmpty);
+    },
+    disposeOwners: () => harness.dispose(),
+  );
 
   testOwnerUI(
     'ready exact session admits recovery without a replacement activation',
