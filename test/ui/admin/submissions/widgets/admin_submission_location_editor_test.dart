@@ -508,7 +508,12 @@ void main() {
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
 
-    final size = tester.getSize(find.byType(Dialog));
+    final dialog = tester.widget<Dialog>(find.byType(Dialog));
+    expect(dialog.constraints?.maxWidth, 840);
+    expect(dialog.constraints?.maxHeight, 720);
+    // Dialog's outer render box fills the viewport; the map content is
+    // constrained by the inner dialog surface.
+    final size = tester.getSize(find.byType(GeoMapLocationPicker));
     expect(size.width, lessThanOrEqualTo(840));
     expect(size.height, lessThanOrEqualTo(720));
     expect(size.width, lessThan(1280));
