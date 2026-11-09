@@ -60,8 +60,8 @@ contradictions that make the task unsafe or impossible require escalation.
 
 ## Flutter UI composition
 
-- Before creating or materially changing Screens, feature widgets or ViewModels
-  under `lib/ui/**`, read `.agents/skills/flutter-ui-engineering/SKILL.md`.
+- Before creating or changing widgets, Screens, or ViewModels and when reviewing
+  Flutter UI code read `.agents/skills/molise-is-flutter-ui-engineering/SKILL.md`.
   Apply its composition, ownership and review guidance together with this file.
   It takes precedence over conflicting generic Flutter skills within its
   specific UI scope but cannot override this file or approved specifications.
