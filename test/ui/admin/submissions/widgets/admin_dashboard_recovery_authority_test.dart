@@ -26,6 +26,124 @@ void main() {
   const nextNonce = '33333333-3333-4333-8333-333333333333';
 
   testOwnerUI(
+    'ready exact session admits recovery without a replacement activation',
+    (tester) async {
+      harness = AdminSaveRouteHarness()
+        ..seedNavigationRecovery(requestNonce: nonce);
+      final candidate = harness.local.drafts.drafts.values.single;
+      final assets = List.of(harness.local.staged.assets[candidate.owner]!);
+      expect(
+        await harness.owner.activate(
+          accountId: candidate.owner.accountId,
+          submissionId: candidate.owner.submissionId,
+          sessionId: candidate.owner.sessionId,
+        ),
+        isA<Success<void>>(),
+      );
+      final original = harness.owner.activation!;
+      expect(original.owner, candidate.owner);
+      expect(harness.owner.isActivationCurrent(original), isTrue);
+
+      var sessionReads = 0;
+      var targetReads = 0;
+      var reconciliations = 0;
+      harness.local.drafts
+        ..onLoadBySession = (_, _) async {
+          sessionReads++;
+          return Result.error(TestException('session read unavailable'));
+        }
+        ..onLoad = (_, _) async {
+          targetReads++;
+          return Result.error(TestException('target read unavailable'));
+        };
+      harness.local.staged.onReconcile = (_) async {
+        reconciliations++;
+        return Result.error(TestException('staging unavailable'));
+      };
+      harness.router.goNamed(RouteNames.adminDashboard);
+      await tester.pumpWidget(harness.app());
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      final dashboardRoute = ModalRoute.of(
+        tester.element(find.byType(AdminDashboardScreen)),
+      );
+
+      // The real admission guard rejects a conflicting target, not this owner.
+      var deniedPushReturned = false;
+      unawaited(
+        harness.router
+            .pushNamed<Object?>(
+              RouteNames.adminSubmissionEditor,
+              pathParameters: {'id': '${candidate.owner.submissionId! + 1}'},
+              queryParameters: {'session': candidate.owner.sessionId},
+            )
+            .then((_) => deniedPushReturned = true),
+      );
+      await pumpCommandTurns(tester);
+      await tester.pumpAndSettle();
+      expect(harness.router.state.uri.path, RoutePaths.admin);
+      expect(deniedPushReturned, isFalse);
+      expect(find.text(message), findsOneWidget);
+      expect(harness.owner.isActivationCurrent(original), isTrue);
+
+      harness.local.drafts.onLoadNavigation = (_) async =>
+          Result.error(TestException('navigation validation unavailable'));
+      await tester.tap(find.text('Riprendi'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+      expect(
+        find.text('Si è verificato un errore, riprova più tardi'),
+        findsOneWidget,
+      );
+      expect(harness.owner.isActivationCurrent(original), isTrue);
+      harness.local.drafts.onLoadNavigation = null;
+      await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+
+      await tester.tap(find.text('Riprendi'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+      expect(
+        find.textContaining('Impossibile aprire il contributo'),
+        findsNothing,
+      );
+      expect(harness.owner.activation!.owner, candidate.owner);
+      expect(harness.owner.activation!.generation, original.generation);
+      expect(harness.owner.isActivationCurrent(original), isTrue);
+      expect(sessionReads, 0);
+      expect(targetReads, 0);
+      expect(reconciliations, 0);
+      final navigationReads = harness.local.drafts.navigationLoadCalls;
+
+      harness.router.pop();
+      await tester.pumpAndSettle();
+      expect(
+        ModalRoute.of(tester.element(find.byType(AdminDashboardScreen))),
+        same(dashboardRoute),
+      );
+      expect(
+        harness.local.drafts.navigationLoadCalls,
+        greaterThan(navigationReads),
+      );
+      expect(find.text(message), findsNothing);
+      expect(deniedPushReturned, isFalse);
+      expect(harness.local.drafts.drafts.values.single, same(candidate));
+      expect(candidate.navigationIntent!.requestNonce, nonce);
+      expect(harness.local.staged.assets[candidate.owner], assets);
+      expect(harness.local.drafts.saves, isEmpty);
+      expect(harness.local.staged.removals, isEmpty);
+      expect(harness.repository.createInputs, isEmpty);
+      expect(harness.repository.updateInputs, isEmpty);
+      expect(harness.repository.addAssetCalls, isEmpty);
+      expect(harness.content.uploadedImages, isEmpty);
+    },
+    disposeOwners: () => harness.dispose(),
+  );
+
+  testOwnerUI(
     'editor owner replacement during explicit revalidation revokes old action',
     (tester) async {
       harness = AdminSaveRouteHarness()
