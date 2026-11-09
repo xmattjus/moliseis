@@ -179,6 +179,27 @@ void main() {
     expect(fields.last.controller!.text, '14.6485406');
   });
 
+  testWidgets('confirming an unchanged point preserves raw drafts', (
+    tester,
+  ) async {
+    final (state, _) = await _pumpEditor(
+      tester,
+      latitude: '41.5575078',
+      longitude: '14.6485406',
+    );
+    await tester.tap(find.text('Seleziona sulla mappa'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(state.selectedPoints, isEmpty);
+    expect(state.latitudeText, '41.5575078');
+    expect(state.longitudeText, '14.6485406');
+  });
+
   testWidgets('switching modes does not emit coordinate changes', (
     tester,
   ) async {

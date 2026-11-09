@@ -11,7 +11,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 /// The initial map center is not a selection.
 const LatLng _fallbackCenter = LatLng(41.5575078, 14.6485406);
 
-/// Opens a location picker on the current navigator as a modal route.
+/// Opens a location picker on the root navigator as a modal route.
 ///
 /// Cancellation and system Back return null; only explicit confirmation
 /// supplies a coordinate. Callers retain ownership of draft mutations.

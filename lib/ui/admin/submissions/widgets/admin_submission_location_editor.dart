@@ -185,6 +185,12 @@ class _AdminSubmissionLocationEditorState
       initialLocation: pair == null ? null : LatLng(pair.$1, pair.$2),
     );
     if (!mounted || point == null) return;
+    // Reconfirming the original marker must not round or dirty raw drafts.
+    if (pair != null &&
+        point.latitude == pair.$1 &&
+        point.longitude == pair.$2) {
+      return;
+    }
     onSelected(point.latitude, point.longitude);
   }
 
