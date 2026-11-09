@@ -73,7 +73,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Object? _toolbarRefresh;
   Object? _manualRefresh;
   Object? _recoveryAttempt;
-  Object? _editorAttempt;
+  ({Object token, Uri location, VoidCallback returned})? _editorVisit;
+  bool _editorCovered = false;
   VoidCallback? _cancelRecovery;
   _RecoveryIdentity? _candidate;
   final _suppressed = <_RecoveryIdentity>{};
@@ -154,7 +155,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _visit++;
     _revokePresentation();
     _recoveryAttempt = null;
-    _editorAttempt = null;
+    _editorVisit = null;
+    _editorCovered = false;
     _suppressed.clear();
     _backRequested = false;
     _account = _auth?.currentUser?.id;
@@ -190,17 +192,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _onRoute() {
     if (!mounted) return;
     final current = _route?.isCurrent ?? true;
-    final location = _router?.routerDelegate.currentConfiguration.uri;
+    final configuration = _router?.routerDelegate.currentConfiguration;
+    final location = configuration?.isNotEmpty == true
+        ? _router!.state.uri
+        : null;
     if (current == _current && location == _location) return;
     _current = current;
     _location = location;
-    if (!current && !identical(_editorAttempt, _recoveryAttempt)) {
-      _recoveryAttempt = null;
+    if (!current) {
+      final editorVisit = _editorVisit;
+      if (editorVisit != null && location == editorVisit.location) {
+        _editorCovered = true;
+      }
+      if (!identical(editorVisit?.token, _recoveryAttempt)) {
+        _recoveryAttempt = null;
+      }
     }
     _routeGeneration++;
     _revokePresentation();
     if (current) {
       _backRequested = false;
+      final editorVisit = _editorVisit;
+      if (editorVisit != null && _editorCovered) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _completeEditorVisit(editorVisit.token);
+        });
+      }
       if (_recoveryAttempt == null) _scheduleLookup();
     }
     // Defer rebuilds because router notifications can arrive during build.
@@ -208,6 +226,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       if (!mounted) return;
       setState(() {});
     });
+  }
+
+  void _completeEditorVisit(Object token) {
+    if (!mounted) return;
+    final editorVisit = _editorVisit;
+    if (editorVisit == null ||
+        !identical(editorVisit.token, token) ||
+        !_editorCovered) {
+      return;
+    }
+    final authority = _capture();
+    if (authority == null ||
+        authority.router.state.name != RouteNames.adminDashboard) {
+      return;
+    }
+    // Consume before callbacks: return reconciliation may notify synchronously.
+    _editorVisit = null;
+    _editorCovered = false;
+    editorVisit.returned();
   }
 
   _DashboardAuthority? _capture() {
@@ -399,7 +436,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         : null;
     if (fresh != identity) {
       _recoveryAttempt = null;
-      showSnackBarGenericError(context: context);
+      if (result is Error<AdminSubmissionDraft?>) {
+        showSnackBarGenericError(context: context);
+      }
       if (fresh != null) _presentRecovery(authority, fresh);
       return;
     }
@@ -423,23 +462,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         if (!mounted) return;
         if (!identical(_recoveryAttempt, attempt)) return;
         _recoveryAttempt = null;
-        if (identical(_editorAttempt, attempt)) _editorAttempt = null;
+        if (identical(_editorVisit?.token, attempt)) {
+          _editorVisit = null;
+          _editorCovered = false;
+        }
       },
     );
-    _editorAttempt = attempt;
+    _editorVisit = (
+      token: attempt,
+      location: admission.location,
+      returned: () =>
+          unawaited(_reconcileRecovery(authority, identity, attempt, editor)),
+    );
+    _editorCovered = false;
     await authority.router.pushNamed<Object?>(
       routeName,
       pathParameters: pathParameters,
       queryParameters: queryParameters,
       extra: admission,
     );
-    // Push completion precedes the dashboard route becoming current.
-    await WidgetsBinding.instance.endOfFrame;
+  }
+
+  Future<void> _reconcileRecovery(
+    _DashboardAuthority authority,
+    _RecoveryIdentity identity,
+    Object attempt,
+    AdminSubmissionEditorViewModel? editor,
+  ) async {
     if (!mounted) return;
     if (_visit != authority.visit || !identical(_recoveryAttempt, attempt)) {
       return;
     }
-    _editorAttempt = null;
     final returned = _capture();
     if (returned == null) {
       _recoveryAttempt = null;
@@ -475,6 +528,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _unbind();
     _visit++;
     _revokePresentation();
+    _editorVisit = null;
     super.dispose();
   }
 
@@ -502,22 +556,32 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final visit = _visit;
     final accountId = auth.currentUser?.id;
     final wasAdmin = auth.isAdmin;
-    submissionId == null
-        ? await router.pushNamed<bool>(RouteNames.adminSubmissionNew)
-        : await router.pushNamed<bool>(
-            RouteNames.adminSubmissionEditor,
-            pathParameters: <String, String>{'id': submissionId.toString()},
-          );
-    if (!mounted) return;
-    if (!_owns(owner) ||
-        _visit != visit ||
-        !identical(widget.authViewModel, auth) ||
-        auth.isDisposed ||
-        auth.isAdmin != wasAdmin ||
-        auth.currentUser?.id != accountId) {
-      return;
-    }
-    await owner.refreshAfterEditorChange();
+    final routeName = submissionId == null
+        ? RouteNames.adminSubmissionNew
+        : RouteNames.adminSubmissionEditor;
+    final pathParameters = <String, String>{
+      if (submissionId != null) 'id': '$submissionId',
+    };
+    _editorVisit = (
+      token: Object(),
+      location: Uri.parse(
+        router.namedLocation(routeName, pathParameters: pathParameters),
+      ),
+      returned: () {
+        if (!mounted) return;
+        if (!_owns(owner) ||
+            _visit != visit ||
+            !identical(widget.authViewModel, auth) ||
+            auth.isDisposed ||
+            auth.isAdmin != wasAdmin ||
+            auth.currentUser?.id != accountId) {
+          return;
+        }
+        unawaited(owner.refreshAfterEditorChange());
+      },
+    );
+    _editorCovered = false;
+    await router.pushNamed<bool>(routeName, pathParameters: pathParameters);
   }
 
   Future<void> _refreshSubmissions(AdminSubmissionsViewModel owner) {

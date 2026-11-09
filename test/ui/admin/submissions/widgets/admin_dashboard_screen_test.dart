@@ -134,6 +134,7 @@ void main() {
         routes: <RouteBase>[
           GoRoute(
             path: '/dashboard',
+            name: RouteNames.adminDashboard,
             builder: (_, _) => ValueListenableBuilder(
               valueListenable: owner,
               builder: (_, currentOwner, _) => AdminDashboardScreen(

@@ -33,7 +33,7 @@ The dashboard SHALL offer recovery only after a successful current-Admin-account
 
 #### Scenario: DRAFT-10 Explicit recovery lookup fails
 - **GIVEN** the user activates `Riprendi` for an eligible candidate
-- **WHEN** authoritative revalidation fails under live dashboard authority
+- **WHEN** authoritative revalidation returns `Result.error` under live dashboard authority
 - **THEN** the established generic custom error is shown exactly once for that action, no editor navigation occurs and durable session/recovery data remains unchanged
 - **AND** the in-flight latch is released without an automatic retry; a later established trigger may recheck eligibility
 
@@ -67,6 +67,14 @@ Recovery SHALL use existing styling and persist except during ordinary feedback,
 - **AND** duplicate presentation is blocked while revalidation runs; the existing editor receives its exact session hint and normal initialization and exit protections remain authoritative
 - **AND** action-in-progress and navigation admission block duplicates but do not prove editor activation succeeded or suppress the candidate for the remainder of the visit
 - **AND** success suppression requires verified initialized editor activation for the exact recovery attempt, account/session/target and validated nonce; neither admission nor push completion suffices and no durable nonce is consumed
+
+#### Scenario: DRAFT-05 Editor return is independent of imperative completion
+- **GIVEN** an admitted recovery editor has genuinely covered its owning Dashboard
+- **WHEN** pop or declarative navigation makes that same Dashboard current again
+- **THEN** the exact visit reconciles and releases once under fresh current-route, account and owner authority even if its imperative push Future remains pending
+- **AND** return reconciliation performs one best-effort list refresh and one authoritative recovery recheck, preserving initialized-activation and nonce-qualified success suppression
+- **AND** early router notifications, admission rejection, an unrelated cover or declarative navigation to another editor do not establish completed Dashboard return
+- **AND** a late push completion or revoked return lookup cannot finalize twice, release a newer attempt or publish obsolete feedback
 
 #### Scenario: DRAFT-05 Rejected navigation releases the exact attempt
 - **GIVEN** a valid interrupted session B and a retained editor A whose accepted remote fields still require a local checkpoint
@@ -108,11 +116,11 @@ Recovery SHALL use existing styling and persist except during ordinary feedback,
 #### Scenario: Candidate changes during action revalidation
 - **GIVEN** a displayed candidate captures request A
 - **WHEN** action revalidation successfully returns absence or a different request B
-- **THEN** A does not navigate and no draft is deleted
+- **THEN** A does not navigate, no generic error is shown and no draft is deleted; successful absence silently retires A
 - **AND** B can become independently eligible if the same dashboard context still owns presentation
 
 #### Scenario: Return to dashboard refreshes eligibility
-- **WHEN** the dashboard becomes current after editor return or another covering route, or an admitted manual refresh is requested
+- **WHEN** the dashboard becomes current after editor return by pop or declarative navigation, another covering route returns, or an admitted manual refresh is requested
 - **THEN** one owner-qualified recovery lookup rechecks eligibility independently of remote read success
 - **AND** explicit dismissal suppression survives covering-route return within the same retained visit, an undismissed eligible candidate can be offered after authoritative validation, and a new dashboard visit or new auth authority can offer an eligible intent again
 

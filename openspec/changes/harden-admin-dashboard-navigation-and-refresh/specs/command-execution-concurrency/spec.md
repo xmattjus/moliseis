@@ -140,6 +140,11 @@ Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh a
 - **THEN** its ignored-then-submissions reads still run under their existing reservation and publish mutation readiness only after their safe settlement
 - **AND** those internal reads do not generate manual-refresh feedback
 
+#### Scenario: Declarative editor return preserves the existing refresh contract
+- **WHEN** an editor opened by the Dashboard returns to that same authorized Dashboard through declarative navigation without completing its imperative push Future
+- **THEN** one best-effort editor-return refresh is requested regardless of boolean result, subject to the existing owner/account/visit checks
+- **AND** a covering route or return to another editor is not treated as Dashboard return, and later push completion cannot duplicate the refresh
+
 #### Scenario: REF-12 Existing entry and editor return remain compatible
 - **WHEN** initial loading, empty, initial failure/retry or editor return occurs
 - **THEN** existing state rendering and best-effort refresh policies remain, including refresh after editor return regardless of its boolean result

@@ -511,9 +511,9 @@ void main() {
     disposeOwners: () => harness.dispose(),
   );
 
-  testOwnerUI(
-    'unrelated initialized editor session cannot qualify failed recovery',
-    (tester) async {
+  for (final declarativeReturn in [false, true]) {
+    testOwnerUI('unrelated initialized editor cannot qualify recovery; '
+        'declarative=$declarativeReturn', (tester) async {
       harness = AdminSaveRouteHarness()
         ..seedNavigationRecovery(requestNonce: nonce);
       final candidate = harness.local.drafts.drafts.values.single;
@@ -543,18 +543,47 @@ void main() {
         }
         return Result.success(harness.local.drafts.drafts[unrelated.lookupKey]);
       };
+      harness.repository.getByIdResults[8] = Result.error(
+        TestException('active detail unavailable'),
+      );
       harness.router.goNamed(RouteNames.adminDashboard);
       await tester.pumpWidget(harness.app());
       await tester.pumpAndSettle();
+      final dashboardRoute = ModalRoute.of(
+        tester.element(find.byType(AdminDashboardScreen)),
+      )!;
       await tester.tap(find.text('Riprendi'));
       await tester.pumpAndSettle();
       expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
       expect(find.text('Riprova'), findsOneWidget);
       expect(harness.owner.activation?.owner, unrelated);
 
-      harness.router.pop();
+      if (declarativeReturn) {
+        final lookups = harness.local.drafts.navigationLoadCalls;
+        final reads = harness.repository.listCallCount;
+        await tester.tap(
+          find.byKey(const ValueKey('admin_return_active_editor')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(dashboardRoute.isCurrent, isFalse);
+        expect(find.text(message), findsNothing);
+        expect(harness.local.drafts.navigationLoadCalls, lookups);
+        expect(harness.repository.listCallCount, reads);
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('admin_recovery_return')),
+        );
+        await tester.tap(find.byKey(const ValueKey('admin_recovery_return')));
+      } else {
+        harness.router.pop();
+      }
       await tester.pumpAndSettle();
 
+      expect(dashboardRoute.isCurrent, isTrue);
+      expect(
+        ModalRoute.of(tester.element(find.byType(AdminDashboardScreen))),
+        same(dashboardRoute),
+      );
       expect(find.text(message), findsOneWidget);
       expect(harness.owner.activation?.owner, unrelated);
       expect(
@@ -571,9 +600,8 @@ void main() {
       expect(harness.repository.createInputs, isEmpty);
       expect(harness.repository.updateInputs, isEmpty);
       expect(harness.content.uploadedImages, isEmpty);
-    },
-    disposeOwners: () => harness.dispose(),
-  );
+    }, disposeOwners: () => harness.dispose());
+  }
 
   testOwnerUI(
     'editor owner replacement during target activation cannot suppress '

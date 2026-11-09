@@ -6,6 +6,7 @@ import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_list_item.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -20,6 +21,90 @@ void main() {
   late AdminSaveRouteHarness harness;
   const message = 'Hai una modifica interrotta da recuperare.';
   const nonce = '22222222-2222-4222-8222-222222222222';
+
+  for (final recovery in [true, false]) {
+    testOwnerUI('declarative editor return restores recovery and refreshes; '
+        'recovery=$recovery', (tester) async {
+      harness = AdminSaveRouteHarness()
+        ..seedNavigationRecovery(requestNonce: nonce);
+      final candidate = harness.local.drafts.drafts.values.single;
+      final assets = List.of(harness.local.staged.assets[candidate.owner]!);
+      harness.repository
+        ..listResult = Result.success([sampleAdminSubmission(id: 7)])
+        ..getByIdResults[7] = Result.error(TestException('detail unavailable'));
+      harness.router.goNamed(RouteNames.adminDashboard);
+      await tester.pumpWidget(harness.app());
+      await tester.pumpAndSettle();
+      final dashboard = tester.state(find.byType(AdminDashboardScreen));
+      final route = ModalRoute.of(
+        tester.element(find.byType(AdminDashboardScreen)),
+      )!;
+      if (recovery) {
+        await tester.tap(find.text('Riprendi'));
+      } else {
+        await tester.ensureVisible(find.byType(AdminSubmissionListItem));
+        await tester.tap(find.byType(AdminSubmissionListItem));
+      }
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+      expect(
+        harness.owner.isActivationCurrent(harness.owner.activation),
+        isTrue,
+      );
+      final reads = harness.repository.listCallCount;
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('admin_recovery_return')),
+      );
+      await tester.tap(find.byKey(const ValueKey('admin_recovery_return')));
+      await tester.pumpAndSettle();
+      expect(route.isCurrent, isTrue);
+      expect(tester.state(find.byType(AdminDashboardScreen)), same(dashboard));
+      expect(
+        ModalRoute.of(tester.element(find.byType(AdminDashboardScreen))),
+        same(route),
+      );
+      if (recovery) expect(find.text(message), findsNothing);
+
+      const replacement = '33333333-3333-4333-8333-333333333333';
+      expect(
+        await harness.local.drafts.saveNavigationIntent(
+          owner: candidate.owner,
+          requestNonce: replacement,
+        ),
+        isA<Success<AdminSubmissionDraft>>(),
+      );
+      final refresh = tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+          .onRefresh();
+      await tester.pumpAndSettle();
+      await refresh;
+      expect(
+        find.text(message),
+        findsOneWidget,
+        reason: 'Declarative return must release recovery for a newer nonce',
+      );
+      expect(
+        harness.repository.listCallCount,
+        reads + 2,
+        reason: 'One editor-return read and one explicit manual refresh',
+      );
+      expect(
+        harness
+            .local
+            .drafts
+            .drafts[candidate.owner.lookupKey]!
+            .navigationIntent!
+            .requestNonce,
+        replacement,
+      );
+      expect(harness.local.staged.assets[candidate.owner], assets);
+      expect(harness.local.drafts.saves, isEmpty);
+      expect(harness.local.staged.removals, isEmpty);
+      expect(harness.repository.createInputs, isEmpty);
+      expect(harness.repository.updateInputs, isEmpty);
+      expect(harness.content.uploadedImages, isEmpty);
+    }, disposeOwners: () => harness.dispose());
+  }
 
   testOwnerUI(
     'recovery is persistent; explicit close suppresses only this visit',
@@ -174,6 +259,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(harness.local.drafts.navigationLoadCalls, count);
     expect(find.byType(SnackBar), findsOneWidget);
+    expect(
+      find.text('Si è verificato un errore, riprova più tardi'),
+      findsOneWidget,
+    );
     expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
     expect(harness.local.drafts.saves, isEmpty);
     harness.local.drafts.onLoadNavigation = null;
@@ -367,7 +456,7 @@ void main() {
       expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
       expect(
         find.text('Si è verificato un errore, riprova più tardi'),
-        findsOneWidget,
+        findsNothing,
       );
       expect(harness.local.drafts.drafts.values.single, same(candidate));
       expect(harness.local.drafts.saves, isEmpty);
@@ -411,28 +500,81 @@ void main() {
     expect(harness.local.drafts.saves, isEmpty);
   }, disposeOwners: () => harness.dispose());
 
-  testOwnerUI('editor-return list refresh does not wait for recovery recheck', (
-    tester,
-  ) async {
-    harness = AdminSaveRouteHarness()
-      ..seedNavigationRecovery(requestNonce: nonce);
-    harness.router.goNamed(RouteNames.adminDashboard);
-    await tester.pumpWidget(harness.app());
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Riprendi'));
-    await tester.pumpAndSettle();
-    final reads = harness.repository.listCallCount;
-    final gate = Completer<Result<AdminSubmissionDraft?>>();
-    harness.local.drafts.onLoadNavigation = (_) => gate.future;
-    harness.router.pop();
-    await tester.pumpAndSettle();
-    expect(harness.repository.listCallCount, reads + 1);
-    expect(find.byType(SnackBar), findsNothing);
-    gate.complete(Result.error(TestException('recheck unavailable')));
-    await tester.pumpAndSettle();
-    expect(find.byType(SnackBar), findsNothing);
-    expect(harness.local.drafts.saves, isEmpty);
-  }, disposeOwners: () => harness.dispose());
+  for (final replace in [false, true]) {
+    testOwnerUI('editor return refresh is independent and stale recheck '
+        'cannot release newer=$replace', (tester) async {
+      harness = AdminSaveRouteHarness()
+        ..seedNavigationRecovery(requestNonce: nonce);
+      harness.router.goNamed(RouteNames.adminDashboard);
+      await tester.pumpWidget(harness.app());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Riprendi'));
+      await tester.pumpAndSettle();
+      final candidate = harness.local.drafts.drafts.values.single;
+      final reads = harness.repository.listCallCount;
+      final gate = Completer<Result<AdminSubmissionDraft?>>();
+      harness.local.drafts.onLoadNavigation = (_) => gate.future;
+      harness.router.pop();
+      await tester.pumpAndSettle();
+      expect(harness.repository.listCallCount, reads + 1);
+      expect(find.byType(SnackBar), findsNothing);
+      if (replace) {
+        final cover = harness.router.pushNamed<Object?>(
+          RouteNames.adminSubmissionNew,
+        );
+        await tester.pumpAndSettle();
+        const replacement = '33333333-3333-4333-8333-333333333333';
+        final updated = await harness.local.drafts.saveNavigationIntent(
+          owner: candidate.owner,
+          requestNonce: replacement,
+        );
+        final fresh = (updated as Success<AdminSubmissionDraft>).value;
+        harness.local.drafts.onLoadNavigation = null;
+        harness.router.pop();
+        await tester.pumpAndSettle();
+        await cover;
+        expect(find.text(message), findsOneWidget);
+        final newer = Completer<Result<AdminSubmissionDraft?>>();
+        harness.local.drafts.onLoadNavigation = (_) => newer.future;
+        await tester.tap(find.text('Riprendi'));
+        await tester.pumpAndSettle();
+        final lookups = harness.local.drafts.navigationLoadCalls;
+        gate.complete(Result.success(candidate));
+        await tester.pumpAndSettle();
+        final refresh = tester
+            .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+            .onRefresh();
+        await tester.pumpAndSettle();
+        await refresh;
+        expect(harness.local.drafts.navigationLoadCalls, lookups);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+        harness.local.drafts.onLoadNavigation = null;
+        newer.complete(Result.success(fresh));
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(harness.owner.activation!.owner, candidate.owner);
+        expect(
+          harness
+              .local
+              .drafts
+              .drafts[candidate.owner.lookupKey]!
+              .navigationIntent!
+              .requestNonce,
+          replacement,
+        );
+      } else {
+        gate.complete(Result.error(TestException('recheck unavailable')));
+        await tester.pumpAndSettle();
+        expect(find.byType(SnackBar), findsNothing);
+      }
+      expect(harness.local.drafts.saves, isEmpty);
+      expect(harness.local.staged.removals, isEmpty);
+      expect(harness.repository.createInputs, isEmpty);
+      expect(harness.repository.updateInputs, isEmpty);
+      expect(harness.content.uploadedImages, isEmpty);
+    }, disposeOwners: () => harness.dispose());
+  }
 
   testOwnerUI('global clear revokes an eligibility lookup not yet registered', (
     tester,
