@@ -387,26 +387,31 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
         bindings: {
           const SingleActivator(LogicalKeyboardKey.escape): requestBack,
         },
-        child: PopScope<Object?>(
-          canPop:
-              defaultTargetPlatform != TargetPlatform.iOS ||
-              !(owner.hasUncheckpointedChanges || owner.exitDecisionPending) ||
-              _allowExplicitPop,
-          child: AdminSubmissionEditorScreen(
-            viewModel: owner,
-            onBack: requestBack,
-            onModerationClose: (activation, lane, execution) {
-              if (!mounted) return false;
-              final visit = _exitVisit;
-              return visit != null &&
-                  (_exitPolicy?.closeAfterModeration(
-                        visit,
-                        activation,
-                        lane,
-                        execution,
-                      ) ??
-                      false);
-            },
+        child: Focus(
+          autofocus: true,
+          skipTraversal: true,
+          child: PopScope<Object?>(
+            canPop:
+                defaultTargetPlatform != TargetPlatform.iOS ||
+                !(owner.hasUncheckpointedChanges ||
+                    owner.exitDecisionPending) ||
+                _allowExplicitPop,
+            child: AdminSubmissionEditorScreen(
+              viewModel: owner,
+              onBack: requestBack,
+              onModerationClose: (activation, lane, execution) {
+                if (!mounted) return false;
+                final visit = _exitVisit;
+                return visit != null &&
+                    (_exitPolicy?.closeAfterModeration(
+                          visit,
+                          activation,
+                          lane,
+                          execution,
+                        ) ??
+                        false);
+              },
+            ),
           ),
         ),
       ),

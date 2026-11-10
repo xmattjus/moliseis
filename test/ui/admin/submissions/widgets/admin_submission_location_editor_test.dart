@@ -1,9 +1,12 @@
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_map/flutter_map.dart' show TapPosition;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
+import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_location_picker.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
@@ -66,6 +69,7 @@ Future<(_HarnessState, GlobalKey<FormState>)> _pumpEditor(
   WidgetTester tester, {
   String latitude = '',
   String longitude = '',
+  Brightness brightness = Brightness.light,
 }) async {
   final formKey = GlobalKey<FormState>();
   final harnessKey = GlobalKey<_HarnessState>();
@@ -73,6 +77,7 @@ Future<(_HarnessState, GlobalKey<FormState>)> _pumpEditor(
     Provider<http.Client>.value(
       value: RecordingTileHttpClient(),
       child: MaterialApp(
+        theme: ThemeData(brightness: brightness),
         home: Scaffold(
           body: SingleChildScrollView(
             child: _Harness(
@@ -91,9 +96,9 @@ Future<(_HarnessState, GlobalKey<FormState>)> _pumpEditor(
 }
 
 void main() {
-  testWidgets(
-    'defaults to Map mode and offers the shared picker',
-    (tester) async {
+  testWidgets('defaults to Map mode and offers the shared picker', (
+    tester,
+  ) async {
     await _pumpEditor(tester);
 
     expect(find.byType(GeoMap), findsNothing);
@@ -140,9 +145,9 @@ void main() {
     expect(find.text('Inserisci anche la longitudine.'), findsOneWidget);
   });
 
-  testWidgets(
-    'blank coordinates open picker without a selection',
-    (tester) async {
+  testWidgets('blank coordinates open picker without a selection', (
+    tester,
+  ) async {
     await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
@@ -150,21 +155,19 @@ void main() {
     expect(find.byType(GeoMapLocationPicker), findsOneWidget);
     expect(tester.widget<GeoMap>(find.byType(GeoMap)).markers, isEmpty);
     expect(
-      tester.widget<FilledButton>(
-        find.byKey(const ValueKey('geo_map_location_picker_confirm')),
-      ).onPressed,
+      tester
+          .widget<FilledButton>(
+            find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+          )
+          .onPressed,
       isNull,
     );
   });
 
-  testWidgets(
-    'existing location initializes picker marker and manual fields',
-    (tester) async {
-    await _pumpEditor(
-      tester,
-      latitude: '41.5575078',
-      longitude: '14.6485406',
-    );
+  testWidgets('existing location initializes picker marker and manual fields', (
+    tester,
+  ) async {
+    await _pumpEditor(tester, latitude: '41.5575078', longitude: '14.6485406');
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
 
@@ -179,26 +182,30 @@ void main() {
     expect(fields.last.controller!.text, '14.6485406');
   });
 
-  testWidgets('confirming an unchanged point preserves raw drafts', (
-    tester,
-  ) async {
-    final (state, _) = await _pumpEditor(
-      tester,
-      latitude: '41.5575078',
-      longitude: '14.6485406',
+  for (final (latitude, longitude) in [
+    ('41.5575078', '14.6485406'),
+    (' 41,5575078 ', ' 14,6485406 '),
+  ]) {
+    testWidgets(
+      'confirming an unchanged point preserves raw drafts $latitude',
+      (tester) async {
+        final (state, _) = await _pumpEditor(
+          tester,
+          latitude: latitude,
+          longitude: longitude,
+        );
+        await tester.tap(find.text('Seleziona sulla mappa'));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+        );
+        await tester.pumpAndSettle();
+        expect(state.selectedPoints, isEmpty);
+        expect(state.latitudeText, latitude);
+        expect(state.longitudeText, longitude);
+      },
     );
-    await tester.tap(find.text('Seleziona sulla mappa'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.byKey(const ValueKey('geo_map_location_picker_confirm')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(state.selectedPoints, isEmpty);
-    expect(state.latitudeText, '41.5575078');
-    expect(state.longitudeText, '14.6485406');
-  });
+  }
 
   testWidgets('switching modes does not emit coordinate changes', (
     tester,
@@ -293,9 +300,9 @@ void main() {
     expect(find.text('Inserisci anche la longitudine.'), findsNothing);
   });
 
-  testWidgets(
-    'map selection mutates draft only after confirmation',
-    (tester) async {
+  testWidgets('map selection mutates draft only after confirmation', (
+    tester,
+  ) async {
     final (state, _) = await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
@@ -325,10 +332,8 @@ void main() {
     expect(fields.last.controller!.text, '14.900000');
   });
 
-  testWidgets(
-    'successive taps replace the temporary marker '
-    'without draft writes',
-    (tester) async {
+  testWidgets('successive taps replace the temporary marker '
+      'without draft writes', (tester) async {
     final (state, _) = await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
@@ -344,8 +349,10 @@ void main() {
     );
     await tester.pump();
     expect(state.selectedPoints, isEmpty);
-    expect(tester.widget<GeoMap>(find.byType(GeoMap)).markers.single.point,
-        const LatLng(41.1, 14.2));
+    expect(
+      tester.widget<GeoMap>(find.byType(GeoMap)).markers.single.point,
+      const LatLng(41.1, 14.2),
+    );
 
     await tester.tap(
       find.byKey(const ValueKey('geo_map_location_picker_confirm')),
@@ -372,9 +379,9 @@ void main() {
     expect(outOfRangeFormKey.currentState!.validate(), isFalse);
   });
 
-  testWidgets(
-    'invalid coordinate drafts do not become a map selection',
-    (tester) async {
+  testWidgets('invalid coordinate drafts do not become a map selection', (
+    tester,
+  ) async {
     await _pumpEditor(tester, latitude: '95', longitude: '200');
     expect(find.byType(GeoMap), findsNothing);
     expect(find.byType(TextFormField), findsNWidgets(2));
@@ -443,9 +450,9 @@ void main() {
     expect(find.text('Seleziona sulla mappa'), findsOneWidget);
   });
 
-  testWidgets(
-    'explicit Back discards the selection without changing draft',
-    (tester) async {
+  testWidgets('explicit Back discards the selection without changing draft', (
+    tester,
+  ) async {
     final (state, _) = await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
@@ -490,27 +497,173 @@ void main() {
     expect(state.longitudeText, '14.64');
   });
 
+  for (final keyboard in [false, true]) {
+    testWidgets('map supports accessible center selection keyboard=$keyboard', (
+      tester,
+    ) async {
+      final (state, _) = await _pumpEditor(tester);
+      await tester.tap(find.text('Seleziona sulla mappa'));
+      await tester.pumpAndSettle();
+      final initialCenter = tester
+          .widget<GeoMap>(find.byType(GeoMap))
+          .initialCenter;
+      if (keyboard) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      } else {
+        tester.semantics.tap(
+          find.semantics.byLabel('Mappa. Attiva per selezionare il centro.'),
+        );
+      }
+      await tester.pump();
+      expect(
+        tester.widget<GeoMap>(find.byType(GeoMap)).markers.single.point,
+        initialCenter,
+      );
+      expect(state.selectedPoints, isEmpty);
+      await tester.tap(
+        find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+      );
+      await tester.pumpAndSettle();
+      expect(state.selectedPoints, [initialCenter]);
+    });
+  }
+
+  testWidgets(
+    'center selection wraps longitude after crossing the antimeridian',
+    (tester) async {
+      final (state, formKey) = await _pumpEditor(
+        tester,
+        latitude: '41',
+        longitude: '179.999',
+      );
+      await tester.tap(find.text('Seleziona sulla mappa'));
+      await tester.pumpAndSettle();
+      final map = tester.widget<GeoMap>(find.byType(GeoMap));
+      map.mapController!.move(const LatLng(41, 180.1), 13);
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      final point = tester
+          .widget<GeoMap>(find.byType(GeoMap))
+          .markers
+          .single
+          .point;
+      expect(point.longitude, closeTo(-179.9, 1e-10));
+      await tester.tap(
+        find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+      );
+      await tester.pumpAndSettle();
+      expect(state.longitudeText, '-179.900000');
+      expect(formKey.currentState!.validate(), isTrue);
+    },
+  );
+
+  testWidgets('resizing across compact preserves the temporary selection', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final (state, _) = await _pumpEditor(tester);
+    await tester.tap(find.text('Seleziona sulla mappa'));
+    await tester.pumpAndSettle();
+    final controller = tester.widget<GeoMap>(find.byType(GeoMap)).mapController!
+      ..move(const LatLng(41.8, 14.9), 11);
+    await tester.pumpAndSettle();
+    // Drive the real map gesture, rather than calling its callback.
+    await tester.tapAt(
+      tester.getCenter(find.byType(GeoMap)) + const Offset(30, 20),
+    );
+    await tester.pumpAndSettle();
+    // flutter_map defers single taps while recognizing a possible double tap.
+    await tester.pump(kDoubleTapTimeout);
+    final point = tester
+        .widget<GeoMap>(find.byType(GeoMap))
+        .markers
+        .single
+        .point;
+    for (final size in [const Size(390, 844), const Size(1280, 900)]) {
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      expect(
+        tester.getSize(find.byType(GeoMapLocationPicker)).width,
+        size.width < 600 ? size.width : lessThanOrEqualTo(840),
+      );
+      expect(
+        tester.widget<GeoMap>(find.byType(GeoMap)).markers.single.point,
+        point,
+      );
+      expect(controller.camera.center, const LatLng(41.8, 14.9));
+      expect(controller.camera.zoom, 11);
+      expect(state.selectedPoints, isEmpty);
+    }
+    await tester.tap(
+      find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+    );
+    await tester.pumpAndSettle();
+    expect(state.selectedPoints, [point]);
+  });
+
+  testWidgets('repeated explicit Back cannot pop the owning page', (
+    tester,
+  ) async {
+    final (state, _) = await _pumpEditor(tester);
+    await tester.tap(find.text('Seleziona sulla mappa'));
+    await tester.pumpAndSettle();
+    final back = tester
+        .widget<CustomBackButton>(
+          find.byKey(const ValueKey('geo_map_location_picker_back')),
+        )
+        .onPressed!;
+    back();
+    back();
+    await tester.pumpAndSettle();
+    expect(find.byType(AdminSubmissionLocationEditor), findsOneWidget);
+    expect(state.selectedPoints, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('compact picker uses a fullscreen dialog', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+
     await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
 
-    expect(tester.getSize(find.byType(Dialog)).width, 390);
-    expect(tester.getSize(find.byType(Dialog)).height, 844);
+    expect(
+      tester.getSize(find.byType(GeoMapLocationPicker)),
+      const Size(390, 844),
+    );
+    tester.view.padding = const FakeViewPadding(
+      top: 24,
+      bottom: 24,
+      left: 20,
+      right: 20,
+    );
+    await tester.pumpAndSettle();
+    final back = tester.getRect(
+      find.byKey(const ValueKey('geo_map_location_picker_back')),
+    );
+    final confirm = tester.getRect(
+      find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+    );
+    expect(back.left, greaterThanOrEqualTo(20));
+    expect(back.top, greaterThanOrEqualTo(24));
+    expect(confirm.right, lessThanOrEqualTo(370));
+    expect(confirm.bottom, lessThanOrEqualTo(820));
   });
 
   testWidgets('expanded picker remains constrained', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1280, 900));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 900);
+    addTearDown(tester.view.reset);
+
     await _pumpEditor(tester);
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
 
-    final dialog = tester.widget<Dialog>(find.byType(Dialog));
-    expect(dialog.constraints?.maxWidth, 840);
-    expect(dialog.constraints?.maxHeight, 720);
     // Dialog's outer render box fills the viewport; the map content is
     // constrained by the inner dialog surface.
     final size = tester.getSize(find.byType(GeoMapLocationPicker));
@@ -519,7 +672,46 @@ void main() {
     expect(size.width, lessThan(1280));
   });
 
-  testWidgets('controllers are disposed without leaks', (tester) async {
+  for (final size in [
+    const Size(390, 844),
+    const Size(568, 320),
+    const Size(600, 300),
+    const Size(700, 360),
+    const Size(1000, 800),
+    const Size(1440, 900),
+    const Size(1800, 1000),
+  ]) {
+    testWidgets('picker controls remain reachable with large text at $size', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.textScaleFactorTestValue = 3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await _pumpEditor(
+        tester,
+        latitude: '41.5575078',
+        longitude: '14.6485406',
+        brightness: size.width >= 1000 ? Brightness.dark : Brightness.light,
+      );
+      await tester.ensureVisible(find.text('Seleziona sulla mappa'));
+      await tester.tap(find.text('Seleziona sulla mappa'));
+      await tester.pumpAndSettle();
+      final confirm = find.byKey(
+        const ValueKey('geo_map_location_picker_confirm'),
+      );
+      await tester.ensureVisible(confirm);
+      expect(confirm.hitTestable(), findsOneWidget);
+      expect(tester.getSize(find.byType(GeoMap)).height, greaterThan(0));
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+      expect(find.byType(GeoMapLocationPicker), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('editor unmounts without framework errors', (tester) async {
     await _pumpEditor(tester);
 
     await tester.pumpWidget(const SizedBox.shrink());

@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart' show TapPosition;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
@@ -16,6 +18,8 @@ import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_save_prog
 import 'package:moliseis/ui/core/themes/base_theme_data.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/unsaved_changes_dialog.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_location_picker.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -414,6 +418,104 @@ void main() {
     },
     disposeOwners: () => harness.dispose(),
   );
+
+  testOwnerUI(
+    'picker cancellation and confirmation preserve the Admin route',
+    (tester) async {
+      harness = AdminSaveRouteHarness(persistedTargets: [1]);
+      await harness.openEditor(tester, target: 1);
+      await tester.scrollUntilVisible(
+        find.text('Seleziona sulla mappa'),
+        400,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('admin_submission_editor_scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.tap(find.text('Seleziona sulla mappa'));
+      await tester.pumpAndSettle();
+      tester.widget<GeoMap>(find.byType(GeoMap)).onPressed!(
+        const TapPosition(Offset.zero, Offset.zero),
+        const LatLng(41.91234567, 14.91234567),
+      );
+      await tester.pump();
+      expect(harness.owner.hasUncheckpointedChanges, isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+      expect(harness.owner.latitudeText, isEmpty);
+      await tester.tap(find.text('Seleziona sulla mappa'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<GeoMap>(find.byType(GeoMap)).markers, isEmpty);
+      tester.widget<GeoMap>(find.byType(GeoMap)).onPressed!(
+        const TapPosition(Offset.zero, Offset.zero),
+        const LatLng(41.91234567, 14.91234567),
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+      expect(harness.owner.latitudeText, '41.912346');
+      expect(harness.owner.longitudeText, '14.912346');
+      expect(harness.owner.hasUncheckpointedChanges, isTrue);
+      expect(harness.local.drafts.saves, isEmpty);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(UnsavedChangesDialog), findsOneWidget);
+    },
+    disposeOwners: () => harness.dispose(),
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
+  testOwnerUI('auth revocation retires picker and its stale callbacks', (
+    tester,
+  ) async {
+    harness = AdminSaveRouteHarness(persistedTargets: [1]);
+    await harness.openEditor(tester, target: 1);
+    await tester.scrollUntilVisible(
+      find.text('Seleziona sulla mappa'),
+      400,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('admin_submission_editor_scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(find.text('Seleziona sulla mappa'));
+    await tester.pumpAndSettle();
+    final select = tester.widget<GeoMap>(find.byType(GeoMap)).onPressed!;
+    select(
+      const TapPosition(Offset.zero, Offset.zero),
+      const LatLng(41.9, 14.9),
+    );
+    await tester.pump();
+    final confirm = tester
+        .widget<FilledButton>(
+          find.byKey(const ValueKey('geo_map_location_picker_confirm')),
+        )
+        .onPressed!;
+    harness.auth.setUser(null);
+    harness.auth.emit(AuthChangeEvent.signedOut);
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.byType(GeoMapLocationPicker), findsNothing);
+    expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+    expect(find.byType(AdminLoginScreen), findsOneWidget);
+    select(
+      const TapPosition(Offset.zero, Offset.zero),
+      const LatLng(41.1, 14.1),
+    );
+    confirm();
+    await tester.pumpAndSettle();
+    expect(harness.local.drafts.saves, isEmpty);
+    expect(harness.owner.sessionId, isNull);
+    expect(tester.takeException(), isNull);
+  }, disposeOwners: () => harness.dispose());
 
   testOwnerUI(
     'desktop Escape enters policy and modal Escape cancels only modal',
