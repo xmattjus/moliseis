@@ -22,6 +22,7 @@ Future<LatLng?> showGeoMapLocationPicker(
 }) {
   return showDialog<LatLng>(
     context: context,
+    useRootNavigator: true,
     barrierDismissible: false,
     builder: (dialogContext) {
       final compact = dialogContext.windowSizeClass.isCompact;
@@ -46,7 +47,7 @@ Future<LatLng?> showGeoMapLocationPicker(
   );
 }
 
-/// Map-only selection UI shared by administrative and public submission flows.
+/// Map-only selection UI currently used by the administrative submission editor.
 ///
 /// The selection stays local to this route until confirmation; the owning
 /// form retains its coordinate text, validation and persistence behavior.
@@ -88,75 +89,83 @@ class _GeoMapLocationPickerState extends State<GeoMapLocationPicker> {
   @override
   Widget build(BuildContext context) {
     final selected = _selected;
-    return LayoutBuilder(
-      builder: (context, constraints) => Column(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Row(
-              children: [
-                CustomBackButton(
-                  key: const ValueKey('geo_map_location_picker_back'),
-                  onPressed: _dismiss,
-                ),
-                Expanded(
-                  child: Semantics(
-                    namesRoute: true,
-                    header: true,
-                    child: Text(
-                      'Seleziona posizione',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.textTheme.titleLarge,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): _dismiss,
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Row(
+                children: [
+                  CustomBackButton(
+                    key: const ValueKey('geo_map_location_picker_back'),
+                    onPressed: _dismiss,
+                  ),
+                  Expanded(
+                    child: Semantics(
+                      namesRoute: true,
+                      header: true,
+                      child: Text(
+                        'Seleziona posizione',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.textTheme.titleLarge,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-              ],
+                  const SizedBox(width: 16),
+                ],
+              ),
             ),
-          ),
-          Expanded(
-            child: CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.enter): _selectCenter,
-                const SingleActivator(LogicalKeyboardKey.numpadEnter):
-                    _selectCenter,
-              },
-              child: Semantics(
-                container: true,
-                excludeSemantics: true,
-                label: 'Mappa. Attiva per selezionare il centro.',
-                onTap: _selectCenter,
-                child: GeoMap(
-                  mapController: _mapController,
-                  initialCenter: widget.initialLocation ?? _fallbackCenter,
-                  initialZoom: widget.initialLocation == null ? 9 : 13,
-                  markers: selected == null
-                      ? const <Marker>[]
-                      : <Marker>[
-                          Marker(
-                            point: selected,
-                            width: 60,
-                            height: 60,
-                            child: const GeoMapMarkerIcon(
-                              Symbols.check,
-                              size: 60,
-                              tooltip: 'Posizione selezionata',
+            Expanded(
+              child: CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.enter): _selectCenter,
+                  const SingleActivator(LogicalKeyboardKey.numpadEnter):
+                      _selectCenter,
+                },
+                child: Semantics(
+                  container: true,
+                  excludeSemantics: true,
+                  label: 'Mappa. Attiva per selezionare il centro.',
+                  hint:
+                      'Per inserire coordinate precise, torna all’editor e scegli Coordinate.',
+                  onTap: _selectCenter,
+                  child: GeoMap(
+                    mapController: _mapController,
+                    initialCenter: widget.initialLocation ?? _fallbackCenter,
+                    initialZoom: widget.initialLocation == null ? 9 : 13,
+                    markers: selected == null
+                        ? const <Marker>[]
+                        : <Marker>[
+                            Marker(
+                              point: selected,
+                              alignment: Alignment.topCenter,
+                              width: 60,
+                              height: 60,
+                              child: const GeoMapMarkerIcon(
+                                Symbols.check,
+                                size: 60,
+                                tooltip: 'Posizione selezionata',
+                              ),
                             ),
-                          ),
-                        ],
-                  onPressed: (_, point) => _select(point),
+                          ],
+                    onPressed: (_, point) => _select(point),
+                  ),
                 ),
               ),
             ),
-          ),
-          _LocationPickerActions(
-            selected: selected,
-            maxHeight: constraints.maxHeight / 2,
-            onConfirm: selected == null ? null : () => _dismiss(selected),
-          ),
-        ],
-      ),
+            _LocationPickerActions(
+              selected: selected,
+              maxHeight: constraints.maxHeight / 2,
+              onConfirm: selected == null ? null : () => _dismiss(selected),
+            ),
+          ],
+        ),
+      );
     );
   }
 }
