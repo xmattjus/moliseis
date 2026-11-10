@@ -26,6 +26,7 @@ class GeoMapMarkerIcon extends StatelessWidget {
     required this.size,
     this.onPressed,
     this.tooltip,
+    this.style,
     super.key,
   });
 
@@ -34,9 +35,13 @@ class GeoMapMarkerIcon extends StatelessWidget {
   final VoidCallback? onPressed;
   final String? tooltip;
 
+  /// Optional button layout overrides; published markers retain their defaults.
+  final ButtonStyle? style;
+
   @override
   Widget build(BuildContext context) {
     return IconButton(
+      style: style,
       visualDensity: const VisualDensity(horizontal: 0.5, vertical: 0.5),
       onPressed: onPressed,
       tooltip: tooltip,

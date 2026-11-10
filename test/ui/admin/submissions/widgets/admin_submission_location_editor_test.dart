@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_map/flutter_map.dart' show TapPosition;
@@ -10,6 +12,7 @@ import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_location_picker.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_marker.dart';
+import 'package:moliseis/ui/geo_map/widgets/geo_map_marker_painter.dart';
 import 'package:provider/provider.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
@@ -180,6 +183,26 @@ void main() {
     );
     expect(fields.first.controller!.text, '41.5575078');
     expect(fields.last.controller!.text, '14.6485406');
+  });
+
+  testWidgets('temporary marker tip meets the selected coordinate', (
+    tester,
+  ) async {
+    await _pumpEditor(tester, latitude: '41.5575078', longitude: '14.6485406');
+    await tester.tap(find.text('Seleziona sulla mappa'));
+    await tester.pumpAndSettle();
+    final marker = tester.widget<GeoMap>(find.byType(GeoMap)).markers.single;
+    expect(marker.alignment, Alignment.topCenter);
+    final artwork = find.descendant(
+      of: find.byType(GeoMapMarkerIcon),
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is CustomPaint && widget.painter is GeoMapMarkerPainter,
+      ),
+    );
+    final tip = tester.getRect(artwork).bottomCenter;
+    final coordinate = tester.getCenter(find.byType(GeoMap));
+    expect((tip - coordinate).distance, lessThanOrEqualTo(1));
   });
 
   for (final (latitude, longitude) in [
@@ -497,6 +520,52 @@ void main() {
     expect(state.longitudeText, '14.64');
   });
 
+  testWidgets(
+    'Enter confirms the focused action without selecting map center',
+    (tester) async {
+      final (state, _) = await _pumpEditor(
+        tester,
+        latitude: '41.55',
+        longitude: '14.64',
+      );
+      await tester.tap(find.text('Seleziona sulla mappa'));
+      await tester.pumpAndSettle();
+      expect(
+        FocusManager.instance.primaryFocus!.context!
+            .findAncestorWidgetOfExactType<GeoMap>(),
+        isNotNull,
+      );
+      await tester.tapAt(
+        tester.getCenter(find.byType(GeoMap)) + const Offset(60, 20),
+      );
+      await tester.pump(kDoubleTapTimeout);
+      await tester.pumpAndSettle();
+      final map = tester.widget<GeoMap>(find.byType(GeoMap));
+      final point = map.markers.single.point;
+      expect(point, isNot(map.mapController!.camera.center));
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      final confirm = find.byKey(
+        const ValueKey('geo_map_location_picker_confirm'),
+      );
+      expect(
+        tester
+            .getSemantics(confirm)
+            .getSemanticsData()
+            .flagsCollection
+            .isFocused,
+        Tristate.isTrue,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(find.byType(GeoMapLocationPicker), findsNothing);
+      expect(state.selectedPoints, [point]);
+      expect(state.latitudeText, point.latitude.toStringAsFixed(6));
+      expect(state.longitudeText, point.longitude.toStringAsFixed(6));
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+  );
+
   for (final keyboard in [false, true]) {
     testWidgets('map supports accessible center selection keyboard=$keyboard', (
       tester,
@@ -508,8 +577,25 @@ void main() {
           .widget<GeoMap>(find.byType(GeoMap))
           .initialCenter;
       if (keyboard) {
+        expect(
+          FocusManager.instance.primaryFocus!.context!
+              .findAncestorWidgetOfExactType<GeoMap>(),
+          isNotNull,
+        );
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       } else {
+        expect(
+          tester
+              .getSemantics(
+                find.bySemanticsLabel(
+                  'Mappa. Attiva per selezionare il centro.',
+                ),
+              )
+              .getSemanticsData()
+              .hint,
+          'Per inserire coordinate precise, torna all’editor '
+          'e scegli Coordinate.',
+        );
         tester.semantics.tap(
           find.semantics.byLabel('Mappa. Attiva per selezionare il centro.'),
         );

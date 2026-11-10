@@ -22,7 +22,6 @@ Future<LatLng?> showGeoMapLocationPicker(
 }) {
   return showDialog<LatLng>(
     context: context,
-    useRootNavigator: true,
     barrierDismissible: false,
     builder: (dialogContext) {
       final compact = dialogContext.windowSizeClass.isCompact;
@@ -47,7 +46,7 @@ Future<LatLng?> showGeoMapLocationPicker(
   );
 }
 
-/// Map-only selection UI currently used by the administrative submission editor.
+/// Map-only location selection, currently used by the Admin editor.
 ///
 /// The selection stays local to this route until confirmation; the owning
 /// form retains its coordinate text, validation and persistence behavior.
@@ -90,9 +89,7 @@ class _GeoMapLocationPickerState extends State<GeoMapLocationPicker> {
   Widget build(BuildContext context) {
     final selected = _selected;
     return CallbackShortcuts(
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.escape): _dismiss,
-      },
+      bindings: {const SingleActivator(LogicalKeyboardKey.escape): _dismiss},
       child: LayoutBuilder(
         builder: (context, constraints) => Column(
           children: [
@@ -123,7 +120,8 @@ class _GeoMapLocationPickerState extends State<GeoMapLocationPicker> {
             Expanded(
               child: CallbackShortcuts(
                 bindings: {
-                  const SingleActivator(LogicalKeyboardKey.enter): _selectCenter,
+                  const SingleActivator(LogicalKeyboardKey.enter):
+                      _selectCenter,
                   const SingleActivator(LogicalKeyboardKey.numpadEnter):
                       _selectCenter,
                 },
@@ -132,7 +130,8 @@ class _GeoMapLocationPickerState extends State<GeoMapLocationPicker> {
                   excludeSemantics: true,
                   label: 'Mappa. Attiva per selezionare il centro.',
                   hint:
-                      'Per inserire coordinate precise, torna all’editor e scegli Coordinate.',
+                      'Per inserire coordinate precise, torna all’editor '
+                      'e scegli Coordinate.',
                   onTap: _selectCenter,
                   child: GeoMap(
                     mapController: _mapController,
@@ -150,6 +149,12 @@ class _GeoMapLocationPickerState extends State<GeoMapLocationPicker> {
                                 Symbols.check,
                                 size: 60,
                                 tooltip: 'Posizione selezionata',
+                                style: ButtonStyle(
+                                  padding: WidgetStatePropertyAll(
+                                    EdgeInsets.zero,
+                                  ),
+                                  visualDensity: VisualDensity.standard,
+                                ),
                               ),
                             ),
                           ],
@@ -165,7 +170,7 @@ class _GeoMapLocationPickerState extends State<GeoMapLocationPicker> {
             ),
           ],
         ),
-      );
+      ),
     );
   }
 }

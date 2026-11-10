@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io' show File;
+import 'dart:ui' show Tristate;
 
+import 'package:flutter/gestures.dart' show kDoubleTapTimeout;
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart' show TapPosition;
 import 'package:flutter_test/flutter_test.dart';
@@ -470,6 +472,84 @@ void main() {
     disposeOwners: () => harness.dispose(),
     variant: TargetPlatformVariant.only(TargetPlatform.macOS),
   );
+
+  for (final actionFocused in [false, true]) {
+    testOwnerUI(
+      'picker Escape retains Admin: actionFocused=$actionFocused',
+      (tester) async {
+        harness = AdminSaveRouteHarness(persistedTargets: [1]);
+        await harness.openEditor(tester, target: 1);
+        harness.owner.setCoordinates(
+          41.55,
+          14.64,
+          activation: harness.owner.activation,
+        );
+        final revision = harness.owner.editorRevision;
+        expect(harness.owner.hasUncheckpointedChanges, isTrue);
+        await tester.scrollUntilVisible(
+          find.text('Seleziona sulla mappa'),
+          400,
+          scrollable: find
+              .descendant(
+                of: find.byKey(
+                  const ValueKey('admin_submission_editor_scroll'),
+                ),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.tap(find.text('Seleziona sulla mappa'));
+        await tester.pumpAndSettle();
+        final pickerResult = ModalRoute.of(
+          tester.element(find.byType(GeoMapLocationPicker)),
+        )!.popped;
+        expect(
+          FocusManager.instance.primaryFocus!.context!
+              .findAncestorWidgetOfExactType<GeoMap>(),
+          isNotNull,
+        );
+        await tester.tapAt(
+          tester.getCenter(find.byType(GeoMap)) + const Offset(60, 20),
+        );
+        await tester.pump(kDoubleTapTimeout);
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<GeoMap>(find.byType(GeoMap)).markers.single.point,
+          isNot(const LatLng(41.55, 14.64)),
+        );
+        if (actionFocused) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+          await tester.pump();
+          final confirm = find.byKey(
+            const ValueKey('geo_map_location_picker_confirm'),
+          );
+          expect(
+            tester
+                .getSemantics(confirm)
+                .getSemanticsData()
+                .flagsCollection
+                .isFocused,
+            Tristate.isTrue,
+          );
+        }
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.escape);
+        await tester.sendKeyRepeatEvent(LogicalKeyboardKey.escape);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.escape);
+        await tester.pumpAndSettle();
+        expect(find.byType(GeoMapLocationPicker), findsNothing);
+        expect(await pickerResult, isNull);
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(find.byType(UnsavedChangesDialog), findsNothing);
+        expect(harness.owner.latitudeText, '41.550000');
+        expect(harness.owner.longitudeText, '14.640000');
+        expect(harness.owner.editorRevision, revision);
+        expect(harness.owner.hasUncheckpointedChanges, isTrue);
+        expect(harness.local.drafts.saves, isEmpty);
+      },
+      disposeOwners: () => harness.dispose(),
+      variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    );
+  }
 
   testOwnerUI('auth revocation retires picker and its stale callbacks', (
     tester,

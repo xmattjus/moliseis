@@ -385,7 +385,10 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
       listenable: owner,
       builder: (context, _) => CallbackShortcuts(
         bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): requestBack,
+          const SingleActivator(
+            LogicalKeyboardKey.escape,
+            includeRepeats: false,
+          ): requestBack,
         },
         child: Focus(
           autofocus: true,
