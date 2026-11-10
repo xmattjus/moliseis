@@ -2945,7 +2945,18 @@ void main() {
         expect(find.text('Posizione'), findsOneWidget);
         expect(find.text('Mappa'), findsOneWidget);
         expect(find.text('Coordinate'), findsOneWidget);
+        expect(find.byType(GeoMap), findsNothing);
+
+        await scrollTo(tester, find.text('Seleziona sulla mappa'));
+        await tester.tap(find.text('Seleziona sulla mappa'));
+        await tester.pumpAndSettle();
         expect(find.byType(GeoMap), findsOneWidget);
+
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byType(GeoMap), findsNothing);
+        expect(find.text('Posizione'), findsOneWidget);
+        expect(viewModel.isDirty, isFalse);
       }, disposeOwners: () => viewModel.dispose());
 
       testOwnerUI('edit screen exposes the Posizione section after load', (

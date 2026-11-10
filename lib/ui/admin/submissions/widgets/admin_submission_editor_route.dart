@@ -385,28 +385,36 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
       listenable: owner,
       builder: (context, _) => CallbackShortcuts(
         bindings: {
-          const SingleActivator(LogicalKeyboardKey.escape): requestBack,
+          const SingleActivator(
+            LogicalKeyboardKey.escape,
+            includeRepeats: false,
+          ): requestBack,
         },
-        child: PopScope<Object?>(
-          canPop:
-              defaultTargetPlatform != TargetPlatform.iOS ||
-              !(owner.hasUncheckpointedChanges || owner.exitDecisionPending) ||
-              _allowExplicitPop,
-          child: AdminSubmissionEditorScreen(
-            viewModel: owner,
-            onBack: requestBack,
-            onModerationClose: (activation, lane, execution) {
-              if (!mounted) return false;
-              final visit = _exitVisit;
-              return visit != null &&
-                  (_exitPolicy?.closeAfterModeration(
-                        visit,
-                        activation,
-                        lane,
-                        execution,
-                      ) ??
-                      false);
-            },
+        child: Focus(
+          autofocus: true,
+          skipTraversal: true,
+          child: PopScope<Object?>(
+            canPop:
+                defaultTargetPlatform != TargetPlatform.iOS ||
+                !(owner.hasUncheckpointedChanges ||
+                    owner.exitDecisionPending) ||
+                _allowExplicitPop,
+            child: AdminSubmissionEditorScreen(
+              viewModel: owner,
+              onBack: requestBack,
+              onModerationClose: (activation, lane, execution) {
+                if (!mounted) return false;
+                final visit = _exitVisit;
+                return visit != null &&
+                    (_exitPolicy?.closeAfterModeration(
+                          visit,
+                          activation,
+                          lane,
+                          execution,
+                        ) ??
+                        false);
+              },
+            ),
           ),
         ),
       ),
