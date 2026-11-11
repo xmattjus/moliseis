@@ -62,7 +62,9 @@ Session-driven declarative redirects and pushed-login replacement SHALL preserve
 
 Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh and retries SHALL use the selected list through owner admission; accepted pull refresh SHALL await its admitted execution's safe settlement, independently of presentation revocation. An editor returning changed SHALL request submissions and then selected ignored sources through ordinary admission; busy requests may be ignored and manual refresh provides recovery. List loading, empty, error, retry and prior-data retention rendering SHALL be preserved.
 
-Admitted toolbar and pull refreshes SHALL share one centered `EmptyView.loading` presentation displaying `Aggiornamento in corso...` within the available Dashboard content region. The Dashboard AppBar SHALL remain visible; the entire filter bar and previous list, empty or error content SHALL be temporarily hidden. Only one progress indicator SHALL be displayed. Normal filters and selected content SHALL return after safe settlement or presentation revocation, preserving retained data, selection and relevant scroll position where practical. Outside admitted manual refresh, existing rendering policies SHALL remain unchanged.
+Admitted toolbar and pull refreshes SHALL share one centered `EmptyView.loading` presentation displaying `Caricamento in corso` within the available Dashboard content region. The Dashboard AppBar SHALL remain visible; the entire filter bar and previous list, empty or error content SHALL be temporarily hidden. Only one progress indicator SHALL be displayed. Normal filters and selected content SHALL return after safe settlement or presentation revocation, preserving retained data, selection and relevant scroll position where practical. Outside admitted manual refresh, existing rendering policies SHALL remain unchanged.
+
+Both entry points SHALL expose an accessible secondary action with the exact visible label `Annulla` while loading is visible, including during a nonterminating read. Its accessibility description SHALL clarify that dismissing the wait does not stop the admitted update. Activation SHALL revoke only the exact manual-refresh presentation and its feedback authority, restoring filters, retained content, interaction, keyboard focus eligibility, accessibility traversal and relevant scroll state without changing the selected filter. It SHALL NOT cancel, restart, complete or reclassify the admitted read or alter its safe-settlement acknowledgement, route authority or recovery Snackbar ownership.
 
 #### Scenario: Initial loading and empty result
 - **WHEN** a new dashboard begins its first request then returns an empty list
@@ -159,6 +161,16 @@ Admitted toolbar and pull refreshes SHALL share one centered `EmptyView.loading`
 - **WHEN** the filter bar and previous content are hidden
 - **THEN** they are not visible, cannot be interacted with or receive keyboard focus, and are excluded from accessibility traversal
 - **AND** restoration preserves appropriate data, selection and relevant scroll state without requiring every widget to remain mounted or retain element identity
+
+
+#### Scenario: Dismiss pending manual-refresh presentation without cancelling execution
+- **GIVEN** a toolbar or pull refresh has been admitted and remains pending, possibly indefinitely
+- **WHEN** the user activates its accessible `Annulla` action
+- **THEN** its loading presentation disappears immediately and retained filters and content become visible, interactive, keyboard-focusable and accessible again with appropriate selection and scroll state
+- **AND** the original read remains admitted and pending without another repository request, fabricated cancellation or completion; a pull callback still awaits that exact execution's safe settlement
+- **AND** the independent lane remains available through normal authorized admission while the original lane retains its single-flight restriction, and ordinary Back/navigation behavior remains available
+- **AND** eventual results follow existing ViewModel publication and safe-settlement rules, but dismissed or obsolete presentation callbacks cannot recreate loading, show stale feedback, dismiss a newer presentation or change current selection
+- **AND** route authority and unrelated recovery Snackbar state are unchanged
 
 
 ## ADDED Requirements
