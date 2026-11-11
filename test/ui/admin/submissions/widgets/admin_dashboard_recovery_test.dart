@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dart';
@@ -21,6 +22,67 @@ void main() {
   late AdminSaveRouteHarness harness;
   const message = 'Hai una modifica interrotta da recuperare.';
   const nonce = '22222222-2222-4222-8222-222222222222';
+
+  for (final pull in [false, true]) {
+    testOwnerUI(
+      'dismissing manual wait preserves unrelated recovery pull=$pull',
+      (tester) async {
+        harness = AdminSaveRouteHarness()
+          ..seedNavigationRecovery(requestNonce: nonce);
+        final candidate = harness.local.drafts.drafts.values.single;
+        final assets = List.of(harness.local.staged.assets[candidate.owner]!);
+        harness.repository.listResult = Result.success([
+          sampleAdminSubmission(),
+        ]);
+        harness.router.goNamed(RouteNames.adminDashboard);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+        expect(find.text(message), findsOneWidget);
+        final pending = Completer<Result<List<AdminSubmission>>>();
+        harness.repository.pendingList = pending;
+        if (pull) {
+          await tester.drag(
+            find.byType(CustomScrollView),
+            const Offset(0, 300),
+          );
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.pump(const Duration(milliseconds: 300));
+        } else {
+          await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+        }
+        await pumpCommandTurns(tester);
+        await tester.pump(const Duration(milliseconds: 300));
+        await pumpCommandTurns(tester);
+        await tester.pump(const Duration(milliseconds: 300));
+        await pumpCommandTurns(tester);
+        expect(find.text('Annulla').hitTestable(), findsOneWidget);
+        expect(find.text(message), findsOneWidget);
+        final recovery = tester.element(find.text(message));
+        await tester.tap(find.text('Annulla'));
+        await tester.pump();
+        expect(tester.element(find.text(message)), same(recovery));
+        expect(find.text('Riprendi').hitTestable(), findsOneWidget);
+        expect(find.text('Tutti'), findsOneWidget);
+        expect(pending.isCompleted, isFalse);
+        expect(harness.repository.listCallCount, 2);
+        pending.complete(Result.error(TestException('dismissed failure')));
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        expect(tester.element(find.text(message)), same(recovery));
+        expect(find.byType(SnackBar), findsOneWidget);
+        expect(
+          harness.local.drafts.drafts[candidate.owner.lookupKey],
+          same(candidate),
+        );
+        expect(harness.local.staged.assets[candidate.owner], assets);
+        expect(harness.local.drafts.saves, isEmpty);
+        expect(harness.local.staged.removals, isEmpty);
+        expect(harness.repository.updateInputs, isEmpty);
+        expect(harness.repository.createInputs, isEmpty);
+      },
+      disposeOwners: () => harness.dispose(),
+    );
+  }
 
   for (final recovery in [true, false]) {
     testOwnerUI('declarative editor return restores recovery and refreshes; '

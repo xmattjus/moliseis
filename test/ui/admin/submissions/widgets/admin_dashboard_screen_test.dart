@@ -1,5 +1,6 @@
 import 'dart:async' show Completer, unawaited;
 
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -1303,6 +1304,56 @@ void main() {
         auth.dispose();
       },
     );
+    testOwnerUI(
+      'REF ignored failure restores retained sources and authorized feedback',
+      (tester) async {
+        repository.ignoredSourcesResult = const Result.success([
+          AdminIgnoredSource(
+            id: 12,
+            provider: 'p',
+            externalId: 'e',
+            name: 'Retained ignored',
+            ignoredAt: 'today',
+          ),
+        ]);
+        final initial = viewModel.refreshIgnoredSources();
+        await pumpCommandTurns(tester);
+        await initial;
+        viewModel.setIgnoredFilter();
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final pending = Completer<Result<List<AdminIgnoredSource>>>();
+        repository.pendingIgnoredList = pending;
+        await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+        await pumpCommandTurns(tester);
+        expect(find.text('Retained ignored'), findsNothing);
+        pending.complete(
+          Result.error(TestException('ignored refresh failure')),
+        );
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        expect(find.text('Retained ignored'), findsOneWidget);
+        expect(find.text('Tutti'), findsOneWidget);
+        expect(
+          find.text('Impossibile caricare le fonti ignorate'),
+          findsOneWidget,
+        );
+        expect(find.byType(SnackBar), findsOneWidget);
+        expect(viewModel.showIgnored, isTrue);
+        expect(repository.listCallCount, 0);
+        expect(repository.ignoredListCalls, 2);
+      },
+      disposeOwners: () {
+        viewModel.dispose();
+        auth.dispose();
+      },
+    );
+
     for (final compact in [false, true]) {
       for (final ignored in [false, true]) {
         testOwnerUI(
@@ -1357,11 +1408,28 @@ void main() {
               await tester.tap(find.byTooltip('Aggiorna i contenuti'));
             }
             await pumpCommandTurns(tester);
-            expect(find.text('Aggiornamento in corso...'), findsOneWidget);
-            expect(tester.element(find.byType(NestedScrollView)), same(scroll));
+            expect(find.text('Caricamento in corso'), findsOneWidget);
+            expect(find.text('Annulla').hitTestable(), findsOneWidget);
+            expect(find.text('Tutti'), findsNothing);
+            expect(
+              find.text(ignored ? 'Retained ignored' : 'Retained row'),
+              findsNothing,
+            );
+            expect(find.byType(CircularProgressIndicator), findsOneWidget);
+            expect(find.byType(RefreshProgressIndicator), findsNothing);
+            expect(find.text('Area redazione').hitTestable(), findsOneWidget);
             expect(
               tester.element(
-                find.text(ignored ? 'Retained ignored' : 'Retained row'),
+                find.byType(NestedScrollView, skipOffstage: false),
+              ),
+              same(scroll),
+            );
+            expect(
+              tester.element(
+                find.text(
+                  ignored ? 'Retained ignored' : 'Retained row',
+                  skipOffstage: false,
+                ),
               ),
               same(row),
             );
@@ -1379,7 +1447,12 @@ void main() {
             }
             await pumpCommandTurns(tester);
             await tester.pumpAndSettle();
-            expect(find.text('Aggiornamento in corso...'), findsNothing);
+            expect(find.text('Caricamento in corso'), findsNothing);
+            expect(find.text('Tutti'), findsOneWidget);
+            expect(
+              find.text(ignored ? 'Retained ignored' : 'Retained row'),
+              findsOneWidget,
+            );
             expect(find.byType(SnackBar), findsNothing);
             expect(router.state.uri.path, '/dashboard');
           },
@@ -1391,7 +1464,275 @@ void main() {
       }
     }
 
-    for (final revoke in ['none', 'selection', 'cover', 'owner', 'auth']) {
+    for (final compact in [false, true]) {
+      for (final ignored in [false, true]) {
+        testOwnerUI(
+          'REF scrolled loading is centered and excludes retained controls '
+          'compact=$compact ignored=$ignored',
+          (tester) async {
+            tester.view
+              ..physicalSize = Size(compact ? 400 : 1000, 900)
+              ..devicePixelRatio = 1;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            final semantics = tester.ensureSemantics();
+            try {
+              repository
+                ..listResult = Result.success([
+                  for (var i = 0; i < 30; i++)
+                    sampleAdminSubmission(id: i + 1, name: 'Retained row $i'),
+                ])
+                ..ignoredSourcesResult = Result.success([
+                  for (var i = 0; i < 30; i++)
+                    AdminIgnoredSource(
+                      id: i + 1,
+                      provider: 'p',
+                      externalId: '$i',
+                      name: 'Retained ignored $i',
+                      ignoredAt: 'today',
+                    ),
+                ]);
+              final initial = ignored
+                  ? viewModel.refreshIgnoredSources()
+                  : viewModel.refreshSubmissions();
+              await pumpCommandTurns(tester);
+              await initial;
+              if (ignored) {
+                viewModel.setIgnoredFilter();
+              } else {
+                viewModel.setFilter(AdminSubmissionStatus.pending);
+              }
+              await tester.pumpWidget(
+                MaterialApp.router(
+                  scaffoldMessengerKey: $scaffoldMessengerKey,
+                  routerConfig: router,
+                  builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(context).copyWith(
+                      // shortcut: test ignored 2x after row fix.
+                      textScaler: TextScaler.linear(
+                        compact && ignored ? 1.3 : 2,
+                      ),
+                      padding: const EdgeInsets.only(top: 24),
+                    ),
+                    child: child!,
+                  ),
+                ),
+              );
+              await tester.pumpAndSettle();
+              await tester.drag(
+                find.byType(CustomScrollView),
+                const Offset(0, -650),
+              );
+              await tester.pumpAndSettle();
+              final scroll = tester.state<NestedScrollViewState>(
+                find.byType(NestedScrollView),
+              );
+              expect(scroll.innerController.position.pixels, greaterThan(0));
+              // Expose the toolbar while retaining the inner scroll offset.
+              scroll.outerController.jumpTo(0);
+              await tester.pumpAndSettle();
+              final offset = scroll.innerController.position.pixels;
+              final filterFocus = Focus.of(tester.element(find.text('Tutti')));
+              expect(filterFocus.canRequestFocus, isTrue);
+              final main = Completer<Result<List<AdminSubmission>>>();
+              final sources = Completer<Result<List<AdminIgnoredSource>>>();
+              repository
+                ..pendingList = main
+                ..pendingIgnoredList = sources;
+              if (compact) {
+                await tester.tap(find.byTooltip('Altro'));
+                await tester.pumpAndSettle();
+                await tester.tap(find.text('Aggiorna'));
+              } else {
+                await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+              }
+              await pumpCommandTurns(tester);
+              expect(find.text('Area redazione').hitTestable(), findsOneWidget);
+              expect(find.byType(ToggleButtons), findsNothing);
+              expect(find.byType(AdminSubmissionListItem), findsNothing);
+              expect(find.textContaining('Retained ignored'), findsNothing);
+              expect(find.bySemanticsLabel('Tutti'), findsNothing);
+              expect(
+                find.bySemanticsLabel(RegExp('Retained (row|ignored)')),
+                findsNothing,
+              );
+              expect(filterFocus.canRequestFocus, isFalse);
+              filterFocus.requestFocus();
+              await tester.pump();
+              expect(filterFocus.hasFocus, isFalse);
+              final cancel = find.text('Annulla');
+              expect(cancel.hitTestable(), findsOneWidget);
+              final cancelSemantics = tester.getSemantics(cancel);
+              expect(
+                cancelSemantics.getSemanticsData().hasAction(
+                  SemanticsAction.tap,
+                ),
+                isTrue,
+              );
+              expect(
+                cancelSemantics.getSemanticsData().hint,
+                contains('aggiornamento può continuare'),
+              );
+              expect(find.byType(CircularProgressIndicator), findsOneWidget);
+              expect(find.byType(RefreshProgressIndicator), findsNothing);
+              final group = find
+                  .ancestor(of: cancel, matching: find.byType(Column))
+                  .first;
+              final appBar = tester.getRect(find.byType(AppBar));
+              expect(
+                tester.getCenter(group),
+                offsetMoreOrLessEquals(
+                  Offset((compact ? 400 : 1000) / 2, (appBar.bottom + 900) / 2),
+                ),
+              );
+              await tester.tap(cancel);
+              await tester.pump();
+              expect(find.text('Caricamento in corso'), findsNothing);
+              expect(find.byType(ToggleButtons), findsOneWidget);
+              expect(find.bySemanticsLabel('Tutti'), findsOneWidget);
+              expect(filterFocus.canRequestFocus, isTrue);
+              filterFocus.requestFocus();
+              await tester.pump();
+              expect(filterFocus.hasFocus, isTrue);
+              expect(scroll.innerController.position.pixels, offset);
+              expect(viewModel.showIgnored, ignored);
+              expect(
+                viewModel.filter,
+                ignored ? null : AdminSubmissionStatus.pending,
+              );
+              expect(
+                ignored
+                    ? viewModel.loadIgnoredSnapshot.isRunning
+                    : viewModel.loadSnapshot.isRunning,
+                isTrue,
+              );
+              expect(repository.listCallCount, ignored ? 0 : 2);
+              expect(repository.ignoredListCalls, ignored ? 2 : 0);
+              if (ignored) {
+                sources.complete(repository.ignoredSourcesResult);
+              } else {
+                main.complete(repository.listResult);
+              }
+              await pumpCommandTurns(tester);
+              await tester.pumpAndSettle();
+              expect(scroll.innerController.position.pixels, offset);
+              expect(find.byType(SnackBar), findsNothing);
+              expect(tester.takeException(), isNull);
+            } finally {
+              semantics.dispose();
+            }
+          },
+          disposeOwners: () {
+            viewModel.dispose();
+            auth.dispose();
+          },
+        );
+      }
+    }
+
+    for (final pull in [false, true]) {
+      for (final failure in [false, true]) {
+        testOwnerUI(
+          'REF dismiss pending wait preserves execution and pull settlement '
+          'pull=$pull failure=$failure',
+          (tester) async {
+            repository.listResult = Result.success([
+              sampleAdminSubmission(name: 'Retained row'),
+            ]);
+            final initial = viewModel.refreshSubmissions();
+            await pumpCommandTurns(tester);
+            await initial;
+            await tester.pumpWidget(
+              MaterialApp.router(
+                scaffoldMessengerKey: $scaffoldMessengerKey,
+                routerConfig: router,
+              ),
+            );
+            await tester.pumpAndSettle();
+            final pending = Completer<Result<List<AdminSubmission>>>();
+            repository.pendingList = pending;
+            if (pull) {
+              await tester.drag(
+                find.byType(CustomScrollView),
+                const Offset(0, 300),
+              );
+              await tester.pump(const Duration(milliseconds: 300));
+              await tester.pump(const Duration(milliseconds: 300));
+            } else {
+              await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+            }
+            await pumpCommandTurns(tester);
+            var pullSettled = false;
+            Future<void>? pullFuture;
+            if (pull) {
+              // show() returns the already armed gesture's pending Future.
+              pullFuture = tester
+                  .state<RefreshIndicatorState>(find.byType(RefreshIndicator))
+                  .show();
+              unawaited(pullFuture.then((_) => pullSettled = true));
+            }
+            expect(find.text('Caricamento in corso'), findsOneWidget);
+            expect(find.text('Annulla').hitTestable(), findsOneWidget);
+            await tester.pump(const Duration(seconds: 30));
+            expect(pending.isCompleted, isFalse);
+            expect(find.text('Annulla').hitTestable(), findsOneWidget);
+            await tester.tap(find.text('Annulla'));
+            await tester.pump();
+            expect(find.text('Retained row'), findsOneWidget);
+            expect(find.text('Tutti').hitTestable(), findsOneWidget);
+            expect(viewModel.loadSnapshot.isRunning, isTrue);
+            expect(viewModel.canRefreshSelectedLane, isFalse);
+            expect(pending.isCompleted, isFalse);
+            expect(pullSettled, isFalse);
+            // Both admission routes must refuse a second read of the busy lane.
+            expect(viewModel.startSelectedLaneRefresh(), isNull);
+            await tester
+                .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+                .onRefresh();
+            expect(repository.listCallCount, 2);
+            expect(find.text('Caricamento in corso'), findsNothing);
+            if (failure) {
+              pending.complete(
+                Result.error(TestException('dismissed failure')),
+              );
+            } else {
+              pending.complete(
+                Result.success([
+                  sampleAdminSubmission(name: 'Late updated row'),
+                ]),
+              );
+            }
+            await pumpCommandTurns(tester);
+            if (pullFuture != null) await pullFuture;
+            await tester.pumpAndSettle();
+            expect(pullSettled, pull);
+            expect(viewModel.loadSnapshot.isRunning, isFalse);
+            expect(
+              find.text(failure ? 'Retained row' : 'Late updated row'),
+              findsOneWidget,
+            );
+            expect(find.text('Caricamento in corso'), findsNothing);
+            expect(find.byType(SnackBar), findsNothing);
+            expect(repository.listCallCount, 2);
+          },
+          disposeOwners: () {
+            viewModel.dispose();
+            auth.dispose();
+          },
+        );
+      }
+    }
+
+    for (final revoke in [
+      'none',
+      'selection',
+      'cover',
+      'owner',
+      'auth',
+      'back',
+      'dispose',
+      'logout',
+    ]) {
       testOwnerUI(
         'REF delayed failure feedback authority=$revoke',
         (tester) async {
@@ -1412,8 +1753,14 @@ void main() {
           repository.pendingList = pending;
           await tester.tap(find.byTooltip('Aggiorna i contenuti'));
           await pumpCommandTurns(tester);
-          expect(find.text('Aggiornamento in corso...'), findsOneWidget);
-          if (revoke == 'selection') {
+          expect(find.text('Caricamento in corso'), findsOneWidget);
+          if (revoke == 'back') {
+            await tester.tap(find.byType(IconButton).first);
+          } else if (revoke == 'dispose') {
+            await tester.pumpWidget(const SizedBox.shrink());
+          } else if (revoke == 'logout') {
+            await tester.tap(find.byTooltip('Esegui il logout'));
+          } else if (revoke == 'selection') {
             viewModel
               ..setFilter(AdminSubmissionStatus.accepted)
               ..setFilter(null);
@@ -1443,10 +1790,12 @@ void main() {
               ..emit(AuthChangeEvent.userUpdated);
           }
           await pumpCommandTurns(tester);
+          expect(pending.isCompleted, isFalse);
+          expect(repository.listCallCount, 2);
           pending.complete(Result.error(TestException('manual failure')));
           await pumpCommandTurns(tester);
           await tester.pumpAndSettle();
-          expect(find.text('Aggiornamento in corso...'), findsNothing);
+          expect(find.text('Caricamento in corso'), findsNothing);
           expect(
             find.byType(SnackBar),
             revoke == 'none' ? findsOneWidget : findsNothing,
@@ -1470,7 +1819,7 @@ void main() {
     }
 
     testOwnerUI(
-      'REF pull owns native progress and awaits only its admitted execution',
+      'REF pull uses unified progress and awaits only its admitted execution',
       (tester) async {
         repository.listResult = Result.success([
           sampleAdminSubmission(name: 'Retained row'),
@@ -1492,9 +1841,12 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
         await pumpCommandTurns(tester);
         expect(repository.listCallCount, 2);
-        expect(find.byType(RefreshProgressIndicator), findsOneWidget);
-        expect(find.text('Aggiornamento in corso...'), findsNothing);
-        expect(find.text('Retained row'), findsOneWidget);
+        expect(find.byType(RefreshProgressIndicator), findsNothing);
+        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        expect(find.text('Caricamento in corso'), findsOneWidget);
+        expect(find.text('Annulla').hitTestable(), findsOneWidget);
+        expect(find.text('Tutti'), findsNothing);
+        expect(find.text('Retained row'), findsNothing);
         pending.complete(repository.listResult);
         await pumpCommandTurns(tester);
         await tester.pumpAndSettle();
@@ -1506,45 +1858,80 @@ void main() {
         auth.dispose();
       },
     );
-    testOwnerUI(
-      'REF old lane completion cannot remove newer toolbar progress',
-      (tester) async {
-        final main = Completer<Result<List<AdminSubmission>>>();
-        final ignored = Completer<Result<List<AdminIgnoredSource>>>();
-        repository
-          ..pendingList = main
-          ..pendingIgnoredList = ignored;
-        await tester.pumpWidget(
-          MaterialApp.router(
-            scaffoldMessengerKey: $scaffoldMessengerKey,
-            routerConfig: router,
-          ),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('Aggiorna i contenuti'));
-        await pumpCommandTurns(tester);
-        expect(find.text('Aggiornamento in corso...'), findsOneWidget);
-        viewModel.setIgnoredFilter();
-        await tester.pump();
-        await tester.tap(find.byTooltip('Aggiorna i contenuti'));
-        await pumpCommandTurns(tester);
-        expect(repository.listCallCount, 1);
-        expect(repository.ignoredListCalls, 1);
-        main.complete(Result.error(TestException('obsolete lane')));
-        await pumpCommandTurns(tester);
-        expect(find.text('Aggiornamento in corso...'), findsOneWidget);
-        expect(find.byType(SnackBar), findsNothing);
-        ignored.complete(const Result.success([]));
-        await pumpCommandTurns(tester);
-        await tester.pumpAndSettle();
-        expect(find.text('Aggiornamento in corso...'), findsNothing);
-        expect(find.byType(SnackBar), findsNothing);
-      },
-      disposeOwners: () {
-        viewModel.dispose();
-        auth.dispose();
-      },
-    );
+    for (final pull in [false, true]) {
+      testOwnerUI(
+        'REF old lane completion cannot remove newer progress pull=$pull',
+        (tester) async {
+          final main = Completer<Result<List<AdminSubmission>>>();
+          final ignored = Completer<Result<List<AdminIgnoredSource>>>();
+          repository
+            ..pendingList = main
+            ..pendingIgnoredList = ignored;
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
+          await tester.pumpAndSettle();
+          if (pull) {
+            await tester.drag(
+              find.byType(CustomScrollView),
+              const Offset(0, 300),
+            );
+            await tester.pump(const Duration(milliseconds: 300));
+            await tester.pump(const Duration(milliseconds: 300));
+          } else {
+            await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+          }
+          await pumpCommandTurns(tester);
+          expect(find.text('Caricamento in corso'), findsOneWidget);
+          final staleDismiss = tester
+              .widget<TextButton>(find.widgetWithText(TextButton, 'Annulla'))
+              .onPressed!;
+          await tester.tap(find.text('Annulla'));
+          await tester.pump();
+          await tester.ensureVisible(find.text('Fonti ignorate'));
+          await tester.tap(find.text('Fonti ignorate'));
+          await pumpCommandTurns(tester);
+          expect(viewModel.loadSnapshot.isRunning, isTrue);
+          expect(viewModel.loadIgnoredSnapshot.isRunning, isTrue);
+          await tester
+              .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+              .onRefresh();
+          expect(find.text('Caricamento in corso'), findsNothing);
+          ignored.complete(const Result.success([]));
+          await pumpCommandTurns(tester);
+          repository.pendingIgnoredList =
+              Completer<Result<List<AdminIgnoredSource>>>();
+          tester
+              .state<NestedScrollViewState>(find.byType(NestedScrollView))
+              .outerController
+              .jumpTo(0);
+          await tester.pump();
+          await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+          await pumpCommandTurns(tester);
+          expect(repository.listCallCount, 1);
+          expect(repository.ignoredListCalls, 2);
+          staleDismiss();
+          await tester.pump();
+          expect(find.text('Caricamento in corso'), findsOneWidget);
+          main.complete(Result.error(TestException('obsolete lane')));
+          await pumpCommandTurns(tester);
+          expect(find.text('Caricamento in corso'), findsOneWidget);
+          expect(find.byType(SnackBar), findsNothing);
+          repository.pendingIgnoredList!.complete(const Result.success([]));
+          await pumpCommandTurns(tester);
+          await tester.pumpAndSettle();
+          expect(find.text('Caricamento in corso'), findsNothing);
+          expect(find.byType(SnackBar), findsNothing);
+        },
+        disposeOwners: () {
+          viewModel.dispose();
+          auth.dispose();
+        },
+      );
+    }
 
     testOwnerUI(
       'REF handled unexpected failure shows one message and reports once',
@@ -1571,7 +1958,7 @@ void main() {
           logger.calls.where((call) => identical(call.error, failure)),
           hasLength(1),
         );
-        expect(find.text('Aggiornamento in corso...'), findsNothing);
+        expect(find.text('Caricamento in corso'), findsNothing);
       },
       disposeOwners: () {
         viewModel.dispose();
@@ -1617,51 +2004,97 @@ void main() {
         auth.dispose();
       },
     );
-    for (final ignored in [false, true]) {
-      testOwnerUI(
-        'REF empty lane pull has only native progress ignored=$ignored',
-        (tester) async {
-          if (ignored) viewModel.setIgnoredFilter();
-          final main = Completer<Result<List<AdminSubmission>>>();
-          final sources = Completer<Result<List<AdminIgnoredSource>>>();
-          repository
-            ..pendingList = main
-            ..pendingIgnoredList = sources;
-          await tester.pumpWidget(
-            MaterialApp.router(
-              scaffoldMessengerKey: $scaffoldMessengerKey,
-              routerConfig: router,
-            ),
-          );
-          await tester.pumpAndSettle();
-          await tester.drag(
-            find.byType(CustomScrollView),
-            const Offset(0, 300),
-          );
-          await tester.pump(const Duration(milliseconds: 300));
-          await tester.pump(const Duration(milliseconds: 300));
-          await pumpCommandTurns(tester);
-          expect(find.byType(RefreshProgressIndicator), findsOneWidget);
-          expect(find.text('Caricamento in corso...'), findsNothing);
-          expect(find.text('Caricamento fonti ignorate...'), findsNothing);
-          expect(find.text('Aggiornamento in corso...'), findsNothing);
-          expect(repository.listCallCount, ignored ? 0 : 1);
-          expect(repository.ignoredListCalls, ignored ? 1 : 0);
-          if (ignored) {
-            sources.complete(const Result.success([]));
-          } else {
-            main.complete(const Result.success([]));
-          }
-          await pumpCommandTurns(tester);
-          await tester.pumpAndSettle();
-          expect(find.byType(RefreshProgressIndicator), findsNothing);
-          expect(find.byType(SnackBar), findsNothing);
-        },
-        disposeOwners: () {
-          viewModel.dispose();
-          auth.dispose();
-        },
-      );
+    for (final failedInitial in [false, true]) {
+      for (final ignored in [false, true]) {
+        testOwnerUI(
+          'REF empty/error lane pull hides placeholders '
+          'ignored=$ignored failedInitial=$failedInitial',
+          (tester) async {
+            tester.view
+              ..physicalSize = const Size(400, 800)
+              ..devicePixelRatio = 1;
+            addTearDown(tester.view.resetPhysicalSize);
+            addTearDown(tester.view.resetDevicePixelRatio);
+            if (ignored) viewModel.setIgnoredFilter();
+            if (failedInitial) {
+              repository
+                ..listResult = Result.error(TestException('initial failure'))
+                ..ignoredSourcesResult = Result.error(
+                  TestException('initial failure'),
+                );
+              final initial = ignored
+                  ? viewModel.refreshIgnoredSources()
+                  : viewModel.refreshSubmissions();
+              await pumpCommandTurns(tester);
+              await initial;
+            }
+            final main = Completer<Result<List<AdminSubmission>>>();
+            final sources = Completer<Result<List<AdminIgnoredSource>>>();
+            repository
+              ..pendingList = main
+              ..pendingIgnoredList = sources;
+            await tester.pumpWidget(
+              MaterialApp.router(
+                scaffoldMessengerKey: $scaffoldMessengerKey,
+                routerConfig: router,
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: const TextScaler.linear(2)),
+                  child: child!,
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            await tester.drag(
+              find.byType(CustomScrollView),
+              const Offset(0, 300),
+            );
+            await tester.pump(const Duration(milliseconds: 300));
+            await tester.pump(const Duration(milliseconds: 300));
+            await pumpCommandTurns(tester);
+            expect(find.byType(RefreshProgressIndicator), findsNothing);
+            expect(find.byType(CircularProgressIndicator), findsOneWidget);
+            expect(find.text('Annulla').hitTestable(), findsOneWidget);
+            expect(find.text('Tutti'), findsNothing);
+            expect(find.text('Nessun contributo da mostrare'), findsNothing);
+            expect(find.text('Nessuna fonte ignorata'), findsNothing);
+            expect(
+              find.text('Impossibile caricare le fonti ignorate'),
+              findsNothing,
+            );
+            expect(
+              find.text('Impossibile caricare i contributi'),
+              findsNothing,
+            );
+            expect(find.text('Riprova'), findsNothing);
+            expect(find.text('Caricamento in corso...'), findsNothing);
+            expect(find.text('Caricamento fonti ignorate...'), findsNothing);
+            expect(find.text('Caricamento in corso'), findsOneWidget);
+            expect(
+              repository.listCallCount,
+              ignored ? 0 : (failedInitial ? 2 : 1),
+            );
+            expect(
+              repository.ignoredListCalls,
+              ignored ? (failedInitial ? 2 : 1) : 0,
+            );
+            if (ignored) {
+              sources.complete(const Result.success([]));
+            } else {
+              main.complete(const Result.success([]));
+            }
+            await pumpCommandTurns(tester);
+            await tester.pumpAndSettle();
+            expect(find.byType(RefreshProgressIndicator), findsNothing);
+            expect(find.byType(SnackBar), findsNothing);
+          },
+          disposeOwners: () {
+            viewModel.dispose();
+            auth.dispose();
+          },
+        );
+      }
     }
   });
 }
