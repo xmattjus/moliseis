@@ -34,6 +34,7 @@ import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
+import '../../../../support/admin_editor_interactions.dart';
 import '../../../../support/admin_moderation_error_cases.dart';
 import '../../../../support/command_test_support.dart';
 import '../../../../support/fake_cache_manager.dart';
@@ -228,7 +229,9 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
-        await tester.ensureVisible(
+        await showAdminEditorActions(tester);
+        await revealAdminEditorWidget(
+          tester,
           find.byKey(const ValueKey('admin_event_search')),
         );
         await tester.pumpAndSettle();
@@ -236,7 +239,7 @@ void main() {
           find.byKey(const ValueKey('admin_event_search')),
           'festa',
         );
-        await tester.ensureVisible(find.text('Cerca eventi'));
+        await revealAdminEditorWidget(tester, find.text('Cerca eventi'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Cerca eventi'));
         await tester.pumpAndSettle();
@@ -252,7 +255,8 @@ void main() {
           ),
           findsOneWidget,
         );
-        await tester.ensureVisible(
+        await revealAdminEditorWidget(
+          tester,
           find.byKey(const ValueKey('admin_event_candidate_43')),
         );
         await tester.pumpAndSettle();
@@ -326,9 +330,13 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
-        expect(find.text('location: applicato'), findsOneWidget);
+        await showAdminEditorActions(tester);
+        expect(find.text('Da applicare'), findsOneWidget);
         expect(find.textContaining('Sovrascrive modifiche'), findsOneWidget);
-        await tester.ensureVisible(find.text('Mantieni valore attuale'));
+        await revealAdminEditorWidget(
+          tester,
+          find.text('Mantieni valore attuale'),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text('Mantieni valore attuale'));
         await tester.pumpAndSettle();
@@ -381,7 +389,8 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Collega a evento'));
+        await showAdminEditorActions(tester);
+        await revealAdminEditorWidget(tester, find.text('Collega a evento'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Collega a evento'));
         await tester.pumpAndSettle();
@@ -440,6 +449,7 @@ void main() {
           await tester.pumpWidget(app);
           unawaited(router.push('/editor'));
           await tester.pumpAndSettle();
+          await showAdminEditorActions(tester);
           expect(viewModel.requestKeepCurrent(group), isTrue);
           await pumpCommandTurns(tester);
           await tester.pumpAndSettle();
@@ -546,6 +556,7 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
         expect(viewModel.requestLink(42), isTrue);
         await pumpCommandTurns(tester);
         await tester.pumpAndSettle();
@@ -606,9 +617,12 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
+        await revealAdminEditorWidget(tester, find.text('Nome: Current Y'));
         expect(find.text('Nome: Current Y'), findsOneWidget);
         expect(find.textContaining('La proposta è precedente'), findsOneWidget);
-        await tester.ensureVisible(
+        await revealAdminEditorWidget(
+          tester,
           find.byKey(const ValueKey('admin_acknowledge_current_source')),
         );
         await tester.pumpAndSettle();
@@ -616,7 +630,7 @@ void main() {
           find.byKey(const ValueKey('admin_acknowledge_current_source')),
         );
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Rifiuta'));
+        await revealAdminEditorWidget(tester, find.text('Rifiuta'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Rifiuta'));
         await tester.pumpAndSettle();
@@ -672,7 +686,9 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
-        await tester.ensureVisible(
+        await showAdminEditorActions(tester);
+        await revealAdminEditorWidget(
+          tester,
           find.byKey(const ValueKey('admin_acknowledge_current_source')),
         );
         await tester.pumpAndSettle();
@@ -694,7 +710,7 @@ void main() {
             ),
           ),
         );
-        await tester.ensureVisible(find.text('Collega a evento'));
+        await revealAdminEditorWidget(tester, find.text('Collega a evento'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Collega a evento'));
         await tester.pumpAndSettle();
@@ -709,7 +725,8 @@ void main() {
               .value,
           isFalse,
         );
-        await tester.ensureVisible(
+        await revealAdminEditorWidget(
+          tester,
           find.byKey(const ValueKey('admin_acknowledge_current_source')),
         );
         await tester.pumpAndSettle();
@@ -756,6 +773,7 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
       expect(
         find.byKey(const ValueKey('admin_acknowledge_current_source')),
         findsNothing,
@@ -809,6 +827,7 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
         viewModel.setName('Edited');
         expect(viewModel.requestSave(), isTrue);
         await pumpCommandTurns(tester);
@@ -852,6 +871,7 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
         expect(find.text('Collega a evento'), findsOneWidget);
         expect(
           find.text('Pubblica come evento'),
@@ -887,6 +907,7 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
       expect(viewModel.allDay, isTrue);
       expect(viewModel.isDirty, isFalse);
       expect(find.text('Senza orario'), findsOneWidget);
@@ -895,7 +916,7 @@ void main() {
         of: find.widgetWithText(Row, 'Senza orario'),
         matching: find.byType(Checkbox),
       );
-      await tester.ensureVisible(toggle);
+      await revealAdminEditorWidget(tester, toggle);
       await tester.tap(toggle);
       await tester.pumpAndSettle();
       expect(viewModel.allDay, isFalse);
@@ -920,6 +941,7 @@ void main() {
         await tester.pumpAndSettle();
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
 
         expect(find.text('Nuovo contributo'), findsOneWidget);
         expect(find.text('Categoria'), findsOneWidget);
@@ -930,23 +952,15 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('È un evento?'), findsOneWidget);
-        final scrollable = find
-            .descendant(
-              of: find.byKey(
-                const ValueKey<String>('admin_submission_editor_scroll'),
-              ),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        await tester.scrollUntilVisible(
+        await revealAdminEditorWidget(
+          tester,
           find.widgetWithText(FilledButton, 'Crea contributo'),
-          200,
-          scrollable: scrollable,
         );
         expect(
           find.widgetWithText(FilledButton, 'Crea contributo'),
           findsOneWidget,
         );
+        await revealAdminEditorWidget(tester, find.text('Foto'));
         expect(find.text('Foto'), findsOneWidget);
       },
       disposeOwners: () => viewModel.dispose(),
@@ -967,19 +981,10 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(
+        tester,
         find.text('Creato come Redattore · redattore@example.com'),
-        200,
-        scrollable: scrollable,
       );
       expect(
         find.text('Creato come Redattore · redattore@example.com'),
@@ -1026,21 +1031,10 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
-      expect(find.text('Modifica contributo'), findsOneWidget);
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
-        find.text('Foto'),
-        200,
-        scrollable: scrollable,
-      );
+      expect(find.text('Revisiona contributo'), findsOneWidget);
+      await revealAdminEditorWidget(tester, find.text('Foto'));
       expect(find.byType(AppNetworkImage), findsOneWidget);
       final renderedAsset = tester.widget<AppNetworkImage>(
         find.byType(AppNetworkImage),
@@ -1056,13 +1050,20 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsOneWidget,
       );
-      expect(find.byTooltip('Rimuovi foto'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('anna@example.com'),
-        200,
-        scrollable: scrollable,
+      await revealAdminEditorWidget(
+        tester,
+        find.byWidgetPredicate(
+          (widget) => widget is Tooltip && widget.message == 'Rimuovi foto',
+        ),
       );
-      expect(find.text('Proposto da'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Tooltip && widget.message == 'Rimuovi foto',
+        ),
+        findsOneWidget,
+      );
+      await revealAdminEditorWidget(tester, find.text('anna@example.com'));
+      expect(find.text('Autore e dettagli tecnici'), findsOneWidget);
       expect(find.text('Anna Bianchi'), findsOneWidget);
       expect(find.text('anna@example.com'), findsOneWidget);
       for (final value in ['Anna Bianchi', 'anna@example.com']) {
@@ -1083,7 +1084,7 @@ void main() {
       );
       expect(
         find.ancestor(
-          of: find.text('Proposto da'),
+          of: find.text('Autore e dettagli tecnici'),
           matching: find.byType(SentryMask),
         ),
         findsNothing,
@@ -1112,19 +1113,8 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
-        final scrollable = find
-            .descendant(
-              of: find.byKey(
-                const ValueKey<String>('admin_submission_editor_scroll'),
-              ),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        await tester.scrollUntilVisible(
-          find.text('mario@example.com'),
-          200,
-          scrollable: scrollable,
-        );
+        await showAdminEditorActions(tester);
+        await revealAdminEditorWidget(tester, find.text('mario@example.com'));
         for (final identity in ['Mario Rossi', 'mario@example.com']) {
           expect(
             find.ancestor(
@@ -1134,7 +1124,7 @@ void main() {
             findsOneWidget,
           );
         }
-        expect(find.text('Proposto da'), findsOneWidget);
+        expect(find.text('Autore e dettagli tecnici'), findsOneWidget);
         expect(tester.takeException(), isNull);
       }, disposeOwners: () => viewModel.dispose());
     }
@@ -1157,6 +1147,7 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
       final cityField = find.widgetWithText(TextFormField, 'Città');
       await tester.tap(cityField);
@@ -1167,19 +1158,10 @@ void main() {
       );
       final cityFocusNode = tester.widget<EditableText>(cityEditable).focusNode;
       expect(FocusManager.instance.primaryFocus, same(cityFocusNode));
-
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
       final addAsset = find.byKey(
         const ValueKey<String>('admin_submission_add_asset'),
       );
-      await tester.scrollUntilVisible(addAsset, 200, scrollable: scrollable);
+      await revealAdminEditorWidget(tester, addAsset);
       expect(FocusManager.instance.primaryFocus, same(cityFocusNode));
 
       await tester.tap(addAsset);
@@ -1219,6 +1201,7 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Città'),
         'Isernia',
@@ -1249,7 +1232,9 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
+      await revealAdminEditorWidget(tester, find.text('Foto'));
       expect(find.text('Foto'), findsOneWidget);
       expect(find.text('0 / 5'), findsOneWidget);
       expect(find.byType(AppNetworkImage), findsNothing);
@@ -1285,7 +1270,9 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
+      await revealAdminEditorWidget(tester, find.text('5 / 5'));
       expect(find.text('5 / 5'), findsOneWidget);
       expect(find.byType(AppNetworkImage), findsNWidgets(5));
       expect(
@@ -1318,8 +1305,12 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
-      final deleteAsset = find.byTooltip('Rimuovi foto');
+      final deleteAsset = find.byWidgetPredicate(
+        (widget) => widget is Tooltip && widget.message == 'Rimuovi foto',
+      );
+      await revealAdminEditorWidget(tester, deleteAsset);
       await tester.tap(deleteAsset);
       await tester.pumpAndSettle();
       expect(
@@ -1330,6 +1321,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(repository.deleteAssetCalls, isEmpty);
 
+      await revealAdminEditorWidget(tester, deleteAsset);
       await tester.tap(deleteAsset);
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(FilledButton, 'Conferma'));
@@ -1367,6 +1359,7 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
       expect(viewModel.requestAddAsset(), isTrue);
       await pumpCommandTurns(tester);
@@ -1416,7 +1409,12 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
 
+        await revealAdminEditorWidget(
+          tester,
+          find.byType(ContentSubmissionAssetListItem),
+        );
         expect(viewModel.requestDeleteAsset(2), isTrue);
         await tester.pump();
 
@@ -1485,6 +1483,7 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Città'),
         'Isernia',
@@ -1494,7 +1493,7 @@ void main() {
       await pumpCommandTurns(tester);
       await tester.pumpAndSettle();
 
-      expect(find.text('Isernia'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Isernia'), findsOneWidget);
       expect(viewModel.city, 'Isernia');
       expect(viewModel.isDirty, isTrue);
     }, disposeOwners: () => viewModel.dispose());
@@ -1515,19 +1514,10 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Pubblica come luogo'),
-        200,
-        scrollable: scrollable,
       );
       final publishButton = find.widgetWithText(
         FilledButton,
@@ -1538,10 +1528,9 @@ void main() {
       expect(tester.widget<FilledButton>(rejectButton).onPressed, isNotNull);
       expect(find.text('Accetta'), findsNothing);
 
-      await tester.scrollUntilVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(TextFormField, 'Città'),
-        200,
-        scrollable: scrollable,
       );
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Città'),
@@ -1549,22 +1538,19 @@ void main() {
       );
       await tester.pump();
 
-      await tester.scrollUntilVisible(
-        publishButton,
-        200,
-        scrollable: scrollable,
-      );
+      await revealAdminEditorWidget(tester, publishButton);
       expect(tester.widget<FilledButton>(publishButton).onPressed, isNull);
       expect(tester.widget<FilledButton>(rejectButton).onPressed, isNull);
       expect(
-        find.text('Salva le modifiche prima di pubblicare o rifiutare.'),
+        find.text(
+          'Salva le modifiche prima di moderare. Il salvataggio non pubblica.',
+        ),
         findsOneWidget,
       );
 
-      await tester.scrollUntilVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Salva modifiche'),
-        200,
-        scrollable: scrollable,
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Salva modifiche'));
       await tester.pumpAndSettle();
@@ -1591,17 +1577,9 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
+      await showAdminEditorActions(tester);
       final publish = find.widgetWithText(FilledButton, 'Pubblica come luogo');
-      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+      await revealAdminEditorWidget(tester, publish);
 
       final reject = find.widgetWithText(FilledButton, 'Rifiuta');
       expect(tester.widget<FilledButton>(publish).onPressed, isNull);
@@ -1611,26 +1589,26 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.scrollUntilVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(InputChip, 'Natura'),
-        200,
-        scrollable: scrollable,
       );
       await tester.tap(find.widgetWithText(InputChip, 'Natura'));
       await tester.pump();
 
-      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+      await revealAdminEditorWidget(tester, publish);
       expect(tester.widget<FilledButton>(publish).onPressed, isNull);
       expect(tester.widget<FilledButton>(reject).onPressed, isNull);
       expect(
-        find.text('Salva le modifiche prima di pubblicare o rifiutare.'),
+        find.text(
+          'Salva le modifiche prima di moderare. Il salvataggio non pubblica.',
+        ),
         findsOneWidget,
       );
 
-      await tester.scrollUntilVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Salva modifiche'),
-        200,
-        scrollable: scrollable,
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Salva modifiche'));
       await tester.pumpAndSettle();
@@ -1641,7 +1619,8 @@ void main() {
 
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(tester, publish);
       expect(tester.widget<FilledButton>(publish).onPressed, isNotNull);
       expect(tester.widget<FilledButton>(reject).onPressed, isNotNull);
       expect(
@@ -1669,18 +1648,10 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Salva modifiche'),
-        200,
-        scrollable: scrollable,
       );
 
       await tester.tap(find.widgetWithText(FilledButton, 'Salva modifiche'));
@@ -1722,16 +1693,9 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
+      await showAdminEditorActions(tester);
       final publish = find.widgetWithText(FilledButton, 'Pubblica come luogo');
-      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+      await revealAdminEditorWidget(tester, publish);
 
       await tester.tap(publish);
       await tester.pump();
@@ -1780,16 +1744,9 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
-        final scrollable = find
-            .descendant(
-              of: find.byKey(
-                const ValueKey<String>('admin_submission_editor_scroll'),
-              ),
-              matching: find.byType(Scrollable),
-            )
-            .first;
+        await showAdminEditorActions(tester);
         final reject = find.widgetWithText(FilledButton, 'Rifiuta');
-        await tester.scrollUntilVisible(reject, 200, scrollable: scrollable);
+        await revealAdminEditorWidget(tester, reject);
 
         await tester.tap(reject);
         await tester.pump();
@@ -1835,16 +1792,9 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
+      await showAdminEditorActions(tester);
       final publish = find.widgetWithText(FilledButton, 'Pubblica come luogo');
-      await tester.scrollUntilVisible(publish, 200, scrollable: scrollable);
+      await revealAdminEditorWidget(tester, publish);
       await tester.tap(publish);
       await tester.pumpAndSettle();
 
@@ -1878,6 +1828,7 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
       expect(viewModel.requestReject(), isTrue);
       await tester.pump();
@@ -1913,24 +1864,15 @@ void main() {
         await tester.pumpAndSettle();
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
         await tester.enterText(
           find.widgetWithText(TextFormField, 'Città'),
           'Isernia',
         );
         await tester.pump();
-
-        final scrollable = find
-            .descendant(
-              of: find.byKey(
-                const ValueKey<String>('admin_submission_editor_scroll'),
-              ),
-              matching: find.byType(Scrollable),
-            )
-            .first;
-        await tester.scrollUntilVisible(
+        await revealAdminEditorWidget(
+          tester,
           find.widgetWithText(FilledButton, 'Salva modifiche'),
-          200,
-          scrollable: scrollable,
         );
         await tester.tap(find.widgetWithText(FilledButton, 'Salva modifiche'));
         await tester.pumpAndSettle();
@@ -1963,18 +1905,10 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Rifiuta'),
-        200,
-        scrollable: scrollable,
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Rifiuta'));
       await tester.pumpAndSettle();
@@ -2014,18 +1948,10 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Pubblica come luogo'),
-        200,
-        scrollable: scrollable,
       );
       // A place draft offers exactly one publication CTA.
       expect(
@@ -2070,24 +1996,17 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Pubblica come evento'),
-        200,
-        scrollable: scrollable,
       );
       expect(
         find.widgetWithText(FilledButton, 'Pubblica come luogo'),
         findsNothing,
       );
-      await tester.ensureVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Pubblica come evento'),
       );
       await tester.pumpAndSettle();
@@ -2131,20 +2050,12 @@ void main() {
       await tester.pumpAndSettle();
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
       expect(find.textContaining('non esiste in Italia'), findsOneWidget);
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Pubblica come evento'),
-        200,
-        scrollable: scrollable,
       );
       expect(
         find.widgetWithText(FilledButton, 'Pubblica come evento'),
@@ -2171,6 +2082,7 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
       }
 
       testOwnerUI('maps readiness codes to actionable Italian copy', (
@@ -2258,7 +2170,9 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
+      await revealAdminEditorWidget(tester, find.text('Accettato'));
       expect(find.text('Accettato'), findsOneWidget);
       expect(find.text('Pubblicato come evento · ID 123'), findsOneWidget);
       expect(find.text('1 / 5'), findsOneWidget);
@@ -2267,7 +2181,12 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsNothing,
       );
-      expect(find.byTooltip('Rimuovi foto'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Tooltip && widget.message == 'Rimuovi foto',
+        ),
+        findsNothing,
+      );
       // No moderation or Save controls remain.
       expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
       expect(
@@ -2326,6 +2245,7 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
       expect(viewModel.requestDeleteAsset(2), isTrue);
       await tester.pump();
@@ -2366,18 +2286,10 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Salva modifiche'),
-        200,
-        scrollable: scrollable,
       );
 
       expect(viewModel.requestSave(), isTrue);
@@ -2425,7 +2337,9 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
+      await revealAdminEditorWidget(tester, find.text('Accettato'));
       expect(find.text('Accettato'), findsOneWidget);
       // Historical accepted rows carry no durable link and none is invented.
       expect(find.text('Pubblicato come evento · ID 123'), findsNothing);
@@ -2436,7 +2350,12 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsNothing,
       );
-      expect(find.byTooltip('Rimuovi foto'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Tooltip && widget.message == 'Rimuovi foto',
+        ),
+        findsNothing,
+      );
       expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
       // The Save control is hidden entirely for read-only rows.
@@ -2478,7 +2397,9 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
 
+      await revealAdminEditorWidget(tester, find.text('Rifiutato'));
       expect(find.text('Rifiutato'), findsOneWidget);
       expect(find.text('1 / 5'), findsOneWidget);
       expect(find.byType(AppNetworkImage), findsOneWidget);
@@ -2486,7 +2407,12 @@ void main() {
         find.byKey(const ValueKey<String>('admin_submission_add_asset')),
         findsNothing,
       );
-      expect(find.byTooltip('Rimuovi foto'), findsNothing);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Tooltip && widget.message == 'Rimuovi foto',
+        ),
+        findsNothing,
+      );
       expect(find.widgetWithText(FilledButton, 'Accetta'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Rifiuta'), findsNothing);
       expect(find.text('Salva modifiche'), findsNothing);
@@ -2520,6 +2446,7 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
+      await showAdminEditorActions(tester);
       await tester.enterText(
         find.widgetWithText(TextFormField, 'Città'),
         'Isernia',
@@ -2556,26 +2483,16 @@ void main() {
       await tester.pumpWidget(app);
       unawaited(router.push('/editor'));
       await tester.pumpAndSettle();
-
-      final scrollable = find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-      await tester.scrollUntilVisible(
+      await showAdminEditorActions(tester);
+      await revealAdminEditorWidget(
+        tester,
         find.widgetWithText(FilledButton, 'Crea contributo'),
-        200,
-        scrollable: scrollable,
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Crea contributo'));
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.text('Seleziona una data di inizio.'),
-        -200,
-        scrollable: scrollable,
       );
 
       expect(find.text('Seleziona una data di inizio.'), findsOneWidget);
@@ -2604,8 +2521,10 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
 
         final endDateChip = find.textContaining('Finisce il');
+        await revealAdminEditorWidget(tester, endDateChip);
         await tester.tap(endDateChip);
         await tester.pump();
         expect(find.byType(DatePickerDialog), findsOneWidget);
@@ -2628,6 +2547,7 @@ void main() {
         await pumpCommandTurns(tester);
         expect(repository.updateInputs, isEmpty);
 
+        await revealAdminEditorWidget(tester, endDateChip);
         await tester.tap(endDateChip);
         await tester.pump();
         pickerActions = find.descendant(
@@ -2675,7 +2595,7 @@ void main() {
           FilledButton,
           'Pubblica come luogo',
         );
-        await tester.ensureVisible(publish);
+        await revealAdminEditorWidget(tester, publish);
         await tester.tap(publish);
         await tester.pumpAndSettle();
         expect(find.byType(AlertDialog), findsOneWidget);
@@ -2756,8 +2676,9 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
         final search = find.byKey(const ValueKey('admin_event_search'));
-        await tester.ensureVisible(search);
+        await revealAdminEditorWidget(tester, search);
         await tester.enterText(search, 'query A');
         expect(viewModel.candidateSearch, 'query A');
         viewModel.selectTargetEvent(42);
@@ -2814,6 +2735,7 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
         expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
         final oldOwner = viewModel;
         final oldUpdate = Completer<Result<AdminSubmission>>();
@@ -2878,8 +2800,9 @@ void main() {
         await tester.pumpWidget(app);
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
         final control = find.widgetWithText(FilledButton, action);
-        await tester.ensureVisible(control);
+        await revealAdminEditorWidget(tester, control);
         await tester.tap(control);
         await tester.pumpAndSettle();
         expect(find.byType(AlertDialog), findsOneWidget);
@@ -2909,15 +2832,6 @@ void main() {
     }
 
     group('location section', () {
-      Finder scrollableOf(WidgetTester tester) => find
-          .descendant(
-            of: find.byKey(
-              const ValueKey<String>('admin_submission_editor_scroll'),
-            ),
-            matching: find.byType(Scrollable),
-          )
-          .first;
-
       Future<void> pushEditor(WidgetTester tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 1600));
         addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -2925,10 +2839,11 @@ void main() {
         await tester.pumpAndSettle();
         unawaited(router.push('/editor'));
         await tester.pumpAndSettle();
+        await showAdminEditorActions(tester);
       }
 
-      Future<void> scrollTo(WidgetTester tester, Finder finder) => tester
-          .scrollUntilVisible(finder, 200, scrollable: scrollableOf(tester));
+      Future<void> scrollTo(WidgetTester tester, Finder finder) =>
+          revealAdminEditorWidget(tester, finder);
 
       testOwnerUI('create screen exposes the Posizione section', (
         tester,

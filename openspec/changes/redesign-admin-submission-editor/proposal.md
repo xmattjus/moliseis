@@ -25,8 +25,8 @@ None.
 
 ## Impact
 
-Future implementation is limited primarily to `lib/ui/admin/submissions/widgets/admin_submission_editor_screen.dart`, cohesive feature-local presentation sections, and targeted widget/routing regressions. It reuses `ContentSubmissionFields`, `AdminSubmissionLocationEditor`, `AdminSubmissionRecoveryPanel`, shared photo widgets and existing ViewModel commands. A small compatible presentation extension to a shared widget is allowed only where justified by accessibility or read-only presentation, with the public editor's defaults preserved.
+Implementation is limited primarily to `lib/ui/admin/submissions/widgets/admin_submission_editor_screen.dart`, cohesive feature-local presentation sections, and targeted widget/routing regressions. It reuses `ContentSubmissionFields`, `AdminSubmissionLocationEditor`, `AdminSubmissionRecoveryPanel`, shared photo widgets and existing ViewModel commands. A small compatible presentation extension to a shared widget is allowed only where justified by accessibility or read-only presentation, with the public editor's defaults preserved.
 
-Confirmed behavior is established by current source and tests, not usability measurements; action discoverability and cognitive-load improvements are design hypotheses to review. This PR contains planning artifacts only and does not authorize implementation.
+Confirmed behavior is established by current source and tests, not usability measurements; action discoverability and cognitive-load improvements are design hypotheses to review. Implementation was explicitly authorized after review of planning commit `bb635bbd6bfde9986770e4bbecf2764aea19fdb0`. The Draft PR now includes the scoped Flutter implementation and regression coverage.
 
 Excluded: Dashboard Back/refresh/recovery changes (Intervention A), new map-picker functionality (Intervention B), database/Edge Function/RPC changes, backend moderation, domain semantics, draft protocols, authentication/authorization, navigation architecture, global theming, unrelated screens, packages and state-management changes. No auto-save or composite Save-and-Publish operation is proposed.

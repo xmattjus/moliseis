@@ -14,6 +14,7 @@ import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_save_prog
 import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../support/admin_editor_interactions.dart';
 import '../support/admin_save_route_harness.dart';
 import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
@@ -54,7 +55,8 @@ void main() {
     );
     expect(find.text('Local fields'), findsWidgets);
     expect(find.text('Remote fields'), findsOneWidget);
-    await tester.ensureVisible(
+    await revealAdminEditorWidget(
+      tester,
       find.byKey(const ValueKey('admin_accept_remote')),
     );
     await tester.tap(find.byKey(const ValueKey('admin_accept_remote')));
@@ -89,7 +91,7 @@ void main() {
     expect(harness.owner.name, 'Remote fields');
     harness.local.drafts.onSave = (_) async =>
         Result.error(Exception('disk failure'));
-    await tester.ensureVisible(find.text('Salva bozza locale'));
+    await revealAdminEditorWidget(tester, find.text('Salva bozza locale'));
     await tester.tap(find.text('Salva bozza locale'));
     await tester.pumpAndSettle();
     expect(harness.owner.pendingRecoveryCheckpoint, isTrue);
@@ -99,7 +101,7 @@ void main() {
     expect(harness.owner.submissionId, 1);
     expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
     harness.local.drafts.onSave = null;
-    await tester.ensureVisible(find.text('Salva bozza locale'));
+    await revealAdminEditorWidget(tester, find.text('Salva bozza locale'));
     await tester.tap(find.text('Salva bozza locale'));
     await tester.pumpAndSettle();
     expect(harness.owner.pendingRecoveryCheckpoint, isFalse);
@@ -142,7 +144,8 @@ void main() {
             find.byKey(const ValueKey('admin_accept_remote')),
           )
           .onPressed!;
-      await tester.ensureVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.byKey(const ValueKey('admin_keep_local')),
       );
       await tester.tap(find.byKey(const ValueKey('admin_keep_local')));
@@ -257,7 +260,8 @@ void main() {
         harness.router.go('/admin/submissions/1');
         await tester.pumpWidget(harness.app());
         await tester.pumpAndSettle();
-        expect(find.text('Modifica contributo'), findsOneWidget);
+        expect(find.text('Revisiona contributo'), findsOneWidget);
+        await revealAdminEditorWidget(tester, find.text('Salva bozza locale'));
         expect(find.text('Salva bozza locale'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('admin_recovery_return')),
@@ -276,6 +280,10 @@ void main() {
             description: null,
             modifiedAtToken: nextVersion,
           ),
+        );
+        await revealAdminEditorWidget(
+          tester,
+          find.byKey(const ValueKey('admin_recovery_reload')),
         );
         await tester.tap(find.byKey(const ValueKey('admin_recovery_reload')));
         await tester.pumpAndSettle();
@@ -344,16 +352,7 @@ void main() {
           isNull,
         );
         final item = find.byKey(ValueKey('admin_staged_${asset.digest}'));
-        await tester.scrollUntilVisible(
-          item,
-          400,
-          scrollable: find
-              .descendant(
-                of: find.byType(AdminSubmissionEditorScreen),
-                matching: find.byType(Scrollable),
-              )
-              .first,
-        );
+        await revealAdminEditorWidget(tester, item);
         await tester.pumpAndSettle();
         await tester.tap(
           find.descendant(of: item, matching: find.byType(InkWell)),
@@ -378,15 +377,9 @@ void main() {
     harness.router.go('/admin/submissions/1');
     await tester.pumpWidget(harness.app());
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
+    await revealAdminEditorWidget(
+      tester,
       find.widgetWithText(FilledButton, 'Rifiuta'),
-      400,
-      scrollable: find
-          .descendant(
-            of: find.byType(AdminSubmissionEditorScreen),
-            matching: find.byType(Scrollable),
-          )
-          .first,
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Rifiuta'));
     await tester.pumpAndSettle();
@@ -498,16 +491,7 @@ void main() {
           ? Result.error(Exception('Local settlement unavailable'))
           : const Result.success(null);
       await tester.pump();
-      await tester.scrollUntilVisible(
-        find.text('Salva modifiche'),
-        500,
-        scrollable: find
-            .descendant(
-              of: find.byType(AdminSubmissionEditorScreen),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      await revealAdminEditorWidget(tester, find.text('Salva modifiche'));
       await tester.tap(find.text('Salva modifiche'));
       await tester.pumpAndSettle();
       expect(find.byType(AdminSubmissionSaveProgressScreen), findsOneWidget);
@@ -536,6 +520,7 @@ void main() {
         const Offset(0, 1800),
       );
       await tester.pumpAndSettle();
+      await revealAdminEditorWidget(tester, find.text('Ricarica stato remoto'));
       expect(find.text('Ricarica stato remoto'), findsOneWidget);
       expect(harness.owner.canRequestSave, isFalse);
       harness.repository.getByIdResults[1] = Result.success(

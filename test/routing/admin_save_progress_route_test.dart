@@ -14,6 +14,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../support/admin_draft_repositories.dart';
+import '../support/admin_editor_interactions.dart';
 import '../support/admin_save_route_harness.dart';
 import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
@@ -155,16 +156,7 @@ void main() {
       }
     });
     await tester.pump();
-    await tester.scrollUntilVisible(
-      find.text('Crea contributo'),
-      500,
-      scrollable: find
-          .descendant(
-            of: find.byType(AdminSubmissionEditorScreen),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
+    await revealAdminEditorWidget(tester, find.text('Crea contributo'));
     await tester.tap(find.text('Crea contributo'));
     await pumpCommandTurns(tester);
     await tester.pump(const Duration(milliseconds: 400));
@@ -297,6 +289,7 @@ void main() {
         Result.error(TestException('private filesystem unavailable'));
     expect(owner.hasDurableDraft, isFalse);
     await tester.pump();
+    await revealAdminEditorWidget(tester, find.text('Salva bozza locale'));
     await tester.tap(find.text('Salva bozza locale'));
     await tester.pumpAndSettle();
     expect(owner.name, 'Unfinished local value');

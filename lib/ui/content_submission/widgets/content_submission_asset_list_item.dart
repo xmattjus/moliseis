@@ -17,6 +17,7 @@ class ContentSubmissionAssetListItem extends StatelessWidget {
   const ContentSubmissionAssetListItem({
     required this.image,
     this.showRemoveIcon = true,
+    this.removeButtonSize = 24,
     this.onRemove,
     super.key,
   });
@@ -26,6 +27,11 @@ class ContentSubmissionAssetListItem extends StatelessWidget {
 
   /// Whether the remove icon is shown or not.
   final bool showRemoveIcon;
+
+  /// Square removal target; larger targets stay within the thumbnail.
+  ///
+  /// Defaults to the existing public editor presentation.
+  final double removeButtonSize;
 
   /// Callback triggered when the remove icon is pressed.
   final void Function()? onRemove;
@@ -41,21 +47,29 @@ class ContentSubmissionAssetListItem extends StatelessWidget {
         ),
         if (showRemoveIcon)
           Positioned(
-            top: -4,
-            right: -4,
-            child: Tooltip(
-              message: 'Rimuovi foto',
-              child: ConstrainedBox(
-                constraints: BoxConstraints.tight(const Size.square(24)),
-                child: Material(
-                  color: context.colorScheme.primaryContainer,
-                  borderRadius: context.appShapes.circular.cornerSmall,
-                  clipBehavior: Clip.hardEdge,
-                  child: InkWell(
-                    onTap: onRemove,
-                    child: Icon(
-                      Symbols.remove,
-                      color: context.colorScheme.onPrimaryContainer,
+            top: removeButtonSize > 24 ? 0 : -4,
+            right: removeButtonSize > 24 ? 0 : -4,
+            child: Semantics(
+              label: 'Rimuovi foto',
+              button: true,
+              enabled: onRemove != null,
+              child: Tooltip(
+                message: 'Rimuovi foto',
+                excludeFromSemantics: true,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints.tight(
+                    Size.square(removeButtonSize),
+                  ),
+                  child: Material(
+                    color: context.colorScheme.primaryContainer,
+                    borderRadius: context.appShapes.circular.cornerSmall,
+                    clipBehavior: Clip.hardEdge,
+                    child: InkWell(
+                      onTap: onRemove,
+                      child: Icon(
+                        Symbols.remove,
+                        color: context.colorScheme.onPrimaryContainer,
+                      ),
                     ),
                   ),
                 ),

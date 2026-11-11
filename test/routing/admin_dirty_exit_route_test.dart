@@ -26,6 +26,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../support/admin_draft_repositories.dart';
+import '../support/admin_editor_interactions.dart';
 import '../support/admin_save_route_harness.dart';
 import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
@@ -426,16 +427,7 @@ void main() {
     (tester) async {
       harness = AdminSaveRouteHarness(persistedTargets: [1]);
       await harness.openEditor(tester, target: 1);
-      await tester.scrollUntilVisible(
-        find.text('Seleziona sulla mappa'),
-        400,
-        scrollable: find
-            .descendant(
-              of: find.byKey(const ValueKey('admin_submission_editor_scroll')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
+      await revealAdminEditorWidget(tester, find.text('Seleziona sulla mappa'));
       await tester.tap(find.text('Seleziona sulla mappa'));
       await tester.pumpAndSettle();
       tester.widget<GeoMap>(find.byType(GeoMap)).onPressed!(
@@ -486,17 +478,9 @@ void main() {
         );
         final revision = harness.owner.editorRevision;
         expect(harness.owner.hasUncheckpointedChanges, isTrue);
-        await tester.scrollUntilVisible(
+        await revealAdminEditorWidget(
+          tester,
           find.text('Seleziona sulla mappa'),
-          400,
-          scrollable: find
-              .descendant(
-                of: find.byKey(
-                  const ValueKey('admin_submission_editor_scroll'),
-                ),
-                matching: find.byType(Scrollable),
-              )
-              .first,
         );
         await tester.tap(find.text('Seleziona sulla mappa'));
         await tester.pumpAndSettle();
@@ -556,16 +540,7 @@ void main() {
   ) async {
     harness = AdminSaveRouteHarness(persistedTargets: [1]);
     await harness.openEditor(tester, target: 1);
-    await tester.scrollUntilVisible(
-      find.text('Seleziona sulla mappa'),
-      400,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const ValueKey('admin_submission_editor_scroll')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
+    await revealAdminEditorWidget(tester, find.text('Seleziona sulla mappa'));
     await tester.tap(find.text('Seleziona sulla mappa'));
     await tester.pumpAndSettle();
     final select = tester.widget<GeoMap>(find.byType(GeoMap)).onPressed!;

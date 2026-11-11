@@ -2,9 +2,9 @@
 
 ## Context
 
-See `proposal.md` for motivation and scope. This is an Intervention C planning change; implementation requires separate authorization.
+See `proposal.md` for motivation and scope. This Intervention C design was explicitly authorized for implementation after review of planning commit `bb635bbd6bfde9986770e4bbecf2764aea19fdb0`.
 
-### Verified implementation and ownership
+### Planning baseline and preserved ownership
 
 - `lib/ui/admin/submissions/widgets/admin_submission_editor_screen.dart` composes a `CustomScrollView`: recovery controls, shared content fields, location, photos, contributor identity, status/source/candidates/merge groups, moderation and finally Save. The app bar names the editor operation rather than the content. Source values and merge maps are rendered as text; publication/rejection sit alongside contextual linking and preview controls. Final-state form/location wrappers use opacity 0.55 and prevent pointer/focus interaction.
 - `ContentSubmissionFields` owns shared field presentation and validation, receives controlled event-date state and `hydrationRevision`, and preserves private text masking. It must remain the single content form; category, municipality, name, rich description, event discriminator, all-day mode and dates remain available with existing semantics.
@@ -130,7 +130,7 @@ Capture owner/callback references before async boundaries, guard `mounted` befor
 
 ## Migration Plan
 
-After explicit implementation authorization, change presentation and its targeted tests together. No data migration, backend deployment or canonical-spec sync is part of this work. Rollback is a UI commit revert; it must not discard drafts or rewrite remote state. This planning PR remains Draft for architecture, scope and regression-protection review.
+After explicit implementation authorization, change presentation and its targeted tests together. No data migration, backend deployment or canonical-spec sync is part of this work. Rollback is a UI commit revert; it must not discard drafts or rewrite remote state. The existing PR remains Draft for independent implementation review.
 
 ## Open Questions
 
