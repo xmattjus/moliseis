@@ -70,8 +70,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _lookup = 0;
   bool _lookupScheduled = false;
   (bool, AdminSubmissionStatus?)? _selection;
-  Object? _toolbarRefresh;
   Object? _manualRefresh;
+  // Dismissed reads retain their prior placeholders until safe settlement.
+  final _manualReads =
+      <(AdminSubmissionsViewModel, bool), ({Object token, bool hadError})>{};
+  // Preserve scroll ownership when the selected lane replaces its indicator.
+  final _scrollKey = GlobalKey<NestedScrollViewState>();
   Object? _recoveryAttempt;
   ({Object token, Uri location, VoidCallback returned})? _editorVisit;
   bool _editorCovered = false;
@@ -146,7 +150,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _revokePresentation() {
     _presentation++;
     _lookup++;
-    _toolbarRefresh = null;
     _manualRefresh = null;
     _retireRecovery();
   }
@@ -184,7 +187,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _selection = selection;
     // Selection revokes refresh feedback independently of draft eligibility.
     _presentation++;
-    _toolbarRefresh = null;
     _manualRefresh = null;
     setState(() {});
   }
@@ -596,32 +598,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return owner.refreshIgnoredSources();
   }
 
-  Future<void> _refreshVisible(
-    AdminSubmissionsViewModel owner, {
-    bool toolbar = false,
-  }) async {
+  Future<void> _refreshVisible(AdminSubmissionsViewModel owner) async {
     if (!mounted) return;
     final authority = _capture();
     if (authority == null || !identical(authority.owner, owner)) return;
+    final readKey = (owner, owner.showIgnored);
+    final hadError = owner.showIgnored
+        ? owner.loadIgnoredSnapshot.hasFailure
+        : owner.error;
     final operation = owner.startSelectedLaneRefresh();
     if (operation == null) return;
     _scheduleLookup();
     final progress = Object();
+    _manualReads[readKey] = (token: progress, hadError: hadError);
     if (_live(authority)) {
-      setState(() {
-        _manualRefresh = progress;
-        if (toolbar) _toolbarRefresh = progress;
-      });
+      setState(() => _manualRefresh = progress);
     }
     final outcome = await operation.settled;
     if (!mounted) return;
-    if (!_live(authority)) return;
-    if (identical(_manualRefresh, progress)) {
-      setState(() {
-        _manualRefresh = null;
-        if (identical(_toolbarRefresh, progress)) _toolbarRefresh = null;
-      });
+    if (identical(_manualReads[readKey]?.token, progress)) {
+      setState(() => _manualReads.remove(readKey));
     }
+    if (!_live(authority) || !identical(_manualRefresh, progress)) return;
+    setState(() => _manualRefresh = null);
     if (outcome.outcome == AdminDashboardRefreshOutcome.expectedFailure ||
         outcome.outcome == AdminDashboardRefreshOutcome.unexpectedFailure) {
       showSnackBar(
@@ -631,6 +630,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         type: SnackBarType.error,
       );
     }
+  }
+
+  void _dismissRefresh(Object progress) {
+    if (!mounted) return;
+    if (!identical(_manualRefresh, progress)) return;
+    setState(() => _manualRefresh = null);
   }
 
   void _logout(AdminAuthViewModel auth, AdminSubmissionsViewModel owner) {
@@ -669,7 +674,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     AdminAuthViewModel auth,
   ) {
     final refresh = owner.canRefreshSelectedLane
-        ? () => unawaited(_refreshVisible(owner, toolbar: true))
+        ? () => unawaited(_refreshVisible(owner))
         : null;
     final logout = auth.canLogout ? () => _logout(auth, owner) : null;
     if (context.windowSizeClass.isCompact) {
@@ -719,299 +724,345 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final viewModel = widget.viewModel;
 
     return Scaffold(
-      body: RefreshIndicator(
-        displacement: 64,
-        edgeOffset: 106,
+      body: RefreshIndicator.noSpinner(
+        key: ValueKey((viewModel, viewModel.showIgnored)),
         onRefresh: () => _refreshVisible(viewModel),
         notificationPredicate: (notification) {
           return notification.depth == 1;
         },
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            NestedScrollView(
-              headerSliverBuilder: (context, _) {
-                return [
-                  SliverOverlapAbsorber(
-                    handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                      context,
-                    ),
-                    sliver: SliverAppBar(
-                      title: const Text('Area redazione'),
-                      leading: CustomBackButton(onPressed: _backCallback()),
-                      actions: <Widget>[
-                        ListenableBuilder(
-                          listenable: Listenable.merge([
-                            widget.authViewModel,
-                            viewModel,
-                          ]),
-                          builder: (context, _) => _actions(
-                            context,
-                            viewModel,
-                            widget.authViewModel,
+            Visibility(
+              visible: _manualRefresh == null,
+              maintainState: true,
+              child: NestedScrollView(
+                key: _scrollKey,
+                headerSliverBuilder: (context, _) {
+                  return [
+                    SliverOverlapAbsorber(
+                      handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                        context,
+                      ),
+                      sliver: SliverAppBar(
+                        title: const Text('Area redazione'),
+                        leading: CustomBackButton(onPressed: _backCallback()),
+                        actions: <Widget>[
+                          ListenableBuilder(
+                            listenable: Listenable.merge([
+                              widget.authViewModel,
+                              viewModel,
+                            ]),
+                            builder: (context, _) => _actions(
+                              context,
+                              viewModel,
+                              widget.authViewModel,
+                            ),
                           ),
-                        ),
-                      ],
-                      floating: true,
-                      snap: true,
-                      forceMaterialTransparency: true,
+                        ],
+                        floating: true,
+                        snap: true,
+                        forceMaterialTransparency: true,
+                      ),
                     ),
-                  ),
-                  SliverAppBar(
-                    flexibleSpace: FlexibleSpaceBar(
-                      background: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: ListenableBuilder(
-                            listenable: viewModel,
-                            builder: (context, _) {
-                              return ToggleButtons(
-                                borderRadius:
-                                    context.appShapes.circular.cornerFull,
-                                constraints: const BoxConstraints(
-                                  minHeight: 40,
-                                  maxHeight: 40,
-                                ),
-                                isSelected: [
-                                  ..._filters.map(
-                                    (status) =>
-                                        !viewModel.showIgnored &&
-                                        viewModel.filter == status,
+                    SliverAppBar(
+                      flexibleSpace: FlexibleSpaceBar(
+                        background: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: ListenableBuilder(
+                              listenable: viewModel,
+                              builder: (context, _) {
+                                return ToggleButtons(
+                                  borderRadius:
+                                      context.appShapes.circular.cornerFull,
+                                  constraints: const BoxConstraints(
+                                    minHeight: 40,
+                                    maxHeight: 40,
                                   ),
-                                  viewModel.showIgnored,
-                                ],
-                                onPressed: (index) {
-                                  if (!mounted) return;
-                                  if (!_owns(viewModel)) return;
-                                  if (index == _filters.length) {
-                                    viewModel.setIgnoredFilter();
-                                    unawaited(
-                                      _refreshIgnoredSources(viewModel),
-                                    );
-                                  } else {
-                                    viewModel.setFilter(_filters[index]);
-                                  }
-                                },
-                                children: const [
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
+                                  isSelected: [
+                                    ..._filters.map(
+                                      (status) =>
+                                          !viewModel.showIgnored &&
+                                          viewModel.filter == status,
                                     ),
-                                    child: Text('Tutti'),
-                                  ),
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
+                                    viewModel.showIgnored,
+                                  ],
+                                  onPressed: (index) {
+                                    if (!mounted) return;
+                                    if (!_owns(viewModel)) return;
+                                    if (index == _filters.length) {
+                                      viewModel.setIgnoredFilter();
+                                      unawaited(
+                                        _refreshIgnoredSources(viewModel),
+                                      );
+                                    } else {
+                                      viewModel.setFilter(_filters[index]);
+                                    }
+                                  },
+                                  children: const [
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text('Tutti'),
                                     ),
-                                    child: Text('Da revisionare'),
-                                  ),
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text('Da revisionare'),
                                     ),
-                                    child: Text('Accettati'),
-                                  ),
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text('Accettati'),
                                     ),
-                                    child: Text('Rifiutati'),
-                                  ),
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 16,
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text('Rifiutati'),
                                     ),
-                                    child: Text('Fonti ignorate'),
-                                  ),
-                                ],
-                              );
-                            },
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text('Fonti ignorate'),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
+                      automaticallyImplyLeading: false,
+                      elevation: 0,
+                      scrolledUnderElevation: 0,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      pinned: true,
                     ),
-                    automaticallyImplyLeading: false,
-                    elevation: 0,
-                    scrolledUnderElevation: 0,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    pinned: true,
-                  ),
-                ];
-              },
-              body: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  ListenableBuilder(
-                    listenable: viewModel,
-                    builder: (context, _) {
-                      if (viewModel.showIgnored) {
-                        if (viewModel.loadIgnoredSnapshot.isRunning &&
-                            viewModel.ignoredSources.isEmpty &&
-                            _manualRefresh == null) {
+                  ];
+                },
+                body: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    ListenableBuilder(
+                      listenable: viewModel,
+                      builder: (context, _) {
+                        final manualRead =
+                            _manualReads[(viewModel, viewModel.showIgnored)];
+                        final hasFailure =
+                            manualRead?.hadError ??
+                            (viewModel.showIgnored
+                                ? viewModel.loadIgnoredSnapshot.hasFailure
+                                : viewModel.error);
+                        if (viewModel.showIgnored) {
+                          if (viewModel.loadIgnoredSnapshot.isRunning &&
+                              viewModel.ignoredSources.isEmpty &&
+                              manualRead == null) {
+                            return const SliverFillRemaining(
+                              child: EmptyView.loading(
+                                text: Text('Caricamento fonti ignorate...'),
+                              ),
+                            );
+                          }
+                          return SliverList.list(
+                            children: [
+                              // Keep the action below the pinned filter.
+                              const SizedBox(height: kToolbarHeight + 16),
+                              if (hasFailure)
+                                ListTile(
+                                  title: const Text(
+                                    'Impossibile caricare le fonti ignorate',
+                                  ),
+                                  trailing: TextButton(
+                                    onPressed: () =>
+                                        _refreshIgnoredSources(viewModel),
+                                    child: const Text('Riprova'),
+                                  ),
+                                ),
+                              if (viewModel.unIgnoreSnapshot.hasFailure)
+                                const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    'Impossibile riattivare la fonte. Riprova.',
+                                  ),
+                                ),
+                              if (viewModel.unIgnoreSnapshot.completed)
+                                const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text('Fonte riattivata'),
+                                ),
+                              if (viewModel.unignoredPendingId
+                                  case final pending?
+                                  when viewModel.canOpenPendingSubmission)
+                                TextButton(
+                                  onPressed: () => _openEditor(
+                                    viewModel,
+                                    submissionId: pending,
+                                    pending: true,
+                                  ),
+                                  child: const Text('Apri revisione in attesa'),
+                                ),
+                              if (viewModel.ignoredSources.isEmpty &&
+                                  !hasFailure)
+                                const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text('Nessuna fonte ignorata'),
+                                ),
+                              for (final source in viewModel.ignoredSources)
+                                ListTile(
+                                  key: ValueKey(
+                                    'admin_ignored_source_${source.id}',
+                                  ),
+                                  title: Text(source.name),
+                                  subtitle: Text(
+                                    [
+                                      source.provider,
+                                      source.externalId,
+                                      if (source.occurrenceKey != null)
+                                        source.occurrenceKey,
+                                      source.ignoredAt,
+                                    ].join(' · '),
+                                  ),
+                                  trailing: TextButton(
+                                    onPressed: viewModel.canUnIgnore
+                                        ? () {
+                                            if (!mounted) return;
+                                            if (!_owns(viewModel)) return;
+                                            viewModel.requestUnIgnore(
+                                              source.id,
+                                            );
+                                          }
+                                        : null,
+                                    child: const Text('Riattiva fonte'),
+                                  ),
+                                ),
+                            ],
+                          );
+                        }
+                        if (viewModel.loading &&
+                            !viewModel.hasData &&
+                            manualRead == null) {
                           return const SliverFillRemaining(
+                            hasScrollBody: false,
                             child: EmptyView.loading(
-                              text: Text('Caricamento fonti ignorate...'),
+                              text: Text('Caricamento in corso...'),
                             ),
                           );
                         }
-                        return SliverList.list(
-                          children: [
-                            // Keep the action below the pinned filter.
-                            const SizedBox(height: kToolbarHeight + 16),
-                            if (viewModel.loadIgnoredSnapshot.hasFailure)
-                              ListTile(
-                                title: const Text(
-                                  'Impossibile caricare le fonti ignorate',
+                        if (hasFailure && !viewModel.hasData) {
+                          return SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: EmptyView.error(
+                              text: const Text(
+                                'Impossibile caricare i contributi',
+                              ),
+                              action: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
                                 ),
-                                trailing: TextButton(
+                                child: FilledButton(
                                   onPressed: () =>
-                                      _refreshIgnoredSources(viewModel),
+                                      _refreshSubmissions(viewModel),
                                   child: const Text('Riprova'),
                                 ),
                               ),
-                            if (viewModel.unIgnoreSnapshot.hasFailure)
-                              const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text(
-                                  'Impossibile riattivare la fonte. Riprova.',
-                                ),
-                              ),
-                            if (viewModel.unIgnoreSnapshot.completed)
-                              const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text('Fonte riattivata'),
-                              ),
-                            if (viewModel.unignoredPendingId case final pending?
-                                when viewModel.canOpenPendingSubmission)
-                              TextButton(
-                                onPressed: () => _openEditor(
-                                  viewModel,
-                                  submissionId: pending,
-                                  pending: true,
-                                ),
-                                child: const Text('Apri revisione in attesa'),
-                              ),
-                            if (viewModel.ignoredSources.isEmpty &&
-                                !viewModel.loadIgnoredSnapshot.hasFailure)
-                              const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Text('Nessuna fonte ignorata'),
-                              ),
-                            for (final source in viewModel.ignoredSources)
-                              ListTile(
-                                key: ValueKey(
-                                  'admin_ignored_source_${source.id}',
-                                ),
-                                title: Text(source.name),
-                                subtitle: Text(
-                                  [
-                                    source.provider,
-                                    source.externalId,
-                                    if (source.occurrenceKey != null)
-                                      source.occurrenceKey,
-                                    source.ignoredAt,
-                                  ].join(' · '),
-                                ),
-                                trailing: TextButton(
-                                  onPressed: viewModel.canUnIgnore
-                                      ? () {
-                                          if (!mounted) return;
-                                          if (!_owns(viewModel)) return;
-                                          viewModel.requestUnIgnore(source.id);
-                                        }
-                                      : null,
-                                  child: const Text('Riattiva fonte'),
-                                ),
-                              ),
-                          ],
-                        );
-                      }
-                      if (viewModel.loading &&
-                          !viewModel.hasData &&
-                          _manualRefresh == null) {
-                        return const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: EmptyView.loading(
-                            text: Text('Caricamento in corso...'),
-                          ),
-                        );
-                      }
-                      if (viewModel.error && !viewModel.hasData) {
-                        return SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: EmptyView.error(
-                            text: const Text(
-                              'Impossibile caricare i contributi',
-                            ),
-                            action: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: FilledButton(
-                                onPressed: () => _refreshSubmissions(viewModel),
-                                child: const Text('Riprova'),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      if (!viewModel.hasData) {
-                        return const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: EmptyView(
-                            icon: Icon(Symbols.inbox),
-                            text: Text('Nessun contributo da mostrare'),
-                          ),
-                        );
-                      }
-
-                      final filteredItems = viewModel.filteredItems;
-                      if (filteredItems.isEmpty) {
-                        return const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: EmptyView(
-                            icon: Icon(Symbols.filter_alt_off),
-                            text: Text(
-                              'Nessun contributo corrisponde al filtro '
-                              'selezionato',
-                            ),
-                          ),
-                        );
-                      }
-
-                      return SliverList.builder(
-                        itemCount: filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final item = filteredItems[index];
-                          return Padding(
-                            padding: EdgeInsets.fromLTRB(
-                              16,
-                              index == 0 ? 16 : 0,
-                              16,
-                              index == filteredItems.length - 1 ? 16 : 8,
-                            ),
-                            child: AdminSubmissionListItem(
-                              summary: item,
-                              onTap: () =>
-                                  _openEditor(viewModel, submissionId: item.id),
                             ),
                           );
-                        },
-                      );
-                    },
-                  ),
-                ],
+                        }
+                        if (!viewModel.hasData) {
+                          return const SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: EmptyView(
+                              icon: Icon(Symbols.inbox),
+                              text: Text('Nessun contributo da mostrare'),
+                            ),
+                          );
+                        }
+
+                        final filteredItems = viewModel.filteredItems;
+                        if (filteredItems.isEmpty) {
+                          return const SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: EmptyView(
+                              icon: Icon(Symbols.filter_alt_off),
+                              text: Text(
+                                'Nessun contributo corrisponde al filtro '
+                                'selezionato',
+                              ),
+                            ),
+                          );
+                        }
+
+                        return SliverList.builder(
+                          itemCount: filteredItems.length,
+                          itemBuilder: (context, index) {
+                            final item = filteredItems[index];
+                            return Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                16,
+                                index == 0 ? 16 : 0,
+                                16,
+                                index == filteredItems.length - 1 ? 16 : 8,
+                              ),
+                              child: AdminSubmissionListItem(
+                                summary: item,
+                                onTap: () => _openEditor(
+                                  viewModel,
+                                  submissionId: item.id,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
-            if (_toolbarRefresh != null)
-              const Positioned(
-                top: 112,
-                left: 0,
-                right: 0,
-                child: IgnorePointer(
-                  child: LimitedBox(
-                    maxHeight: 240,
+            if (_manualRefresh case final progress?)
+              Positioned.fill(
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('Area redazione'),
+                    leading: CustomBackButton(onPressed: _backCallback()),
+                    actions: [
+                      ListenableBuilder(
+                        listenable: Listenable.merge([
+                          widget.authViewModel,
+                          viewModel,
+                        ]),
+                        builder: (context, _) =>
+                            _actions(context, viewModel, widget.authViewModel),
+                      ),
+                    ],
+                  ),
+                  body: Center(
                     child: SingleChildScrollView(
-                      child: EmptyView.loading(
-                        text: Text('Aggiornamento in corso...'),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const EmptyView.loading(
+                            text: Text('Caricamento in corso'),
+                          ),
+                          MergeSemantics(
+                            child: Semantics(
+                              hint:
+                                  'Termina l’attesa; '
+                                  'l’aggiornamento può continuare',
+                              child: TextButton(
+                                onPressed: () => _dismissRefresh(progress),
+                                child: const Text('Annulla'),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1020,12 +1071,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openEditor(viewModel),
-        foregroundColor: context.colorScheme.onTertiaryContainer,
-        backgroundColor: context.colorScheme.tertiaryContainer,
-        icon: const Icon(Symbols.add),
-        label: const Text('Nuovo contributo'),
+      // Hide immediately instead of retaining Scaffold's outgoing FAB.
+      floatingActionButton: Visibility(
+        visible: _manualRefresh == null,
+        child: FloatingActionButton.extended(
+          onPressed: () => _openEditor(viewModel),
+          foregroundColor: context.colorScheme.onTertiaryContainer,
+          backgroundColor: context.colorScheme.tertiaryContainer,
+          icon: const Icon(Symbols.add),
+          label: const Text('Nuovo contributo'),
+        ),
       ),
     );
   }

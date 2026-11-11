@@ -60,7 +60,11 @@ Session-driven declarative redirects and pushed-login replacement SHALL preserve
 
 ### Requirement: Dashboard entry and refresh consumers retain behavior
 
-Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh and retries SHALL use the selected list through owner admission; accepted pull refresh SHALL await terminal commit. An editor returning changed SHALL request submissions and then selected ignored sources through ordinary admission; busy requests may be ignored and manual refresh provides recovery. List loading, empty, error, retry and prior-data retention rendering SHALL be preserved.
+Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh and retries SHALL use the selected list through owner admission; accepted pull refresh SHALL await its admitted execution's safe settlement, independently of presentation revocation. An editor returning changed SHALL request submissions and then selected ignored sources through ordinary admission; busy requests may be ignored and manual refresh provides recovery. List loading, empty, error, retry and prior-data retention rendering SHALL be preserved.
+
+Admitted toolbar and pull refreshes SHALL share one centered `EmptyView.loading` presentation displaying `Caricamento in corso` within the available Dashboard content region. The Dashboard AppBar SHALL remain visible; the entire filter bar and previous list, empty or error content SHALL be temporarily hidden. Only one progress indicator SHALL be displayed. Normal filters and selected content SHALL return after safe settlement or presentation revocation, preserving retained data, selection and relevant scroll position where practical. Outside admitted manual refresh, existing rendering policies SHALL remain unchanged.
+
+Both entry points SHALL expose an accessible secondary action with the exact visible label `Annulla` while loading is visible, including during a nonterminating read. Its accessibility description SHALL clarify that dismissing the wait does not stop the admitted update. Activation SHALL revoke only the exact manual-refresh presentation and its feedback authority, restoring filters, retained content, interaction, keyboard focus eligibility, accessibility traversal and relevant scroll state without changing the selected filter. It SHALL NOT cancel, restart, complete or reclassify the admitted read or alter its safe-settlement acknowledgement, route authority or recovery Snackbar ownership.
 
 #### Scenario: Initial loading and empty result
 - **WHEN** a new dashboard begins its first request then returns an empty list
@@ -72,11 +76,11 @@ Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh a
 
 #### Scenario: Refresh retains existing submissions
 - **WHEN** a refresh fails with previously displayed submissions
-- **THEN** those rows remain and the existing main-list error visibility policy is preserved
+- **THEN** those rows are retained and become visible again after any admitted manual-refresh loading presentation ends; the existing main-list error visibility policy is preserved
 
 #### Scenario: Refresh ignored sources with retained data
 - **WHEN** ignored-source refresh fails with existing sources
-- **THEN** retained sources and the existing ignored-source error/retry feedback remain visible
+- **THEN** retained sources and the existing ignored-source error/retry feedback become visible again after any admitted manual-refresh loading presentation ends; outside that presentation their existing visibility policy is preserved
 
 #### Scenario: Editor returns changed
 - **WHEN** the editor returns true to the same live dashboard owner
@@ -89,14 +93,14 @@ Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh a
 #### Scenario: REF-01 Toolbar refresh communicates admitted progress
 - **GIVEN** the selected list can admit a manual read
 - **WHEN** the toolbar refresh is activated in compact or wide layout
-- **THEN** that list alone is requested and established application loading feedback remains observable until safe settlement
-- **AND** existing content state and identity are retained rather than replaced by a new route
+- **THEN** only the selected list is requested and the shared centered manual-refresh presentation appears, with the AppBar visible and filters and previous content hidden
+- **AND** loading remains correctly centered in the available content region in compact and wide layouts, with enlarged text and after scrolling, until safe settlement or presentation revocation; no route replacement is introduced
 
 #### Scenario: REF-02 Pull refresh waits for its own safe settlement
 - **GIVEN** the selected list can admit a pull refresh
 - **WHEN** the native pull interaction begins
-- **THEN** its progress awaits that admitted execution's safe settlement without a redundant toolbar loading presentation
-- **AND** the nested scrolling and notification-depth behavior remains compatible
+- **THEN** it displays the same loading presentation as REF-01 without a simultaneous native pull spinner, and its callback awaits that exact admitted execution's safe settlement
+- **AND** the pull gesture, nested scrolling and notification-depth behavior remain functional; presentation revocation does not prematurely complete or strand the admitted callback
 
 #### Scenario: REF-03 Accepted success is quiet
 - **WHEN** an admitted manual refresh successfully settles
@@ -105,7 +109,7 @@ Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh a
 #### Scenario: REF-04 Expected failure retains usable data
 - **GIVEN** a manual refresh owns current presentation authority
 - **WHEN** its admitted read settles with an expected application failure
-- **THEN** one established custom error notification appears, progress ends and the previous list and local filter remain available
+- **THEN** loading ends, the filters and retained selected content become available again, and one established custom error notification appears without resetting the local filter
 
 #### Scenario: REF-05 Handled unexpected failure preserves reporting
 - **WHEN** an admitted manual read settles through its existing handled unexpected-error channel under live presentation authority
@@ -119,20 +123,21 @@ Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh a
 
 #### Scenario: REF-07 Retained data and retry
 - **WHEN** manual refresh fails after previously loading data and a later retry is admitted
-- **THEN** retained rows remain usable and retry requests only the affected read without resetting local status selection
+- **THEN** retained rows and local status selection are available again after loading ends, and retry requests only the affected read
 
 #### Scenario: REF-08 Independent read lanes remain independent
 - **WHEN** manual submissions and ignored-source reads overlap after selection changes
 - **THEN** each lane retains its own single-flight admission and settlement without cancelling the other
+- **AND** visible loading belongs only to the current selection authority; revoking an earlier presentation does not cancel either accepted execution
 
 #### Scenario: REF-09 Selection changes are not reverted
 - **WHEN** a user changes status or selected list before a manual read settles
-- **THEN** its data can commit through existing ownership but completion never restores the old selection
+- **THEN** the old loading presentation is revoked and normal content for the current selection returns; accepted data can commit through existing ownership, but completion never restores the old selection
 
 #### Scenario: REF-10 Obsolete presentation cannot emit feedback
 - **GIVEN** a manual refresh captures dashboard visit, account/auth generation, owner and selection revision
 - **WHEN** a route departure or cover, logout, owner replacement, selection change or disposal revokes that authority before settlement
-- **THEN** no stale progress overlay or error notification is published, even if the same account or filter later returns
+- **THEN** stale loading is removed and no obsolete error notification is published, even if the same account or filter later returns; an old completion cannot clear a newer presentation or alter the current selection
 - **AND** accepted physical work and private settlement remain intact
 
 #### Scenario: REF-11 Reactivation retains mandatory refresh ordering
@@ -148,6 +153,24 @@ Route entry SHALL initialize submissions once. Manual refresh, pull-to-refresh a
 #### Scenario: REF-12 Existing entry and editor return remain compatible
 - **WHEN** initial loading, empty, initial failure/retry or editor return occurs
 - **THEN** existing state rendering and best-effort refresh policies remain, including refresh after editor return regardless of its boolean result
+- **AND** initial, retry, filter-triggered, editor-return and reactivation reads do not acquire the manual-refresh loading presentation
+
+
+#### Scenario: Hidden refresh content is unavailable to interaction and accessibility
+- **GIVEN** an admitted manual refresh owns the loading presentation
+- **WHEN** the filter bar and previous content are hidden
+- **THEN** they are not visible, cannot be interacted with or receive keyboard focus, and are excluded from accessibility traversal
+- **AND** restoration preserves appropriate data, selection and relevant scroll state without requiring every widget to remain mounted or retain element identity
+
+
+#### Scenario: Dismiss pending manual-refresh presentation without cancelling execution
+- **GIVEN** a toolbar or pull refresh has been admitted and remains pending, possibly indefinitely
+- **WHEN** the user activates its accessible `Annulla` action
+- **THEN** its loading presentation disappears immediately and retained filters and content become visible, interactive, keyboard-focusable and accessible again with appropriate selection and scroll state
+- **AND** the original read remains admitted and pending without another repository request, fabricated cancellation or completion; a pull callback still awaits that exact execution's safe settlement
+- **AND** the independent lane remains available through normal authorized admission while the original lane retains its single-flight restriction, and ordinary Back/navigation behavior remains available
+- **AND** eventual results follow existing ViewModel publication and safe-settlement rules, but dismissed or obsolete presentation callbacks cannot recreate loading, show stale feedback, dismiss a newer presentation or change current selection
+- **AND** route authority and unrelated recovery Snackbar state are unchanged
 
 
 ## ADDED Requirements
