@@ -81,9 +81,24 @@ External submissions SHALL show recognizable provenance and stale-source state b
 - **AND** acknowledgement remains an explicit choice for the displayed source state
 
 #### Scenario: Merge preview contains an overwrite conflict
-- **WHEN** a preview group would overwrite current editorial content
-- **THEN** the affected group, warning and proposed/current values are visible before Apply without opening a collapsed panel
-- **AND** base and source values remain available in full and Keep Current retains its group-specific behavior
+- **WHEN** a valid preview group would overwrite current editorial content
+- **THEN** the persistent decision area shows an explicit accessible warning with the number of overwrite groups and an action labeled "Esamina sovrascritture" in both compact and expanded layouts
+- **AND** overwrite groups appear first, prioritizing their warning and complete proposed moderated/current destination values without secondary disclosure
+- **AND** complete base/source values and other comparison evidence remain accessible, and Keep Current retains its original merge-group identity and behavior
+- **AND** the warning is informational: no new confirmation, per-group acknowledgement or requirement to visit conflicts changes Apply eligibility
+
+#### Scenario: Long preview leaves overwrite evidence off-screen
+- **GIVEN** a valid preview has enough comparison groups and content for an overwrite group to be outside the viewport
+- **WHEN** Apply remains accessible in the persistent decision area while the conflicting comparison is off-screen
+- **THEN** the overwrite-count warning and "Esamina sovrascritture" remain visible without secondary disclosure in both compact and expanded layouts
+- **AND** selecting that action reveals the current preview's first overwrite group, its warning and complete proposed moderated/current destination values for reading without secondary disclosure, with long values scrollable in full
+- **AND** navigation executes neither Apply nor Keep Current and does not add an Apply admission requirement
+
+#### Scenario: Preview invalidation or replacement changes overwrite navigation
+- **WHEN** the current preview is invalidated or replaced, including replacement with no overwrite groups
+- **THEN** the warning/count and navigation target update to the current valid preview or disappear when none contains overwrites
+- **AND** obsolete navigation callbacks cannot reveal a retired preview or affect a replacement activation
+- **AND** preview changes, rebuilds and layout changes do not automatically scroll or execute moderation
 
 #### Scenario: Secondary metadata is disclosed
 - **WHEN** the user opens contributor or technical details
