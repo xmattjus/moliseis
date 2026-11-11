@@ -10,7 +10,7 @@ The Admin Dashboard has no explicit Back control, exposes recovery solely becaus
 - Replace the permanent AppBar resume action with one persistent, actionable, explicitly dismissible custom Snackbar, eligible only after a successful current-account navigation-intent lookup.
 - Extend the existing Snackbar helper minimally with native persistence/close support and cancellable ownership. Prevent queued stale recovery and allow ordinary feedback to temporarily displace recovery, then revalidate and restore an undismissed candidate without clearing unrelated messages. Automatic eligibility failures remain silent; explicit recovery failures use existing generic error feedback.
 - Give admitted manual dashboard refreshes an execution-correlated outcome while preserving existing `Future<void>` APIs, command reporting and safe settlement.
-- Use the established loading presentation for toolbar refresh and the existing custom error Snackbar for genuine refresh failures. Keep native pull-to-refresh, retained data and local filters; add no success notification or global sync dependency.
+- Use one centered `EmptyView.loading` presentation with `Aggiornamento in corso...` for admitted toolbar and pull refreshes. Keep the Dashboard AppBar visible while temporarily hiding the entire filter bar and list, empty or error content. Preserve the pull gesture and its admitted execution's safe settlement; restore retained data, selection and relevant scroll position when loading ends. Preserve the existing custom error Snackbar for authorized failures, with no success notification or global sync dependency.
 - Add focused navigation, helper, recovery and read-lifecycle regressions without weakening existing protection tests.
 
 ## Capabilities
