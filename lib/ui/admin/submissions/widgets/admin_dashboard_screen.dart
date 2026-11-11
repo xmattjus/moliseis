@@ -71,6 +71,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _lookupScheduled = false;
   (bool, AdminSubmissionStatus?)? _selection;
   Object? _manualRefresh;
+  // Dismissed reads retain their prior placeholders until safe settlement.
+  final _manualReads =
+      <(AdminSubmissionsViewModel, bool), ({Object token, bool hadError})>{};
+  // Preserve scroll ownership when the selected lane replaces its indicator.
+  final _scrollKey = GlobalKey<NestedScrollViewState>();
   Object? _recoveryAttempt;
   ({Object token, Uri location, VoidCallback returned})? _editorVisit;
   bool _editorCovered = false;
@@ -597,15 +602,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (!mounted) return;
     final authority = _capture();
     if (authority == null || !identical(authority.owner, owner)) return;
+    final readKey = (owner, owner.showIgnored);
+    final hadError = owner.showIgnored
+        ? owner.loadIgnoredSnapshot.hasFailure
+        : owner.error;
     final operation = owner.startSelectedLaneRefresh();
     if (operation == null) return;
     _scheduleLookup();
     final progress = Object();
+    _manualReads[readKey] = (token: progress, hadError: hadError);
     if (_live(authority)) {
       setState(() => _manualRefresh = progress);
     }
     final outcome = await operation.settled;
     if (!mounted) return;
+    if (identical(_manualReads[readKey]?.token, progress)) {
+      setState(() => _manualReads.remove(readKey));
+    }
     if (!_live(authority) || !identical(_manualRefresh, progress)) return;
     setState(() => _manualRefresh = null);
     if (outcome.outcome == AdminDashboardRefreshOutcome.expectedFailure ||
@@ -712,6 +725,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     return Scaffold(
       body: RefreshIndicator.noSpinner(
+        key: ValueKey((viewModel, viewModel.showIgnored)),
         onRefresh: () => _refreshVisible(viewModel),
         notificationPredicate: (notification) {
           return notification.depth == 1;
@@ -723,6 +737,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               visible: _manualRefresh == null,
               maintainState: true,
               child: NestedScrollView(
+                key: _scrollKey,
                 headerSliverBuilder: (context, _) {
                   return [
                     SliverOverlapAbsorber(
@@ -838,10 +853,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ListenableBuilder(
                       listenable: viewModel,
                       builder: (context, _) {
+                        final manualRead =
+                            _manualReads[(viewModel, viewModel.showIgnored)];
+                        final hasFailure =
+                            manualRead?.hadError ??
+                            (viewModel.showIgnored
+                                ? viewModel.loadIgnoredSnapshot.hasFailure
+                                : viewModel.error);
                         if (viewModel.showIgnored) {
                           if (viewModel.loadIgnoredSnapshot.isRunning &&
                               viewModel.ignoredSources.isEmpty &&
-                              _manualRefresh == null) {
+                              manualRead == null) {
                             return const SliverFillRemaining(
                               child: EmptyView.loading(
                                 text: Text('Caricamento fonti ignorate...'),
@@ -852,7 +874,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             children: [
                               // Keep the action below the pinned filter.
                               const SizedBox(height: kToolbarHeight + 16),
-                              if (viewModel.loadIgnoredSnapshot.hasFailure)
+                              if (hasFailure)
                                 ListTile(
                                   title: const Text(
                                     'Impossibile caricare le fonti ignorate',
@@ -887,7 +909,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                   child: const Text('Apri revisione in attesa'),
                                 ),
                               if (viewModel.ignoredSources.isEmpty &&
-                                  !viewModel.loadIgnoredSnapshot.hasFailure)
+                                  !hasFailure)
                                 const Padding(
                                   padding: EdgeInsets.all(16),
                                   child: Text('Nessuna fonte ignorata'),
@@ -925,7 +947,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         }
                         if (viewModel.loading &&
                             !viewModel.hasData &&
-                            _manualRefresh == null) {
+                            manualRead == null) {
                           return const SliverFillRemaining(
                             hasScrollBody: false,
                             child: EmptyView.loading(
@@ -933,7 +955,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                             ),
                           );
                         }
-                        if (viewModel.error && !viewModel.hasData) {
+                        if (hasFailure && !viewModel.hasData) {
                           return SliverFillRemaining(
                             hasScrollBody: false,
                             child: EmptyView.error(
@@ -1049,12 +1071,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openEditor(viewModel),
-        foregroundColor: context.colorScheme.onTertiaryContainer,
-        backgroundColor: context.colorScheme.tertiaryContainer,
-        icon: const Icon(Symbols.add),
-        label: const Text('Nuovo contributo'),
+      // Hide immediately instead of retaining Scaffold's outgoing FAB.
+      floatingActionButton: Visibility(
+        visible: _manualRefresh == null,
+        child: FloatingActionButton.extended(
+          onPressed: () => _openEditor(viewModel),
+          foregroundColor: context.colorScheme.onTertiaryContainer,
+          backgroundColor: context.colorScheme.tertiaryContainer,
+          icon: const Icon(Symbols.add),
+          label: const Text('Nuovo contributo'),
+        ),
       ),
     );
   }

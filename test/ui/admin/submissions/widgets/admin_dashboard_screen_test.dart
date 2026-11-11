@@ -1448,6 +1448,10 @@ void main() {
             await pumpCommandTurns(tester);
             await tester.pumpAndSettle();
             expect(find.text('Caricamento in corso'), findsNothing);
+            expect(
+              find.byType(FloatingActionButton).hitTestable(),
+              findsOneWidget,
+            );
             expect(find.text('Tutti'), findsOneWidget);
             expect(
               find.text(ignored ? 'Retained ignored' : 'Retained row'),
@@ -1630,6 +1634,356 @@ void main() {
       }
     }
 
+    testOwnerUI(
+      'REM FAB is unavailable during loading and restored with its action',
+      (tester) async {
+        repository.listResult = Result.success([sampleAdminSubmission()]);
+        final initial = viewModel.refreshSubmissions();
+        await pumpCommandTurns(tester);
+        await initial;
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final semantics = tester.ensureSemantics();
+        try {
+          expect(
+            find.byType(FloatingActionButton).hitTestable(),
+            findsOneWidget,
+          );
+          expect(find.bySemanticsLabel('Nuovo contributo'), findsOneWidget);
+          final focus = Focus.of(tester.element(find.text('Nuovo contributo')))
+            ..requestFocus();
+          await tester.pump();
+          expect(focus.hasFocus, isTrue);
+          final pending = Completer<Result<List<AdminSubmission>>>();
+          repository.pendingList = pending;
+          await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+          await pumpCommandTurns(tester);
+          expect(find.byType(FloatingActionButton), findsNothing);
+          expect(find.bySemanticsLabel('Nuovo contributo'), findsNothing);
+          expect(focus.hasFocus, isFalse);
+          expect(FocusManager.instance.primaryFocus, isNot(same(focus)));
+          await tester.tap(find.text('Annulla'));
+          await tester.pump();
+          expect(
+            find.byType(FloatingActionButton).hitTestable(),
+            findsOneWidget,
+          );
+          expect(find.bySemanticsLabel('Nuovo contributo'), findsOneWidget);
+          expect(pending.isCompleted, isFalse);
+          await tester.tap(find.byType(FloatingActionButton));
+          await tester.pumpAndSettle();
+          expect(find.text('CREATE_EDITOR_MARKER'), findsOneWidget);
+          pending.complete(Result.error(TestException('dismissed')));
+          await pumpCommandTurns(tester);
+          await tester.pumpAndSettle();
+          expect(find.byType(SnackBar), findsNothing);
+        } finally {
+          semantics.dispose();
+        }
+      },
+      disposeOwners: () {
+        viewModel.dispose();
+        auth.dispose();
+      },
+    );
+
+    for (final ignored in [false, true]) {
+      for (final failed in [false, true]) {
+        testOwnerUI(
+          'REM A dismissal restores settled empty/error content '
+          'ignored=$ignored failed=$failed',
+          (tester) async {
+            if (ignored) viewModel.setIgnoredFilter();
+            if (failed) {
+              repository
+                ..listResult = Result.error(TestException('initial'))
+                ..ignoredSourcesResult = Result.error(TestException('initial'));
+            }
+            final initial = ignored
+                ? viewModel.refreshIgnoredSources()
+                : viewModel.refreshSubmissions();
+            await pumpCommandTurns(tester);
+            await initial;
+            await tester.pumpWidget(
+              MaterialApp.router(
+                scaffoldMessengerKey: $scaffoldMessengerKey,
+                routerConfig: router,
+              ),
+            );
+            await tester.pumpAndSettle();
+            final previous = failed
+                ? (ignored
+                      ? 'Impossibile caricare le fonti ignorate'
+                      : 'Impossibile caricare i contributi')
+                : (ignored
+                      ? 'Nessuna fonte ignorata'
+                      : 'Nessun contributo da mostrare');
+            expect(find.text(previous), findsOneWidget);
+            final main = Completer<Result<List<AdminSubmission>>>();
+            final sources = Completer<Result<List<AdminIgnoredSource>>>();
+            repository
+              ..pendingList = main
+              ..pendingIgnoredList = sources;
+            await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+            await pumpCommandTurns(tester);
+            expect(find.text('Caricamento in corso'), findsOneWidget);
+            await tester.tap(find.text('Annulla'));
+            await tester.pump();
+            expect(find.byType(CircularProgressIndicator), findsNothing);
+            expect(find.text('Tutti').hitTestable(), findsOneWidget);
+            expect(find.text(previous), findsOneWidget);
+            expect(
+              ignored
+                  ? viewModel.loadIgnoredSnapshot.isRunning
+                  : viewModel.loadSnapshot.isRunning,
+              isTrue,
+            );
+            expect(ignored ? sources.isCompleted : main.isCompleted, isFalse);
+            if (failed) {
+              await tester.tap(find.text('Riprova'));
+              await pumpCommandTurns(tester);
+            }
+            expect(repository.listCallCount, ignored ? 0 : 2);
+            expect(repository.ignoredListCalls, ignored ? 2 : 0);
+            if (ignored) {
+              sources.complete(
+                failed
+                    ? const Result.success([
+                        AdminIgnoredSource(
+                          id: 12,
+                          provider: 'p',
+                          externalId: 'e',
+                          name: 'New source',
+                          ignoredAt: 'today',
+                        ),
+                      ])
+                    : Result.error(TestException('manual terminal')),
+              );
+            } else {
+              main.complete(
+                failed
+                    ? Result.success([sampleAdminSubmission(name: 'New row')])
+                    : Result.error(TestException('manual terminal')),
+              );
+            }
+            await pumpCommandTurns(tester);
+            await tester.pumpAndSettle();
+            expect(
+              find.text(
+                failed
+                    ? (ignored ? 'New source' : 'New row')
+                    : (ignored
+                          ? 'Impossibile caricare le fonti ignorate'
+                          : 'Impossibile caricare i contributi'),
+              ),
+              findsOneWidget,
+            );
+            expect(find.byType(CircularProgressIndicator), findsNothing);
+            expect(find.byType(SnackBar), findsNothing);
+            // A later automatic read must still get ordinary loading semantics.
+            if (ignored) {
+              repository
+                ..pendingIgnoredList = null
+                ..ignoredSourcesResult = const Result.success([]);
+            } else {
+              repository
+                ..pendingList = null
+                ..listResult = const Result.success([]);
+            }
+            final empty = ignored
+                ? viewModel.refreshIgnoredSources()
+                : viewModel.refreshSubmissions();
+            await pumpCommandTurns(tester);
+            await empty;
+            final automaticMain = Completer<Result<List<AdminSubmission>>>();
+            final automaticSources =
+                Completer<Result<List<AdminIgnoredSource>>>();
+            repository
+              ..pendingList = automaticMain
+              ..pendingIgnoredList = automaticSources;
+            final automatic = ignored
+                ? viewModel.refreshIgnoredSources()
+                : viewModel.refreshSubmissions();
+            await pumpCommandTurns(tester);
+            expect(find.byType(CircularProgressIndicator), findsOneWidget);
+            expect(find.text('Annulla'), findsNothing);
+            if (ignored) {
+              automaticSources.complete(
+                Result.error(TestException('terminal')),
+              );
+            } else {
+              automaticMain.complete(Result.error(TestException('terminal')));
+            }
+            await pumpCommandTurns(tester);
+            await automatic;
+            await tester.pumpAndSettle();
+            expect(
+              find.text(
+                ignored
+                    ? 'Impossibile caricare le fonti ignorate'
+                    : 'Impossibile caricare i contributi',
+              ),
+              findsOneWidget,
+            );
+          },
+          disposeOwners: () {
+            viewModel.dispose();
+            auth.dispose();
+          },
+        );
+      }
+    }
+
+    for (final oldFirst in [false, true]) {
+      testOwnerUI(
+        'REM B second real pull admits independent lane oldFirst=$oldFirst',
+        (tester) async {
+          repository
+            ..listResult = Result.success([
+              for (var i = 0; i < 30; i++)
+                sampleAdminSubmission(id: i + 1, name: 'Retained row $i'),
+            ])
+            ..ignoredSourcesResult = Result.success([
+              for (var i = 0; i < 30; i++)
+                AdminIgnoredSource(
+                  id: i + 1,
+                  provider: 'p',
+                  externalId: '$i',
+                  name: 'Source $i',
+                  ignoredAt: 'today',
+                ),
+            ]);
+          final initialMain = viewModel.refreshSubmissions();
+          final initialIgnored = viewModel.refreshIgnoredSources();
+          await pumpCommandTurns(tester);
+          await initialMain;
+          await initialIgnored;
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final nested = tester.state<NestedScrollViewState>(
+            find.byType(NestedScrollView),
+          );
+          final main = Completer<Result<List<AdminSubmission>>>();
+          repository.pendingList = main;
+          // Observe the actual gesture callback without changing its Future.
+          final element = tester.element(find.byType(RefreshIndicator));
+          final indicator = tester.widget<RefreshIndicator>(
+            find.byType(RefreshIndicator),
+          );
+          Future<void>? callback;
+          tester.binding.buildOwner!.buildScope(element, () {
+            element.update(
+              RefreshIndicator.noSpinner(
+                key: indicator.key,
+                notificationPredicate: indicator.notificationPredicate,
+                onRefresh: () => callback = indicator.onRefresh(),
+                child: indicator.child,
+              ),
+            );
+          });
+          await tester.drag(
+            find.byType(CustomScrollView),
+            const Offset(0, 300),
+          );
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.pump(const Duration(milliseconds: 300));
+          await pumpCommandTurns(tester);
+          expect(callback, isNotNull);
+          var originalSettled = false;
+          unawaited(callback!.then((_) => originalSettled = true));
+          expect(repository.listCallCount, 2);
+          await tester.tap(find.text('Annulla'));
+          await tester.pump();
+          expect(originalSettled, isFalse);
+          expect(viewModel.startSelectedLaneRefresh(), isNull);
+          await tester.drag(
+            find.byType(CustomScrollView),
+            const Offset(0, -500),
+          );
+          await tester.pumpAndSettle();
+          final offset = nested.innerController.position.pixels;
+          expect(offset, greaterThan(0));
+          await tester.ensureVisible(find.text('Fonti ignorate'));
+          await tester.tap(find.text('Fonti ignorate'));
+          await pumpCommandTurns(tester);
+          await tester.pumpAndSettle();
+          expect(repository.ignoredListCalls, 2);
+          expect(viewModel.showIgnored, isTrue);
+          expect(
+            tester.state<NestedScrollViewState>(find.byType(NestedScrollView)),
+            same(nested),
+          );
+          expect(nested.innerController.position.pixels, offset);
+          final sources = Completer<Result<List<AdminIgnoredSource>>>();
+          repository.pendingIgnoredList = sources;
+          // Return to the pull edge after the filter's horizontal scroll.
+          nested.innerController.jumpTo(0);
+          nested.outerController.jumpTo(0);
+          await tester.pumpAndSettle();
+          await tester.drag(
+            find.byType(CustomScrollView),
+            const Offset(0, 300),
+          );
+          await tester.pump(const Duration(milliseconds: 300));
+          await tester.pump(const Duration(milliseconds: 300));
+          await pumpCommandTurns(tester);
+          expect(repository.ignoredListCalls, 3);
+          expect(viewModel.loadSnapshot.isRunning, isTrue);
+          expect(viewModel.loadIgnoredSnapshot.isRunning, isTrue);
+          expect(originalSettled, isFalse);
+          expect(find.text('Caricamento in corso'), findsOneWidget);
+          final second = tester
+              .state<RefreshIndicatorState>(find.byType(RefreshIndicator))
+              .show();
+          var secondSettled = false;
+          unawaited(second.then((_) => secondSettled = true));
+          if (oldFirst) {
+            main.complete(Result.error(TestException('obsolete')));
+            await pumpCommandTurns(tester);
+            expect(originalSettled, isTrue);
+            expect(secondSettled, isFalse);
+            expect(find.text('Caricamento in corso'), findsOneWidget);
+            expect(find.byType(SnackBar), findsNothing);
+          }
+          sources.complete(const Result.success([]));
+          await pumpCommandTurns(tester);
+          await second;
+          await tester.pumpAndSettle();
+          expect(secondSettled, isTrue);
+          expect(find.text('Nessuna fonte ignorata'), findsOneWidget);
+          expect(find.text('Caricamento in corso'), findsNothing);
+          if (!oldFirst) {
+            expect(originalSettled, isFalse);
+            main.complete(
+              Result.success([sampleAdminSubmission(name: 'Late row')]),
+            );
+            await pumpCommandTurns(tester);
+          }
+          await callback;
+          await tester.pumpAndSettle();
+          expect(originalSettled, isTrue);
+          expect(viewModel.showIgnored, isTrue);
+          expect(find.byType(SnackBar), findsNothing);
+          expect(repository.listCallCount, 2);
+          expect(repository.ignoredListCalls, 3);
+        },
+        disposeOwners: () {
+          viewModel.dispose();
+          auth.dispose();
+        },
+      );
+    }
+
     for (final pull in [false, true]) {
       for (final failure in [false, true]) {
         testOwnerUI(
@@ -1801,6 +2155,10 @@ void main() {
             revoke == 'none' ? findsOneWidget : findsNothing,
           );
           if (revoke == 'none') {
+            expect(
+              find.byType(FloatingActionButton).hitTestable(),
+              findsOneWidget,
+            );
             expect(
               find.text(
                 'Si è verificato un errore durante '
