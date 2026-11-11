@@ -84,7 +84,7 @@ The decision area SHALL emphasize one appropriate next action while retaining ap
 
 #### Scenario: Selected target outlives Event eligibility
 - **GIVEN** a persisted human Event has a selected target
-- **WHEN** its start becomes missing or invalid, or it is converted to Place and saved while the target remains selected
+- **WHEN** its start becomes missing or unresolved, or it is converted to Place and saved while the target remains selected
 - **THEN** target presence and command admission alone do not offer or enable Link as an eligible primary action; Place-like content cannot link to an Event
 - **AND** stale callbacks cannot bypass the existing request-time start, dirty, activation or other mutation guards, and ineligible linking issues no repository mutation
 - **AND** publication still follows Event/Place semantics and Reject does not inherit publication-category readiness
