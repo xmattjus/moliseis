@@ -15,6 +15,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../support/admin_draft_repositories.dart';
+import '../../../../support/admin_editor_interactions.dart';
 import '../../../../support/admin_save_route_harness.dart';
 import '../../../../support/command_test_support.dart';
 import '../../../../support/fake_repositories.dart';
@@ -67,7 +68,8 @@ void main() {
         ),
       );
       await harness.openEditor(tester, target: 1);
-      await tester.ensureVisible(
+      await revealAdminEditorWidget(
+        tester,
         find.byKey(const ValueKey('admin_accept_remote')),
       );
       await tester.tap(find.byKey(const ValueKey('admin_accept_remote')));
@@ -160,7 +162,7 @@ void main() {
         queryParameters: {'session': original.owner.sessionId},
       );
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('Salva bozza locale'));
+      await revealAdminEditorWidget(tester, find.text('Salva bozza locale'));
       await tester.tap(find.text('Salva bozza locale'));
       await tester.pumpAndSettle();
       expect(harness.owner.pendingRecoveryCheckpoint, isFalse);
@@ -570,7 +572,8 @@ void main() {
         expect(find.text(message), findsNothing);
         expect(harness.local.drafts.navigationLoadCalls, lookups);
         expect(harness.repository.listCallCount, reads);
-        await tester.ensureVisible(
+        await revealAdminEditorWidget(
+          tester,
           find.byKey(const ValueKey('admin_recovery_return')),
         );
         await tester.tap(find.byKey(const ValueKey('admin_recovery_return')));

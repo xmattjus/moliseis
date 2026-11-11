@@ -44,6 +44,7 @@ import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../support/admin_draft_repositories.dart';
+import '../support/admin_editor_interactions.dart';
 import '../support/command_test_support.dart';
 import '../support/crash_reporting_support.dart';
 import '../support/fake_cache_manager.dart';
@@ -1266,7 +1267,7 @@ void main() {
               FilledButton,
               dialog == 'Publish' ? 'Pubblica come luogo' : 'Rifiuta',
             );
-            await tester.ensureVisible(action);
+            await revealAdminEditorWidget(tester, action);
             await tester.pumpAndSettle();
             await tester.tap(action);
             await tester.pumpAndSettle();
@@ -1366,7 +1367,7 @@ void main() {
                 FilledButton,
                 dialog == 'Publish' ? 'Pubblica come luogo' : 'Rifiuta',
               );
-              await tester.ensureVisible(action);
+              await revealAdminEditorWidget(tester, action);
               await tester.pumpAndSettle();
               await tester.tap(action);
               await tester.pumpAndSettle();
@@ -1471,7 +1472,7 @@ void main() {
               expect(find.byType(SnackBar), findsNothing);
               // Session cleanup permits a new explicit interaction without
               // reviving the prior Save receipt or stale moderation intent.
-              await tester.ensureVisible(action);
+              await revealAdminEditorWidget(tester, action);
               await tester.pumpAndSettle();
               await tester.tap(action);
               await tester.pumpAndSettle();
