@@ -121,7 +121,7 @@ void main() {
           expect(tester.getSize(toggle).height, greaterThanOrEqualTo(48));
           expect(
             tester.widget<Tooltip>(toggle).message,
-            contains('1 sovrascritture'),
+            contains('1 sovrascrittura'),
           );
           expect(
             tester.widget<Tooltip>(toggle).message,
@@ -351,6 +351,15 @@ void main() {
         findsOneWidget,
       );
       expect(harness.repository.updateIds, isEmpty);
+      final decisionToggle = find.byKey(
+        const ValueKey('admin_open_decisions'),
+      );
+      expect(decisionToggle.hitTestable(), findsOneWidget);
+      expect(
+        tester.widget<Tooltip>(decisionToggle).message,
+        contains('Errore: Controlla i campi del contributo.'),
+      );
+      expect(find.byIcon(Icons.error_outline).hitTestable(), findsWidgets);
       await openAdminEditorDecisions(tester);
       final feedback = find.byKey(const ValueKey('admin_validation_feedback'));
       await tester.ensureVisible(feedback);
