@@ -7,21 +7,6 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: AdminSubmissionMetadataSection(
-            contributorName: null,
-            contributorEmail: null,
-            submissionId: 1,
-            createdAt: null,
-            modifiedAt: null,
-            externalEvent: null,
-          ),
-        ),
-      ),
-    );
-
-    await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: AdminSubmissionMetadataSection(
