@@ -85,8 +85,12 @@ void main() {
           );
           expect(primary.hitTestable(), findsOneWidget);
           expect(find.text('Applica aggiornamento'), findsOneWidget);
-          final initialNode = tester.getSemantics(find.text('Altre azioni'));
-          expect(initialNode.label, contains('Altre azioni'));
+          final toggle = find.byKey(
+            const ValueKey('admin_secondary_toggle'),
+          );
+          final initialNode = tester.getSemantics(toggle);
+          expect(initialNode.label, 'Altre azioni');
+          expect(initialNode.flagsCollection.isButton, isTrue);
           expect(initialNode.flagsCollection.isExpanded, isNot(Tristate.none));
           expect(initialNode.flagsCollection.isExpanded,
             expanded ? Tristate.isTrue : Tristate.isFalse);
@@ -94,8 +98,9 @@ void main() {
             await tester.tap(find.text('Altre azioni'));
             await tester.pumpAndSettle();
           }
-          final expandedNode = tester.getSemantics(find.text('Altre azioni'));
-          expect(expandedNode.label, contains('Altre azioni'));
+          final expandedNode = tester.getSemantics(toggle);
+          expect(expandedNode.label, 'Altre azioni');
+          expect(expandedNode.flagsCollection.isButton, isTrue);
           expect(expandedNode.flagsCollection.isExpanded, isNot(Tristate.none));
           expect(expandedNode.flagsCollection.isExpanded, Tristate.isTrue);
           expect(primary.hitTestable(), findsOneWidget);
