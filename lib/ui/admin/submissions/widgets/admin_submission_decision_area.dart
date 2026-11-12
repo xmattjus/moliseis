@@ -187,10 +187,11 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
                     ],
                   ],
                   if (alternatives.isNotEmpty) ...[
-                    Semantics(
-                      key: const ValueKey('admin_secondary_toggle'),
-                      expanded: _actionsExpanded,
-                      child: TextButton.icon(
+                    MergeSemantics(
+                      child: Semantics(
+                        key: const ValueKey('admin_secondary_toggle'),
+                        expanded: _actionsExpanded,
+                        child: TextButton.icon(
                         style: TextButton.styleFrom(
                           minimumSize: const Size(48, 48),
                         ),
@@ -203,6 +204,7 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
                               : Icons.expand_more,
                         ),
                         label: const Text('Altre azioni'),
+                        ),
                       ),
                     ),
                     if (_actionsExpanded && !scrollAll)
