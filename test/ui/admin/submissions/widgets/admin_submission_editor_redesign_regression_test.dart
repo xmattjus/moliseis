@@ -731,7 +731,10 @@ void main() {
       await tester.enterText(city, 'Isernia');
       await tester.pumpAndSettle();
       expect(city.hitTestable(), findsOneWidget);
+      await openAdminEditorDecisions(tester);
       final save = find.widgetWithText(FilledButton, 'Salva modifiche');
+      await tester.ensureVisible(save);
+      await tester.pumpAndSettle();
       expect(save.hitTestable(), findsOneWidget);
       expect(tester.getBottomRight(save).dy, lessThanOrEqualTo(400));
       expect(harness.owner.city, 'Isernia');

@@ -7,6 +7,7 @@ class AdminSubmissionDecisionArea extends StatefulWidget {
     required this.expanded,
     required this.primaryAction,
     required this.secondaryActions,
+    this.scrollAll = false,
     this.guidance = const [],
     this.feedback,
     this.status,
@@ -20,6 +21,9 @@ class AdminSubmissionDecisionArea extends StatefulWidget {
 
   /// Whether available width supports the moderation side panel.
   final bool expanded;
+
+  /// Scrolls the complete decision surface when fixed controls cannot fit.
+  final bool scrollAll;
 
   /// Current workflow decision, including its existing disabled state.
   final Widget? primaryAction;
@@ -91,7 +95,10 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: widget.scrollAll ? 0 : 8,
+          ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
@@ -102,7 +109,8 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
                 ...widget.guidance,
                 ...widget.secondaryActions,
               ];
-              return Column(
+              final scrollAll = widget.scrollAll;
+              final panel = Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -197,7 +205,7 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
                         label: const Text('Altre azioni'),
                       ),
                     ),
-                    if (_actionsExpanded)
+                    if (_actionsExpanded && !scrollAll)
                       Flexible(
                         child: SingleChildScrollView(
                           key: const ValueKey(
@@ -224,9 +232,26 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
                           ),
                         ),
                       ),
+                    if (_actionsExpanded && scrollAll)
+                      ...alternatives.map(
+                        (action) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: action,
+                          ),
+                        ),
+                      ),
                   ],
                 ],
               );
+              return scrollAll
+                  ? SingleChildScrollView(
+                      key: const ValueKey('admin_decision_complete_scroll'),
+                      primary: false,
+                      child: panel,
+                    )
+                  : panel;
             },
           ),
         ),

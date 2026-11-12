@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
+import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
@@ -71,11 +72,15 @@ class _AdminSubmissionEditorScreenState
   final _consumed = <String, int?>{};
   late AdminSubmissionEditorViewModel _owner;
   AdminDraftActivation? _boundActivation;
+  AdminEventCandidate? _selectedTargetIdentity;
+  AdminDraftActivation? _selectedTargetActivation;
   var _statusDialogOpen = false;
   ModalRoute<dynamic>? _statusDialogRoute;
   var _statusDialogRevoked = false;
   var _dialogSession = 0;
   var _routeExited = false;
+  var _decisionsOpen = false;
+  FocusNode? _editingFocus;
 
   @override
   void initState() {
@@ -95,6 +100,10 @@ class _AdminSubmissionEditorScreenState
   void _bind(AdminSubmissionEditorViewModel owner) {
     _retireStatusDialog();
     _clearValidation();
+    _selectedTargetIdentity = null;
+    _selectedTargetActivation = null;
+    _decisionsOpen = false;
+    _editingFocus = null;
     _owner = owner;
     _boundActivation = owner.activation;
     _routeExited = false;
@@ -237,6 +246,12 @@ class _AdminSubmissionEditorScreenState
     final owner = _owner;
     final next = owner.activation;
     final previous = _boundActivation;
+    if (_selectedTargetIdentity != null &&
+        (!owner.isActivationCurrent(_selectedTargetActivation) ||
+            owner.targetEventId != _selectedTargetIdentity!.id)) {
+      _selectedTargetIdentity = null;
+      _selectedTargetActivation = null;
+    }
     if (next != null &&
         previous != null &&
         previous.owner.submissionId == null &&
@@ -756,6 +771,7 @@ class _AdminSubmissionEditorScreenState
               !owner.isActivationCurrent(activation)) {
             return;
           }
+          if (_decisionsOpen) _closeDecisions(restoreFocus: false);
           if (location) setState(() => _revealCoordinatesRevision++);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
@@ -852,9 +868,37 @@ class _AdminSubmissionEditorScreenState
         !current()) {
       return;
     }
+    if (_decisionsOpen) {
+      _closeDecisions(restoreFocus: false);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _revealEvidence(owner, activation, target, current);
+      });
+      return;
+    }
     final targetContext = target.currentContext;
     if (targetContext != null) {
       Scrollable.ensureVisible(targetContext, duration: Durations.medium2);
+    }
+  }
+
+  void _closeDecisions({bool restoreFocus = true}) {
+    final focus = _editingFocus;
+    _editingFocus = null;
+    setState(() => _decisionsOpen = false);
+    if (restoreFocus && focus != null) {
+      final owner = _owner;
+      final activation = owner.activation;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_owns(owner) &&
+            owner.isActivationCurrent(activation) &&
+            !_decisionsOpen &&
+            focus.context != null &&
+            focus.canRequestFocus) {
+          focus.requestFocus();
+        }
+      });
     }
   }
 
@@ -862,6 +906,7 @@ class _AdminSubmissionEditorScreenState
     AdminSubmissionEditorViewModel viewModel,
     AdminDraftActivation? activation, {
     required bool expanded,
+    bool scrollAll = false,
   }) {
     final pending = viewModel.status == AdminSubmissionStatus.pending;
     final recovery =
@@ -1091,7 +1136,7 @@ class _AdminSubmissionEditorScreenState
             'Seleziona una categoria e salva prima di pubblicare.',
           ),
         ),
-      if (viewModel.isExternalUpdate && !linkWorkflow)
+      if (pending && viewModel.isExternalUpdate && !linkWorkflow)
         TextButton(
           onPressed: () => _revealEvidence(
             viewModel,
@@ -1101,7 +1146,7 @@ class _AdminSubmissionEditorScreenState
           ),
           child: const Text('Completa la data di inizio dell’evento.'),
         )
-      else if (viewModel.isExternalUpdate && selectedTarget == null)
+      else if (pending && viewModel.isExternalUpdate && selectedTarget == null)
         TextButton(
           onPressed: () => _revealEvidence(
             viewModel,
@@ -1145,6 +1190,7 @@ class _AdminSubmissionEditorScreenState
     return AdminSubmissionDecisionArea(
       key: ObjectKey(viewModel),
       expanded: expanded,
+      scrollAll: scrollAll,
       primaryAction: primary is ButtonStyleButton
           ? FilledButton(
               key: primary.key,
@@ -1166,7 +1212,7 @@ class _AdminSubmissionEditorScreenState
       linkIdentity: identical(primary, link)
           ? AdminSubmissionLinkTargetIdentity(
               targetId: selectedTarget!,
-              candidates: viewModel.candidates,
+              candidate: _selectedTargetIdentity,
               concise: true,
             )
           : null,
@@ -1214,7 +1260,12 @@ class _AdminSubmissionEditorScreenState
             viewModel.loading &&
             !viewModel.hasLoadedDetail) {
           return const Scaffold(
-            body: EmptyView.loading(text: Text('Caricamento in corso...')),
+            body: Center(
+              child: SingleChildScrollView(
+                primary: false,
+                child: EmptyView.loading(text: Text('Caricamento in corso...')),
+              ),
+            ),
           );
         }
         // New typing may coexist with a captured Save. Other mutation lanes
@@ -1512,6 +1563,7 @@ class _AdminSubmissionEditorScreenState
                   key: _verificationTargetKey,
                   viewModel: viewModel,
                   targetController: _eventTargetController,
+                  selectedTargetIdentity: _selectedTargetIdentity,
                   sourceKey: _sourceTargetKey,
                   overwriteKey: _overwriteTargetKey,
                   previewErrorMessage: previewErrorMessage,
@@ -1535,11 +1587,30 @@ class _AdminSubmissionEditorScreenState
                             activation: activation,
                           ),
                         ),
-                  onTargetChanged: (id) => _request(
-                    viewModel,
-                    () =>
-                        viewModel.selectTargetEvent(id, activation: activation),
-                  ),
+                  onCandidateSelected: (candidate, candidates) {
+                    if (!_owns(viewModel) ||
+                        !viewModel.isActivationCurrent(activation) ||
+                        !identical(viewModel.candidates, candidates)) {
+                      return;
+                    }
+                    viewModel.selectTargetEvent(
+                      candidate.id,
+                      activation: activation,
+                    );
+                    if (viewModel.targetEventId != candidate.id) return;
+                    setState(() {
+                      _selectedTargetIdentity = candidate;
+                      _selectedTargetActivation = activation;
+                    });
+                  },
+                  onTargetChanged: (id) => _request(viewModel, () {
+                    if (!viewModel.isActivationCurrent(activation)) return;
+                    setState(() {
+                      _selectedTargetIdentity = null;
+                      _selectedTargetActivation = null;
+                    });
+                    viewModel.selectTargetEvent(id, activation: activation);
+                  }),
                   onAcknowledge: viewModel.operationRunning
                       ? null
                       : (selected) {
@@ -1599,24 +1670,42 @@ class _AdminSubmissionEditorScreenState
                 constraints.maxWidth >= 840 &&
                 constraints.maxWidth >= (520 + 320) * scale + 24;
             final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+            final topInset = MediaQuery.paddingOf(context).top;
+            final bottomInset = MediaQuery.paddingOf(context).bottom;
+            // These outer constraints include the keyboard and system padding.
+            final availableHeight =
+                (constraints.maxHeight -
+                        keyboardInset -
+                        topInset -
+                        kToolbarHeight -
+                        bottomInset)
+                    .clamp(0.0, double.infinity);
+            final constrained = availableHeight < 480 * scale;
+            final completeSurface = constrained || _decisionsOpen;
             final decisions = _decisionArea(
               viewModel,
               activation,
               expanded: expanded,
+              scrollAll: completeSurface,
             );
+            final overwriteCount =
+                viewModel.mergePreview?.groups
+                    .where((group) => group.overwrite)
+                    .length ??
+                0;
+            final risks = [
+              if (overwriteCount > 0) '$overwriteCount sovrascritture',
+              if (viewModel.externalEvent?.stale == true) 'Fonte aggiornata',
+            ];
             return Scaffold(
-              bottomNavigationBar: expanded
+              bottomNavigationBar: expanded || completeSurface
                   ? null
                   : Padding(
                       padding: EdgeInsets.only(bottom: keyboardInset),
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxHeight:
-                              (constraints.maxHeight -
-                                      keyboardInset -
-                                      kToolbarHeight -
-                                      48)
-                                  .clamp(0, double.infinity),
+                              availableHeight - 160 * scale + bottomInset,
                         ),
                         child: decisions,
                       ),
@@ -1630,24 +1719,95 @@ class _AdminSubmissionEditorScreenState
                           ? 'Revisiona contributo'
                           : 'Nuovo contributo',
                     ),
+                    actions: completeSurface
+                        ? [
+                            Tooltip(
+                              key: const ValueKey('admin_open_decisions'),
+                              message: _decisionsOpen
+                                  ? 'Torna al contenuto'
+                                  : [
+                                      'Decisioni e rischi',
+                                      ...risks,
+                                    ].join(' · '),
+                              child: TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(48, 48),
+                                ),
+                                onPressed: () {
+                                  if (!_owns(viewModel)) return;
+                                  if (_decisionsOpen) {
+                                    _closeDecisions();
+                                  } else {
+                                    _editingFocus =
+                                        FocusManager.instance.primaryFocus;
+                                    setState(() => _decisionsOpen = true);
+                                  }
+                                },
+                                icon: Badge(
+                                  isLabelVisible:
+                                      !_decisionsOpen && overwriteCount > 0,
+                                  label: Text('$overwriteCount'),
+                                  child: Icon(
+                                    _decisionsOpen
+                                        ? Icons.edit_outlined
+                                        : risks.isEmpty
+                                        ? Icons.fact_check_outlined
+                                        : Icons.warning_amber,
+                                  ),
+                                ),
+                                label: Text(
+                                  _decisionsOpen ? 'Contenuto' : 'Decisioni',
+                                ),
+                              ),
+                            ),
+                          ]
+                        : null,
                   ),
                   Expanded(
-                    child: Flex(
-                      direction: expanded ? Axis.horizontal : Axis.vertical,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 800),
-                              child: content,
+                    child: Semantics(
+                      container: true,
+                      child: SafeArea(
+                        top: false,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ExcludeFocus(
+                              excluding: _decisionsOpen,
+                              child: Flex(
+                                direction: expanded
+                                    ? Axis.horizontal
+                                    : Axis.vertical,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: Align(
+                                      alignment: Alignment.topCenter,
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 800,
+                                        ),
+                                        child: content,
+                                      ),
+                                    ),
+                                  ),
+                                  if (expanded && !completeSurface)
+                                    SizedBox(
+                                      width: 320 * scale,
+                                      child: decisions,
+                                    ),
+                                ],
+                              ),
                             ),
-                          ),
+                            if (_decisionsOpen)
+                              BlockSemantics(
+                                child: FocusScope(
+                                  autofocus: true,
+                                  child: decisions,
+                                ),
+                              ),
+                          ],
                         ),
-                        if (expanded)
-                          SizedBox(width: 320 * scale, child: decisions),
-                      ],
+                      ),
                     ),
                   ),
                 ],

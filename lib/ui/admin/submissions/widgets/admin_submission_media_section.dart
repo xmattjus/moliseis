@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/admin_submission_staged_asset.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
+import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
@@ -82,21 +83,16 @@ class AdminSubmissionMediaSection extends StatelessWidget {
                   ...viewModel.stagedAssets.map(
                     (asset) => ContentSubmissionAssetListItem(
                       key: ValueKey('admin_staged_${asset.digest}'),
-                      image: FutureBuilder<Result<File>>(
-                        future: viewModel.stagedAssetFile(asset),
-                        builder: (context, snapshot) => switch (snapshot.data) {
-                          Success<File>(:final value) => Image.file(
-                            value,
-                            width: contentSubmissionAssetSize.width,
-                            height: contentSubmissionAssetSize.height,
-                            fit: BoxFit.cover,
-                          ),
-                          _ => const SizedBox(
-                            width: 80,
-                            height: 80,
-                            child: Icon(Icons.image),
-                          ),
-                        },
+                      image: _AdminStagedAssetPreview(
+                        key: ValueKey((
+                          viewModel,
+                          viewModel.activation?.generation,
+                          asset.owner,
+                          asset.digest,
+                          asset.relativePath,
+                        )),
+                        viewModel: viewModel,
+                        asset: asset,
                       ),
                       removeButtonSize: 48,
                       showRemoveIcon: viewModel.canCheckpoint,
@@ -150,4 +146,74 @@ class AdminSubmissionMediaSection extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Retains resolution for the keyed owner, activation and private file.
+class _AdminStagedAssetPreview extends StatefulWidget {
+  const _AdminStagedAssetPreview({
+    required this.viewModel,
+    required this.asset,
+    required super.key,
+  });
+
+  final AdminSubmissionEditorViewModel viewModel;
+  final AdminSubmissionStagedAsset asset;
+
+  @override
+  State<_AdminStagedAssetPreview> createState() =>
+      _AdminStagedAssetPreviewState();
+}
+
+class _AdminStagedAssetPreviewState extends State<_AdminStagedAssetPreview> {
+  late Future<Result<File>> _resolution;
+  late final AdminDraftActivation? _activation;
+
+  @override
+  void initState() {
+    super.initState();
+    _activation = widget.viewModel.activation;
+    _resolution = widget.viewModel.stagedAssetFile(widget.asset);
+  }
+
+  void _retry() {
+    if (!mounted) return;
+    if (!widget.viewModel.isActivationCurrent(_activation)) return;
+    setState(() {
+      _resolution = widget.viewModel.stagedAssetFile(widget.asset);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Result<File>>(
+    future: _resolution,
+    builder: (context, snapshot) => switch (snapshot.data) {
+      Success<File>(:final value) => Image.file(
+        value,
+        width: contentSubmissionAssetSize.width,
+        height: contentSubmissionAssetSize.height,
+        cacheWidth:
+            (contentSubmissionAssetSize.width *
+                    MediaQuery.devicePixelRatioOf(context))
+                .ceil(),
+        cacheHeight:
+            (contentSubmissionAssetSize.height *
+                    MediaQuery.devicePixelRatioOf(context))
+                .ceil(),
+        fit: BoxFit.cover,
+      ),
+      _ => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(width: 80, height: 80, child: Icon(Icons.image)),
+          if (snapshot.connectionState == ConnectionState.done)
+            IconButton(
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              tooltip: 'Riprova anteprima foto',
+              onPressed: _retry,
+              icon: const Icon(Icons.refresh),
+            ),
+        ],
+      ),
+    },
+  );
 }

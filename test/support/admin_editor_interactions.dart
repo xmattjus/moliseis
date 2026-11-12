@@ -1,8 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// Opens the complete decision surface only when space requires it.
+Future<void> openAdminEditorDecisions(WidgetTester tester) async {
+  final open = find.byKey(const ValueKey('admin_open_decisions'));
+  if (open.evaluate().isNotEmpty &&
+      tester.widget<Tooltip>(open).message != 'Torna al contenuto') {
+    await tester.tap(open);
+    await tester.pumpAndSettle();
+  }
+}
+
 /// Opens the editor's secondary decisions without scrolling its content form.
 Future<void> showAdminEditorActions(WidgetTester tester) async {
+  await openAdminEditorDecisions(tester);
   final title = find.text('Altre azioni');
   if (title.evaluate().isEmpty) return;
   final toggle = find.byKey(const ValueKey('admin_secondary_toggle'));
@@ -17,6 +28,17 @@ Future<void> showAdminEditorActions(WidgetTester tester) async {
 Future<void> revealAdminEditorWidget(WidgetTester tester, Finder finder) async {
   if (finder.hitTestable().evaluate().isEmpty) {
     await showAdminEditorActions(tester);
+  }
+  final open = find.byKey(const ValueKey('admin_open_decisions'));
+  final inContent = find.ancestor(
+    of: finder,
+    matching: find.byKey(const ValueKey('admin_submission_editor_scroll')),
+  );
+  if (open.evaluate().isNotEmpty &&
+      tester.widget<Tooltip>(open).message == 'Torna al contenuto' &&
+      (finder.evaluate().isEmpty || inContent.evaluate().isNotEmpty)) {
+    await tester.tap(open);
+    await tester.pumpAndSettle();
   }
   if (finder.evaluate().isEmpty) {
     final details = find.text('Autore e dettagli tecnici', skipOffstage: false);

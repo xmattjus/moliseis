@@ -239,7 +239,7 @@ void main() {
   }, disposeOwners: () => harness.dispose());
 
   testOwnerUI(
-    'Link identifies only current candidates and sends the selected manual ID',
+    'Link retains tapped identity after invalidation and sends ID 42',
     (tester) async {
       harness = AdminSaveRouteHarness();
       harness.repository.getByIdResults[1] = Result.success(
@@ -272,6 +272,14 @@ void main() {
         isTrue,
       );
       await tester.pumpAndSettle();
+      final candidate = find.byKey(const ValueKey('admin_event_candidate_42'));
+      await revealAdminEditorWidget(tester, candidate);
+      await tester.tap(candidate);
+      await tester.pumpAndSettle();
+      expect(harness.owner.candidates, isNull);
+      expect(harness.owner.targetEventId, 42);
+      expect(find.text('Festa del borgo'), findsNWidgets(2));
+      expect(find.text('Isernia'), findsNWidgets(2));
       final decision = find.byType(AdminSubmissionDecisionArea);
       expect(
         find.descendant(of: decision, matching: find.text('Festa del borgo')),
@@ -288,29 +296,35 @@ void main() {
       await tester.pump();
       expect(
         find.descendant(of: decision, matching: find.text('Festa del borgo')),
+        findsOneWidget,
+      );
+      harness.repository.candidatesResult = Result.success(
+        AdminEventCandidates(
+          events: const [AdminEventCandidate(id: 42, name: 'Unrelated result')],
+          pendingWarnings: const [],
+        ),
+      );
+      expect(
+        harness.owner.requestFindCandidates(
+          activation: harness.owner.activation,
+        ),
+        isTrue,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: decision, matching: find.text('Festa del borgo')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: decision, matching: find.text('Unrelated result')),
         findsNothing,
       );
-      expect(
-        find.descendant(
-          of: decision,
-          matching: find.text('Evento #42 · identità da verificare'),
-        ),
-        findsOneWidget,
-      );
-      harness.owner.selectTargetEvent(43, activation: harness.owner.activation);
-      await tester.pump();
-      expect(
-        find.descendant(
-          of: decision,
-          matching: find.text('Evento #43 · identità da verificare'),
-        ),
-        findsOneWidget,
-      );
+      expect(find.text('Evento #42 · identità da verificare'), findsNothing);
       final link = find.widgetWithText(FilledButton, 'Collega a evento');
       expect(tester.widget<FilledButton>(link).onPressed, isNotNull);
       await tester.tap(link);
       await tester.pumpAndSettle();
-      expect(harness.repository.linkCalls, [(1, 43)]);
+      expect(harness.repository.linkCalls, [(1, 42)]);
     },
     disposeOwners: () => harness.dispose(),
   );
@@ -450,6 +464,7 @@ void main() {
             isTrue,
           );
           await tester.pumpAndSettle();
+          await openAdminEditorDecisions(tester);
           final area = find.byType(AdminSubmissionDecisionArea);
           expect(
             tester.widget<AdminSubmissionDecisionArea>(area).expanded,
@@ -460,7 +475,12 @@ void main() {
             'Applica aggiornamento',
           );
           expect(tester.widget<FilledButton>(apply).onPressed, isNotNull);
+          await tester.ensureVisible(apply);
+          await tester.pumpAndSettle();
           expect(apply.hitTestable(), findsOneWidget);
+          final risks = find.byKey(const ValueKey('admin_decision_risks'));
+          await tester.ensureVisible(risks);
+          await tester.pumpAndSettle();
           expect(
             find.textContaining('1 sovrascrittura').hitTestable(),
             findsOneWidget,
@@ -470,9 +490,8 @@ void main() {
             findsOneWidget,
           );
           await showAdminEditorActions(tester);
-          expect(apply.hitTestable(), findsOneWidget);
           final secondary = find.byKey(
-            const ValueKey('admin_decision_secondary_scroll'),
+            const ValueKey('admin_decision_complete_scroll'),
           );
           final reject = find.widgetWithText(FilledButton, 'Rifiuta');
           await tester.ensureVisible(reject);
@@ -487,8 +506,15 @@ void main() {
           );
           expect(reject.hitTestable(), findsOneWidget);
           expect(tester.widget<FilledButton>(reject).onPressed, isNotNull);
+          expect(
+            tester.widget<SingleChildScrollView>(secondary).primary,
+            isFalse,
+          );
+          await tester.ensureVisible(apply);
+          await tester.pumpAndSettle();
           expect(apply.hitTestable(), findsOneWidget);
-          final risks = find.byKey(const ValueKey('admin_decision_risks'));
+          await tester.ensureVisible(risks);
+          await tester.pumpAndSettle();
           expect(risks.hitTestable(), findsOneWidget);
           await tester.tap(risks);
           await tester.pumpAndSettle();
@@ -497,7 +523,13 @@ void main() {
           expect(find.text('Descrizione').hitTestable(), findsOneWidget);
           expect(harness.repository.applyCalls, isEmpty);
           expect(harness.owner.acknowledgeCurrentSource, isFalse);
-          expect(apply.hitTestable(), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('admin_open_decisions')).hitTestable(),
+            findsOneWidget,
+          );
+          await openAdminEditorDecisions(tester);
+          await tester.ensureVisible(risks);
+          await tester.pumpAndSettle();
           await tester.tap(risks);
           await tester.pumpAndSettle();
           await tester.tap(find.text('Esamina fonte aggiornata'));
@@ -539,7 +571,7 @@ void main() {
       (tester) async {
         harness = AdminSaveRouteHarness();
         tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = const Size(320, 500);
+        tester.view.physicalSize = const Size(320, 1200);
         tester.view.viewInsets = const FakeViewPadding(bottom: 100);
         tester.platformDispatcher.textScaleFactorTestValue = 2;
         addTearDown(tester.view.resetDevicePixelRatio);
@@ -588,6 +620,28 @@ void main() {
           isTrue,
         );
         await tester.pumpAndSettle();
+        final candidate = find.byKey(
+          const ValueKey('admin_event_candidate_42'),
+        );
+        final contentScroll = find
+            .descendant(
+              of: find.byKey(const ValueKey('admin_submission_editor_scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final position = tester.state<ScrollableState>(contentScroll).position;
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(candidate);
+        await tester.pumpAndSettle();
+        final contentViewport = tester.getRect(
+          find.byKey(const ValueKey('admin_submission_editor_scroll')),
+        );
+        await tester.tapAt(
+          tester.getRect(candidate).intersect(contentViewport).center,
+        );
+        await tester.pumpAndSettle();
+        expect(harness.owner.candidates, isNull);
         final area = find.byType(AdminSubmissionDecisionArea);
         final identity = find.descendant(of: area, matching: find.text(title));
         final link = find.widgetWithText(FilledButton, 'Collega a evento');
@@ -613,11 +667,13 @@ void main() {
         expect(link.hitTestable(), findsOneWidget);
         if (staleExternal) {
           expect(
-            find.byKey(const ValueKey('admin_decision_risks')).hitTestable(),
+            find.text('È disponibile una fonte aggiornata').hitTestable(),
             findsOneWidget,
           );
           expect(
-            find.textContaining('Fonte aggiornata').hitTestable(),
+            find
+                .widgetWithText(TextButton, 'Esamina fonte aggiornata')
+                .hitTestable(),
             findsOneWidget,
           );
         }

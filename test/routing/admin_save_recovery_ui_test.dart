@@ -355,7 +355,12 @@ void main() {
         await revealAdminEditorWidget(tester, item);
         await tester.pumpAndSettle();
         await tester.tap(
-          find.descendant(of: item, matching: find.byType(InkWell)),
+          find.descendant(
+            of: item,
+            matching: find.byWidgetPredicate(
+              (widget) => widget is Tooltip && widget.message == 'Rimuovi foto',
+            ),
+          ),
         );
         await tester.pumpAndSettle();
         expect(harness.owner.stagedAssets, isEmpty);

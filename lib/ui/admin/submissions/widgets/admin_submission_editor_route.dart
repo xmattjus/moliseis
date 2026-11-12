@@ -329,52 +329,58 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
     if (!_ready) {
       return Scaffold(
         appBar: AppBar(),
-        body: _error == null
-            ? const EmptyView.loading(text: Text('Apertura editor...'))
-            : EmptyView.error(
-                text: Text(
-                  canReturn && owner.pendingRecoveryCheckpoint
-                      ? 'Salva nella bozza locale i campi remoti '
-                            'accettati prima di aprire un altro contributo.'
-                      : 'Impossibile aprire il contributo. '
-                            'Il lavoro locale è conservato.',
-                ),
-                action: Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  children: [
-                    TextButton(
-                      onPressed: () => unawaited(_activate()),
-                      child: const Text('Riprova'),
+        body: Center(
+          child: SingleChildScrollView(
+            primary: false,
+            child: _error == null
+                ? const EmptyView.loading(text: Text('Apertura editor...'))
+                : EmptyView.error(
+                    text: Text(
+                      canReturn && owner.pendingRecoveryCheckpoint
+                          ? 'Salva nella bozza locale i campi remoti '
+                                'accettati prima di aprire un altro contributo.'
+                          : 'Impossibile aprire il contributo. '
+                                'Il lavoro locale è conservato.',
                     ),
-                    if (canReturn)
-                      TextButton(
-                        key: const ValueKey('admin_return_active_editor'),
-                        onPressed: () {
-                          if (!mounted) return;
-                          if (!identical(widget.viewModel, owner) ||
-                              !identical(widget.auth, auth) ||
-                              !auth.isAdmin ||
-                              auth.currentUser?.id != active.owner.accountId ||
-                              !owner.isActivationCurrent(active)) {
-                            return;
-                          }
-                          final id = active.owner.submissionId;
-                          context.goNamed(
-                            id == null
-                                ? RouteNames.adminSubmissionNew
-                                : RouteNames.adminSubmissionEditor,
-                            pathParameters: {if (id != null) 'id': '$id'},
-                            queryParameters: {
-                              'session': active.owner.sessionId,
+                    action: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: () => unawaited(_activate()),
+                          child: const Text('Riprova'),
+                        ),
+                        if (canReturn)
+                          TextButton(
+                            key: const ValueKey('admin_return_active_editor'),
+                            onPressed: () {
+                              if (!mounted) return;
+                              if (!identical(widget.viewModel, owner) ||
+                                  !identical(widget.auth, auth) ||
+                                  !auth.isAdmin ||
+                                  auth.currentUser?.id !=
+                                      active.owner.accountId ||
+                                  !owner.isActivationCurrent(active)) {
+                                return;
+                              }
+                              final id = active.owner.submissionId;
+                              context.goNamed(
+                                id == null
+                                    ? RouteNames.adminSubmissionNew
+                                    : RouteNames.adminSubmissionEditor,
+                                pathParameters: {if (id != null) 'id': '$id'},
+                                queryParameters: {
+                                  'session': active.owner.sessionId,
+                                },
+                              );
                             },
-                          );
-                        },
-                        child: const Text('Torna all’editor corrente'),
-                      ),
-                  ],
-                ),
-              ),
+                            child: const Text('Torna all’editor corrente'),
+                          ),
+                      ],
+                    ),
+                  ),
+          ),
+        ),
       );
     }
     if (widget.child case final child?) return child;

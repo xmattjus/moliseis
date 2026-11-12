@@ -16,7 +16,7 @@ The editor SHALL present content identity and moderation status before editable 
 - **AND** preserved local content is distinguished from a conflicting remote final status
 
 ### Requirement: Editor decisions remain available across layouts
-The editor SHALL provide one persistent decision area independent of content scroll position: a bottom area on compact layouts and a side panel only when available space supports both readable content and actions. It SHALL expose applicable actions without duplicate decision controls in the scrollable body and explain blocked primary actions.
+The editor SHALL provide one persistent decision area independent of content scroll position: a bottom area on compact layouts and a side panel only when available space supports both readable content and actions, with explicit toolbar access to the complete decision surface when height cannot support both. It SHALL expose applicable actions without duplicate decision controls in the scrollable body and explain blocked primary actions.
 
 #### Scenario: Compact editor with keyboard and enlarged text
 - **WHEN** the editor is used at a narrow width with the keyboard visible or enlarged text
@@ -201,10 +201,23 @@ The workspace SHALL render semantic comparisons and target identities from exist
 - **AND** ordinary retry revalidates all existing requirements and captured continuation retains its bypass
 
 #### Scenario: Selected Link identity changes
-- **WHEN** target or candidate results are replaced or invalidated
-- **THEN** only a matching currently authorized candidate identifies the selected target; otherwise an explicit unverified numeric fallback is displayed
-- **AND** no lookup or new eligibility condition is introduced
+- **WHEN** an administrator taps a current Event candidate
+- **THEN** its ID, name and municipality remain readable in verification and decision context after search-result invalidation and query changes
+- **AND** manual entry, a different target or owner/activation replacement retire the captured identity; obsolete responses and callbacks cannot relabel the selected target
+- **AND** the ViewModel's selected ID remains authoritative, with an unverified numeric fallback when no identity was explicitly selected, without a lookup or new eligibility condition
 
 #### Scenario: Short decision viewport retains usable alternatives
 - **WHEN** compact or expanded decisions coexist with keyboard insets and enlarged text
-- **THEN** primary decision and meaningful risk indicators remain visible, an expanded alternative region exposes a complete 48-pixel target, and its scrolling does not attach to the main primary controller
+- **THEN** feasible layouts keep primary decisions and meaningful risks visible while reserving an editing viewport, with complete 48-pixel alternatives and isolated secondary scrolling
+- **AND** when height is genuinely insufficient, a visible accessible "Decisioni" control identifies risks and opens the complete independently scrollable decision surface; primary, risk navigation and secondary targets remain sequentially reachable without requiring simultaneous visibility
+- **AND** returning to content preserves form state, typed drafts and focus intent; evidence and invalid-Save navigation reveal actual reachable fields after closing that surface
+- **AND** keyboard disappearance/reappearance does not unexpectedly close or reopen a deliberately selected surface
+
+#### Scenario: Staged thumbnail rebuilds or changes owner
+- **WHEN** ordinary edits, notifications or upload receipts rebuild a staged thumbnail
+- **THEN** the existing resolution Future is retained without repeated file integrity I/O, and decoding is bounded to the DPR-adjusted thumbnail size
+- **AND** file/owner/activation replacement or removal retires that resolution; explicit failed-preview retry retains the original verification and masking boundaries and obsolete completion cannot expose another owner's media
+
+#### Scenario: Finalized external update is reviewed
+- **WHEN** an accepted or rejected external update has a missing start or comparison target
+- **THEN** no instruction asks the administrator to correct its read-only fields; equivalent pending states retain their existing guidance and admission guards

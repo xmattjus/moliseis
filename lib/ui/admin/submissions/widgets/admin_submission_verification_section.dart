@@ -13,6 +13,7 @@ class AdminSubmissionVerificationSection extends StatelessWidget {
   const AdminSubmissionVerificationSection({
     required this.viewModel,
     required this.targetController,
+    required this.selectedTargetIdentity,
     required this.sourceKey,
     required this.overwriteKey,
     required this.previewErrorMessage,
@@ -20,6 +21,7 @@ class AdminSubmissionVerificationSection extends StatelessWidget {
     required this.onSearchChanged,
     required this.onFindCandidates,
     required this.onTargetChanged,
+    required this.onCandidateSelected,
     required this.onAcknowledge,
     required this.onKeepCurrent,
     super.key,
@@ -30,6 +32,9 @@ class AdminSubmissionVerificationSection extends StatelessWidget {
 
   /// Screen-owned controller, preserved across responsive rebuilds.
   final TextEditingController targetController;
+
+  /// Readable identity explicitly selected in this editor activation.
+  final AdminEventCandidate? selectedTargetIdentity;
 
   /// Current-source navigation anchor, retired with its owning Screen.
   final GlobalKey sourceKey;
@@ -49,7 +54,11 @@ class AdminSubmissionVerificationSection extends StatelessWidget {
   /// Runs the current admitted candidate command, or disables the action.
   final VoidCallback? onFindCandidates;
 
-  /// Selects the exact existing candidate or manually entered ID.
+  /// Captures a current result independently of subsequent search invalidation.
+  final void Function(AdminEventCandidate, AdminEventCandidates)
+  onCandidateSelected;
+
+  /// Selects a manually entered ID without borrowing a candidate identity.
   final ValueChanged<int?> onTargetChanged;
 
   /// Explicitly acknowledges the displayed source under identity guards.
@@ -176,13 +185,13 @@ class AdminSubmissionVerificationSection extends StatelessWidget {
                       selected: viewModel.targetEventId == candidate.id,
                       onTap: viewModel.operationRunning || viewModel.loading
                           ? null
-                          : () => onTargetChanged(candidate.id),
+                          : () => onCandidateSelected(candidate, matches),
                     ),
                 ],
                 if (viewModel.targetEventId case final target?)
                   AdminSubmissionLinkTargetIdentity(
                     targetId: target,
-                    candidates: viewModel.candidates,
+                    candidate: selectedTargetIdentity,
                   ),
                 TextFormField(
                   key: const ValueKey('admin_event_target'),
@@ -226,12 +235,12 @@ class AdminSubmissionVerificationSection extends StatelessWidget {
   }
 }
 
-/// Describes only a selected ID's match in the current authorized candidates.
+/// Describes the explicitly selected candidate or an unverified numeric ID.
 class AdminSubmissionLinkTargetIdentity extends StatelessWidget {
-  /// Uses only the current candidate list; never performs a target lookup.
+  /// Uses the captured selection only; never performs a target lookup.
   const AdminSubmissionLinkTargetIdentity({
     required this.targetId,
-    required this.candidates,
+    required this.candidate,
     this.concise = false,
     super.key,
   });
@@ -239,17 +248,15 @@ class AdminSubmissionLinkTargetIdentity extends StatelessWidget {
   /// Selected command target, even when no readable identity is verified.
   final int targetId;
 
-  /// Current authorized results, discarded by the owner when superseded.
-  final AdminEventCandidates? candidates;
+  /// Minimal identity retained by the Screen for the current owner/activation.
+  final AdminEventCandidate? candidate;
 
   /// Bounds text in the persistent panel; full values remain in verification.
   final bool concise;
 
   @override
   Widget build(BuildContext context) {
-    final candidate = candidates?.events
-        .where((event) => event.id == targetId)
-        .firstOrNull;
+    final candidate = this.candidate?.id == targetId ? this.candidate : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

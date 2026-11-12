@@ -2659,6 +2659,75 @@ void main() {
     }
 
     testOwnerUI(
+      'selected candidate identity is retired when the Screen owner changes',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(800, 2600));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        repository.getByIdResults[1] = Result.success(
+          sampleAdminSubmission(
+            startDate: DateTime.utc(2026, 10, 2),
+            targetEventId: 42,
+          ),
+        );
+        repository.candidatesResult = Result.success(
+          AdminEventCandidates(
+            events: const [
+              AdminEventCandidate(
+                id: 42,
+                name: 'Chosen Event',
+                city: 'Isernia',
+              ),
+            ],
+            pendingWarnings: const [],
+          ),
+        );
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        await tester.pumpWidget(app);
+        unawaited(router.push('/editor'));
+        await tester.pumpAndSettle();
+        expect(viewModel.requestFindCandidates(), isTrue);
+        await tester.pumpAndSettle();
+        final candidate = find.byKey(
+          const ValueKey('admin_event_candidate_42'),
+        );
+        await revealAdminEditorWidget(tester, candidate);
+        final obsoleteSelection = tester.widget<ListTile>(candidate).onTap!;
+        await tester.tap(candidate);
+        await tester.pumpAndSettle();
+        expect(viewModel.candidates, isNull);
+        expect(find.text('Chosen Event'), findsNWidgets(2));
+        final oldOwner = viewModel;
+        viewModel = AdminSubmissionEditorViewModel(
+          repository: repository,
+          contentSubmissionRepository: contentSubmissionRepository,
+          submissionId: 1,
+        );
+        expect(viewModel.requestLoad(), isTrue);
+        await pumpCommandTurns(tester);
+        rebuildEditor(() {});
+        await tester.pumpAndSettle();
+        oldOwner.dispose();
+        obsoleteSelection();
+        await tester.pumpAndSettle();
+        expect(viewModel.targetEventId, 42);
+        expect(find.text('Chosen Event'), findsNothing);
+        expect(
+          find.text('Evento #42 · identità da verificare'),
+          findsNWidgets(2),
+        );
+        expect(repository.linkCalls, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () => viewModel.dispose(),
+    );
+
+    testOwnerUI(
       'candidate input survives same-owner rebuild and rebinds to new owner',
       (tester) async {
         await tester.binding.setSurfaceSize(const Size(800, 2600));
