@@ -1,4 +1,4 @@
-import 'dart:ui' show SemanticsFlag;
+import 'dart:ui' show Tristate;
 
 import 'package:flutter/foundation.dart'
     show debugDefaultTargetPlatformOverride;
@@ -85,19 +85,19 @@ void main() {
           );
           expect(primary.hitTestable(), findsOneWidget);
           expect(find.text('Applica aggiornamento'), findsOneWidget);
-          final toggle = find.byKey(const ValueKey('admin_secondary_toggle'));
           final initialNode = tester.getSemantics(find.text('Altre azioni'));
           expect(initialNode.label, contains('Altre azioni'));
-          expect(initialNode.hasFlag(SemanticsFlag.hasExpandedState), isTrue);
-          expect(initialNode.hasFlag(SemanticsFlag.isExpanded), expanded);
+          expect(initialNode.flagsCollection.isExpanded, isNot(Tristate.none));
+          expect(initialNode.flagsCollection.isExpanded,
+            expanded ? Tristate.isTrue : Tristate.isFalse);
           if (!expanded) {
             await tester.tap(find.text('Altre azioni'));
             await tester.pumpAndSettle();
           }
           final expandedNode = tester.getSemantics(find.text('Altre azioni'));
           expect(expandedNode.label, contains('Altre azioni'));
-          expect(expandedNode.hasFlag(SemanticsFlag.hasExpandedState), isTrue);
-          expect(expandedNode.hasFlag(SemanticsFlag.isExpanded), isTrue);
+          expect(expandedNode.flagsCollection.isExpanded, isNot(Tristate.none));
+          expect(expandedNode.flagsCollection.isExpanded, Tristate.isTrue);
           expect(primary.hitTestable(), findsOneWidget);
           final secondaryViewport = find.byKey(
             const ValueKey('admin_decision_secondary_scroll'),
