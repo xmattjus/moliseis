@@ -7,6 +7,7 @@ import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_file_thumbnail.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
@@ -187,19 +188,8 @@ class _AdminStagedAssetPreviewState extends State<_AdminStagedAssetPreview> {
   Widget build(BuildContext context) => FutureBuilder<Result<File>>(
     future: _resolution,
     builder: (context, snapshot) => switch (snapshot.data) {
-      Success<File>(:final value) => Image.file(
-        value,
-        width: contentSubmissionAssetSize.width,
-        height: contentSubmissionAssetSize.height,
-        cacheWidth:
-            (contentSubmissionAssetSize.width *
-                    MediaQuery.devicePixelRatioOf(context))
-                .ceil(),
-        cacheHeight:
-            (contentSubmissionAssetSize.height *
-                    MediaQuery.devicePixelRatioOf(context))
-                .ceil(),
-        fit: BoxFit.cover,
+      Success<File>(:final value) => ContentSubmissionFileThumbnail(
+        file: value,
       ),
       _ => Column(
         mainAxisSize: MainAxisSize.min,
