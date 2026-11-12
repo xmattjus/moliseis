@@ -110,6 +110,7 @@ void main() {
       final resize = image.image as ResizeImage;
       expect(resize.width, (86 * dpr).ceil());
       expect(resize.height, (86 * dpr).ceil());
+      expect(resize.policy, ResizeImagePolicy.fit);
       expect(image.width, contentSubmissionAssetSize.width);
       expect(image.height, contentSubmissionAssetSize.height);
       expect(image.fit, BoxFit.cover);
