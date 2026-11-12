@@ -192,18 +192,18 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
                         key: const ValueKey('admin_secondary_toggle'),
                         expanded: _actionsExpanded,
                         child: TextButton.icon(
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(48, 48),
-                        ),
-                        onPressed: () => setState(
-                          () => _actionsExpanded = !_actionsExpanded,
-                        ),
-                        icon: Icon(
-                          _actionsExpanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
-                        ),
-                        label: const Text('Altre azioni'),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                          ),
+                          onPressed: () => setState(
+                            () => _actionsExpanded = !_actionsExpanded,
+                          ),
+                          icon: Icon(
+                            _actionsExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                          ),
+                          label: const Text('Altre azioni'),
                         ),
                       ),
                     ),
