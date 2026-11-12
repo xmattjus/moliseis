@@ -747,6 +747,50 @@ void main() {
     );
 
     testOwnerUI(
+      'loading detail exposes Back and exits through the existing route policy',
+      (tester) async {
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
+        final pendingDetail = Completer<Result<AdminSubmission>>();
+        harness.repository.onGetById = (_) => pendingDetail.future;
+        harness.router.go('/admin/submissions/1');
+        await tester.pumpWidget(harness.app());
+        await pumpCommandTurns(tester);
+
+        expect(harness.repository.getByIdIds, [1]);
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(find.text('Caricamento in corso...'), findsOneWidget);
+        final back = find.byTooltip('Indietro');
+        expect(back.hitTestable(), findsOneWidget);
+        await tester.tap(back);
+        await tester.pumpAndSettle();
+        expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
+        expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+
+        pendingDetail.complete(
+          Result.success(
+            sampleAdminSubmission(
+              modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+            ),
+          ),
+        );
+        await pumpCommandTurns(tester);
+        expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () {
+        harness.editor.dispose();
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
+
+    testOwnerUI(
       'W4 owner blocks target replacement during hydration and permits retry',
       (tester) async {
         harness = _AdminRouteHarness(
