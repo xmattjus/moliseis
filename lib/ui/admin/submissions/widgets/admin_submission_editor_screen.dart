@@ -1694,7 +1694,10 @@ class _AdminSubmissionEditorScreenState
                     .length ??
                 0;
             final risks = [
-              if (overwriteCount > 0) '$overwriteCount sovrascritture',
+              if (overwriteCount > 0)
+                overwriteCount == 1
+                    ? '1 sovrascrittura'
+                    : '$overwriteCount sovrascritture',
               if (viewModel.externalEvent?.stale == true) 'Fonte aggiornata',
             ];
             return Scaffold(
@@ -1727,6 +1730,8 @@ class _AdminSubmissionEditorScreenState
                                   ? 'Torna al contenuto'
                                   : [
                                       'Decisioni e rischi',
+                                      if (_validationMessage case final issue?)
+                                        'Errore: $issue',
                                       ...risks,
                                     ].join(' · '),
                               child: TextButton.icon(
@@ -1750,6 +1755,8 @@ class _AdminSubmissionEditorScreenState
                                   child: Icon(
                                     _decisionsOpen
                                         ? Icons.edit_outlined
+                                        : _validationMessage != null
+                                        ? Icons.error_outline
                                         : risks.isEmpty
                                         ? Icons.fact_check_outlined
                                         : Icons.warning_amber,
