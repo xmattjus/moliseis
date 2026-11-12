@@ -747,7 +747,7 @@ void main() {
     );
 
     testOwnerUI(
-      'loading detail exposes Back and exits through the existing route policy',
+      'loading detail exposes Back, but the existing exit guard waits for load',
       (tester) async {
         harness = _AdminRouteHarness(
           initialUser: makeAuthUser(
@@ -767,9 +767,15 @@ void main() {
         final back = find.byTooltip('Indietro');
         expect(back.hitTestable(), findsOneWidget);
         await tester.tap(back);
-        await tester.pumpAndSettle();
-        expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
-        expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+        // The existing exit policy refuses navigation while the detail load
+        // holds its reservation. An active loading animation cannot settle.
+        await pumpCommandTurns(tester);
+        expect(
+          harness.router.routerDelegate.state.uri.path,
+          '/admin/submissions/1',
+        );
+        expect(find.text('Caricamento in corso...'), findsOneWidget);
+        expect(harness.repository.getByIdIds, [1]);
 
         pendingDetail.complete(
           Result.success(
@@ -778,8 +784,14 @@ void main() {
             ),
           ),
         );
-        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        final readyBack = find.byTooltip('Indietro');
+        expect(readyBack.hitTestable(), findsOneWidget);
+        await tester.tap(readyBack);
+        await tester.pumpAndSettle();
         expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
+        expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
         expect(tester.takeException(), isNull);
       },
       disposeOwners: () {
