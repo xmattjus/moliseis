@@ -76,6 +76,10 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
     }
   }
 
+  void _toggleActions() {
+    setState(() => _actionsExpanded = !_actionsExpanded);
+  }
+
   @override
   Widget build(BuildContext context) {
     final count = widget.overwriteCount;
@@ -187,17 +191,19 @@ class _DecisionAreaState extends State<AdminSubmissionDecisionArea> {
                     ],
                   ],
                   if (alternatives.isNotEmpty) ...[
-                    MergeSemantics(
-                      child: Semantics(
-                        key: const ValueKey('admin_secondary_toggle'),
-                        expanded: _actionsExpanded,
+                    Semantics(
+                      key: const ValueKey('admin_secondary_toggle'),
+                      container: true,
+                      button: true,
+                      expanded: _actionsExpanded,
+                      label: 'Altre azioni',
+                      onTap: _toggleActions,
+                      child: ExcludeSemantics(
                         child: TextButton.icon(
                           style: TextButton.styleFrom(
                             minimumSize: const Size(48, 48),
                           ),
-                          onPressed: () => setState(
-                            () => _actionsExpanded = !_actionsExpanded,
-                          ),
+                          onPressed: _toggleActions,
                           icon: Icon(
                             _actionsExpanded
                                 ? Icons.expand_less
