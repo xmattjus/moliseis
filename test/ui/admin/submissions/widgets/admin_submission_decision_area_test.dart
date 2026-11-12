@@ -1,3 +1,5 @@
+import 'dart:ui' show SemanticsFlag;
+
 import 'package:flutter/foundation.dart'
     show debugDefaultTargetPlatformOverride;
 import 'package:flutter/services.dart';
@@ -84,11 +86,18 @@ void main() {
           expect(primary.hitTestable(), findsOneWidget);
           expect(find.text('Applica aggiornamento'), findsOneWidget);
           final toggle = find.byKey(const ValueKey('admin_secondary_toggle'));
-          if (tester.widget<Semantics>(toggle).properties.expanded != true) {
+          final initialNode = tester.getSemantics(find.text('Altre azioni'));
+          expect(initialNode.label, contains('Altre azioni'));
+          expect(initialNode.hasFlag(SemanticsFlag.hasExpandedState), isTrue);
+          expect(initialNode.hasFlag(SemanticsFlag.isExpanded), expanded);
+          if (!expanded) {
             await tester.tap(find.text('Altre azioni'));
             await tester.pumpAndSettle();
           }
-          expect(tester.widget<Semantics>(toggle).properties.expanded, isTrue);
+          final expandedNode = tester.getSemantics(find.text('Altre azioni'));
+          expect(expandedNode.label, contains('Altre azioni'));
+          expect(expandedNode.hasFlag(SemanticsFlag.hasExpandedState), isTrue);
+          expect(expandedNode.hasFlag(SemanticsFlag.isExpanded), isTrue);
           expect(primary.hitTestable(), findsOneWidget);
           final secondaryViewport = find.byKey(
             const ValueKey('admin_decision_secondary_scroll'),
