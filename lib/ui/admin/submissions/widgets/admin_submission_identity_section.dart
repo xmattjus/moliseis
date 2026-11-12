@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/core/event_time.dart';
 import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -105,9 +106,9 @@ class AdminSubmissionMetadataSection extends StatelessWidget {
         if (contributorEmail case final email?) SentryMask(Text(email)),
         if (submissionId case final id?) SentryMask(Text('Contributo #$id')),
         if (createdAt case final created?)
-          SentryMask(Text('Creato il $created')),
+          SentryMask(Text('Creato il ${_formatRomeTimestamp(created)}')),
         if (modifiedAt case final modified?)
-          SentryMask(Text('Modificato il $modified')),
+          SentryMask(Text('Modificato il ${_formatRomeTimestamp(modified)}')),
         if (externalEvent case final source?)
           SentryMask(
             SelectableText(
@@ -122,4 +123,13 @@ class AdminSubmissionMetadataSection extends StatelessWidget {
       ],
     ),
   );
+}
+
+String _formatRomeTimestamp(DateTime instant) {
+  final policy = EventTimePolicy();
+  final date = policy.calendarDateForUtc(instant);
+  final time = policy.clockTimeForUtc(instant);
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  return '${twoDigits(date.day)}/${twoDigits(date.month)}/${date.year} '
+      '$time (ora di Roma)';
 }
