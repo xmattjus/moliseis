@@ -1259,8 +1259,11 @@ class _AdminSubmissionEditorScreenState
         if (viewModel.isEditMode &&
             viewModel.loading &&
             !viewModel.hasLoadedDetail) {
-          return const Scaffold(
-            body: Center(
+          return Scaffold(
+            appBar: AppBar(
+              leading: CustomBackButton(onPressed: widget.onBack),
+            ),
+            body: const Center(
               child: SingleChildScrollView(
                 primary: false,
                 child: EmptyView.loading(text: Text('Caricamento in corso...')),
