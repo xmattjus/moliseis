@@ -124,7 +124,7 @@ External submissions SHALL show recognizable provenance and stale-source state b
 #### Scenario: Long preview leaves overwrite evidence off-screen
 - **GIVEN** a valid preview has enough comparison groups and content for an overwrite group to be outside the viewport
 - **WHEN** Apply remains accessible in the persistent decision area while the conflicting comparison is off-screen
-- **THEN** the overwrite-count warning and "Esamina sovrascritture" remain visible without secondary disclosure in both compact and expanded layouts
+- **THEN** the overwrite-count warning and its evidence access remain visible independently of secondary-action disclosure in both layouts; when full messages cannot fit alongside usable actions, a labeled combined risk surface identifies the count and newer-source condition and immediately exposes "Esamina sovrascritture" and "Esamina fonte aggiornata"
 - **AND** selecting that action reveals the current preview's first overwrite group, its warning and complete proposed moderated/current destination values for reading without secondary disclosure, with long values scrollable in full
 - **AND** navigation executes neither Apply nor Keep Current and does not add an Apply admission requirement
 
@@ -185,3 +185,26 @@ Every newly composed or moved editor surface SHALL preserve the canonical sessio
 #### Scenario: Masking regression coverage is assessed
 - **WHEN** focused widget tests inspect the restructured private/public boundaries
 - **THEN** they verify official application masking ancestors and authorized readability, without claiming native Replay pixel output or changing global privacy configuration
+
+
+### Requirement: Remediated presentation reflects current editorial meaning
+The workspace SHALL render semantic comparisons and target identities from existing authorized state, without changing merge groups, command eligibility or validation ownership.
+
+#### Scenario: Structured merge values are reviewed
+- **WHEN** name, category, description, schedule or location groups contain structured, null or long values
+- **THEN** proposed/current values use understandable Italian labels and complete evidence remains accessible
+- **AND** differing rich and plain description representations remain distinguishable, and Keep Current receives the original group
+
+#### Scenario: Failed Save feedback is corrected
+- **WHEN** a relevant field changes after ordinary Save fails validation
+- **THEN** outdated summary feedback is retired while unrelated notifications preserve meaningful feedback
+- **AND** ordinary retry revalidates all existing requirements and captured continuation retains its bypass
+
+#### Scenario: Selected Link identity changes
+- **WHEN** target or candidate results are replaced or invalidated
+- **THEN** only a matching currently authorized candidate identifies the selected target; otherwise an explicit unverified numeric fallback is displayed
+- **AND** no lookup or new eligibility condition is introduced
+
+#### Scenario: Short decision viewport retains usable alternatives
+- **WHEN** compact or expanded decisions coexist with keyboard insets and enlarged text
+- **THEN** primary decision and meaningful risk indicators remain visible, an expanded alternative region exposes a complete 48-pixel target, and its scrolling does not attach to the main primary controller

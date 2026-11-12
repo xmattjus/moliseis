@@ -1,33 +1,30 @@
 import 'dart:async' show scheduleMicrotask, unawaited;
-import 'dart:io';
 
 import 'package:command_it/command_it.dart' as commands;
 import 'package:go_router/go_router.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
-import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission_promotion.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_decision_area.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_identity_section.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_location_editor.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_media_section.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_recovery_panel.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
-import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_verification_section.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_fields.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
-import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
-import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/text_section_divider.dart';
-import 'package:moliseis/ui/core/utils/content_submission_asset_size.dart';
-import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
+
+enum _ValidationSection { content, location, eventTime }
 
 /// Form screen for creating and editing a moderation submission.
 class AdminSubmissionEditorScreen extends StatefulWidget {
@@ -66,6 +63,11 @@ class _AdminSubmissionEditorScreenState
   int _revealCoordinatesRevision = 0;
   String? _validationMessage;
   VoidCallback? _validationReveal;
+  _ValidationSection? _validationSection;
+  String? _validationContentField;
+  AdminDraftActivation? _validationActivation;
+  int? _validationHydrationRevision;
+  var _validationRevision = 0;
   final _consumed = <String, int?>{};
   late AdminSubmissionEditorViewModel _owner;
   AdminDraftActivation? _boundActivation;
@@ -92,8 +94,7 @@ class _AdminSubmissionEditorScreenState
 
   void _bind(AdminSubmissionEditorViewModel owner) {
     _retireStatusDialog();
-    _validationMessage = null;
-    _validationReveal = null;
+    _clearValidation();
     _owner = owner;
     _boundActivation = owner.activation;
     _routeExited = false;
@@ -232,6 +233,7 @@ class _AdminSubmissionEditorScreenState
   }
 
   void _onOwnerChanged() {
+    if (!mounted) return;
     final owner = _owner;
     final next = owner.activation;
     final previous = _boundActivation;
@@ -243,6 +245,11 @@ class _AdminSubmissionEditorScreenState
         previous.owner.sessionId == next.owner.sessionId) {
       // Adoption changes only the target. Old callbacks retain old tokens.
       _boundActivation = next;
+    }
+    if (_validationMessage != null &&
+        (!owner.isActivationCurrent(_validationActivation) ||
+            owner.hydrationRevision != _validationHydrationRevision)) {
+      setState(_clearValidation);
     }
     if (!_owns(owner)) return;
     _syncEventTarget();
@@ -663,6 +670,36 @@ class _AdminSubmissionEditorScreenState
     }
   }
 
+  void _clearValidation() {
+    _validationMessage = null;
+    _validationReveal = null;
+    _validationSection = null;
+    _validationContentField = null;
+    _validationActivation = null;
+    _validationHydrationRevision = null;
+    _validationRevision++;
+  }
+
+  void _editFields(
+    AdminSubmissionEditorViewModel owner,
+    _ValidationSection section,
+    String? field,
+    AdminDraftActivation? activation,
+    VoidCallback edit,
+  ) {
+    if (!_owns(owner) || !owner.isActivationCurrent(activation)) return;
+    final before = owner.editorRevision;
+    final previousIssue = owner.eventTimeIssue;
+    edit();
+    if (!_owns(owner)) return;
+    if (_validationSection == section &&
+        (_validationContentField == null || _validationContentField == field) &&
+        (owner.editorRevision != before ||
+            owner.eventTimeIssue != previousIssue)) {
+      setState(_clearValidation);
+    }
+  }
+
   void _save(
     AdminSubmissionEditorViewModel owner,
     AdminDraftActivation? activation, {
@@ -684,21 +721,46 @@ class _AdminSubmissionEditorScreenState
       final field = !contentOk
           ? contentErrors?.firstOrNull
           : locationErrors?.firstOrNull;
+      final revealRevision = ++_validationRevision;
       setState(() {
+        _validationSection = !contentOk
+            ? _ValidationSection.content
+            : location
+            ? _ValidationSection.location
+            : _ValidationSection.eventTime;
+        _validationContentField = !contentOk && field != null
+            ? field.widget.key ==
+                      ValueKey<(int?, String)>((
+                        owner.hydrationRevision,
+                        'city',
+                      ))
+                  ? 'city'
+                  : field.widget.key ==
+                        ValueKey<(int?, String)>((
+                          owner.hydrationRevision,
+                          'name',
+                        ))
+                  ? 'name'
+                  : 'description'
+            : null;
+        _validationActivation = activation;
+        _validationHydrationRevision = owner.hydrationRevision;
         _validationMessage = !contentOk
             ? 'Controlla i campi del contributo.'
             : !locationOk
             ? 'Correggi le coordinate della posizione.'
             : 'Controlla data e ora dell’evento.';
         _validationReveal = () {
-          if (!_hasRouteEffectAuthority(owner) ||
+          if (revealRevision != _validationRevision ||
+              !_hasRouteEffectAuthority(owner) ||
               !owner.isActivationCurrent(activation)) {
             return;
           }
           if (location) setState(() => _revealCoordinatesRevision++);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
-            if (!_hasRouteEffectAuthority(owner) ||
+            if (revealRevision != _validationRevision ||
+                !_hasRouteEffectAuthority(owner) ||
                 !owner.isActivationCurrent(activation)) {
               return;
             }
@@ -723,10 +785,7 @@ class _AdminSubmissionEditorScreenState
       return;
     }
     if (contentOk && locationOk && eventTimeOk) {
-      setState(() {
-        _validationMessage = null;
-        _validationReveal = null;
-      });
+      setState(_clearValidation);
       _unfocus();
       if (!owner.requestSave(
         activation: activation,
@@ -781,29 +840,6 @@ class _AdminSubmissionEditorScreenState
       'Impossibile caricare il contributo. Il lavoro locale è conservato. '
           'Puoi riprovare o tornare alla lista.',
   };
-
-  String _mergeLabel(String name) => switch (name) {
-    'name' => 'Nome',
-    'description' => 'Descrizione',
-    'location' => 'Posizione',
-    'schedule' => 'Date e orari',
-    'category' => 'Categoria',
-    _ => name,
-  };
-
-  List<AdminEventMergeGroup> _orderedGroups(
-    List<AdminEventMergeGroup> groups,
-  ) => [
-    ...groups.where((g) => g.overwrite),
-    ...groups.where(
-      (g) =>
-          !g.overwrite && (g.apply || g.providerChanged || g.moderatorChanged),
-    ),
-    ...groups.where(
-      (g) =>
-          !g.overwrite && !g.apply && !g.providerChanged && !g.moderatorChanged,
-    ),
-  ];
 
   void _revealEvidence(
     AdminSubmissionEditorViewModel owner,
@@ -1034,162 +1070,119 @@ class _AdminSubmissionEditorScreenState
     if (!recovery && (!viewModel.isEditMode || pending)) {
       actions.addAll(recoveryActions);
     }
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Flexible(
-                flex: 3,
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (viewModel.operationRunning)
-                        Text(
-                          viewModel.saveSnapshot.isRunning
-                              ? 'Salvataggio in corso…'
-                              : viewModel.previewSnapshot.isRunning
-                              ? 'Preparazione anteprima…'
-                              : viewModel.applySnapshot.isRunning
-                              ? 'Applicazione aggiornamento…'
-                              : viewModel.linkSnapshot.isRunning
-                              ? 'Collegamento in corso…'
-                              : 'Operazione in corso…',
-                          semanticsLabel: 'Operazione in corso',
-                        ),
-                      if (recovery) Text(recoverySummary),
-                      if (finalized)
-                        Text(
-                          '${viewModel.status?.label ?? "Contributo"} · '
-                          'sola lettura',
-                        ),
-                      if (_validationMessage != null)
-                        TextButton.icon(
-                          key: const ValueKey('admin_validation_feedback'),
-                          onPressed: _validationReveal,
-                          icon: const Icon(Icons.error_outline),
-                          label: Text(_validationMessage!),
-                        ),
-                      if (pending && viewModel.isDirty)
-                        const Text(
-                          'Salva le modifiche prima di moderare. '
-                          'Il salvataggio non pubblica.',
-                        ),
-                      if (pending &&
-                          !viewModel.isDirty &&
-                          !viewModel.hasPublishableCategory &&
-                          !viewModel.isExternalUpdate)
-                        TextButton(
-                          onPressed: () => _revealEvidence(
-                            viewModel,
-                            activation,
-                            _contentTargetKey,
-                            () => true,
-                          ),
-                          child: const Text(
-                            'Seleziona una categoria e salva '
-                            'prima di pubblicare.',
-                          ),
-                        ),
-                      if (viewModel.isExternalUpdate && !linkWorkflow)
-                        TextButton(
-                          onPressed: () => _revealEvidence(
-                            viewModel,
-                            activation,
-                            _temporalTargetKey,
-                            () => true,
-                          ),
-                          child: const Text(
-                            'Completa la data di inizio dell’evento.',
-                          ),
-                        )
-                      else if (viewModel.isExternalUpdate &&
-                          selectedTarget == null)
-                        TextButton(
-                          onPressed: () => _revealEvidence(
-                            viewModel,
-                            activation,
-                            _verificationTargetKey,
-                            () => true,
-                          ),
-                          child: const Text(
-                            'Seleziona l’evento da confrontare.',
-                          ),
-                        ),
-                      if (identical(primary, link))
-                        Text(
-                          'Collega la proposta all’evento '
-                          '#${viewModel.targetEventId}, '
-                          'senza sovrascriverne i contenuti.',
-                        ),
-                      if (primary is ButtonStyleButton)
-                        FilledButton(
-                          key: primary.key,
-                          onPressed: primary.onPressed,
-                          child: primary.child,
-                        )
-                      else
-                        ?primary,
-                      if (overwrites > 0) ...[
-                        Text(
-                          overwrites == 1
-                              ? '1 sovrascrittura nell’evento'
-                              : '$overwrites sovrascritture nell’evento',
-                          key: const ValueKey('admin_overwrite_warning'),
-                        ),
-                        TextButton(
-                          onPressed: () => _revealEvidence(
-                            viewModel,
-                            activation,
-                            _overwriteTargetKey,
-                            () => identical(viewModel.mergePreview, merge),
-                          ),
-                          child: const Text('Esamina sovrascritture'),
-                        ),
-                      ],
-                      if (external?.stale == true) ...[
-                        const Text('È disponibile una fonte aggiornata'),
-                        TextButton(
-                          onPressed: () => _revealEvidence(
-                            viewModel,
-                            activation,
-                            _sourceTargetKey,
-                            () => identical(viewModel.externalEvent, external),
-                          ),
-                          child: const Text('Esamina fonte aggiornata'),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              if (actions.isNotEmpty)
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: ExpansionTile(
-                      key: ValueKey(('admin_secondary_actions', expanded)),
-                      initiallyExpanded: expanded,
-                      title: const Text('Altre azioni'),
-                      children: actions
-                          .map(
-                            (action) => Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: action,
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ),
-                ),
-            ],
+    final guidance = <Widget>[
+      if (recovery) Text(recoverySummary),
+      if (pending && viewModel.isDirty)
+        const Text(
+          'Salva le modifiche prima di moderare. Il salvataggio non pubblica.',
+        ),
+      if (pending &&
+          !viewModel.isDirty &&
+          !viewModel.hasPublishableCategory &&
+          !viewModel.isExternalUpdate)
+        TextButton(
+          onPressed: () => _revealEvidence(
+            viewModel,
+            activation,
+            _contentTargetKey,
+            () => true,
+          ),
+          child: const Text(
+            'Seleziona una categoria e salva prima di pubblicare.',
           ),
         ),
+      if (viewModel.isExternalUpdate && !linkWorkflow)
+        TextButton(
+          onPressed: () => _revealEvidence(
+            viewModel,
+            activation,
+            _temporalTargetKey,
+            () => true,
+          ),
+          child: const Text('Completa la data di inizio dell’evento.'),
+        )
+      else if (viewModel.isExternalUpdate && selectedTarget == null)
+        TextButton(
+          onPressed: () => _revealEvidence(
+            viewModel,
+            activation,
+            _verificationTargetKey,
+            () => true,
+          ),
+          child: const Text('Seleziona l’evento da confrontare.'),
+        ),
+      if (identical(primary, link))
+        const Text(
+          'Il collegamento associa la proposta senza sovrascrivere '
+          'i contenuti dell’evento.',
+        ),
+    ];
+    final status =
+        viewModel.operationRunning || viewModel.previewSnapshot.isRunning
+        ? viewModel.saveSnapshot.isRunning
+              ? 'Salvataggio in corso…'
+              : viewModel.previewSnapshot.isRunning
+              ? 'Preparazione anteprima…'
+              : viewModel.applySnapshot.isRunning
+              ? 'Applicazione aggiornamento…'
+              : viewModel.linkSnapshot.isRunning
+              ? 'Collegamento in corso…'
+              : 'Operazione in corso…'
+        : recovery
+        ? 'Recupero richiesto'
+        : finalized
+        ? '${viewModel.status!.label} · sola lettura'
+        : pending &&
+              !viewModel.isDirty &&
+              !viewModel.hasPublishableCategory &&
+              !viewModel.isExternalUpdate
+        ? 'Categoria da selezionare e salvare'
+        : viewModel.isExternalUpdate && !linkWorkflow
+        ? 'Completa la data di inizio'
+        : viewModel.isExternalUpdate && selectedTarget == null
+        ? 'Seleziona l’evento da confrontare'
+        : null;
+    return AdminSubmissionDecisionArea(
+      key: ObjectKey(viewModel),
+      expanded: expanded,
+      primaryAction: primary is ButtonStyleButton
+          ? FilledButton(
+              key: primary.key,
+              onPressed: primary.onPressed,
+              child: primary.child,
+            )
+          : primary,
+      secondaryActions: actions,
+      guidance: guidance,
+      status: status == null ? null : Text(status),
+      feedback: _validationMessage == null
+          ? null
+          : TextButton.icon(
+              key: const ValueKey('admin_validation_feedback'),
+              onPressed: _validationReveal,
+              icon: const Icon(Icons.error_outline),
+              label: Text(_validationMessage!),
+            ),
+      linkIdentity: identical(primary, link)
+          ? AdminSubmissionLinkTargetIdentity(
+              targetId: selectedTarget!,
+              candidates: viewModel.candidates,
+              concise: true,
+            )
+          : null,
+      overwriteCount: overwrites,
+      sourceStale: external?.stale == true,
+      onReviewOverwrites: () => _revealEvidence(
+        viewModel,
+        activation,
+        _overwriteTargetKey,
+        () => identical(viewModel.mergePreview, merge),
+      ),
+      onReviewSource: () => _revealEvidence(
+        viewModel,
+        activation,
+        _sourceTargetKey,
+        () => identical(viewModel.externalEvent, external),
       ),
     );
   }
@@ -1198,803 +1191,437 @@ class _AdminSubmissionEditorScreenState
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
 
-    return Scaffold(
-      body: ListenableBuilder(
-        listenable: viewModel,
-        builder: (context, _) {
-          final activation = viewModel.activation;
-          final pickerRequest = viewModel.pickerRequestNonce;
-          final status = viewModel.status;
-          final previewErrorMessage =
-              switch (viewModel.keepCurrentSnapshot.hasFailure
-              ? viewModel.keepCurrentSnapshot.data
-              : viewModel.previewSnapshot.data) {
-                Error(:final AdminContentSubmissionApiException error) =>
-                  _moderationErrorMessage(error.code) ?? error.message,
-                _ =>
-                  'Impossibile completare l’anteprima. '
-                      'Verifica i dati e ricarica.',
-              };
-          final observation = viewModel.recoveryObservation;
+    return ListenableBuilder(
+      listenable: viewModel,
+      builder: (context, _) {
+        final activation = viewModel.activation;
+        final pickerRequest = viewModel.pickerRequestNonce;
+        final status = viewModel.status;
+        final previewErrorMessage =
+            switch (viewModel.keepCurrentSnapshot.hasFailure
+            ? viewModel.keepCurrentSnapshot.data
+            : viewModel.previewSnapshot.data) {
+              Error(:final AdminContentSubmissionApiException error) =>
+                _moderationErrorMessage(error.code) ?? error.message,
+              _ =>
+                'Impossibile completare l’anteprima. '
+                    'Verifica i dati e ricarica.',
+            };
+        final observation = viewModel.recoveryObservation;
+        final displayedSource = viewModel.externalEvent;
 
-          if (viewModel.isEditMode &&
-              viewModel.loading &&
-              !viewModel.hasLoadedDetail) {
-            return const EmptyView.loading(
-              text: Text('Caricamento in corso...'),
-            );
-          }
-          // New typing may coexist with a captured Save. Other mutation lanes
-          // keep their existing interaction protection.
-          final lockEditor =
-              !viewModel.isEditable ||
-              (viewModel.operationRunning &&
-                  !viewModel.saveSnapshot.isRunning) ||
-              viewModel.loading;
+        if (viewModel.isEditMode &&
+            viewModel.loading &&
+            !viewModel.hasLoadedDetail) {
+          return const Scaffold(
+            body: EmptyView.loading(text: Text('Caricamento in corso...')),
+          );
+        }
+        // New typing may coexist with a captured Save. Other mutation lanes
+        // keep their existing interaction protection.
+        final lockEditor =
+            !viewModel.isEditable ||
+            (viewModel.operationRunning && !viewModel.saveSnapshot.isRunning) ||
+            viewModel.loading;
 
-          final content = CustomScrollView(
-            key: const ValueKey<String>('admin_submission_editor_scroll'),
-            slivers: <Widget>[
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                sliver: SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          spacing: 8,
-                          children: [
-                            SentryMask(
-                              Text(
-                                viewModel.name?.trim().isNotEmpty == true
-                                    ? viewModel.name!
-                                    : 'Titolo da inserire',
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineSmall,
-                              ),
-                            ),
-                            SentryMask(
-                              Text(
-                                viewModel.city?.trim().isNotEmpty == true
-                                    ? viewModel.city!
-                                    : 'Comune da indicare',
-                              ),
-                            ),
-                            Text(
-                              '${viewModel.isEvent ? 'Evento' : 'Luogo'} · '
-                              '${status?.label ?? 'Nuovo contributo'}',
-                            ),
-                            if (status == AdminSubmissionStatus.accepted ||
-                                status == AdminSubmissionStatus.rejected)
-                              const Text('Contributo concluso · sola lettura'),
-                            if (viewModel.externalEvent case final external?)
-                              Text(
-                                external.eventId == null
-                                    ? 'Proposta da fonte esterna'
-                                    : 'Proposta da fonte esterna · evento '
-                                          '#${external.eventId}',
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (viewModel.recoveryState !=
-                              AdminEditorRecoveryState.none ||
-                          viewModel.loadSnapshot.hasFailure)
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            _recoveryMessage(viewModel.recoveryState),
-                          ),
-                        ),
-                      if (observation != null)
-                        AdminSubmissionRecoveryPanel(
-                          local: observation.localSnapshot,
-                          remote: observation.remoteSnapshot,
-                          status: observation.detail.status,
-                          onAccept:
-                              !viewModel.canReconcile(
-                                observation,
-                                acceptRemote: true,
-                              )
-                              ? null
-                              : () => _request(
-                                  viewModel,
-                                  () => viewModel.requestReconcile(
-                                    observation,
-                                    acceptRemote: true,
-                                    activation: activation,
-                                  ),
-                                ),
-                          onKeep:
-                              !viewModel.canReconcile(
-                                observation,
-                                acceptRemote: false,
-                              )
-                              ? null
-                              : () => _request(
-                                  viewModel,
-                                  () => viewModel.requestReconcile(
-                                    observation,
-                                    acceptRemote: false,
-                                    activation: activation,
-                                  ),
-                                ),
-                        ),
-                      if (viewModel.pendingRecoveryCheckpoint)
-                        const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Text(
-                            'I campi remoti accettati non sono ancora '
-                            'nella bozza locale. '
-                            'Salva la bozza locale prima di aprire '
-                            'un altro contributo.',
-                          ),
-                        ),
-                      Focus(
-                        canRequestFocus: !lockEditor,
-                        descendantsAreFocusable: !lockEditor,
-                        child: IgnorePointer(
-                          ignoring: lockEditor,
-                          child: KeyedSubtree(
-                            key: _contentTargetKey,
-                            child: ContentSubmissionFields(
-                              key: ObjectKey(viewModel),
-                              formKey: _formKey,
-                              hydrationRevision: viewModel.hydrationRevision,
-                              eventModeLocked: viewModel.externalEvent != null,
-                              category: viewModel.category,
-                              city: viewModel.city,
-                              name: viewModel.name,
-                              description: viewModel.description,
-                              descriptionDelta: viewModel.descriptionDelta,
-                              isEvent: viewModel.isEvent,
-                              allDay: viewModel.allDay,
-                              onAllDayChanged: (allDay) => _request(
-                                viewModel,
-                                () => viewModel.setAllDay(
-                                  allDay: allDay,
-                                  activation: activation,
-                                ),
-                              ),
-                              startCalendarDate: viewModel.startCalendarDate,
-                              startClockTime: viewModel.startClockTime,
-                              endCalendarDate: viewModel.endCalendarDate,
-                              eventTimeIssue: viewModel.eventTimeIssue,
-                              onCategorySelected: (value) => _request(
-                                viewModel,
-                                () => viewModel.setCategory(
-                                  value,
-                                  activation: activation,
-                                ),
-                              ),
-                              onCategoryDeleted: () => _request(
-                                viewModel,
-                                () => viewModel.setCategory(
-                                  null,
-                                  activation: activation,
-                                ),
-                              ),
-                              onCityChanged: (value) => _request(
-                                viewModel,
-                                () => viewModel.setCity(
-                                  value,
-                                  activation: activation,
-                                ),
-                              ),
-                              onNameChanged: (value) => _request(
-                                viewModel,
-                                () => viewModel.setName(
-                                  value,
-                                  activation: activation,
-                                ),
-                              ),
-                              onDescriptionChanged:
-                                  ({
-                                    required description,
-                                    required descriptionDelta,
-                                  }) => _request(
-                                    viewModel,
-                                    () => viewModel.setDescription(
-                                      activation: activation,
-                                      description: description,
-                                      descriptionDelta: descriptionDelta,
-                                    ),
-                                  ),
-                              onEventChanged: (enabled) => _request(
-                                viewModel,
-                                () => viewModel.setEventEnabled(
-                                  enabled: enabled,
-                                  activation: activation,
-                                ),
-                              ),
-                              onStartDateChanged: (value) => _request(
-                                viewModel,
-                                () => viewModel.setStartCalendarDate(
-                                  value,
-                                  activation: activation,
-                                ),
-                              ),
-                              onStartTimeChanged: (value) => _request(
-                                viewModel,
-                                () => viewModel.setStartClockTime(
-                                  value,
-                                  activation: activation,
-                                ),
-                              ),
-                              onEndDateChanged: (value) => _request(
-                                viewModel,
-                                () => viewModel.setEndCalendarDate(
-                                  value,
-                                  activation: activation,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(key: _temporalTargetKey, height: 8),
-                    ],
-                  ),
-                ),
-              ),
-              SliverToBoxAdapter(
+        final content = CustomScrollView(
+          key: const ValueKey<String>('admin_submission_editor_scroll'),
+          slivers: <Widget>[
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
-                    const TextSectionDivider('Posizione'),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Focus(
-                        canRequestFocus: !lockEditor,
-                        descendantsAreFocusable: !lockEditor,
-                        child: IgnorePointer(
-                          ignoring: lockEditor,
-                          child: AdminSubmissionLocationEditor(
+                    AdminSubmissionIdentitySection(
+                      name: viewModel.name,
+                      city: viewModel.city,
+                      isEvent: viewModel.isEvent,
+                      status: status,
+                      externalEvent: viewModel.externalEvent,
+                    ),
+                    if (viewModel.recoveryState !=
+                            AdminEditorRecoveryState.none ||
+                        viewModel.loadSnapshot.hasFailure)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(_recoveryMessage(viewModel.recoveryState)),
+                      ),
+                    if (observation != null)
+                      AdminSubmissionRecoveryPanel(
+                        local: observation.localSnapshot,
+                        remote: observation.remoteSnapshot,
+                        status: observation.detail.status,
+                        onAccept:
+                            !viewModel.canReconcile(
+                              observation,
+                              acceptRemote: true,
+                            )
+                            ? null
+                            : () => _request(
+                                viewModel,
+                                () => viewModel.requestReconcile(
+                                  observation,
+                                  acceptRemote: true,
+                                  activation: activation,
+                                ),
+                              ),
+                        onKeep:
+                            !viewModel.canReconcile(
+                              observation,
+                              acceptRemote: false,
+                            )
+                            ? null
+                            : () => _request(
+                                viewModel,
+                                () => viewModel.requestReconcile(
+                                  observation,
+                                  acceptRemote: false,
+                                  activation: activation,
+                                ),
+                              ),
+                      ),
+                    if (viewModel.pendingRecoveryCheckpoint)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'I campi remoti accettati non sono ancora '
+                          'nella bozza locale. '
+                          'Salva la bozza locale prima di aprire '
+                          'un altro contributo.',
+                        ),
+                      ),
+                    Focus(
+                      canRequestFocus: !lockEditor,
+                      descendantsAreFocusable: !lockEditor,
+                      child: IgnorePointer(
+                        ignoring: lockEditor,
+                        child: KeyedSubtree(
+                          key: _contentTargetKey,
+                          child: ContentSubmissionFields(
                             key: ObjectKey(viewModel),
-                            latitudeText: viewModel.latitudeText,
-                            longitudeText: viewModel.longitudeText,
-                            formKey: _locationFormKey,
-                            revealCoordinatesRevision:
-                                _revealCoordinatesRevision,
-                            onLatitudeTextChanged: (value) => _request(
+                            formKey: _formKey,
+                            hydrationRevision: viewModel.hydrationRevision,
+                            eventModeLocked: viewModel.externalEvent != null,
+                            category: viewModel.category,
+                            city: viewModel.city,
+                            name: viewModel.name,
+                            description: viewModel.description,
+                            descriptionDelta: viewModel.descriptionDelta,
+                            isEvent: viewModel.isEvent,
+                            allDay: viewModel.allDay,
+                            onAllDayChanged: (allDay) => _editFields(
                               viewModel,
-                              () => viewModel.setLatitudeText(
+                              _ValidationSection.eventTime,
+                              null,
+                              activation,
+                              () => viewModel.setAllDay(
+                                allDay: allDay,
+                                activation: activation,
+                              ),
+                            ),
+                            startCalendarDate: viewModel.startCalendarDate,
+                            startClockTime: viewModel.startClockTime,
+                            endCalendarDate: viewModel.endCalendarDate,
+                            eventTimeIssue: viewModel.eventTimeIssue,
+                            onCategorySelected: (value) => _request(
+                              viewModel,
+                              () => viewModel.setCategory(
                                 value,
                                 activation: activation,
                               ),
                             ),
-                            onLongitudeTextChanged: (value) => _request(
+                            onCategoryDeleted: () => _request(
                               viewModel,
-                              () => viewModel.setLongitudeText(
+                              () => viewModel.setCategory(
+                                null,
+                                activation: activation,
+                              ),
+                            ),
+                            onCityChanged: (value) => _editFields(
+                              viewModel,
+                              _ValidationSection.content,
+                              'city',
+                              activation,
+                              () => viewModel.setCity(
                                 value,
                                 activation: activation,
                               ),
                             ),
-                            onMapCoordinatesSelected: (latitude, longitude) =>
-                                _request(
+                            onNameChanged: (value) => _editFields(
+                              viewModel,
+                              _ValidationSection.content,
+                              'name',
+                              activation,
+                              () => viewModel.setName(
+                                value,
+                                activation: activation,
+                              ),
+                            ),
+                            onDescriptionChanged:
+                                ({
+                                  required description,
+                                  required descriptionDelta,
+                                }) => _editFields(
                                   viewModel,
-                                  () => viewModel.setCoordinates(
-                                    latitude,
-                                    longitude,
+                                  _ValidationSection.content,
+                                  'description',
+                                  activation,
+                                  () => viewModel.setDescription(
                                     activation: activation,
+                                    description: description,
+                                    descriptionDelta: descriptionDelta,
                                   ),
                                 ),
+                            onEventChanged: (enabled) => _editFields(
+                              viewModel,
+                              _ValidationSection.eventTime,
+                              null,
+                              activation,
+                              () => viewModel.setEventEnabled(
+                                enabled: enabled,
+                                activation: activation,
+                              ),
+                            ),
+                            onStartDateChanged: (value) => _editFields(
+                              viewModel,
+                              _ValidationSection.eventTime,
+                              null,
+                              activation,
+                              () => viewModel.setStartCalendarDate(
+                                value,
+                                activation: activation,
+                              ),
+                            ),
+                            onStartTimeChanged: (value) => _editFields(
+                              viewModel,
+                              _ValidationSection.eventTime,
+                              null,
+                              activation,
+                              () => viewModel.setStartClockTime(
+                                value,
+                                activation: activation,
+                              ),
+                            ),
+                            onEndDateChanged: (value) => _editFields(
+                              viewModel,
+                              _ValidationSection.eventTime,
+                              null,
+                              activation,
+                              () => viewModel.setEndCalendarDate(
+                                value,
+                                activation: activation,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ),
+                    SizedBox(key: _temporalTargetKey, height: 8),
                   ],
                 ),
               ),
-              if (!viewModel.isEditMode ||
-                  viewModel.hasLoadedDetail ||
-                  viewModel.stagedAssets.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      const TextSectionDivider('Foto'),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          spacing: 8,
-                          children: <Widget>[
-                            Text(
-                              '${viewModel.imageCount} / '
-                              '$kMaximumSubmissionAssetCount',
+            ),
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  const TextSectionDivider('Posizione'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Focus(
+                      canRequestFocus: !lockEditor,
+                      descendantsAreFocusable: !lockEditor,
+                      child: IgnorePointer(
+                        ignoring: lockEditor,
+                        child: AdminSubmissionLocationEditor(
+                          key: ObjectKey(viewModel),
+                          latitudeText: viewModel.latitudeText,
+                          longitudeText: viewModel.longitudeText,
+                          formKey: _locationFormKey,
+                          revealCoordinatesRevision: _revealCoordinatesRevision,
+                          onLatitudeTextChanged: (value) => _editFields(
+                            viewModel,
+                            _ValidationSection.location,
+                            null,
+                            activation,
+                            () => viewModel.setLatitudeText(
+                              value,
+                              activation: activation,
                             ),
-                            if (viewModel.stagedAssets.any(
-                              viewModel.isStagedAssociationUnavailable,
-                            ))
-                              const Text(
-                                'La presenza remota di una foto confermata '
-                                'non è verificata. '
-                                'La copia locale è conservata: puoi rimuoverla '
-                                'dalla bozza '
-                                'o verificare di nuovo lo stato remoto.',
-                              ),
-                            if (viewModel.stagedAssets.any(
-                              (asset) => asset.progressInvalid,
-                            ))
-                              const Text(
-                                'La conferma di una foto non è leggibile. '
-                                'I file locali sono conservati; '
-                                'la ripresa è sospesa.',
-                              ),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: <Widget>[
-                                ...viewModel.stagedAssets.map(
-                                  (asset) => ContentSubmissionAssetListItem(
-                                    key: ValueKey(
-                                      'admin_staged_${asset.digest}',
-                                    ),
-                                    image: FutureBuilder<Result<File>>(
-                                      future: viewModel.stagedAssetFile(asset),
-                                      builder: (context, snapshot) =>
-                                          switch (snapshot.data) {
-                                            Success<File>(:final value) =>
-                                              Image.file(
-                                                value,
-                                                width:
-                                                    contentSubmissionAssetSize
-                                                        .width,
-                                                height:
-                                                    contentSubmissionAssetSize
-                                                        .height,
-                                                fit: BoxFit.cover,
-                                              ),
-                                            _ => const SizedBox(
-                                              width: 80,
-                                              height: 80,
-                                              child: Icon(Icons.image),
-                                            ),
-                                          },
-                                    ),
-                                    removeButtonSize: 48,
-                                    showRemoveIcon: viewModel.canCheckpoint,
-                                    onRemove: viewModel.operationRunning
-                                        ? null
-                                        : () => viewModel
-                                              .requestRemoveStagedAsset(
-                                                asset,
-                                                activation: activation,
-                                              ),
-                                  ),
+                          ),
+                          onLongitudeTextChanged: (value) => _editFields(
+                            viewModel,
+                            _ValidationSection.location,
+                            null,
+                            activation,
+                            () => viewModel.setLongitudeText(
+                              value,
+                              activation: activation,
+                            ),
+                          ),
+                          onMapCoordinatesSelected: (latitude, longitude) =>
+                              _editFields(
+                                viewModel,
+                                _ValidationSection.location,
+                                null,
+                                activation,
+                                () => viewModel.setCoordinates(
+                                  latitude,
+                                  longitude,
+                                  activation: activation,
                                 ),
-                                ...viewModel.assets.map((asset) {
-                                  return ContentSubmissionAssetListItem(
-                                    key: ValueKey<String>(
-                                      'admin_submission_asset_${asset.id}',
-                                    ),
-                                    image: AppNetworkImage(
-                                      url: asset.url,
-                                      imageWidth: asset.width,
-                                      imageHeight: asset.height,
-                                      width: contentSubmissionAssetSize.width,
-                                      height: contentSubmissionAssetSize.height,
-                                    ),
-                                    removeButtonSize: 48,
-                                    showRemoveIcon:
-                                        status == AdminSubmissionStatus.pending,
-                                    onRemove: !viewModel.canRequestDeleteAsset
-                                        ? null
-                                        : () => unawaited(
-                                            _confirmAssetDeletion(
-                                              viewModel,
-                                              asset.id,
-                                            ),
-                                          ),
-                                  );
-                                }),
-                                if (((!viewModel.isEditMode ||
-                                            status ==
-                                                AdminSubmissionStatus
-                                                    .pending) &&
-                                        viewModel.imageCount <
-                                            kMaximumSubmissionAssetCount) &&
-                                    viewModel.canRequestAddAsset)
-                                  ContentSubmissionAddAssetButton(
-                                    key: const ValueKey<String>(
-                                      'admin_submission_add_asset',
-                                    ),
-                                    onPressed: !viewModel.canRequestAddAsset
-                                        ? null
-                                        : () {
-                                            _unfocus();
-                                            _request(
-                                              viewModel,
-                                              () => viewModel.requestAddAsset(
-                                                activation: activation,
-                                              ),
-                                            );
-                                          },
-                                  ),
-                                if (viewModel.pickerWaiting)
-                                  TextButton(
-                                    onPressed: () {
-                                      if (viewModel.isActivationCurrent(
-                                        activation,
-                                      )) {
-                                        if (pickerRequest != null) {
-                                          viewModel.abandonPicker(
-                                            requestNonce: pickerRequest,
-                                          );
-                                        }
-                                      }
-                                    },
-                                    child: const Text('Interrompi selezione'),
-                                  ),
-                                if (viewModel.operationRunning)
-                                  const Padding(
-                                    padding: EdgeInsets.all(24),
-                                    child: CustomCircularProgressIndicator(
-                                      size: 36,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
+                              ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              if (viewModel.isEditMode && status != null)
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      TextSectionDivider(
-                        'Verifica e confronto',
-                        key: _verificationTargetKey,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          spacing: 8,
-                          children: <Widget>[
-                            if (viewModel.externalEvent
-                                case final external?) ...[
-                              if (external.stale)
-                                const Text(
-                                  'La proposta è precedente alla versione '
-                                  'corrente della fonte.',
-                                ),
-                              Text(
-                                'Versione corrente della fonte',
-                                key: _sourceTargetKey,
-                              ),
-                              if (external.currentSnapshot == null)
-                                const Text(
-                                  'Dettaglio della fonte non disponibile.',
-                                ),
-                              if (external.currentSnapshot
-                                  case final source?) ...[
-                                for (final entry in source.entries)
-                                  SentryMask(
-                                    SelectableText(
-                                      '${switch (entry.key) {
-                                        'name' => 'Nome',
-                                        'category' => 'Categoria',
-                                        'description' => 'Descrizione',
-                                        'city' => 'Città',
-                                        'latitude' => 'Latitudine',
-                                        'longitude' => 'Longitudine',
-                                        'all_day' => 'Tutto il giorno',
-                                        'start_date' => 'Inizio',
-                                        'end_date' => 'Fine',
-                                        _ => entry.key,
-                                      }}: ${entry.value ?? "Non disponibile"}',
-                                    ),
-                                  ),
-                              ],
-                              if (external.stale &&
-                                  status == AdminSubmissionStatus.pending)
-                                CheckboxListTile(
-                                  key: const ValueKey(
-                                    'admin_acknowledge_current_source',
-                                  ),
-                                  subtitle: const Text(
-                                    'La risoluzione della proposta '
-                                    'non considera '
-                                    'automaticamente valutate '
-                                    'le revisioni più recenti.',
-                                  ),
-                                  title: const Text(
-                                    'Considera valutata anche la versione '
-                                    'corrente della fonte',
-                                  ),
-                                  value: viewModel.acknowledgeCurrentSource,
-                                  onChanged: viewModel.operationRunning
-                                      ? null
-                                      : (value) {
-                                          if (!identical(
-                                            viewModel.externalEvent,
-                                            external,
-                                          )) {
-                                            return;
-                                          }
-                                          _request(
-                                            viewModel,
-                                            () => viewModel
-                                                .setAcknowledgeCurrentSource(
-                                                  selected: value ?? false,
-                                                  activation: activation,
-                                                ),
-                                          );
-                                        },
-                                ),
-                            ],
-                            if (status == AdminSubmissionStatus.pending) ...[
-                              if (viewModel.startDate != null) ...[
-                                SentryMask(
-                                  KeyedSubtree(
-                                    key: ObjectKey(viewModel),
-                                    child: TextFormField(
-                                      key: const ValueKey('admin_event_search'),
-                                      decoration: const InputDecoration(
-                                        labelText: 'Cerca evento per nome',
-                                      ),
-                                      initialValue: viewModel.candidateSearch,
-                                      onChanged: (value) => _request(
-                                        viewModel,
-                                        () => viewModel.setCandidateSearch(
-                                          value,
-                                          activation: activation,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: !viewModel.canRequestFindCandidates
-                                      ? null
-                                      : () => _request(
-                                          viewModel,
-                                          () => viewModel.requestFindCandidates(
-                                            activation: activation,
-                                          ),
-                                        ),
-                                  child: const Text('Cerca eventi'),
-                                ),
-                                if (viewModel.findCandidatesSnapshot.hasFailure)
-                                  const Text(
-                                    'Impossibile cercare gli eventi. Riprova.',
-                                  ),
-                                if (viewModel.candidates
-                                    case final matches?) ...[
-                                  for (final warning in matches.pendingWarnings)
-                                    SentryMask(
-                                      Text(
-                                        'Altro contributo in attesa: '
-                                        '${warning.name} (#${warning.id}). '
-                                        'Questo avviso non blocca '
-                                        'la moderazione.',
-                                      ),
-                                    ),
-                                  for (final candidate in matches.events)
-                                    ListTile(
-                                      key: ValueKey(
-                                        'admin_event_candidate_${candidate.id}',
-                                      ),
-                                      title: Text(candidate.name),
-                                      subtitle: Text(
-                                        candidate.city == null
-                                            ? 'Città non disponibile '
-                                                  '· #${candidate.id}'
-                                            : '${candidate.city} '
-                                                  '· #${candidate.id}',
-                                      ),
-                                      selected:
-                                          viewModel.targetEventId ==
-                                          candidate.id,
-                                      onTap:
-                                          viewModel.operationRunning ||
-                                              viewModel.loading
-                                          ? null
-                                          : () => _request(
-                                              viewModel,
-                                              () => viewModel.selectTargetEvent(
-                                                candidate.id,
-                                                activation: activation,
-                                              ),
-                                            ),
-                                    ),
-                                ],
-                                if (viewModel.targetEventId case final target?)
-                                  Text('Evento selezionato: #$target'),
-                                TextFormField(
-                                  key: const ValueKey('admin_event_target'),
-                                  controller: _eventTargetController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'ID evento esistente',
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  enabled:
-                                      !viewModel.operationRunning &&
-                                      !viewModel.loading,
-                                  onChanged: (value) => _request(
-                                    viewModel,
-                                    () => viewModel.selectTargetEvent(
-                                      int.tryParse(value),
-                                      activation: activation,
-                                    ),
-                                  ),
-                                ),
-                                if (viewModel.isExternalUpdate) ...[
-                                  if (viewModel.previewSnapshot.hasFailure ||
-                                      viewModel.keepCurrentSnapshot.hasFailure)
-                                    SentryMask(Text(previewErrorMessage)),
-                                  if (viewModel.mergePreview case final merge?)
-                                    for (final group in _orderedGroups(
-                                      merge.groups,
-                                    ))
-                                      Card(
-                                        key:
-                                            identical(
-                                              group,
-                                              merge.groups
-                                                  .where((g) => g.overwrite)
-                                                  .firstOrNull,
-                                            )
-                                            ? _overwriteTargetKey
-                                            : ObjectKey(group),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(12),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                _mergeLabel(group.name),
-                                                style: Theme.of(
-                                                  context,
-                                                ).textTheme.titleMedium,
-                                              ),
-                                              Text(
-                                                group.apply
-                                                    ? 'Da applicare'
-                                                    : 'Resta invariato',
-                                              ),
-                                              if (group.overwrite)
-                                                const Text(
-                                                  'Sovrascrive modifiche del '
-                                                  'moderatore '
-                                                  'nell’evento attuale',
-                                                ),
-
-                                              SentryMask(
-                                                Text(
-                                                  'Proposta: '
-                                                  '${group.moderated}',
-                                                ),
-                                              ),
-                                              SelectableText(
-                                                'Attuale: ${group.current}',
-                                              ),
-                                              ExpansionTile(
-                                                title: const Text(
-                                                  'Base e fonte complete',
-                                                ),
-                                                children: [
-                                                  SentryMask(
-                                                    SelectableText(
-                                                      'Base: ${group.base}',
-                                                    ),
-                                                  ),
-                                                  SentryMask(
-                                                    SelectableText(
-                                                      'Fonte: ${group.source}',
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              TextButton(
-                                                onPressed:
-                                                    !viewModel
-                                                        .canRequestKeepCurrent
-                                                    ? null
-                                                    : () => _request(
-                                                        viewModel,
-                                                        () => viewModel
-                                                            .requestKeepCurrent(
-                                                              group,
-                                                              activation:
-                                                                  activation,
-                                                            ),
-                                                      ),
-                                                child: const Text(
-                                                  'Mantieni valore attuale',
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                ],
-                              ],
-                            ] else ...[
-                              Text(status.label),
-                              if (viewModel.promotion case final promotion?
-                                  when status == AdminSubmissionStatus.accepted)
-                                Text(_publishedAs(promotion)),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              if (viewModel.isEditMode)
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: <Widget>[
-                            ExpansionTile(
-                              title: const Text('Autore e dettagli tecnici'),
-                              children: [
-                                if (viewModel.contributorName case final name?)
-                                  SentryMask(Text(name)),
-                                if (viewModel.contributorEmail
-                                    case final email?)
-                                  SentryMask(Text(email)),
-                                SentryMask(
-                                  Text('Contributo #${viewModel.submissionId}'),
-                                ),
-                                if (viewModel.createdAt case final created?)
-                                  SentryMask(Text('Creato il $created')),
-                                if (viewModel.modifiedAt case final modified?)
-                                  SentryMask(Text('Modificato il $modified')),
-                                if (viewModel.externalEvent case final source?)
-                                  SentryMask(
-                                    SelectableText(
-                                      'Record fonte #${source.recordId} · '
-                                      'versione ${source.snapshotVersion}\n'
-                                      'Hash proposta: ${source.snapshotHash}\n'
-                                      'Hash corrente: '
-                                      '${source.currentHash ?? 'Assente'}'
-                                      '\n'
-                                      'Proposta originale: ${source.snapshot}',
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (viewModel.contributorName case final name?)
-                if (viewModel.contributorEmail case final email?)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text('Creato come $name · $email'),
                     ),
                   ),
-            ],
-          );
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-              final expanded =
-                  constraints.maxWidth >= 840 &&
-                  constraints.maxWidth >= (520 + 320) * scale + 24;
-              return Column(
+                ],
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: AdminSubmissionMediaSection(
+                viewModel: viewModel,
+                onAdd: () {
+                  _unfocus();
+                  _request(
+                    viewModel,
+                    () => viewModel.requestAddAsset(activation: activation),
+                  );
+                },
+                onRemoveStaged: (asset) => _request(
+                  viewModel,
+                  () => viewModel.requestRemoveStagedAsset(
+                    asset,
+                    activation: activation,
+                  ),
+                ),
+                onRemoveAsset: (id) =>
+                    unawaited(_confirmAssetDeletion(viewModel, id)),
+                onCancelPicker: () => _request(viewModel, () {
+                  if (viewModel.isActivationCurrent(activation) &&
+                      pickerRequest != null) {
+                    viewModel.abandonPicker(requestNonce: pickerRequest);
+                  }
+                }),
+              ),
+            ),
+            if (viewModel.isEditMode && status != null)
+              SliverToBoxAdapter(
+                child: AdminSubmissionVerificationSection(
+                  key: _verificationTargetKey,
+                  viewModel: viewModel,
+                  targetController: _eventTargetController,
+                  sourceKey: _sourceTargetKey,
+                  overwriteKey: _overwriteTargetKey,
+                  previewErrorMessage: previewErrorMessage,
+                  publicationLabel:
+                      status == AdminSubmissionStatus.accepted &&
+                          viewModel.promotion != null
+                      ? _publishedAs(viewModel.promotion!)
+                      : null,
+                  onSearchChanged: (value) => _request(
+                    viewModel,
+                    () => viewModel.setCandidateSearch(
+                      value,
+                      activation: activation,
+                    ),
+                  ),
+                  onFindCandidates: !viewModel.canRequestFindCandidates
+                      ? null
+                      : () => _request(
+                          viewModel,
+                          () => viewModel.requestFindCandidates(
+                            activation: activation,
+                          ),
+                        ),
+                  onTargetChanged: (id) => _request(
+                    viewModel,
+                    () =>
+                        viewModel.selectTargetEvent(id, activation: activation),
+                  ),
+                  onAcknowledge: viewModel.operationRunning
+                      ? null
+                      : (selected) {
+                          if (!identical(
+                            viewModel.externalEvent,
+                            displayedSource,
+                          )) {
+                            return;
+                          }
+                          _request(
+                            viewModel,
+                            () => viewModel.setAcknowledgeCurrentSource(
+                              selected: selected,
+                              activation: activation,
+                            ),
+                          );
+                        },
+                  onKeepCurrent: !viewModel.canRequestKeepCurrent
+                      ? null
+                      : (group) => _request(
+                          viewModel,
+                          () => viewModel.requestKeepCurrent(
+                            group,
+                            activation: activation,
+                          ),
+                        ),
+                ),
+              ),
+            if (viewModel.isEditMode)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: AdminSubmissionMetadataSection(
+                    contributorName: viewModel.contributorName,
+                    contributorEmail: viewModel.contributorEmail,
+                    submissionId: viewModel.submissionId,
+                    createdAt: viewModel.createdAt,
+                    modifiedAt: viewModel.modifiedAt,
+                    externalEvent: viewModel.externalEvent,
+                  ),
+                ),
+              )
+            else if (viewModel.contributorName case final name?)
+              if (viewModel.contributorEmail case final email?)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('Creato come $name · $email'),
+                  ),
+                ),
+          ],
+        );
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
+            final expanded =
+                constraints.maxWidth >= 840 &&
+                constraints.maxWidth >= (520 + 320) * scale + 24;
+            final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+            final decisions = _decisionArea(
+              viewModel,
+              activation,
+              expanded: expanded,
+            );
+            return Scaffold(
+              bottomNavigationBar: expanded
+                  ? null
+                  : Padding(
+                      padding: EdgeInsets.only(bottom: keyboardInset),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight:
+                              (constraints.maxHeight -
+                                      keyboardInset -
+                                      kToolbarHeight -
+                                      48)
+                                  .clamp(0, double.infinity),
+                        ),
+                        child: decisions,
+                      ),
+                    ),
+              body: Column(
                 children: [
                   AppBar(
                     leading: CustomBackButton(onPressed: widget.onBack),
@@ -2018,30 +1645,17 @@ class _AdminSubmissionEditorScreenState
                             ),
                           ),
                         ),
-                        SizedBox(
-                          width: expanded ? 320 * scale : null,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxHeight: expanded
-                                  ? double.infinity
-                                  : constraints.maxHeight * .5,
-                            ),
-                            child: _decisionArea(
-                              viewModel,
-                              activation,
-                              expanded: expanded,
-                            ),
-                          ),
-                        ),
+                        if (expanded)
+                          SizedBox(width: 320 * scale, child: decisions),
                       ],
                     ),
                   ),
                 ],
-              );
-            },
-          );
-        },
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

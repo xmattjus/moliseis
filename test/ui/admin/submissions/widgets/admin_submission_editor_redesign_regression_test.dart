@@ -352,14 +352,8 @@ void main() {
           find.textContaining('Sovrascrive modifiche').hitTestable(),
           findsOneWidget,
         );
-        final proposed = find.text(
-          'Proposta: {description: $longValue}',
-          skipOffstage: false,
-        );
-        final current = find.text(
-          'Attuale: {description: current $longValue}',
-          skipOffstage: false,
-        );
+        final proposed = find.text(longValue, skipOffstage: false);
+        final current = find.text('current $longValue', skipOffstage: false);
         expect(proposed, findsOneWidget);
         expect(current, findsOneWidget);
         expect(

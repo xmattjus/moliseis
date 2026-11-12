@@ -32,3 +32,13 @@ Implementation was explicitly authorized after review of planning commit `bb635b
 
 - [x] 5.1 Run `flutter analyze`, the affected editor screen/location widget tests, shared content-fields tests, editor command/ViewModel tests, and `admin_save_progress_route_test.dart`, `admin_save_recovery_ui_test.dart`, `admin_dirty_exit_route_test.dart`, `admin_editor_navigation_admission_test.dart` and `admin_session_target_route_test.dart` under `test/routing/`. Run any additional shared-widget tests touched by a compatible extension. Record actual results in the implementation review; broaden only for a changed shared contract or observed failure.
 - [x] 5.2 Review the implemented workspace against every delta scenario and the CTA matrix using representative ordinary, external create/update, final and recovery submissions. Confirm no production change outside Intervention C, no new packages/backend/domain/persistence/navigation architecture, no duplicate listeners/actions and no weakened moderation, exit or save authority; run `git diff --check` and strict OpenSpec validation.
+
+
+## 6. Adversarial remediation and semantic extraction
+
+- [x] 6.1 Pin current decision/status and combined overwrite/newer-source risks outside secondary scrolling. Verify actual compact/expanded editor hit visibility with long values, keyboard insets and 200% text; retain explicit evidence navigation without acknowledgement or dispatch.
+- [x] 6.2 Render all five original merge groups readably with null, rich/plain differences, Rome schedule and location cases, complete exact evidence, original Keep Current identity and selective masks.
+- [x] 6.3 Retire stale validation summaries on relevant edits and owner/activation/hydration changes, preserving unrelated errors, ordinary validation/retry, invalid-input admission refusal and captured-save bypass.
+- [x] 6.4 Identify Link targets only through matching current candidates with honest manual-ID fallback. Verify query/target invalidation, obsolete asynchronous results, long constrained identity and exact command target.
+- [x] 6.5 Extract cohesive feature-local identity/metadata, media, decision, verification and merge widgets. Verify stable Form/controller ownership, recovery/lifecycle/routing/media/privacy regressions, primary-controller isolation and complete secondary targets.
+- [ ] 6.6 Run formatting, full analyzer, targeted regressions, complete autonomous suite, strict OpenSpec and diff checks; inspect rendered compact/expanded flows, adversarial final diff and latest pushed CI. Retain only intentional source/tests/change artifacts and keep the existing PR Draft.

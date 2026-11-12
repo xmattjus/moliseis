@@ -5,7 +5,8 @@ import 'package:material_ui/material_ui.dart';
 Future<void> showAdminEditorActions(WidgetTester tester) async {
   final title = find.text('Altre azioni');
   if (title.evaluate().isEmpty) return;
-  if (ExpansibleController.of(tester.element(title)).isExpanded) return;
+  final toggle = find.byKey(const ValueKey('admin_secondary_toggle'));
+  if (tester.widget<Semantics>(toggle).properties.expanded == true) return;
   await tester.ensureVisible(title);
   await tester.pumpAndSettle();
   await tester.tap(title);
