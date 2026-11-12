@@ -1694,10 +1694,8 @@ class _AdminSubmissionEditorScreenState
                     .length ??
                 0;
             final risks = [
-              if (overwriteCount > 0)
-                overwriteCount == 1
-                    ? '1 sovrascrittura'
-                    : '$overwriteCount sovrascritture',
+              if (overwriteCount == 1) '1 sovrascrittura',
+              if (overwriteCount > 1) '$overwriteCount sovrascritture',
               if (viewModel.externalEvent?.stale == true) 'Fonte aggiornata',
             ];
             return Scaffold(
