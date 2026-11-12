@@ -126,10 +126,13 @@ class AdminSubmissionMetadataSection extends StatelessWidget {
 }
 
 String _formatRomeTimestamp(DateTime instant) {
-  final policy = EventTimePolicy();
-  final date = policy.calendarDateForUtc(instant);
-  final time = policy.clockTimeForUtc(instant);
+  final local = EventTimePolicy().localDateTimeForUtc(instant);
+  final offset = local.timeZoneOffset;
+  final offsetMinutes = offset.inMinutes.abs();
   String twoDigits(int value) => value.toString().padLeft(2, '0');
-  return '${twoDigits(date.day)}/${twoDigits(date.month)}/${date.year} '
-      '$time (ora di Roma)';
+  return '${twoDigits(local.day)}/${twoDigits(local.month)}/${local.year} '
+      '${twoDigits(local.hour)}:${twoDigits(local.minute)}:'
+      '${twoDigits(local.second)} '
+      '(UTC${offset.isNegative ? '-' : '+'}'
+      '${twoDigits(offsetMinutes ~/ 60)}:${twoDigits(offsetMinutes % 60)})';
 }

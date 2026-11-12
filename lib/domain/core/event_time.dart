@@ -269,6 +269,10 @@ final class EventTimePolicy {
     return _rome = tz.getLocation(locationName);
   }
 
+  /// Retains the full Rome clock and actual UTC offset for [instant].
+  tz.TZDateTime localDateTimeForUtc(DateTime instant) =>
+      tz.TZDateTime.from(instant.toUtc(), _romeLocation);
+
   /// Returns the Rome calendar day containing [instant].
   EventCalendarDate calendarDateForUtc(DateTime instant) {
     final local = tz.TZDateTime.from(instant.toUtc(), _romeLocation);
