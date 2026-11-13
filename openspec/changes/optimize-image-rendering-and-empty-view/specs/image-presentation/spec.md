@@ -189,11 +189,34 @@ Image performance acceptance SHALL distinguish deterministic decode correctness 
 #### Scenario: Representative-device performance acceptance
 
 - **WHEN** TASK-43 and TASK-16 performance completion is evaluated
-- **THEN** the same representative fixtures, list/grid density and scrolling interaction are compared on identified real devices/builds
+- **THEN** a focused Profile-mode comparison remains required on identified representative physical Android hardware/builds using ordinary/extreme fixtures, the same list/grid density and scrolling interaction
+- **AND** equivalent physical iOS Profile-mode validation, including memory pressure and scrolling/raster behavior, is required when suitable hardware becomes available; until then those iOS results remain NOT VERIFIED
 - **AND** memory pressure and scroll/raster observations, expected pixel-cost increases and residual risks are documented
 - **AND** unexplained extra work or observed memory-pressure/scroll failures are investigated before declaring the performance DoD complete
 - **AND** unavailable devices/backends or unverified formats remain explicit NOT VERIFIED gaps rather than claimed passes
 - **AND** focused implementation verification does not require duplicating the entire earlier benchmark campaign
+
+#### Scenario: Deterministic correctness and iOS compatibility evidence
+
+- **WHEN** implementation verification is evaluated
+- **THEN** applicable automated decoded-dimension/proportion, cache identity/reuse, provider/slideshow lifecycle/ownership/stale-callback/disposal, error/accessibility and acquisition/loading/rendering/gallery regressions remain mandatory
+- **AND** iOS compilation and simulator functional checks provide additional compatibility evidence where supported by the available toolchain
+- **AND** simulator success does not demonstrate physical-device memory or GPU performance; emulator, simulator, Android and estimated-buffer results do not substitute for physical iOS observations
+
+#### Scenario: Implementation merge with unavailable physical iOS measurements
+
+- **GIVEN** physical iOS performance results remain NOT VERIFIED
+- **WHEN** all other applicable verification requirements have been satisfied
+- **THEN** that absence alone SHALL NOT automatically block the future implementation PR merge
+- **AND** NOT VERIFIED is neither PASSED nor automatically ACCEPTED; physical follow-up remains outstanding and merge approval is not iOS release authorization
+- **AND** physical Android and all other applicable gates remain mandatory; demonstrated material regressions can still block implementation merge or release
+
+#### Scenario: iOS release with outstanding physical-device verification
+
+- **GIVEN** physical iOS performance verification remains unresolved
+- **WHEN** an iOS release is considered
+- **THEN** release SHALL require an explicit, recorded residual-risk decision by the release decision owner identifying unavailable verification, alternative evidence and its limits, possible memory/performance consequences, who accepts the risk and outstanding physical-device follow-up
+- **AND** risk acceptance does not mark missing measurements PASSED or remove follow-up, and no acceptance is inferred from implementation merge approval
 
 ### Requirement: Image loading callbacks report state transitions
 
