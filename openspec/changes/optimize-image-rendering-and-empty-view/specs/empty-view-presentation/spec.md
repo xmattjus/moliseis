@@ -2,70 +2,70 @@
 
 ## Purpose
 
-Keep reusable empty, loading and error states visible and accessible within their allocated constraints while preserving spacious presentation and usable existing actions.
+Keep known image-error descriptions accessible in compact slots, and preserve shared empty/loading/error content and reachable actions under their actual supported constraints.
 
 ## ADDED Requirements
 
-### Requirement: EmptyView adapts to effective layout constraints without a specialized API
+### Requirement: Compact image errors have explicit semantic ownership
 
-The existing `EmptyView`, `EmptyView.error` and `EmptyView.loading` constructors SHALL remain unchanged. `EmptyView` SHALL adapt its presentation to the constraints actually allocated by its parent, without an image-specific constructor, compact flag, new public variant or dependency on the viewport's global size. Where space permits, it SHALL preserve the current centered composition, padding, typography, icon size and action layout.
-
-#### Scenario: Existing spacious screen renders EmptyView
-
-- **GIVEN** a current loading, error or empty state with enough available height and width for the normal composition
-- **WHEN** the screen renders `EmptyView`
-- **THEN** icon, text, action, hierarchy and normal spacing remain visibly equivalent to the existing presentation
-- **AND** current text scaling, focus and semantics behavior is preserved
+The noninteractive image-error caller/composition SHALL own an explicit known image-unavailable label independently of visible text. It SHALL NOT extract a string from arbitrary EmptyView widget content. A single semantic boundary SHALL retain that description while excluding duplicate decorative/icon/text announcements. Raw URLs and private staging paths SHALL NOT be included. EmptyView constructors and widget-valued fields SHALL remain unchanged.
 
 #### Scenario: Compact noninteractive image slot
 
-- **GIVEN** an `EmptyView` with a meaningful icon and text but no interactive action, constrained to 32×32, 48×48, 72×72 or 86×86 logical pixels
-- **WHEN** it is laid out
-- **THEN** the component fits inside its allocated bounds without `RenderFlex` overflow and the meaningful icon has nonzero visible, unclipped geometry
-- **AND** it reduces discretionary padding, spacing and icon size as needed
-- **AND** if the visible text cannot remain readable, it may omit visible text while retaining an accessible description of the state
-- **AND** no new constructor or image-specific public switch is necessary
+- **GIVEN** the known image-error state in a 32×32, 48×48, 72×72 or 86×86 logical slot
+- **WHEN** its normal visual icon/text/decorations do not fit
+- **THEN** a nonzero visible broken-image icon remains fully within the slot without overflow or clipping
+- **AND** the semantics tree exposes exactly one meaningful image-unavailable description even though visible Text is omitted
+- **AND** decorative descendants do not produce duplicate announcements
+- **AND** this behavior belongs to the image-error composition, not arbitrary shared EmptyView content/actions
 
-#### Scenario: Constrained non-square container or scaled text
+#### Scenario: Known label fits normally
 
-- **GIVEN** an `EmptyView` with text and optional icon inside a narrow or short bounded container, possibly with enlarged text scaling
-- **WHEN** available constraints are smaller than the normal presentation requires
-- **THEN** it respects parent bounds and avoids uncontrolled layout overflow, preserving readable text when sufficient room exists
-- **AND** it does not globally suppress text scaling or shrink all content with an indiscriminate `FittedBox`
+- **WHEN** actual parent constraints allow the known label at effective typography/TextScaler and the existing icon/decorations
+- **THEN** image-error presentation uses the existing EmptyView visual composition with unchanged normal geometry
+- **AND** the same one semantic description remains available without duplicate visible-text announcements
+- **AND** compact selection uses measured content requirements, including width/height boundaries and enlarged text, rather than a global viewport or arbitrary image-height breakpoint
+- **AND** text scaling is not suppressed and the whole state is not indiscriminately shrunk
 
-### Requirement: EmptyView preserves reachable accessible actions
+### Requirement: Shared EmptyView preserves arbitrary content and spacious layout
 
-Within actual supported parent constraints, EmptyView SHALL preserve visible, reachable actions with usable hit targets, callbacks, keyboard focus and assistive-technology access. Finite content overflow SHALL use appropriate reachability without invalid nested scrolling; relevant unbounded scroll/sliver hosts SHALL remain valid. The compact noninteractive square matrix SHALL NOT imply support for arbitrary actions in those dimensions.
+EmptyView, EmptyView.error and EmptyView.loading constructors and widget-valued fields SHALL remain unchanged. Shared adaptation SHALL preserve arbitrary content, descendant semantics and roomy layout. It SHALL NOT hide arbitrary text or infer its semantic string. No image-specific constructor/parameter, general responsive framework or semantic extraction system SHALL be introduced.
 
-#### Scenario: Error or empty state contains recovery action
+#### Scenario: Existing spacious state
 
-- **GIVEN** a current `EmptyView` with icon, message and a retry/return action under its actual supported parent constraints
-- **WHEN** its parent supplies insufficient bounded space for the normal column
-- **THEN** the action remains accessible, focusable and usable, with an appropriate hit target
-- **AND** the widget does not hide it as a compact image-only fallback
-- **AND** any scrolling or content reduction does not cause a viewport overflow or unbounded-flex error
-- **AND** tests verify visible hit geometry and successful activation, including keyboard access and text scaling, rather than only widget presence
+- **GIVEN** an existing empty/loading/error state whose content fits its supported host
+- **WHEN** finite-height reachability support is applied
+- **THEN** icon/text/action rectangles and normal visual hierarchy remain equivalent
+- **AND** action callbacks, text scaling, keyboard focus and descendant semantics remain intact
 
-#### Scenario: Physical viewport is smaller than an action target
+#### Scenario: Shared content needs more finite height
 
-- **WHEN** a viewport cannot expose an entire existing 48×48 logical-pixel target at once
-- **THEN** the layout does not claim that the full target fits without scrolling or clipping, and does not hide, disable or shrink the action to an unusable size
-- **AND** acceptance uses the existing consumer's supported host geometry and verifies reachable visible hit area after scrolling where appropriate
-- **AND** the 32/48/72/86 square image-error matrix remains limited to noninteractive states
+- **GIVEN** actual existing caller content in a narrow/short finite host with enlarged text
+- **WHEN** its full composition exceeds available height
+- **THEN** appropriate bounded vertical scrolling keeps the content reachable without hiding or shrinking it
+- **AND** normal centered geometry is preserved where the content fits
+- **AND** this vertical reachability contract does not promise that any arbitrary child fits every possible width/height
 
-#### Scenario: EmptyView is placed in a vertically unbounded scroll host
+### Requirement: Shared EmptyView actions remain reachable and accessible
 
-- **WHEN** an existing screen renders `EmptyView` inside a scrollable/sliver composition that provides unbounded height
-- **THEN** responsive layout does not assume finite height or introduce an invalid viewport/flex constraint
-- **AND** the content remains laid out and reachable in the same host
+Within actual supported parent constraints, action-bearing EmptyView SHALL preserve usable hit targets, labels, callbacks, keyboard focus/activation and assistive-technology access. The compact image-error semantic exclusion SHALL NOT wrap action-bearing states or remove their descendants. The small noninteractive square matrix SHALL NOT be used as an action contract.
 
-### Requirement: Compact error semantics remain meaningful
+#### Scenario: Finite existing error and retry consumer
 
-Where `EmptyView` omits visual text for insufficient space, the textual meaning of the state SHALL remain available through assistive technologies without exposing private file paths or image URLs. Decorative icon semantics SHALL NOT produce redundant or contradictory announcements.
+- **GIVEN** a Nearby/Suggestion-style error/retry state, including width 320, height 216 and text scale 2
+- **WHEN** content exceeds its bounded height
+- **THEN** scrolling makes the labelled action reachable and tappable with its existing usable target, at least 48 logical pixels where required by that consumer
+- **AND** keyboard focus/Enter and semantics tap activate its actual callback
+- **AND** tests inspect visible/reachable hit geometry, not only widget presence or absence of exceptions
 
-#### Scenario: Text is hidden but broken-image icon remains
+#### Scenario: Viewport smaller than an action target
 
-- **WHEN** a bounded image slot shows an icon-only error
-- **THEN** the semantics tree exposes an understandable image-unavailable label
-- **AND** no duplicate or misleading error label is announced
-- **AND** a screen reader does not require the hidden text to remain visually laid out
+- **WHEN** a supported viewport cannot expose an entire existing 48×48 target simultaneously
+- **THEN** the action is not hidden, disabled or shrunk to imply it fits
+- **AND** tests verify reachable usable visible geometry after scrolling without claiming that the entire target is simultaneously exposed
+
+#### Scenario: Vertically unbounded scroll or sliver host
+
+- **WHEN** EmptyView is hosted in an existing SliverToBoxAdapter or another unbounded-height composition
+- **THEN** it retains a valid shrink-wrapped content path without introducing an unbounded nested viewport or flex error
+- **AND** its text/action semantics and reachable/tappable geometry remain available

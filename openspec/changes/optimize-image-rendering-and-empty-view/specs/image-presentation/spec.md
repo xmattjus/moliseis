@@ -6,16 +6,24 @@ Provide proportional local and remote image presentation with stable cache behav
 
 ## ADDED Requirements
 
-### Requirement: Cover images decode proportionally for their physical rendering targets
+### Requirement: Bounded cover decoding preserves proportions with an explicit output ceiling
 
-Cover images SHALL preserve intrinsic proportions and avoid avoidable upscaling relative to their authorized decode target, subject to source resolution and codec rounding. Local thumbnails SHALL target their physical slot dimensions; bounded network images SHALL target existing clamped buckets. Requests SHALL NOT exceed intrinsic resolution.
+Bounded cover images SHALL use one scale limited by intrinsic resolution, cover geometry and a 1728-pixel output ceiling. Requests SHALL be positive and never exceed intrinsic resolution or the ceiling. Actual output SHALL preserve proportions within documented integer/codec tolerance on the declared backend envelope. Full coverage SHALL be required only when source and ceiling permit it. Physical local targets and network requested-bucket semantics SHALL remain unchanged.
+
+#### Scenario: Positive bounded sizing
+
+- **GIVEN** positive decoder-reported intrinsic dimensions and physical requested targets
+- **WHEN** the cover size is calculated
+- **THEN** scale is `min(1, max(targetWidth / intrinsicWidth, targetHeight / intrinsicHeight), 1728 / max(intrinsicWidth, intrinsicHeight))`
+- **AND** both axes use that scale with ceil and final positive/intrinsic/1728 integer guards
+- **AND** the output ceiling is a declared quality/resource policy, not a universal GPU or process-memory guarantee
 
 #### Scenario: Non-square local photo in a square thumbnail
 
 - **GIVEN** a valid staged local photo with a 4:3, 3:4, 4:1 or 1:4 aspect ratio
 - **WHEN** the Admin or Public Content Submission form displays its 86×86 logical thumbnail at a supported device-pixel ratio
-- **THEN** the image is decoded at an aspect-ratio-preserving size that covers the required physical rectangle where intrinsic source resolution permits
-- **AND** painting with `BoxFit.cover` crops without stretching or avoidable upscaling
+- **THEN** the image is decoded at an aspect-ratio-preserving size that covers the required physical rectangle where intrinsic resolution and the output ceiling permit
+- **AND** painting with `BoxFit.cover` crops without stretching, with enlargement accepted only for the declared intrinsic/output-bound exceptions
 - **AND** neither form introduces an additional file copy, metadata-only read, persistent cache or independently owned asynchronous preview state
 
 #### Scenario: Network destination exceeds the bucket cap
@@ -31,7 +39,7 @@ Cover images SHALL preserve intrinsic proportions and avoid avoidable upscaling 
 - **GIVEN** the intrinsic image is smaller than the target along an axis
 - **WHEN** its preview is decoded
 - **THEN** the decoder does not request pixels above intrinsic source resolution to manufacture detail
-- **AND** rendering remains proportional and displays the best available source without distortion
+- **AND** rendering remains proportional within integer/codec tolerance, using the detail permitted by source resolution and the output ceiling
 
 #### Scenario: Oriented photo and fractional DPR
 
@@ -40,9 +48,43 @@ Cover images SHALL preserve intrinsic proportions and avoid avoidable upscaling 
 - **THEN** sizing uses the actual decoder-reported dimensions rather than unverified database metadata
 - **AND** the result preserves orientation and source proportions within decoder rounding tolerances
 
+#### Scenario: Exceptional panorama output remains bounded and proportional
+
+- **GIVEN** a 12000×1000 source or its transpose and an 864×864 physical requested target
+- **WHEN** the bounded cover provider decodes it
+- **THEN** the requested and observed output is 1728×144 or 144×1728 within documented one-pixel sizing/codec tolerance
+- **AND** the short axis requires accepted 6× enlargement to fill the slot, without an independently clamped distorted aspect ratio
+- **AND** at a 258-square local target the same bound explicitly permits 1728×144 instead of ideal 3096×258
+
+#### Scenario: Output ceiling also affects a large ordinary source
+
+- **GIVEN** a 4000×3000 source at a 1728-square requested bucket
+- **WHEN** the output ceiling binds
+- **THEN** output is 1728×1296, rather than ideal 2304×1728
+- **AND** that declared enlargement is accepted, while an 864-square target still obtains uncapped ideal cover output 1152×864
+- **AND** a sufficiently large square source still obtains the full 1728-square output
+
+#### Scenario: Backend output-limit compatibility
+
+- **GIVEN** an identified backend supporting texture dimensions of at least 1728
+- **WHEN** bounded cover fixtures cross the formerly oversized-output cases in both orientations
+- **THEN** actual decoded output remains proportional within the documented integer/codec tolerance and does not exceed the output ceiling
+- **AND** an observed 8192 limit is not treated as a portable guarantee or selected cap
+- **AND** unverified lower-capability/legacy backends remain NOT VERIFIED until the supported-device contract is established, without silently changing platform filters or adding a capability-query system
+
 ### Requirement: ImageProvider reuse preserves framework cache and error contracts
 
-The shared cover-specific provider SHALL preserve acquisition, decoding, key-resolution and error ownership. Its stable key SHALL distinguish source identity and requested target, reuse equivalent cover requests and remain distinct from incompatible stock-provider decodes. Synchronous key resolution, correct error eviction and fresh resolution after failure SHALL be preserved.
+The shared provider SHALL preserve acquisition, synchronous key resolution, key/decode error propagation and error ownership. Its immutable key SHALL distinguish source and requested target, reuse equivalent retained requests, and remain distinct from incompatible stock decodes. Failed outer entries SHALL be evicted so fresh resolution can recover.
+
+#### Scenario: Key resolution fails
+
+- **WHEN** an inner key fails synchronously or asynchronously
+- **THEN** the failure propagates through the framework error path without a hanging future or poisoned cover key
+
+#### Scenario: Different targets converge on the output ceiling
+
+- **WHEN** different requested buckets produce equal bounded dimensions
+- **THEN** their original requested-target outer keys remain distinct, sharing only existing URL/disk identity
 
 #### Scenario: Same source and requested bucket
 
@@ -55,6 +97,14 @@ The shared cover-specific provider SHALL preserve acquisition, decoding, key-res
 - **WHEN** the content-addressed staged path or remote provider identity changes, or a network image moves into a different size bucket
 - **THEN** the image-cache key changes appropriately and the corresponding content/size is decoded
 - **AND** obsolete source completions do not replace the current displayed image
+
+#### Scenario: Released exceptional working set reuses retained decodes
+
+- **GIVEN** a clean default Flutter ImageCache, no competing entries, and 1, 5, 10 or 20 distinct 12000×1000 image identities at one 864-square or 1728-square requested target
+- **WHEN** each is resolved, all consumer listeners are released, and the identical source order is revisited
+- **THEN** the bounded 1728×144 outputs remain retained and the revisit requires no new decode or unnecessary file/cache-manager read
+- **AND** pending/live counts return to zero after release, separately from retained bytes/entries
+- **AND** larger or mixed working sets may legitimately evict entries; retention is not claimed to bound all live/native/GPU/process memory
 
 #### Scenario: Underlying decode fails
 
@@ -112,7 +162,8 @@ Network decode sizing SHALL preserve original URL/cache-key and persistent disk 
 #### Scenario: Gallery shows full-resolution image
 
 - **WHEN** a user opens an image in the zoomable gallery
-- **THEN** the displayed image uses its full intrinsic resolution with `BoxFit.contain` in the current gallery path
+- **THEN** the gallery keeps its original unresized provider request, with actual intrinsic output subject to existing codec/backend limits and `BoxFit.contain`
+- **AND** the bounded-cover provider/output ceiling is not applied to this path
 - **AND** the display keeps its existing gallery navigation/zoom/pan behavior
 - **AND** shared error/loading handling is available without replacing the full-resolution path with a thumbnail decode
 
@@ -125,7 +176,7 @@ Network decode sizing SHALL preserve original URL/cache-key and persistent disk 
 
 ### Requirement: Image rendering costs have reproducible acceptance evidence
 
-Image performance acceptance SHALL distinguish deterministic decode correctness from device-dependent memory and scrolling behavior. Comparisons SHALL account for source/target aspect-ratio mismatch and the increased pixel cost of cover. Existing cache limits and network buckets SHALL remain unchanged; no constant-memory guarantee independent of aspect ratio SHALL be claimed.
+Image performance acceptance SHALL distinguish deterministic decode correctness from device-dependent memory and scrolling behavior. Comparisons SHALL account for source/target aspect-ratio mismatch, the selected output ceiling and the remaining pixel cost of cover. A per-image output-pixel bound SHALL NOT be presented as a total process/live-memory bound. Existing cache limits and network buckets SHALL remain unchanged; no constant-memory guarantee independent of aspect ratio SHALL be claimed.
 
 #### Scenario: Compare fit, cover and full-resolution costs
 
@@ -133,7 +184,7 @@ Image performance acceptance SHALL distinguish deterministic decode correctness 
 - **THEN** evidence records source geometry/format, target, DPR/bucket, expected and observed decoded dimensions for old fit, proposed cover and full-resolution paths
 - **AND** estimated pixel-buffer cost uses decoded width × decoded height × bytes per pixel with its pixel-format assumption stated
 - **AND** compressed file size and buffer estimates are not presented as total decoder, GPU, cache or process memory
-- **AND** requests stay within intrinsic resolution and increased cover cost is explained without a new cap, fallback or transform
+- **AND** all requests stay within intrinsic resolution; only bounded-cover requests use the selected 1728 output ceiling, explaining ordinary cover gains and bounded-quality exceptions without new transforms or cache tuning
 
 #### Scenario: Representative-device performance acceptance
 
@@ -141,11 +192,12 @@ Image performance acceptance SHALL distinguish deterministic decode correctness 
 - **THEN** the same representative fixtures, list/grid density and scrolling interaction are compared on identified real devices/builds
 - **AND** memory pressure and scroll/raster observations, expected pixel-cost increases and residual risks are documented
 - **AND** unexplained extra work or observed memory-pressure/scroll failures are investigated before declaring the performance DoD complete
-- **AND** unavailable devices or unverified formats remain explicit gaps rather than claimed passes
+- **AND** unavailable devices/backends or unverified formats remain explicit NOT VERIFIED gaps rather than claimed passes
+- **AND** focused implementation verification does not require duplicating the entire earlier benchmark campaign
 
 ### Requirement: Image loading callbacks report state transitions
 
-`AppNetworkImage.onImageLoading` SHALL describe loading for the active source in both constructors. Success and failure SHALL leave consumers non-loading; rebuild/frame activity SHALL NOT cause unnecessary duplicate notifications, and obsolete-source completions SHALL NOT publish current loading state. Existing slideshow behavior SHALL remain correct.
+AppNetworkImage.onImageLoading SHALL report current-effective-request loading in both constructors. Success and failure SHALL settle non-loading. Obsolete request events and unchanged frame/build notifications SHALL NOT republish current loading. PostMediaSlideshow SHALL own active-page admission independently of repeated child notifications.
 
 #### Scenario: Parent rebuilds while loading state is unchanged
 
@@ -158,20 +210,63 @@ Image performance acceptance SHALL distinguish deterministic decode correctness 
 - **THEN** `onImageLoading` reports `false` for that source
 - **AND** slideshow or other consumers are not left stuck in loading state
 
-#### Scenario: Source changes while an earlier source is unresolved
+#### Scenario: Effective request changes while an earlier request is unresolved
 
-- **WHEN** source A is replaced by source B before A completes
+- **WHEN** request A is replaced by B before A completes, including source/provider, same-URL target/fit or full-resolution path changes
 - **THEN** loading notifications reflect source B
 - **AND** a late completion from A does not mutate or notify B's loading state
 
+### Requirement: Slideshow page ownership controls loading and autoplay
+
+PostMediaSlideshow SHALL retain readiness for valid built/prefetched page owners and allow only the current PageView active owner to control loading, pause controls and autoplay. Its public image callback SHALL remain bool-valued. Obsolete-owner publications SHALL be rejected at callback entry and after deferral; mounted alone SHALL NOT establish ownership. Source-local loading and slideshow-page ownership SHALL remain separate responsibilities.
+
+#### Scenario: Offscreen image settles before the active pending page
+
+- **WHEN** offscreen B succeeds or fails while visible active A remains pending
+- **THEN** B updates only its own readiness and cannot enable or disable A's controls or ticker
+- **AND** selecting already-settled B admits it without requiring another image transition callback
+- **AND** a late A event after selecting pending B cannot admit B
+
+#### Scenario: Delayed events and unchanged rebuilds
+
+- **WHEN** multiple callbacks queue in a frame, a page changes, or an unrelated parent rebuild occurs
+- **THEN** deferred UI publication reflects the latest valid active-owner state rather than a captured stale bool
+- **AND** an unknown/pending current page cannot start autoplay even when child notifications are deduplicated
+- **AND** terminal success or handled failure settles that owner's loading and allows existing controls/autoplay when all other gates permit
+
+#### Scenario: Media owners are replaced or reordered
+
+- **WHEN** an index changes media identity, the list reorders/shrinks/becomes empty, or an ordered identity changes through in-place list mutation
+- **THEN** replaced/removed owner handles and their callbacks lose publication authority, including A→C→A list replacement
+- **AND** unchanged slots preserve readiness without callback replay, such as ready A in [A,B]→[A,C]
+- **AND** child identity is bound to its valid owner and controller/active indices remain valid
+- **AND** readiness is scoped/pruned to current slots, not a new media cache or application state layer
+
+#### Scenario: Visibility, user intent and resource lifetime
+
+- **WHEN** visibility changes without a parent rebuild, the notifier is replaced, media count crosses zero/one/many, or the widget is disposed
+- **THEN** autoplay admission requires a mounted, visible, enabled slideshow with multiple media and a settled valid current owner
+- **AND** manual pause/user-scroll intent and existing gallery pause/return behavior remain respected
+- **AND** visibility listeners are rebound/released and the ticker is initialized/disposed by State lifetime, without late callbacks touching disposed resources
+
+#### Scenario: Gallery future owns an autoplay pause
+
+- **GIVEN** scroll visibility remains true while the existing gallery route Future is pending
+- **WHEN** the current image completes or the parent rebuilds during that pause
+- **THEN** the slideshow ticker remains stopped independently of image readiness and scroll visibility
+- **AND** repeated opens do not create competing owners for the local suspension
+- **AND** return releases suspension and rechecks current owner/readiness, visibility and user intent; obsolete or disposed state cannot restart autoplay
+- **AND** route failures retain their existing exception propagation while releasing the local pause safely
+
 ### Requirement: Local and remote image failures provide accessible empty states
 
-Failed local image reads/decodes and remote image loads/decodes, including full-resolution gallery images, SHALL display a meaningful `EmptyView` containing a Material Symbols `broken_image` icon and an accessible neutral image-unavailable description. A corrupt file SHALL NOT present a per-image retry control; the existing admin staged-path resolution retry SHALL remain a separate, unchanged recovery action. The failure view SHALL obey the image slot's bounds without overflow.
+Local and remote image failures, including gallery, SHALL display the known-label noninteractive image-error composition with a visible broken-image symbol and one neutral accessible description. Feedback SHALL respect slot bounds and privacy. Corrupt-media retry SHALL NOT be added; admin staged-path resolution retry SHALL remain separate.
 
 #### Scenario: Local file is unreadable, absent, empty or corrupt
 
 - **WHEN** the local thumbnail provider fails to read or decode a staged file
-- **THEN** a bounded `EmptyView` with the broken-image symbol replaces the failed image, and error semantics remain available even if visible text cannot fit
+- **THEN** the bounded image-error composition replaces the failed image, and its explicit label remains in the semantics tree even when visible text is omitted
+- **AND** decorative icon/text semantics do not duplicate it; no arbitrary-widget string extraction or EmptyView public API addition is required
 - **AND** the original failure cause and available stack remain useful in local Debug diagnostics through the existing typed logger, without a private path in the event source label
 - **AND** no raw staging path is rendered or forwarded to inappropriate remote telemetry
 - **AND** no retry button is added for retrying the corrupt image decoder
