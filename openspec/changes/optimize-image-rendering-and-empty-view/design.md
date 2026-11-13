@@ -21,12 +21,14 @@ Applicable repo rules: root `AGENTS.md`, Flutter UI engineering and async safety
 - Give local, remote and full-resolution image failures a visible, accessible `EmptyView` with `Symbols.broken_image`, without a per-corrupt-image retry.
 - Make the *existing* `EmptyView` layout constraint-adaptive: unchanged spacious appearance when it fits, small noninteractive states never overflow, important actions remain usable.
 - Document public image APIs and verify decoded images, cache semantics, loading/error paths, constrained accessibility and performance budgets.
+- Preserve Molise Is's current static-only image contract: multi-frame network media must not play as animation.
 
 **Non-goals**
 - New server transforms, new URLs, disk caches, staging files, metadata I/O, providers at domain/data boundaries, image editing, new dependencies or Flutter upgrade.
 - Rewrite staging integrity/reconciliation, upload, cloud storage, gallery navigation, app-wide loading, or theme design.
 - Replace `EmptyView` with specialized image variants, add a `compact` flag/new constructor, or hide interactive actions to achieve compactness.
 - Blanket logging changes; leave `ImageLoadFailed` policy and privacy boundary intact.
+- Add animated-image playback support, playback controls or a new media-animation abstraction.
 
 ## Decisions
 
@@ -40,6 +42,8 @@ If `scale >= 1`, decode no larger than source dimensions. Otherwise use a propor
 
 Use a small delegating `ImageProvider` wrapper (instead of reimplementing HTTP/file codecs). Delegate load, preserve compatible `obtainKey` behavior including synchronous resolution, use a distinct immutable key containing the inner key and bucketed requested physical dimensions, and forward a cover-aware `getTargetSize` to the decoder. Preserve error propagation and Flutter `ImageCache` eviction semantics; check relevant `loadImage`/codec signatures in Flutter 3.47.5 and `cached_network_image_ce` 4.13.1 before implementation. Avoid extra file reads, retained image descriptors, async state in thumbnails or a new cache layer. Do not assume a custom provider implementation is automatically robust: test cache equality, synchronous hits, errors/eviction, and actual decode outputs.
 
+Resolve `cached_network_image_ce` from the current 4.13.1 lock to 4.13.2 within the existing dependency constraint before implementation. The patch fixes `DefaultCacheManager` initialization after an OS-cleared cache directory; inspect the resolved provider/cache implementation and keep this as a focused patch update rather than a broader dependency refresh.
+
 Use the same pure rule for unit testing and both pipelines; keep provider-specific resource ownership in existing components. Do not alter the raw staged file, ownership digest or copy/cleanup contracts.
 
 ### 2. Bounded local thumbnails and network images
@@ -52,11 +56,15 @@ For `.fullResolution`, do not constrain decoding; keep zoom/pan suitability and 
 
 Remove `imageWidth/imageHeight` from both public constructors and all actual Flutter call sites/tests. Keep media/asset width and height in domain and persistence for their real uses; avoid unrelated model or schema changes.
 
+Molise Is currently treats application images as static media. Configure `CachedNetworkImageProvider` with animation disabled so a multi-frame network image renders its first frame without continuing animation decode/playback. Preserve that setting as part of provider/cache identity and do not introduce animated-media support through this change. Local staged-photo handling remains static and gains no animated-media capability.
+
 ### 3. Image failure presentation and logging
 
 On image decoding/read or network load failure (including `.fullResolution`), show `EmptyView` with `Symbols.broken_image` and concise, neutral description such as "Immagine non disponibile". A network timeout or missing file must not be reported to users as positively corrupt. Keep existing bounded image dimensions and clipping; the full-screen case must use available constraints and stay visible over the gallery background. No automatic per-image retry or retry action for a corrupt staged image. Preserve the existing admin staged-path *resolution* retry: it addresses a different boundary, and is not a retry of the image decoder.
 
-Ensure `onImageLoading` is implemented for both `AppNetworkImage` constructors, reflects terminal success/failure correctly for consumers (especially slideshow), and does not remain falsely loading after a failed image. Prevent callback side effects from stale widget/source identity. Preserve existing typed logging (`ImageLoadFailed`) for network failures, with original error/stack retained for local debug handling and without new sensitive URL/path reporting to Sentry. Avoid emitting repeated logs for rebuilds of the same failed image if this can be addressed locally without additional architecture; do not add a new global logger or remote event family. Handle local errors without unhandled framework exceptions or leaking private staging paths.
+Ensure `onImageLoading` is implemented for both `AppNetworkImage` constructors and represents semantic loading-state transitions rather than `frameBuilder`/rebuild notifications. Do not emit duplicate consecutive values solely because an image frame or parent build repeats; terminal success and terminal failure transition to `false`, and source replacement establishes the new source's state without allowing stale completions to notify consumers. Preserve existing typed logging (`ImageLoadFailed`) for network failures, with original error/stack retained for local debug handling and without new sensitive URL/path reporting to Sentry. Avoid emitting repeated logs for rebuilds of the same failed image if this can be addressed locally without additional architecture; do not add a new global logger or remote event family. Handle local errors without unhandled framework exceptions or leaking private staging paths.
+
+Audit the current `AnimatedOpacity` loading fade, including its `Durations.extralong4` duration, on representative dense list/grid consumers. Synchronous/cache hits remain transition-free. For asynchronous loads, choose the simplest transition behavior that preserves acceptable feedback without introducing visible raster/scroll regressions; shortening or removing the fade for dense bounded images is allowed, while adding a new public animation-configuration API is out of scope unless implementation evidence demonstrates a concrete need.
 
 ### 4. Adaptive EmptyView, unchanged API
 
@@ -72,11 +80,11 @@ Use real decodes (not only constructor/provider type assertions) to verify physi
 
 Check `ImageCache` key identity and error eviction, same-URL same-bucket reuse, different buckets producing separate in-memory entries, and unchanged `CacheManager` disk key/request behavior. Memory estimates must compare decoded-pixel counts (current vs corrected vs full-resolution) with explicit source and DPR, rather than asserting that total process RSS drops; sharper cover decodes intentionally use more decoded pixels. Review scrolling fluidity on a real device if available and do not invent measurements.
 
-Exercise local missing/corrupt/empty file paths and remote load failures, including gallery. Assert visible error with `Symbols.broken_image`, no raw exception surfaced, no unwarranted retry, terminal loading callback, no duplicate failure logging on repeated build, and no private path/full URL in privacy-sensitive telemetry. Preserve admin owner/activation and path-resolution behavior.
+Exercise local missing/corrupt/empty file paths and remote load failures, including gallery. Assert visible error with `Symbols.broken_image`, no raw exception surfaced, no unwarranted retry, edge-triggered loading callback sequences without consecutive duplicates, terminal `false` on success/failure, no stale-source callback, no duplicate failure logging on repeated build, and no private path/full URL in privacy-sensitive telemetry. Add a multi-frame network fixture proving the static-only contract: the first frame may render, but later animation frames are not decoded/played. Preserve admin owner/activation and path-resolution behavior.
 
 Cover `EmptyView` at 32×32, 48×48, 72×72, 86×86, representative large views and bounded narrow/short layouts, with/without icon/text/action, with text scaling, keyboard/SafeArea where relevant, and with unbounded scroll/sliver constraints. Assert no overflow, correct semantics for icon-only presentation, preservation of action focus/reachability, and unchanged appearance when space allows.
 
-Run focused tests, analyzer, then full relevant automated suite and GitHub CI. Complete a targeted manual device pass on real camera photos, HEIC/HEIF where supported, gallery/error states and long image lists/grids, noting unresolved platforms. No incidental snapshots, scratchpad logs or experimental binaries in Git commits.
+Run focused tests, analyzer, then full relevant automated suite and GitHub CI. Complete a targeted manual device pass on real camera photos, HEIC/HEIF where supported, gallery/error states and long image lists/grids, noting unresolved platforms. Include the current-vs-chosen `AnimatedOpacity` behavior in the dense list/grid device pass and record observed scroll/raster behavior without inventing performance gains. No incidental snapshots, scratchpad logs or experimental binaries in Git commits.
 
 ## Risks / Tradeoffs
 
