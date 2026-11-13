@@ -1,10 +1,14 @@
 # image-presentation Specification
 
+## Purpose
+
+Provide proportional local and remote image presentation with stable cache behavior, accessible failure feedback and verifiable rendering costs while preserving staging and gallery contracts.
+
 ## ADDED Requirements
 
 ### Requirement: Cover images decode proportionally for their physical rendering targets
 
-Local staged thumbnails and bounded remote images painted with `BoxFit.cover` SHALL decode at a size based on decoder-reported intrinsic dimensions and the destination's physical width and height, preserving source aspect ratio and avoiding avoidable render-time upscaling. The requested decode dimensions SHALL NOT exceed the source's intrinsic resolution merely to satisfy a larger display target. Integer rounding and fractional device-pixel ratios SHALL NOT systematically undershoot a cover target that the source can satisfy.
+Cover images SHALL preserve intrinsic proportions and avoid avoidable upscaling relative to their authorized decode target, subject to source resolution and codec rounding. Local thumbnails SHALL target their physical slot dimensions; bounded network images SHALL target existing clamped buckets. Requests SHALL NOT exceed intrinsic resolution.
 
 #### Scenario: Non-square local photo in a square thumbnail
 
@@ -13,6 +17,14 @@ Local staged thumbnails and bounded remote images painted with `BoxFit.cover` SH
 - **THEN** the image is decoded at an aspect-ratio-preserving size that covers the required physical rectangle where intrinsic source resolution permits
 - **AND** painting with `BoxFit.cover` crops without stretching or avoidable upscaling
 - **AND** neither form introduces an additional file copy, metadata-only read, persistent cache or independently owned asynchronous preview state
+
+#### Scenario: Network destination exceeds the bucket cap
+
+- **GIVEN** a 1000×1000 logical network slot at DPR 2 and a sufficiently large square source
+- **WHEN** the existing bucket policy resolves the decode target
+- **THEN** the requested target remains 1728×1728, and proportional cover decoding covers that bucket
+- **AND** upscale to the 2000×2000 physical display is an accepted consequence of the existing clamp
+- **AND** avoidable undersampling from fit decoding is corrected relative to the bucket without raising or removing the cap
 
 #### Scenario: Small original photograph
 
@@ -30,7 +42,7 @@ Local staged thumbnails and bounded remote images painted with `BoxFit.cover` SH
 
 ### Requirement: ImageProvider reuse preserves framework cache and error contracts
 
-The shared cover-aware `ImageProvider` SHALL delegate actual byte acquisition and decoding to its wrapped provider without replacing local file, HTTP or cache-manager ownership. It SHALL use a stable immutable image-cache key distinguishing inner source identity and requested physical decode size; correctly propagate decode errors and allow normal eviction and subsequent resolution. It SHALL preserve synchronous cache-hit behavior when the underlying provider resolves synchronously.
+The shared cover-specific provider SHALL preserve acquisition, decoding, key-resolution and error ownership. Its stable key SHALL distinguish source identity and requested target, reuse equivalent cover requests and remain distinct from incompatible stock-provider decodes. Synchronous key resolution, correct error eviction and fresh resolution after failure SHALL be preserved.
 
 #### Scenario: Same source and requested bucket
 
@@ -48,11 +60,25 @@ The shared cover-aware `ImageProvider` SHALL delegate actual byte acquisition an
 
 - **WHEN** the wrapped file or network decoder emits an error
 - **THEN** the error reaches the image display's failure handling without an unhandled Flutter framework exception
-- **AND** failed decoding does not leave a permanently poisoned key that blocks a future fresh resolution
+- **AND** eviction addresses the failed cover key without leaving a permanently poisoned entry that blocks a future fresh resolution
+- **AND** error handling does not retain an unused stream through an extra permanent listener
+
+#### Scenario: Cover and contain use the same source and target
+
+- **GIVEN** a non-square source whose cover and contain decoded dimensions differ for the same target
+- **WHEN** cover is resolved before contain, and the reverse order is tested independently
+- **THEN** each path receives its correct actual decoded result without reusing the incompatible result
+- **AND** repeated equivalent cover requests reuse their retained cover entry, and repeated equivalent contain requests reuse their retained stock entry
+
+#### Scenario: Existing multiframe behavior survives delegation
+
+- **WHEN** an existing supported multiframe network fixture is displayed through bounded cover and full-resolution paths
+- **THEN** provider configuration and playback behavior remain equivalent to the existing dependency behavior
+- **AND** delegation does not freeze frames or introduce new playback functionality
 
 ### Requirement: Network image sizing preserves network and disk-cache behavior
 
-`AppNetworkImage` SHALL continue to derive physical decode targets from its explicit logical bounds and `ImageSizeBucket`. It SHALL use cover-aware proportional decoding for `BoxFit.cover`, contain-compatible decoding for `BoxFit.contain`/`BoxFit.scaleDown`, and an explicitly safe policy for other supported fits. Full-resolution gallery images SHALL remain unbounded by thumbnail buckets. Decode sizing SHALL NOT add URL variants, server-side transformations, network requests or disk-cache entries merely for additional decoded sizes.
+Network decode sizing SHALL preserve original URL/cache-key and persistent disk identity, with separate in-memory identities for incompatible decodes. Cache-manager reads and HTTP requests SHALL NOT increase unnecessarily relative to the existing pipeline under equivalent conditions. Concurrent cold misses SHALL NOT imply a single HTTP request. Full-resolution gallery decoding SHALL remain unbucketed.
 
 #### Scenario: Same remote URL displayed in multiple sizes
 
@@ -60,6 +86,28 @@ The shared cover-aware `ImageProvider` SHALL delegate actual byte acquisition an
 - **THEN** the remote/disk identity remains the same original URL
 - **AND** each physical decode target has its appropriate in-memory cache identity
 - **AND** revisiting a still-cached target does not generate an unnecessary extra cache-manager read or network fetch
+
+#### Scenario: Warm disk entry serves a new decode bucket
+
+- **GIVEN** a valid warm original disk entry and a new decoded target not retained in ImageCache
+- **WHEN** that target is resolved
+- **THEN** a manager read and decode may occur while the original disk identity is reused
+- **AND** manager reads and actual HTTP sends are measured separately against equivalent baseline conditions without new persistent resize variants
+
+#### Scenario: Concurrent cold-cache resolutions
+
+- **GIVEN** no disk entry and concurrent consumers of the same URL in the same or different buckets
+- **WHEN** the images resolve
+- **THEN** equivalent cover keys share their pending image stream, while different buckets may acquire and decode separately
+- **AND** HTTP request counts are compared with the old pipeline under equivalent conditions rather than constrained to one request
+- **AND** no request-coalescing layer, URL variant or replacement cache manager is introduced
+
+#### Scenario: Expired original cache entry
+
+- **GIVEN** a deterministically expired original entry where the test harness supports expiry
+- **WHEN** a network image resolves
+- **THEN** refresh behavior preserves the existing manager policy and original identity
+- **AND** regression verification distinguishes manager activity from actual HTTP sends and records any untested expiry behavior
 
 #### Scenario: Gallery shows full-resolution image
 
@@ -71,29 +119,38 @@ The shared cover-aware `ImageProvider` SHALL delegate actual byte acquisition an
 #### Scenario: Bounded contain or unusual fit
 
 - **WHEN** `AppNetworkImage` is configured with `BoxFit.contain`, `scaleDown` or another supported fit
-- **THEN** its decoding strategy does not produce aspect-ratio distortion or avoidable undersampling for that fit
-- **AND** changes preserve existing visual geometry and network caching
+- **THEN** contain/scaleDown retain appropriate stock Flutter proportional decoding outside the cover-specific wrapper
+- **AND** other fits retain their existing Flutter behavior without expanding the custom abstraction
+- **AND** changes preserve existing visual geometry, cache policy and intrinsic resolution limits
 
-### Requirement: Network image rendering remains static-only
+### Requirement: Image rendering costs have reproducible acceptance evidence
 
-Molise Is SHALL treat images rendered by `AppNetworkImage` as static media. `CachedNetworkImageProvider` SHALL resolve multi-frame network formats with animation disabled so only the first frame is presented and subsequent animation frames are not continuously decoded or played. The static/animated setting SHALL remain part of provider/cache identity as defined by the dependency, and this change SHALL NOT introduce animated-image playback support.
+Image performance acceptance SHALL distinguish deterministic decode correctness from device-dependent memory and scrolling behavior. Comparisons SHALL account for source/target aspect-ratio mismatch and the increased pixel cost of cover. Existing cache limits and network buckets SHALL remain unchanged; no constant-memory guarantee independent of aspect ratio SHALL be claimed.
 
-#### Scenario: Multi-frame network image is encountered
+#### Scenario: Compare fit, cover and full-resolution costs
 
-- **GIVEN** a GIF, animated WebP, APNG or other supported multi-frame network image reaches `AppNetworkImage`
-- **WHEN** the provider resolves and displays it
-- **THEN** the first frame may be rendered as the static representation
-- **AND** subsequent frames are not played as an animation
-- **AND** no playback controls, animation lifecycle or separate animated-media path is introduced
+- **WHEN** typical square, portrait, landscape and extreme-ratio fixtures are verified
+- **THEN** evidence records source geometry/format, target, DPR/bucket, expected and observed decoded dimensions for old fit, proposed cover and full-resolution paths
+- **AND** estimated pixel-buffer cost uses decoded width × decoded height × bytes per pixel with its pixel-format assumption stated
+- **AND** compressed file size and buffer estimates are not presented as total decoder, GPU, cache or process memory
+- **AND** requests stay within intrinsic resolution and increased cover cost is explained without a new cap, fallback or transform
+
+#### Scenario: Representative-device performance acceptance
+
+- **WHEN** TASK-43 and TASK-16 performance completion is evaluated
+- **THEN** the same representative fixtures, list/grid density and scrolling interaction are compared on identified real devices/builds
+- **AND** memory pressure and scroll/raster observations, expected pixel-cost increases and residual risks are documented
+- **AND** unexplained extra work or observed memory-pressure/scroll failures are investigated before declaring the performance DoD complete
+- **AND** unavailable devices or unverified formats remain explicit gaps rather than claimed passes
 
 ### Requirement: Image loading callbacks report state transitions
 
-`AppNetworkImage.onImageLoading` SHALL report semantic loading-state transitions for the active source rather than raw image-frame or widget-build activity. It SHALL NOT emit duplicate consecutive values solely because `frameBuilder` or a parent rebuild repeats. Terminal success and terminal failure SHALL report `false`; changing the source SHALL establish the new source's loading state and obsolete completions SHALL NOT notify consumers.
+`AppNetworkImage.onImageLoading` SHALL describe loading for the active source in both constructors. Success and failure SHALL leave consumers non-loading; rebuild/frame activity SHALL NOT cause unnecessary duplicate notifications, and obsolete-source completions SHALL NOT publish current loading state. Existing slideshow behavior SHALL remain correct.
 
 #### Scenario: Parent rebuilds while loading state is unchanged
 
 - **WHEN** an `AppNetworkImage` rebuilds repeatedly while the same source remains loading, loaded or failed
-- **THEN** `onImageLoading` does not emit duplicate consecutive values for the unchanged state
+- **THEN** `onImageLoading` avoids unnecessary duplicate notifications for the unchanged state without imposing extra callback-state machinery unrelated to consumer needs
 
 #### Scenario: Active source succeeds or fails
 
@@ -115,14 +172,16 @@ Failed local image reads/decodes and remote image loads/decodes, including full-
 
 - **WHEN** the local thumbnail provider fails to read or decode a staged file
 - **THEN** a bounded `EmptyView` with the broken-image symbol replaces the failed image, and error semantics remain available even if visible text cannot fit
-- **AND** no raw staging path is rendered or unnecessarily reported in telemetry
+- **AND** the original failure cause and available stack remain useful in local Debug diagnostics through the existing typed logger, without a private path in the event source label
+- **AND** no raw staging path is rendered or forwarded to inappropriate remote telemetry
 - **AND** no retry button is added for retrying the corrupt image decoder
 
 #### Scenario: Remote image fails in list, card, slideshow or gallery
 
 - **WHEN** a remote image fails to load or decode
 - **THEN** the same neutral image-unavailable presentation is available in every `AppNetworkImage` constructor
-- **AND** the existing typed image-failure diagnostic is emitted under the established logging privacy policy without repeated rebuild noise
+- **AND** the existing typed image-failure diagnostic retains local cause/stack under the established logger policy without repeated rebuild noise
+- **AND** approved remote telemetry excludes full URLs, private paths and raw URL-bearing messages/stacks, without a new capture owner or remote event family
 - **AND** the error does not remain a blank/black image with no user feedback
 - **AND** terminal failure does not leave a consumer's loading callback or slideshow behavior stuck in an incorrect loading state
 
@@ -134,11 +193,11 @@ Failed local image reads/decodes and remote image loads/decodes, including full-
 
 ### Requirement: Network image API exposes only effective parameters
 
-`AppNetworkImage` SHALL document its bounded and full-resolution constructors, fit, dimensions, cache, static-image and loading semantics and SHALL NOT require unused source `imageWidth` or `imageHeight` arguments. Existing domain and persisted media metadata SHALL remain unchanged.
+`AppNetworkImage` SHALL document its bounded and full-resolution constructors, fit, dimensions, cache, animation compatibility and loading semantics and SHALL NOT require unused source `imageWidth` or `imageHeight` arguments. Existing domain and persisted media metadata SHALL remain unchanged.
 
 #### Scenario: All current consumers migrate to the effective API
 
 - **WHEN** bounded cards/lists/carousel/slideshow/admin media and full-resolution gallery construct `AppNetworkImage`
 - **THEN** they pass only functional parameters and compile without `imageWidth` or `imageHeight`
 - **AND** the unchanged intrinsic metadata remains available to unrelated domain and navigation contracts
-- **AND** the widget documentation describes the actual image-sizing, static-only animation policy, loading, cache and error behavior
+- **AND** the widget documentation describes the actual image-sizing, preserved animation behavior, loading, cache and error behavior

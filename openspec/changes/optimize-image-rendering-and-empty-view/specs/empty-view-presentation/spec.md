@@ -1,5 +1,9 @@
 # empty-view-presentation Specification
 
+## Purpose
+
+Keep reusable empty, loading and error states visible and accessible within their allocated constraints while preserving spacious presentation and usable existing actions.
+
 ## ADDED Requirements
 
 ### Requirement: EmptyView adapts to effective layout constraints without a specialized API
@@ -17,7 +21,7 @@ The existing `EmptyView`, `EmptyView.error` and `EmptyView.loading` constructors
 
 - **GIVEN** an `EmptyView` with a meaningful icon and text but no interactive action, constrained to 32×32, 48×48, 72×72 or 86×86 logical pixels
 - **WHEN** it is laid out
-- **THEN** the component fits inside its allocated bounds without `RenderFlex` overflow
+- **THEN** the component fits inside its allocated bounds without `RenderFlex` overflow and the meaningful icon has nonzero visible, unclipped geometry
 - **AND** it reduces discretionary padding, spacing and icon size as needed
 - **AND** if the visible text cannot remain readable, it may omit visible text while retaining an accessible description of the state
 - **AND** no new constructor or image-specific public switch is necessary
@@ -31,15 +35,23 @@ The existing `EmptyView`, `EmptyView.error` and `EmptyView.loading` constructors
 
 ### Requirement: EmptyView preserves reachable accessible actions
 
-A constrained `EmptyView` SHALL NOT silently discard, disable or reduce an existing action to an unusable hit target merely to prevent overflow. If content with an action cannot fit, the component SHALL use an appropriate bounded reachability strategy, such as scrolling within finite constraints, while keeping the action focusable and semantically discoverable. The layout SHALL remain valid under relevant unbounded-axis constraints used by scrollable or sliver-based parents.
+Within actual supported parent constraints, EmptyView SHALL preserve visible, reachable actions with usable hit targets, callbacks, keyboard focus and assistive-technology access. Finite content overflow SHALL use appropriate reachability without invalid nested scrolling; relevant unbounded scroll/sliver hosts SHALL remain valid. The compact noninteractive square matrix SHALL NOT imply support for arbitrary actions in those dimensions.
 
 #### Scenario: Error or empty state contains recovery action
 
-- **GIVEN** a current `EmptyView` with icon, message and a retry/return action
+- **GIVEN** a current `EmptyView` with icon, message and a retry/return action under its actual supported parent constraints
 - **WHEN** its parent supplies insufficient bounded space for the normal column
 - **THEN** the action remains accessible, focusable and usable, with an appropriate hit target
 - **AND** the widget does not hide it as a compact image-only fallback
-- **AND** any scrolling or content reduction does not cause a viewport overflow
+- **AND** any scrolling or content reduction does not cause a viewport overflow or unbounded-flex error
+- **AND** tests verify visible hit geometry and successful activation, including keyboard access and text scaling, rather than only widget presence
+
+#### Scenario: Physical viewport is smaller than an action target
+
+- **WHEN** a viewport cannot expose an entire existing 48×48 logical-pixel target at once
+- **THEN** the layout does not claim that the full target fits without scrolling or clipping, and does not hide, disable or shrink the action to an unusable size
+- **AND** acceptance uses the existing consumer's supported host geometry and verifies reachable visible hit area after scrolling where appropriate
+- **AND** the 32/48/72/86 square image-error matrix remains limited to noninteractive states
 
 #### Scenario: EmptyView is placed in a vertically unbounded scroll host
 

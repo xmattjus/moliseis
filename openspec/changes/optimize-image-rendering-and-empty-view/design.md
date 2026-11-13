@@ -2,97 +2,95 @@
 
 ## Context
 
-At the inspected baseline (`main` = `886556409ef8e7254e8c241a77d643c5e9403fd1`), local staged photographs are displayed by `ContentSubmissionFileThumbnail` through `ResizeImage(FileImage(...), width, height, policy: fit)` and then `BoxFit.cover` in an 86×86 logical slot. Both public content submission and admin new-contribution paths reuse the same thumbnail widget.
+At the inspected baseline (`main` = `886556409ef8e7254e8c241a77d643c5e9403fd1`), Admin and Public Content Submission share `ContentSubmissionFileThumbnail`: an 86×86 logical slot using `ResizeImagePolicy.fit` and `BoxFit.cover`. See proposal.md for the resulting undersampling defect.
 
-`AppNetworkImage` similarly wraps `CachedNetworkImageProvider` with `ResizeImagePolicy.fit` for a bucketed physical-size target; all six bounded network consumers use cover, whereas `.fullResolution` is intended for gallery/zoom with `BoxFit.contain`. `imageWidth/imageHeight` are declared and supplied but unused. The project uses `cached_network_image_ce` 4.13.1 and `ImageSizeBucket`; the network provider fetches/caches the original URL and resized decodes are separate Flutter image-cache entries.
+There are five bounded `AppNetworkImage` call sites: content grid card, content list item, explore suggestions, post slideshow and admin associated media. They use cover. One full-resolution gallery call site uses contain for zoom/pan. `imageWidth/imageHeight` are supplied but unused. Flutter 3.47.5 and the locked `cached_network_image_ce` 4.13.1 are the compatibility baseline; no dependency update is part of this change. The app leaves the network provider's animation setting at its existing default, which is enabled.
 
-The provided independent audit (TASK-43 + TASK-16) reports real decode reproductions of undersampling and safe existing local staging/identity behavior, but no device profiling. Treat reported timings/sharpness as baseline comparison material, not unconditionally reproducible device measurements. Repository sources, actual SDK and dependent package implementations are authoritative when implementing.
+`AppNetworkImage.fullResolution` currently bypasses the usual error/loading builders. Local thumbnails have no error builder. `EmptyView` uses a centered Column, 16 px outer padding, 16/16/16/8 icon padding and a default 40 px icon. It also serves spacious loading/error/action states and unbounded-height sliver hosts.
 
-`AppNetworkImage.fullResolution` currently returns a bare `Image` before its usual frame/error builders. Local thumbnail rendering has no error builder. `EmptyView` is a general reusable centered Column with 16 px outer padding, 16/16/16/8 icon padding and default icon size 40; that composition does not fit some image slots. It is used for normal empty, loading, errors and actions elsewhere: this change must not redesign those screens.
-
-Applicable repo rules: root `AGENTS.md`, Flutter UI engineering and async safety skills, OpenSpec conventions and logging/privacy contracts. A single shared `ImageProvider` wrapper and removal of unused image size API parameters have explicit user authorization.
+The supplied audits establish useful source/decode evidence, not device performance acceptance. Repository sources and applicable AGENTS.md, Flutter UI, async safety and logging/privacy contracts remain authoritative.
 
 ## Goals / Non-Goals
 
 **Goals**
-- Preserve intrinsic image aspect ratio while decoding enough pixels to draw cover-cropped images without avoidable upscale, within source resolution.
-- Reuse one minimal, testable sizing rule and provider wrapper across local and network images.
-- Maintain network disk cache identity/traffic, useful existing size buckets, gallery full-resolution rendering and local staging/session ownership.
-- Give local, remote and full-resolution image failures a visible, accessible `EmptyView` with `Symbols.broken_image`, without a per-corrupt-image retry.
-- Make the *existing* `EmptyView` layout constraint-adaptive: unchanged spacious appearance when it fits, small noninteractive states never overflow, important actions remain usable.
-- Document public image APIs and verify decoded images, cache semantics, loading/error paths, constrained accessibility and performance budgets.
-- Preserve Molise Is's current static-only image contract: multi-frame network media must not play as animation.
+- Correct proportional cover decoding against local physical thumbnail targets and network bucket targets, within intrinsic source resolution.
+- Share one cover-only wrapper without changing acquisition, cache ownership or staging lifecycle.
+- Preserve network bucket limits, full-resolution gallery behavior, existing animation behavior and loading fade.
+- Provide neutral accessible failure feedback and useful privacy-safe diagnostics; preserve admin path-resolution retry.
+- Adapt existing EmptyView constructors to actual constraints while preserving spacious layouts and usable actions.
+- Establish reproducible decode/memory comparisons and device acceptance without promising constant memory independent of aspect ratio.
 
 **Non-goals**
-- New server transforms, new URLs, disk caches, staging files, metadata I/O, providers at domain/data boundaries, image editing, new dependencies or Flutter upgrade.
-- Rewrite staging integrity/reconciliation, upload, cloud storage, gallery navigation, app-wide loading, or theme design.
-- Replace `EmptyView` with specialized image variants, add a `compact` flag/new constructor, or hide interactive actions to achieve compactness.
-- Blanket logging changes; leave `ImageLoadFailed` policy and privacy boundary intact.
-- Add animated-image playback support, playback controls or a new media-animation abstraction.
+- Metadata-only reads, new caches, staging copies, server transforms, URL variants, dependencies or dependency/SDK upgrades.
+- A configurable decode-policy wrapper, strategy hierarchy, extra provider subclasses for non-cover fits, request coalescing or network infrastructure.
+- Changes to staging/upload, domain metadata, persistence, gallery navigation, theme, animation policy or fade design.
+- Compact constructors/flags, a responsive framework, per-corrupt-image retry, new logging services or remote event families.
 
 ## Decisions
 
-### 1. One narrow provider wrapper and sizing rule
+### 1. One cover-specific provider
 
-Implement a pure `coverDecodeSize(intrinsicWidth, intrinsicHeight, targetPhysicalWidth, targetPhysicalHeight)` (name illustrative). It computes:
+Use one small delegating `ImageProvider` shared by local thumbnails and bounded network cover images. Flutter's stock `ResizeImage` exposes fit/exact sizing but no equivalent intrinsic-aware cover policy; delegating its decoder callback avoids a separate metadata read or reimplementation of HTTP/file codecs.
 
-`scale = max(targetWidth / intrinsicWidth, targetHeight / intrinsicHeight)`.
+The pure sizing rule uses actual decoder-reported intrinsic dimensions, including orientation as exposed by the codec:
 
-If `scale >= 1`, decode no larger than source dimensions. Otherwise use a proportion-preserving size approximating `ceil(intrinsicWidth * scale)` × `ceil(intrinsicHeight * scale)`, capped to source dimensions and avoiding avoidable target-axis undersampling from integer rounding where possible. Explicitly define rounding, zero/invalid guard behavior and codec constraints based on the checked-out Flutter SDK. Use decoder-reported intrinsic dimensions, including EXIF orientation as provided by the codec; do not trust database width/height for decode decisions.
+`scale = min(1, max(targetWidth / intrinsicWidth, targetHeight / intrinsicHeight))`.
 
-Use a small delegating `ImageProvider` wrapper (instead of reimplementing HTTP/file codecs). Delegate load, preserve compatible `obtainKey` behavior including synchronous resolution, use a distinct immutable key containing the inner key and bucketed requested physical dimensions, and forward a cover-aware `getTargetSize` to the decoder. Preserve error propagation and Flutter `ImageCache` eviction semantics; check relevant `loadImage`/codec signatures in Flutter 3.47.5 and `cached_network_image_ce` 4.13.1 before implementation. Avoid extra file reads, retained image descriptors, async state in thumbnails or a new cache layer. Do not assume a custom provider implementation is automatically robust: test cache equality, synchronous hits, errors/eviction, and actual decode outputs.
+Request approximately `ceil(intrinsicWidth * scale)` × `ceil(intrinsicHeight * scale)`, capped to intrinsic dimensions. Define positive-size guards and codec rounding tolerance against the actual SDK; avoid systematic target-axis undersampling where source resolution permits. Do not derive decode decisions from database dimensions or request manufactured source detail.
 
-Resolve `cached_network_image_ce` from the current 4.13.1 lock to 4.13.2 within the existing dependency constraint before implementation. The patch fixes `DefaultCacheManager` initialization after an OS-cleared cache directory; inspect the resolved provider/cache implementation and keep this as a focused patch update rather than a broader dependency refresh.
+Delegate `loadImage` to `FileImage` or `CachedNetworkImageProvider`, forwarding a cover-aware `getTargetSize`. Preserve synchronous `obtainKey` resolution and normal error propagation. Use a distinct immutable cover-key type containing the resolved inner source key and requested target dimensions. Equivalent cover requests reuse that key; stock `ResizeImage` keys must never collide with it. Error eviction must address the outer cover key as well as preserve underlying provider behavior. Use ephemeral error handling rather than a retained listener that keeps an unused stream alive. Avoid descriptors retained beyond codec ownership or new asynchronous thumbnail state.
 
-Use the same pure rule for unit testing and both pipelines; keep provider-specific resource ownership in existing components. Do not alter the raw staged file, ownership digest or copy/cleanup contracts.
+Keep the wrapper exclusively cover-specific: no policy property or non-cover strategy. For contain/scaleDown retain stock `ResizeImage(policy: ResizeImagePolicy.fit)` where compatible. Other fits keep their existing Flutter path and geometry, without expanding the wrapper or claiming that this change fixes every pre-existing fit limitation. Verify cover→contain, contain→cover and repeated equivalent requests using actual decoded results, not just runtime types.
 
-### 2. Bounded local thumbnails and network images
+### 2. Targets, identity and compatibility
 
-For `ContentSubmissionFileThumbnail`, request the 86×86 logical slot multiplied by DPR (rounded appropriately); paint with `BoxFit.cover` as before. Shared usage across admin and public is unchanged; no staging or upload modifications.
+Local thumbnails use `ceil(86 * DPR)` on both axes and continue painting with cover. Bounded network images keep `ImageSizeBucket.resolveAndClamp` on logical bounds and DPR. Their no-avoidable-underdecode guarantee is relative to the resulting bucket, capped at 1728 px per requested axis, not the unrestricted screen target. For example, 1000×1000 logical at DPR 2 requests a 1728×1728 bucket, so render-time upscale to 2000×2000 is accepted. This intentional cap differs from the fit/cover mismatch being fixed. A proportional decode may exceed 1728 on its uncropped axis; the cap bounds the requested rectangle, not every output dimension.
 
-For `AppNetworkImage` bounded constructor, keep `ImageSizeBucket.resolveAndClamp`. Use the cover provider on cover-painted slots with bucketed target width/height. For `BoxFit.contain` or `scaleDown`, retain proportional contain-style decoding; for other supported fits, explicitly test or document a conservative no-underdecode policy rather than forcing an incorrect one. Preserve stable image-cache keys within the same bucket.
+Keep five separate invariants:
 
-For `.fullResolution`, do not constrain decoding; keep zoom/pan suitability and source aspect ratio. Unify image loading/error presentation where needed without introducing a surprising full-screen layout change.
+| Boundary | Preserved contract |
+| --- | --- |
+| URL/cache key | Original URL and existing underlying cache-key configuration; no size-derived variants |
+| Persistent disk cache | Same original entry; do not pass decode targets as disk-resize parameters or add persistent variants |
+| Flutter ImageCache | Distinct entries for incompatible source/target/provider keys; equivalent retained requests reuse their decoded stream |
+| Cache-manager activity | No unnecessary extra reads relative to the old pipeline under equivalent conditions; a retained decoded hit bypasses acquisition |
+| Actual HTTP requests | No unnecessary increase relative to the old pipeline with equivalent cache state and access pattern; no single-request promise for concurrent cold misses |
 
-Remove `imageWidth/imageHeight` from both public constructors and all actual Flutter call sites/tests. Keep media/asset width and height in domain and persistence for their real uses; avoid unrelated model or schema changes.
+Different buckets can require separate decodes and manager reads while sharing disk identity. The real manager can issue multiple HTTP requests for concurrent cold reads of one URL and may refresh expired entries. Regression checks must measure manager reads and HTTP sends separately: same/different buckets, warm cache, concurrent cold cache and deterministic expiry where practical. Retain existing manager, cache limits and configuration; add no coalescing layer.
 
-Molise Is currently treats application images as static media. Configure `CachedNetworkImageProvider` with animation disabled so a multi-frame network image renders its first frame without continuing animation decode/playback. Preserve that setting as part of provider/cache identity and do not introduce animated-media support through this change. Local staged-photo handling remains static and gains no animated-media capability.
+Full-resolution images keep their intrinsic decode and gallery contain/zoom/pan behavior. Preserve network provider animation configuration and multiframe completer behavior in both paths; a compatibility fixture checks that delegation does not freeze or break existing playback. Preserve the bounded loading fade, including synchronous-hit behavior, by default. Device checks look for regressions, not a fade optimization workstream or new configuration API.
 
-### 3. Image failure presentation and logging
+Remove unused `imageWidth/imageHeight` from both AppNetworkImage constructors and all six call sites/tests. Retain domain, persistence and navigation dimensions. Document effective fit, bounds, DPR/buckets, cache, loading/error and animation compatibility contracts.
 
-On image decoding/read or network load failure (including `.fullResolution`), show `EmptyView` with `Symbols.broken_image` and concise, neutral description such as "Immagine non disponibile". A network timeout or missing file must not be reported to users as positively corrupt. Keep existing bounded image dimensions and clipping; the full-screen case must use available constraints and stay visible over the gallery background. No automatic per-image retry or retry action for a corrupt staged image. Preserve the existing admin staged-path *resolution* retry: it addresses a different boundary, and is not a retry of the image decoder.
+### 3. Failure feedback, diagnostics and loading callbacks
 
-Ensure `onImageLoading` is implemented for both `AppNetworkImage` constructors and represents semantic loading-state transitions rather than `frameBuilder`/rebuild notifications. Do not emit duplicate consecutive values solely because an image frame or parent build repeats; terminal success and terminal failure transition to `false`, and source replacement establishes the new source's state without allowing stale completions to notify consumers. Preserve existing typed logging (`ImageLoadFailed`) for network failures, with original error/stack retained for local debug handling and without new sensitive URL/path reporting to Sentry. Avoid emitting repeated logs for rebuilds of the same failed image if this can be addressed locally without additional architecture; do not add a new global logger or remote event family. Handle local errors without unhandled framework exceptions or leaking private staging paths.
+Use the existing EmptyView with `Symbols.broken_image` and neutral feedback such as "Immagine non disponibile" for local missing/empty/corrupt/unreadable files and remote timeout/HTTP/decode failures, including full-resolution gallery. Keep clipping and slot geometry; ensure gallery feedback remains visible against its background. Add no per-image corrupt-media retry. The existing admin staged-path resolution retry remains unchanged and separate.
 
-Audit the current `AnimatedOpacity` loading fade, including its `Durations.extralong4` duration, on representative dense list/grid consumers. Synchronous/cache hits remain transition-free. For asynchronous loads, choose the simplest transition behavior that preserves acceptable feedback without introducing visible raster/scroll regressions; shortening or removing the fade for dense bounded images is allowed, while adding a new public animation-configuration API is out of scope unless implementation evidence demonstrates a concrete need.
+Separate presentation, local Debug diagnostics and approved remote telemetry. For network errors retain `ImageLoadFailed`, original error/stack and AppLogger's existing bounded projection. For resolved local-file decode/read failures, reuse that typed logging boundary with a fixed non-sensitive source label rather than a private path in the event's URL field; retain the original cause/stack for Debug inspection. Do not pre-render exception messages. The existing event has no application exception capture and its remote projection excludes raw URL/message/stack; keep that policy, consent and terminal-owner rules unchanged. This preserves useful local evidence when errorBuilder consumes the framework error without adding a logger or remote event family. Suppress repeated diagnostics caused only by rebuilds of the same failure locally, without global deduplication or concealing a genuinely new failure.
 
-### 4. Adaptive EmptyView, unchanged API
+Both constructors' `onImageLoading` must let consumers leave loading on success or failure, avoid unnecessary repeated notifications from frame/build activity, and reject obsolete-source completions. Use the smallest local lifecycle bookkeeping needed by actual consumers; do not impose an extra state machine or a universal callback sequence. Test synchronous hits, pending success/error, rebuilds, replacement, disposal and slideshow autoplay admission. Preserve existing consumer behavior rather than relying on repeated frame notifications to repair it.
 
-Keep all existing `EmptyView`, `EmptyView.error` and `EmptyView.loading` signatures and default icon/typography. Do not add a constructor, boolean compact flag, external size variant or image-only widget. Base adaptation on effective constraints (`LayoutBuilder` or equally simple constraint-aware composition), not the device/window class.
+### 4. Adaptive EmptyView with unchanged API
 
-When existing outer/icon padding, a 40-pixel icon, text and action fit, preserve the established spacious layout and visual hierarchy. For *bounded compact space*, shrink discretionary padding/spacing and icon size first. For noninteractive image errors with very little space, render the meaningful icon alone, centered, with accessible error semantics even if the visible text is omitted. Do not render an illegibly scaled text or a tiny interactive control. Ensure textScaleFactor / MediaQuery.textScaler is respected when text is shown, and no `RenderFlex` overflow is produced for supported compact slot sizes (including 32, 48, 72 and 86 logical pixels).
+Keep EmptyView, EmptyView.error and EmptyView.loading signatures, default typography/icon and spacious composition. Base adaptation on allocated constraints, using LayoutBuilder or equally simple composition. A constraint reader alone does not prove arbitrary child content fits.
 
-Actions cannot be discarded simply to fit. Preserve focus, semantics and usable interactive targets: for constrained hosts containing actions, permit a bounded scrollable fallback or a similar simple solution that keeps actions reachable. Determine the finite-axis/unbounded-axis cases from actual call sites before choosing exact widget composition; avoid a `LayoutBuilder` branch that assumes finite height inside a `SliverToBoxAdapter` or scroll view. Scope adaptations to avoid unnecessary layout churn across full-sized existing screens. Do not hardcode image-specific thresholds in the general widget.
+For compact noninteractive image errors, reduce decorative padding/spacing and icon size first. At 32×32, 48×48, 72×72 and 86×86 logical pixels, require a visibly nonzero, unclipped meaningful icon and no overflow. Omit visible text only when necessary, retaining its meaning in accessible semantics without duplicate decorative announcements. Respect ambient text scaling when text is shown; no indiscriminate FittedBox or suppression of scaling.
 
-### 5. Test and verification strategy
+The small square matrix does not apply to arbitrary actions. Test existing action-bearing consumers under their actual supported parent constraints, including short/narrow layouts, text scaling, keyboard/SafeArea and assistive technology. Preserve callbacks, focus and visible usable hit geometry. Where content exceeds finite space, a bounded scroll fallback may keep actions reachable; do not introduce nested unbounded viewports or unbounded flex under existing scroll/sliver hosts. A viewport smaller than a 48×48 target cannot expose that entire target simultaneously: do not claim otherwise, shrink it to fit, or accept a test based only on widget presence. Verify reachable/tappable geometry after scrolling where appropriate. Preserve existing loading and full-screen states wherever their normal content fits.
 
-Use real decodes (not only constructor/provider type assertions) to verify physical decode dimensions and cover crop for source ratios 1:1, 4:3, 3:4, 4:1, 1:4 and an extreme panoramic case; test source-smaller-than-target, EXIF orientation when feasible, DPR 1, 2, 2.625 and 3, and non-square rendered slots. Do not enforce an impossible no-upscale assertion when intrinsic source is smaller than the requested physical region. Verify that integer rounding cannot systematically undersample a target axis.
+### 5. Verification and memory acceptance
 
-Check `ImageCache` key identity and error eviction, same-URL same-bucket reuse, different buckets producing separate in-memory entries, and unchanged `CacheManager` disk key/request behavior. Memory estimates must compare decoded-pixel counts (current vs corrected vs full-resolution) with explicit source and DPR, rather than asserting that total process RSS drops; sharper cover decodes intentionally use more decoded pixels. Review scrolling fluidity on a real device if available and do not invent measurements.
+Use real local/network-provider decodes for ratios 1:1, 4:3, 3:4, 4:1, 1:4 and an extreme panorama, small sources, non-square targets and DPR 1/2/2.625/3. Include EXIF orientation where feasible. Compare old fit, proposed cover and full-resolution dimensions using the same fixture and target. Deterministic acceptance requires proportional output within documented codec rounding, no requested dimensions above source, local coverage where source permits, and network coverage relative to the authorized bucket including its above-cap exception.
 
-Exercise local missing/corrupt/empty file paths and remote load failures, including gallery. Assert visible error with `Symbols.broken_image`, no raw exception surfaced, no unwarranted retry, edge-triggered loading callback sequences without consecutive duplicates, terminal `false` on success/failure, no stale-source callback, no duplicate failure logging on repeated build, and no private path/full URL in privacy-sensitive telemetry. Add a multi-frame network fixture proving the static-only contract: the first frame may render, but later animation frames are not decoded/played. Preserve admin owner/activation and path-resolution behavior.
+Record a reproducible table with fixture dimensions/format/orientation, slot, DPR, bucket, expected and observed decode dimensions, pixel counts and estimated buffer cost `decodedWidth * decodedHeight * bytesPerPixel`. State the pixel-format assumption (for example 4 bytes for RGBA8888); this is a buffer estimate, not total decoder/native/GPU/cache/process memory. Cover can cost substantially more than fit because it retains pixels later cropped. Memory proportionality depends on destination geometry and source/target aspect-ratio mismatch, not compressed file bytes or slot area alone. Preserve existing cache limits and network buckets; add no new cap, fallback or transform.
 
-Cover `EmptyView` at 32×32, 48×48, 72×72, 86×86, representative large views and bounded narrow/short layouts, with/without icon/text/action, with text scaling, keyboard/SafeArea where relevant, and with unbounded scroll/sliver constraints. Assert no overflow, correct semantics for icon-only presentation, preservation of action focus/reachability, and unchanged appearance when space allows.
+Device-dependent acceptance compares the same fixtures, list/grid density and scrolling interaction on representative supported hardware, recording device/build, memory pressure, scrolling/raster observations and residual risks. The expected sharper decode cost is not itself a regression failure; unexplained extra decoding/reads or observed memory-pressure/scroll failures require investigation before declaring the performance DoD complete. Unavailable devices, formats or observations remain explicit verification gaps, never invented passes. No universal memory budget or constant-memory claim is made.
 
-Run focused tests, analyzer, then full relevant automated suite and GitHub CI. Complete a targeted manual device pass on real camera photos, HEIC/HEIF where supported, gallery/error states and long image lists/grids, noting unresolved platforms. Include the current-vs-chosen `AnimatedOpacity` behavior in the dense list/grid device pass and record observed scroll/raster behavior without inventing performance gains. No incidental snapshots, scratchpad logs or experimental binaries in Git commits.
+Tasks assign decode/cache, local lifecycle, remote/gallery and EmptyView regressions to their respective groups. Integration acceptance additionally runs analyzer, relevant suite and CI, verifies both Notion DoDs and records the device comparison. Do not commit scratch logs, experimental harnesses or generated evidence clutter.
 
 ## Risks / Tradeoffs
 
-- **Cache/memory:** cover correctness increases decoded pixels, sometimes substantially for extreme aspect ratios; keep bounded by source resolution and image-cache policy, verify actual memory/scroll behavior. Do not silently reduce sharpness to regain memory.
-- **Provider compatibility:** Flutter provider key/error/loading semantics are subtle; no broad provider hierarchy, and deterministic provider tests are required.
-- **EmptyView scope:** its reused layout includes full-screen actionable error and loading states; compact adaptations must not regress those and must not hide required actions.
-- **Error telemetry:** handling image exceptions prevents default framework error bubbling; retain useful typed logs within the approved reporting boundary without exposing sensitive paths or entire URLs.
-
-## Open Questions
-
-No outstanding authorization is required for the shared provider or the responsive existing widget: both were explicitly chosen. Implementation must verify Flutter 3.47.5 codec/delegation API details and establish a simple bounded action fallback for `EmptyView` from real constraints. Manual device performance/HEIC verification remains a merge-readiness check; no unproven device measurements are treated as baseline facts.
+- **Extreme aspect ratios** → quantify the intentional pixel increase and device impact; source and existing cache limits do not promise a universal slot-sized memory bound.
+- **Provider lifecycle** → verify synchronous keys, policy separation, error eviction, listener release and late source changes against the locked dependency.
+- **Shared EmptyView** → test actual visible/interactive geometry, semantics and unbounded hosts as well as spacious-layout equivalence.
+- **Handled errors** → preserve original local diagnostics and the existing sanitized remote boundary without duplicate capture.
