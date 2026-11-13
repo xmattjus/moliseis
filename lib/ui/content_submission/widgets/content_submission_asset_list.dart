@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/content_submission/view_models/content_submission_view_model.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_add_asset_button.dart';
 import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_list_item.dart';
+import 'package:moliseis/ui/content_submission/widgets/content_submission_file_thumbnail.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
@@ -236,13 +237,8 @@ class _ContentSubmissionAssetListState
                       }
                       renderedOwner.requestRemoveAssetAt(renderedIndex);
                     },
-                    image: Image.file(
-                      File(asset.file.path),
-                      width: contentSubmissionAssetSize.width,
-                      height: contentSubmissionAssetSize.height,
-                      cacheWidth: contentSubmissionAssetSize.width.toInt(),
-                      cacheHeight: contentSubmissionAssetSize.height.toInt(),
-                      fit: BoxFit.cover,
+                    image: ContentSubmissionFileThumbnail(
+                      file: File(asset.file.path),
                     ),
                   );
                 },

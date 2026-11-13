@@ -34,8 +34,12 @@ class AdminSubmissionLocationEditor extends StatefulWidget {
     required this.onLongitudeTextChanged,
     required this.onMapCoordinatesSelected,
     required this.formKey,
+    this.revealCoordinatesRevision = 0,
     super.key,
   });
+
+  /// Changes only when validation explicitly requests the coordinate inputs.
+  final int revealCoordinatesRevision;
 
   /// Raw latitude draft from the view model.
   final String latitudeText;
@@ -90,6 +94,10 @@ class _AdminSubmissionLocationEditorState
   @override
   void didUpdateWidget(AdminSubmissionLocationEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.revealCoordinatesRevision !=
+        oldWidget.revealCoordinatesRevision) {
+      _mode = _LocationMode.coordinate;
+    }
     // Echo-guard sync: overwrite a controller only when the incoming prop was
     // not already mirrored in its text AND was not emitted by this widget's
     // manual callbacks. Note _lastEmitted* records only manual emissions and

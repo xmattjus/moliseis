@@ -44,6 +44,7 @@ import 'package:provider/single_child_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../support/admin_draft_repositories.dart';
+import '../support/admin_editor_interactions.dart';
 import '../support/command_test_support.dart';
 import '../support/crash_reporting_support.dart';
 import '../support/fake_cache_manager.dart';
@@ -746,6 +747,62 @@ void main() {
     );
 
     testOwnerUI(
+      'loading detail exposes Back, but the existing exit guard waits for load',
+      (tester) async {
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
+        final pendingDetail = Completer<Result<AdminSubmission>>();
+        harness.repository.onGetById = (_) => pendingDetail.future;
+        harness.router.go('/admin/submissions/1');
+        await tester.pumpWidget(harness.app());
+        await pumpCommandTurns(tester);
+
+        expect(harness.repository.getByIdIds, [1]);
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        expect(find.text('Caricamento in corso...'), findsOneWidget);
+        final back = find.byTooltip('Indietro');
+        expect(back.hitTestable(), findsOneWidget);
+        await tester.tap(back);
+        // The existing exit policy refuses navigation while the detail load
+        // holds its reservation. An active loading animation cannot settle.
+        await pumpCommandTurns(tester);
+        expect(
+          harness.router.routerDelegate.state.uri.path,
+          '/admin/submissions/1',
+        );
+        expect(find.text('Caricamento in corso...'), findsOneWidget);
+        expect(harness.repository.getByIdIds, [1]);
+
+        pendingDetail.complete(
+          Result.success(
+            sampleAdminSubmission(
+              modifiedAtToken: '2026-08-20T00:00:00.000000Z',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
+        final readyBack = find.byTooltip('Indietro');
+        expect(readyBack.hitTestable(), findsOneWidget);
+        await tester.tap(readyBack);
+        await tester.pumpAndSettle();
+        expect(harness.router.routerDelegate.state.uri.path, RoutePaths.admin);
+        expect(find.byType(AdminSubmissionEditorScreen), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () {
+        harness.editor.dispose();
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
+
+    testOwnerUI(
       'W4 owner blocks target replacement during hydration and permits retry',
       (tester) async {
         harness = _AdminRouteHarness(
@@ -1266,7 +1323,7 @@ void main() {
               FilledButton,
               dialog == 'Publish' ? 'Pubblica come luogo' : 'Rifiuta',
             );
-            await tester.ensureVisible(action);
+            await revealAdminEditorWidget(tester, action);
             await tester.pumpAndSettle();
             await tester.tap(action);
             await tester.pumpAndSettle();
@@ -1366,7 +1423,7 @@ void main() {
                 FilledButton,
                 dialog == 'Publish' ? 'Pubblica come luogo' : 'Rifiuta',
               );
-              await tester.ensureVisible(action);
+              await revealAdminEditorWidget(tester, action);
               await tester.pumpAndSettle();
               await tester.tap(action);
               await tester.pumpAndSettle();
@@ -1471,7 +1528,7 @@ void main() {
               expect(find.byType(SnackBar), findsNothing);
               // Session cleanup permits a new explicit interaction without
               // reviving the prior Save receipt or stale moderation intent.
-              await tester.ensureVisible(action);
+              await revealAdminEditorWidget(tester, action);
               await tester.pumpAndSettle();
               await tester.tap(action);
               await tester.pumpAndSettle();
