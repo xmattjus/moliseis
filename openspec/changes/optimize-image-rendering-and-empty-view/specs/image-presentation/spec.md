@@ -74,6 +74,39 @@ The shared cover-aware `ImageProvider` SHALL delegate actual byte acquisition an
 - **THEN** its decoding strategy does not produce aspect-ratio distortion or avoidable undersampling for that fit
 - **AND** changes preserve existing visual geometry and network caching
 
+### Requirement: Network image rendering remains static-only
+
+Molise Is SHALL treat images rendered by `AppNetworkImage` as static media. `CachedNetworkImageProvider` SHALL resolve multi-frame network formats with animation disabled so only the first frame is presented and subsequent animation frames are not continuously decoded or played. The static/animated setting SHALL remain part of provider/cache identity as defined by the dependency, and this change SHALL NOT introduce animated-image playback support.
+
+#### Scenario: Multi-frame network image is encountered
+
+- **GIVEN** a GIF, animated WebP, APNG or other supported multi-frame network image reaches `AppNetworkImage`
+- **WHEN** the provider resolves and displays it
+- **THEN** the first frame may be rendered as the static representation
+- **AND** subsequent frames are not played as an animation
+- **AND** no playback controls, animation lifecycle or separate animated-media path is introduced
+
+### Requirement: Image loading callbacks report state transitions
+
+`AppNetworkImage.onImageLoading` SHALL report semantic loading-state transitions for the active source rather than raw image-frame or widget-build activity. It SHALL NOT emit duplicate consecutive values solely because `frameBuilder` or a parent rebuild repeats. Terminal success and terminal failure SHALL report `false`; changing the source SHALL establish the new source's loading state and obsolete completions SHALL NOT notify consumers.
+
+#### Scenario: Parent rebuilds while loading state is unchanged
+
+- **WHEN** an `AppNetworkImage` rebuilds repeatedly while the same source remains loading, loaded or failed
+- **THEN** `onImageLoading` does not emit duplicate consecutive values for the unchanged state
+
+#### Scenario: Active source succeeds or fails
+
+- **WHEN** the current image reaches terminal success or terminal failure
+- **THEN** `onImageLoading` reports `false` for that source
+- **AND** slideshow or other consumers are not left stuck in loading state
+
+#### Scenario: Source changes while an earlier source is unresolved
+
+- **WHEN** source A is replaced by source B before A completes
+- **THEN** loading notifications reflect source B
+- **AND** a late completion from A does not mutate or notify B's loading state
+
 ### Requirement: Local and remote image failures provide accessible empty states
 
 Failed local image reads/decodes and remote image loads/decodes, including full-resolution gallery images, SHALL display a meaningful `EmptyView` containing a Material Symbols `broken_image` icon and an accessible neutral image-unavailable description. A corrupt file SHALL NOT present a per-image retry control; the existing admin staged-path resolution retry SHALL remain a separate, unchanged recovery action. The failure view SHALL obey the image slot's bounds without overflow.
@@ -101,11 +134,11 @@ Failed local image reads/decodes and remote image loads/decodes, including full-
 
 ### Requirement: Network image API exposes only effective parameters
 
-`AppNetworkImage` SHALL document its bounded and full-resolution constructors, fit, dimensions, cache and loading semantics and SHALL NOT require unused source `imageWidth` or `imageHeight` arguments. Existing domain and persisted media metadata SHALL remain unchanged.
+`AppNetworkImage` SHALL document its bounded and full-resolution constructors, fit, dimensions, cache, static-image and loading semantics and SHALL NOT require unused source `imageWidth` or `imageHeight` arguments. Existing domain and persisted media metadata SHALL remain unchanged.
 
 #### Scenario: All current consumers migrate to the effective API
 
 - **WHEN** bounded cards/lists/carousel/slideshow/admin media and full-resolution gallery construct `AppNetworkImage`
 - **THEN** they pass only functional parameters and compile without `imageWidth` or `imageHeight`
 - **AND** the unchanged intrinsic metadata remains available to unrelated domain and navigation contracts
-- **AND** the widget documentation describes the actual image-sizing, loading, cache and error behavior
+- **AND** the widget documentation describes the actual image-sizing, static-only animation policy, loading, cache and error behavior
