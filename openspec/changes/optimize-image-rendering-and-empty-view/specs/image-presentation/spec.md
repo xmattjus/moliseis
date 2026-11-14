@@ -203,6 +203,8 @@ Image performance acceptance SHALL distinguish deterministic decode correctness 
 - **AND** equivalent physical iOS Profile-mode validation, including memory pressure and scrolling/raster behavior, is required when suitable hardware becomes available; until then those iOS results remain NOT VERIFIED
 - **AND** memory pressure and scroll/raster observations, expected pixel-cost increases and residual risks are documented
 - **AND** unexplained extra work or observed memory-pressure/scroll failures are investigated before declaring the performance DoD complete
+- **AND** expected decoded-pixel cost and cache eviction/additional decode work are distinguished from measured user-visible scrolling, frame-time or memory-pressure regressions; pixel growth or eviction alone is not an automatic failure
+- **AND** a material, reproducible regression on representative physical Android hardware requires verified correction or explicit recorded acceptance of a demonstrated, bounded quality/performance tradeoff by the responsible release/product decision owner, with evidence, user impact and release implications; otherwise the performance DoD remains incomplete
 - **AND** unavailable devices/backends or unverified formats remain explicit NOT VERIFIED gaps rather than claimed passes
 - **AND** focused implementation verification does not require duplicating the entire earlier benchmark campaign
 

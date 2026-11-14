@@ -30,7 +30,7 @@ The original unbounded cover rule is also insufficient. Real Android decoding in
 
 ### Modified Capabilities
 
-None in canonical specs. The stale decode wording in the still-active `redesign-admin-submission-editor` delta is corrected at its source to reference `image-presentation`; its staged-resolution lifecycle remains unchanged. That scenario is not yet canonical, so this change adds no duplicate MODIFIED requirement. Neither synchronization order introduces a second sizing policy. Staging, upload, moderation, routing and data-domain contracts remain unchanged.
+None in canonical specs. The related active `redesign-admin-submission-editor` delta owns thumbnail target derivation and staged-file lifecycle, while the shared renderer owns decoding policy. Its scenario supports both current fit decoding and the future bounded-cover renderer independently of synchronization order; it does not require this change’s unimplemented `image-presentation` contract. No duplicate MODIFIED admin-editor requirement is added. Staging, upload, moderation, routing and data-domain contracts remain unchanged.
 
 ## Impact
 
