@@ -8,7 +8,7 @@ Provide proportional local and remote image presentation with stable cache behav
 
 ### Requirement: Bounded cover decoding preserves proportions with an explicit output ceiling
 
-Bounded cover images SHALL use one scale limited by intrinsic resolution, cover geometry and a 1728-pixel output ceiling. Requests SHALL be positive and never exceed intrinsic resolution or the ceiling. Actual output SHALL preserve proportions within documented integer/codec tolerance on the declared backend envelope. Full coverage SHALL be required only when source and ceiling permit it. Physical local targets and network requested-bucket semantics SHALL remain unchanged.
+Bounded cover SHALL use one proportional scale limited by intrinsic size, cover geometry and a 1728-pixel request ceiling. Requests SHALL be positive and respect those limits. Actual output SHALL preserve proportions within integer/codec tolerance on the declared backend envelope; sizing guarantees apply where codecs honor resizing. Full coverage SHALL be required only where source and ceiling permit it. Physical local targets and network bucket semantics SHALL remain unchanged.
 
 #### Scenario: Positive bounded sizing
 
@@ -50,7 +50,7 @@ Bounded cover images SHALL use one scale limited by intrinsic resolution, cover 
 
 #### Scenario: Exceptional panorama output remains bounded and proportional
 
-- **GIVEN** a 12000×1000 source or its transpose and an 864×864 physical requested target
+- **GIVEN** a single-frame 12000×1000 source or its transpose and an 864×864 physical requested target
 - **WHEN** the bounded cover provider decodes it
 - **THEN** the requested and observed output is 1728×144 or 144×1728 within documented one-pixel sizing/codec tolerance
 - **AND** the short axis requires accepted 6× enlargement to fill the slot, without an independently clamped distorted aspect ratio
@@ -66,7 +66,7 @@ Bounded cover images SHALL use one scale limited by intrinsic resolution, cover 
 
 #### Scenario: Backend output-limit compatibility
 
-- **GIVEN** an identified backend supporting texture dimensions of at least 1728
+- **GIVEN** a codec honoring target resizing and an identified backend supporting texture dimensions of at least 1728
 - **WHEN** bounded cover fixtures cross the formerly oversized-output cases in both orientations
 - **THEN** actual decoded output remains proportional within the documented integer/codec tolerance and does not exceed the output ceiling
 - **AND** an observed 8192 limit is not treated as a portable guarantee or selected cap
@@ -106,6 +106,14 @@ The shared provider SHALL preserve acquisition, synchronous key resolution, key/
 - **AND** pending/live counts return to zero after release, separately from retained bytes/entries
 - **AND** larger or mixed working sets may legitimately evict entries; retention is not claimed to bound all live/native/GPU/process memory
 
+#### Scenario: Released ordinary photographs increase decoded-cache pressure
+
+- **GIVEN** thirty distinct 4000×3000 image identities at an 864×864 target, identical access/revisit order and the same clean default cache configuration for old fit and bounded cover
+- **WHEN** each cohort resolves, releases all consumer listeners and revisits those identities
+- **THEN** evidence compares decoded dimensions, estimated decoded bytes, retained/live/pending entries and revisit decode counts
+- **AND** acquisition measurements distinguish cache-manager reads from HTTP sends
+- **AND** increased decoded-cache eviction is evaluated against improved quality and observed physical-device behavior, without requiring thirty retained images or unconditional fit/cover cache-hit parity
+
 #### Scenario: Underlying decode fails
 
 - **WHEN** the wrapped file or network decoder emits an error
@@ -124,7 +132,9 @@ The shared provider SHALL preserve acquisition, synchronous key resolution, key/
 
 - **WHEN** an existing supported multiframe network fixture is displayed through bounded cover and full-resolution paths
 - **THEN** provider configuration and playback behavior remain equivalent to the existing dependency behavior
-- **AND** delegation does not freeze frames or introduce new playback functionality
+- **AND** evidence records bounded-cover requested dimensions separately from observed frame dimensions where supported
+- **AND** existing multiframe codecs may bypass target resizing and exceed 1728 in observed output; this is a codec/backend limitation, not a different application sizing policy or a process-memory guarantee
+- **AND** delegation does not freeze frames or introduce new playback functionality, manual animated-frame resizing or fallback transformations
 
 ### Requirement: Network image sizing preserves network and disk-cache behavior
 
@@ -224,30 +234,31 @@ AppNetworkImage.onImageLoading SHALL report current-effective-request loading in
 
 #### Scenario: Parent rebuilds while loading state is unchanged
 
-- **WHEN** an `AppNetworkImage` rebuilds repeatedly while the same source remains loading, loaded or failed
+- **WHEN** an `AppNetworkImage` rebuilds repeatedly while the same effective request remains loading, loaded or failed
 - **THEN** `onImageLoading` avoids unnecessary duplicate notifications for the unchanged state without imposing extra callback-state machinery unrelated to consumer needs
 
 #### Scenario: Active source succeeds or fails
 
-- **WHEN** the current image reaches terminal success or terminal failure
-- **THEN** `onImageLoading` reports `false` for that source
+- **WHEN** the current effective image request reaches terminal success or terminal failure
+- **THEN** `onImageLoading` reports `false` for that request
 - **AND** slideshow or other consumers are not left stuck in loading state
 
 #### Scenario: Effective request changes while an earlier request is unresolved
 
 - **WHEN** request A is replaced by B before A completes, including source/provider, same-URL target/fit or full-resolution path changes
-- **THEN** loading notifications reflect source B
+- **THEN** loading notifications reflect request B, whose pending state cannot inherit A’s terminal readiness even when the media identity is unchanged
 - **AND** a late completion from A does not mutate or notify B's loading state
 
 ### Requirement: Slideshow page ownership controls loading and autoplay
 
-PostMediaSlideshow SHALL retain readiness for valid built/prefetched page owners and allow only the current PageView active owner to control loading, pause controls and autoplay. Its public image callback SHALL remain bool-valued. Obsolete-owner publications SHALL be rejected at callback entry and after deferral; mounted alone SHALL NOT establish ownership. Source-local loading and slideshow-page ownership SHALL remain separate responsibilities.
+PostMediaSlideshow SHALL retain readiness only for valid page owners and their effective child requests; only the active owner/request SHALL control loading, pause controls and autoplay. Slot identity SHALL NOT imply request continuity. The callback SHALL remain bool-valued. Obsolete publications SHALL be rejected at entry and after deferral; mounted alone SHALL NOT establish ownership. Source loading and page ownership SHALL remain separate.
 
 #### Scenario: Offscreen image settles before the active pending page
 
+- **GIVEN** B is actually built during a transition, without assuming PageView prefetch
 - **WHEN** offscreen B succeeds or fails while visible active A remains pending
 - **THEN** B updates only its own readiness and cannot enable or disable A's controls or ticker
-- **AND** selecting already-settled B admits it without requiring another image transition callback
+- **AND** selecting already-settled B admits it without requiring another image transition callback only while B’s current child/request readiness remains valid
 - **AND** a late A event after selecting pending B cannot admit B
 
 #### Scenario: Delayed events and unchanged rebuilds
@@ -261,9 +272,18 @@ PostMediaSlideshow SHALL retain readiness for valid built/prefetched page owners
 
 - **WHEN** an index changes media identity, the list reorders/shrinks/becomes empty, or an ordered identity changes through in-place list mutation
 - **THEN** replaced/removed owner handles and their callbacks lose publication authority, including A→C→A list replacement
-- **AND** unchanged slots preserve readiness without callback replay, such as ready A in [A,B]→[A,C]
+- **AND** unchanged slots preserve readiness without callback replay when their effective child requests remain valid, such as ready A in [A,B]→[A,C]
 - **AND** child identity is bound to its valid owner and controller/active indices remain valid
 - **AND** readiness is scoped/pruned to current slots, not a new media cache or application state layer
+
+#### Scenario: Remounted page starts a fresh request after failure or eviction
+
+- **GIVEN** image B has failed or its decoded entry has been evicted after settling
+- **WHEN** navigation away unmounts B’s page child and returning to the same media slot initiates a fresh pending image request
+- **THEN** B’s obsolete terminal readiness cannot enable pause controls or activate autoplay while that request is pending
+- **AND** success or handled failure of the current request settles readiness and permits normal admission under the existing gates
+- **AND** obsolete child/request events cannot settle the replacement request
+- **AND** an immediately available cached image remains admissible without redundant callbacks; unchanged rebuilds retaining the effective request preserve valid readiness
 
 #### Scenario: Visibility, user intent and resource lifetime
 

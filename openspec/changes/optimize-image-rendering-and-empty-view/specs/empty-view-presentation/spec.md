@@ -66,6 +66,7 @@ Within actual supported parent constraints, action-bearing EmptyView SHALL prese
 
 #### Scenario: Vertically unbounded scroll or sliver host
 
-- **WHEN** EmptyView is hosted in an existing SliverToBoxAdapter or another unbounded-height composition
-- **THEN** it retains a valid shrink-wrapped content path without introducing an unbounded nested viewport or flex error
+- **WHEN** EmptyView is hosted in an existing SliverToBoxAdapter, another unbounded-height composition, or an intrinsic-measuring SliverFillRemaining(hasScrollBody: false)
+- **THEN** it supports the host’s intrinsic measurement and layout without exceptions, an unbounded nested viewport or a flex error
+- **AND** finite-height overflow still scrolls to reachable content/actions and roomy layouts remain equivalent
 - **AND** its text/action semantics and reachable/tappable geometry remain available
