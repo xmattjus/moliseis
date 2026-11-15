@@ -119,7 +119,10 @@ void main() {
       );
       await tester.pump();
       final pixels = <int>{};
-      for (var tick = 0; tick < 20 && pixels.length < 2; tick++) {
+      // Native decoding advances in real time, independently of pumped time.
+      final decodingTime = Stopwatch()..start();
+      while (pixels.length < 2 &&
+          decodingTime.elapsed < const Duration(seconds: 10)) {
         await tester.runAsync(() => Future<void>(() {}));
         await tester.pump(const Duration(milliseconds: 100));
         final raw = tester.widget<RawImage>(find.byType(RawImage));
