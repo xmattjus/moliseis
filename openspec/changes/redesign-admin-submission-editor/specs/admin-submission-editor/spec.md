@@ -215,8 +215,9 @@ The workspace SHALL render semantic comparisons and target identities from exist
 
 #### Scenario: Staged thumbnail rebuilds or changes owner
 - **WHEN** ordinary edits, notifications or upload receipts rebuild a staged thumbnail
-- **THEN** the existing resolution Future is retained without repeated file integrity I/O, and decoding is bounded to the DPR-adjusted thumbnail size
-- **AND** file/owner/activation replacement or removal retires that resolution; explicit failed-preview retry retains the original verification and masking boundaries and obsolete completion cannot expose another owner's media
+- **THEN** the existing resolution Future is retained without repeated file integrity I/O, and the DPR-adjusted thumbnail size supplies the decode target
+- **AND** staging, masking, validation and upload behavior remain unchanged
+- **AND** file/owner/activation replacement or removal retires that resolution; explicit retry after resolution failure retains the original verification and masking boundaries and obsolete completion cannot expose another owner's media
 
 #### Scenario: Finalized external update is reviewed
 - **WHEN** an accepted or rejected external update has a missing start or comparison target
