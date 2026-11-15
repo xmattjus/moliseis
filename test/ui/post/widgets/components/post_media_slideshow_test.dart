@@ -2,7 +2,6 @@ import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
@@ -10,6 +9,7 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../support/fake_cache_manager.dart';
+import '../../../../support/post_media_slideshow_harness.dart';
 import '../../../../support/typography_measurement_harness.dart';
 
 void main() {
@@ -30,7 +30,7 @@ void main() {
               height: 400,
               child: PostMediaSlideshow(
                 height: 400,
-                media: [_buildMedia()],
+                media: [slideshowMedia(1)],
                 visibilityNotifier: visibilityNotifier,
               ),
             ),
@@ -45,6 +45,208 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
 
     expect(tester.takeException(), isNull);
+  });
+
+  group('page ownership and autoplay', () {
+    testWidgets('only the current built page can settle controls or advance', (
+      tester,
+    ) async {
+      final fixture = PostMediaSlideshowHarness(
+        media: [slideshowMedia(1), slideshowMedia(2)],
+      );
+      addTearDown(fixture.dispose);
+      await fixture.pump(tester);
+      final controller = fixture.controller(tester);
+      final pendingA = fixture.image(tester, 1).onImageLoading!;
+      controller.jumpTo(240);
+      await tester.pump();
+      await tester.pump();
+      final settledB = fixture.image(tester, 2).onImageLoading!;
+      settledB(false);
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+      controller.jumpToPage(1);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isTrue);
+      pendingA(true);
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isTrue);
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(controller.page, closeTo(0, 0.01));
+      expect(fixture.controlsEnabled(tester), isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets(
+      'list ABA, in-place replacement and reorder revoke old callbacks',
+      (tester) async {
+        final fixture = PostMediaSlideshowHarness(
+          media: [slideshowMedia(1), slideshowMedia(2)],
+        );
+        addTearDown(fixture.dispose);
+        await fixture.pump(tester);
+        final obsolete = fixture.image(tester, 1).onImageLoading!;
+        obsolete(false);
+        await tester.pump();
+        await tester.pump();
+        expect(fixture.controlsEnabled(tester), isTrue);
+        fixture.media[0] = slideshowMedia(3);
+        fixture.rebuild();
+        await tester.pump();
+        await tester.pump();
+        expect(fixture.controlsEnabled(tester), isFalse);
+        fixture.media[0] = slideshowMedia(1);
+        fixture.rebuild();
+        await tester.pump();
+        await tester.pump();
+        obsolete(false);
+        await tester.pump();
+        await tester.pump();
+        expect(fixture.controlsEnabled(tester), isFalse);
+        fixture.image(tester, 1).onImageLoading!(false);
+        await tester.pump();
+        await tester.pump();
+        expect(fixture.controlsEnabled(tester), isTrue);
+        fixture
+          ..media = fixture.media.reversed.toList()
+          ..rebuild();
+        await tester.pump();
+        await tester.pump();
+        obsolete(false);
+        await tester.pump();
+        await tester.pump();
+        expect(fixture.controlsEnabled(tester), isFalse);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets(
+      'unchanged child and partial list replacement preserve readiness '
+      'without replay',
+      (tester) async {
+        final fixture = PostMediaSlideshowHarness(
+          media: [slideshowMedia(1), slideshowMedia(2)],
+        );
+        addTearDown(fixture.dispose);
+        await fixture.pump(tester);
+        final callback = fixture.image(tester, 1).onImageLoading!;
+        callback(false);
+        await tester.pump();
+        await tester.pump();
+        fixture.rebuild();
+        await tester.pump();
+        await tester.pump();
+        expect(
+          identical(fixture.image(tester, 1).onImageLoading, callback),
+          isTrue,
+        );
+        expect(fixture.controlsEnabled(tester), isTrue);
+        fixture
+          ..media = [slideshowMedia(1), slideshowMedia(3)]
+          ..rebuild();
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+        expect(
+          identical(fixture.image(tester, 1).onImageLoading, callback),
+          isTrue,
+        );
+        expect(fixture.controlsEnabled(tester), isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets(
+      'bucket replacement invalidates old readiness and queued updates '
+      'read current owner',
+      (tester) async {
+        final fixture = PostMediaSlideshowHarness(
+          media: [slideshowMedia(1), slideshowMedia(2)],
+        );
+        addTearDown(fixture.dispose);
+        await fixture.pump(tester);
+        final obsolete = fixture.image(tester, 1).onImageLoading!;
+        obsolete(false);
+        fixture
+          ..width = 300
+          ..rebuild();
+        await tester.pump();
+        await tester.pump();
+        obsolete(false);
+        await tester.pump();
+        await tester.pump();
+        expect(fixture.controlsEnabled(tester), isFalse);
+        final current = fixture.image(tester, 1).onImageLoading!;
+        current(false);
+        current(true);
+        await tester.pump();
+        await tester.pump();
+        expect(fixture.controlsEnabled(tester), isFalse);
+        current(false);
+        await tester.pump();
+        await tester.pump();
+        expect(fixture.controlsEnabled(tester), isTrue);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets('visibility listener rebinds, count changes safely '
+        'and pause intent survives', (tester) async {
+      final fixture = PostMediaSlideshowHarness(media: []);
+      addTearDown(fixture.dispose);
+      await fixture.pump(tester);
+      fixture
+        ..media = [slideshowMedia(1)]
+        ..rebuild();
+      await tester.pump();
+      await tester.pump();
+      fixture
+        ..media = [slideshowMedia(1), slideshowMedia(2)]
+        ..rebuild();
+      await tester.pump();
+      await tester.pump();
+      fixture.image(tester, 1).onImageLoading!(false);
+      await tester.pump();
+      await tester.pump();
+      final oldVisibility = fixture.visibility;
+      fixture
+        ..visibility = ValueNotifier(false)
+        ..rebuild();
+      await tester.pump();
+      await tester.pump();
+      oldVisibility
+        ..value = false
+        ..dispose();
+      await tester.pump(const Duration(seconds: 6));
+      expect(fixture.controller(tester).page, 0);
+      expect(fixture.controlsEnabled(tester), isFalse);
+      fixture.visibility.value = true;
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isTrue);
+      await tester.tap(find.byType(FilledButton));
+      await tester.pump();
+      await tester.pump();
+      fixture.visibility.value = false;
+      fixture.visibility.value = true;
+      await tester.pump(const Duration(seconds: 6));
+      expect(fixture.controller(tester).page, 0);
+      fixture
+        ..media = []
+        ..rebuild();
+      await tester.pump();
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('pause label measurement', () {
@@ -83,7 +285,7 @@ void main() {
                     height: 400,
                     child: PostMediaSlideshow(
                       height: 400,
-                      media: [_buildMedia(), _buildMedia()],
+                      media: [slideshowMedia(1), slideshowMedia(1)],
                       visibilityNotifier: visibility,
                     ),
                   ),
@@ -162,14 +364,3 @@ void main() {
     }
   });
 }
-
-Media _buildMedia() => Media(
-  remoteId: 1,
-  url: 'https://example.com/image.jpg',
-  width: 800,
-  height: 600,
-  createdAt: DateTime.utc(2026),
-  modifiedAt: DateTime.utc(2026),
-  areaName: 'Event',
-  cityName: 'Molise',
-);
