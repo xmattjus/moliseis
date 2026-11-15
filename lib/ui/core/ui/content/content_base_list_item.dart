@@ -56,8 +56,6 @@ class ContentBaseListItem extends StatelessWidget {
                   url: content.media.first.url,
                   width: 72,
                   height: 72,
-                  imageWidth: content.media.first.width,
-                  imageHeight: content.media.first.height,
                 ),
               ),
             Expanded(

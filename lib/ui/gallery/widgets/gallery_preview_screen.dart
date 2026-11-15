@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal_overlay.dart';
@@ -123,11 +124,12 @@ class _GalleryPreviewScreenState extends State<GalleryPreviewScreen>
               itemCount: widget.data.media.length,
               itemBuilder: (_, index) {
                 final media = widget.data.media[index];
-                return AppNetworkImage.fullResolution(
-                  url: media.url,
-                  imageWidth: media.width,
-                  imageHeight: media.height,
-                  fit: BoxFit.contain,
+                return Theme(
+                  data: AppThemeData.photoViewer,
+                  child: AppNetworkImage.fullResolution(
+                    url: media.url,
+                    fit: BoxFit.contain,
+                  ),
                 );
               },
               onSwipe: (index) => setState(() => _index.value = index),
