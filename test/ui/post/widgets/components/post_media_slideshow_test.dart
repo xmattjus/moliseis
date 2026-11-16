@@ -9,10 +9,18 @@ import 'package:moliseis/utils/extensions/extensions.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../support/fake_cache_manager.dart';
+import '../../../../support/network_image_harness.dart';
 import '../../../../support/post_media_slideshow_harness.dart';
+import '../../../../support/test_image_files.dart';
 import '../../../../support/typography_measurement_harness.dart';
 
 void main() {
+  setUp(() {
+    PaintingBinding.instance.imageCache
+      ..clear()
+      ..clearLiveImages();
+  });
+
   testWidgets('queued image loading callback is safe after disposal', (
     tester,
   ) async {
@@ -48,125 +56,166 @@ void main() {
   });
 
   group('page ownership and autoplay', () {
-    testWidgets('only the current built page can settle controls or advance', (
+    testWidgets('offscreen completion cannot settle the active page; '
+        'a settled page is admitted on selection without replay', (
       tester,
     ) async {
+      final files = TestImageFiles.create();
+      addTearDown(files.dispose);
+      final bytes = files.createSizedPng(64, 64).readAsBytesSync();
+      final manager = ControlledImageCacheManager();
       final fixture = PostMediaSlideshowHarness(
         media: [slideshowMedia(1), slideshowMedia(2)],
+        cacheManager: manager,
       );
       addTearDown(fixture.dispose);
       await fixture.pump(tester);
-      final controller = fixture.controller(tester);
-      final pendingA = fixture.image(tester, 1).onImageLoading!;
-      controller.jumpTo(240);
+      // Page 0 stays active while page 1 is built offscreen.
+      final controller = fixture.controller(tester)..jumpTo(240);
       await tester.pump();
       await tester.pump();
-      final settledB = fixture.image(tester, 2).onImageLoading!;
-      settledB(false);
-      await tester.pump();
-      await tester.pump();
+      final a = manager.lastRequestFor(slideshowMedia(1).url);
+      final b = manager.lastRequestFor(slideshowMedia(2).url);
+      expect((a, b), (0, 1));
+      await completeSlideshowImage(tester, manager, b, bytes);
       expect(fixture.controlsEnabled(tester), isFalse);
+      expect(controller.offset, 240);
+
       controller.jumpToPage(1);
       await tester.pump();
       await tester.pump();
-      await tester.pump();
-      await tester.pump();
       expect(fixture.controlsEnabled(tester), isTrue);
-      pendingA(true);
+      expect(manager.requests, hasLength(2));
+
+      // A's request completes after its page was disposed.
+      manager.complete(a, bytes);
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
       await tester.pump();
       await tester.pump();
       expect(fixture.controlsEnabled(tester), isTrue);
       await tester.pump(const Duration(seconds: 6));
       await tester.pump(const Duration(seconds: 2));
-      await tester.pump();
       expect(controller.page, closeTo(0, 0.01));
-      expect(fixture.controlsEnabled(tester), isFalse);
       await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
     });
 
-    testWidgets(
-      'list ABA, in-place replacement and reorder revoke old callbacks',
-      (tester) async {
-        final fixture = PostMediaSlideshowHarness(
-          media: [slideshowMedia(1), slideshowMedia(2)],
-        );
-        addTearDown(fixture.dispose);
-        await fixture.pump(tester);
-        final obsolete = fixture.image(tester, 1).onImageLoading!;
-        obsolete(false);
-        await tester.pump();
-        await tester.pump();
-        expect(fixture.controlsEnabled(tester), isTrue);
-        fixture.media[0] = slideshowMedia(3);
-        fixture.rebuild();
-        await tester.pump();
-        await tester.pump();
-        expect(fixture.controlsEnabled(tester), isFalse);
-        fixture.media[0] = slideshowMedia(1);
-        fixture.rebuild();
-        await tester.pump();
-        await tester.pump();
-        obsolete(false);
-        await tester.pump();
-        await tester.pump();
-        expect(fixture.controlsEnabled(tester), isFalse);
-        fixture.image(tester, 1).onImageLoading!(false);
-        await tester.pump();
-        await tester.pump();
-        expect(fixture.controlsEnabled(tester), isTrue);
-        fixture
-          ..media = fixture.media.reversed.toList()
-          ..rebuild();
-        await tester.pump();
-        await tester.pump();
-        obsolete(false);
-        await tester.pump();
-        await tester.pump();
-        expect(fixture.controlsEnabled(tester), isFalse);
-        await tester.pumpWidget(const SizedBox.shrink());
-      },
-    );
+    testWidgets('list ABA and reorder revoke owners; a retained ABA decode '
+        'is synchronously admissible', (tester) async {
+      final files = TestImageFiles.create();
+      addTearDown(files.dispose);
+      final bytes = files.createSizedPng(64, 64).readAsBytesSync();
+      final manager = ControlledImageCacheManager();
+      final fixture = PostMediaSlideshowHarness(
+        media: [slideshowMedia(1), slideshowMedia(2)],
+        cacheManager: manager,
+      );
+      addTearDown(fixture.dispose);
+      await fixture.pump(tester);
+      await completeSlideshowImage(tester, manager, 0, bytes);
+      expect(fixture.controlsEnabled(tester), isTrue);
+      final firstOwner = fixture.image(tester, 1).onImageLoading!;
 
-    testWidgets(
-      'unchanged child and partial list replacement preserve readiness '
-      'without replay',
-      (tester) async {
-        final fixture = PostMediaSlideshowHarness(
-          media: [slideshowMedia(1), slideshowMedia(2)],
-        );
-        addTearDown(fixture.dispose);
-        await fixture.pump(tester);
-        final callback = fixture.image(tester, 1).onImageLoading!;
-        callback(false);
-        await tester.pump();
-        await tester.pump();
-        fixture.rebuild();
-        await tester.pump();
-        await tester.pump();
-        expect(
-          identical(fixture.image(tester, 1).onImageLoading, callback),
-          isTrue,
-        );
-        expect(fixture.controlsEnabled(tester), isTrue);
-        fixture
-          ..media = [slideshowMedia(1), slideshowMedia(3)]
-          ..rebuild();
-        await tester.pump();
-        await tester.pump();
-        await tester.pump();
-        await tester.pump();
-        expect(
-          identical(fixture.image(tester, 1).onImageLoading, callback),
-          isTrue,
-        );
-        expect(fixture.controlsEnabled(tester), isTrue);
-        await tester.pumpWidget(const SizedBox.shrink());
-      },
-    );
+      fixture.media[0] = slideshowMedia(3);
+      fixture.rebuild();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+      expect(manager.lastRequestFor(slideshowMedia(3).url), greaterThan(0));
 
+      fixture.media[0] = slideshowMedia(1);
+      fixture.rebuild();
+      await tester.pump();
+      await tester.pump();
+      final reads = manager.requests.length;
+      expect(fixture.controlsEnabled(tester), isTrue);
+      expect(manager.lastRequestFor(slideshowMedia(1).url), 0);
+      // Adversarial: the A owner replaced by C stays revoked after A returns.
+      firstOwner(true);
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isTrue);
+
+      // Capture the callback that holds authority immediately before reorder.
+      final live = fixture.image(tester, 1).onImageLoading!;
+      live(true);
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+      live(false);
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isTrue);
+
+      fixture
+        ..media = fixture.media.reversed.toList()
+        ..rebuild();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+      live(false);
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+      final b = manager.lastRequestFor(slideshowMedia(2).url);
+      expect(b, reads);
+      await completeSlideshowImage(tester, manager, b, bytes);
+      expect(fixture.controlsEnabled(tester), isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('unchanged rebuild and partial list replacement preserve '
+        'ready slots without new requests', (tester) async {
+      final files = TestImageFiles.create();
+      addTearDown(files.dispose);
+      final manager = ControlledImageCacheManager();
+      final fixture = PostMediaSlideshowHarness(
+        media: [slideshowMedia(1), slideshowMedia(2)],
+        cacheManager: manager,
+      );
+      addTearDown(fixture.dispose);
+      await fixture.pump(tester);
+      await completeSlideshowImage(
+        tester,
+        manager,
+        0,
+        files.createSizedPng(64, 64).readAsBytesSync(),
+      );
+      expect(fixture.controlsEnabled(tester), isTrue);
+      // Without a retained decode, replacing A's child would force a reload.
+      PaintingBinding.instance.imageCache
+        ..clear()
+        ..clearLiveImages();
+      fixture.rebuild();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isTrue);
+
+      fixture
+        ..media = [slideshowMedia(1), slideshowMedia(3)]
+        ..rebuild();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isTrue);
+      expect(manager.requests, hasLength(1));
+
+      // Retained A readiness alone admits autoplay to the replaced slot.
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pump(const Duration(seconds: 2));
+      expect(fixture.controller(tester).page, closeTo(1, 0.01));
+      expect(manager.lastRequestFor(slideshowMedia(3).url), 1);
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+    });
+
+    // Adversarial: AppNetworkImage generations already fence real obsolete
+    // events; this exercises the slideshow's own request revocation.
     testWidgets(
-      'bucket replacement invalidates old readiness and queued updates '
-      'read current owner',
+      'revoked page callback cannot settle a replaced bucket; queued updates '
+      'read the current owner',
       (tester) async {
         final fixture = PostMediaSlideshowHarness(
           media: [slideshowMedia(1), slideshowMedia(2)],

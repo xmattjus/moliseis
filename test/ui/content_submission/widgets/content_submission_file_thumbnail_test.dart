@@ -156,6 +156,73 @@ void main() {
   }
 
   testWidgets(
+    'valid replacement after a real failure does not keep the old placeholder',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final files = TestImageFiles.create();
+      addTearDown(files.dispose);
+      final invalid = files.createSizedPng(400, 300)
+        ..writeAsBytesSync([0, 1, 2]);
+      final valid = files.createSizedPng(300, 400);
+      final logger = MockLogger();
+      Widget thumbnail(File file) => typographyHarness(
+        child: Scaffold(
+          body: Center(
+            child: Provider<Logger?>.value(
+              value: logger,
+              child: ContentSubmissionFileThumbnail(file: file),
+            ),
+          ),
+        ),
+      );
+
+      await tester.runAsync(() async {
+        await tester.pumpWidget(thumbnail(invalid));
+        final image = tester.widget<Image>(find.byType(Image));
+        await expectLater(decodeImage(image.image), throwsA(anything));
+      });
+      await tester.pump();
+      expect(find.byType(ImageErrorPlaceholder), findsOneWidget);
+      expect(logger.eventsOfType<ImageLoadFailed>(), hasLength(1));
+      final state = tester.state(find.byType(ContentSubmissionFileThumbnail));
+
+      final frame = await tester.runAsync(() async {
+        // Real file I/O starts here, so B remains pending until awaited below.
+        await tester.pumpWidget(thumbnail(valid));
+        expect(
+          tester.state(find.byType(ContentSubmissionFileThumbnail)),
+          same(state),
+        );
+        expect(find.byType(ImageErrorPlaceholder), findsNothing);
+        expect(tester.widget<RawImage>(find.byType(RawImage)).image, isNull);
+        expect(logger.eventsOfType<ImageLoadFailed>(), hasLength(1));
+        return await decodeImage(
+          tester.widget<Image>(find.byType(Image)).image,
+        );
+      });
+      frame!.dispose();
+      await tester.pump();
+      expect(find.byType(ImageErrorPlaceholder), findsNothing);
+      final raw = tester.widget<RawImage>(find.byType(RawImage));
+      expect((raw.image!.width, raw.image!.height), (86, 115));
+      expect(
+        tester.getSize(find.byType(ContentSubmissionFileThumbnail)),
+        const Size(86, 86),
+      );
+      expect(
+        tester.renderObject<RenderImage>(find.byType(RawImage)).size,
+        const Size(86, 86),
+      );
+      expect(logger.eventsOfType<ImageLoadFailed>(), hasLength(1));
+      await tester.pumpWidget(const SizedBox.shrink());
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'replacement and disposal revoke captured stale error callbacks',
     (tester) async {
       tester.view.devicePixelRatio = 1;

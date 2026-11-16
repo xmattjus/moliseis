@@ -27,6 +27,10 @@ class ControlledImageCacheManager extends FakeCacheManager {
     return stream.stream;
   }
 
+  /// Index of the most recent acquisition of [url], or -1 when none exists.
+  int lastRequestFor(String url) =>
+      requests.lastIndexWhere((request) => request.url == url);
+
   /// Supplies actual bytes to the production network provider and codec.
   void complete(int index, List<int> bytes) {
     final request = requests[index];

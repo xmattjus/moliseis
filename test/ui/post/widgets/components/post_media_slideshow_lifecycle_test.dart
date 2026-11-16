@@ -93,6 +93,202 @@ void main() {
     );
   }
 
+  // Each step replaces one input of the active page's effective request and
+  // triggers only the rebuilds that change itself would cause.
+  final replacements =
+      <String, List<void Function(WidgetTester, PostMediaSlideshowHarness)>>{
+        'bucket': [
+          (_, fixture) => fixture
+            ..width = 300
+            ..rebuild(),
+          (_, fixture) => fixture
+            ..width = 450
+            ..rebuild(),
+        ],
+        // Only MediaQuery dependents rebuild; the slideshow's parent does not.
+        'DPR': [
+          (tester, _) => tester.view.devicePixelRatio = 1,
+          (tester, _) => tester.view.devicePixelRatio = 2,
+        ],
+        // Decoded identity is URL-based, so a retained decode would be a valid
+        // synchronous hit; clear it to make the new manager's request pending.
+        // Provider reads do not subscribe, so a parent rebuild applies it.
+        'cache manager': [
+          for (var i = 0; i < 2; i++)
+            (_, fixture) {
+              PaintingBinding.instance.imageCache
+                ..clear()
+                ..clearLiveImages();
+              fixture
+                ..cacheManager = ControlledImageCacheManager()
+                ..rebuild();
+            },
+        ],
+      };
+  for (final MapEntry(key: input, value: steps) in replacements.entries) {
+    testWidgets('$input replacement invalidates readiness in its first frame; '
+        'late obsolete completion cannot admit the pending request', (
+      tester,
+    ) async {
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final files = TestImageFiles.create();
+      addTearDown(files.dispose);
+      final bytes = files.createSizedPng(64, 64).readAsBytesSync();
+      final fixture = PostMediaSlideshowHarness(
+        media: [slideshowMedia(1), slideshowMedia(2)],
+        cacheManager: ControlledImageCacheManager(),
+      );
+      final managers = <ControlledImageCacheManager>[];
+      addTearDown(() async {
+        await fixture.dispose();
+        for (final manager in managers) {
+          await manager.dispose();
+        }
+      });
+      ControlledImageCacheManager current() =>
+          fixture.cacheManager as ControlledImageCacheManager;
+      int request() => current().lastRequestFor(slideshowMedia(1).url);
+      Future<void> replace(int step) async {
+        final previous = current();
+        steps[step](tester, fixture);
+        // Exactly one frame: controls must already reflect the new request.
+        if (identical(previous, fixture.cacheManager)) {
+          await tester.pump();
+        } else {
+          managers.add(previous);
+          await fixture.pump(tester);
+        }
+      }
+
+      await fixture.pump(tester);
+      await completeSlideshowImage(tester, current(), request(), bytes);
+      expect(fixture.controlsEnabled(tester), isTrue);
+
+      // Old terminal readiness must not survive into the new request.
+      await replace(0);
+      expect(fixture.controlsEnabled(tester), isFalse);
+      final pending = request();
+      expect(pending, greaterThanOrEqualTo(0));
+      final pendingManager = current();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+
+      // Replace again while that request is pending, then complete it late.
+      await replace(1);
+      expect(fixture.controlsEnabled(tester), isFalse);
+      final effective = request();
+      expect(
+        identical(pendingManager, current()) ? effective : pending + 1,
+        greaterThan(pending),
+      );
+      pendingManager.complete(pending, bytes);
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+      await tester.pump(const Duration(seconds: 6));
+      expect(fixture.controller(tester).page, 0);
+
+      await completeSlideshowImage(tester, current(), effective, bytes);
+      expect(fixture.controlsEnabled(tester), isTrue);
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pump(const Duration(seconds: 2));
+      expect(fixture.controller(tester).page, closeTo(1, 0.01));
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'retained bucket is synchronously admissible; unchanged parent rebuilds '
+    'keep readiness without new requests or extra frames',
+    (tester) async {
+      final files = TestImageFiles.create();
+      addTearDown(files.dispose);
+      final manager = ControlledImageCacheManager();
+      final fixture = PostMediaSlideshowHarness(
+        media: [slideshowMedia(1), slideshowMedia(2)],
+        cacheManager: manager,
+      );
+      addTearDown(fixture.dispose);
+      await fixture.pump(tester);
+      await completeSlideshowImage(
+        tester,
+        manager,
+        0,
+        files.createSizedPng(64, 64).readAsBytesSync(),
+      );
+      // User pause stops the ticker so scheduled frames are observable.
+      await tester.tap(find.byType(FilledButton));
+      await tester.pumpAndSettle();
+      expect(fixture.controlsEnabled(tester), isTrue);
+
+      fixture
+        ..width = 300
+        ..rebuild();
+      await tester.pump();
+      expect(fixture.controlsEnabled(tester), isFalse);
+      await tester.pumpAndSettle();
+      final reads = manager.requests.length;
+
+      fixture
+        ..width = 600
+        ..rebuild();
+      await tester.pump();
+      await tester.pump();
+      expect(manager.requests, hasLength(reads));
+      expect(fixture.controlsEnabled(tester), isTrue);
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 3; i++) {
+        fixture.rebuild();
+        await tester.pump();
+        expect(tester.binding.hasScheduledFrame, isFalse);
+        expect(fixture.controlsEnabled(tester), isTrue);
+      }
+      expect(manager.requests, hasLength(reads));
+      await tester.pumpWidget(const SizedBox.shrink());
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('swapping to an already visible notifier resumes autoplay '
+      'for a settled active page', (tester) async {
+    final files = TestImageFiles.create();
+    addTearDown(files.dispose);
+    final manager = ControlledImageCacheManager();
+    final fixture = PostMediaSlideshowHarness(
+      media: [slideshowMedia(1), slideshowMedia(2)],
+      cacheManager: manager,
+    );
+    addTearDown(fixture.dispose);
+    fixture.visibility.value = false;
+    await fixture.pump(tester);
+    await completeSlideshowImage(
+      tester,
+      manager,
+      0,
+      files.createSizedPng(64, 64).readAsBytesSync(),
+    );
+    await tester.pump(const Duration(seconds: 6));
+    expect(fixture.controller(tester).page, 0);
+    final hidden = fixture.visibility;
+    addTearDown(hidden.dispose);
+    fixture
+      ..visibility = ValueNotifier(true)
+      ..rebuild();
+    await tester.pump();
+    await tester.pump();
+    expect(fixture.controlsEnabled(tester), isTrue);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump(const Duration(seconds: 2));
+    expect(fixture.controller(tester).page, closeTo(1, 0.01));
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'actual completion cannot restart autoplay during awaited gallery, '
     'return resumes',
