@@ -70,9 +70,11 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     if (oldWidget.visibilityNotifier != widget.visibilityNotifier) {
       oldWidget.visibilityNotifier.removeListener(_onVisibilityChanged);
       widget.visibilityNotifier.addListener(_onVisibilityChanged);
+      // Reconcile after build, when request invalidation has been applied.
+      _queuePublication();
     }
+    // Owner and request changes queue their own deferred publication.
     _reconcileOwners();
-    _queuePublication();
   }
 
   void _reconcileOwners() {
