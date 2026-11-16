@@ -49,15 +49,35 @@ Implementation is authorized by the current user request. Deterministic evidence
 and remaining gates are recorded in
 [`image-rendering-implementation.md`](../../../docs/performance/image-rendering-implementation.md).
 
-- 5.2 remains open for remote CI: the stacked implementation PR targets the
-  planning branch; the existing workflow only triggers for a `main` base.
-  Local formatting, analyzer, all 217 autonomous Flutter test files (4406
-  passed, 4 skipped), iOS simulator build and both native functional tests pass.
-- 5.3 remains open: no physical Android or iOS device is available. Simulator
-  compatibility and decoded-buffer estimates are not Profile acceptance.
-- 5.4 remains open for physical Android performance and real TalkBack/VoiceOver
-  acceptance; physical iOS performance remains NOT VERIFIED under the existing
-  release-owner decision policy. No task closure or release approval is implied.
+- Historical (2026-11-15): at handoff the implementation PR was stacked on the
+  planning branch, so remote CI could not run. Local formatting, analyzer, all
+  217 autonomous Flutter test files (4406 passed, 4 skipped), iOS simulator
+  build and both native functional tests passed.
 - Independent code review found and rechecked the gallery contrast correction;
   no further material finding remained in the reviewed production diff.
 - No canonical spec synchronization or archival has been performed.
+
+## Adversarial review remediation (2026-11-16)
+
+#43 merged to `main` (`a872161`) and PR #44 targets `main`. Pull request CI ran
+on head `a7041ac`, and `Flutter analyze` and `Autonomous Flutter tests` passed.
+The remediation adds mutation-checked real-provider regressions for both
+generation keys and controlled-provider slideshow request, reorder and
+partial-replacement coverage. It also limits `didUpdateWidget` publication
+scheduling to visibility-notifier swaps. Slideshow request tracking, owner
+validity/child leases and image-widget lifecycle guards are retained, with the
+evidence recorded in the implementation document.
+
+- 5.2 remains open only until remote CI reports on the remediation head. The
+  consolidated local and network table, cost and aspect-ratio explanation,
+  ceiling/full-resolution boundaries and local format/analyzer/full-suite
+  results are recorded.
+- 5.3 remains open: no physical Android or iOS device is available. Android
+  Profile acceptance, including normal-photo-density cache pressure, is
+  required. Physical iOS performance is NOT VERIFIED. Emulator, simulator,
+  software codec and buffer-estimate results are not substitutes.
+- 5.4 remains open: the deterministic TASK-43 DoD 1–6 and TASK-16 correctness,
+  lifecycle and compatibility evidence is recorded, but physical Android
+  performance, real TalkBack/VoiceOver, HEIC/HEIF platform codecs and
+  low-capability graphics backends are not verified. Deterministic tests and
+  green CI do not close it.
