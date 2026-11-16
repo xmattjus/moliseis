@@ -16,6 +16,7 @@ import 'package:moliseis/ui/content_submission/widgets/content_submission_asset_
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/ui/custom_circular_progress_indicator.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
+import 'package:moliseis/ui/core/ui/media/bounded_cover_image.dart';
 import 'package:moliseis/utils/constants.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:moliseis/utils/result.dart';
@@ -676,8 +677,9 @@ void main() {
       );
       expect(find.byType(ContentSubmissionAssetListItem), findsOneWidget);
       final renderedImage = tester.widget<Image>(find.byType(Image));
-      expect(renderedImage.image, isA<ResizeImage>());
-      final fileImage = (renderedImage.image as ResizeImage).imageProvider;
+      expect(renderedImage.image, isA<BoundedCoverImage>());
+      final fileImage =
+          (renderedImage.image as BoundedCoverImage).imageProvider;
       expect(fileImage, isA<FileImage>());
       expect((fileImage as FileImage).file.path, stagedPath);
       expect(find.byType(SnackBar), findsNothing);

@@ -109,8 +109,6 @@ class AdminSubmissionMediaSection extends StatelessWidget {
                       ),
                       image: AppNetworkImage(
                         url: asset.url,
-                        imageWidth: asset.width,
-                        imageHeight: asset.height,
                         width: contentSubmissionAssetSize.width,
                         height: contentSubmissionAssetSize.height,
                       ),

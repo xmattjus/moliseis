@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/admin_submission_staged_asset.dart';
 import 'package:moliseis/domain/models/submission_asset.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_media_section.dart';
+import 'package:moliseis/ui/core/ui/media/bounded_cover_image.dart';
 import 'package:moliseis/ui/core/utils/content_submission_asset_size.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
@@ -107,10 +108,9 @@ void main() {
       await tester.pumpWidget(adminMediaApp(harness.owner));
       await tester.pumpAndSettle();
       final image = tester.widget<Image>(find.byType(Image));
-      final resize = image.image as ResizeImage;
+      final resize = image.image as BoundedCoverImage;
       expect(resize.width, (86 * dpr).ceil());
       expect(resize.height, (86 * dpr).ceil());
-      expect(resize.policy, ResizeImagePolicy.fit);
       expect(image.width, contentSubmissionAssetSize.width);
       expect(image.height, contentSubmissionAssetSize.height);
       expect(image.fit, BoxFit.cover);
@@ -231,7 +231,7 @@ void main() {
       old.complete(Result.success(oldFile));
       await tester.pumpAndSettle();
       final resize =
-          tester.widget<Image>(find.byType(Image)).image as ResizeImage;
+          tester.widget<Image>(find.byType(Image)).image as BoundedCoverImage;
       expect(
         (resize.imageProvider as FileImage).file.path,
         replacementFile.path,
@@ -284,7 +284,7 @@ void main() {
       current.complete(Result.success(file));
       await tester.pumpAndSettle();
       final resize =
-          tester.widget<Image>(find.byType(Image)).image as ResizeImage;
+          tester.widget<Image>(find.byType(Image)).image as BoundedCoverImage;
       expect((resize.imageProvider as FileImage).file.path, file.path);
       expect(resolutions, beforeCurrent);
       expect(tester.takeException(), isNull);
@@ -351,7 +351,8 @@ void main() {
           next.complete(Result.success(nextFile));
           await tester.pumpAndSettle();
           final resize =
-              tester.widget<Image>(find.byType(Image)).image as ResizeImage;
+              tester.widget<Image>(find.byType(Image)).image
+                  as BoundedCoverImage;
           expect((resize.imageProvider as FileImage).file.path, nextFile.path);
           expect(replacementResolutions, 1);
           expect(tester.takeException(), isNull);

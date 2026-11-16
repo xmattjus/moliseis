@@ -2,15 +2,15 @@ import 'dart:async';
 
 import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
+import 'package:moliseis/ui/core/ui/media/image_error_placeholder.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../support/fake_cache_manager.dart';
 import '../../../../support/mock_logger.dart';
+import '../../../../support/network_image_harness.dart';
 
 Widget _buildTestApp({
   required CacheManager cacheManager,
@@ -20,29 +20,20 @@ Widget _buildTestApp({
   double height = 200,
   ValueChanged<bool>? onImageLoading,
 }) {
-  return MultiProvider(
-    providers: [
-      Provider<CacheManager>.value(value: cacheManager),
-      Provider<Logger?>.value(value: logger),
-    ],
-    child: Directionality(
-      textDirection: TextDirection.ltr,
-      child: fullResolution
-          ? AppNetworkImage.fullResolution(
-              url: 'https://example.com/image.jpg',
-              imageWidth: 100,
-              imageHeight: 100,
-              onImageLoading: onImageLoading,
-            )
-          : AppNetworkImage(
-              url: 'https://example.com/image.jpg',
-              imageWidth: 100,
-              imageHeight: 100,
-              width: width,
-              height: height,
-              onImageLoading: onImageLoading,
-            ),
-    ),
+  return networkImageHarness(
+    manager: cacheManager,
+    logger: logger,
+    child: fullResolution
+        ? AppNetworkImage.fullResolution(
+            url: 'https://example.com/image.jpg',
+            onImageLoading: onImageLoading,
+          )
+        : AppNetworkImage(
+            url: 'https://example.com/image.jpg',
+            width: width,
+            height: height,
+            onImageLoading: onImageLoading,
+          ),
   );
 }
 
@@ -63,8 +54,6 @@ void main() {
             textDirection: TextDirection.ltr,
             child: AppNetworkImage(
               url: 'https://example.com/image.jpg',
-              imageWidth: 100,
-              imageHeight: 100,
               width: 200,
               height: 200,
             ),
@@ -91,8 +80,8 @@ void main() {
 
       await tester.pump();
 
-      expect(find.byType(EmptyView), findsOneWidget);
-      expect(find.byIcon(Symbols.image_not_supported), findsOneWidget);
+      expect(find.byType(ImageErrorPlaceholder), findsOneWidget);
+      expect(find.byType(ImageErrorPlaceholder), findsOneWidget);
     });
 
     testWidgets('errorBuilder logs ImageLoadFailed to Logger', (tester) async {
@@ -158,8 +147,6 @@ void main() {
     test('sets width and height to zero', () {
       const widget = AppNetworkImage.fullResolution(
         url: 'https://example.com/image.jpg',
-        imageWidth: 100,
-        imageHeight: 100,
       );
 
       expect(widget.width, 0);
@@ -170,8 +157,6 @@ void main() {
       expect(
         () => const AppNetworkImage.fullResolution(
           url: 'https://example.com/image.jpg',
-          imageWidth: 100,
-          imageHeight: 100,
         ),
         returnsNormally,
       );
