@@ -1,8 +1,10 @@
 # Image rendering implementation evidence
 
-This records deterministic checks of the implementation based on planning PR
-#43 (`5707389`), using Flutter 3.47.5 and cached_network_image_ce 4.13.1.
-It supplements, rather than reuses as acceptance, the historical experiments.
+This records deterministic checks of the PR #44 implementation, using Flutter
+3.47.5 and cached_network_image_ce 4.13.1. The implementation was first built
+on planning PR #43 head `5707389`; #43 has since merged to `main` as `a872161`,
+which is PR #44's base. It supplements, rather than reuses as acceptance, the
+historical experiments.
 
 ## Provider contract and checked sources
 
@@ -89,6 +91,22 @@ slot and exactly one neutral semantics label; logs retain the cause and stack
 with the fixed `staged-local-image` event source and do not repeat on rebuild.
 The unreadable fixture uses a directory at the image path so the result is
 consistent even when CI privileges bypass ordinary permission bits.
+
+The committed 400×300 JPEG with EXIF orientation 6 at an 86×86 physical target
+decodes to 86×115 (9890 pixels / 39560 estimated bytes), confirming that the
+oriented 300×400 dimensions drive cover sizing on the software test codec.
+
+Network consumers use the same provider through `AppNetworkImage` and the real
+`CachedNetworkImageProvider`. `app_network_image_lifecycle_test.dart` asserts
+these actual RawImage outputs (PNG sources, DPR 2, unchanged buckets):
+
+| PNG intrinsic | Logical slot | Bucket | Fit | Old fit | Observed output | Pixels | Estimated RGBA bytes |
+| --- | --- | --- | --- | --- | --- | ---: | ---: |
+| 4000×3000 | 86×86 | 216×216 | cover | 216×162 | 288×216 | 62208 | 248832 |
+| 4000×3000 | 300×300 | 720×720 | cover | 720×540 | 960×720 | 691200 | 2764800 |
+| 4000×3000 | 300×300 | 720×720 | contain | 720×540 | 720×540 (stock fit) | 388800 | 1555200 |
+| 2400×2400 | 1000×1000 | 1728×1728 | cover | 1728×1728 | 1728×1728 | 2985984 | 11943936 |
+| 2400×2400 | gallery | none | contain | 2400×2400 | 2400×2400 (full resolution) | 5760000 | 23040000 |
 
 The full-resolution 4000×3000 decode observed by the interoperability test is
 4000×3000: 12000000 pixels and an estimated 48000000-byte buffer. The ordinary
@@ -215,8 +233,9 @@ are required by that test target.
 
 ## Verification and handoff
 
-The implementation branch is based on planning PR #43 head `5707389`; fetched
-main is `8865564`. The original checkout and planning branch are unchanged.
+The implementation branch was created from planning PR #43 head `5707389`
+while `main` was `8865564`. #43 has since merged (`a872161`), and PR #44 now
+targets `main` directly.
 No backend, domain, staging, upload, persistence, bucket/cache limits or dependency
 inputs changed. Source media dimensions remain in their domain/navigation models;
 only the six AppNetworkImage call sites drop unused width/height metadata.
@@ -226,13 +245,16 @@ readiness is invalidated on remount/request replacement and revoked on slot
 replacement/reorder/removal, including ABA and in-place list changes. Deferred
 publication schedules a frame and reads latest authority. A State-lifetime ticker,
 rebound visibility listener and Future-owned gallery pause share one admission
-gate. Fourteen slideshow tests include actual provider decode/error, failed and
-evicted B remount, synchronous cached remount, queued callbacks, partial changes,
-visibility, manual pause, count changes, gallery return/error/disposal. Its local
+gate. Nineteen slideshow tests (after the remediation below) include actual
+provider decode/error, failed and evicted B remount, synchronous cached remount,
+bucket/DPR/cache-manager replacement, offscreen completion, ABA/reorder,
+partial changes, queued callbacks, visibility, manual pause, count changes and
+gallery return/error/disposal. Its local
 page State exists to own the child lifetime, not as another application state
 layer; the cohesive owner code stays in one file despite the file-size heuristic.
 
-Final commands and observations:
+Initial implementation handoff (2026-11-15, historical) commands and
+observations:
 
 - Formatter check on all 32 changed Dart files: unchanged.
 - `git diff --check`: clean.
@@ -252,9 +274,83 @@ The first complete run encountered one compile failure while a slideshow test
 was being edited. The stable full rerun above supersedes both attempts. Neither
 was hidden by changing assertions or excluding affected autonomous tests.
 
-The implementation PR is stacked on the still-open planning branch. Remote CI
-is NOT RUN for this base because the existing workflow filters pull requests to
-`main`; rerun its checks when the implementation PR can target main. Task 5.2
-therefore remains open despite completed local checks. Tasks 5.3 and 5.4 remain
-open for device/assistive-technology acceptance. No merge, release, canonical
-spec synchronization or archival is authorized by this handoff.
+At that handoff the PR was stacked on the then-open planning branch, so remote
+CI could not run. Once PR #44 targeted `main`, the `Pull request checks`
+workflow ran on head `a7041ac`: `Flutter analyze` and `Autonomous Flutter tests`
+both succeeded.
+
+## Adversarial review remediation (2026-11-16)
+
+Review findings were treated as hypotheses and checked by mutation: each
+guard was temporarily removed or altered, the focused test was run, and the
+production code was restored. No mutated code is committed.
+
+- Generation keys (F1). With both `ObjectKey(generation)` keys deleted, all 291
+  pre-existing media, thumbnail, slideshow and gallery tests still passed,
+  confirming the gap. Flutter 3.47.5's `_ImageState._updateSourceStream` does
+  not clear `_lastException`, so a retained Image State renders a pending
+  replacement through its new error builder. New real-provider tests fail a
+  request (network acquisition failure; corrupt staged file), replace it while
+  the parent State is retained, assert no placeholder, loading `true`, no second
+  log while pending, then complete the real decode and assert the output,
+  86×86 geometry and terminal `false`. Each fails without its key (stale
+  `ImageErrorPlaceholder`) and passes with it.
+- Slideshow request tracking (F2): retained. Removing the parent-side
+  bucket/manager tracking and the page request lease left the bucket and
+  cache-manager tests green. Parent rebuilds eagerly rebuild built
+  `PageView` children before the pause overlay sibling. A DPR change rebuilds
+  only `MediaQuery` dependents, though. Without tracking, the pause control was
+  still enabled in the first frame of a pending DPR replacement, so the test
+  failed. A child-to-parent request protocol would replace the tracking with
+  comparable machinery, so the tracking was kept.
+- Image-widget `mounted`/generation guards: evaluated and retained. They
+  directly enforce the contract that obsolete and post-disposal publications
+  are rejected. Removing them would save about eight lines and has no
+  correctness or maintenance benefit.
+- Owner model (`valid`, child lease, request): retained unchanged. Slot
+  identity, owner validity, child lifetime, effective request and readiness
+  remain separate; mounted alone does not establish ownership.
+- Unconditional `_queuePublication()` in `didUpdateWidget`: simplified. It now
+  runs only when the visibility notifier is replaced; owner and request
+  changes already queue their own deferred publication. Unchanged parent
+  rebuilds no longer schedule an extra frame. Restoring the unconditional call
+  fails the new no-extra-frame assertion. Removing the queued reconcile on a
+  notifier swap fails the new hidden→visible swap test. The visible→hidden
+  direction is also stopped by `_onTick` rechecking admission.
+- Weak slideshow tests (F3): rewritten with controlled real providers. The
+  reorder case now captures the callback that is live immediately before the
+  reorder and shows it has authority, then shows it loses authority and that the
+  new active page stays pending until its own request completes. Closure-identity
+  assertions became observable checks: no new acquisition after the decoded
+  cache is cleared, controls stay enabled in the first frame, and autoplay
+  advances from the retained slot. Identity-blind slot reuse, no slot reuse and
+  any-owner admission each fail at least one rewritten test. The one remaining
+  synthetic test is labelled adversarial. It checks the slideshow's own
+  request revocation, which `AppNetworkImage` generations otherwise hide.
+- New controlled-provider coverage: bucket, DPR and cache-manager replacement
+  of a terminal and a pending request, including late obsolete completion. Also:
+  retained-bucket synchronous admission, unchanged rebuilds without new
+  requests, offscreen completion and gallery/visibility interaction. A cache
+  manager change alone reuses the URL-keyed retained decode as a valid
+  synchronous hit. That test clears the decoded cache to observe a pending
+  request.
+
+Remediation verification (Linux, Flutter 3.47.5, `TZ=Europe/Rome`):
+
+- `dart format --set-exit-if-changed` on changed Dart files, `git diff --check`
+  and `flutter analyze --no-pub`: clean. `dart format test/` also reports three
+  pre-existing unrelated files, left untouched.
+- `flutter test --no-pub --reporter expanded` with the CI-equivalent explicit
+  autonomous file list (217 files): 4413 passed, 4 skipped, zero failures.
+  Existing skips were not changed; the seven additional passes are the new
+  test instances.
+- The 38 tests in the changed media/thumbnail/slideshow/gallery lifecycle files
+  passed five times in file order and once each with random ordering seeds
+  1, 42, 777, 2026 and 31337.
+- `openspec validate optimize-image-rendering-and-empty-view --strict`: valid.
+- Native integration tests were not rerun: no simulator or device is available
+  in the remediation environment.
+
+Tasks 5.3 and 5.4 remain open for device and assistive-technology acceptance.
+No merge, release, canonical spec synchronization or archival is authorized by
+this handoff.
