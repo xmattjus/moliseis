@@ -60,7 +60,8 @@ final class PostMediaSlideshowHarness {
     );
   }
 
-  final CacheManager cacheManager;
+  /// Replace, then [pump] and [rebuild], to change the effective manager.
+  CacheManager cacheManager;
   final ValueNotifier<int> revision = ValueNotifier(0);
   ValueNotifier<bool> visibility = ValueNotifier(true);
   List<Media> media;

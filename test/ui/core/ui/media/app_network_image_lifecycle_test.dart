@@ -74,6 +74,61 @@ void main() {
     });
   }
 
+  testWidgets('pending replacement after a real failure does not inherit '
+      'the failed request presentation or readiness', (tester) async {
+    final manager = ControlledImageCacheManager();
+    addTearDown(manager.dispose);
+    final files = TestImageFiles.create();
+    addTearDown(files.dispose);
+    final bytes = files.createSizedPng(400, 300).readAsBytesSync();
+    final logger = MockLogger();
+    final states = <bool>[];
+    Future<void> show(String url) => tester.pumpWidget(
+      networkImageHarness(
+        manager: manager,
+        logger: logger,
+        child: AppNetworkImage(
+          url: url,
+          width: 86,
+          height: 86,
+          onImageLoading: states.add,
+        ),
+      ),
+    );
+
+    await show('https://example.test/a.png');
+    final state = tester.state(find.byType(AppNetworkImage));
+    manager.fail(0, Exception('a failed'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ImageErrorPlaceholder), findsOneWidget);
+    expect(states, [true, false]);
+    expect(logger.calls, hasLength(1));
+
+    await show('https://example.test/b.png');
+    await tester.pump();
+    expect(tester.state(find.byType(AppNetworkImage)), same(state));
+    expect(manager.requests.map((r) => r.url).last, endsWith('/b.png'));
+    expect(find.byType(ImageErrorPlaceholder), findsNothing);
+    expect(states, [true, false, true]);
+    expect(logger.calls, hasLength(1));
+
+    manager.complete(1, bytes);
+    await tester.pump();
+    await tester.runAsync(() async {
+      final frame = await decodeImage(
+        tester.widget<Image>(find.byType(Image)).image,
+      );
+      frame.dispose();
+    });
+    await tester.pumpAndSettle();
+    expect(find.byType(ImageErrorPlaceholder), findsNothing);
+    final raw = tester.widget<RawImage>(find.byType(RawImage));
+    expect(raw.image, isNotNull);
+    expect(states, [true, false, true, false]);
+    expect(logger.calls, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('target and fit replacement revokes old publications; '
       'unchanged builds dedup', (tester) async {
     final manager = ControlledImageCacheManager();
