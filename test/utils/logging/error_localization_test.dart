@@ -82,6 +82,73 @@ void main() {
     },
   );
 
+  test(
+    'upload envelope keeps canonical locations and excludes private input',
+    () async {
+      const sources = [
+        'package:moliseis/data/repositories/content_submission_repository_impl.dart',
+        'package:flutter/src/widgets/framework.dart',
+        'dart:async/future_impl.dart',
+      ];
+      final error = StateError('PRIVATE_UPLOAD_ERROR_MESSAGE');
+      final stack = StackTrace.fromString(
+        '#0 PRIVATE_RAW_METHOD (${sources[0]}:42:7)\n'
+        '#1 PRIVATE_RAW_METHOD (${sources[1]}:42:7)\n'
+        '#2 PRIVATE_RAW_METHOD (${sources[2]}:42:7)\n'
+        '#3 f (file:///private/PRIVATE_NONCANONICAL_PATH.dart:42:7)\n'
+        '#4 f (package:moliseis/PRIVATE_UNSUPPORTED_PATH.dart:42:7)\n'
+        'PRIVATE_RAW_STACK_TEXT',
+      );
+      const ambient = 'PRIVATE_AMBIENT_CONTEXT';
+      const extra = {
+        'authorization': 'PRIVATE_AUTHORIZATION',
+        'url': 'https://example.test/PRIVATE_URL',
+        'body': 'PRIVATE_REQUEST_BODY',
+        'contributor': 'PRIVATE_CONTRIBUTOR',
+        'error_metadata': 'PRIVATE_ERROR_METADATA',
+      };
+      await Sentry.configureScope(
+        (scope) => scope.setContexts('private', {'value': ambient}),
+      );
+      logger.log(
+        const ContentSubmissionUploadFailed(),
+        error: error,
+        stackTrace: stack,
+        extra: extra,
+      );
+      await transport.settleCaptures();
+      expect(transport.events, hasLength(1));
+      expect(transport.envelopes, hasLength(1));
+      final exception = transport
+          .exceptionValues(await transport.serializedEvent(0))
+          .single;
+      final frames = exception['stacktrace']['frames'] as List<dynamic>;
+      expect(
+        frames.map((frame) => frame['abs_path']),
+        unorderedEquals(sources),
+      );
+      for (final frame in frames) {
+        expect(frame['lineno'], 42);
+        expect(frame['colno'], 7);
+        expect(frame, isNot(contains('function')));
+      }
+      final envelope = await transport.serializedEnvelope(0);
+      for (final canary in [
+        'PRIVATE_UPLOAD_ERROR_MESSAGE',
+        'PRIVATE_RAW_METHOD',
+        'PRIVATE_NONCANONICAL_PATH',
+        'PRIVATE_UNSUPPORTED_PATH',
+        'PRIVATE_RAW_STACK_TEXT',
+        ambient,
+        ...extra.values,
+      ]) {
+        expect(envelope, isNot(contains(canary)));
+      }
+      expect(talker.history.single.exception, same(error));
+      expect(talker.history.single.stackTrace, same(stack));
+    },
+  );
+
   for (final stack in <String?>[
     null,
     private,

@@ -5,7 +5,14 @@
 import 'dart:async'
     show Completer, TimeoutException, runZonedGuarded, unawaited;
 import 'dart:convert' show utf8;
-import 'dart:io' show Directory, File, FileSystemException, HttpOverrides;
+import 'dart:io'
+    show
+        Directory,
+        File,
+        FileSystemException,
+        HttpException,
+        HttpOverrides,
+        SocketException;
 
 import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +30,7 @@ import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 
+import '../../../../support/application_reporting_harness.dart';
 import '../../../../support/fake_cloudinary_http_request.dart';
 import '../../../../support/fake_cloudinary_server.dart';
 import '../../../../support/fake_cloudinary_upload_preparation_client.dart';
@@ -222,6 +230,7 @@ void main() {
               ..automatedTestMode = true
               ..transport = transport
               ..addEventProcessor(transport)
+              ..beforeSend = AppLogger.beforeSend
               ..enablePrintBreadcrumbs = false,
           );
           addTearDown(Sentry.close);
@@ -249,6 +258,12 @@ void main() {
           await transport.settleCaptures();
           expect(transport.events, hasLength(consent ? 1 : 0));
           expect(transport.envelopes, hasLength(consent ? 1 : 0));
+          expect(
+            Sentry.currentHub.scope.breadcrumbs.where(
+              (entry) => entry.message == 'cloudinary_request_failed',
+            ),
+            hasLength(consent ? 1 : 0),
+          );
           for (final envelope in transport.envelopes) {
             final serialized = await utf8.decoder
                 .bind(envelope.envelopeStream(Sentry.currentHub.options))
@@ -807,9 +822,60 @@ void main() {
       expect(progressValues, contains(1.0));
     });
 
+    for (final cause in [
+      const SocketException('synthetic socket failure'),
+      const HttpException('synthetic HTTP failure'),
+    ]) {
+      for (final late in [false, true]) {
+        test(
+          'TASK-46 ${cause.runtimeType} with late request observer=$late',
+          () async {
+            final reporting = ApplicationReportingHarness();
+            await reporting.start();
+            final directory = await Directory.systemTemp.createTemp(
+              'terminal_fault_',
+            );
+            addTearDown(() => directory.delete(recursive: true));
+            final file = File('${directory.path}/image.jpg')
+              ..writeAsBytesSync([1]);
+            final http = FaultingCloudinaryHttpClient(
+              beforeClose: late,
+              failure: cause,
+              deferPassiveFailure: late,
+            );
+            final faultClient = HttpOverrides.runZoned(
+              () => CloudinaryUploadClientImpl(
+                logger: reporting.logger,
+                cloudName: 'test',
+                preparationClient: preparationClient,
+              ),
+              createHttpClient: (_) => http,
+            );
+            addTearDown(faultClient.dispose);
+
+            final result = await faultClient.uploadImageTask(file).result;
+            expect((result as Error<SubmissionAsset>).error, same(cause));
+            expect(http.closeCalled, !late);
+            if (late) {
+              expect(http.completion.isCompleted, isFalse);
+              http.completion.completeError(cause);
+            }
+            // The observer subscribed during upload, before this await.
+            await expectLater(http.completion.future, throwsA(same(cause)));
+            await reporting.expectTerminal('cloudinary_request_failed', cause, {
+              'stage': 'upload',
+              'category': 'transport',
+            }, captures: cause is HttpException);
+          },
+        );
+      }
+    }
+
     test(
-      'per-attempt timeout exhausts retries and returns a TimeoutException',
+      'TASK-46 exhausted upload retries retain the TimeoutException',
       () async {
+        final reporting = ApplicationReportingHarness();
+        await reporting.start();
         server.setUploadResponse(
           status: 200,
           body: const {
@@ -830,16 +896,20 @@ void main() {
         addTearDown(() => tempDir.delete(recursive: true));
 
         final shortTimeoutClient = CloudinaryUploadClientImpl(
-          logger: logger,
+          logger: reporting.logger,
           cloudName: server.cloudName,
           preparationClient: preparationClient,
           baseUrl: server.baseUri.toString(),
           uploadTimeout: const Duration(milliseconds: 100),
         );
-        addTearDown(shortTimeoutClient.dispose);
 
-        final task = shortTimeoutClient.uploadImageTask(file);
-        final result = await task.result;
+        final Result<SubmissionAsset> result;
+        try {
+          result = await shortTimeoutClient.uploadImageTask(file).result;
+        } finally {
+          shortTimeoutClient.dispose();
+          await server.stop();
+        }
 
         expect(result.isError, isTrue);
         expect(switch (result) {
@@ -849,15 +919,24 @@ void main() {
         // Exactly three POSTs: one per attempt; no zombie dupes.
         expect(server.requests.where((r) => r.method == 'POST'), hasLength(3));
 
+        final messages = reporting.talker.history.map((entry) => entry.message);
         expect(
-          logger.eventsOfType<CloudinaryUploadRetry>().map((e) => e.attempt),
-          [1, 2],
+          messages.where(
+            (message) => message?.contains('cloudinary_upload_retry') ?? false,
+          ),
+          [contains('attempt: 1'), contains('attempt: 2')],
         );
         expect(
-          logger.eventsOfType<CloudinaryRequestFailed>().single.category,
-          CloudinaryFailureCategory.timeout,
+          messages,
+          isNot(contains(contains('cloudinary_upload_completed'))),
         );
-        expect(logger.eventsOfType<CloudinaryUploadCompleted>(), isEmpty);
+        await reporting.expectTerminal(
+          'cloudinary_request_failed',
+          (result as Error<SubmissionAsset>).error,
+          {'stage': 'upload', 'category': 'timeout'},
+          captures: false,
+          hasStack: false,
+        );
       },
     );
 

@@ -252,10 +252,11 @@ class AppLogger implements Logger {
     LogEvent event,
     Object? error,
   ) {
-    final hasCause = error != null;
+    final hasReportableCause =
+        error != null &&
+        syncFailureCategory(error) != SyncFailureCategory.connectivity;
     final report =
-        hasCause &&
-        syncFailureCategory(error) != SyncFailureCategory.connectivity &&
+        hasReportableCause &&
         !(error is AuthRetryableFetchException && error.statusCode == null);
     switch (event) {
       case SyncFailure():
@@ -275,7 +276,7 @@ class AppLogger implements Logger {
       case CloudinaryRequestFailed():
         return (
           report:
-              hasCause &&
+              hasReportableCause &&
               event.category != CloudinaryFailureCategory.validation &&
               event.category != CloudinaryFailureCategory.fileRead,
           data: {
@@ -302,7 +303,7 @@ class AppLogger implements Logger {
         return (report: false, data: {'source': event.source.name});
       case ContentSubmissionUploadFailed():
         return (
-          report: hasCause,
+          report: hasReportableCause,
           data: {
             'outcome': event.outcome.name,
             if (_status(event.statusCode) case final int status)
@@ -311,7 +312,9 @@ class AppLogger implements Logger {
         );
       case AdminBackendRequestFailed():
         return (
-          report: event.operation == 'associateStagedAsset' ? hasCause : report,
+          report: event.operation == 'associateStagedAsset'
+              ? hasReportableCause
+              : report,
           data: {
             'operation': _known(event.operation, const {
               'list',

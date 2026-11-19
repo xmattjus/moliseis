@@ -15,6 +15,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:sentry/sentry.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../support/application_reporting_harness.dart';
 import '../../support/fake_cloudinary_upload_client.dart';
 import '../../support/mock_logger.dart';
 import '../../support/recording_sentry_transport.dart';
@@ -406,30 +407,57 @@ void main() {
     });
   }
 
-  for (final failure in <({String name, Exception error})>[
-    (name: 'timeout', error: TimeoutException('submit-content timed out')),
-    (name: 'client', error: http.ClientException('transport failed')),
-    (name: 'socket', error: const SocketException('network unavailable')),
+  for (final failure in <({String name, Object cause})>[
+    (name: 'timeout', cause: TimeoutException('submit-content timed out')),
+    (name: 'client', cause: http.ClientException('transport failed')),
+    (name: 'socket', cause: const SocketException('network unavailable')),
+    (name: 'opaque fetch', cause: 'PRIVATE_FETCH_DETAIL'),
   ]) {
     test(
-      'returns ${failure.name} transport failure after one request',
+      'TASK-46 public ${failure.name} uses the terminal reporting policy',
       () async {
-        httpClient.error = failure.error;
-
+        final reporting = ApplicationReportingHarness();
+        await reporting.start();
+        repository = ContentSubmissionRepositoryImpl(
+          logger: reporting.logger,
+          supabaseClient: client,
+          cloudinaryUploadClient: FakeCloudinaryUploadClient(),
+        );
+        httpClient.error = failure.cause;
         final result = await submit();
 
-        expect(result, isA<Error<void>>());
-        expect((result as Error<void>).error, same(failure.error));
+        final error = (result as Error<void>).error;
+        final opaque = failure.cause is! Exception;
+        if (opaque) {
+          expect(
+            (error as FunctionsFetchException).details,
+            same(failure.cause),
+          );
+          expect(error.status, 0);
+        } else {
+          expect(error, same(failure.cause));
+        }
         expect(httpClient.requests, hasLength(1));
-        expect(
-          logger.eventsOfType<ContentSubmissionUploadFailed>().single.data,
+        await reporting.expectTerminal(
+          'content_submission_upload_failed',
+          error,
           {'outcome': 'unconfirmed'},
+          captures: opaque,
         );
+        if (opaque) {
+          expect(
+            await reporting.transport.serializedEnvelope(0),
+            isNot(contains(failure.cause)),
+          );
+        }
         expect(
-          logger.firstCallOfType<ContentSubmissionUploadFailed>()!.error,
-          same(failure.error),
+          reporting.talker.history.any(
+            (entry) =>
+                entry.message?.contains('content_submission_confirmed') ??
+                false,
+          ),
+          isFalse,
         );
-        expect(logger.eventsOfType<ContentSubmissionConfirmed>(), isEmpty);
       },
     );
   }
@@ -465,19 +493,6 @@ void main() {
       },
     );
   }
-
-  test('retains a fetch wrapper with non-Exception details', () async {
-    const originalError = 'transport diagnostic';
-    httpClient.error = originalError;
-
-    final result = await submit();
-
-    final error = (result as Error<void>).error as FunctionsFetchException;
-    expect(error.details, same(originalError));
-    expect(error.status, 0);
-    expect(httpClient.requests, hasLength(1));
-    expect(logger.eventsOfType<ContentSubmissionUploadFailed>(), hasLength(1));
-  });
 
   test('normalizes string Function failures and transport failures', () async {
     httpClient.queueText('Bad request', status: 400);
