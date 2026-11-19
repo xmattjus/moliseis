@@ -462,6 +462,50 @@ void main() {
     );
   }
 
+  for (final rejected in [true, false]) {
+    test('T2 public rejected=$rejected retains one eligible report', () async {
+      const private = 'PRIVATE_SUBMISSION_RESPONSE';
+      final reporting = ApplicationReportingHarness();
+      await reporting.start();
+      repository = ContentSubmissionRepositoryImpl(
+        logger: reporting.logger,
+        supabaseClient: client,
+        cloudinaryUploadClient: FakeCloudinaryUploadClient(),
+      );
+      if (rejected) {
+        httpClient.queueJson({
+          'code': 'VALIDATION_ERROR',
+          'message': private,
+        }, status: 400);
+      } else {
+        httpClient.queueJson({'submission_id': private});
+      }
+
+      final result = await submit();
+
+      final error = (result as Error<void>).error;
+      if (rejected) {
+        final rejection = error as ContentSubmissionApiException;
+        expect(
+          (rejection.statusCode, rejection.code, rejection.message),
+          (400, 'VALIDATION_ERROR', private),
+        );
+      } else {
+        expect(error, isA<FormatException>());
+      }
+      expect(httpClient.requests, hasLength(1));
+      await reporting
+          .expectTerminal('content_submission_upload_failed', error, {
+            'outcome': rejected ? 'rejected' : 'unconfirmed',
+            if (rejected) 'status_code': 400,
+          }, captures: true);
+      expect(
+        await reporting.transport.serializedEnvelope(0),
+        isNot(contains(private)),
+      );
+    });
+  }
+
   for (final assetCount in [0, 2]) {
     test(
       'one whole-submission acknowledgement covers $assetCount assets',

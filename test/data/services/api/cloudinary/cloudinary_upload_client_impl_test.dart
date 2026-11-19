@@ -16,6 +16,7 @@ import 'dart:io'
 
 import 'package:crypto/crypto.dart' show sha1;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' show ClientException;
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_public_id_generator.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_client_impl.dart';
 import 'package:moliseis/data/services/api/cloudinary/cloudinary_upload_options.dart';
@@ -615,17 +616,38 @@ void main() {
       expect(result.isError, isTrue);
     });
 
-    test('preparation failure prevents a Cloudinary upload request', () async {
-      preparationClient.enqueue(Result.error(Exception('preparation failed')));
-      final tempDir = await Directory.systemTemp.createTemp('prepare_error_');
-      final file = File('${tempDir.path}/image.jpg')..writeAsBytesSync([1]);
-      addTearDown(() => tempDir.delete(recursive: true));
+    test(
+      'T2 preparation connectivity retains diagnostics without a capture',
+      () async {
+        final reporting = ApplicationReportingHarness();
+        await reporting.start();
+        final cause = ClientException('preparation disconnected');
+        preparationClient.enqueue(Result.error(cause));
+        final uploadClient = CloudinaryUploadClientImpl(
+          logger: reporting.logger,
+          cloudName: server.cloudName,
+          preparationClient: preparationClient,
+          baseUrl: server.baseUri.toString(),
+        );
+        addTearDown(uploadClient.dispose);
+        final tempDir = await Directory.systemTemp.createTemp('prepare_error_');
+        addTearDown(() => tempDir.delete(recursive: true));
+        final file = File('${tempDir.path}/image.jpg')..writeAsBytesSync([1]);
 
-      final result = await client.uploadImageTask(file).result;
+        final result = await uploadClient.uploadImageTask(file).result;
 
-      expect(result.isError, isTrue);
-      expect(server.requests, isEmpty);
-    });
+        expect((result as Error<SubmissionAsset>).error, same(cause));
+        expect(preparationClient.calls, hasLength(1));
+        expect(server.requests, isEmpty);
+        await reporting.expectTerminal(
+          'cloudinary_request_failed',
+          cause,
+          {'stage': 'preparation', 'category': 'preparation'},
+          captures: false,
+          hasStack: false,
+        );
+      },
+    );
 
     test(
       'malformed authorization response failure prevents a Cloudinary POST',

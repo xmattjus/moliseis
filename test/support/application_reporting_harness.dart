@@ -29,6 +29,18 @@ final class ApplicationReportingHarness {
         ..addEventProcessor(transport),
     );
     addTearDown(Sentry.close);
+
+    // Check the SDK before the producer runs. The awaited probe is an
+    // independent health check, not a barrier for other captures.
+    expect(Sentry.isEnabled, isTrue);
+    final probeId = await Sentry.captureException(
+      StateError('transport probe'),
+    );
+    expect(probeId, isNot(const SentryId.empty()));
+    expect(transport.events.single.eventId, probeId);
+    expect(transport.envelopes.single.header.eventId, probeId);
+    transport.events.clear();
+    transport.envelopes.clear();
   }
 
   Future<void> expectTerminal(

@@ -1,3 +1,6 @@
+import 'dart:async' show TimeoutException;
+import 'dart:io' show SocketException;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
@@ -720,9 +723,15 @@ void main() {
       );
     }
 
-    for (final scenario in ['transport', 'rejected', 'invalid receipt']) {
+    for (final (scenario, cause) in [
+      ('client', http.ClientException('private transport message')),
+      ('socket', const SocketException('private transport message')),
+      ('timeout', TimeoutException('private transport message')),
+      ('rejected', null),
+      ('invalid receipt', null),
+    ]) {
       test(
-        'TASK-46 Admin association $scenario preserves reporting policy',
+        'T2 Admin association $scenario preserves reporting policy',
         () async {
           final reporting = ApplicationReportingHarness();
           await reporting.start();
@@ -730,9 +739,8 @@ void main() {
             logger: reporting.logger,
             supabaseClient: client,
           );
-          final cause = http.ClientException('private transport message');
           switch (scenario) {
-            case 'transport':
+            case 'client' || 'socket' || 'timeout':
               httpClient.error = cause;
             case 'rejected':
               httpClient.queueJson({
@@ -760,7 +768,7 @@ void main() {
           );
           final error = (result as Error<AdminSubmissionAsset>).error;
           expect(error, switch (scenario) {
-            'transport' => same(cause),
+            'client' || 'socket' || 'timeout' => same(cause),
             'rejected' => isA<AdminContentSubmissionApiException>(),
             _ => isA<FormatException>(),
           });
@@ -770,8 +778,8 @@ void main() {
                 'operation': 'associateStagedAsset',
                 'outcome': scenario == 'rejected' ? 'rejected' : 'unconfirmed',
                 if (scenario == 'rejected') 'status_code': 409,
-              }, captures: scenario != 'transport');
-          if (scenario != 'transport') {
+              }, captures: cause == null);
+          if (cause == null) {
             expect(
               await reporting.transport.serializedEnvelope(0),
               isNot(contains('PRIVATE_ADMIN_RESPONSE')),
