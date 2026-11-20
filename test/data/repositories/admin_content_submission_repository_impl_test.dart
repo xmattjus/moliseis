@@ -1,3 +1,6 @@
+import 'dart:async' show TimeoutException;
+import 'dart:io' show SocketException;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:moliseis/data/repositories/admin_content_submission_api_exception.dart';
@@ -14,6 +17,7 @@ import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../support/admin_moderation_error_cases.dart';
+import '../../support/application_reporting_harness.dart';
 import '../../support/mock_logger.dart';
 import '../../support/recording_supabase_functions_http_client.dart';
 
@@ -719,29 +723,79 @@ void main() {
       );
     }
 
-    test(
-      'staged transport loss preserves the cause and unconfirmed outcome',
-      () async {
-        final cause = http.ClientException('private transport message');
-        httpClient.error = cause;
-        final result = await repository.associateStagedAsset(
-          7,
-          const SubmissionAsset(
-            secureUrl: 'https://example.com/a.jpg',
-            width: 100,
-            height: 90,
-          ),
-        );
-        expect((result as Error).error, same(cause));
-        expect(httpClient.requests, hasLength(1));
-        expect(logger.calls, hasLength(1));
-        expect(logger.eventsOfType<AdminBackendRequestFailed>().single.data, {
-          'operation': 'associateStagedAsset',
-          'outcome': 'unconfirmed',
-        });
-        expect(logger.eventsOfType<AdminStagedAssetAssociated>(), isEmpty);
-      },
-    );
+    for (final (scenario, cause) in [
+      ('client', http.ClientException('private transport message')),
+      ('socket', const SocketException('private transport message')),
+      ('timeout', TimeoutException('private transport message')),
+      ('rejected', null),
+      ('invalid receipt', null),
+    ]) {
+      test(
+        'T2 Admin association $scenario preserves reporting policy',
+        () async {
+          final reporting = ApplicationReportingHarness();
+          await reporting.start();
+          repository = AdminContentSubmissionRepositoryImpl(
+            logger: reporting.logger,
+            supabaseClient: client,
+          );
+          switch (scenario) {
+            case 'client' || 'socket' || 'timeout':
+              httpClient.error = cause;
+            case 'rejected':
+              httpClient.queueJson({
+                'code': 'ASSET_LIMIT_REACHED',
+                'message': 'PRIVATE_ADMIN_RESPONSE',
+              }, status: 409);
+            case 'invalid receipt':
+              httpClient.queueJson({
+                'outcome': 'created',
+                'asset': {
+                  'id': 9,
+                  'url': 'https://example.com/a.jpg',
+                  'width': 101,
+                  'height': 90,
+                },
+              });
+          }
+          final result = await repository.associateStagedAsset(
+            7,
+            const SubmissionAsset(
+              secureUrl: 'https://example.com/a.jpg',
+              width: 100,
+              height: 90,
+            ),
+          );
+          final error = (result as Error<AdminSubmissionAsset>).error;
+          expect(error, switch (scenario) {
+            'client' || 'socket' || 'timeout' => same(cause),
+            'rejected' => isA<AdminContentSubmissionApiException>(),
+            _ => isA<FormatException>(),
+          });
+          expect(httpClient.requests, hasLength(1));
+          await reporting
+              .expectTerminal('admin_backend_request_failed', error, {
+                'operation': 'associateStagedAsset',
+                'outcome': scenario == 'rejected' ? 'rejected' : 'unconfirmed',
+                if (scenario == 'rejected') 'status_code': 409,
+              }, captures: cause == null);
+          if (cause == null) {
+            expect(
+              await reporting.transport.serializedEnvelope(0),
+              isNot(contains('PRIVATE_ADMIN_RESPONSE')),
+            );
+          }
+          expect(
+            reporting.talker.history.any(
+              (entry) =>
+                  entry.message?.contains('admin_staged_asset_associated') ??
+                  false,
+            ),
+            isFalse,
+          );
+        },
+      );
+    }
 
     test('create sends only the twelve editor-owned fields', () async {
       httpClient.queueJson(<String, dynamic>{

@@ -5,7 +5,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Records capture attempts and waits for their actual transport delivery.
 class RecordingSentryTransport implements Transport, EventProcessor {
-  /// Events observed by the scope processor, before asynchronous enrichment.
+  /// Events observed at this processor, before final envelope delivery.
   final List<SentryEvent> events = [];
 
   /// Envelopes delivered after all Sentry processors have completed.
@@ -52,12 +52,15 @@ class RecordingSentryTransport implements Transport, EventProcessor {
     return envelope.header.eventId ?? SentryId.newId();
   }
 
-  /// Waits for captures started by the preceding synchronous logger call.
+  /// Drains microtask-only capture setup, then waits for the envelopes of
+  /// events observed by this processor. Await producer callbacks first.
+  ///
+  /// This is not an SDK flush. It cannot see a capture scheduled by a later
+  /// timer or one still blocked before this processor by asynchronous work.
   Future<void> settleCaptures() async {
-    // In sentry 10.0.0-rc.2, Hub.captureException awaits scope cloning before
-    // applying processors; async sanitized scopes also require microtasks.
-    // Observe attempts here, before Linux enrichment starts /proc/meminfo IO,
-    // so a forbidden capture cannot pass an empty-envelope assertion.
+    // For the app's configured 10.0.0-rc.2 test path, scope preparation
+    // reaches the first options processor via microtasks. Envelope delivery
+    // can then wait on asynchronous enrichment, including Linux device I/O.
     await Future<void>(() {});
     while (events.any(
       (event) => !envelopes.any(

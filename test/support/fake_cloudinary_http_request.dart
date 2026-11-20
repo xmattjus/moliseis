@@ -34,10 +34,18 @@ class FakeCloudinaryHttpResponse implements HttpClientResponse {
 
 /// An HTTP client that fails at a deterministic request boundary.
 class FaultingCloudinaryHttpClient implements HttpClient {
-  FaultingCloudinaryHttpClient({required this.beforeClose});
+  FaultingCloudinaryHttpClient({
+    required this.beforeClose,
+    this.failure = const HttpException('synthetic request failure'),
+    this.deferPassiveFailure = false,
+  }) : assert(
+         beforeClose || !deferPassiveFailure,
+         'Deferral requires a primary failure before close',
+       );
 
   final bool beforeClose;
-  final failure = const HttpException('synthetic request failure');
+  final Exception failure;
+  final bool deferPassiveFailure;
   final completion = Completer<HttpClientResponse>();
   bool closeCalled = false;
 
@@ -72,7 +80,9 @@ class FaultingCloudinaryHttpRequest implements HttpClientRequest {
   @override
   void add(List<int> data) {
     if (client.beforeClose) {
-      client.completion.completeError(client.failure);
+      if (!client.deferPassiveFailure) {
+        client.completion.completeError(client.failure);
+      }
       throw client.failure;
     }
   }

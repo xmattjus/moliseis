@@ -24,6 +24,8 @@ import 'package:moliseis/utils/result.dart' show Result;
 import 'package:moliseis/utils/result_command.dart';
 import 'package:moliseis/utils/sentry_logging_flag.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show AuthRetryableFetchException;
 import 'package:talker_flutter/talker_flutter.dart';
 
 import '../../support/logging_faults.dart';
@@ -606,6 +608,38 @@ void main() {
         );
       },
     );
+
+    for (final event in [
+      const CloudinaryRequestFailed(
+        stage: CloudinaryFailureStage.preparation,
+        category: CloudinaryFailureCategory.preparation,
+      ),
+      const ContentSubmissionUploadFailed(),
+      const AdminBackendRequestFailed(operation: 'associateStagedAsset'),
+      const AdminBackendRequestFailed(operation: 'list'),
+    ]) {
+      test(
+        '${event.name} missing cause and auth policy for ${event.data}',
+        () async {
+          sentryFlag.enabled = true;
+          final logger = AppLogger(null, sentryFlag: sentryFlag);
+          logger.log(event);
+          await fakeTransport.settleCaptures();
+          expect(fakeTransport.events, isEmpty);
+          expect(fakeTransport.envelopes, isEmpty);
+
+          logger.log(
+            event,
+            error: AuthRetryableFetchException(message: 'auth fetch failed'),
+          );
+          await fakeTransport.settleCaptures();
+          final unrelatedAdmin =
+              event is AdminBackendRequestFailed && event.operation == 'list';
+          expect(fakeTransport.events, hasLength(unrelatedAdmin ? 0 : 1));
+          expect(fakeTransport.envelopes, hasLength(unrelatedAdmin ? 0 : 1));
+        },
+      );
+    }
 
     for (final enabled in [false, true]) {
       for (final status in [400, 503]) {
