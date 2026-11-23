@@ -22,6 +22,8 @@ void main() {
       final files = TestImageFiles.create();
       addTearDown(files.dispose);
       final bytes = files.createSizedPng(4000, 3000).readAsBytesSync();
+      final freshBytes = files.createSizedPng(3000, 4000).readAsBytesSync();
+      var responseBytes = bytes;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => server.close(force: true));
       final sends = <String>[];
@@ -30,7 +32,7 @@ void main() {
         request.response.headers
           ..contentType = ContentType('image', 'png')
           ..set(HttpHeaders.cacheControlHeader, 'max-age=3600');
-        request.response.add(bytes);
+        request.response.add(responseBytes);
         await request.response.close();
       });
       final evidence = <({int concurrentReads, int concurrentHttp})>[];
@@ -43,6 +45,7 @@ void main() {
           client: clients[cover ? 1 : 0],
         );
         try {
+          responseBytes = bytes;
           final cache = PaintingBinding.instance.imageCache
             ..clear()
             ..clearLiveImages();
@@ -123,12 +126,15 @@ void main() {
           expect(expired!.validTill.isBefore(DateTime.now()), isTrue);
           sendsBefore = sends.length;
           final readsBeforeRefresh = manager.reads.length;
+          responseBytes = freshBytes;
+          final expectedFreshSize = cover ? (864, 1152) : (648, 864);
           final refreshed = Completer<void>();
           final stream = sized[864]!.resolve(ImageConfiguration.empty);
           final listener = ImageStreamListener(
             (image, _) {
+              final size = (image.image.width, image.image.height);
               image.dispose();
-              if (sends.length > sendsBefore && !refreshed.isCompleted) {
+              if (size == expectedFreshSize && !refreshed.isCompleted) {
                 refreshed.complete();
               }
             },
