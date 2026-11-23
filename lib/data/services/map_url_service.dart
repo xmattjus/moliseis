@@ -12,7 +12,6 @@ class MapUrlService {
   // Map service URLs
   static const _mapTilerUrl = 'https://www.maptiler.com/copyright/';
   static const _openStreetMapUrl = 'https://www.openstreetmap.org/copyright';
-  static const _googleMapsBaseUrl = 'https://www.google.com/maps/search/?api=1';
 
   /// Opens the MapTiler copyright web page with the default web browser app.
   ///
@@ -41,7 +40,10 @@ class MapUrlService {
         ? '$contentName, $cityName, Molise, Italia'
         : '$contentName, Molise, Italia';
 
-    final searchUrl = '$_googleMapsBaseUrl&query=$query';
+    final searchUrl = Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': query,
+    }).toString();
 
     return _externalUrlService.launchGenericUrl(searchUrl);
   }
