@@ -98,3 +98,43 @@ jobs:
           fi
           printf 'Running %s autonomous test files.\n' "${#test_files[@]}"
           flutter test --no-pub --reporter expanded "${test_files[@]}"
+
+  deno-tests:
+    name: Autonomous Deno tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: "2.9.7"
+
+      - name: Verify Deno version
+        run: deno --version
+
+      - name: Run autonomous Deno tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Tests requiring Supabase/PostgreSQL live under supabase/tests/.
+          mapfile -d '' test_files < <(
+            find supabase/functions supabase/tools -type f -name '*_test.ts' \
+              -print0 | sort -z
+          )
+          if (( ${#test_files[@]} == 0 )); then
+            echo "No autonomous Deno tests found."
+            exit 1
+          fi
+          printf 'Running %s autonomous Deno test files.\n' "${#test_files[@]}"
+          deno test \
+            --allow-env=SUPABASE_PUBLISHABLE_KEYS,SUPABASE_ANON_KEY,EXTERNAL_EVENTS_IMPORTER_USER_ID \
+            --allow-read=supabase/tools/external_event_deployment_runbook.md,/tmp \
+            --allow-write=/tmp \
+            --allow-run="$(command -v deno)" \
+            --reporter=dot \
+            "${test_files[@]}"
