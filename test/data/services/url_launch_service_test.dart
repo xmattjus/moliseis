@@ -95,9 +95,70 @@ void main() {
       final opened = await service.openGoogleMaps('Castelpetroso', 'Isernia');
 
       expect(opened, isTrue);
-      expect(externalUrlService.launchedUrls, [
-        'https://www.google.com/maps/search/?api=1&query=Castelpetroso, Isernia, Molise, Italia',
-      ]);
+      final uri = Uri.parse(externalUrlService.launchedUrls.single);
+      expect(uri.scheme, 'https');
+      expect(uri.host, 'www.google.com');
+      expect(uri.path, '/maps/search/');
+      expect(uri.queryParameters, {
+        'api': '1',
+        'query': 'Castelpetroso, Isernia, Molise, Italia',
+      });
+      expect(uri.fragment, isEmpty);
+    });
+
+    test('openGoogleMaps encodes reserved characters with a city', () async {
+      final service = UrlLaunchService(
+        logger: logger,
+        externalUrlService: externalUrlService,
+      );
+
+      final opened = await service.openGoogleMaps(
+        'Caffè 100% & Cultura #1',
+        "Sant'Agapito",
+      );
+
+      expect(opened, isTrue);
+      final uri = Uri.parse(externalUrlService.launchedUrls.single);
+      expect(uri.queryParameters, {
+        'api': '1',
+        'query': "Caffè 100% & Cultura #1, Sant'Agapito, Molise, Italia",
+      });
+      expect(uri.fragment, isEmpty);
+    });
+
+    test('openGoogleMaps preserves the query without a city', () async {
+      final service = UrlLaunchService(
+        logger: logger,
+        externalUrlService: externalUrlService,
+      );
+
+      final opened = await service.openGoogleMaps(
+        "L'arte & i borghi #Molise – città",
+        null,
+      );
+
+      expect(opened, isTrue);
+      final uri = Uri.parse(externalUrlService.launchedUrls.single);
+      expect(uri.queryParameters, {
+        'api': '1',
+        'query': "L'arte & i borghi #Molise – città, Molise, Italia",
+      });
+      expect(uri.fragment, isEmpty);
+    });
+
+    test('openGoogleMaps preserves external launch failure', () async {
+      externalUrlService.nextResult = Result.error(
+        Exception('launch failed'),
+      );
+      final service = UrlLaunchService(
+        logger: logger,
+        externalUrlService: externalUrlService,
+      );
+
+      final opened = await service.openGoogleMaps('Castelpetroso', null);
+
+      expect(opened, isFalse);
+      expect(externalUrlService.launchedUrls, hasLength(1));
     });
 
     test('uses injected app and map service overrides when provided', () async {
