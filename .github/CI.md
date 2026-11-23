@@ -34,7 +34,7 @@ canale stable e cache come `build-release.yml`. Dart è quello incluso in
 Flutter (3.13.4 nella verifica locale), senza un'installazione indipendente.
 Il job Deno usa `denoland/setup-deno@v2` con versione esplicita **2.9.7**.
 La cache Deno non è abilitata, dato che attualmente non è presente un lockfile
-Deno nel repository. Le dipendenze vengono installate con
+Deno nel repository. Nei soli job Flutter, le dipendenze vengono installate con
 `flutter pub get --enforce-lockfile`: un lockfile non valido fallisce invece di
 risolvere nuove versioni. Java e Xcode del workflow release non servono a questi
 controlli. `build-release.yml` rimane invariato.
