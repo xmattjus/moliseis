@@ -173,6 +173,14 @@ void main() {
       await tester.pump();
       expect(fixture.controlsEnabled(tester), isFalse);
 
+      // Keep the original stream observable even if replacement evicts it.
+      final obsoleteStream = slideshowImageStream(
+        tester,
+        pendingManager.requests[pending].url,
+      );
+      final handle = obsoleteStream.completer!.keepAlive();
+      addTearDown(handle.dispose);
+
       // Replace again while that request is pending, then complete it late.
       await replace(1);
       expect(fixture.controlsEnabled(tester), isFalse);
@@ -181,12 +189,13 @@ void main() {
         identical(pendingManager, current()) ? effective : pending + 1,
         greaterThan(pending),
       );
-      pendingManager.complete(pending, bytes);
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      await completeSlideshowImage(
+        tester,
+        pendingManager,
+        pending,
+        bytes,
+        stream: obsoleteStream,
       );
-      await tester.pump();
-      await tester.pump();
       expect(fixture.controlsEnabled(tester), isFalse);
       await tester.pump(const Duration(seconds: 6));
       expect(fixture.controller(tester).page, 0);

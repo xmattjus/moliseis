@@ -34,8 +34,12 @@ class FailingKeyImageProvider extends ImageProvider<Object> {
 /// Resolves the first actual frame and releases its listener on every outcome.
 ///
 /// The caller owns the returned [ImageInfo] and must dispose it.
-Future<ImageInfo> decodeImage(ImageProvider provider) async {
-  final stream = provider.resolve(ImageConfiguration.empty);
+Future<ImageInfo> decodeImage(ImageProvider provider) async =>
+    await firstImageFrame(provider.resolve(ImageConfiguration.empty));
+
+/// Observes an already resolved stream without resolving its cache key again.
+/// The caller owns the returned [ImageInfo].
+Future<ImageInfo> firstImageFrame(ImageStream stream) async {
   final frame = Completer<ImageInfo>();
   final listener = ImageStreamListener(
     (image, _) {

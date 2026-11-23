@@ -81,19 +81,35 @@ void main() {
       expect(fixture.controlsEnabled(tester), isFalse);
       expect(controller.offset, 240);
 
+      final obsoleteStream = slideshowImageStream(
+        tester,
+        manager.requests[a].url,
+      );
+      final handle = obsoleteStream.completer!.keepAlive();
+      addTearDown(handle.dispose);
       controller.jumpToPage(1);
       await tester.pump();
       await tester.pump();
       expect(fixture.controlsEnabled(tester), isTrue);
       expect(manager.requests, hasLength(2));
 
-      // A's request completes after its page was disposed.
-      manager.complete(a, bytes);
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)),
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is AppNetworkImage &&
+              widget.url == manager.requests[a].url,
+          skipOffstage: false,
+        ),
+        findsNothing,
       );
-      await tester.pump();
-      await tester.pump();
+      // Observe A's decoded frame independently of its disposed page.
+      await completeSlideshowImage(
+        tester,
+        manager,
+        a,
+        bytes,
+        stream: obsoleteStream,
+      );
       expect(fixture.controlsEnabled(tester), isTrue);
       await tester.pump(const Duration(seconds: 6));
       await tester.pump(const Duration(seconds: 2));

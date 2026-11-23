@@ -107,29 +107,43 @@ final class PostMediaSlideshowHarness {
   }
 }
 
+/// Captures the mounted image's request before its cache key can be reused.
+ImageStream slideshowImageStream(WidgetTester tester, String url) {
+  final image = find.descendant(
+    of: find.byWidgetPredicate(
+      (widget) => widget is AppNetworkImage && widget.url == url,
+      skipOffstage: false,
+    ),
+    matching: find.byType(Image, skipOffstage: false),
+  );
+  final widget = tester.widget<Image>(image);
+  return widget.image.resolve(
+    createLocalImageConfiguration(
+      tester.element(image),
+      size: Size(widget.width!, widget.height!),
+    ),
+  );
+}
+
 /// Completes the provider and waits for its real first decoded frame.
+/// Pass [stream] to observe a request captured before replacement or unmount.
 Future<void> completeSlideshowImage(
   WidgetTester tester,
   ControlledImageCacheManager manager,
   int requestIndex,
-  List<int> bytes,
-) async {
+  List<int> bytes, {
+  ImageStream? stream,
+}) async {
+  final request =
+      stream ??
+      slideshowImageStream(tester, manager.requests[requestIndex].url);
   manager.complete(requestIndex, bytes);
-  await tester.pump();
-  final url = manager.requests[requestIndex].url;
-  final image = tester.widget<Image>(
-    find.descendant(
-      of: find.byWidgetPredicate(
-        (widget) => widget is AppNetworkImage && widget.url == url,
-        skipOffstage: false,
-      ),
-      matching: find.byType(Image, skipOffstage: false),
-    ),
-  );
-  final frame = await tester.runAsync(() => decodeImage(image.image));
-  frame?.dispose();
-  await tester.pump();
-  await tester.pump();
+  await tester.pump(); // Deliver the controlled response in the widget zone.
+  final frame = await tester.runAsync(() => firstImageFrame(request));
+  expect(frame, isNotNull);
+  frame!.dispose();
+  await tester.pump(); // Flush any loading notification.
+  await tester.pump(); // Render controls after deferred publication.
 }
 
 /// Observes the real async gallery callback despite CardBase's void API.
