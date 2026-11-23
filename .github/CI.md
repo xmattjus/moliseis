@@ -1,6 +1,6 @@
 # CI per pull request
 
-Il workflow `pull-request.yml` esegue due job indipendenti per ogni pull request
+Il workflow `pull-request.yml` esegue tre job indipendenti per ogni pull request
 verso `main` (apertura, aggiornamento dei commit e riapertura), anche senza modifiche
 a file Dart. Non effettua build release, deploy o merge e non configura protezioni
 del branch: gli eventuali required checks vanno impostati separatamente su GitHub.
@@ -15,16 +15,26 @@ del branch: gli eventuali required checks vanno impostati separatamente su GitHu
   Alla preparazione della CI sono 144 file: unit test, widget test, repository e
   persistenza con store ObjectBox temporanei reali. I nuovi test fuori da
   `test/integration/` vengono inclusi automaticamente. Una selezione vuota fallisce.
+- **Autonomous Deno tests**: Deno **2.9.7** sui file `*_test.ts` in
+  `supabase/functions/` e `supabase/tools/`. La selezione è automatica e
+  fallisce se non trova test. I test in `supabase/tests/` richiedono servizi
+  locali e sono esclusi. Il job non avvia Docker o Supabase e non usa segreti.
+  Concede solo gli accessi Deno necessari ai test correnti: variabili d'ambiente
+  nominate, lettura del runbook e di `/tmp`, scrittura su `/tmp` e
+  avvio del binario Deno per il test CLI che crea un subprocesso.
 
 I job sono indipendenti: un fallimento di analyze non impedisce l'esecuzione dei
 test. Nessun `continue-on-error`, esclusione per nome di test fallito o neutralizzazione
 degli exit code. Gli skip già dichiarati nei test restano visibili nel reporter;
 questa CI non li rimuove e non equivale a copertura di quei casi.
 
-Entrambi usano `ubuntu-latest`, `permissions: contents: read`, checkout v6 e
-flutter-action v2, Flutter **3.47.5**, canale stable e cache come
-`build-release.yml`. Dart è quello incluso in Flutter (3.13.4 nella verifica
-locale), senza un'installazione indipendente. Le dipendenze vengono installate con
+Tutti e tre i job usano `ubuntu-latest`, `permissions: contents: read`
+e checkout v6. I due job Flutter usano flutter-action v2, Flutter **3.47.5**,
+canale stable e cache come `build-release.yml`. Dart è quello incluso in
+Flutter (3.13.4 nella verifica locale), senza un'installazione indipendente.
+Il job Deno usa `denoland/setup-deno@v2` con versione esplicita **2.9.7**.
+La cache Deno non è abilitata, dato che attualmente non è presente un lockfile
+Deno nel repository. Nei soli job Flutter, le dipendenze vengono installate con
 `flutter pub get --enforce-lockfile`: un lockfile non valido fallisce invece di
 risolvere nuove versioni. Java e Xcode del workflow release non servono a questi
 controlli. `build-release.yml` rimane invariato.
@@ -74,9 +84,9 @@ e aggiornare questa lista; i test autonomi vanno nelle altre directory di `test/
 Un futuro job per lo stack locale dovrà predisporre esplicitamente servizi,
 migration e fixture e lasciare propagare i fallimenti.
 
-Restano fuori anche test SQL/migration/RLS e Deno sotto `supabase/`, test su device
-o emulatori, build Android/iOS, signing, verifica dei generatori, coverage e
-deploy. Nessuno di questi controlli è dichiarato coperto dalla prima CI.
+Restano fuori i test SQL/migration/RLS e gli altri test Deno con servizi
+sotto `supabase/tests/`, i test su device o emulatori, build Android/iOS,
+signing, verifica dei generatori, coverage e deploy. Nessuno di questi controlli è dichiarato coperto dalla prima CI.
 
 ## Verifica iniziale
 
