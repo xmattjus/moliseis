@@ -264,6 +264,7 @@ Deno.test("canonical source Delta survives exact loaded Admin no-op Save", () =>
   const request = (input: typeof raw | NormalizedExternalEvent) => ({
     operation: "update",
     submission_id: 1,
+    expected_modified_at: "2026-08-21T11:00:00.000Z",
     input: { ...input, start_calendar_date: null, end_calendar_date: null },
   });
   assertEquals(
