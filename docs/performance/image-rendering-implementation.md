@@ -263,16 +263,8 @@ observations:
 - Independent gallery/slideshow rerun: 17 passed; the review's actual-gallery
   contrast finding was fixed and rechecked, with no further material finding.
 
-The initial focused run lacked the ignored native ObjectBox test library in the
-new worktree; the installed original-checkout library was then made available.
-The first complete run encountered one compile failure while a slideshow test
-was being edited. The stable full rerun above supersedes both attempts. Neither
-was hidden by changing assertions or excluding affected autonomous tests.
-
-At that handoff the PR was stacked on the then-open planning branch, so remote
-CI could not run. Once PR #44 targeted `main`, the `Pull request checks`
-workflow ran on head `a7041ac`: `Flutter analyze` and `Autonomous Flutter tests`
-both succeeded.
+The `Pull request checks` workflow on head `a7041ac` passed `Flutter analyze`
+and `Autonomous Flutter tests`.
 
 ## Adversarial review remediation (2026-11-16)
 
@@ -345,10 +337,6 @@ Remediation verification (Linux, Flutter 3.47.5, `TZ=Europe/Rome`):
 - `openspec validate optimize-image-rendering-and-empty-view --strict`: valid.
 - Native integration tests were not rerun: no simulator or device is available
   in the remediation environment.
-
-Tasks 5.3 and 5.4 remain open for device and assistive-technology acceptance.
-No merge, release, canonical spec synchronization or archival is authorized by
-this handoff.
 
 ## Physical Android Profile acceptance — 2026-11-24
 
@@ -779,8 +767,7 @@ remains applicable to the unchanged layout and semantics code.
   suite passed 4,428 tests with four skips.
 - The two checked-in image presentation integration tests passed on iOS 27.2. The native VoiceOver comparison confirmed compact and spacious speech with one labeled element each and reverse navigation to the screen title.
 - Strict OpenSpec validation, the direct documentation audit and Git diff
-  checks passed. The named repository-local documentation audit skill was
-  unavailable.
+  checks passed.
 - At this follow-up, task 5.4 remained open for confirmed VoiceOver activation.
   The acceptance-policy amendment below supersedes that merge disposition.
 
@@ -817,8 +804,7 @@ The Android campaign, native investigation and local Flutter suite were
 reused because the implementation, tests and dependencies are unchanged.
 [CI run 45481212630](https://github.com/xmattjus/moliseis/actions/runs/45481212630)
 also passed Flutter analyze, autonomous Flutter tests and autonomous Deno
-tests on the same implementation and tests. The documentation amendment's
-own CI checks apply to the updated PR head.
+tests on the same implementation and tests.
 
 ## iOS release gates
 

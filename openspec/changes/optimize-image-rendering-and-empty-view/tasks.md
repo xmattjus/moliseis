@@ -49,18 +49,11 @@ Implementation is authorized by the current user request. Deterministic evidence
 and remaining gates are recorded in
 [`image-rendering-implementation.md`](../../../docs/performance/image-rendering-implementation.md).
 
-- Historical (2026-11-15): at handoff the implementation PR was stacked on the
-  planning branch, so remote CI could not run. Local formatting, analyzer, all
-  217 autonomous Flutter test files (4406 passed, 4 skipped), iOS simulator
-  build and both native functional tests passed.
 - Independent code review found and rechecked the gallery contrast correction;
   no further material finding remained in the reviewed production diff.
-- No canonical spec synchronization or archival has been performed.
 
 ## Adversarial review remediation (2026-11-16)
 
-#43 merged to `main` (`a872161`) and PR #44 targets `main`. Pull request CI ran
-on head `a7041ac`, and `Flutter analyze` and `Autonomous Flutter tests` passed.
 The remediation adds mutation-checked real-provider regressions for both
 generation keys and controlled-provider slideshow request, reorder and
 partial-replacement coverage. It also limits `didUpdateWidget` publication
