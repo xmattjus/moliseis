@@ -781,4 +781,66 @@ remains applicable to the unchanged layout and semantics code.
 - Strict OpenSpec validation, the direct documentation audit and Git diff
   checks passed. The named repository-local documentation audit skill was
   unavailable.
-- Task 5.4 remains open for confirmed VoiceOver activation. Physical iOS raster, scrolling and memory remain NOT VERIFIED under the existing merge and release policy.
+- At this follow-up, task 5.4 remained open for confirmed VoiceOver activation.
+  The acceptance-policy amendment below supersedes that merge disposition.
+
+
+## Integrated acceptance decision — 2026-11-24
+
+On 2026-11-24, the project owner explicitly authorized deferring genuine
+VoiceOver activation of the enlarged Nearby Retry action to the iOS release
+gate alongside the previously approved physical iOS performance deferral.
+Implementation merge may proceed once every other applicable requirement
+and check is satisfied. The amendment changes verification timing only.
+It grants no verification pass, residual-risk acceptance or release
+authorization. Both functional delta specifications remain unchanged.
+All other accessibility, deterministic correctness, lifecycle,
+compatibility and Android acceptance requirements remain in force.
+
+| Check | Current result | Evidence and disposition |
+| --- | --- | --- |
+| VoiceOver compact and spacious image-error speech | PASS on the tested simulator | Both variants spoke one meaningful image-error description. |
+| VoiceOver enlarged Nearby Retry reachability and reverse navigation | PASS on the tested simulator | With VoiceOver active, supported three-finger scrolling exposed the button. Forward navigation spoke “Riprova Button” and reverse navigation returned to the error text. The original failed procedure remains recorded above. |
+| Genuine VoiceOver enlarged Nearby Retry activation | NOT VERIFIED | The follow-up did not establish an application defect or a simulator defect. The remaining check is required at the iOS release gate. |
+| Physical iOS Profile memory pressure, scrolling and raster | NOT VERIFIED | The physical-device follow-up and existing release-owner decision policy remain in force. |
+| Android TalkBack | PASS within the documented boundary | Device-user verification at the largest Android font size. |
+| Physical Android Profile acceptance | PASS within the documented boundary | Identified Samsung device, native codec checks and repeated Profile comparisons. |
+
+[Flutter issue #192774](https://github.com/flutter/flutter/issues/192774) and
+[merged upstream PR #195731](https://github.com/flutter/flutter/pull/195731)
+are scrolling-accessibility follow-up references. The upstream change does
+not establish genuine Retry activation on the intended release implementation.
+Tasks 5.3 and 5.4 are complete for implementation acceptance under the
+amended policy. The TASK-43 and TASK-16 evidence at the physical-device
+handoff and VoiceOver follow-up satisfies the non-deferred requirements.
+The Android campaign, native investigation and local Flutter suite were
+reused because the implementation, tests and dependencies are unchanged.
+[CI run 45481212630](https://github.com/xmattjus/moliseis/actions/runs/45481212630)
+also passed Flutter analyze, autonomous Flutter tests and autonomous Deno
+tests on the same implementation and tests. The documentation amendment's
+own CI checks apply to the updated PR head.
+
+## iOS release gates
+
+Carry these open checks forward independently of OpenSpec synchronization
+or archival. Both are currently **NOT VERIFIED**.
+
+- [ ] **Genuine VoiceOver activation for enlarged Nearby Retry.** On the
+  intended iOS release implementation, preferably on a physical iPhone,
+  verify the spoken label, button role, reachability, reverse navigation
+  and actual invocation of the retry callback with VoiceOver active.
+  Follow the native procedure above. Ordinary touch, synthetic pointer
+  input and direct Flutter semantics invocation cannot satisfy the gate.
+  Resolve and reverify any demonstrated material accessibility defect
+  before release. The next iOS release requires this verification to pass.
+- [ ] **Physical iOS Profile performance.** Verify representative memory
+  pressure, scrolling and raster behavior using the intended iOS release
+  implementation. If suitable measurements remain unavailable at release
+  time, the responsible release owner must explicitly document the missing
+  checks, alternative evidence and its limits, possible memory-pressure,
+  scrolling and raster consequences, who accepts the residual risk, and
+  the outstanding physical-device follow-up. Such a decision leaves the
+  missing results **NOT VERIFIED** and keeps the follow-up open.
+
+The 2026-11-24 decision authorizes the implementation-merge deferrals
+only. No iOS release or release-owner residual-risk decision is recorded.
