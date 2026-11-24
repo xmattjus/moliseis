@@ -10,9 +10,9 @@ the upstream inactive-branch system Back gate. Platform gesture checks on
 physical devices belong to implementation verification.
 
 Use source-qualified actions, the original router host, and native Material
-Back presentation. Scope the ordinary policy to app-owned Back. The protected
-malformed Admin route retains a blocking departure-boundary decision as
-described below. A global router wrapper is outside the selected design.
+Back presentation. Scope the ordinary policy to app-owned Back. A dedicated
+malformed Admin error route removes the deferred editor exit from the error
+path. A global router wrapper is outside the design.
 
 ## Ordinary decision and local authority
 
@@ -132,67 +132,124 @@ denial from a live standalone Dashboard was established, so the plan does
 not add a generic latch reset, change existing recovery, or install a route
 listener for it. Read real auth/Sync redirects as router outcomes.
 
-## Protected malformed Admin error — decision gate
+## Separate the malformed Admin error from the editor
 
-A malformed ID uses the same GoRoute as the editor. It may have no registered
-editor activation. Its explicit controls need one source-bound action that
-goes only to the actual predecessor with `AdminSubmissionExitPolicy.exit`.
-A lower dirty editor is its own owner. A page pop must preserve it, and a
-declaration that also removes it must evaluate its separate exit decision.
+The current editor GoRoute renders the malformed error in its builder and
+applies the editor's `onExit` to both screens. GoRouter schedules a page pop
+through that hook even for an immediate decision, then completes and removes
+the captured match. Two requests can obtain approval for that same match.
+A declaration uses the same hook for each outgoing match, including any
+editor underneath. The public hook receives equivalent inputs in both
+paths. Keeping the shared route with a local latch would either allow two
+pop approvals or suppress valid declarations. A frame can pass while an
+exit vote is still pending.
 
-Prior real-router probes found leading/text and system Back can enqueue
-multiple exits for one malformed page, including a second system Back after
-commit but before reconciliation. GoRouter awaits `onExit` in a microtask,
-then completes the captured imperative match and removes it. It calls the
-same hook during declaration, in reverse order through the outgoing stack.
-An allowed declaration does not complete the popped match's imperative
-result. These are two different call sites but the public hook does not carry
-origin or the captured match.
+Use the existing named editor route's local redirect to send a rejected
+`RouteParameters.submissionId()` value to the dedicated sibling
+`/admin/submission-error/:id` under Dashboard. Keep valid editor locations
+and names, and keep the specific `new` and `save-progress` matches. A valid
+positive identifier whose record is missing, unavailable, loading, or bound
+to an inadmissible session stays on the editor route and retains its existing
+behavior. Use the same identifier codec for matching decisions and preserve
+its accepted noncanonical forms. A matching-regex split at the original URI
+would have to duplicate decoded Dart number parsing, including overflow and
+encoded input. The local redirect uses the authoritative codec directly.
 
-An additional controlled GoRouter probe queued a declaration and a page pop
-in the same turn. The two callbacks received the same context, equal
-GoRouterState, identical committed configuration and identical provider
-request object. Keeping the declaration pending, rejecting the page pop and
-then admitting the declaration evaluated the lower editor hook and committed
-the new destination before the original page rebuilt. A separate held-vote
-probe showed that resetting a local latch at the next frame allowed a second
-evaluation while the first was still pending. The fixtures isolate the
-dependency contract. They do not claim that the app's malformed vote has the
-same artificial delay. Page key and URI are also stable across a refreshed
-imperative mapping. A local guard using only these inputs cannot grant both
-duplicate-pop exclusion and independent declarative exit. The missing
-evidence is a supported origin distinction, or a demonstrated app
-invariant that removes the ambiguity without changing a native gesture or a
-protected exit contract.
+Construct the destination with URI path segments, carrying the decoded
+identifier as one encoded segment and retaining the query and fragment.
+Reconstruct the original normalized editor URI for the error screen and
+its existing diagnostic reason. The malformed location is the only URI
+contract that changes. A direct use of the dedicated path with a valid or
+reserved identifier returns to Dashboard. It cannot open an editor by
+redirect and bypass editor admission.
 
-Keep malformed Admin blocked for implementation until that decision is
-made. The options for review are a narrowly authorized origin seam for this
-route, with no parser envelope or ordinary request receipts, or a separately
-approved routing/policy change that removes the need for a deferred page
-pop at this particular error. A fallback to key-only admission would veto
-valid declarations or allow duplicate completion. Returning true to two
-compatible-looking calls can approve two pops. Broad `PopScope` interception
-changes native eligibility and does not intercept every ordinary router pop.
-Dart Zone markers and host forwarding are removed from the selected
-ordinary design; any separate origin seam needs its own proof and explicit
-approval. Do not start the guarded Admin implementation from a speculative seam.
+GoRouter runs global `onEnter` against the incoming request before legacy
+top-level and route-level redirects. Keep existing authority and occupied
+operation checks in place. Make the editor-specific part of Admin
+`onEnter` recognize only `new` or an ID accepted by
+`RouteParameters.submissionId()` in the existing editor path. A malformed
+target, including one with a session hint, has no editor identity and must
+not start a hint lookup or recovery admission. The Sync redirect still
+takes precedence, and top-level auth is re-evaluated after the local
+redirect. The parser constructs its imperative match from the redirected
+target using the original push intent and completer. Direct navigation
+retains declarative Dashboard ancestry. A push retains its actual base.
 
-First investigate whether the malformed route can use a public, route-local
-origin boundary while retaining its matching, native gesture and Admin policy
-contracts. If it cannot, seek a scope decision before adding a host interception
-or changing the route contract. The broad host projection and request tracking
-would still be unnecessary.
+The dedicated error has no editor owner or deferred exit hook. The existing
+error-pop branch for a different Page key already allows return to the
+retained editor even while that editor owns an exit reservation. The
+no-visit veto when `_pending` survives unregister protects an invocation
+owned by an earlier editor. Closing the diagnostic page consumes no
+activation, reservation, checkpoint or recovery, and leaves the invocation
+and the global admission check untouched. A declaration that also removes
+an editor still evaluates the editor's original hook. A covered dirty editor
+can veto the declaration. Auth revocation from an Admin stack still takes
+its security path without prompting or simulating a pop result.
 
-Any Admin solution needs to distinguish an approved pop from
-actual removal, keep its vote claimed until decision, and reject a retired
-mapping before reconciliation. The existing real-router probe showed that
-the deferred pop can commit without provider alignment and immediately
-refresh back into the error. A one-shot listener with public `restore` fixed
-that probe. Keep it only for an exact, owned remove whose provider input
-has not been replaced. Dispose on release, departure or supersession.
-An approved operation past GoRouter's public boundary cannot be cancelled
-by the app. A Navigator frame can establish a mapping update and cannot
-settle an unfinished policy vote.
+### Back and reconciliation
+
+Give both error controls one predecessor-only override of the existing
+explicit Back action. Bind it to the actual current root Route, displayed
+error and reconciled match as for other imperative pages. If the source is
+stale, covered, refreshed but not yet reconciled, or lacks an authorized
+predecessor, the action leaves navigation alone. A later tap may act once
+the source is eligible. No Home fallback, local exit lease or continuation
+is needed.
+
+With no `onExit` on the error, GoRouter's regular page-pop path completes
+the live match and removes it synchronously. The explicit `GoRouter.pop()`
+updates route information in the same call. The second saved control sees
+the old source as retired. Concurrent system requests already in
+`Navigator.maybePop()` recheck the snapshotted route after the asynchronous
+check; a new system request after removal can legitimately act on the new
+top. Keep the original delegate and native transition. No manual restore,
+one-shot listener, RouterConfig wrapper or origin marker is required.
+
+The real-router prototype preserved the exact Dashboard or dirty editor on
+return, kept the editor's activation and dirty fields, and made no lookup
+for a malformed session hint. A held lookup from a separate valid request
+remained owned by the editor when the covering error returned. The probe
+also exercised named and unnamed navigation, encoded slashes, repeated query
+keys, declarative and imperative restoration, Sync return, sign-out with a covered dirty
+editor, overlap in both explicit/system orders, predictive cancellation and
+commit, and iOS edge swipe. A refresh with the same imperative Page key
+replaced the match and its completer. Saved explicit Back did nothing before
+build and current Back could act after the new Page settings were observed.
+
+### Dependency and compatibility limits
+
+The system delegate uses Navigator rather than `GoRouter.pop()`. Both the
+baseline and route-split prototype could replay an imperative error on
+refresh between a system-pop commit and route-information reporting. Native
+Back against a pre-frame stale mapping can also complete an old imperative
+result, as characterized separately for ordinary app routes. The explicit
+action guards that window for its own dispatch. These general native
+reporting and reconciliation behaviors are outside the change.
+
+A synthetic malformed push over a public base also survived an auth refresh
+in both routers because GoRouter restoration re-evaluates the base URI.
+Normal Admin entry, direct error and pushes over the Admin stack still use
+the existing auth redirect. The error is read-only and must not own or
+restore any Admin activation. The repository's production callers of named
+editor push provide typed submission IDs; malformed external entry uses
+declarative navigation. No generic imperative-auth repair belongs to this
+change.
+
+GoRouter's codec decodes each saved imperative location with matching alone,
+without replaying its per-route redirect. A synthetic state serialized by
+the old router can therefore still reach the original builder with a
+malformed imperative match. Keep its null-ID branch as a defensive,
+predecessor-only diagnostic with no editor activation. The probe verified
+that this historical payload renders safely. Current malformed requests
+commit the dedicated route. A new saved imperative entry restores to that
+route. The old synthetic
+imperative stack retains the old exit semantics; the plan introduces no
+stored-state migration or generic completer repair.
+
+The canonical routing and editor capabilities keep their existing
+contracts. The new diagnostic contract belongs to explicit Back. The
+active Admin editor redesign owns editor presentation and shares no route
+change. The Gallery slideshow follow-up remains with the image change.
 
 ## Presentation and impact
 
@@ -220,7 +277,7 @@ SearchBar layouts own their constraints.
 | Gallery preview and overlay | Direct where explicit Back currently routes itself. Preserve gesture/dismissal ownership, transparent styling and other gallery actions. |
 | Admin Login, Post, Category and Search Results | Indirect through shared Back. Preserve actual parent/entry, parameters and styled leading. |
 | Admin Dashboard | Conditional terminal integration in both bars. Preserve feature authority and recovery. |
-| Malformed Admin in `router.dart` | Protected decision gate. No shared Home fallback. |
+| Malformed Admin in `router.dart` and Admin admission | Dedicated protected error route, local redirect and shared predecessor-only action. Valid editor hooks remain with the editor. |
 | Shell and branch boundaries | Read existing ownership/disposition. No new Navigator, observer or global lifecycle. |
 | Ready and opening Admin Editor, Save Progress, Content Submission and Progress | Feature-owned. Preserve visibility, checkpoints, dirty exit, outstanding work and exact return owner. |
 | Search Anchor, GeoMap, Location Picker | Retain local close, cleanup, state and results. Only shared styling changes where already used. |

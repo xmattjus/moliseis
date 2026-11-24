@@ -11,11 +11,11 @@
 - [ ] 2.1 Migrate Settings, ordinary Route Error, Gallery and Gallery Unavailable. Test both ordinary error actions, visibility and reuse of the same binding across leading and text. Verify unmatched and matched error routing, and preserve Gallery gesture and local controls.
 - [ ] 2.2 Keep Dashboard account, visit, route generation, refresh and recovery authority. Delegate its terminal decision after existing checks and shared preflight. Test both AppBars, one revocation and dispatch, sign-out and stale view callbacks, a failed preflight and retained Settings beneath the Login replacement. Preserve logout.
 
-## 3. Resolve and verify malformed Admin departure
+## 3. Separate malformed Admin diagnostics from editor exit
 
-- [ ] 3.1 Resolve the scoped origin boundary in design review before implementation. Demonstrate that duplicate page pops can be distinguished from a legitimate multi-exit declaration and qualify the original mapping through same-key refresh. Preserve native Back and the original Admin policy. Obtain approval for a cross-cutting boundary if it proves necessary.
-- [ ] 3.2 Following that decision, use one protected leading/text action and one admission shared by competing page pops. Test explicit/system overlap in both orders, two system events, leading/text, denial and retry, dirty editor below, auth revocation, multi-route declarations, reconciled and stale match, disposal and a second system event before rebuild. Check at most one removal and completion and no Home fallback.
-- [ ] 3.3 Verify synchronization of the exact deferred pop before same-input refresh. Assert that newer independent input survives and that listeners are removed on terminal outcomes. Assert the same protected predecessor is kept and that declaration does not manufacture a page-pop result.
+- [ ] 3.1 Add the protected error sibling and redirect only when the existing ID codec rejects the editor parameter. Preserve diagnostics, original query and fragment, valid editor and named paths, New, Save Progress, and defensive rendering of an old decoded error. Narrow editor-specific admission after the existing auth and pending checks. Verify direct and named entry, ID boundary and encoding, foreign session hints, pushes, restoration, Sync and auth redirects.
+- [ ] 3.2 Connect the leading and text controls to one source-qualified predecessor-only action. With the real router exercise repeated and mixed explicit/system requests, a later independent Back, obsolete actions after replacement/disposal, synchronous commit and immediate refresh, same-key refresh before and after rebuild, and exact live result completion. Verify predictive cancel/commit and iOS swipe without a new platform Back owner.
+- [ ] 3.3 Verify ownership over the exact Dashboard and dirty editor, with a controlled pending editor lookup and authorization revocation. Verify that a declaration removing an editor still respects its veto and that a permitted declaration manufactures no push result. Keep checkpoint, recovery, activation and editor exit policies intact.
 
 ## 4. Adopt native presentation and run compatibility checks
 

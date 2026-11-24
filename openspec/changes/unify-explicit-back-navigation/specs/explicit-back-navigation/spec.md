@@ -103,39 +103,52 @@ the binding of a retained presentation.
 ### Requirement: Companion Back actions share the source's departure policy
 
 When an error surface shows both icon and text Back, both SHALL use one
-source and departure policy. The malformed Admin Editor error SHALL leave
-through its protected route's exit policy and actual predecessor.
+source and departure policy.
 
 #### Scenario: Ordinary route error or unavailable Gallery
 
 - **WHEN** an available leading or text Back is activated on an ordinary error
 - **THEN** both controls apply the same predecessor, veto and fallback rules
 
-#### Scenario: A protected malformed Admin detail receives concurrent Back
+### Requirement: Malformed Admin errors return without leaving a retained editor
 
-- **WHEN** explicit Back, its companion action or system Back requests the
-  same departure while an exit is pending
-- **THEN** the exit policy decides whether that exact page is removed
-- **AND** an allowed return completes the popped live entry's result once,
-  preserves any underlying editor state, and remains removed after a refresh
-  of the same input
-- **AND** a refusal allows a fresh eligible attempt without an Explore fallback
+An authorized request for a malformed Admin submission identifier SHALL show
+a diagnostic under Admin without activating an editor session. Both explicit
+actions SHALL return only to the actual predecessor when eligible. The
+editor's own exit decisions SHALL apply whenever navigation removes the
+editor itself.
 
-#### Scenario: A declaration removes the malformed page and other routes
+#### Scenario: Malformed link or named navigation
 
-- **WHEN** an independent declaration would remove the malformed page and
-  other routes while a page-pop decision is still in progress
-- **THEN** the declaration can evaluate the existing exit policy of each
-  outgoing route as required
-- **AND** after its departure commits, a retired page pop cannot affect the
-  new stack, complete a different result or overwrite newer route information
+- **WHEN** an authorized request supplies an identifier rejected by the
+  submission ID codec
+- **THEN** the Admin error retains the original diagnostic URI and parameters
+  without using a session hint to start an editor
+- **AND** a direct entry has Dashboard as its predecessor
+- **AND** valid editor, New and Save Progress destinations retain their behavior
 
-#### Scenario: System Back reaches a stale malformed Admin page
+#### Scenario: Concurrent Back requests target one live error
 
-- **WHEN** system Back reaches the previously popped malformed page after its
-  removal committed and before the Navigator reconciles
-- **THEN** the retired page cannot complete its result again or remove another
-  route on its behalf
+- **WHEN** leading, text or system Back requests overlap on the same live error
+- **THEN** that page is removed once and its live imperative result completes
+  once if it was pushed
+- **AND** the exact predecessor is retained, including any dirty editor and
+  its activation
+- **AND** subsequent requests captured from the retired error leave the stack
+  alone, with no Explore fallback
+
+#### Scenario: The error is explicitly popped before refresh
+
+- **WHEN** an explicit Back pops the live error and refresh follows before the
+  next frame
+- **THEN** the request retains its actual predecessor and the error stays removed
+
+#### Scenario: An independent declaration also leaves the editor
+
+- **WHEN** a declaration replaces the error and an underlying editor
+- **THEN** the editor's own policy decides whether it can leave
+- **AND** declarative removal does not manufacture an imperative pop result
+- **AND** an action retained by the retired error cannot override the new stack
 
 ### Requirement: Back presentation follows the app's adaptive theme
 

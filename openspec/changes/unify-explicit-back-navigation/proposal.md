@@ -16,9 +16,9 @@ when Back requests overlap.
   A supplied callback owns the entire action.
 - Share the ordinary policy between applicable error leading and text
   controls, and reuse the terminal decision after Dashboard's feature checks.
-- Keep the malformed Admin error on its protected predecessor-only path.
-  Its concurrent page pops require a separate departure decision before
-  implementation can start.
+- Give malformed Admin submission identifiers a dedicated Admin error route
+  with predecessor-only Back. Keep the editor exit policy on the routes that
+  own editor state.
 
 ## Capabilities
 
@@ -33,8 +33,10 @@ None.
 
 ## Impact
 
-The ordinary plan affects shared Back, Settings, ordinary Route Error,
-Gallery and the terminal Dashboard action. It uses the existing Router host
+The plan affects shared Back, Settings, Route Error, Gallery, the terminal
+Dashboard action and routing for malformed Admin identifiers. The malformed
+location redirects to a protected error path. Valid editor locations and the
+editor's exit behavior stay intact. The plan uses the existing Router host
 and dependencies. Editor and submission decisions, local Search and GeoMap
 actions, picker results, shell roots, Sync, logout, third-party controls and
 native Back gestures retain their owners. The image presentation change owns
