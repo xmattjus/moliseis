@@ -80,7 +80,7 @@ evidence recorded in the implementation document.
   Physical iOS memory-pressure, scrolling and raster remain NOT VERIFIED
   under the documented deferral. Tested and untested codec/backend
   configurations are listed separately.
-- 5.4 remains open because the enlarged Nearby Retry could not be reached in
-  the iOS simulator VoiceOver focus check. The Android device user reported
-  passing the TalkBack checks. See the Definition of Done matrix and release
-  disposition in the implementation evidence.
+- 5.4 remains open for verified VoiceOver activation. The iOS simulator
+  follow-up recovered Retry speech and forward/backward traversal after
+  active VoiceOver scrolling. The Android TalkBack pass remains applicable.
+  See the follow-up in the implementation evidence.

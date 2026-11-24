@@ -635,7 +635,7 @@ compositions and confirmed the next page indicator and resumed slide.
 The native two-frame GIF check and the current-head network playback
 regression cover existing multiframe delivery.
 
-### Definition of Done and release disposition
+### Definition of Done at the physical-device handoff
 
 | Criterion | Status | Evidence and provenance |
 | --- | --- | --- |
@@ -658,11 +658,11 @@ regression cover existing multiframe delivery.
 | VoiceOver compact and spacious image errors | PASS | Xcode 27.2 captured actual VoiceOver output on the iPhone 18 Pro / iOS 27.2 simulator. Both cases spoke “Immagine non disponibile” for one image-error element. Reverse navigation returned to the screen title. No fixture URL/path or redundant decorative label was spoken in the captured traversal. |
 | VoiceOver enlarged Nearby Retry | FAIL | With the largest accessibility text setting, the actual Nearby error widget exposed a visible, hittable 176.8×62 pt `Riprova` after scrolling. The VoiceOver service spoke the heading and error text but did not reach the action through repeated forward navigation. Touch exploration at the action still returned the error utterance in the simulator probe. Ordinary touch activated the action with VoiceOver off. No physical iOS VoiceOver comparison or verified correction is available. |
 
-Task 5.3 is complete with the documented physical iOS deferral. Task 5.4
-remains open because the enlarged VoiceOver Retry check failed on the
-simulator. A physical iOS reproduction or an independently verified fix
-is still needed for that gate. The failed simulator focus check does not
-establish a production regression against the old UI.
+Task 5.3 was completed with the documented physical iOS deferral. Task 5.4
+was left open at this handoff after the enlarged VoiceOver Retry check
+failed on the simulator. See the follow-up below for the later disposition.
+The original simulator focus check did not establish a regression against
+the old UI.
 
 Design §6 permits the physical iOS performance deferral for implementation
 handoff after all other applicable gates pass. Any iOS release with that
@@ -670,3 +670,115 @@ gap requires an explicit recorded decision by the release owner covering
 the missing checks, alternative evidence and its limits, possible memory and
 scrolling/raster consequences and the pending physical follow-up. This
 evidence records no release or residual-risk acceptance.
+
+## VoiceOver Retry follow-up — 2026-11-24
+
+The follow-up started from clean PR #44 head
+`3552cc5cda1a11fd531799a20b3f1afed517f4e8`, based on
+`8722856e854699e03f373f65fe4acff68cca1779`. The disposable native probe
+used byte-identical production Nearby, EmptyView, image-error and theme
+sources. It ran in Debug on the iPhone 18 Pro simulator with iOS 27.2
+(24B8117), Xcode 27.2 (27B52) and the locked Flutter 3.47.5 engine
+`af7e796e16`. The simulator viewport was 402×874 logical points at DPR 3.
+The system content size was **Accessibility Extra Extra Extra Large**.
+The app measured 49.882 logical points for a 16-point body font
+(approximately 3.118×) and 43.647 for a 14-point font.
+
+### Reproduction and isolation
+
+The actual Nearby error viewport was 320×216 points with scroll range
+0–392. The Flutter tree initially contained a single hidden `Riprova`
+button node with a tap action and a local rect from (71.6, 530.0) to
+(248.4, 592.0). The native snapshot recorded a zero frame for that
+offscreen button. At offset 376 the same Flutter node had a fully visible
+176.8×62-point rect from (71.6, 154.0) to (248.4, 216.0), retained its
+button and enabled flags and tap action, and no longer had the hidden
+flag. Native XCTest continued to identify the element as a Button.
+Ordinary touch activated the expected retry callback.
+
+The historical pre-scroll procedure was reproduced. It used ordinary
+scrolling before enabling VoiceOver, then drove forward and backward
+navigation with `XCUIVoiceOverService`.
+
+| Probe | Native speech and behavior with the original procedure |
+| --- | --- |
+| Actual Nearby with app typography | Spoke the screen title, “Nelle vicinanze” and the error text, then repeated the error. A silent focus step returned error 3. The tested forward sequence did not speak Retry. |
+| Standalone EmptyView with the same action | Reproduced error-text repetition and omission of Retry. |
+| Stock SingleChildScrollView with Column, Text and TextButton | Reproduced the same omission in a 320×216 viewport without Nearby or EmptyView. The button moved from hidden at offset 0 to visible at offset 178. |
+| Same stock TextButton without a scroll viewport | Spoke “Riprova Button”. Backward navigation returned to the error and forward returned to Retry. |
+
+The results isolate the observed failure to navigation through a Flutter
+scrollable on the tested iOS/VoiceOver stack and interaction sequence.
+They exclude the app button implementation, Nearby-specific ancestors,
+and EmptyView decoration as necessary reproduction conditions. The locked
+Flutter viewport preserves offscreen children within its semantics clip
+and reports scroll actions. The iOS embedder returns the superclass
+accessibility frame for hidden nodes, which matched the zero native frame
+observed here. [Flutter issue #192774](https://github.com/flutter/flutter/issues/192774)
+documents iOS 27 implicit-scroll limitations and separately reports
+visible elements being skipped. This is consistent with the offscreen
+behavior in the probe. It does not independently establish the cause of
+the pre-scrolled, visible-element traversal result.
+
+### Corrected verification procedure
+
+With VoiceOver already active, the probe advanced from the Nearby heading
+to the error area and sent two actual three-finger upward swipe gestures.
+After the first swipe Retry still had a zero native frame. After the
+second its native frame was (112.6, 605.0, 176.8, 62.0), wholly inside the
+viewport. The next forward step spoke “Riprova Button”. Moving backward
+spoke the preceding error. A three-finger downward swipe returned Retry
+outside the visible area. The stock scroll view also exposed and spoke its
+button after an active VoiceOver scroll. This exercises Apple's documented
+[VoiceOver scrolling gestures](https://support.apple.com/guide/iphone/use-voiceover-gestures-iph3e2e2281/27/ios/27).
+Ordinary pre-scrolling was insufficient to establish this path.
+
+The follow-up verifies Retry speech and supported scroll and reverse
+navigation on the simulator. A single touch at the visible button
+preserved the current “Riprova Button” reading and did not activate it.
+Independent touch-to-focus from a different element was inconclusive:
+moving backward to the long error could first scroll Retry out of view.
+
+**VoiceOver activation remains NOT VERIFIED.** A double-tap away from
+the action and the VoiceOver keyboard activation command did not invoke
+the callback on either Nearby or the plain control. An on-target
+double-tap did invoke each callback, but Flutter pointer logging recorded
+an ordinary pointer-down at the button before each invocation. The
+locked iOS bridge dispatches a semantic tap directly from
+`accessibilityActivate`, so those callbacks were excluded. The
+split-tap did not activate the plain control. It invoked Nearby's
+callback immediately after a Flutter pointer-down at the button, so
+that event was also excluded. The plain-control results prevent
+attributing the activation gap to Nearby. No physical iPhone was
+available for the remaining verification.
+
+Native reproduction for follow-up: set the iPhone's accessibility text
+size to its largest setting, enable VoiceOver, and open Nearby with a
+retryable failure in the 320×216 viewport. Navigate to the error text,
+scroll with three fingers until the whole Retry control is visible,
+move focus forward to “Riprova Button”, then verify reverse navigation
+back to the error. Scroll back to the control if needed. Select Retry,
+double-tap using VoiceOver, and confirm the retry callback or observable
+retry state changes once. Record the speech and the observed state.
+
+Removing the viewport was a useful plain-button control. It cannot
+preserve the specified 216-point overflow behavior by itself. Changing
+the button or Nearby alone would leave the same behavior in the standard
+scroll control. The evidence did not warrant custom semantics, forced
+focus, platform branches or an engine workaround. Production behavior and
+existing automated regressions were retained. The simulator test covers
+native VoiceOver speech and focus. The existing Flutter tests cover
+geometry, semantic nodes and callbacks, keyboard and Enter, Nearby,
+Suggestion and finite and sliver hosts. The earlier Android TalkBack pass
+remains applicable to the unchanged layout and semantics code.
+
+### Checks and remaining gates
+
+- Flutter analyze passed. Formatting passed on eight affected Dart files.
+- The focused Flutter regressions passed 94 tests. A disposable run of the existing Suggestion failure/retry fixture at 320×500 and text scale 2 also passed, including scrolling to its single visible Retry action and activating it. The autonomous Flutter
+  suite passed 4,428 tests with four skips.
+- The two checked-in image presentation integration tests passed on iOS 27.2. The native VoiceOver comparison confirmed compact and spacious speech with one labeled element each and reverse navigation to the screen title.
+- Strict OpenSpec validation, the direct documentation audit and Git diff
+  checks passed. The named repository-local documentation audit skill was
+  unavailable.
+- Task 5.4 remains open for confirmed VoiceOver activation. Physical iOS raster, scrolling and memory remain NOT VERIFIED under the existing merge and release policy.
