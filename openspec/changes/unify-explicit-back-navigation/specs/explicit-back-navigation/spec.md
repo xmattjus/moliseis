@@ -18,7 +18,7 @@ and its retained state.
 
 - **WHEN** eligible Back is activated from a page pushed above an existing route
 - **THEN** only the pushed page is removed and the same predecessor is revealed
-- **AND** the popped entry's outstanding result is completed once
+- **AND** the popped live entry's result is completed once
 
 #### Scenario: A deep link or restoration supplies a branch parent
 
@@ -59,41 +59,24 @@ leave the current stack in place.
 - **WHEN** the policy is invoked at canonical Explore root without a predecessor
 - **THEN** it leaves that route, stack and state in place
 
-### Requirement: Explicit Back keeps request admission separate from departure
+### Requirement: An unsuccessful standard Back has no secondary action
 
-A permitted dispatch starts a request. The application SHALL recognize
-departure only when the originating route has actually left the committed
-presentation. A refusal, failure or obsolete activation SHALL issue no
-secondary navigation. An outstanding ordinary request SHALL admit at most
-one explicit departure from its originating presentation.
+An obsolete activation, route veto or refused navigation SHALL NOT cause a
+secondary navigation. A fresh activation from a still-eligible presentation
+SHALL remain possible. A request to go to Explore SHALL remain subject to
+normal router admission and redirects.
 
-#### Scenario: A fallback is refused with route information still pointing at it
+#### Scenario: A predecessor exists but departure is vetoed
 
-- **WHEN** the committed source survives a refused fallback and the requested
-  URI still appears in route information
-- **THEN** a fresh eligible activation can retry
-- **AND** a refresh does not replay the refused explicit fallback
+- **WHEN** an explicit Back is activated from a page with a predecessor and
+  that page disallows the pop
+- **THEN** it remains in place and Explore is never requested
 
-#### Scenario: An external request is pending and then refused
+#### Scenario: An independent navigation replaces the source
 
-- **WHEN** an unresolved external navigation is evaluating departure from
-  the current standard Back presentation
-- **THEN** an activation cannot dispatch against the source while it is pending
-- **AND** a fresh activation can act on the same source once the request has
-  settled there, even if the requested URI is still reported by the provider
-
-#### Scenario: A newer navigation supersedes a pending explicit fallback
-
-- **WHEN** a later navigation supersedes an explicit fallback before it commits
-- **THEN** the old request cannot issue another navigation or restore its
-  source's authority over the later presentation
-
-#### Scenario: Repeat and independent activations
-
-- **WHEN** the same control or its companion requests a departure repeatedly
-  while the same departure is pending
-- **THEN** at most one departure is admitted
-- **AND** a separate activation from the current successor remains eligible
+- **WHEN** another navigation has replaced the source of an explicit action
+- **THEN** the obsolete callback makes no further navigation request
+- **AND** an eligible control on the successor can act independently
 
 ### Requirement: Standard Back affects only its originating presentation
 
@@ -108,7 +91,7 @@ the binding of a retained presentation.
   or popup or is in an inactive branch
 - **THEN** it changes neither presentation's stack
 - **AND** the same retained presentation is eligible after it becomes current
-  again and has no unresolved departure
+  again
 
 #### Scenario: The source was removed or rebound
 
@@ -133,17 +116,19 @@ through its protected route's exit policy and actual predecessor.
 - **WHEN** explicit Back, its companion action or system Back requests the
   same departure while an exit is pending
 - **THEN** the exit policy decides whether that exact page is removed
-- **AND** an allowed return completes its result once, preserves any underlying
-  editor state, and remains removed after a refresh of the same input
+- **AND** an allowed return completes the popped live entry's result once,
+  preserves any underlying editor state, and remains removed after a refresh
+  of the same input
 - **AND** a refusal allows a fresh eligible attempt without an Explore fallback
 
-#### Scenario: An independent declarative departure supersedes a pending pop
+#### Scenario: A declaration removes the malformed page and other routes
 
-- **WHEN** a new declarative navigation supersedes the malformed page pop
-  before its approval
-- **THEN** the declarative navigation can evaluate its own exit policy
-- **AND** the superseded pop does not remove a match, complete its result,
-  or overwrite the newer route information
+- **WHEN** an independent declaration would remove the malformed page and
+  other routes while a page-pop decision is still in progress
+- **THEN** the declaration can evaluate the existing exit policy of each
+  outgoing route as required
+- **AND** after its departure commits, a retired page pop cannot affect the
+  new stack, complete a different result or overwrite newer route information
 
 #### Scenario: System Back reaches a stale malformed Admin page
 
@@ -167,6 +152,7 @@ constraints permit it, with native glyph and background presentation.
 - **THEN** it presents the corresponding native appearance, semantics and
   tooltip with the configured layout and a target at least as reachable as
   before
+- **AND** the native tooltip is “Indietro” in Italian and “Back” in English
 
 #### Scenario: A standard mobile leading slot is 56 logical pixels
 

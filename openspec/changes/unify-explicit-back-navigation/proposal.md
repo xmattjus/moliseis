@@ -2,34 +2,30 @@
 
 ## Why
 
-The shared Back control can remove a different page when an old callback
-is reused. Other Back controls choose their own return or fallback.
-The same-frame failures include a removed detail reopening on refresh
-after a direct Navigator pop and a malformed Admin page completing a
-pushed route's result twice.
+App-owned Back controls disagree about where to go, and saved callbacks can
+pop a different page. A direct Navigator pop can reopen a page on refresh.
+The malformed Admin error can also complete an imperative result twice
+when Back requests overlap.
 
 ## What Changes
 
-- Give ordinary explicit Back one source-aware policy. Return to the
-  actual permitted predecessor or request canonical Explore root.
-- Distinguish pending, refused, superseded and committed departures
-  so a rejected or old request cannot displace a later presentation.
-- Use the native themed Material Back control while preserving
-  configurable backgrounds, caller-supplied spacing and full callback
-  overrides. Use a 48 × 48 mobile target where the host permits it.
-- Share one action across the applicable error icons and text actions.
-  Preserve Dashboard account and presentation admission and the
-  malformed Admin page's existing protected exit decision. Its explicit
-  and platform pop paths share one departure admission.
-- Preserve shell visibility, system Back, native gestures, redirects,
-  restoration and all feature-owned destinations and controls.
+- Share one source-qualified explicit Back policy. Return to the permitted
+  predecessor when present and request canonical Explore root otherwise.
+- Render the native Material Back button with localized semantics, existing
+  styling options and a 48 × 48 mobile target where the layout permits it.
+  A supplied callback owns the entire action.
+- Share the ordinary policy between applicable error leading and text
+  controls, and reuse the terminal decision after Dashboard's feature checks.
+- Keep the malformed Admin error on its protected predecessor-only path.
+  Its concurrent page pops require a separate departure decision before
+  implementation can start.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `explicit-back-navigation` defines ordinary explicit Back, presentation
-  authority, request lifecycle, native presentation and feature overrides.
+- `explicit-back-navigation` defines standard explicit Back and its
+  presentation, plus the behavior of companion and protected controls.
 
 ### Modified Capabilities
 
@@ -37,10 +33,9 @@ None.
 
 ## Impact
 
-The implementation affects the app's Router host, the shared control and
-routing action, Settings, error and gallery controls, and the terminal
-Dashboard action. It uses existing Flutter and GoRouter APIs and adds no
-dependencies. Editor and submission policy, Search, local GeoMap, the picker,
-shell roots, Sync, logout and third-party controls retain their established
-behavior. The active Admin editor and image presentation plans share a few
-UI surfaces and continue to own their respective feature contracts.
+The ordinary plan affects shared Back, Settings, ordinary Route Error,
+Gallery and the terminal Dashboard action. It uses the existing Router host
+and dependencies. Editor and submission decisions, local Search and GeoMap
+actions, picker results, shell roots, Sync, logout, third-party controls and
+native Back gestures retain their owners. The image presentation change owns
+slideshow lifecycle and the Admin redesign owns editor presentation.
