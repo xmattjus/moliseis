@@ -114,12 +114,29 @@ The desktop theme defaults to shrink-wrap. A parent can constrain either
 dimension, as the AppBar probe demonstrates. Preserve the measured existing
 AppBar and SearchBar geometry, maintain target reachability and avoid
 shrinking any existing hit target. Assert the native minimum where unconstrained
-under the mobile theme. The inherited 40-pixel padded AppBar case is a baseline
-limit. No app-wide density or toolbar resizing is proposed. Test transparent
-Gallery/Search/GeoMap backgrounds, surface defaults, directional zero/custom
-outer padding and constrained leading slots. A manual composition from
-`IconButton` and `BackButtonIcon` would duplicate tooltip and action
-presentation with no styling advantage under this locked version.
+under the mobile theme. The measured 40-by-40 AppBar target is an opportunity for a local fix.
+For standard padded mobile styling, center the native button under loose
+constraints. With default wrapper padding, retain up to eight logical
+pixels on each side while leaving room for the native 48-by-48 hit box
+on each axis where the host allows it. For example, a 56-pixel slot uses
+four logical pixels of outer padding per side. The underlying native
+Material face stays 40 by 40, with the existing centered native
+24-pixel glyph where the effective theme uses that size. The package's
+native padded target provides the expanded hit test and semantic bounds.
+Keep explicit padding, current desktop density, platform/icon themes
+and surface/transparent styles. Preserve native target and face dimensions
+in hosts with sufficient room. If the host or explicitly supplied padding
+constrains an axis below 48, preserve the existing usable area and report
+that host-specific limitation. No toolbar, global density or hit-test
+wrapper change is needed.
+
+The widget probe verified face, glyph, render box, semantic bounds and
+edge taps in AppBar, SliverAppBar, SearchBar, an overlay, a row, desktop
+and RTL. Production host acceptance additionally verifies actual
+Dashboard and editor layouts, Gallery overlay, GeoMap, and the caller's
+zero or custom padding. Use a native BackButton with the shared style.
+An IconButton and BackButtonIcon reassembly adds tooltip and action
+work without a styling advantage in this version.
 
 ### 2. Dispatch ordinary Back through GoRouter
 
@@ -253,6 +270,75 @@ Forwarding the public pipeline is the smallest alternative that supplies
 the missing refusal/supersession acknowledgement without narrowing
 ordinary Back to a best-effort action or guessing at timings.
 
+### Public forwarding contract and stale work
+
+Use a stable boundary instance for the lifetime of the app Router host.
+Delegate initial, new and restored route operations to the corresponding
+original method, with the original parsed match list. For incoming or
+restored information call the original context-aware parser. Preserve
+synchronous futures where the original completes synchronously and
+preserve asynchronous return, values and failures otherwise. Use a
+typed continuation with once-only cleanup on success or failure.
+Forward listener registration and removal to the original delegate
+so its notification order and identities remain intact. Preserve its
+build context, descendants and original inherited GoRouter. Theme and
+locale rebuild without reconstructing the router or subscribing again.
+
+Forward ordinary provider input and reporting to the same provider.
+Pass only the original match list back to the original encoder.
+For state restoration, pass the decoded result through the original
+restored setter. No request token or receipt is written to the URL,
+provider state or restoration data. Keep the original Back dispatcher
+instance and forward `popRoute` and its result. The narrow zone for
+malformed-route declarative evaluation adds neither a scheduling step
+nor an error handler. Disposal retires only this boundary's pending work
+and ignores late results. The existing host still owns original GoRouter
+disposal. The wrapper needs no duplicate subscriptions. Keep exceptions
+on Flutter's original path, including exceptions thrown before a Future
+is returned. Use public API only in production.
+
+Flutter ignores older parser results before delegate entry. A delegate
+setter already in asynchronous `onExit` can still commit. That
+out-of-order configuration change was reproduced with two controlled
+setters. It is not evidence that the app's Admin or Submission policy
+permits that same sequence. Admin Editor checks its captured visit,
+account, authorization and configuration around dirty exits. Content
+Submission uses an owned transition token plus ViewModel and submission
+identity checks before and after asynchronous work. Neither policy is
+rewritten here. Standard fallback has no outgoing guarded setter.
+The malformed pop lease handles its own exact source and does not
+supersede an autonomous feature policy.
+
+The boundary may retire a receipt, not cancel an underlying setter.
+A late receipt may neither release a newer admission nor restore the
+provider, revive a source, or publish a projection. Refresh and Auth
+or Sync redirects are observed through their actual ingress and
+committed match. Only the live host's actual build may publish its
+projection, and only while that exact configuration is still current.
+A late commit from the original delegate still causes the original
+notification. While it has not reached its Navigator tree, explicit
+activation remains ineligible. Never serialize independent navigation
+or withhold original delegate notifications to improve apparent ordering.
+
+A focused widget probe forwarded the initial, new and restored setters
+through the original GoRouter, restored the child page, and returned to
+its parent via the original system Back delegate. The previously tested
+opaque envelope and this forwarding probe characterize the individual
+seams. The complete composed host remains implementation acceptance.
+
+Permanent compatibility tests belong with the routing boundary and run
+in the existing Flutter suite. Pin each method and ordering using
+controlled synchronous and asynchronous completions, failures and
+listener registration/removal. Compare observable route information
+and restored Navigator state against the original configuration.
+Exercise the actual MaterialApp host with initial/deep-link input,
+restoration, normal and same-input refresh, locale/theme rebuild,
+system Back and host replacement or disposal. Assert token-free
+encoding, original GoRouter and dispatcher identity, unchanged error
+propagation, single receipt settlement and no late publication after an
+already-entered old setter resolves. No separate CI or compatibility
+framework is required.
+
 ### 4. Keep presentation authority local
 
 | Event or hazard | Rule and evidence |
@@ -288,61 +374,82 @@ generation. If a newer ingress remains pending, a fresh callback is
 still temporarily ineligible. Keep logout and recovery admissions
 separate.
 
-**Malformed Admin ID.** Both Route Error controls share a protected,
-pop-only callback supplied by the invalid-ID router branch. It is
-outside standard Home fallback and does not use the ready editor
-callback. The existing `AdminSubmissionExitPolicy.exit` still decides
-exit, including the unavailable binding and distinct underlying editor
-visit cases. An existing dirty editor can refuse a replacement before
-a malformed screen appears. No long confirmation or true refusal of
-the rendered malformed page was observed in the valid tested topologies.
+**Malformed Admin ID.** The explicit leading button and text action share a source-qualified,
+pop-only callback. System Back continues through the original dispatcher
+and `GoRouterDelegate.popRoute`. Neither path owns a second admission.
+Both reach the same narrow admission at the malformed match's deferred
+`onExit` hook. A handled result from platform Back only acknowledges
+the request. The lease can remain pending after that Future returns. The original `AdminSubmissionExitPolicy.exit` remains
+responsible for the exit decision, including the case where a dirty
+editor is below an unavailable pushed match. A valid editor and Save
+Progress keep their original hooks. The malformed route has a predecessor
+in the supported topology and never falls back to Home.
 
-The concrete failure is two scheduled exits on the same imperative match.
-One scoped admission belongs to the active malformed page. Claim it
-before calling the otherwise identical source-qualified `GoRouter.pop`.
-The deferred GoRouter hook receives no request marker in its method
-arguments. Carry the admitted token in a private Dart zone value for that
-one dispatch. The probe verified propagation to the scheduled pop hook
-and isolation from unrelated declarative exit. Only the malformed branch
-of the existing route's `onExit` reads that token. The adapter checks exact
-page match, route, current account and absence of competing new
-navigation before evaluating the existing policy, and rechecks after
-its Future resolves. Track independent intent separately from reparsing
-the same provider input, as for ordinary fallback. Refusal,
-exception, supersession and disposal release only that admission. Normal
-declarative auth/Sync decisions and ready editor exits continue through
-their existing policy. A positive result only marks approval. Mark it as
-the last operation before returning true to GoRouter, after validating
-that the exact source is still the current leaf and no independent
-navigation has started. While it is outstanding both explicit controls refuse duplicate
-dispatch. For the malformed route only, require the exit hook's entry to
-still belong to the committed stack even for an untagged callback. A
-platform Back in the commit-to-build gap can otherwise replay the stale
-Page's onExit and complete its imperative Future twice. Keep rejecting
-that retired entry through Navigator reconciliation, independently of
-whether the explicit restore is still owed. A live untagged departure
-uses the original policy, including declarative exits from a retained
-malformed match. An independent ingress after approval retires the restore claim. A
-refresh re-evaluating the same input is not independent and leaves that
-claim intact. The restore then re-evaluates redirects from the surviving
-configuration. Do not treat
-GoRouter's deferred removal as cancellable after approval. The existing
-malformed presentation has no forward push action. Do not add arbitration
-for arbitrary external imperative pushes against an approved removal.
+A GoRouter page pop queues its hook in a microtask and awaits the result.
+After true, the delegate completes the imperative result and removes
+the match before the Navigator rebuilds. The removal searches the
+current match list and removes that match and descendants, so an old
+approval must never be issued against a changed stack. A Page key,
+URI and `GoRouterState` can all survive replacement of an imperative
+match and its completer. The adapter uses the live root page and the
+exact top match from the host's last reconciled projection, checked
+against the current committed match by object identity. It also
+checks the routed state against that page. Capture this match before
+the first await and recheck identity, root presentation, account and
+independent ingress immediately before returning true. Reject if the
+projection is behind. GoRouter enqueues its hook from the page mapping
+used for the pop before the next build. Tests pin that ordering and the
+surviving identity on equivalent refresh.
 
-An approved deferred pop needs synchronization after the match is
-actually removed. The ordinary `GoRouter.pop` check cannot see it at
-return. Use one removable listener scoped to the admitted protected pop
-on the actual delegate. Require committed removal of the admitted top
-entry with the expected predecessor. On that removal, detach the
-listener and issue one public `router.restore` of the surviving
-configuration while the exact departure still owns it. A veto,
-unrelated commit or new independent request retires the restore claim. Release
-the listener also on cancellation or disposal. The real-router probe
-reproduced reopening after an immediate refresh in this deferred gap,
-and a one-shot restore at commit prevented it. No global observer or
-second editor policy is needed. No Home fallback is applicable to this
-protected child.
+The hook alone cannot tell a declarative exit from a deferred pop.
+Move the former explicit-only Dart Zone marker to the existing host
+boundary's calls to the original initial, new and restored setters.
+The marker carries the setter ingress identity so a stale setter cannot
+retire a later lease. A marked hook delegates to the existing policy
+for its own departure and neither claims nor waits on the pop lease.
+If the latest setter actually reaches this match's exit while a pop
+is evaluating, it retires that pop before invoking policy. This also
+applies to a same-input refresh that is replacing the match. A refresh
+that keeps the exact match needs no such action.
+The scope is confined to setter work. System and explicit pop dispatch
+use the pop origin even if invoked reentrantly. Untagged page-pop hooks
+including native pre-frame callbacks use the same lease. Proof of the
+exact reconciled source and an actual predecessor is required before
+a pop can acquire it. No token in route information, alternate
+Navigator, general exit policy or lock on unrelated navigation is needed.
+
+| Phase | Malformed route handling |
+| --- | --- |
+| Unclaimed | The first qualified pop hook claims one lease for the exact live root match before calling the existing policy. A competing explicit or platform hook for that match returns false without evaluating policy again. The explicit controls may avoid dispatch when the lease is already held. Two queued hooks still arbitrate at this one gate. |
+| Evaluating | Await the existing result. A false answer, exception, stale account, disposed host, changed match or independently superseding declarative ingress retires only this attempt. An unmodified same-input reparse can continue independently. If it reconstructs the match, the old attempt loses authority and the reconciled match may accept a fresh attempt. A duplicate Back on the same match is not independent navigation. A scoped failure follows existing error propagation. |
+| Approved | Return true once, as the last operation after rechecking the exact committed top match and latest independent ingress. Keep the lease through committed removal. GoRouter owns completion and removal from this point. A newer independent request never inherits the lease. Its own declarative policy and dispatch continue, and the old adapter forfeits any later restore over that input. No cancellation of an already approved GoRouter operation is claimed. |
+| Committed | Keep refusing stale page callbacks while the Navigator still uses the prior projection. The retired match has no authority even if its Route remains current before build. A fresh presentation is eligible after reconciliation. |
+| Refused or superseded | Clear only the still-owned lease and its temporary listener. A fresh activation can retry on the live presentation. No outgoing fallback or automatic retry applies here. |
+
+Listen once to the real delegate from the admitted pop, until its
+expected removal is observed or its lease is retired. For the expected
+commit, detach before using public `router.restore` on the surviving
+configuration. The normal public pop synchronizes only when commit
+occurs before it returns. This listener covers the demonstrable deferred
+gap for either pop origin. It may supersede a reparse of the exact stale
+provider input while retaining redirect evaluation from the surviving
+configuration. An independent ingress, a different commit or disposal
+forbids that restore. Keep the waiter scoped to this departure and
+remove it on every exit path.
+
+A real double-system probe reproduced duplicate completion without
+an intervening rebuild. Controlled probes held decisions for both mixed
+orders, two system callbacks and the two explicit actions. One gate
+admitted one decision, a veto allowed another attempt, and a late
+system callback once commit landed did not complete again. A marked
+independent setter reached its own policy while a pop was pending.
+A same-key imperative reconstruction also revoked the pending pop
+despite retaining the native Route. The previously characterized
+dirty editor predecessor and pre-frame refresh remain integration
+acceptance cases. A real sign-out during a malformed departure reached
+Admin Login in the fresh probe. The controlled false result covers the
+lease's refusal path. The tested permanently rendered malformed page
+did not require a long user decision in the real app.
 
 ### 6. Call-site inventory
 
@@ -396,6 +503,45 @@ reachability within the existing refresh behavior. The shared files do not
 justify concurrent changes to one control from both plans. Review overlapping
 hunks when implementing after either lands.
 
+### Live imperative results and dependency boundary
+
+GoRouter's codec persists location, extra and Page key for imperative
+entries. Decoding builds a new match and completer. Retaining the native
+Route and Page key does not preserve the old `push` Future after a
+post-reporting refresh or restoration. The original match equality
+also includes its completer. The planned Back operation must remove the
+actual live match and settle its live result once. The boundary must
+forward normal input, parsing, encoding and restoration without extra
+reparsing, rebuilding stacks or manufacturing results.
+
+A real Post opened a valid Gallery through `GalleryPreviewScreen.show`.
+Without refresh, GoRouter pop completed the original Future. With an
+ordinary post-reporting refresh, Gallery State and Page key survived
+but the match changed. After closing it, the same Post State was shown
+and the original Future was still pending. The slideshow awaits that
+Future to resume after Gallery. The planned local pause in
+`optimize-image-rendering-and-empty-view` could likewise fail to clear
+when that Future is its sole release condition. This is concrete
+overlap. A simple pop without match reconstruction must continue to
+release the existing presentation. A separate Gallery/slideshow task
+or an upstream fix is needed for refresh-safe recovery when that Future
+is stranded. The explicit Back change neither adds that waiting
+dependency nor revises the other change.
+
+Dashboard uses an explicit editor visit and route return for recovery
+and refresh. Its calls await a push but have no effect after the await.
+Settings entry navigation does not consume the result. Submission's
+progress push handles errors and performs no successful work on result
+settlement, and Admin Save Progress dispatch does not await a returned
+value. Keep these ownership paths intact. No public GoRouter hook
+preserves a decoded imperative completer. Rewriting decoded matches,
+intercepting all refreshes or adding a second completion channel is
+outside this change. Permanent regressions verify normal Gallery push
+and pop through the composed host, retained Post/slideshow state,
+unchanged original refresh/reporting behavior and one live push result.
+Do not require an original Future to remain stranded as a product
+contract.
+
 ## Risks / Trade-offs
 
 - App-host forwarding increases the compatibility surface when Flutter or
@@ -417,13 +563,11 @@ hunks when implementing after either lands.
 - Dashboard eligibility recovery must release only the original latch, with
   fresh controls for the current authorized presentation. An async receipt
   must not recreate a retired notification or revive a recovery attempt.
-- Keep the AppBar constraint explicit. At 56 pixels with outer 8 padding,
-  the existing center hit region measures 40 × 40 even under a mobile theme.
-  Test the interactive render box and edge taps separately from the glyph.
-  In an unconstrained padded mobile host expect the native 48 × 48 target.
-  Preserve native desktop sizing, center alignment, backgrounds and the
-  existing default/custom padding. The constrained baseline remains an
-  accessibility limit and does not justify editing toolbar geometry here.
+- The default native mobile target can grow locally while the face and
+  icon remain centered. Preserve explicit padding and desktop density.
+  Compare actual edge taps and accessibility bounds in constrained hosts.
+  A truly narrower host needs a separate layout decision.
+
 
 ## Migration Plan
 

@@ -128,13 +128,22 @@ through its protected route's exit policy and actual predecessor.
 - **WHEN** an available leading or text Back is activated on an ordinary error
 - **THEN** both controls apply the same predecessor, veto and fallback rules
 
-#### Scenario: A protected malformed Admin detail receives repeated Back
+#### Scenario: A protected malformed Admin detail receives concurrent Back
 
-- **WHEN** its two controls are activated while one departure is pending
+- **WHEN** explicit Back, its companion action or system Back requests the
+  same departure while an exit is pending
 - **THEN** the exit policy decides whether that exact page is removed
 - **AND** an allowed return completes its result once, preserves any underlying
-  editor state, and remains removed after refresh
-- **AND** a refused or superseded request initiates no Explore fallback
+  editor state, and remains removed after a refresh of the same input
+- **AND** a refusal allows a fresh eligible attempt without an Explore fallback
+
+#### Scenario: An independent declarative departure supersedes a pending pop
+
+- **WHEN** a new declarative navigation supersedes the malformed page pop
+  before its approval
+- **THEN** the declarative navigation can evaluate its own exit policy
+- **AND** the superseded pop does not remove a match, complete its result,
+  or overwrite the newer route information
 
 #### Scenario: System Back reaches a stale malformed Admin page
 
@@ -147,8 +156,9 @@ through its protected route's exit policy and actual predecessor.
 
 Shared Back controls SHALL use the effective themed platform, directional
 icon, customized icon where supplied and localized accessibility label. They
-SHALL retain configured spacing and backgrounds and preserve target
-reachability within the host's constraints.
+SHALL retain caller-configured spacing and backgrounds. A default padded
+mobile Back target SHALL be at least 48 × 48 logical pixels where host
+constraints permit it, with native glyph and background presentation.
 
 #### Scenario: Theme and layout differ between hosts
 
@@ -157,6 +167,13 @@ reachability within the host's constraints.
 - **THEN** it presents the corresponding native appearance, semantics and
   tooltip with the configured layout and a target at least as reachable as
   before
+
+#### Scenario: A standard mobile leading slot is 56 logical pixels
+
+- **WHEN** default Back is rendered in a 56 × 56 padded mobile leading slot
+- **THEN** its native target is at least 48 × 48, including the interactive
+  edges and accessibility bounds, and the visible face remains centered
+- **AND** it does not overlap another control
 
 ### Requirement: Feature overrides and platform Back retain their own policies
 

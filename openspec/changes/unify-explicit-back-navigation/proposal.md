@@ -15,10 +15,12 @@ pushed route's result twice.
 - Distinguish pending, refused, superseded and committed departures
   so a rejected or old request cannot displace a later presentation.
 - Use the native themed Material Back control while preserving
-  existing backgrounds, spacing and full callback overrides.
+  configurable backgrounds, caller-supplied spacing and full callback
+  overrides. Use a 48 × 48 mobile target where the host permits it.
 - Share one action across the applicable error icons and text actions.
   Preserve Dashboard account and presentation admission and the
-  malformed Admin page's existing protected exit decision.
+  malformed Admin page's existing protected exit decision. Its explicit
+  and platform pop paths share one departure admission.
 - Preserve shell visibility, system Back, native gestures, redirects,
   restoration and all feature-owned destinations and controls.
 
