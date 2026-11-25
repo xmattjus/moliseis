@@ -19,7 +19,6 @@ import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
-import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/utils/lru_cache.dart';
 import 'package:moliseis/utils/result.dart';
@@ -86,12 +85,7 @@ final class RouteOwnershipFixture {
         GoRoute(
           path: RoutePaths.gallery,
           name: RouteNames.gallery,
-          builder: (_, state) {
-            final data = GalleryPreviewRouteData.tryParse(state.extra);
-            return data == null
-                ? const GalleryUnavailableScreen()
-                : GalleryPreviewScreen(data: data);
-          },
+          pageBuilder: GalleryPreviewScreen.buildPage,
         ),
         StatefulShellRoute.indexedStack(
           branches: <StatefulShellBranch>[

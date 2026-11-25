@@ -235,12 +235,12 @@ No backend, domain, staging, upload, persistence, bucket/cache limits or depende
 inputs changed. Source media dimensions remain in their domain/navigation models;
 only the six AppNetworkImage call sites drop unused width/height metadata.
 
-The slideshow keeps slot handles and live-child/request leases locally. Current
+At the original handoff, the slideshow kept slot handles and live-child/request leases locally. Current
 readiness is invalidated on remount/request replacement and revoked on slot
 replacement/reorder/removal, including ABA and in-place list changes. Deferred
 publication schedules a frame and reads latest authority. A State-lifetime ticker,
-rebound visibility listener and Future-owned gallery pause share one admission
-gate. Nineteen slideshow tests (after the remediation below) include actual
+rebound visibility listener and Future-owned Gallery pause shared one admission
+gate. The later [Gallery correction](#gallery-presentation-lifecycle--2026-11-25) supersedes that pause mechanism. Nineteen slideshow tests (after the remediation below) include actual
 provider decode/error, failed and evicted B remount, synchronous cached remount,
 bucket/DPR/cache-manager replacement, offscreen completion, ABA/reorder,
 partial changes, queued callbacks, visibility, manual pause, count changes and
@@ -830,3 +830,92 @@ or archival. Both are currently **NOT VERIFIED**.
 
 The 2026-11-24 decision authorizes the implementation-merge deferrals
 only. No iOS release or release-owner residual-risk decision is recorded.
+
+## Gallery presentation lifecycle (2026-11-25)
+
+This correction extends the original image-rendering change after its initial
+verification. On main `e13a0e341535bdebb53b48997a5ee1301a6c0188`, the actual app
+router reported the base Post URI and serialized the imperative Gallery. A
+controlled GoTrue `signedOut` event with the backing user cleared drove the
+real `AdminAuthViewModel` refresh. GoTrue 2.27.2 can emit that event when an
+automatic refresh fails with a non-retryable auth error and the session is
+still current. The test controls the SDK event boundary.
+
+After Navigator reconciliation, Back completed the replacement result,
+removed Gallery and revealed the same Post and slideshow. The original result
+remained pending during bounded observation. The old code left autoplay on
+page 0 beyond five seconds and a hit-tested photo tap opened no Gallery.
+Before reconciliation, Back instead completed the obsolete result. Flutter
+recreated Gallery's physical Route for the same Page key. A synthetic
+invocation of the covered slideshow callback admitted a second imperative
+push on the baseline.
+
+The slideshow now reserves one opening and binds it to the existing root
+MaterialPage and its actual Flutter Routes. The request observes app refusal
+and supersession before attachment. The exact Page key carries ownership
+across reconciliation and Route recreation. Flutter transition completion
+releases that reservation when the presentation ends, even if the push
+result remains pending. Temporary coverage and early results retain the
+suspension. Release consults current visibility, user intent, media count and
+valid active-image readiness. Disposal detaches the originating State, and
+navigation errors still propagate through the calling Future.
+
+The permanent regressions include real Back, repeated hit-tested opens,
+unchanged auth fields, pending readiness, user pause, hidden and single-media
+slideshow states, root route replacement, Sync and restoration. A real
+GoRouter `Block.stop()` in the isolated harness demonstrates refusal with an
+unresolved result and reusable admission. A synthetic out-of-order Route
+removal verifies that a retired slideshow cannot affect its replacement.
+The existing Gallery route and restoration suites exercise explicit, system,
+drag and predictive Back in widget tests.
+
+Verification used Flutter 3.47.5 (`6a19cca564`), Dart 3.13.4, GoRouter
+18.0.2 and OpenSpec 2.1.0 on macOS.
+
+- The final stranded-result and early-result regressions both failed on the
+  unchanged production baseline at the expected assertions. Both pass with
+  the correction.
+- The focused Gallery and slideshow lifecycle files passed 24 tests. The
+  35-file routing, restoration, Admin, Gallery and media run passed 613
+  tests with the existing NAV-01 skip.
+- The CI-equivalent autonomous Flutter list ran 218 files. It passed 4,444
+  tests with four existing skips and zero failures. The skips are NAV-01 and
+  three command-disposal probes for the upstream late StateError behavior.
+  Autonomous Deno passed 246 tests and 34 substeps with zero failures.
+- Formatting and Flutter analysis passed. The change passed strict OpenSpec
+  validation. Strict canonical validation returned the same 110 existing
+  warnings across 17 of 28 specs, compared by spec, level, path and message.
+  `git diff --check` passed.
+
+GoRouter's reporting and stale-pop behavior are outside this correction.
+The image/rendering path and measured performance boundaries are the same.
+Widget results provide no physical gesture or iOS release evidence. Genuine
+VoiceOver activation of enlarged Nearby Retry, physical iOS Profile memory,
+scrolling and raster verification, and the existing residual-risk decision
+remain in the [iOS release gates](#ios-release-gates).
+
+### Final Gallery review remediation
+
+The production Sync race redirected a Gallery push to an imperative Sync
+entry above the original Post. After Sync finished, replacing that entry
+with the original Post location retained the same Post and slideshow.
+A photo tap opened Gallery while the redirected push result remained
+pending. Redirects use the existing Sync-before-Admin rule and committed
+configuration changes retire displaced openings. The explicit Block
+notification remains because GoRouter can keep the identical configuration.
+The production guard regression opens a real Admin dirty-exit decision over
+a retained Post and invokes the covered slideshow callback synthetically.
+It complements the earlier isolated GoRouter refusal harness.
+
+The Page uses Flutter's default compatibility predicate. The post-frame
+observation follows same-key Routes recreated by stale Back, including
+another refresh before the older Route finishes. A refresh requested before
+the post-frame observer applies the next Page on the following frame.
+The regression repeats the sequence with normal and reduced motion and
+exercises platform Back during an incomplete entrance. Separate committed-before-build regressions cover
+same-Post replacement and a covering push. The latter deliberately schedules
+a Settings push and invokes the covered callback to challenge admission.
+Removing the opening commit observer stranded the reservation after
+replacement. Removing the provider qualification or the replacement
+observation admitted a duplicate. Removing the production Block hook
+prevented a second opening after the Admin exit decision cleared.

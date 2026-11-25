@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/scaffold_shell.dart';
-import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -40,12 +39,7 @@ final class TargetTopologyFixture {
         GoRoute(
           path: '/gallery',
           name: RouteNames.gallery,
-          builder: (_, state) {
-            final data = GalleryPreviewRouteData.tryParse(state.extra);
-            return data == null
-                ? const GalleryUnavailableScreen()
-                : GalleryPreviewScreen(data: data);
-          },
+          pageBuilder: GalleryPreviewScreen.buildPage,
         ),
         GoRoute(
           path: '/destination',
