@@ -33,8 +33,48 @@ final class TestImageFiles {
     );
   }
 
+  /// Writes an opaque RGBA PNG with real dimensions for decoder regressions.
+  File createSizedPng(int width, int height) {
+    final row = Uint8List(width * 4 + 1);
+    for (var x = 0; x < width; x++) {
+      row[x * 4 + 1] = x.isEven ? 255 : 32;
+      row[x * 4 + 3] = 128;
+      row[x * 4 + 4] = 255;
+    }
+    final raw = BytesBuilder(copy: false);
+    for (var y = 0; y < height; y++) {
+      raw.add(row);
+    }
+    final header = <int>[
+      ..._uint32Bytes(width),
+      ..._uint32Bytes(height),
+      8,
+      6,
+      0,
+      0,
+      0,
+    ];
+    final bytes = <int>[
+      ..._onePixelPng.take(8),
+      ..._pngChunk('IHDR', header),
+      ..._pngChunk('IDAT', zlib.encode(raw.takeBytes())),
+      ..._pngChunk('IEND', const []),
+    ];
+    return File('${_directory.path}/sized_${_nextFileIndex++}.png')
+      ..writeAsBytesSync(bytes);
+  }
+
   /// Deletes every temporary image file owned by this fixture.
   void dispose() => _directory.deleteSync(recursive: true);
+}
+
+List<int> _pngChunk(String type, List<int> data) {
+  final contents = <int>[...type.codeUnits, ...data];
+  return <int>[
+    ..._uint32Bytes(data.length),
+    ...contents,
+    ..._uint32Bytes(_crc32(contents)),
+  ];
 }
 
 List<int> _pngBytesForIndex(int index) {

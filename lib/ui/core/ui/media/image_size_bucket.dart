@@ -7,25 +7,9 @@ import 'package:material_ui/material_ui.dart';
 /// Separate bucket lists are kept for width and height so each axis can be
 /// tuned independently (e.g. tall mobile screens need larger height buckets).
 ///
-/// Usage
-/// -----
-/// ```dart
-/// return LayoutBuilder(
-///   builder: (BuildContext context, BoxConstraints constraints) {
-///     final bucket = ImageSizeBucket.resolve(
-///       logicalWidth:  constraints.maxWidth,
-///       logicalHeight: constraints.maxHeight,
-///       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
-///     );
-///
-///     return CachedNetworkImage(
-///       // ...
-///       memCacheWidth: bucket.width,
-///       memCacheHeight: bucket.height,
-///     );
-///   }
-/// );
-/// ```
+/// AppNetworkImage uses [resolveAndClamp] for its requested decode rectangle.
+/// The cover provider separately limits proportional output; disk identity is
+/// unaffected by these in-memory targets.
 abstract final class ImageSizeBucket {
   // ---------------------------------------------------------------------------
   // Bucket thresholds – physical pixels (logical × DPR).

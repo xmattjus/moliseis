@@ -55,8 +55,6 @@ class ContentBaseCardGridItem extends StatelessWidget {
                         url: content.media.first.url,
                         width: constraints.maxWidth,
                         height: constraints.maxHeight,
-                        imageWidth: content.media.first.width,
-                        imageHeight: content.media.first.height,
                       ),
                     ),
                   ),
