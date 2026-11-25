@@ -240,7 +240,7 @@ readiness is invalidated on remount/request replacement and revoked on slot
 replacement/reorder/removal, including ABA and in-place list changes. Deferred
 publication schedules a frame and reads latest authority. A State-lifetime ticker,
 rebound visibility listener and Future-owned Gallery pause shared one admission
-gate. The later [Gallery correction](#gallery-presentation-lifecycle--2026-11-25) supersedes that pause mechanism. Nineteen slideshow tests (after the remediation below) include actual
+gate. The later [Gallery correction](#gallery-presentation-lifecycle-2026-11-25) supersedes that pause mechanism. Nineteen slideshow tests (after the remediation below) include actual
 provider decode/error, failed and evicted B remount, synchronous cached remount,
 bucket/DPR/cache-manager replacement, offscreen completion, ABA/reorder,
 partial changes, queued callbacks, visibility, manual pause, count changes and
