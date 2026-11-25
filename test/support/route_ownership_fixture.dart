@@ -14,6 +14,7 @@ import 'package:moliseis/domain/repositories/place_repository.dart';
 import 'package:moliseis/domain/repositories/settings_repository.dart';
 import 'package:moliseis/domain/use-cases/favourite_get_ids_use_case.dart';
 import 'package:moliseis/routing/core_routes.dart';
+import 'package:moliseis/routing/explicit_back.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
@@ -79,8 +80,12 @@ final class RouteOwnershipFixture {
     router = GoRouter(
       navigatorKey: rootNavigatorKey,
       initialLocation: initialLocation,
-      errorBuilder: (_, state) =>
-          RouteErrorScreen(uri: state.uri, error: state.error),
+      errorBuilder: (_, state) => RouteErrorScreen(
+        uri: state.uri,
+        error: state.error,
+        onBack: (context) =>
+            requestExplicitBack(context, unmatchedError: state.error),
+      ),
       routes: <RouteBase>[
         GoRoute(
           path: RoutePaths.gallery,

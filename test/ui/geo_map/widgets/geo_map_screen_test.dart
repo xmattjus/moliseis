@@ -1999,7 +1999,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(GeoMapModalSearchResults), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Indietro'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(GeoMapModalSearchResults),
+        matching: find.byType(BackButton),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(GeoMapModalSearchResults), findsNothing);

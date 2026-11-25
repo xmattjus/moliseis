@@ -111,7 +111,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(GalleryPreviewScreen), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Indietro'));
+    await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
 
     expect(find.byType(GalleryPreviewScreen), findsNothing);
@@ -137,7 +137,7 @@ void main() {
       // Cycle 2: app-bar back.
       await tester.tap(find.text('Open gallery'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Indietro'));
+      await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
       expect(find.text('Detail page'), findsOneWidget);
 

@@ -8,6 +8,7 @@ import 'package:moliseis/domain/repositories/admin_submission_draft_repository.d
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
 import 'package:moliseis/routing/admin_submission_exit_policy.dart';
 import 'package:moliseis/routing/core_routes.dart';
+import 'package:moliseis/routing/explicit_back.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -107,8 +108,12 @@ GoRouter buildAppRouter({
     redirect: (context, state) =>
         _redirectForSync(context, syncViewModel, state) ??
         _redirectForAdminAuth(adminAuthViewModel, state),
-    errorBuilder: (_, state) =>
-        RouteErrorScreen(uri: state.uri, error: state.error),
+    errorBuilder: (_, state) => RouteErrorScreen(
+      uri: state.uri,
+      error: state.error,
+      onBack: (context) =>
+          requestExplicitBack(context, unmatchedError: state.error),
+    ),
     routes: <RouteBase>[
       GoRoute(
         path: RoutePaths.sync,
@@ -322,6 +327,8 @@ GoRouter buildAppRouter({
                   error: GoException(
                     'Invalid submission id "${state.pathParameters['id']}"',
                   ),
+                  onBack: (context) =>
+                      requestExplicitBack(context, predecessorOnly: true),
                 );
               }
 

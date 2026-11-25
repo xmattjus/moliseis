@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
+import 'package:moliseis/routing/explicit_back.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/themes/app_theme_data.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
@@ -226,12 +227,7 @@ class GalleryUnavailableScreen extends StatelessWidget {
             const Text('Anteprima non disponibile.'),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: () async {
-                final didPop = await Navigator.of(context).maybePop();
-                if (!didPop && context.mounted) {
-                  context.goNamed(RouteNames.home);
-                }
-              },
+              onPressed: () => requestExplicitBack(context),
               child: const Text('Torna indietro'),
             ),
           ],

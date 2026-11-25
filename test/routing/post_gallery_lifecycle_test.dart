@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -78,8 +79,9 @@ void main() {
         );
 
         if (early) {
-          // The old Page still handles Back before Navigator reconciliation.
-          await fixture.back();
+          // A lower-level pop still exercises Gallery's lifecycle protection
+          // when the old Page handles a pop before Navigator reconciliation.
+          fixture.router.pop();
           await tester.idle();
           expect(originalReturned, isTrue);
           expect(original.completer.isCompleted, isTrue);
@@ -147,6 +149,71 @@ void main() {
         expect(originalReturned, isFalse);
       },
     );
+  }
+
+  for (final keyboard in [false, true]) {
+    testOwnerUI('Gallery Back rejects a stale push (keyboard: $keyboard)', (
+      tester,
+    ) async {
+      final fixture = await _PostGalleryFixture.mount(tester);
+      final postRoute = ModalRoute.of(tester.element(fixture.post));
+      await fixture.tapPhoto();
+      await _frames(tester);
+      final original = fixture.match;
+      final shown = ModalRoute.of(tester.element(fixture.gallery));
+      final back = find.byType(BackButton);
+      TestGesture? press;
+      if (keyboard) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+        final focused = FocusManager.instance.primaryFocus?.context;
+        expect(
+          find.ancestor(
+            of: find.byElementPredicate(
+              (element) => identical(element, focused),
+            ),
+            matching: back,
+          ),
+          findsOneWidget,
+        );
+      } else {
+        press = await tester.startGesture(tester.getCenter(back));
+      }
+
+      fixture.auth
+        ..setUser(null)
+        ..emit(AuthChangeEvent.signedOut);
+      await tester.idle();
+      final live = fixture.match;
+      expect(live.pageKey, original.pageKey);
+      expect(live.completer, isNot(same(original.completer)));
+      expect(ModalRoute.of(tester.element(fixture.gallery)), same(shown));
+
+      if (keyboard) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      } else {
+        await press!.up();
+      }
+      await tester.idle();
+      expect(original.completer.isCompleted, isFalse);
+      expect(live.completer.isCompleted, isFalse);
+      expect(fixture.match, same(live));
+
+      await _frames(tester);
+      expect(ModalRoute.of(tester.element(fixture.gallery)), same(shown));
+      if (keyboard) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      } else {
+        await tester.tap(back);
+      }
+      fixture.router.refresh();
+      await _frames(tester);
+      expect(fixture.gallery, findsNothing);
+      expect(ModalRoute.of(tester.element(fixture.post)), same(postRoute));
+      expect(live.completer.isCompleted, isTrue);
+      expect(original.completer.isCompleted, isFalse);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testOwnerUI('normal Gallery return survives coverage and unchanged auth', (
@@ -446,7 +513,7 @@ void main() {
         // Request refresh before the popped observer runs. Flutter applies
         // the next Page on the following frame.
         tester.binding.addPostFrameCallback((_) => fixture.router.refresh());
-        await fixture.back();
+        fixture.router.configuration.navigatorKey.currentState!.pop();
         await tester.idle();
         expect(oldMatch.completer.isCompleted, isTrue);
         expect(committed.completer.isCompleted, isFalse);
@@ -697,5 +764,5 @@ final class _PostGalleryFixture {
         .hitTestable()
         .first,
   );
-  Future<void> back() => tester.tap(find.byTooltip('Indietro'));
+  Future<void> back() => tester.tap(find.byType(BackButton));
 }

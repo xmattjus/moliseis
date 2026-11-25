@@ -75,8 +75,12 @@ does not cover this interleaving. Gallery's presentation tracking preserved
 slideshow admission, while the requested departure failed.
 
 For ordinary matched pushes, reuse GoRouter's existing association from
-the installed Route's Page to `GoRouterState.of(context)`. First qualify
-the intended live entry and its key/destination. The pinned fixed router
+the installed Route's Page to `GoRouterState.of(context)`. Confirm by
+reference that the Route uses the owning Navigator's top installed Page.
+A local Navigator push can carry Page settings with the expected key
+without an association in the router. Qualify the associated state's key
+and destination to reject a missing or unrelated ancestor association.
+The pinned fixed router
 also exposes an inexpensive discriminator without a new association.
 `ImperativeRouteMatch.buildState` passes its inner path-parameter map
 through directly, and decoding a replacement result matches the location

@@ -169,49 +169,58 @@ void main() {
       },
     );
 
-    testOwnerUI(
-      'dashboard AppBar Back falls back to Home '
-      'and ignores a repeated callback',
-      (tester) async {
-        harness = _AdminRouteHarness(
-          initialUser: makeAuthUser(
-            isAdmin: true,
-            id: AdminDraftSessionHarness.accountA,
-          ),
-        );
-        harness.router.go(RoutePaths.admin);
-        await tester.pumpWidget(harness.app());
-        await tester.pumpAndSettle();
+    for (final width in [430.0, 1000.0]) {
+      testOwnerUI(
+        'dashboard AppBar Back falls back to Home '
+        'and ignores a repeated callback (width: $width)',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          harness = _AdminRouteHarness(
+            initialUser: makeAuthUser(
+              isAdmin: true,
+              id: AdminDraftSessionHarness.accountA,
+            ),
+          );
+          harness.router.go(RoutePaths.admin);
+          await tester.pumpWidget(harness.app());
+          await tester.pumpAndSettle();
 
-        final back = tester.widget<IconButton>(
-          find.descendant(
-            of: find.byTooltip('Indietro'),
-            matching: find.byType(IconButton),
-          ),
-        );
-        final onPressed = back.onPressed!;
-        onPressed();
-        onPressed();
-        await tester.pumpAndSettle();
+          final back = tester.widget<IconButton>(find.byType(BackButton));
+          final onPressed = back.onPressed!;
+          await tester.tap(find.byType(BackButton));
+          onPressed();
+          await tester.pumpAndSettle();
 
-        expect(harness.router.state.uri.path, RoutePaths.home);
-        expect(find.byType(AdminDashboardScreen), findsNothing);
-        expect(find.byType(AdminLoginScreen), findsNothing);
-        expect(harness.auth.viewModel.isAdmin, isTrue);
-      },
-      disposeOwners: () {
-        harness.editor.dispose();
-        harness.auth.dispose();
-        harness.syncViewModel.dispose();
-        harness.router.dispose();
-      },
-    );
+          expect(harness.router.state.uri.path, RoutePaths.home);
+          expect(find.byType(AdminDashboardScreen), findsNothing);
+          expect(find.byType(AdminLoginScreen), findsNothing);
+          expect(harness.auth.viewModel.isAdmin, isTrue);
+        },
+        disposeOwners: () {
+          harness.editor.dispose();
+          harness.auth.dispose();
+          harness.syncViewModel.dispose();
+          harness.router.dispose();
+        },
+      );
+    }
 
-    for (final systemBack in [false, true]) {
+    for (final (systemBack, width) in [
+      (false, 430.0),
+      (false, 1000.0),
+      (true, 430.0),
+    ]) {
       testOwnerUI(
         'authenticated Settings keeps its route and state '
-        'with system Back=$systemBack',
+        'with system Back=$systemBack (width: $width)',
         (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
           harness = _AdminRouteHarness(
             initialUser: makeAuthUser(
               isAdmin: true,
@@ -240,16 +249,31 @@ void main() {
           if (systemBack) {
             expect(await tester.binding.handlePopRoute(), isTrue);
           } else {
-            final callback = tester
-                .widget<IconButton>(
-                  find.descendant(
-                    of: find.byTooltip('Indietro'),
-                    matching: find.byType(IconButton),
-                  ),
-                )
-                .onPressed!;
+            final back = find.byType(BackButton);
+            final original =
+                harness.router.routerDelegate.currentConfiguration.last
+                    as ImperativeRouteMatch;
+            final press = await tester.startGesture(tester.getCenter(back));
+            harness.router.refresh();
+            await tester.idle();
+            final live =
+                harness.router.routerDelegate.currentConfiguration.last
+                    as ImperativeRouteMatch;
+            expect(live.completer, isNot(same(original.completer)));
+            await press.up();
+            await tester.idle();
+            expect(
+              harness.router.routerDelegate.currentConfiguration.last,
+              same(live),
+            );
+            expect(original.completer.isCompleted, isFalse);
+            expect(live.completer.isCompleted, isFalse);
+
+            await tester.pumpAndSettle();
+            final callback = tester.widget<BackButton>(back).onPressed!;
+            await tester.tap(back);
             callback();
-            callback();
+            expect(live.completer.isCompleted, isTrue);
           }
           await tester.pumpAndSettle();
           expect(harness.router.state.uri.path, RoutePaths.settings);
@@ -301,12 +325,7 @@ void main() {
           await tester.pumpWidget(harness.app());
           await tester.pumpAndSettle();
           final callback = tester
-              .widget<IconButton>(
-                find.descendant(
-                  of: find.byTooltip('Indietro'),
-                  matching: find.byType(IconButton),
-                ),
-              )
+              .widget<IconButton>(find.byType(BackButton))
               .onPressed!;
           if (transition == 'sign out') {
             harness.auth.setUser(null);
@@ -473,6 +492,18 @@ void main() {
 
         expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
         expect(find.byType(AdminLoginScreen), findsOneWidget);
+        final configuration = harness.router.routerDelegate;
+        expect(configuration.currentConfiguration.matches, hasLength(1));
+        final commits = <RouteMatchList>[];
+        configuration.addListener(
+          () => commits.add(configuration.currentConfiguration),
+        );
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(harness.router.state.uri.path, RoutePaths.home);
+        expect(commits, isNotEmpty);
+        expect(commits.every((commit) => commit.isNotEmpty), isTrue);
+        expect(tester.takeException(), isNull);
       },
       disposeOwners: () {
         harness.editor.dispose();
@@ -556,7 +587,7 @@ void main() {
 
         expect(settingsRoute.isActive, isTrue);
         expect(settingsRoute.isCurrent, isFalse);
-        await tester.tap(find.byTooltip('Indietro'));
+        await tester.tap(find.byType(BackButton));
         await tester.pumpAndSettle();
 
         expect(
@@ -764,7 +795,7 @@ void main() {
         expect(harness.repository.getByIdIds, [1]);
         expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
         expect(find.text('Caricamento in corso...'), findsOneWidget);
-        final back = find.byTooltip('Indietro');
+        final back = find.byType(BackButton);
         expect(back.hitTestable(), findsOneWidget);
         await tester.tap(back);
         // The existing exit policy refuses navigation while the detail load
@@ -786,7 +817,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
-        final readyBack = find.byTooltip('Indietro');
+        final readyBack = find.byType(BackButton);
         expect(readyBack.hitTestable(), findsOneWidget);
         await tester.tap(readyBack);
         await tester.pumpAndSettle();
@@ -1554,29 +1585,55 @@ void main() {
       }
     }
 
-    testOwnerUI(
-      'shows the route error screen for an invalid submission id',
-      (tester) async {
-        harness = _AdminRouteHarness(
-          initialUser: makeAuthUser(
-            isAdmin: true,
-            id: AdminDraftSessionHarness.accountA,
-          ),
-        );
+    for (final leading in [true, false]) {
+      testOwnerUI(
+        'malformed editor only departs through its protected pop '
+        '(leading: $leading)',
+        (tester) async {
+          harness = _AdminRouteHarness(
+            initialUser: makeAuthUser(
+              isAdmin: true,
+              id: AdminDraftSessionHarness.accountA,
+            ),
+          );
+          final router = harness.router..go('/admin/submissions/abc');
+          await tester.pumpWidget(harness.app());
+          await tester.pumpAndSettle();
+          final error = find.byType(RouteErrorScreen);
+          final back = leading
+              ? find.byType(BackButton)
+              : find.text('Indietro');
+          expect(error, findsOneWidget);
+          await tester.tap(back);
+          await tester.pumpAndSettle();
+          expect(router.state.uri.path, RoutePaths.admin);
 
-        harness.router.go('/admin/submissions/abc');
-        await tester.pumpWidget(harness.app());
-        await tester.pumpAndSettle();
+          router.go('/admin/submissions/new');
+          await tester.pumpAndSettle();
+          final editor = find.byType(AdminSubmissionEditorScreen);
+          final retained = ModalRoute.of(tester.element(editor))!;
+          unawaited(router.push<void>('/admin/submissions/abc'));
+          await tester.pumpAndSettle();
+          expect(error, findsOneWidget);
+          expect(retained.isActive, isTrue);
+          expect(retained.isCurrent, isFalse);
 
-        expect(find.byType(RouteErrorScreen), findsOneWidget);
-      },
-      disposeOwners: () {
-        harness.editor.dispose();
-        harness.auth.dispose();
-        harness.syncViewModel.dispose();
-        harness.router.dispose();
-      },
-    );
+          await tester.tap(back);
+          expect(retained.isCurrent, isFalse);
+          await tester.pumpAndSettle();
+          expect(error, findsNothing);
+          expect(ModalRoute.of(tester.element(editor)), same(retained));
+          expect(router.state.uri.path, '/admin/submissions/new');
+          expect(tester.takeException(), isNull);
+        },
+        disposeOwners: () {
+          harness.editor.dispose();
+          harness.auth.dispose();
+          harness.syncViewModel.dispose();
+          harness.router.dispose();
+        },
+      );
+    }
   });
 }
 
