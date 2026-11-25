@@ -127,9 +127,10 @@ editor itself.
 - **AND** a direct entry has Dashboard as its predecessor
 - **AND** valid editor, New and Save Progress destinations retain their behavior
 
-#### Scenario: Concurrent Back requests target one live error
+#### Scenario: Concurrent Back requests target the dedicated Admin diagnostic
 
-- **WHEN** leading, text or system Back requests overlap on the same live error
+- **WHEN** leading, text or system Back requests overlap on the same live
+  dedicated Admin diagnostic route
 - **THEN** that page is removed once and its live imperative result completes
   once if it was pushed
 - **AND** the exact predecessor is retained, including any dirty editor and
@@ -137,11 +138,22 @@ editor itself.
 - **AND** subsequent requests captured from the retired error leave the stack
   alone, with no Explore fallback
 
-#### Scenario: The error is explicitly popped before refresh
+#### Scenario: The dedicated Admin diagnostic is explicitly popped before refresh
 
-- **WHEN** an explicit Back pops the live error and refresh follows before the
-  next frame
+- **WHEN** explicit Back pops the live dedicated Admin diagnostic route and
+  refresh follows before the next frame
 - **THEN** the request retains its actual predecessor and the error stays removed
+
+#### Scenario: A historical malformed imperative entry restores to the editor route
+
+- **WHEN** restoration places a historical malformed imperative entry on the
+  original editor route
+- **THEN** it renders the defensive Admin diagnostic without activating an
+  editor session
+- **AND** explicit Back remains subject to the existing protected exit policy
+  and returns only to the actual predecessor when permitted, with no Explore
+  fallback
+- **AND** the dedicated route's concurrent Back guarantee does not apply
 
 #### Scenario: An independent declaration also leaves the editor
 

@@ -242,8 +242,10 @@ malformed imperative match. Keep its null-ID branch as a defensive,
 predecessor-only diagnostic with no editor activation. The probe verified
 that this historical payload renders safely. Current malformed requests
 commit the dedicated route. A new saved imperative entry restores to that
-route. The old synthetic
-imperative stack retains the old exit semantics; the plan introduces no
+route. Historical entries restored to the original editor route retain the
+existing protected exit policy. Explicit Back can only return to the actual
+predecessor when permitted. The concurrent Back and immediate-refresh
+guarantees apply to the dedicated diagnostic route. The plan introduces no
 stored-state migration or generic completer repair.
 
 The canonical routing and editor capabilities keep their existing
