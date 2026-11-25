@@ -128,16 +128,6 @@ final class _GalleryPage extends MaterialPage<void> {
   final routeSlot = _GalleryRouteSlot();
 
   @override
-  bool canUpdate(Page<dynamic> other) {
-    final matches = super.canUpdate(other);
-    if (matches && other is _GalleryPage) {
-      // A Page update can keep the Route without calling createRoute again.
-      routeSlot.route = other.routeSlot.route;
-    }
-    return matches;
-  }
-
-  @override
   Route<void> createRoute(BuildContext context) {
     final created = super.createRoute(context) as TransitionRoute<void>;
     routeSlot.route = created;

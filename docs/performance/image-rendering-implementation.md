@@ -893,3 +893,29 @@ Widget results provide no physical gesture or iOS release evidence. Genuine
 VoiceOver activation of enlarged Nearby Retry, physical iOS Profile memory,
 scrolling and raster verification, and the existing residual-risk decision
 remain in the [iOS release gates](#ios-release-gates).
+
+### Final Gallery review remediation
+
+The production Sync race redirected a Gallery push to an imperative Sync
+entry above the original Post. After Sync finished, replacing that entry
+with the original Post location retained the same Post and slideshow.
+A photo tap opened Gallery while the redirected push result remained
+pending. Redirects use the existing Sync-before-Admin rule and committed
+configuration changes retire displaced openings. The explicit Block
+notification remains because GoRouter can keep the identical configuration.
+The production guard regression opens a real Admin dirty-exit decision over
+a retained Post and invokes the covered slideshow callback synthetically.
+It complements the earlier isolated GoRouter refusal harness.
+
+The Page uses Flutter's default compatibility predicate. The post-frame
+observation follows same-key Routes recreated by stale Back, including
+another refresh before the older Route finishes. A refresh requested before
+the post-frame observer applies the next Page on the following frame.
+The regression repeats the sequence with normal and reduced motion and
+exercises platform Back during an incomplete entrance. Separate committed-before-build regressions cover
+same-Post replacement and a covering push. The latter deliberately schedules
+a Settings push and invokes the covered callback to challenge admission.
+Removing the opening commit observer stranded the reservation after
+replacement. Removing the provider qualification or the replacement
+observation admitted a duplicate. Removing the production Block hook
+prevented a second opening after the Admin exit decision cleared.

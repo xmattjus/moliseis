@@ -104,15 +104,9 @@ GoRouter buildAppRouter({
           ? observe(decision)
           : decision.then(observe);
     },
-    redirect: (context, state) {
-      final destination =
-          _redirectForSync(context, syncViewModel, state) ??
-          _redirectForAdminAuth(adminAuthViewModel, state);
-      if (destination != null && state.matchedLocation == RoutePaths.gallery) {
-        GalleryPreviewScreen.refuseOpening(state.extra);
-      }
-      return destination;
-    },
+    redirect: (context, state) =>
+        _redirectForSync(context, syncViewModel, state) ??
+        _redirectForAdminAuth(adminAuthViewModel, state),
     errorBuilder: (_, state) =>
         RouteErrorScreen(uri: state.uri, error: state.error),
     routes: <RouteBase>[

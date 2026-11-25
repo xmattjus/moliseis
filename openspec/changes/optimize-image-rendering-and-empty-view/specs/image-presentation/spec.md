@@ -321,6 +321,12 @@ A slideshow SHALL admit at most one Gallery opening or presentation at a time. A
 - **THEN** its pending reservation is released and the slideshow can try again
 - **AND** navigation exceptions continue to propagate through the original call contract
 
+#### Scenario: The admitted opening has not yet created a Route
+
+- **WHEN** another navigation request arrives after the Gallery match commits and before its physical Route is created
+- **THEN** the reservation remains exclusive while the committed Gallery match is still admitted, including under a covering push
+- **AND** if a subsequent commit omits Gallery, it releases the reservation even if the original push result remains pending
+
 #### Scenario: The originating slideshow is disposed or replaced
 
 - **WHEN** a retired opening reports a late result or a retired Gallery Route terminates

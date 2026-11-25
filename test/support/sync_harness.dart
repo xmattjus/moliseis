@@ -145,6 +145,7 @@ final class _GatedCityRepository extends CityRepository {
   CacheManager? cacheManager,
   ControllableAdminAuth? auth,
   String? restorationScopeId,
+  Iterable<LocalizationsDelegate<dynamic>> localizationsDelegates = const [],
 }) {
   final authHarness = auth ?? ControllableAdminAuth();
   final router = buildAppRouter(
@@ -165,6 +166,7 @@ final class _GatedCityRepository extends CityRepository {
       scaffoldMessengerKey: $scaffoldMessengerKey,
       routerConfig: router,
       restorationScopeId: restorationScopeId,
+      localizationsDelegates: localizationsDelegates,
     ),
   );
 

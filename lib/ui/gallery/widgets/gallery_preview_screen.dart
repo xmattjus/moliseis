@@ -98,7 +98,7 @@ class GalleryPreviewScreen extends StatefulWidget {
     );
   }
 
-  /// Releases a live opening when the app's guard blocks or redirects it.
+  /// Releases a live opening when the app's guard blocks it.
   static void refuseOpening(Object? extra) {
     if (extra is _GalleryOpeningExtra) extra.presentation._openingEnded();
   }

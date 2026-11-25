@@ -1,16 +1,23 @@
 import 'dart:async' show unawaited;
 
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
+import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
+import 'package:moliseis/ui/core/ui/unsaved_changes_dialog.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
 import 'package:moliseis/ui/post/widgets/post_screen.dart';
+import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
 import 'package:moliseis/utils/result.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 
+import '../support/admin_draft_repositories.dart';
 import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
 import '../support/fixtures.dart';
@@ -254,6 +261,245 @@ void main() {
     expect(returned, isFalse);
   });
 
+  testOwnerUI('a committed opening superseded before build frees the Post', (
+    tester,
+  ) async {
+    final fixture = await _PostGalleryFixture.mount(tester);
+    final post = tester.state(fixture.post);
+    final slideshow = tester.state(fixture.slideshow);
+    final opening = openSlideshowGallery(tester);
+    unawaited(opening);
+    await tester.idle();
+    final original = fixture.match;
+    expect(fixture.gallery, findsNothing);
+
+    fixture.router.go(_PostGalleryFixture.location);
+    await _frames(tester);
+    expect(fixture.gallery, findsNothing);
+    expect(tester.state(fixture.post), same(post));
+    expect(tester.state(fixture.slideshow), same(slideshow));
+    expect(original.completer.isCompleted, isFalse);
+
+    await fixture.tapPhoto();
+    await _frames(tester);
+    expect(fixture.gallery, findsOneWidget);
+    expect(fixture.match.pageKey, isNot(original.pageKey));
+    expect(original.completer.isCompleted, isFalse);
+  });
+
+  testOwnerUI('a push over an unbuilt committed Gallery preserves its owner', (
+    tester,
+  ) async {
+    final fixture = await _PostGalleryFixture.mount(tester);
+    final post = tester.state(fixture.post);
+    final slideshow = tester.state(fixture.slideshow);
+    final attemptAgain = tester.widget<CardBase>(fixture.photo).onPressed!;
+    unawaited(openSlideshowGallery(tester));
+    await tester.idle();
+    final original = fixture.match;
+    expect(fixture.gallery, findsNothing);
+
+    // Adversarial scheduling of a normal router API over the unbuilt Gallery.
+    unawaited(fixture.router.push<void>('/settings'));
+    await tester.idle();
+    expect(
+      fixture.router.routerDelegate.currentConfiguration.matches,
+      contains(same(original)),
+    );
+    expect(fixture.gallery, findsNothing);
+    await _frames(tester);
+    final settings = find.byType(SettingsScreen);
+    expect(settings, findsOneWidget);
+    final gallery = find.byType(GalleryPreviewScreen, skipOffstage: false);
+    final route = ModalRoute.of(tester.element(gallery));
+
+    // The covered source cannot receive a hit-tested photo tap.
+    attemptAgain();
+    await _frames(tester);
+    expect(settings, findsOneWidget);
+    expect(fixture.match.matches.uri.path, '/settings');
+    fixture.router.pop();
+    await _frames(tester);
+    expect(ModalRoute.of(tester.element(fixture.gallery)), same(route));
+    await fixture.back();
+    await _frames(tester);
+    expect(original.completer.isCompleted, isTrue);
+    expect(tester.state(fixture.post), same(post));
+    expect(tester.state(fixture.slideshow), same(slideshow));
+    await fixture.tapPhoto();
+    await _frames(tester);
+    expect(fixture.gallery, findsOneWidget);
+    expect(fixture.match.pageKey, isNot(original.pageKey));
+  });
+
+  testOwnerUI('Sync redirects a Gallery push over a retained Post', (
+    tester,
+  ) async {
+    final fixture = await _PostGalleryFixture.mount(tester);
+    final post = tester.state(fixture.post);
+    final slideshow = tester.state(fixture.slideshow);
+    fixture.sync.viewModel.sync.run(true);
+    var returned = false;
+    unawaited(openSlideshowGallery(tester).then((_) => returned = true));
+    await tester.idle();
+    final redirected = fixture.match;
+    expect(redirected.matches.uri.path, '/sync');
+    expect(redirected.matches.uri.queryParameters['from'], '/gallery');
+    expect(fixture.gallery, findsNothing);
+    await _frames(tester);
+    expect(post.mounted, isTrue);
+    expect(slideshow.mounted, isTrue);
+    fixture.sync.release();
+    await _frames(tester);
+    expect(fixture.match.pageKey, redirected.pageKey);
+    fixture.router.go(_PostGalleryFixture.location);
+    await _frames(tester);
+    expect(redirected.completer.isCompleted, isFalse);
+    expect(returned, isFalse);
+    expect(tester.state(fixture.post), same(post));
+    expect(tester.state(fixture.slideshow), same(slideshow));
+    await fixture.tapPhoto();
+    await _frames(tester);
+    expect(fixture.gallery, findsOneWidget);
+  });
+
+  testOwnerUI('an occupied Admin exit blocks a retained Post Gallery request', (
+    tester,
+  ) async {
+    final fixture = await _PostGalleryFixture.mount(
+      tester,
+      auth: ControllableAdminAuth(
+        initialUser: makeAuthUser(
+          id: AdminDraftSessionHarness.accountA,
+          isAdmin: true,
+        ),
+      ),
+    );
+    final slideshow = tester.state(fixture.slideshow);
+    final attempt = tester.widget<CardBase>(fixture.photo).onPressed!;
+    unawaited(fixture.router.push<void>('/admin/submissions/new'));
+    await _frames(tester);
+    final editor = find.byType(AdminSubmissionEditorScreen);
+    final owner = tester.element(editor).read<AdminSubmissionEditorViewModel>();
+    owner.setName('Edited draft', activation: owner.activation);
+    await _frames(tester);
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await _frames(tester);
+    expect(find.byType(UnsavedChangesDialog), findsOneWidget);
+    expect(slideshow.mounted, isTrue);
+    expect(fixture.slideshow, findsNothing);
+
+    // Invoke the covered Post callback synthetically against the real guard.
+    final configuration = fixture.router.routerDelegate.currentConfiguration;
+    var returned = false;
+    final opening = Function.apply(attempt, const []) as Future<void>;
+    unawaited(opening.then((_) => returned = true));
+    await _frames(tester);
+    expect(
+      fixture.router.routerDelegate.currentConfiguration,
+      same(configuration),
+    );
+    expect(fixture.gallery, findsNothing);
+
+    await tester.tap(find.text('Annulla'));
+    await _frames(tester);
+    expect(editor, findsOneWidget);
+    expect(
+      fixture.router.routerDelegate.currentConfiguration,
+      same(configuration),
+    );
+    expect(returned, isFalse);
+    attempt();
+    await _frames(tester);
+    expect(fixture.gallery, findsOneWidget);
+    expect(returned, isFalse);
+  });
+
+  for (final reducedMotion in [false, true]) {
+    testOwnerUI('repeated stale Back retains the recreated Gallery '
+        '(reduced motion: $reducedMotion)', (tester) async {
+      if (reducedMotion) {
+        tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(
+          tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+      }
+      final fixture = await _PostGalleryFixture.mount(tester);
+      final slideshow = tester.state(fixture.slideshow);
+      final attemptAgain = tester.widget<CardBase>(fixture.photo).onPressed!;
+      unawaited(openSlideshowGallery(tester));
+      await _frames(tester);
+      final key = fixture.match.pageKey;
+      for (var i = 0; i < 2; i++) {
+        final retiring = ModalRoute.of(tester.element(fixture.gallery))!;
+        final oldMatch = fixture.match;
+        var retired = false;
+        unawaited(retiring.completed.then((_) => retired = true));
+
+        fixture.router.refresh();
+        await tester.idle();
+        final committed = fixture.match;
+        expect(committed.pageKey, key);
+        expect(committed.completer, isNot(same(oldMatch.completer)));
+        expect(ModalRoute.of(tester.element(fixture.gallery)), same(retiring));
+        // Request refresh before the popped observer runs. Flutter applies
+        // the next Page on the following frame.
+        tester.binding.addPostFrameCallback((_) => fixture.router.refresh());
+        await fixture.back();
+        await tester.idle();
+        expect(oldMatch.completer.isCompleted, isTrue);
+        expect(committed.completer.isCompleted, isFalse);
+        expect(fixture.match, same(committed));
+
+        await tester.pump();
+        final recreated = tester
+            .elementList(find.byType(GalleryPreviewScreen, skipOffstage: false))
+            .map(ModalRoute.of)
+            .singleWhere((route) => route!.isCurrent)!;
+        expect(recreated, isNot(same(retiring)));
+        expect(recreated.animation!.isCompleted, isFalse);
+        expect(retired, isFalse);
+
+        final recreatedPage = recreated.settings;
+        await tester.idle();
+        final reconciled = fixture.match;
+        expect(reconciled.pageKey, key);
+        expect(reconciled.completer, isNot(same(committed.completer)));
+        await _frames(tester);
+        expect(retired, isTrue);
+        expect(ModalRoute.of(tester.element(fixture.gallery)), same(recreated));
+        expect(recreated.settings, isNot(same(recreatedPage)));
+        expect(fixture.match, same(reconciled));
+        attemptAgain();
+        await tester.idle();
+        expect(fixture.match, same(reconciled));
+      }
+
+      await fixture.back();
+      await _frames(tester);
+      expect(fixture.gallery, findsNothing);
+      expect(tester.state(fixture.slideshow), same(slideshow));
+      await fixture.tapPhoto();
+      await _frames(tester);
+      expect(fixture.gallery, findsOneWidget);
+      expect(fixture.match.pageKey, isNot(key));
+
+      await fixture.back();
+      await _frames(tester);
+      await fixture.tapPhoto();
+      await tester.pump();
+      final entering = ModalRoute.of(
+        tester.element(find.byType(GalleryPreviewScreen, skipOffstage: false)),
+      )!;
+      expect(entering.animation!.isCompleted, isFalse);
+      expect(await tester.binding.handlePopRoute(), isTrue);
+      await _frames(tester);
+      expect(fixture.gallery, findsNothing);
+      expect(tester.state(fixture.slideshow), same(slideshow));
+    });
+  }
+
   for (final replacement in _SourceReplacement.values) {
     testOwnerUI('Gallery ownership ends on ${replacement.name}', (
       tester,
@@ -360,6 +606,7 @@ final class _PostGalleryFixture {
   static Future<_PostGalleryFixture> mount(
     WidgetTester tester, {
     int mediaCount = 2,
+    ControllableAdminAuth? auth,
   }) async {
     PaintingBinding.instance.imageCache
       ..clear()
@@ -390,6 +637,8 @@ final class _PostGalleryFixture {
     final sync = SyncHarness();
     final fixture = buildSyncRouterApp(
       sync,
+      auth: auth,
+      localizationsDelegates: const [FlutterQuillLocalizations.delegate],
       cacheManager: cache,
       restorationScopeId: 'app',
       eventRepository: FakeEventRepository(
