@@ -1,7 +1,11 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
 import 'package:moliseis/ui/core/ui/media/image_error_placeholder.dart';
+import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
 
 import '../../../../support/network_image_harness.dart';
@@ -298,46 +302,45 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-    'actual completion cannot restart autoplay during awaited gallery, '
-    'return resumes',
-    (tester) async {
-      final files = TestImageFiles.create();
-      addTearDown(files.dispose);
-      final manager = ControlledImageCacheManager();
-      final fixture = PostMediaSlideshowHarness(
-        media: [slideshowMedia(1), slideshowMedia(2)],
-        cacheManager: manager,
-      );
-      addTearDown(fixture.dispose);
-      await fixture.pump(tester);
-      final controller = fixture.controller(tester);
-      await tester.tapAt(tester.getCenter(find.byType(PostMediaSlideshow)));
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.text('Open gallery'), findsOneWidget);
-      final requestIndex = manager.requests.indexWhere(
-        (r) => r.url == slideshowMedia(1).url,
-      );
-      await completeSlideshowImage(
-        tester,
-        manager,
-        requestIndex,
-        files.createSizedPng(64, 64).readAsBytesSync(),
-      );
-      fixture.rebuild();
-      await tester.pump(const Duration(seconds: 6));
-      expect(controller.page, 0);
-      fixture.router.pop();
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      await tester.pump(const Duration(seconds: 6));
-      await tester.pump(const Duration(seconds: 2));
-      expect(controller.page, closeTo(1, 0.01));
-      await tester.pumpWidget(const SizedBox.shrink());
-      expect(tester.takeException(), isNull);
-    },
-  );
+  testWidgets('actual image completion cannot restart autoplay during Gallery, '
+      'return resumes', (tester) async {
+    final files = TestImageFiles.create();
+    addTearDown(files.dispose);
+    final manager = ControlledImageCacheManager();
+    final fixture = PostMediaSlideshowHarness(
+      media: [slideshowMedia(1), slideshowMedia(2)],
+      cacheManager: manager,
+    );
+    addTearDown(fixture.dispose);
+    await fixture.pump(tester);
+    final controller = fixture.controller(tester);
+    await tester.tapAt(tester.getCenter(find.byType(PostMediaSlideshow)));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(GalleryPreviewScreen), findsOneWidget);
+    final requestIndex = manager.requests.indexWhere(
+      (r) => r.url == slideshowMedia(1).url,
+    );
+    await completeSlideshowImage(
+      tester,
+      manager,
+      requestIndex,
+      files.createSizedPng(64, 64).readAsBytesSync(),
+    );
+    fixture.rebuild();
+    await tester.pump(const Duration(seconds: 6));
+    expect(controller.page, 0);
+    fixture.router.pop();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(GalleryPreviewScreen), findsNothing);
+    await tester.pump(); // First tick after the outgoing Route is disposed.
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pump(const Duration(seconds: 2));
+    expect(controller.page, closeTo(1, 0.01));
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('retained decoded B remount admits synchronous cached success', (
     tester,
@@ -401,7 +404,7 @@ void main() {
     await duplicate;
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Open gallery'), findsOneWidget);
+    expect(find.byType(GalleryPreviewScreen), findsOneWidget);
     fixture.router.pop();
     await first;
     await tester.pump();
@@ -436,6 +439,90 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(page.page, closeTo(1, 0.01));
     await tester.pumpWidget(const SizedBox.shrink());
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an actual Block leaves its result pending and frees admission', (
+    tester,
+  ) async {
+    var blockGallery = true;
+    final fixture = PostMediaSlideshowHarness(
+      media: [slideshowMedia(1), slideshowMedia(2)],
+      onEnter: (_, _, next, _) {
+        if (blockGallery && next.matchedLocation == '/gallery') {
+          GalleryPreviewScreen.refuseOpening(next.extra);
+          return const Block.stop();
+        }
+        return const Allow();
+      },
+    );
+    addTearDown(fixture.dispose);
+    await fixture.pump(tester);
+    await tester.pump();
+    var returned = false;
+    unawaited(openSlideshowGallery(tester).then((_) => returned = true));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(GalleryPreviewScreen), findsNothing);
+    expect(returned, isFalse);
+
+    blockGallery = false;
+    await tester.tap(find.byType(PageView).hitTestable());
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(GalleryPreviewScreen), findsOneWidget);
+    expect(returned, isFalse);
+  });
+
+  testWidgets('old Gallery removal cannot release a new slideshow owner', (
+    tester,
+  ) async {
+    final fixture = PostMediaSlideshowHarness(
+      media: [slideshowMedia(1), slideshowMedia(2)],
+    );
+    addTearDown(fixture.dispose);
+    await fixture.pump(tester);
+    final slideshow = find.byType(PostMediaSlideshow, skipOffstage: false);
+    final formerOwner = tester.state(slideshow);
+    await tester.tap(find.byType(PageView).hitTestable());
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    final gallery = find.byType(GalleryPreviewScreen);
+    final formerGallery = tester.state(gallery);
+    final route = ModalRoute.of(tester.element(gallery))!;
+
+    fixture
+      ..ownerKey = const ValueKey('replacement slideshow')
+      ..rebuild();
+    await tester.pump();
+    final currentOwner = tester.state(slideshow);
+    expect(formerOwner.mounted, isFalse);
+    expect(currentOwner, isNot(same(formerOwner)));
+
+    // Synthetic opening and out-of-order physical removal: both slideshows
+    // sit beneath Gallery, where a user cannot invoke these operations.
+    unawaited(openSlideshowGallery(tester, skipOffstage: false));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    final currentGallery = tester.state(gallery);
+    expect(currentGallery, isNot(same(formerGallery)));
+    route.navigator!.removeRoute(route);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(formerGallery.mounted, isFalse);
+    expect(tester.state(gallery), same(currentGallery));
+
+    var duplicateReturned = false;
+    unawaited(
+      openSlideshowGallery(tester, skipOffstage: false).then((_) {
+        duplicateReturned = true;
+      }),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(duplicateReturned, isTrue);
+    expect(tester.state(gallery), same(currentGallery));
+    expect(fixture.controller(tester).page, 0);
     expect(tester.takeException(), isNull);
   });
 

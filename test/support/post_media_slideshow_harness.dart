@@ -6,6 +6,7 @@ import 'package:moliseis/domain/models/media.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
+import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/ui/post/widgets/components/post_media_slideshow.dart';
 import 'package:provider/provider.dart';
 
@@ -27,9 +28,13 @@ Media slideshowMedia(int id) => Media(
 
 /// Runs the real slideshow and gallery push Future on an isolated test router.
 final class PostMediaSlideshowHarness {
-  PostMediaSlideshowHarness({required this.media, CacheManager? cacheManager})
-    : cacheManager = cacheManager ?? FakeCacheManager() {
+  PostMediaSlideshowHarness({
+    required this.media,
+    CacheManager? cacheManager,
+    OnEnter? onEnter,
+  }) : cacheManager = cacheManager ?? FakeCacheManager() {
     router = GoRouter(
+      onEnter: onEnter,
       routes: [
         GoRoute(
           path: '/',
@@ -42,6 +47,7 @@ final class PostMediaSlideshowHarness {
                   width: width,
                   height: height,
                   child: PostMediaSlideshow(
+                    key: ownerKey,
                     height: height,
                     media: media,
                     visibilityNotifier: visibility,
@@ -54,7 +60,7 @@ final class PostMediaSlideshowHarness {
         GoRoute(
           path: '/gallery',
           name: RouteNames.gallery,
-          builder: (_, _) => const Scaffold(body: Text('Open gallery')),
+          pageBuilder: GalleryPreviewScreen.buildPage,
         ),
       ],
     );
@@ -65,6 +71,7 @@ final class PostMediaSlideshowHarness {
   final ValueNotifier<int> revision = ValueNotifier(0);
   ValueNotifier<bool> visibility = ValueNotifier(true);
   List<Media> media;
+  Key? ownerKey;
   double width = 600;
   double height = 400;
   late final GoRouter router;
@@ -110,8 +117,12 @@ final class PostMediaSlideshowHarness {
 /// Captures the mounted image's request before its cache key can be reused.
 ImageStream slideshowImageStream(WidgetTester tester, String url) {
   final image = find.descendant(
-    of: find.byWidgetPredicate(
-      (widget) => widget is AppNetworkImage && widget.url == url,
+    of: find.descendant(
+      of: find.byType(PostMediaSlideshow, skipOffstage: false),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is AppNetworkImage && widget.url == url,
+        skipOffstage: false,
+      ),
       skipOffstage: false,
     ),
     matching: find.byType(Image, skipOffstage: false),
@@ -147,12 +158,16 @@ Future<void> completeSlideshowImage(
 }
 
 /// Observes the real async gallery callback despite CardBase's void API.
-Future<void> openSlideshowGallery(WidgetTester tester) {
+Future<void> openSlideshowGallery(
+  WidgetTester tester, {
+  bool skipOffstage = true,
+}) {
   final card = tester.widget<CardBase>(
     find
         .descendant(
-          of: find.byType(PostMediaSlideshow),
-          matching: find.byType(CardBase),
+          of: find.byType(PostMediaSlideshow, skipOffstage: skipOffstage),
+          matching: find.byType(CardBase, skipOffstage: skipOffstage),
+          skipOffstage: skipOffstage,
         )
         .first,
   );

@@ -142,7 +142,9 @@ final class _GatedCityRepository extends CityRepository {
 ({GoRouter router, Widget app, ControllableAdminAuth auth}) buildSyncRouterApp(
   SyncHarness harness, {
   FakeEventRepository? eventRepository,
+  CacheManager? cacheManager,
   ControllableAdminAuth? auth,
+  String? restorationScopeId,
 }) {
   final authHarness = auth ?? ControllableAdminAuth();
   final router = buildAppRouter(
@@ -157,10 +159,12 @@ final class _GatedCityRepository extends CityRepository {
       harness,
       auth: authHarness,
       eventRepository: eventRepository,
+      cacheManager: cacheManager,
     ),
     child: MaterialApp.router(
       scaffoldMessengerKey: $scaffoldMessengerKey,
       routerConfig: router,
+      restorationScopeId: restorationScopeId,
     ),
   );
 
@@ -188,6 +192,7 @@ List<SingleChildWidget> buildSyncProviders(
   SyncHarness harness, {
   required ControllableAdminAuth auth,
   FakeEventRepository? eventRepository,
+  CacheManager? cacheManager,
 }) {
   final eventRepo = eventRepository ?? FakeEventRepository();
   final placeRepo = FakePlaceRepository();
@@ -235,7 +240,7 @@ List<SingleChildWidget> buildSyncProviders(
     Provider<SearchRepository>.value(value: FakeSearchRepository()),
     Provider<SettingsRepository>.value(value: settingsRepository),
     Provider<CachedWeatherApiClient>.value(value: weatherApiClient),
-    Provider<CacheManager>.value(value: FakeCacheManager()),
+    Provider<CacheManager>.value(value: cacheManager ?? FakeCacheManager()),
     Provider<http.Client>.value(value: RecordingTileHttpClient()),
     Provider<Logger>.value(value: logger),
     Provider<UrlLaunchService>(create: (_) => UrlLaunchService(logger: logger)),

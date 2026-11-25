@@ -47,7 +47,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
   Object _listRevision = Object();
   int _activeIndex = 0;
   bool _userDisabledScroll = false;
-  bool _galleryInFlight = false;
+  GalleryPresentation? _galleryPresentation;
   bool _publicationQueued = false;
   Duration _lastElapsed = Duration.zero;
 
@@ -116,6 +116,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     for (final owner in _owners) {
       owner.revoke();
     }
+    _galleryPresentation?.detach();
     _ticker.dispose();
     _pageController.dispose();
     _autoPlayEnabledNotifier.dispose();
@@ -150,7 +151,7 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
       _hasMultipleMedia &&
       _isSlideshowVisible &&
       _isAutoPlayEnabled &&
-      !_galleryInFlight &&
+      _galleryPresentation == null &&
       !_isMediaLoading;
 
   void _reconcileAutoPlay() {
@@ -183,24 +184,23 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
 
   Future<void> _openGalleryPreview(_MediaPageOwner owner) async {
     if (!mounted) return;
-    if (_galleryInFlight || !owner.valid) return;
+    if (_galleryPresentation != null || !owner.valid) return;
     final initialIndex = _owners.indexOf(owner);
     if (initialIndex < 0) return;
-    final media = List<Media>.of(widget.media);
-    _galleryInFlight = true;
+    late final GalleryPresentation presentation;
+    presentation = GalleryPresentation(() {
+      if (!mounted || !identical(_galleryPresentation, presentation)) return;
+      _galleryPresentation = null;
+      _reconcileAutoPlay();
+    });
+    _galleryPresentation = presentation;
     _stopAutoPlay();
-    try {
-      await GalleryPreviewScreen.show(
-        context: context,
-        media: media,
-        initialIndex: initialIndex,
-      );
-    } finally {
-      if (mounted) {
-        _galleryInFlight = false;
-        _reconcileAutoPlay();
-      }
-    }
+    await GalleryPreviewScreen.show(
+      context: context,
+      media: widget.media,
+      initialIndex: initialIndex,
+      presentation: presentation,
+    );
   }
 
   void _queuePublication() {

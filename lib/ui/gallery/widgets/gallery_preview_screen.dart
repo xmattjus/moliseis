@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -9,9 +12,11 @@ import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_modal_overlay.dart';
 import 'package:swipe_image_gallery/widget/gallery.dart';
 
+part '_gallery_presentation.dart';
+
 /// Full-screen, route-owned image gallery.
 ///
-/// Hosted on a standard opaque [MaterialPage] via the router's `builder:`
+/// Hosted on a standard opaque [MaterialPage] via the router's `pageBuilder:`
 /// callback (see `lib/routing/router.dart`). [MaterialPage] is always opaque,
 /// so routes beneath this page are never painted even though the inner
 /// [Scaffold] uses `Colors.transparent` below. The transparent Scaffold lets
@@ -33,9 +38,8 @@ import 'package:swipe_image_gallery/widget/gallery.dart';
 ///   behavior.
 ///
 /// This route intentionally avoids the `CustomTransitionPage(opaque: false)`
-/// fade pattern described in `.agents/skills/molise-is-go-router-navigator`:
-/// the in-app drag would otherwise show the source route through the fading
-/// background.
+/// fade pattern. The in-app drag would show the source route through a fading
+/// transparent page.
 class GalleryPreviewScreen extends StatefulWidget {
   const GalleryPreviewScreen({required this.data, super.key});
 
@@ -44,19 +48,59 @@ class GalleryPreviewScreen extends StatefulWidget {
 
   /// Pushes the gallery as a managed root GoRouter route.
   ///
+  /// An optional [presentation] tracks ownership separately from the navigation
+  /// result returned to the caller.
+  ///
   /// Throws an [ArgumentError] or [RangeError] when the input cannot describe
   /// a valid gallery.
   static Future<void> show({
     required BuildContext context,
     required List<Media> media,
     required int initialIndex,
+    GalleryPresentation? presentation,
   }) {
-    final data = GalleryPreviewRouteData(
-      media: media,
-      initialIndex: initialIndex,
-    );
+    try {
+      final data = GalleryPreviewRouteData(
+        media: media,
+        initialIndex: initialIndex,
+      );
+      final extra = data.toExtra();
+      if (presentation == null) {
+        return context.pushNamed<void>(RouteNames.gallery, extra: extra);
+      }
 
-    return context.pushNamed<void>(RouteNames.gallery, extra: data.toExtra());
+      final router = GoRouter.of(context);
+      final opening = _GalleryOpeningExtra(extra, presentation);
+      final result = router.pushNamed<void>(RouteNames.gallery, extra: opening);
+      presentation._watchOpening(router, opening);
+      return result.whenComplete(presentation._openingEnded);
+    } on Object {
+      presentation?._openingEnded();
+      rethrow;
+    }
+  }
+
+  /// Builds the root Navigator Page with the standard Material transition.
+  static Page<void> buildPage(BuildContext context, GoRouterState state) {
+    final extra = state.extra;
+    final data = GalleryPreviewRouteData.tryParse(extra);
+    return _GalleryPage(
+      key: state.pageKey,
+      name: state.name ?? state.path,
+      arguments: {...state.pathParameters, ...state.uri.queryParameters},
+      restorationId: state.pageKey.value,
+      presentation: data != null && extra is _GalleryOpeningExtra
+          ? extra.presentation
+          : null,
+      child: data == null
+          ? const GalleryUnavailableScreen()
+          : GalleryPreviewScreen(data: data),
+    );
+  }
+
+  /// Releases a live opening when the app's guard blocks or redirects it.
+  static void refuseOpening(Object? extra) {
+    if (extra is _GalleryOpeningExtra) extra.presentation._openingEnded();
   }
 
   @override
