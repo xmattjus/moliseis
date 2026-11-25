@@ -1,267 +1,151 @@
-# Spec Delta
+# Explicit Back Navigation Delta
 
 ## Purpose
 
-Define when app-owned explicit Back may return to the previous route or
-Explore root, and how feature actions and platform Back retain their owners.
+Define ordinary app-owned Back departures and consistent native presentation
+while preserving feature and platform navigation ownership.
 
 ## ADDED Requirements
 
-### Requirement: Standard explicit Back returns to the actual predecessor
+### Requirement: Ordinary Back acts only for its originating route
 
-A standard explicit Back SHALL evaluate its originating presentation and
-Navigator at activation. When departure is permitted and a predecessor exists,
-it SHALL remove only that originating route, preserving the actual predecessor
-and its retained state.
+An ordinary Back activation SHALL verify that its displayed Route still owns
+the requested departure in the committed navigation stack. A permitted pop
+SHALL remove only that originating Route and reveal its actual predecessor.
+A denied activation SHALL make no secondary navigation request.
 
-#### Scenario: A page was pushed
+#### Scenario: An inactive or covered route still exists
 
-- **WHEN** eligible Back is activated from a page pushed above an existing route
-- **THEN** only the pushed page is removed and the same predecessor is revealed
-- **AND** the popped live entry's result is completed once
+- **WHEN** a source belongs to an inactive branch, the committed branch changes
+  before the old branch rebuilds, or a root page or popup covers the source
+- **THEN** Back from the ineligible source leaves the stacks unchanged, even
+  if the old Route remains locally current
 
-#### Scenario: A deep link or restoration supplies a branch parent
+#### Scenario: An existing predecessor is protected by a departure veto
 
-- **WHEN** eligible Back is activated from a canonical Category, Post or Search
-  Results reached by deep link or restoration
-- **THEN** it returns one level through the owning branch and preserves the
-  predecessor's canonical identity and query `q` where applicable
+- **WHEN** the originating route has a predecessor but cannot be popped
+- **THEN** Back leaves that route and predecessor in place and does not request
+  Explore
 
-#### Scenario: Refresh follows a successful explicit pop before rendering
+#### Scenario: Back follows the current navigation ancestry
 
-- **WHEN** the router refreshes after an ordinary explicit pop commits synchronously and
-  before the next frame
-- **THEN** refresh uses the surviving navigation entry and does not reopen the
-  page that Back removed
+- **WHEN** ordinary Back pops a pushed route or a route with a declarative
+  predecessor
+- **THEN** it reveals the exact predecessor and preserves its retained state,
+  including the Search query where applicable
 
-#### Scenario: Refresh changes the match before the Navigator rebuilds
+#### Scenario: Refresh follows a synchronous explicit pop
 
-- **WHEN** an activation arrives after a refresh committed a new match for
-  a still-mounted page and before the Navigator uses that match
-- **THEN** the activation leaves the stack and its results alone
-- **AND** the current presentation can act after Navigator reconciliation
+- **WHEN** immediate router refresh follows a successful synchronous ordinary pop
+- **THEN** the removed route stays removed and its actual predecessor remains
 
-### Requirement: Standard explicit Back has a canonical Explore fallback
+#### Scenario: A pushed entry is being reconciled after refresh
 
-An eligible standard Back activation without a predecessor SHALL request
-canonical Explore root subject to existing router admission and redirects.
-An activation already at canonical Explore root without a predecessor SHALL
-leave the current stack in place.
+- **WHEN** a supported refresh replaces the live push result before the
+  displayed Route uses the new entry
+- **THEN** ordinary Back leaves both entries alone
+- **AND** a later activation can pop the reconciled source and complete only its
+  live result
 
-#### Scenario: Standalone source or retained Explore detail
+### Requirement: Eligible standalone Back requests canonical Explore
 
-- **WHEN** an eligible standalone source requests fallback and it is permitted
-- **THEN** Explore opens at its root unless an existing redirect applies
-- **AND** the fallback creates no history entry above the source it replaces
+An eligible ordinary source without a predecessor SHALL request canonical
+Explore root, subject to existing router admission and redirects. A source
+already at canonical Explore root SHALL make no request.
 
-#### Scenario: Explore is already at its root
+#### Scenario: The visible Back control is tapped on standalone Login
 
-- **WHEN** the policy is invoked at canonical Explore root without a predecessor
-- **THEN** it leaves that route, stack and state in place
+- **WHEN** Login is the only page and the user activates its eligible Back
+- **THEN** the app reaches canonical Explore root without an empty navigation
+  configuration or a navigation assertion
 
-### Requirement: An unsuccessful standard Back has no secondary action
+#### Scenario: Login was pushed above Settings
 
-An obsolete activation, route veto or refused navigation SHALL NOT cause a
-secondary navigation. A subsequent ordinary activation MAY act only if its
-originating presentation qualifies again. A failed shared preflight SHALL consume no feature-owned departure authority. Explore requests SHALL remain subject to router admission and
-redirects. Dashboard retains its account, visit, generation, recovery and
-one-action authority after admitted dispatch.
+- **WHEN** eligible Back is activated on Login pushed from Settings
+- **THEN** it returns to the exact retained Settings Route and state
 
-#### Scenario: A predecessor exists but departure is vetoed
+#### Scenario: A standalone ordinary source has a retained Explore detail
 
-- **WHEN** an explicit Back is activated from a page with a predecessor and
-  that page disallows the pop
-- **THEN** it remains in place and Explore is never requested
+- **WHEN** the source makes an eligible fallback request
+- **THEN** it reaches Explore root even if Explore retains a deeper page,
+  subject to the normal router admission and redirects
 
-#### Scenario: An independent navigation replaces the source
+#### Scenario: Explore is already displayed at its root
 
-- **WHEN** another navigation has replaced the source of an explicit action
-- **THEN** the obsolete callback makes no further navigation request
-- **AND** an eligible control on the successor can act independently
+- **WHEN** the ordinary decision is evaluated at canonical Explore root with
+  no predecessor
+- **THEN** it leaves Explore and its navigation state in place
 
-#### Scenario: Dashboard preflight denies departure
+### Requirement: Error companion controls use the same departure policy
 
-- **WHEN** Dashboard's own checks allow evaluation but ordinary source qualification denies departure
-- **THEN** the Dashboard latch and presentation authority remain available to a later eligible activation
-- **AND** a later admitted departure is subject to Dashboard's existing one-action policy
+Leading and text Back controls on the same error SHALL use the same
+departure policy. Matched ordinary errors SHALL follow their owning routes.
+Unmatched errors SHALL require the current displayed root error source.
 
-### Requirement: Standard Back affects only its originating presentation
+#### Scenario: An ordinary unmatched error is shown
 
-A standard Back callback SHALL require a live, current route, active owner
-and matching displayed identity. Removal of its originating Route or an
-installed semantic replacement SHALL permanently retire the old binding. Equivalent reconstruction and
-temporary coverage SHALL preserve a retained ordinary binding. An entry
-replacement that has yet to reconcile with the installed Page SHALL
-suspend eligibility without changing either result.
+- **WHEN** the eligible error is shown as an imperative Page above a
+  predecessor or as a standalone first root Page
+- **THEN** either control returns to the actual predecessor or requests
+  Explore according to the ordinary policy
+- **AND** a covered or obsolete error activation makes no request
 
-#### Scenario: A retained page is temporarily covered or inactive
+#### Scenario: The existing malformed Admin diagnostic is shown
 
-- **WHEN** a captured Back is invoked while its source is covered by a page
-  or popup or is in an inactive branch
-- **THEN** it changes neither presentation's stack
-- **AND** the same retained presentation is eligible after it becomes current
-  again
+- **WHEN** the user activates either Back control on the diagnostic
+- **THEN** it requests only a permitted departure to its predecessor through
+  the existing protected exit policy, with no Explore fallback or removal of
+  an underlying editor
 
-#### Scenario: Branch ownership changes before rendering
+### Requirement: Shared Back has native presentation and interaction
 
-- **WHEN** the root shell is covered by a root popup or the committed active branch changes before the prior branch rebuilds
-- **THEN** the old branch action cannot navigate even if its local Route is still current
-- **AND** no fallback is dispatched
+Shared Back SHALL preserve the themed platform glyph, RTL direction, icon
+customization, localized tooltip and accessibility semantics, existing
+background and spacing options, and leading visibility. Where supported
+mobile constraints permit, its effective interaction target SHALL be at
+least 48 × 48 logical pixels.
 
-#### Scenario: The source was removed or rebound
+#### Scenario: Theme, locale or layout changes
 
-- **WHEN** an old callback is invoked after its route is removed or after its
-  page has presented a different semantic identity under the same page key
-- **THEN** it has no effect, including after a new visit returns to the old value
-- **AND** an activation from the newly bound current presentation can act
+- **WHEN** an existing host renders Back under a different platform, locale,
+  direction or constraint
+- **THEN** the native control adapts and preserves the configured options and
+  reachable interaction geometry
+- **AND** its tooltip reads “Indietro” in Italian and “Back” in English
 
-#### Scenario: Gallery refresh or a media swipe preserves a presentation
+#### Scenario: A mobile slot accommodates the target
 
-- **WHEN** a retained Gallery reconstructs equivalent ordered media and initial-page data or the user swipes to another image
-- **THEN** its ordinary Back binding retains its presentation identity and requires the live installed Page-to-result association at activation
-- **AND** a different installed payload or recreated physical Route cannot be acted on by the old binding
-- **AND** the canonical Gallery presentation remains the owner of slideshow admission and autoplay
+- **WHEN** a Back host can fit the 48 × 48 target
+- **THEN** its semantic bounds and hit-tested edges cover that target, the
+  visible face is centered, and adjacent controls remain independent
 
-### Requirement: Companion Back actions share the source's departure policy
+### Requirement: Feature and platform departures retain ownership
 
-When an error surface shows both icon and text Back, both SHALL use one
-source and departure policy.
+A supplied feature callback SHALL fully replace the ordinary decision and
+remain callable without GoRouter where supported. Existing feature policies,
+visibility and results, Gallery presentation lifecycle and platform Back
+ownership SHALL be preserved.
 
-#### Scenario: Ordinary route error or unavailable Gallery
+#### Scenario: A feature uses an override
 
-- **WHEN** an available leading or text Back is activated on an ordinary error
-- **THEN** both controls apply the same predecessor, veto and fallback rules
+- **WHEN** a protected or local feature activates its custom Back
+- **THEN** only that callback runs and its existing departure policy applies
 
-#### Scenario: A standalone unmatched route shows the root diagnostic
+#### Scenario: Dashboard evaluates its terminal ordinary decision
 
-- **WHEN** the actual installed root error Page is first in its Navigator and represents the currently committed unmatched error
-- **THEN** either eligible control may request canonical Explore
-- **AND** a covered or obsolete error action makes no request
+- **WHEN** Dashboard's feature authority allows evaluation but source
+  qualification denies departure
+- **THEN** no dispatch occurs and its existing one-action authority is
+  available to a later eligible activation
 
-#### Scenario: An unmatched route was pushed
+#### Scenario: Gallery closes through ordinary Back
 
-- **WHEN** the installed root error Page represents the current imperative error entry and a predecessor exists
-- **THEN** either eligible control removes only that Route and completes only its live result
-- **AND** an error Page whose result mapping has yet to reconcile cannot act, even when its displayed diagnostic is equivalent
+- **WHEN** eligible ordinary Back closes Gallery and reveals its predecessor
+- **THEN** Gallery's existing presentation owner decides reservation release
+  and autoplay based on the physical lifecycle
 
-#### Scenario: A matched validation error changes in place
+#### Scenario: System Back or a native gesture runs
 
-- **WHEN** a retained error surface changes its displayed URI, error type or reason
-- **THEN** its old actions retire permanently and the new actions follow the actual owning route and Navigator
-- **AND** equivalent rebuilds preserve the binding and existing log deduplication
-
-### Requirement: Malformed Admin errors return without leaving a retained editor
-
-An authorized request for a malformed Admin submission identifier SHALL show
-a dedicated protected diagnostic under Admin without activating an editor
-session. Both explicit actions SHALL return only to the actual predecessor when eligible. The
-editor's own exit decisions SHALL apply whenever navigation removes the
-editor itself.
-
-#### Scenario: Malformed link or named navigation
-
-- **WHEN** an authorized request supplies an identifier rejected by the
-  submission ID codec
-- **THEN** the Admin error retains the original normalized diagnostic URI, decoded ID, ordered query parameters including repeated and empty values, and fragment
-- **AND** a session hint starts no editor lookup, recovery or activation
-- **AND** a direct entry has Dashboard as its predecessor
-- **AND** valid editor, New and Save Progress destinations retain their behavior
-
-#### Scenario: Dedicated diagnostic path contains a valid or reserved identifier
-
-- **WHEN** a direct request uses the dedicated path with a valid or reserved editor identifier
-- **THEN** existing router admission and authorization apply and the path does not admit or open an editor
-
-#### Scenario: Concurrent Back requests target the dedicated Admin diagnostic
-
-- **WHEN** leading, text or system Back requests overlap on the same live
-  dedicated Admin diagnostic route
-- **THEN** that page is removed once and its live imperative result completes
-  once if it was pushed
-- **AND** the exact predecessor is retained, including any dirty editor and
-  its activation
-- **AND** subsequent requests captured from the retired error leave the stack
-  alone, with no Explore fallback
-
-#### Scenario: The dedicated Admin diagnostic is explicitly popped before refresh
-
-- **WHEN** explicit Back pops the live dedicated Admin diagnostic route and
-  refresh follows before the next frame
-- **THEN** the request retains its actual predecessor and the error stays removed
-
-#### Scenario: A historical malformed imperative entry restores to the editor route
-
-- **WHEN** restoration places a historical malformed imperative entry on the
-  original editor route
-- **THEN** it renders the defensive Admin diagnostic without activating an
-  editor session
-- **AND** explicit Back remains subject to the existing protected exit policy
-  and returns only to the actual predecessor when permitted, with no Explore
-  fallback
-- **AND** the existing deferred-exit and refresh behavior applies to this historical entry
-
-#### Scenario: An independent declaration also leaves the editor
-
-- **WHEN** a declaration replaces the error and an underlying editor
-- **THEN** the editor's own policy decides whether it can leave, including a veto while clean but covered by an unrelated diagnostic
-- **AND** an action retained by a retired diagnostic cannot override the new stack
-
-#### Scenario: A declaration removes the dedicated diagnostic above Dashboard
-
-- **WHEN** admission permits a declaration removing the diagnostic with no retained editor to consult
-- **THEN** it can commit without manufacturing an imperative pop result
-
-#### Scenario: Authorization is revoked with an editor covered
-
-- **WHEN** authorization is revoked on a protected diagnostic and editor stack
-- **THEN** the existing security navigation can remove the stack without activating an editor, showing a dirty-exit prompt or manufacturing a pop result
-
-### Requirement: Back presentation follows the app's adaptive theme
-
-Shared Back controls SHALL use the effective themed platform, directional
-icon, customized icon where supplied and localized accessibility label. They
-SHALL retain caller-configured spacing and backgrounds. A default padded
-mobile Back target SHALL be at least 48 × 48 logical pixels where host
-constraints permit it, with native glyph and background presentation.
-
-#### Scenario: Theme and layout differ between hosts
-
-- **WHEN** a Back control renders under another platform, locale, text
-  direction, icon theme or constrained host
-- **THEN** it presents the corresponding native appearance, semantics and
-  tooltip with the configured layout and a target at least as reachable as
-  before
-- **AND** the native tooltip is “Indietro” in Italian and “Back” in English
-
-#### Scenario: A standard mobile leading slot is 56 logical pixels
-
-- **WHEN** default Back is rendered in a 56 × 56 padded mobile leading slot
-- **THEN** its native target is at least 48 × 48, including the interactive
-  edges and accessibility bounds, and the visible face remains centered
-- **AND** it does not overlap another control
-
-### Requirement: Feature overrides and platform Back retain their own policies
-
-A custom explicit Back callback SHALL fully replace the standard action.
-Existing feature policies own their decisions, destinations and control
-visibility. Platform Back and native gestures SHALL retain their behavior.
-
-#### Scenario: Local or protected override is used
-
-- **WHEN** an editor, submission, Search, GeoMap or picker uses its own action
-- **THEN** only that action runs, including any pending-operation veto,
-  checkpoint, cleanup or return result where applicable
-- **AND** a custom action can run without an app router
-
-#### Scenario: A screen intentionally offers no Back
-
-- **WHEN** a shell root, Sync or a standalone submission form without a
-  predecessor is displayed
-- **THEN** the change adds no explicit departure control
-
-#### Scenario: Platform Back is used
-
-- **WHEN** system Back, Android predictive Back or native iOS Back is invoked
-  or cancelled
-- **THEN** existing effects and eligibility are preserved independently of
-  explicit Back's Explore fallback
+- **WHEN** the platform requests or cancels Back
+- **THEN** existing eligibility and behavior apply without the ordinary
+  explicit Explore fallback
