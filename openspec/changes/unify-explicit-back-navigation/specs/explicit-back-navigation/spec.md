@@ -29,8 +29,8 @@ and its retained state.
 
 #### Scenario: Refresh follows a successful explicit pop before rendering
 
-- **WHEN** the router refreshes after an ordinary explicit pop commits and before
-  route information is reported
+- **WHEN** the router refreshes after an ordinary explicit pop commits synchronously and
+  before the next frame
 - **THEN** refresh uses the surviving navigation entry and does not reopen the
   page that Back removed
 
@@ -62,9 +62,10 @@ leave the current stack in place.
 ### Requirement: An unsuccessful standard Back has no secondary action
 
 An obsolete activation, route veto or refused navigation SHALL NOT cause a
-secondary navigation. A fresh activation from a still-eligible presentation
-SHALL remain possible. A request to go to Explore SHALL remain subject to
-normal router admission and redirects.
+secondary navigation. A subsequent ordinary activation MAY act only if its
+originating presentation qualifies again. A failed shared preflight SHALL consume no feature-owned departure authority. Explore requests SHALL remain subject to router admission and
+redirects. Dashboard retains its account, visit, generation, recovery and
+one-action authority after admitted dispatch.
 
 #### Scenario: A predecessor exists but departure is vetoed
 
@@ -78,12 +79,20 @@ normal router admission and redirects.
 - **THEN** the obsolete callback makes no further navigation request
 - **AND** an eligible control on the successor can act independently
 
+#### Scenario: Dashboard preflight denies departure
+
+- **WHEN** Dashboard's own checks allow evaluation but ordinary source qualification denies departure
+- **THEN** the Dashboard latch and presentation authority remain available to a later eligible activation
+- **AND** a later admitted departure is subject to Dashboard's existing one-action policy
+
 ### Requirement: Standard Back affects only its originating presentation
 
 A standard Back callback SHALL require a live, current route, active owner
-and matching displayed identity. Removal and replacement invalidate the old
-binding. Equivalent rebuilds, refresh and temporary coverage SHALL preserve
-the binding of a retained presentation.
+and matching displayed identity. Removal of its originating Route or an
+installed semantic replacement SHALL permanently retire the old binding. Equivalent reconstruction and
+temporary coverage SHALL preserve a retained ordinary binding. An entry
+replacement that has yet to reconcile with the installed Page SHALL
+suspend eligibility without changing either result.
 
 #### Scenario: A retained page is temporarily covered or inactive
 
@@ -93,12 +102,25 @@ the binding of a retained presentation.
 - **AND** the same retained presentation is eligible after it becomes current
   again
 
+#### Scenario: Branch ownership changes before rendering
+
+- **WHEN** the root shell is covered by a root popup or the committed active branch changes before the prior branch rebuilds
+- **THEN** the old branch action cannot navigate even if its local Route is still current
+- **AND** no fallback is dispatched
+
 #### Scenario: The source was removed or rebound
 
 - **WHEN** an old callback is invoked after its route is removed or after its
   page has presented a different semantic identity under the same page key
 - **THEN** it has no effect, including after a new visit returns to the old value
 - **AND** an activation from the newly bound current presentation can act
+
+#### Scenario: Gallery refresh or a media swipe preserves a presentation
+
+- **WHEN** a retained Gallery reconstructs equivalent ordered media and initial-page data or the user swipes to another image
+- **THEN** its ordinary Back binding retains its presentation identity and requires the live installed Page-to-result association at activation
+- **AND** a different installed payload or recreated physical Route cannot be acted on by the old binding
+- **AND** the canonical Gallery presentation remains the owner of slideshow admission and autoplay
 
 ### Requirement: Companion Back actions share the source's departure policy
 
@@ -110,11 +132,29 @@ source and departure policy.
 - **WHEN** an available leading or text Back is activated on an ordinary error
 - **THEN** both controls apply the same predecessor, veto and fallback rules
 
+#### Scenario: A standalone unmatched route shows the root diagnostic
+
+- **WHEN** the actual installed root error Page is first in its Navigator and represents the currently committed unmatched error
+- **THEN** either eligible control may request canonical Explore
+- **AND** a covered or obsolete error action makes no request
+
+#### Scenario: An unmatched route was pushed
+
+- **WHEN** the installed root error Page represents the current imperative error entry and a predecessor exists
+- **THEN** either eligible control removes only that Route and completes only its live result
+- **AND** an error Page whose result mapping has yet to reconcile cannot act, even when its displayed diagnostic is equivalent
+
+#### Scenario: A matched validation error changes in place
+
+- **WHEN** a retained error surface changes its displayed URI, error type or reason
+- **THEN** its old actions retire permanently and the new actions follow the actual owning route and Navigator
+- **AND** equivalent rebuilds preserve the binding and existing log deduplication
+
 ### Requirement: Malformed Admin errors return without leaving a retained editor
 
 An authorized request for a malformed Admin submission identifier SHALL show
-a diagnostic under Admin without activating an editor session. Both explicit
-actions SHALL return only to the actual predecessor when eligible. The
+a dedicated protected diagnostic under Admin without activating an editor
+session. Both explicit actions SHALL return only to the actual predecessor when eligible. The
 editor's own exit decisions SHALL apply whenever navigation removes the
 editor itself.
 
@@ -122,10 +162,15 @@ editor itself.
 
 - **WHEN** an authorized request supplies an identifier rejected by the
   submission ID codec
-- **THEN** the Admin error retains the original diagnostic URI and parameters
-  without using a session hint to start an editor
+- **THEN** the Admin error retains the original normalized diagnostic URI, decoded ID, ordered query parameters including repeated and empty values, and fragment
+- **AND** a session hint starts no editor lookup, recovery or activation
 - **AND** a direct entry has Dashboard as its predecessor
 - **AND** valid editor, New and Save Progress destinations retain their behavior
+
+#### Scenario: Dedicated diagnostic path contains a valid or reserved identifier
+
+- **WHEN** a direct request uses the dedicated path with a valid or reserved editor identifier
+- **THEN** existing router admission and authorization apply and the path does not admit or open an editor
 
 #### Scenario: Concurrent Back requests target the dedicated Admin diagnostic
 
@@ -153,14 +198,23 @@ editor itself.
 - **AND** explicit Back remains subject to the existing protected exit policy
   and returns only to the actual predecessor when permitted, with no Explore
   fallback
-- **AND** the dedicated route's concurrent Back guarantee does not apply
+- **AND** the existing deferred-exit and refresh behavior applies to this historical entry
 
 #### Scenario: An independent declaration also leaves the editor
 
 - **WHEN** a declaration replaces the error and an underlying editor
-- **THEN** the editor's own policy decides whether it can leave
-- **AND** declarative removal does not manufacture an imperative pop result
-- **AND** an action retained by the retired error cannot override the new stack
+- **THEN** the editor's own policy decides whether it can leave, including a veto while clean but covered by an unrelated diagnostic
+- **AND** an action retained by a retired diagnostic cannot override the new stack
+
+#### Scenario: A declaration removes the dedicated diagnostic above Dashboard
+
+- **WHEN** admission permits a declaration removing the diagnostic with no retained editor to consult
+- **THEN** it can commit without manufacturing an imperative pop result
+
+#### Scenario: Authorization is revoked with an editor covered
+
+- **WHEN** authorization is revoked on a protected diagnostic and editor stack
+- **THEN** the existing security navigation can remove the stack without activating an editor, showing a dirty-exit prompt or manufacturing a pop result
 
 ### Requirement: Back presentation follows the app's adaptive theme
 

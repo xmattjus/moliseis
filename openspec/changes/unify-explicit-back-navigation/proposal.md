@@ -2,42 +2,40 @@
 
 ## Why
 
-App-owned Back controls disagree about where to go, and saved callbacks can
-pop a different page. A direct Navigator pop can reopen a page on refresh.
-The malformed Admin error can also complete an imperative result twice
-when Back requests overlap.
+App-owned Back controls disagree about where to go. A saved action can pop
+a different route, and bypassing GoRouter can reopen a removed route on
+refresh. Malformed Admin submission requests also inherit the editor's
+deferred exit hook, which can approve multiple pops of one imperative entry.
 
 ## What Changes
 
-- Share one source-qualified explicit Back policy. Return to the permitted
-  predecessor when present and request canonical Explore root otherwise.
-- Render the native Material Back button with localized semantics, existing
-  styling options and a 48 × 48 mobile target where the layout permits it.
-  A supplied callback owns the entire action.
-- Share the ordinary policy between applicable error leading and text
-  controls, and reuse the terminal decision after Dashboard's feature checks.
-- Give malformed Admin submission identifiers a dedicated Admin error route
-  with predecessor-only Back. Keep the editor exit policy on the routes that
-  own editor state.
+- Share a small explicit Back decision for eligible originating presentations.
+  Pop their actual predecessor-facing route, request canonical Explore root
+  when a standalone source permits fallback, or make no request.
+- Use the native Material Back control with localized semantics, existing
+  customization and a 48 × 48 logical mobile target where the host allows.
+  A supplied callback owns the full action.
+- Give malformed Admin IDs a protected diagnostic with predecessor-only
+  Back. Keep editor exit, authorization and recovery in their existing owners.
+- Qualify Gallery Back against its installed Page and live imperative
+  entry while preserving the canonical presentation-owned slideshow pause.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `explicit-back-navigation` defines standard explicit Back and its
-  presentation, plus the behavior of companion and protected controls.
+- `explicit-back-navigation` defines source-qualified explicit Back,
+  its presentation and the departure rules of companion controls.
 
 ### Modified Capabilities
 
-None.
+None. The routing, shell, Admin editor, image and empty-view contracts
+already cover the behavior that this change must preserve.
 
 ## Impact
 
-The plan affects shared Back, Settings, Route Error, Gallery, the terminal
-Dashboard action and routing for malformed Admin identifiers. The malformed
-location redirects to a protected error path. Valid editor locations and the
-editor's exit behavior stay intact. The plan uses the existing Router host
-and dependencies. Editor and submission decisions, local Search and GeoMap
-actions, picker results, shell roots, Sync, logout, third-party controls and
-native Back gestures retain their owners. The image presentation change owns
-slideshow lifecycle and the Admin redesign owns editor presentation.
+The plan affects shared Back, Settings, ordinary errors, Gallery, the
+Dashboard's terminal departure, and routing for malformed Admin IDs.
+Category, Post, Search Results and Login inherit the ordinary policy.
+Existing control visibility, feature callbacks, platform Back, native
+gestures, and the Gallery presentation lifecycle retain their owners.
